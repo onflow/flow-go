@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"runtime"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
@@ -76,40 +78,55 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 	}
 }
 
-var storageKeyPrefix = []byte("storage\x1f")
-var privateKeyPrefix = []byte("private\x1f")
-var publicKeyPrefix = []byte("public\x1f")
-var contractKeyPrefix = []byte("contract")
+var decMode = func() cbor.DecMode {
+	decMode, err := cbor.DecOptions{
+		IntDec:           cbor.IntDecConvertNone,
+		MaxArrayElements: math.MaxInt32,
+		MaxMapPairs:      math.MaxInt32,
+		MaxNestedLevels:  256,
+	}.DecMode()
+	if err != nil {
+		panic(err)
+	}
+	return decMode
+}()
+
+var publicKeyKeyPrefix = []byte("public_key_")
+var storageUsedKey = []byte("storage_used")
+var existsKey = []byte("exists")
+var uuidKey = []byte("uuid")
+var codeKeyPrefix = []byte("code.")
+var accountAddressStateKey = []byte("account_address_state")
 
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
-	// If the payload value is not a Cadence value (it does not have the Cadence data magic prefix),
-	// return the payload as is
+	keyParts := payload.Key.KeyParts
 
-	rawOwner := payload.Key.KeyParts[0].Value
-	rawController := payload.Key.KeyParts[1].Value
-	rawKey := payload.Key.KeyParts[2].Value
+	rawOwner := keyParts[0].Value
+	rawKey := keyParts[2].Value
 
-	if len(rawOwner) == 0 ||
-		len(rawController) != 0 ||
-		len(payload.Value) == 0 {
+	// Ignore known payload keys that are not Cadence values
 
-		return payload, nil
-	}
-
-	if !bytes.HasPrefix(rawKey, storageKeyPrefix) &&
-		!bytes.HasPrefix(rawKey, privateKeyPrefix) &&
-		!bytes.HasPrefix(rawKey, publicKeyPrefix) &&
-		!bytes.HasPrefix(rawKey, contractKeyPrefix) {
+	if bytes.HasPrefix(rawKey, publicKeyKeyPrefix) ||
+		bytes.Equal(rawKey, storageUsedKey) ||
+		bytes.Equal(rawKey, existsKey) ||
+		bytes.HasPrefix(rawKey, codeKeyPrefix) ||
+		bytes.HasPrefix(rawKey, accountAddressStateKey) ||
+		bytes.Equal(rawKey, uuidKey) {
 
 		return payload, nil
 	}
 
 	value, version := interpreter.StripMagic(payload.Value)
 
+	err := decMode.Valid(value)
+	if err != nil {
+		return payload, nil
+	}
+
 	// Extract the owner from the key and re-encode the value
 
-	owner := common.BytesToAddress(payload.Key.KeyParts[0].Value)
+	owner := common.BytesToAddress(rawOwner)
 
 	newValue, err := rencodeValueV4(value, owner, string(rawKey), version)
 	if err != nil {
