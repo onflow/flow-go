@@ -661,7 +661,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate execution result and block seal
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
-	seal := run.GenerateRootSeal(result)
+	seal, err := run.GenerateRootSeal(result)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot")
+	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {

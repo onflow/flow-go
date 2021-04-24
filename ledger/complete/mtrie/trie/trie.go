@@ -39,9 +39,16 @@ func NewEmptyMTrie() *MTrie {
 	return &MTrie{root: nil}
 }
 
+// IsEmpty checks if a trie is empty.
+//
+// An empty try doesn't mean a trie with no allocated registers.
+func (mt *MTrie) IsEmpty() bool {
+	return mt.root == nil
+}
+
 // NewMTrie returns a Mtrie given the root
 func NewMTrie(root *node.Node) (*MTrie, error) {
-	if root.Height() != ledger.NodeMaxHeight {
+	if root != nil && root.Height() != ledger.NodeMaxHeight {
 		return nil, fmt.Errorf("height of root node must be %d but is %d", ledger.NodeMaxHeight, root.Height())
 	}
 	return &MTrie{
@@ -49,21 +56,32 @@ func NewMTrie(root *node.Node) (*MTrie, error) {
 	}, nil
 }
 
-// RootHash returns the trie's root hash (i.e. the hash of the trie's root node).
+// RootHash returns the trie's root hash.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) RootHash() ledger.RootHash {
+	if mt.IsEmpty() {
+		// case of an empty trie
+		return EmptyTrieRootHash()
+	}
 	return ledger.RootHash(mt.root.Hash())
 }
 
 // AllocatedRegCount returns the number of allocated registers in the trie.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) AllocatedRegCount() uint64 {
+	// check if trie is empty
+	if mt.IsEmpty() {
+		return 0
+	}
 	return mt.root.RegCount()
 }
 
 // MaxDepth returns the length of the longest branch from root to leaf.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) MaxDepth() uint16 {
+	if mt.IsEmpty() {
+		return 0
+	}
 	return mt.root.MaxDepth()
 }
 

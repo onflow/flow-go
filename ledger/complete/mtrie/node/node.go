@@ -181,10 +181,6 @@ func (n *Node) VerifyCachedHash() bool {
 // Hash returns the Node's hash value.
 // Do NOT MODIFY returned slice!
 func (n *Node) Hash() hash.Hash {
-	if n == nil {
-		// case of an empty trie root
-		return ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight)
-	}
 	return n.hashValue
 }
 
@@ -192,46 +188,28 @@ func (n *Node) Hash() hash.Hash {
 // Per definition, the height of a node v in a tree is the number
 // of edges on the longest downward path between v and a tree leaf.
 func (n *Node) Height() int {
-	if n == nil {
-		return ledger.NodeMaxHeight
-	}
 	return n.height
 }
 
 // MaxDepth returns the longest path from this node to compacted leafs in the subtree.
 // in contrast to the Height, this value captures compactness of the subtrie.
 func (n *Node) MaxDepth() uint16 {
-	if n == nil {
-		return 0
-	}
 	return n.maxDepth
 }
 
 // RegCount returns number of registers allocated in the subtrie of this node.
 func (n *Node) RegCount() uint64 {
-	if n == nil {
-		return 0
-	}
 	return n.regCount
 }
 
 // Path returns the the Node's register storage path.
-//
-// the path of an nil node is defined as the arbitrary value 00..00, although
-// no node or trie algorithm is relying on this value.
 func (n *Node) Path() ledger.Path {
-	if n == nil {
-		return ledger.DummyPath
-	}
 	return n.path
 }
 
 // Payload returns the the Node's payload.
 // Do NOT MODIFY returned slices!
 func (n *Node) Payload() *ledger.Payload {
-	if n == nil {
-		return nil
-	}
 	return n.payload
 }
 
