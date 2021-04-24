@@ -11,11 +11,6 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-type keyPair struct {
-	key   ledger.Key
-	value ledger.Value
-}
-
 func TestStorageFormatV4Migration(t *testing.T) {
 
 	const cborTagCompositeValue = 132
