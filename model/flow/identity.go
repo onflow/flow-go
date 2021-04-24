@@ -326,6 +326,17 @@ func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
 	return il.Sample(size)
 }
 
+// DeterministicShuffle randomly and deterministically shuffles the identity
+// list, returning the shuffled list without modifying the receiver.
+func (il IdentityList) DeterministicShuffle(seed int64) IdentityList {
+	dup := il.Copy()
+	rng := rand.New(rand.NewSource(seed))
+	rng.Shuffle(len(il), func(i, j int) {
+		dup[i], dup[j] = dup[j], dup[i]
+	})
+	return dup
+}
+
 // SamplePct returns a random sample from the receiver identity list. The
 // sample contains `pct` percentage of the list. The sample is rounded up
 // if `pct>0`, so this will always select at least one identity.
