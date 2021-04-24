@@ -1,13 +1,17 @@
 package migrations
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"runtime"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -66,36 +70,71 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 		if err != nil {
 			result.error = err
 		} else {
+			if err := checkStorageFormatV4(migratedPayload); err != nil {
+				panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
+			}
 			result.Payload = migratedPayload
 		}
 		results <- result
 	}
 }
 
+var decMode = func() cbor.DecMode {
+	decMode, err := cbor.DecOptions{
+		IntDec:           cbor.IntDecConvertNone,
+		MaxArrayElements: math.MaxInt32,
+		MaxMapPairs:      math.MaxInt32,
+		MaxNestedLevels:  256,
+	}.DecMode()
+	if err != nil {
+		panic(err)
+	}
+	return decMode
+}()
+
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
-	// If the payload value is not a Cadence value (it does not have the Cadence data magic prefix),
-	// return the payload as is
+	keyParts := payload.Key.KeyParts
+
+	rawOwner := keyParts[0].Value
+	rawController := keyParts[1].Value
+	rawKey := keyParts[2].Value
+
+	// Ignore known payload keys that are not Cadence values
+
+	if state.IsFVMStateKey(string(rawOwner), string(rawController), string(rawKey)) {
+		return payload, nil
+	}
 
 	value, version := interpreter.StripMagic(payload.Value)
-	if version == 0 {
+
+	err := decMode.Valid(value)
+	if err != nil {
 		return payload, nil
 	}
 
 	// Extract the owner from the key and re-encode the value
 
-	owner := common.BytesToAddress(payload.Key.KeyParts[0].Value)
+	owner := common.BytesToAddress(rawOwner)
 
-	var err error
-	payload.Value, err = rencodeValueV4(value, owner, version)
+	newValue, err := rencodeValueV4(value, owner, string(rawKey), version)
 	if err != nil {
-		return ledger.Payload{}, err
+		return ledger.Payload{},
+			fmt.Errorf(
+				"failed to re-encode key: %s: %w\n\nvalue:\n%s",
+				rawKey, err, hex.Dump(value),
+			)
 	}
+
+	payload.Value = interpreter.PrependMagic(
+		newValue,
+		interpreter.CurrentEncodingVersion,
+	)
 
 	return payload, nil
 }
 
-func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, error) {
+func rencodeValueV4(data []byte, owner common.Address, key string, version uint16) ([]byte, error) {
 
 	// Determine the appropriate decoder from the decoded version
 
@@ -106,20 +145,31 @@ func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, 
 
 	// Decode the value
 
-	value, err := decodeFunction(data, &owner, nil, version, nil)
+	path := []string{key}
+
+	value, err := decodeFunction(data, &owner, path, version, nil)
 	if err != nil {
 		return nil,
-			fmt.Errorf("failed to decode value: %w\n%s\n", err, hex.Dump(data))
+			fmt.Errorf(
+				"failed to decode value: %w\n\nvalue:\n%s\n",
+				err, hex.Dump(data),
+			)
 	}
 
 	// Encode the value using the new encoder
 
-	newData, deferrals, err := interpreter.EncodeValue(value, nil, true, nil)
+	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to encode value: %w\n%s\n",
-			err, value,
+		//return nil, fmt.Errorf(
+		//	"failed to encode value: %w\n%s\n",
+		//	err, value,
+		//)
+
+		fmt.Printf(
+			"failed to encode value for owner=%s key=%s: %s\n%s\n",
+			owner, key, err, value,
 		)
+		return data, nil
 	}
 
 	// Encoding should not provide any deferred values or deferred moves
@@ -144,7 +194,7 @@ func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, 
 	newValue, err := interpreter.DecodeValue(
 		newData,
 		&owner,
-		nil,
+		path,
 		interpreter.CurrentEncodingVersion,
 		nil,
 	)
@@ -171,4 +221,18 @@ func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, 
 	}
 
 	return newData, nil
+}
+
+func checkStorageFormatV4(payload ledger.Payload) error {
+
+	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
+		return nil
+	}
+
+	_, version := interpreter.StripMagic(payload.Value)
+	if version != interpreter.CurrentEncodingVersion {
+		return fmt.Errorf("invalid version for key %s: %d", payload.Key.String(), version)
+	}
+
+	return nil
 }
