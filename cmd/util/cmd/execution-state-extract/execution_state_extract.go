@@ -51,6 +51,7 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 	newState, err := led.ExportCheckpointAt(
 		targetHash,
 		[]ledger.Migration{
+			migrations.PruneMigration,
 			migrations.StorageFormatV4Migration,
 		},
 		[]ledger.Reporter{
