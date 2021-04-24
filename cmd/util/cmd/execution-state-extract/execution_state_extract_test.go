@@ -198,7 +198,10 @@ func getSampleKeyValues(i int) ([]ledger.Key, []ledger.Value) {
 		values := make([]ledger.Value, 0)
 		for j := 0; j < 10; j++ {
 			address := make([]byte, 32)
-			rand.Read(address)
+			_, err := rand.Read(address)
+			if err != nil {
+				panic(err)
+			}
 			keys = append(keys, getKey(string(address), "", "test"))
 			values = append(values, getRandomCadenceValue())
 		}
@@ -218,8 +221,10 @@ func getKey(owner, controller, key string) ledger.Key {
 func getRandomCadenceValue() ledger.Value {
 
 	randomPart := make([]byte, 10)
-	rand.Read(randomPart)
-
+	_, err := rand.Read(randomPart)
+	if err != nil {
+		panic(err)
+	}
 	valueBytes := []byte{
 		// magic prefix
 		0x0, 0xca, 0xde, 0x0, 0x4,
