@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 )
 
@@ -91,33 +92,17 @@ var decMode = func() cbor.DecMode {
 	return decMode
 }()
 
-var publicKeyKeyPrefix = []byte("public_key_")
-var storageUsedKey = []byte("storage_used")
-var existsKey = []byte("exists")
-var frozenKey = []byte("frozen")
-var uuidKey = []byte("uuid")
-var codeKeyPrefix = []byte("code.")
-var accountAddressStateKey = []byte("account_address_state")
-var contractNamesKey = []byte("contract_names")
-
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
 
 	rawOwner := keyParts[0].Value
+	rawController := keyParts[1].Value
 	rawKey := keyParts[2].Value
 
 	// Ignore known payload keys that are not Cadence values
 
-	if bytes.HasPrefix(rawKey, publicKeyKeyPrefix) ||
-		bytes.Equal(rawKey, storageUsedKey) ||
-		bytes.Equal(rawKey, existsKey) ||
-		bytes.Equal(rawKey, frozenKey) ||
-		bytes.HasPrefix(rawKey, codeKeyPrefix) ||
-		bytes.HasPrefix(rawKey, accountAddressStateKey) ||
-		bytes.Equal(rawKey, uuidKey) ||
-		bytes.Equal(rawKey, contractNamesKey) {
-
+	if state.IsFVMStateKey(string(rawOwner), string(rawController), string(rawKey)) {
 		return payload, nil
 	}
 
