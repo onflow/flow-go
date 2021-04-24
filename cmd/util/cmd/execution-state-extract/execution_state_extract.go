@@ -5,7 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -20,7 +20,12 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 	return commits.ByBlockID(blockHash)
 }
 
-func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDir string, log zerolog.Logger) error {
+func extractExecutionState(dir string,
+	targetHash flow.StateCommitment,
+	outputDir string,
+	log zerolog.Logger,
+	migrate bool,
+	report bool) error {
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
@@ -48,16 +53,24 @@ func extractExecutionState(dir string, targetHash flow.StateCommitment, outputDi
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
+	migrations := []ledger.Migration{}
+	reporters := []ledger.Reporter{}
+	if migrate {
+		migrations = []ledger.Migration{
+			mgr.PruneMigration,
+			mgr.StorageFormatV4Migration,
+		}
+	}
+	if report {
+		reporters = []ledger.Reporter{
+			mgr.ContractReporter{Log: log, OutputDir: outputDir},
+			mgr.StorageReporter{Log: log, OutputDir: outputDir},
+		}
+	}
 	newState, err := led.ExportCheckpointAt(
 		targetHash,
-		[]ledger.Migration{
-			migrations.PruneMigration,
-			migrations.StorageFormatV4Migration,
-		},
-		[]ledger.Reporter{
-			migrations.ContractReporter{Log: log, OutputDir: outputDir},
-			migrations.StorageReporter{Log: log, OutputDir: outputDir},
-		},
+		migrations,
+		reporters,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
