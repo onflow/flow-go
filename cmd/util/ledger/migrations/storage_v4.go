@@ -94,9 +94,11 @@ var decMode = func() cbor.DecMode {
 var publicKeyKeyPrefix = []byte("public_key_")
 var storageUsedKey = []byte("storage_used")
 var existsKey = []byte("exists")
+var frozenKey = []byte("frozen")
 var uuidKey = []byte("uuid")
 var codeKeyPrefix = []byte("code.")
 var accountAddressStateKey = []byte("account_address_state")
+var contractNamesKey = []byte("contract_names")
 
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
@@ -110,9 +112,11 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 	if bytes.HasPrefix(rawKey, publicKeyKeyPrefix) ||
 		bytes.Equal(rawKey, storageUsedKey) ||
 		bytes.Equal(rawKey, existsKey) ||
+		bytes.Equal(rawKey, frozenKey) ||
 		bytes.HasPrefix(rawKey, codeKeyPrefix) ||
 		bytes.HasPrefix(rawKey, accountAddressStateKey) ||
-		bytes.Equal(rawKey, uuidKey) {
+		bytes.Equal(rawKey, uuidKey) ||
+		bytes.Equal(rawKey, contractNamesKey) {
 
 		return payload, nil
 	}
