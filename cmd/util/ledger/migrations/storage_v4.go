@@ -158,6 +158,8 @@ func rencodeValueV4(data []byte, owner common.Address, key string, version uint1
 
 	// Encode the value using the new encoder
 
+	rewriteTokenForwarderStorageReference(key, value)
+
 	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
 	if err != nil {
 		//return nil, fmt.Errorf(
@@ -221,6 +223,84 @@ func rencodeValueV4(data []byte, owner common.Address, key string, version uint1
 	}
 
 	return newData, nil
+}
+
+var flowTokenReceiverStorageKey = interpreter.StorageKey(
+	interpreter.PathValue{
+		Domain:     common.PathDomainStorage,
+		Identifier: "flowTokenReceiver",
+	},
+)
+
+var tokenForwardingLocationTestnet = common.AddressLocation{
+	Address: common.BytesToAddress([]byte{0x75, 0x4a, 0xed, 0x9d, 0xe6, 0x19, 0x76, 0x41}),
+	Name:    "TokenForwarding",
+}
+
+var tokenForwardingLocationMainnet = common.AddressLocation{
+	Address: common.BytesToAddress([]byte{0x0e, 0xbf, 0x2b, 0xd5, 0x2a, 0xc4, 0x2c, 0xb3}),
+	Name:    "TokenForwarding",
+}
+
+func isTokenForwardingLocation(location common.Location) bool {
+	return common.LocationsMatch(location, tokenForwardingLocationTestnet) ||
+		common.LocationsMatch(location, tokenForwardingLocationMainnet)
+}
+
+func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) {
+	compositeValue, ok := value.(*interpreter.CompositeValue)
+	if !ok ||
+		key != flowTokenReceiverStorageKey ||
+		!isTokenForwardingLocation(compositeValue.Location) ||
+		compositeValue.QualifiedIdentifier != "TokenForwarding.Forwarder" {
+
+		return
+	}
+
+	const recipientField = "recipient"
+
+	recipient, ok := compositeValue.Fields.Get(recipientField)
+	if !ok {
+		fmt.Printf(
+			"Warning: missing recipient field for TokenForwarding Forwarder:\n%s\n\n",
+			value,
+		)
+		return
+	}
+
+	recipientRef, ok := recipient.(*interpreter.StorageReferenceValue)
+	if !ok {
+		fmt.Printf(
+			"Warning: TokenForwarding Forwarder field recipient is not a storage reference:\n%s\n\n",
+			value,
+		)
+		return
+	}
+
+	if recipientRef.TargetKey != "storage\x1fflowTokenVault" {
+		fmt.Printf(
+			"Warning: TokenForwarding Forwarder recipient reference has unsupported target key: %s\n",
+			recipientRef.TargetKey,
+		)
+		return
+	}
+
+	recipientCap := interpreter.CapabilityValue{
+		Address: interpreter.AddressValue(recipientRef.TargetStorageAddress),
+		Path: interpreter.PathValue{
+			Domain:     common.PathDomainStorage,
+			Identifier: "flowTokenVault",
+		},
+	}
+
+	fmt.Printf(
+		"Rewriting TokenForwarding Forwarder: %s\n\treference: %#+v\n\tcapability: %#+v\n",
+		compositeValue,
+		recipientRef,
+		recipientCap,
+	)
+
+	compositeValue.Fields.Set(recipientField, recipientCap)
 }
 
 func checkStorageFormatV4(payload ledger.Payload) error {
