@@ -257,32 +257,33 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	// 		- address, "", "storage_used"
 	// 		- address, "", "frozen"
 
-	if owner == controller && key == KeyPublicKeyCount {
-		return true
+	if owner == controller {
+
+		if key == KeyPublicKeyCount {
+			return true
+		}
+		if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
+			return true
+		}
+		if key == KeyContractNames {
+			return true
+		}
+		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
+			return true
+		}
+
 	}
 
-	if owner == controller && bytes.HasPrefix([]byte(key), []byte("public_key_")) {
-		return true
-	}
-
-	if owner == controller && key == KeyContractNames {
-		return true
-	}
-
-	if owner == controller && bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
-		return true
-	}
-
-	if len(controller) == 0 && key == KeyExists {
-		return true
-	}
-
-	if len(controller) == 0 && key == KeyStorageUsed {
-		return true
-	}
-
-	if len(controller) == 0 && key == KeyAccountFrozen {
-		return true
+	if len(controller) == 0 {
+		if key == KeyExists {
+			return true
+		}
+		if key == KeyStorageUsed {
+			return true
+		}
+		if key == KeyAccountFrozen {
+			return true
+		}
 	}
 
 	return false
