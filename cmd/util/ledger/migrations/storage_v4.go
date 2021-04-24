@@ -106,21 +106,24 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
 	owner := common.BytesToAddress(payload.Key.KeyParts[0].Value)
 
-	var err error
-	payload.Value, err = rencodeValueV4(value, owner, version)
+	newValue, err := rencodeValueV4(value, owner, string(rawKey), version)
 	if err != nil {
-		return ledger.Payload{}, err
+		return ledger.Payload{},
+			fmt.Errorf(
+				"failed to re-encode key: %s: %w\n\nvalue:\n%s",
+				rawKey, err, hex.Dump(value),
+			)
 	}
 
 	payload.Value = interpreter.PrependMagic(
-		payload.Value,
+		newValue,
 		interpreter.CurrentEncodingVersion,
 	)
 
 	return payload, nil
 }
 
-func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, error) {
+func rencodeValueV4(data []byte, owner common.Address, key string, version uint16) ([]byte, error) {
 
 	// Determine the appropriate decoder from the decoded version
 
@@ -131,15 +134,20 @@ func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, 
 
 	// Decode the value
 
-	value, err := decodeFunction(data, &owner, nil, version, nil)
+	path := []string{key}
+
+	value, err := decodeFunction(data, &owner, path, version, nil)
 	if err != nil {
 		return nil,
-			fmt.Errorf("failed to decode value: %w\n%s\n", err, hex.Dump(data))
+			fmt.Errorf(
+				"failed to decode value: %w\n\nvalue:\n%s\n",
+				err, hex.Dump(data),
+			)
 	}
 
 	// Encode the value using the new encoder
 
-	newData, deferrals, err := interpreter.EncodeValue(value, nil, true, nil)
+	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to encode value: %w\n%s\n",
@@ -169,7 +177,7 @@ func rencodeValueV4(data []byte, owner common.Address, version uint16) ([]byte, 
 	newValue, err := interpreter.DecodeValue(
 		newData,
 		&owner,
-		nil,
+		path,
 		interpreter.CurrentEncodingVersion,
 		nil,
 	)
