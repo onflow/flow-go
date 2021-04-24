@@ -76,10 +76,10 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 	}
 }
 
-var publicKeyKeyPrefix = []byte("public_key_")
-var codeKeyPrefix = []byte("code.")
-var contractNamesKey = []byte("contract_names")
-var accountAddressStateKey = []byte("account_address_state")
+var storageKeyPrefix = []byte("storage\x1f")
+var privateKeyPrefix = []byte("private\x1f")
+var publicKeyPrefix = []byte("public\x1f")
+var contractKeyPrefix = []byte("contract")
 
 func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
@@ -91,19 +91,21 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 	rawKey := payload.Key.KeyParts[2].Value
 
 	if len(rawOwner) == 0 ||
-		!bytes.Equal(rawOwner, rawController) ||
-		bytes.HasPrefix(rawKey, publicKeyKeyPrefix) ||
-		bytes.HasPrefix(rawKey, codeKeyPrefix) ||
-		bytes.Equal(rawKey, contractNamesKey) ||
-		bytes.Equal(rawKey, accountAddressStateKey) {
+		len(rawController) != 0 ||
+		len(payload.Value) == 0 {
+
+		return payload, nil
+	}
+
+	if !bytes.HasPrefix(rawKey, storageKeyPrefix) &&
+		!bytes.HasPrefix(rawKey, privateKeyPrefix) &&
+		!bytes.HasPrefix(rawKey, publicKeyPrefix) &&
+		!bytes.HasPrefix(rawKey, contractKeyPrefix) {
 
 		return payload, nil
 	}
 
 	value, version := interpreter.StripMagic(payload.Value)
-	if version == 0 {
-		return ledger.Payload{}, fmt.Errorf("Cadence payload key has no magic prefix: %s", payload.Key)
-	}
 
 	// Extract the owner from the key and re-encode the value
 
