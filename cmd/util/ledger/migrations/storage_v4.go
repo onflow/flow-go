@@ -154,10 +154,16 @@ func rencodeValueV4(data []byte, owner common.Address, key string, version uint1
 
 	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
 	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to encode value: %w\n%s\n",
-			err, value,
+		//return nil, fmt.Errorf(
+		//	"failed to encode value: %w\n%s\n",
+		//	err, value,
+		//)
+
+		fmt.Printf(
+			"failed to encode value for owner=%s key=%s: %s\n%s\n",
+			owner, key, err, value,
 		)
+		return data, nil
 	}
 
 	// Encoding should not provide any deferred values or deferred moves
