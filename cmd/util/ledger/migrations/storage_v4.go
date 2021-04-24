@@ -232,17 +232,26 @@ var flowTokenReceiverStorageKey = interpreter.StorageKey(
 	},
 )
 
-var flowTokenForwardingLocation = common.AddressLocation{
+var tokenForwardingLocationTestnet = common.AddressLocation{
 	Address: common.BytesToAddress([]byte{0x75, 0x4a, 0xed, 0x9d, 0xe6, 0x19, 0x76, 0x41}),
 	Name:    "TokenForwarding",
 }
 
-func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) {
+var tokenForwardingLocationMainnet = common.AddressLocation{
+	Address: common.BytesToAddress([]byte{0x0e, 0xbf, 0x2b, 0xd5, 0x2a, 0xc4, 0x2c, 0xb3}),
+	Name:    "TokenForwarding",
+}
 
+func isTokenForwardingLocation(location common.Location) bool {
+	return common.LocationsMatch(location, tokenForwardingLocationTestnet) ||
+		common.LocationsMatch(location, tokenForwardingLocationMainnet)
+}
+
+func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) {
 	compositeValue, ok := value.(*interpreter.CompositeValue)
 	if !ok ||
 		key != flowTokenReceiverStorageKey ||
-		!common.LocationsMatch(compositeValue.Location, flowTokenForwardingLocation) ||
+		!isTokenForwardingLocation(compositeValue.Location) ||
 		compositeValue.QualifiedIdentifier != "TokenForwarding.Forwarder" {
 
 		return
