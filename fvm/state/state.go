@@ -249,16 +249,14 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	}
 	// check account level keys
 	// cases:
-	// 		- address, address, "public_key_%d" (index)
 	// 		- address, address, "public_key_count"
+	// 		- address, address, "public_key_%d" (index)
 	// 		- address, address, "contract_names"
 	// 		- address, address, "code.%s" (contract name)
 	// 		- address, "", exists
 	// 		- address, "", "storage_used"
 	// 		- address, "", "frozen"
-
 	if owner == controller {
-
 		if key == KeyPublicKeyCount {
 			return true
 		}
@@ -271,7 +269,6 @@ func IsFVMStateKey(owner, controller, key string) bool {
 		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
 			return true
 		}
-
 	}
 
 	if len(controller) == 0 {
