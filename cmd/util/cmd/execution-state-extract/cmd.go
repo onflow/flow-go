@@ -19,6 +19,7 @@ var (
 	flagStateCommitment   string
 	flagDatadir           string
 	flagNoMigration       bool
+	flagNoReport          bool
 )
 
 var Cmd = &cobra.Command{
@@ -46,8 +47,10 @@ func init() {
 		"directory that stores the protocol state")
 
 	Cmd.Flags().BoolVar(&flagNoMigration, "no-migration", false,
-		"don't migrate data when exporting")
+		"don't migrate the state")
 
+	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
+		"don't report the state")
 }
 
 func run(*cobra.Command, []string) {
@@ -86,7 +89,7 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
 
-	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, flagNoMigration)
+	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, !flagNoMigration, !flagNoReport)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

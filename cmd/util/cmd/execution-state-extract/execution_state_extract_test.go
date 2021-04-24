@@ -59,7 +59,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
-			err := extractExecutionState(execdir, unittest.StateCommitmentFixture(), outdir, zerolog.Nop(), true)
+			err := extractExecutionState(execdir, unittest.StateCommitmentFixture(), outdir, zerolog.Nop(), false, false)
 			require.Error(t, err)
 		})
 	})
@@ -128,7 +128,8 @@ func TestExtractExecutionState(t *testing.T) {
 				//we need fresh output dir to prevent contamination
 				unittest.RunWithTempDir(t, func(outdir string) {
 
-					Cmd.SetArgs([]string{"--execution-state-dir", execdir, "--output-dir", outdir, "--block-hash", blockID.String(), "--datadir", datadir, "--no-migration"})
+					Cmd.SetArgs([]string{"--execution-state-dir", execdir, "--output-dir", outdir, "--block-hash", blockID.String(), "--datadir", datadir, "--no-migration", "--no-report"})
+
 					err := Cmd.Execute()
 					require.NoError(t, err)
 

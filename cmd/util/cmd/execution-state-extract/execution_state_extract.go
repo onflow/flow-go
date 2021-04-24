@@ -24,7 +24,8 @@ func extractExecutionState(dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
-	noMigration bool) error {
+	migrate bool,
+	report bool) error {
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
@@ -54,11 +55,13 @@ func extractExecutionState(dir string,
 
 	migrations := []ledger.Migration{}
 	reporters := []ledger.Reporter{}
-	if !noMigration {
+	if migrate {
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
 			mgr.StorageFormatV4Migration,
 		}
+	}
+	if report {
 		reporters = []ledger.Reporter{
 			mgr.ContractReporter{Log: log, OutputDir: outputDir},
 			mgr.StorageReporter{Log: log, OutputDir: outputDir},
