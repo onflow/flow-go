@@ -67,6 +67,9 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 		if err != nil {
 			result.error = err
 		} else {
+			if err := checkStorageFormatV4(migratedPayload); err != nil {
+				panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
+			}
 			result.Payload = migratedPayload
 		}
 		results <- result
@@ -204,4 +207,18 @@ func rencodeValueV4(data []byte, owner common.Address, key string, version uint1
 	}
 
 	return newData, nil
+}
+
+func checkStorageFormatV4(payload ledger.Payload) error {
+
+	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
+		return nil
+	}
+
+	_, version := interpreter.StripMagic(payload.Value)
+	if version != interpreter.CurrentEncodingVersion {
+		return fmt.Errorf("invalid version for key %s: %d", payload.Key.String(), version)
+	}
+
+	return nil
 }
