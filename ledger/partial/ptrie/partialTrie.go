@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
@@ -110,13 +110,13 @@ func NewPSMT(
 			// otherwise the value is stored in the proofs
 			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
 			v := defaultHash
-			flag := utils.Bit(pr.Flags, j)
+			flag := bitutils.Bit(pr.Flags, j)
 			if flag == 1 {
 				// use the proof at index proofIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bit := utils.Bit(path[:], j)
+			bit := bitutils.Bit(path[:], j)
 			// look at the bit number j (left to right) for branching
 			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child

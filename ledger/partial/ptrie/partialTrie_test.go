@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -31,8 +32,8 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		// add path1 to the empty trie
 		// 00000000...0 (0)
-		path1 := ledger.PathByUint16(0)
-		payload1 := ledger.LightPayload('A', 'a')
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
 
 		paths := []ledger.Path{path1}
 		payloads := []*ledger.Payload{payload1}
@@ -59,7 +60,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 			t.Fatal("rootNode hash doesn't match [after set]")
 		}
 
-		updatedPayload1 := ledger.LightPayload('B', 'b')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
 
 		u = &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
@@ -81,13 +82,13 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := ledger.PathByUint16(0)
-		payload1 := ledger.LightPayload('A', 'a')
-		updatedPayload1 := ledger.LightPayload('B', 'b')
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 
-		path2 := ledger.PathByUint16(1)
-		payload2 := ledger.LightPayload('C', 'c')
-		updatedPayload2 := ledger.LightPayload('D', 'd')
+		path2 := utils.PathByUint16(1)
+		payload2 := utils.LightPayload('C', 'c')
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -126,17 +127,17 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := ledger.PathByUint16(0)
-		payload1 := ledger.LightPayload('A', 'a')
-		updatedPayload1 := ledger.LightPayload('B', 'b')
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 
-		path2 := ledger.PathByUint16(2)
-		payload2 := ledger.LightPayload('C', 'c')
-		updatedPayload2 := ledger.LightPayload('D', 'd')
+		path2 := utils.PathByUint16(2)
+		payload2 := utils.LightPayload('C', 'c')
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
-		path3 := ledger.PathByUint16(8)
-		payload3 := ledger.LightPayload('E', 'e')
-		updatedPayload3 := ledger.LightPayload('F', 'f')
+		path3 := utils.PathByUint16(8)
+		payload3 := utils.LightPayload('E', 'e')
+		updatedPayload3 := utils.LightPayload('F', 'f')
 
 		paths := []ledger.Path{path1, path2, path3}
 		payloads := []*ledger.Payload{payload1, payload2, payload3}
@@ -182,13 +183,13 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := ledger.PathByUint16(0)
-		payload1 := ledger.LightPayload('A', 'a')
-		updatedPayload1 := ledger.LightPayload('B', 'b')
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
+		updatedPayload1 := utils.LightPayload('B', 'b')
 		//  10000....0
-		path2 := ledger.PathByUint16(32768)
-		payload2 := ledger.LightPayload('C', 'c')
-		updatedPayload2 := ledger.LightPayload('D', 'd')
+		path2 := utils.PathByUint16(32768)
+		payload2 := utils.LightPayload('C', 'c')
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
 		paths := []ledger.Path{path1, path2}
 		payloads := []*ledger.Payload{payload1, payload2}
@@ -232,14 +233,14 @@ func TestMixProof(t *testing.T) {
 	pathByteSize := 32
 	withForest(t, pathByteSize, 10, func(t *testing.T, f *mtrie.Forest) {
 
-		path1 := ledger.PathByUint16(0)
-		payload1 := ledger.LightPayload('A', 'a')
+		path1 := utils.PathByUint16(0)
+		payload1 := utils.LightPayload('A', 'a')
 
-		path2 := ledger.PathByUint16(2)
-		updatedPayload2 := ledger.LightPayload('D', 'd')
+		path2 := utils.PathByUint16(2)
+		updatedPayload2 := utils.LightPayload('D', 'd')
 
-		path3 := ledger.PathByUint16(8)
-		payload3 := ledger.LightPayload('E', 'e')
+		path3 := utils.PathByUint16(8)
+		payload3 := utils.LightPayload('E', 'e')
 
 		paths := []ledger.Path{path1, path3}
 		payloads := []*ledger.Payload{payload1, payload3}
@@ -290,8 +291,8 @@ func TestRandomProofs(t *testing.T) {
 			rand.Seed(seed)
 			t.Logf("rand seed is %x", seed)
 			numberOfPaths := rand.Intn(256) + 1
-			paths := ledger.RandomPaths(numberOfPaths)
-			payloads := ledger.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
+			paths := utils.RandomPaths(numberOfPaths)
+			payloads := utils.RandomPayloads(numberOfPaths, minPayloadSize, maxPayloadSize)
 			// keep a subset as initial insert and keep the rest for reading default values
 			split := rand.Intn(numberOfPaths)
 			insertPaths := paths[:split]

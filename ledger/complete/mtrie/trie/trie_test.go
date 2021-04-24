@@ -12,6 +12,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -34,8 +35,8 @@ func Test_EmptyTrie(t *testing.T) {
 func Test_TrieWithLeftRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
-	path := ledger.PathByUint16LeftPadded(0)
-	payload := ledger.LightPayload(11, 12345)
+	path := utils.PathByUint16LeftPadded(0)
+	payload := utils.LightPayload(11, 12345)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "b30c99cc3e027a6ff463876c638041b1c55316ed935f1b3699e52a2c3e3eaaab"
@@ -54,7 +55,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	for i := 0; i < len(path); i++ {
 		path[i] = uint8(255)
 	}
-	payload := ledger.LightPayload(12346, 54321)
+	payload := utils.LightPayload(12346, 54321)
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
@@ -69,8 +70,8 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
 
-	path := ledger.PathByUint16LeftPadded(56809)
-	payload := ledger.LightPayload(12346, 59656)
+	path := utils.PathByUint16LeftPadded(56809)
+	payload := utils.LightPayload(12346, 59656)
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
@@ -107,9 +108,9 @@ func Test_FullTrie(t *testing.T) {
 	paths := make([]ledger.Path, 0, numberRegisters)
 	payloads := make([]ledger.Payload, 0, numberRegisters)
 	for i := 0; i < numberRegisters; i++ {
-		paths = append(paths, ledger.PathByUint16LeftPadded(uint16(i)))
+		paths = append(paths, utils.PathByUint16LeftPadded(uint16(i)))
 		temp := rng.next()
-		payload := ledger.LightPayload(temp, temp)
+		payload := utils.LightPayload(temp, temp)
 		payloads = append(payloads, *payload)
 	}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
@@ -150,9 +151,9 @@ func Test_UpdateTrie(t *testing.T) {
 
 	// allocate single random register
 	rng := &LinearCongruentialGenerator{seed: 0}
-	path := ledger.PathByUint16LeftPadded(rng.next())
+	path := utils.PathByUint16LeftPadded(rng.next())
 	temp := rng.next()
-	payload := ledger.LightPayload(temp, temp)
+	payload := utils.LightPayload(temp, temp)
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
@@ -228,10 +229,10 @@ func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
 	for i := 0; i < number; i++ {
-		path := ledger.PathByUint16LeftPadded(rng.next())
+		path := utils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
 		t := rng.next()
-		payload := ledger.LightPayload(t, t)
+		payload := utils.LightPayload(t, t)
 		payloads = append(payloads, *payload)
 	}
 	return paths, payloads
@@ -289,10 +290,10 @@ func TestSplitByPath(t *testing.T) {
 
 	// check correctness
 	for i := 0; i < index; i++ {
-		assert.Equal(t, utils.Bit(paths[i][:], randomIndex), 0)
+		assert.Equal(t, bitutils.Bit(paths[i][:], randomIndex), 0)
 	}
 	for i := index; i < len(paths); i++ {
-		assert.Equal(t, utils.Bit(paths[i][:], randomIndex), 1)
+		assert.Equal(t, bitutils.Bit(paths[i][:], randomIndex), 1)
 	}
 
 	// check the multi-set didn't change

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/proof"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
 	"github.com/onflow/flow-go/module/metrics"
@@ -342,11 +343,11 @@ func TestLeafInsert(t *testing.T) {
 	require.NoError(t, err)
 
 	// path: 000...0000000100000000
-	p1 := ledger.PathByUint16LeftPadded(256)
+	p1 := utils.PathByUint16LeftPadded(256)
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
 	// path: 000...0000000100000001
-	p2 := ledger.PathByUint16LeftPadded(257)
+	p2 := utils.PathByUint16LeftPadded(257)
 	v2 := payloadBySlices([]byte{'B'}, []byte{'B'})
 
 	paths := []ledger.Path{p1, p2}
@@ -717,8 +718,8 @@ func TestRandomUpdateReadProof(t *testing.T) {
 	latestPayloadByPath := make(map[ledger.Path]*ledger.Payload) // map store
 
 	for e := 0; e < rep; e++ {
-		paths := ledger.RandomPathsRandLen(maxNumPathsPerStep)
-		payloads := ledger.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
+		paths := utils.RandomPathsRandLen(maxNumPathsPerStep)
+		payloads := utils.RandomPayloads(len(paths), minPayloadByteSize, maxPayloadByteSize)
 
 		// update map store with key values
 		// we use this at the end of each step to check all existing keys

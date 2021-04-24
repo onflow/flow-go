@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	realWAL "github.com/onflow/flow-go/ledger/complete/wal"
 )
 
@@ -15,11 +16,11 @@ func TestUpdate(t *testing.T) {
 
 	var rootHash ledger.RootHash
 	copy(rootHash[:], []byte{2, 1, 3, 7})
-	p1 := ledger.PathByUint16(uint16(1))
-	p2 := ledger.PathByUint16(uint16(772))
+	p1 := utils.PathByUint16(uint16(1))
+	p2 := utils.PathByUint16(uint16(772))
 	paths := []ledger.Path{p1, p2}
-	v1 := ledger.LightPayload8(1, 2)
-	v2 := ledger.LightPayload(2, 3)
+	v1 := utils.LightPayload8(1, 2)
+	v2 := utils.LightPayload(2, 3)
 	payloads := []*ledger.Payload{v1, v2}
 	update := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
 

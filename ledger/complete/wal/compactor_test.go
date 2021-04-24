@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -58,8 +59,8 @@ func Test_Compactor(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := ledger.RandomPaths(numInsPerStep)
-				payloads0 := ledger.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+				paths0 := utils.RandomPaths(numInsPerStep)
+				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
 				var payloads []*ledger.Payload
@@ -220,8 +221,8 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := ledger.RandomPaths(numInsPerStep)
-				payloads0 := ledger.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
+				paths0 := utils.RandomPaths(numInsPerStep)
+				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
 				var payloads []*ledger.Payload

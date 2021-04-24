@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/flow"
@@ -92,8 +93,8 @@ func TestExtractExecutionState(t *testing.T) {
 				//keys := utils.GetRandomRegisterIDs(4)
 				//values := utils.GetRandomValues(len(keys), 10, valueMaxByteSize)
 
-				keys := ledger.RandomUniqueKeys(4, 3, 10, keyMaxByteSize)
-				values := ledger.RandomValues(len(keys), 10, valueMaxByteSize)
+				keys := utils.RandomUniqueKeys(4, 3, 10, keyMaxByteSize)
+				values := utils.RandomValues(len(keys), 10, valueMaxByteSize)
 
 				update, err := ledger.NewUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)

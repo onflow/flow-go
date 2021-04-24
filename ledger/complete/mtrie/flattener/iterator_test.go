@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
@@ -28,12 +29,12 @@ func TestPopulatedTrie(t *testing.T) {
 	emptyTrie := trie.NewEmptyMTrie()
 
 	// key: 0000...
-	p1 := ledger.PathByUint8(1)
-	v1 := ledger.LightPayload8('A', 'a')
+	p1 := utils.PathByUint8(1)
+	v1 := utils.LightPayload8('A', 'a')
 
 	// key: 0100....
-	p2 := ledger.PathByUint8(64)
-	v2 := ledger.LightPayload8('B', 'b')
+	p2 := utils.PathByUint8(64)
+	v2 := utils.LightPayload8('B', 'b')
 
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}

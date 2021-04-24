@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	cryptoHash "github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // Path captures storage path of a payload;
@@ -76,7 +76,7 @@ func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash
 	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
 		// h is the height of the node, whose hash we are computing in this iteration.
 		// The hash is computed from the node's children at height h-1.
-		bit := utils.Bit(path[:], NodeMaxHeight-h)
+		bit := bitutils.Bit(path[:], NodeMaxHeight-h)
 		if bit == 1 { // right branching
 			out = hash.HashInterNode(GetDefaultHashForHeight(h-1), out)
 		} else { // left branching

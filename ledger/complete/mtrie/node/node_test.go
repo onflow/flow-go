@@ -6,14 +6,14 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
 
 // Test_ProperLeaf verifies that the hash value of a proper leaf (at height 0) is computed correctly
 func Test_ProperLeaf(t *testing.T) {
-	path := ledger.PathByUint16(56809)
-	payload := ledger.LightPayload(56810, 59656)
+	path := utils.PathByUint16(56809)
+	payload := utils.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 0)
 	expectedRootHashHex := "0ee164bc69981088186b5ceeb666e90e8e11bb15a1427aa56f47a484aedf73b4"
 	nodeHash := n.Hash()
@@ -26,8 +26,8 @@ func Test_ProperLeaf(t *testing.T) {
 // We test the hash at the lowest-possible height (1), for the leaf to be still compactified,
 // at an interim height (9) and the max possible height (256)
 func Test_CompactifiedLeaf(t *testing.T) {
-	path := ledger.PathByUint16(56809)
-	payload := ledger.LightPayload(56810, 59656)
+	path := utils.PathByUint16(56809)
+	payload := utils.LightPayload(56810, 59656)
 	n := node.NewLeaf(path, payload, 1)
 	expectedRootHashHex := "aa496f68adbbf43197f7e4b6ba1a63a47b9ce19b1587ca9ce587a7f29cad57d5"
 	nodeHash := n.Hash()
@@ -66,8 +66,8 @@ func Test_InterimNodeWithoutChildren(t *testing.T) {
 // Test_InterimNodeWithOneChild verifies that the hash value of an interim node with
 // only one child (left or right) is computed correctly.
 func Test_InterimNodeWithOneChild(t *testing.T) {
-	path := ledger.PathByUint16(56809)
-	payload := ledger.LightPayload(56810, 59656)
+	path := utils.PathByUint16(56809)
+	payload := utils.LightPayload(56810, 59656)
 	c := node.NewLeaf(path, payload, 0)
 
 	n := node.NewInterimNode(1, c, nil)
@@ -84,12 +84,12 @@ func Test_InterimNodeWithOneChild(t *testing.T) {
 // Test_InterimNodeWithBothChildren verifies that the hash value of an interim node with
 // both children (left and right) is computed correctly.
 func Test_InterimNodeWithBothChildren(t *testing.T) {
-	leftPath := ledger.PathByUint16(56809)
-	leftPayload := ledger.LightPayload(56810, 59656)
+	leftPath := utils.PathByUint16(56809)
+	leftPayload := utils.LightPayload(56810, 59656)
 	leftChild := node.NewLeaf(leftPath, leftPayload, 0)
 
-	rightPath := ledger.PathByUint16(2)
-	rightPayload := ledger.LightPayload(11, 22)
+	rightPath := utils.PathByUint16(2)
+	rightPayload := utils.LightPayload(11, 22)
 	rightChild := node.NewLeaf(rightPath, rightPayload, 0)
 
 	n := node.NewInterimNode(1, leftChild, rightChild)
@@ -99,8 +99,8 @@ func Test_InterimNodeWithBothChildren(t *testing.T) {
 }
 
 func Test_MaxDepth(t *testing.T) {
-	path := ledger.PathByUint16(1)
-	payload := ledger.LightPayload(2, 3)
+	path := utils.PathByUint16(1)
+	payload := utils.LightPayload(2, 3)
 
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
@@ -112,8 +112,8 @@ func Test_MaxDepth(t *testing.T) {
 }
 
 func Test_RegCount(t *testing.T) {
-	path := ledger.PathByUint16(1)
-	payload := ledger.LightPayload(2, 3)
+	path := utils.PathByUint16(1)
+	payload := utils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 0)
@@ -123,8 +123,8 @@ func Test_RegCount(t *testing.T) {
 	require.Equal(t, n5.RegCount(), uint64(3))
 }
 func Test_AllPayloads(t *testing.T) {
-	path := ledger.PathByUint16(1)
-	payload := ledger.LightPayload(2, 3)
+	path := utils.PathByUint16(1)
+	payload := utils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 0)
@@ -134,8 +134,8 @@ func Test_AllPayloads(t *testing.T) {
 }
 
 func Test_VerifyCachedHash(t *testing.T) {
-	path := ledger.PathByUint16(1)
-	payload := ledger.LightPayload(2, 3)
+	path := utils.PathByUint16(1)
+	payload := utils.LightPayload(2, 3)
 	n1 := node.NewLeaf(path, payload, 0)
 	n2 := node.NewLeaf(path, payload, 0)
 	n3 := node.NewLeaf(path, payload, 0)

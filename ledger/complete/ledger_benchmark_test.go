@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/partial/ptrie"
@@ -63,8 +64,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 
-		keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 		totalRegOperation += len(keys)
 
@@ -164,8 +165,8 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -212,8 +213,8 @@ func BenchmarkTrieRead(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {
@@ -270,8 +271,8 @@ func BenchmarkTrieProve(b *testing.B) {
 
 	state := led.InitialState()
 
-	keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-	values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 
 	update, err := ledger.NewUpdate(state, keys, values)
 	if err != nil {

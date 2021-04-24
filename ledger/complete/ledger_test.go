@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/proof"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
@@ -64,7 +65,7 @@ func TestLedger_Update(t *testing.T) {
 
 		curSC := led.InitialState()
 
-		u := ledger.UpdateFixture()
+		u := utils.UpdateFixture()
 		u.SetState(curSC)
 
 		newSc, err := led.Set(u)
@@ -109,7 +110,7 @@ func TestLedger_Get(t *testing.T) {
 
 		curS := led.InitialState()
 
-		q := ledger.QueryFixture()
+		q := utils.QueryFixture()
 		q.SetState(curS)
 
 		retValues, err := led.Get(q)
@@ -149,7 +150,7 @@ func TestLedger_Proof(t *testing.T) {
 		require.NoError(t, err)
 
 		curS := led.InitialState()
-		q := ledger.QueryFixture()
+		q := utils.QueryFixture()
 		q.SetState(curS)
 		require.NoError(t, err)
 
@@ -171,7 +172,7 @@ func TestLedger_Proof(t *testing.T) {
 
 		curS := led.InitialState()
 
-		u := ledger.UpdateFixture()
+		u := utils.UpdateFixture()
 		u.SetState(curS)
 
 		newSc, err := led.Set(u)
@@ -217,8 +218,8 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			assert.NoError(t, err)
 			state, err = led.Set(update)
@@ -304,8 +305,8 @@ func TestLedgerFunctionality(t *testing.T) {
 			for i := 0; i < steps; i++ {
 				// add new keys
 				// TODO update some of the existing keys and shuffle them
-				keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-				values := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 				update, err := ledger.NewUpdate(state, keys, values)
 				assert.NoError(t, err)
 				newState, err := led.Set(update)
@@ -394,7 +395,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				state := led.InitialState()
-				u := ledger.UpdateFixture()
+				u := utils.UpdateFixture()
 				u.SetState(state)
 
 				state, err = led.Set(u)
@@ -438,7 +439,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				state := led.InitialState()
-				u := ledger.UpdateFixture()
+				u := utils.UpdateFixture()
 				u.SetState(state)
 
 				state, err = led.Set(u)
@@ -480,7 +481,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				require.NoError(t, err)
 
 				state := led.InitialState()
-				u := ledger.UpdateFixture()
+				u := utils.UpdateFixture()
 				u.SetState(state)
 
 				state, err = led.Set(u)

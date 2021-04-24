@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
@@ -626,7 +627,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Inclusion = utils.Bit(byteInclusion, 0) == 1
+	pInst.Inclusion = bitutils.Bit(byteInclusion, 0) == 1
 
 	// read steps
 	steps, rest, err := utils.ReadUint8(rest)

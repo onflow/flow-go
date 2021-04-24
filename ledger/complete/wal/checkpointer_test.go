@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -60,8 +61,8 @@ func Test_WAL(t *testing.T) {
 
 		for i := 0; i < size; i++ {
 
-			keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-			values := ledger.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+			keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			require.NoError(t, err)
 			state, err = led.Set(update)
@@ -137,8 +138,8 @@ func Test_Checkpointing(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				keys := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
-				values := ledger.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
+				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
+				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
 				require.NoError(t, err)
 
@@ -256,8 +257,8 @@ func Test_Checkpointing(t *testing.T) {
 			}
 		})
 
-		keys2 := ledger.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
-		values2 := ledger.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+		keys2 := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+		values2 := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 		t.Run("create segment after checkpoint", func(t *testing.T) {
 
 			//require.NoFileExists(t, path.Join(dir, "00000011"))
