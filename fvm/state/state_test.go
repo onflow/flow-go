@@ -194,3 +194,10 @@ func TestState_MaxInteraction(t *testing.T) {
 	_, err = st.Get("3", "4", "5")
 	require.Error(t, err)
 }
+
+func TestState_IsFVMStateKey(t *testing.T) {
+	require.True(t, state.IsFVMStateKey("", "", "uuid"))
+	require.True(t, state.IsFVMStateKey("Address", "Address", state.KeyPublicKeyCount))
+	require.True(t, state.IsFVMStateKey("Address", "Address", "code.MYCODE"))
+	require.False(t, state.IsFVMStateKey("Address", "", "anything else"))
+}
