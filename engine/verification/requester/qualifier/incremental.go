@@ -14,8 +14,11 @@ type ChunkDataRequestQualifier struct {
 	qualifierFunc   RequestQualifierFunc
 }
 
-func NewIncrementalQualifier(requests mempool.ChunkRequests) *ChunkDataRequestQualifier {
-	return &ChunkDataRequestQualifier{pendingRequests: requests}
+func NewIncrementalQualifier(requests mempool.ChunkRequests, qualifierFunc RequestQualifierFunc) *ChunkDataRequestQualifier {
+	return &ChunkDataRequestQualifier{
+		pendingRequests: requests,
+		qualifierFunc:   qualifierFunc,
+	}
 }
 
 // CanDispatchRequest returns true if the chunk request can be dispatched to the network, otherwise
@@ -37,6 +40,12 @@ func (i *ChunkDataRequestQualifier) OnRequestDispatched(chunkID flow.Identifier)
 }
 
 type RequestQualifierFunc func(uint64, time.Time, time.Duration) bool
+
+func UnlimitedAttemptQualifier() RequestQualifierFunc {
+	return func(uint64, time.Time, time.Duration) bool {
+		return true
+	}
+}
 
 func MaxAttemptQualifier(maxAttempts uint64) RequestQualifierFunc {
 	return func(attempts uint64, _ time.Time, _ time.Duration) bool {

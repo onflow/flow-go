@@ -53,7 +53,7 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 func (cs *ChunkRequests) RequestInfo(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
-		return -1, time.Time{}, time.Duration(0), false
+		return 0, time.Time{}, time.Duration(0), false
 	}
 	request := toChunkRequestStatus(entity)
 

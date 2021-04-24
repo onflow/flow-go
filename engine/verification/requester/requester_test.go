@@ -72,7 +72,7 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		Return(s.con, nil).
 		Once()
 
-	requestQualifier := qualifier.NewIncrementalQualifier(s.pendingRequests)
+	requestQualifier := qualifier.NewIncrementalQualifier(s.pendingRequests, qualifier.UnlimitedAttemptQualifier())
 
 	e, err := requester.New(s.log,
 		s.state,
