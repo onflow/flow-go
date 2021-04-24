@@ -59,7 +59,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
-			err := extractExecutionState(execdir, unittest.StateCommitmentFixture(), outdir, zerolog.Nop())
+			err := extractExecutionState(execdir, unittest.StateCommitmentFixture(), outdir, zerolog.Nop(), true)
 			require.Error(t, err)
 		})
 	})
@@ -121,14 +121,14 @@ func TestExtractExecutionState(t *testing.T) {
 
 			//for blockID, stateCommitment := range commitsByBlocks {
 
-			for _, blockID := range blocksInOrder {
+			for i, blockID := range blocksInOrder {
 
-				// stateCommitment := commitsByBlocks[blockID]
+				stateCommitment := commitsByBlocks[blockID]
 
 				//we need fresh output dir to prevent contamination
 				unittest.RunWithTempDir(t, func(outdir string) {
 
-					Cmd.SetArgs([]string{"--execution-state-dir", execdir, "--output-dir", outdir, "--block-hash", blockID.String(), "--datadir", datadir})
+					Cmd.SetArgs([]string{"--execution-state-dir", execdir, "--output-dir", outdir, "--block-hash", blockID.String(), "--datadir", datadir, "--no-migration"})
 					err := Cmd.Execute()
 					require.NoError(t, err)
 
@@ -140,36 +140,34 @@ func TestExtractExecutionState(t *testing.T) {
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
 
-					// TODO rebuild this part to support migrations
+					data := keysValuesByCommit[string(stateCommitment)]
 
-					// data := keysValuesByCommit[string(stateCommitment)]
+					keys := make([]ledger.Key, 0, len(data))
+					for _, v := range data {
+						keys = append(keys, v.key)
+					}
 
-					// keys := make([]ledger.Key, 0, len(data))
-					// for _, v := range data {
-					// 	keys = append(keys, v.key)
-					// }
+					query, err := ledger.NewQuery(stateCommitment, keys)
+					require.NoError(t, err)
 
-					// query, err := ledger.NewQuery(stateCommitment, keys)
-					// require.NoError(t, err)
+					registerValues, err := storage.Get(query)
+					//registerValues, err := mForest.Read([]byte(stateCommitment), keys)
+					require.NoError(t, err)
 
-					// registerValues, err := storage.Get(query)
-					// //registerValues, err := mForest.Read([]byte(stateCommitment), keys)
-					// require.NoError(t, err)
+					for i, key := range keys {
+						registerValue := registerValues[i]
+						require.Equal(t, data[key.String()].value, registerValue)
+					}
 
-					// for i, key := range keys {
-					// 	registerValue := registerValues[i]
-					// 	require.Equal(t, data[key.String()].value, registerValue)
-					// }
+					//make sure blocks after this one are not in checkpoint
+					// ie - extraction stops after hitting right hash
+					for j := i + 1; j < len(blocksInOrder); j++ {
 
-					// //make sure blocks after this one are not in checkpoint
-					// // ie - extraction stops after hitting right hash
-					// for j := i + 1; j < len(blocksInOrder); j++ {
-
-					// 	query.SetState(commitsByBlocks[blocksInOrder[j]])
-					// 	_, err := storage.Get(query)
-					// 	//_, err := storage.GetRegisters(keys, commitsByBlocks[blocksInOrder[j]])
-					// 	require.Error(t, err)
-					// }
+						query.SetState(commitsByBlocks[blocksInOrder[j]])
+						_, err := storage.Get(query)
+						//_, err := storage.GetRegisters(keys, commitsByBlocks[blocksInOrder[j]])
+						require.Error(t, err)
+					}
 
 					<-diskWal.Done()
 					<-storage.Done()
