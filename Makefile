@@ -266,12 +266,12 @@ docker-build-verification-debug:
 
 .PHONY: docker-build-access
 docker-build-access:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=access --target production \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=access --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --target production \
 		-t "$(CONTAINER_REGISTRY)/access:latest" -t "$(CONTAINER_REGISTRY)/access:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-access-debug
 docker-build-access-debug:
-	docker build -f cmd/Dockerfile  --build-arg TARGET=access --target debug \
+	docker build -f cmd/Dockerfile  --build-arg TARGET=access  --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(IMAGE_TAG) --target debug \
 		-t "$(CONTAINER_REGISTRY)/access-debug:latest" -t "$(CONTAINER_REGISTRY)/access-debug:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/access-debug:$(IMAGE_TAG)" .
 
 .PHONY: docker-build-ghost

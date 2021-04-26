@@ -491,11 +491,11 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 	node2Id := *identities[1]
 
 	// test node1 can ping node 2
-	_, err := node1.Ping(suite.ctx, node2Id)
+	_, _, err := node1.Ping(suite.ctx, node2Id)
 	require.NoError(suite.T(), err)
 
 	// test node 2 can ping node 1
-	_, err = node2.Ping(suite.ctx, node1Id)
+	_, _, err = node2.Ping(suite.ctx, node1Id)
 	require.NoError(suite.T(), err)
 }
 
@@ -606,7 +606,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		allowList,
 		rootID)
 	require.NoError(t, err)
-	n.SetStreamHandler(handlerFunc)
+	n.SetFlowProtocolStreamHandler(handlerFunc)
 
 	require.Eventuallyf(t, func() bool {
 		ip, p, err := n.GetIPPort()

@@ -3,13 +3,11 @@
 package p2p
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"sync"
 	"time"
 
-	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
@@ -130,7 +128,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
 	m.libP2PNode = libP2PNode
-	m.libP2PNode.SetStreamHandler(m.handleIncomingStream)
+	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
@@ -265,19 +263,9 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to create stream for %s :%w", targetID.String(), err)
 	}
 
-	// create a gogo protobuf writer
-	bufw := bufio.NewWriter(stream)
-	writer := ggio.NewDelimitedWriter(bufw)
-
-	err = writer.WriteMsg(msg)
+	err = WriteMessageToStream(msg, stream)
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
-	}
-
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to send message: %w", err)
 	}
 
 	// close the stream immediately
@@ -428,10 +416,10 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 }
 
 // Ping pings the target node and returns the ping RTT or an error
-func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
 	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return -1, fmt.Errorf("could not find identity for target id: %w", err)
+		return message.PingResponse{}, -1, fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
 	return m.libP2PNode.Ping(m.ctx, targetIdentity)

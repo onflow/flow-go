@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package message;
+
+message PingRequest {
+}
+
+message PingResponse {
+    string version = 1;
+    uint64 blockHeight = 2;
+}
