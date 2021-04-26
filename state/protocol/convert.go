@@ -75,7 +75,7 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch dkg: %w", err)
 	}
-	dkgParticipantKeys, err := GetDKGParticipantKeys(dkg, participants.Filter(filter.HasRole(flow.RoleConsensus)))
+	dkgParticipantKeys, err := GetDKGParticipantKeys(dkg, participants.Filter(filter.IsValidDKGParticipant))
 	if err != nil {
 		return nil, fmt.Errorf("could not get dkg participant keys: %w", err)
 	}
