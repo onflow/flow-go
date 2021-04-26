@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -51,7 +52,7 @@ func NewBuilder(
 	recPool mempool.ExecutionTree,
 	tracer module.Tracer,
 	options ...func(*Config),
-) *Builder {
+) (*Builder, error) {
 
 	// initialize default config
 	cfg := Config{
@@ -83,7 +84,13 @@ func NewBuilder(
 		recPool:   recPool,
 		cfg:       cfg,
 	}
-	return b
+
+	err := b.repopulateExecutionTree()
+	if err != nil {
+		return nil, fmt.Errorf("could not repopulate execution tree: %w", err)
+	}
+
+	return b, nil
 }
 
 // BuildOn creates a new block header on top of the provided parent, using the
@@ -131,6 +138,81 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	}
 
 	return proposal.Header, nil
+}
+
+func (b *Builder) repopulateExecutionTree() error {
+	finalized, err := b.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not retrieve finalized block: %w", err)
+	}
+	finalizedID := finalized.ID()
+
+	// Get the latest sealed block on this fork, ie the highest block for which
+	// there is a seal in this fork. This block is not necessarily finalized.
+	latestSeal, err := b.seals.ByBlockID(finalizedID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
+	}
+
+	latestSealed, err := b.headers.ByBlockID(latestSeal.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSeal.BlockID, err)
+	}
+
+	blockLookup := make(map[flow.Identifier]*flow.Header)
+
+	// usually we start with empty execution tree, prune it to minimum height before adding results
+	err = b.recPool.PruneUpToHeight(latestSealed.Height)
+	if err != nil {
+		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
+	}
+
+	traverser := func(header *flow.Header) error {
+		index, err := b.index.ByBlockID(header.ID())
+		if err != nil {
+			return fmt.Errorf("could not retrieve index for block (%x): %w", header.ID(), err)
+		}
+
+		for _, resultID := range index.ResultIDs {
+			result, err := b.resultsDB.ByID(resultID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve result by id (%x): %w", resultID, err)
+			}
+
+			// in general case same block can be referenced
+			// by different execution results
+			block, found := blockLookup[result.BlockID]
+			if !found {
+				block, err = b.headers.ByBlockID(result.BlockID)
+				if err != nil {
+					return fmt.Errorf("could not get block (%x): %w", result.BlockID, err)
+				}
+				blockLookup[result.BlockID] = block
+			}
+
+			err = b.recPool.AddResult(result, block)
+			if err != nil {
+				return fmt.Errorf("could not add result to execution tree: %w", err)
+			}
+		}
+		return nil
+	}
+
+	// traverse chain backwards to collect all execution results that were incorporated in this fork
+	// starting from finalized block and finishing with latest sealed block
+	err = state.TraverseBackward(b.headers, finalizedID, traverser, func(block *flow.Header) bool {
+		return block.Height != latestSealed.Height
+	})
+	if err != nil {
+		return fmt.Errorf("internal error while traversing fork: %w", err)
+	}
+
+	err = b.recPool.PruneUpToHeight(latestSealed.Height)
+	if err != nil {
+		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
+	}
+
+	return nil
 }
 
 // getInsertableGuarantees returns the list of CollectionGuarantees that should
@@ -395,10 +477,10 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
-	sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
-	}
+	//sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
+	//}
 	sealed, err := b.headers.ByBlockID(latestSeal.BlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
@@ -442,15 +524,15 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 		ancestorID = ancestor.ParentID
 	}
 
-	// After recovering from a crash, the mempools are wiped and the sealed results will not
-	// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
-	// a vertex in the tree without attaching any Execution Receipts to it. Thereby, we can
-	// traverse to receipts committing to derived results without having to find the receipts
-	// for the sealed result.
-	err = b.recPool.AddResult(sealedResult, sealed) // no-op, if result is already in Execution Tree
-	if err != nil {
-		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
-	}
+	//// After recovering from a crash, the mempools are wiped and the sealed results will not
+	//// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
+	//// a vertex in the tree without attaching any Execution Receipts to it. Thereby, we can
+	//// traverse to receipts committing to derived results without having to find the receipts
+	//// for the sealed result.
+	//err = b.recPool.AddResult(sealedResult, sealed) // no-op, if result is already in Execution Tree
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
+	//}
 	isResultForUnsealedBlock := isResultForBlock(ancestors)
 	isReceiptUniqueAndUnsealed := isNoDupAndNotSealed(includedReceipts, sealedBlockID)
 	// find all receipts:
