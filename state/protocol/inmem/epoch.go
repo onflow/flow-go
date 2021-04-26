@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -92,9 +91,6 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 
 func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 	identities := es.setupEvent.Participants.Filter(filter.Any)
-	// apply a deterministic sort to the participants
-	identities = identities.Order(order.ByNodeIDAsc)
-
 	return identities, nil
 }
 
