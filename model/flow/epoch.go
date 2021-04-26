@@ -172,6 +172,26 @@ func (commit *EpochCommit) ID() Identifier {
 	return MakeID(commit)
 }
 
+// ToDKGParticipantLookup constructs a DKG participant lookup from an identity
+// list and a key list. The identity list must be EXACTLY the same (order and
+// contents) as that used when initializing the corresponding DKG instance.
+func ToDKGParticipantLookup(participants IdentityList, keys []crypto.PublicKey) (map[Identifier]DKGParticipant, error) {
+	if len(participants) != len(keys) {
+		return nil, fmt.Errorf("participant list (len=%d) does not match key list (len=%d)", len(participants), len(keys))
+	}
+
+	lookup := make(map[Identifier]DKGParticipant, len(participants))
+	for i := 0; i < len(participants); i++ {
+		part := participants[i]
+		key := keys[i]
+		lookup[part.NodeID] = DKGParticipant{
+			Index:    uint(i),
+			KeyShare: key,
+		}
+	}
+	return lookup, nil
+}
+
 type DKGParticipant struct {
 	Index    uint
 	KeyShare crypto.PublicKey
