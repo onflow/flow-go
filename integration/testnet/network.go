@@ -680,12 +680,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RandomSource: randomSource,
 	}
 
-	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
 	epochCommit := &flow.EpochCommit{
-		Counter:         epochCounter,
-		ClusterQCs:      clusterQCs,
-		DKGGroupKey:     dkg.PubGroupKey,
-		DKGParticipants: dkgLookup,
+		Counter:            epochCounter,
+		ClusterQCs:         clusterQCs,
+		DKGGroupKey:        dkg.PubGroupKey,
+		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
 	// generate execution result and block seal
