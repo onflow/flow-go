@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"sort"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
@@ -70,10 +69,10 @@ func (setup *EpochSetup) ID() Identifier {
 // When an EpochCommit event is emitted, the network is ready to transition to
 // the epoch.
 type EpochCommit struct {
-	Counter         uint64                        // the number of the epoch
-	ClusterQCs      []*QuorumCertificate          // quorum certificates for each cluster
-	DKGGroupKey     crypto.PublicKey              // group key from DKG
-	DKGParticipants map[Identifier]DKGParticipant // public keys for DKG participants
+	Counter            uint64               // the number of the epoch
+	ClusterQCs         []*QuorumCertificate // quorum certificates for each cluster
+	DKGGroupKey        crypto.PublicKey     // group key from DKG
+	DKGParticipantKeys []crypto.PublicKey   // public keys for DKG participants
 }
 
 func (commit *EpochCommit) ServiceEvent() ServiceEvent {
@@ -84,27 +83,35 @@ func (commit *EpochCommit) ServiceEvent() ServiceEvent {
 }
 
 type encodableCommit struct {
-	Counter         uint64
-	ClusterQCs      []*QuorumCertificate
-	DKGGroupKey     encodable.RandomBeaconPubKey
-	DKGParticipants map[Identifier]DKGParticipant
+	Counter            uint64
+	ClusterQCs         []*QuorumCertificate
+	DKGGroupKey        encodable.RandomBeaconPubKey
+	DKGParticipantKeys []encodable.RandomBeaconPubKey
 }
 
 func encodableFromCommit(commit *EpochCommit) encodableCommit {
+	encKeys := make([]encodable.RandomBeaconPubKey, 0, len(commit.DKGParticipantKeys))
+	for _, key := range commit.DKGParticipantKeys {
+		encKeys = append(encKeys, encodable.RandomBeaconPubKey{PublicKey: key})
+	}
 	return encodableCommit{
-		Counter:         commit.Counter,
-		ClusterQCs:      commit.ClusterQCs,
-		DKGGroupKey:     encodable.RandomBeaconPubKey{PublicKey: commit.DKGGroupKey},
-		DKGParticipants: commit.DKGParticipants,
+		Counter:            commit.Counter,
+		ClusterQCs:         commit.ClusterQCs,
+		DKGGroupKey:        encodable.RandomBeaconPubKey{PublicKey: commit.DKGGroupKey},
+		DKGParticipantKeys: encKeys,
 	}
 }
 
 func commitFromEncodable(enc encodableCommit) EpochCommit {
+	dkgKeys := make([]crypto.PublicKey, 0, len(enc.DKGParticipantKeys))
+	for _, key := range enc.DKGParticipantKeys {
+		dkgKeys = append(dkgKeys, key.PublicKey)
+	}
 	return EpochCommit{
-		Counter:         enc.Counter,
-		ClusterQCs:      enc.ClusterQCs,
-		DKGGroupKey:     enc.DKGGroupKey.PublicKey,
-		DKGParticipants: enc.DKGParticipants,
+		Counter:            enc.Counter,
+		ClusterQCs:         enc.ClusterQCs,
+		DKGGroupKey:        enc.DKGGroupKey.PublicKey,
+		DKGParticipantKeys: dkgKeys,
 	}
 }
 
@@ -140,39 +147,22 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 // EncodeRLP encodes the commit as RLP. The RLP encoding needs to be handled
 // differently from JSON/msgpack, because it does not handle custom encoders
 // within map types.
+// NOTE: DecodeRLP is not needed, as this is only used for hashing.
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	rlpEncodable := struct {
-		Counter         uint64
-		ClusterQCs      []*QuorumCertificate
-		DKGGroupKey     []byte
-		DKGParticipants []struct {
-			NodeID []byte
-			Part   encodableDKGParticipant
-		}
+		Counter            uint64
+		ClusterQCs         []*QuorumCertificate
+		DKGGroupKey        []byte
+		DKGParticipantKeys [][]byte
 	}{
-		Counter:     commit.Counter,
-		ClusterQCs:  commit.ClusterQCs,
-		DKGGroupKey: commit.DKGGroupKey.Encode(),
+		Counter:            commit.Counter,
+		ClusterQCs:         commit.ClusterQCs,
+		DKGGroupKey:        commit.DKGGroupKey.Encode(),
+		DKGParticipantKeys: make([][]byte, 0, len(commit.DKGParticipantKeys)),
 	}
-	for nodeID, part := range commit.DKGParticipants {
-		// must copy the node ID, since the loop variable references the same
-		// backing memory for each iteration
-		nodeIDRaw := make([]byte, len(nodeID))
-		copy(nodeIDRaw, nodeID[:])
-
-		rlpEncodable.DKGParticipants = append(rlpEncodable.DKGParticipants, struct {
-			NodeID []byte
-			Part   encodableDKGParticipant
-		}{
-			NodeID: nodeIDRaw,
-			Part:   encodableFromDKGParticipant(part),
-		})
+	for _, key := range commit.DKGParticipantKeys {
+		rlpEncodable.DKGParticipantKeys = append(rlpEncodable.DKGParticipantKeys, key.Encode())
 	}
-
-	// sort to ensure consistent ordering prior to encoding
-	sort.Slice(rlpEncodable.DKGParticipants, func(i, j int) bool {
-		return rlpEncodable.DKGParticipants[i].Part.Index < rlpEncodable.DKGParticipants[j].Part.Index
-	})
 
 	return rlp.Encode(w, rlpEncodable)
 }
