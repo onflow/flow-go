@@ -3,6 +3,7 @@ package protocol
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -74,18 +75,43 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch dkg: %w", err)
 	}
-	dkgParticipants, err := ToDKGParticipantLookup(dkg, participants.Filter(filter.HasRole(flow.RoleConsensus)))
+	dkgParticipantKeys, err := GetDKGParticipantKeys(dkg, participants.Filter(filter.HasRole(flow.RoleConsensus)))
 	if err != nil {
-		return nil, fmt.Errorf("could not compute dkg participant lookup: %w", err)
+		return nil, fmt.Errorf("could not get dkg participant keys: %w", err)
 	}
 
 	commit := &flow.EpochCommit{
-		Counter:         counter,
-		ClusterQCs:      qcs,
-		DKGGroupKey:     dkg.GroupKey(),
-		DKGParticipants: dkgParticipants,
+		Counter:            counter,
+		ClusterQCs:         qcs,
+		DKGGroupKey:        dkg.GroupKey(),
+		DKGParticipantKeys: dkgParticipantKeys,
 	}
 	return commit, nil
+}
+
+// GetDKGParticipantKeys retrieves the canonically ordered list of DKG
+// participant keys from the DKG.
+func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.PublicKey, error) {
+
+	keys := make([]crypto.PublicKey, len(participants))
+	for _, identity := range participants {
+
+		index, err := dkg.Index(identity.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get index (node=%x): %w", identity.NodeID, err)
+		}
+		key, err := dkg.KeyShare(identity.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get key share (node=%x): %w", identity.NodeID, err)
+		}
+
+		if keys[int(index)] != nil {
+			return nil, fmt.Errorf("got two conflicting participants (index=%d, node_id=%x)", index, identity.NodeID)
+		}
+		keys[int(index)] = key
+	}
+
+	return keys, nil
 }
 
 // ToDKGParticipantLookup computes the nodeID -> DKGParticipant lookup for a

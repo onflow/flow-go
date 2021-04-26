@@ -160,11 +160,18 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
+	// filter initial participants to valid DKG participants
+	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
+	lookup, err := flow.ToDKGParticipantLookup(participants, es.commitEvent.DKGParticipantKeys)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct dkg lookup: %w", err)
+	}
+
 	dkg, err := DKGFromEncodable(EncodableDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
 			PublicKey: es.commitEvent.DKGGroupKey,
 		},
-		Participants: es.commitEvent.DKGParticipants,
+		Participants: lookup,
 	})
 	return dkg, err
 }
