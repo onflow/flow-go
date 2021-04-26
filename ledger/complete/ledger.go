@@ -273,10 +273,19 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		if err != nil {
 			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
-		if payloadSize != len(payloads) {
-			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
+
+		newPayloadSize := len(payloads)
+
+		if payloadSize != newPayloadSize {
+			l.logger.Warn().
+				Int("migration_step", i).
+				Int("expected_size", payloadSize).
+				Int("outcome_size", newPayloadSize).
+				Msg("payload counts has changed during migration, make sure this is expected.")
 		}
 		l.logger.Info().Msgf("migration %d is done", i)
+
+		payloadSize = newPayloadSize
 	}
 
 	// run reporters
