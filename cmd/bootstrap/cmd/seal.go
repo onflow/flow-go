@@ -36,7 +36,6 @@ func constructRootResultAndSeal(
 		RandomSource: getRandomSource(block.ID()),
 	}
 
-	// TODO remove bootstrap.ToDKGLookup
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
 		ClusterQCs:         clusterQCs,
