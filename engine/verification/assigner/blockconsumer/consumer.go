@@ -86,10 +86,10 @@ func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
 	})
 }
 
-// To implement FinalizationConsumer
+// OnBlockIncorporated is to implement FinalizationConsumer
 func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
 
-// To implement FinalizationConsumer
+// OnDoubleProposeDetected is to implement FinalizationConsumer
 func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 func (c *BlockConsumer) Ready() <-chan struct{} {
@@ -104,9 +104,12 @@ func (c *BlockConsumer) Ready() <-chan struct{} {
 }
 
 func (c *BlockConsumer) Done() <-chan struct{} {
-	c.consumer.Stop()
-
 	ready := make(chan struct{})
-	close(ready)
+	go func() {
+		completeChan := c.unit.Done()
+		c.consumer.Stop()
+		<-completeChan
+		close(ready)
+	}()
 	return ready
 }
