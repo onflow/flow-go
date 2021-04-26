@@ -111,7 +111,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		return nil, fmt.Errorf("could not bootstrap libp2p host: %w", err)
 	}
 
-	pingLibP2PProtocolID := generateID(rootBlockID)
+	pingLibP2PProtocolID := generateProtocolID(rootBlockID)
 	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, logger)
 
 	n := &Node{

@@ -42,7 +42,7 @@ func init() {
 	}
 }
 
-func SetSemver(sv string){
+func SetSemver(sv string) {
 	semver = sv
 }
 

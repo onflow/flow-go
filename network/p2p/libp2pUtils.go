@@ -163,6 +163,10 @@ func generateProtocolID(rootBlockID string) protocol.ID {
 	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
 
+func generateID(rootBlockID string) protocol.ID {
+	return protocol.ID(FlowLibP2PPingPrefix + rootBlockID)
+}
+
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
