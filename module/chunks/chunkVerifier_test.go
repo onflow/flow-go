@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -22,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
