@@ -11,6 +11,8 @@ import (
 
 	swarmt "github.com/libp2p/go-libp2p-swarm/testing"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/build"
 )
 
 func TestPing(t *testing.T) {
@@ -30,19 +32,20 @@ func TestPing(t *testing.T) {
 
 	logger := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	protocolID := generateID("1234")
+	version := "version_1"
+	build.SetSemver(version)
 	ps1 := NewPingService(h1, protocolID, logger)
 	ps2 := NewPingService(h2, protocolID, logger)
 
-	testPing(t, ps1, h2.ID())
-	testPing(t, ps2, h1.ID())
+	testPing(t, ps1, h2.ID(), version)
+	testPing(t, ps2, h1.ID(), version)
 }
 
-func testPing(t *testing.T, ps *PingService, p peer.ID) {
+func testPing(t *testing.T, ps *PingService, p peer.ID, expectedVersion string) {
 	pctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	resp, rtt, err := ps.Ping(pctx, p)
 	assert.NoError(t, err)
 	assert.NotZero(t, rtt)
-	assert.Equal(t, "", resp.Version)
-	assert.Equal(t, uint64(1), resp.BlockHeight)
+	assert.Equal(t, expectedVersion, resp.Version)
 }

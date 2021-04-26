@@ -25,7 +25,7 @@ func NewPingCollector() *PingCollector {
 	return pc
 }
 
-func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration) {
+func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration, version string) {
 	var rttValue float64
 	if rtt > 0 {
 		rttValue = float64(rtt.Milliseconds())
@@ -37,6 +37,7 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt
 		LabelNodeID:      node.NodeID.String(),
 		LabelNodeAddress: node.Address,
 		LabelNodeRole:    node.Role.String(),
-		LabelNodeInfo:    nodeInfo}).
+		LabelNodeInfo:    nodeInfo,
+		LabelNodeVersion: version}).
 		Set(rttValue)
 }

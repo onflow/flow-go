@@ -41,3 +41,11 @@ func init() {
 		commit = undefined
 	}
 }
+
+func SetSemver(sv string){
+	semver = sv
+}
+
+func SetCommit(cmt string) {
+	commit = cmt
+}

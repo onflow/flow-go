@@ -12,6 +12,7 @@ import (
 	"github.com/libp2p/go-msgio"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/build"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -82,8 +83,8 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	}
 
 	pingResponse := &message.PingResponse{
-		Version:     "",
-		BlockHeight: 1,
+		Version: build.Semver(), // the semantic version of the build
+		// TODO populate BlockHeight:
 	}
 
 	responseBytes, err := pingResponse.Marshal()
