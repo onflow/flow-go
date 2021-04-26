@@ -93,8 +93,8 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 // participant keys from the DKG.
 func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.PublicKey, error) {
 
-	keys := make([]crypto.PublicKey, len(participants))
-	for _, identity := range participants {
+	keys := make([]crypto.PublicKey, 0, len(participants))
+	for i, identity := range participants {
 
 		index, err := dkg.Index(identity.NodeID)
 		if err != nil {
@@ -104,11 +104,11 @@ func GetDKGParticipantKeys(dkg DKG, participants flow.IdentityList) ([]crypto.Pu
 		if err != nil {
 			return nil, fmt.Errorf("could not get key share (node=%x): %w", identity.NodeID, err)
 		}
-
-		if keys[int(index)] != nil {
-			return nil, fmt.Errorf("got two conflicting participants (index=%d, node_id=%x)", index, identity.NodeID)
+		if uint(i) != index {
+			return nil, fmt.Errorf("participant list index (%d) does not match dkg index (%d)", i, index)
 		}
-		keys[int(index)] = key
+
+		keys = append(keys, key)
 	}
 
 	return keys, nil
