@@ -3,11 +3,9 @@ package p2p
 // All utilities for libp2p not natively provided by the library.
 
 import (
-	"bufio"
 	"fmt"
 	"net"
 
-	ggio "github.com/gogo/protobuf/io"
 	core "github.com/libp2p/go-libp2p-core"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
@@ -17,7 +15,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/message"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -166,10 +163,6 @@ func generateProtocolID(rootBlockID string) protocol.ID {
 	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
 
-func generateID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PPingPrefix + rootBlockID)
-}
-
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
@@ -210,24 +203,4 @@ func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 		validIDs = append(validIDs, peerInfo)
 	}
 	return validIDs, invalidIDs
-}
-
-func WriteMessageToStream(msg *message.Message, stream network.Stream) error {
-
-	// create a gogo protobuf writer
-	bufw := bufio.NewWriter(stream)
-	writer := ggio.NewDelimitedWriter(bufw)
-
-	err := writer.WriteMsg(msg)
-	if err != nil {
-		return fmt.Errorf("failed to write to stream for protocol %s: %w", stream.Protocol(), err)
-	}
-
-	// flush the stream
-	err = bufw.Flush()
-	if err != nil {
-		return fmt.Errorf("failed to flush stream for protocol %s: %w", stream.Protocol(), err)
-	}
-
-	return nil
 }

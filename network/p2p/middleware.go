@@ -3,11 +3,13 @@
 package p2p
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"sync"
 	"time"
 
+	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
@@ -263,9 +265,19 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to create stream for %s :%w", targetID.String(), err)
 	}
 
-	err = WriteMessageToStream(msg, stream)
+	// create a gogo protobuf writer
+	bufw := bufio.NewWriter(stream)
+	writer := ggio.NewDelimitedWriter(bufw)
+
+	err = writer.WriteMsg(msg)
 	if err != nil {
-		return fmt.Errorf("failed to send message: %w", err)
+		return fmt.Errorf("failed to send message to %s: %w", targetID.String(), err)
+	}
+
+	// flush the stream
+	err = bufw.Flush()
+	if err != nil {
+		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
 	}
 
 	// close the stream immediately

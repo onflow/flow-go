@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/build"
 )
 
+// TestPing tests PingService by creating two libp2p hosts and ping each one from the other
 func TestPing(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

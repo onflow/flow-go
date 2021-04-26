@@ -38,9 +38,6 @@ const (
 	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
 	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 	FlowLibP2PProtocolIDPrefix = "/flow/push/"
-
-	// Maximum time to wait for a ping reply from a remote node
-	PingTimeoutSecs = time.Second * 4
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -445,7 +442,7 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	return nil
 }
 
-// host returns pointer to host object of node.
+// Host returns pointer to host object of node.
 func (n *Node) Host() host.Host {
 	return n.host
 }

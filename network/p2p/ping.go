@@ -16,10 +16,12 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
+// the Flow Ping protocol prefix
 const FlowLibP2PPingPrefix = "/flow/ping/"
 
 const pingTimeout = time.Second * 60
 
+// PingService handles the outbound and inbound ping requests and response
 type PingService struct {
 	host           host.Host
 	logger         zerolog.Logger
@@ -32,6 +34,7 @@ func NewPingService(h host.Host, pingProtocolID protocol.ID, logger zerolog.Logg
 	return ps
 }
 
+// PingHandler receives the inbound stream for Flow ping protocol and respond back with the PingResponse message
 func (ps *PingService) PingHandler(s network.Stream) {
 
 	errCh := make(chan error, 1)
@@ -44,12 +47,14 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	go func() {
 		select {
 		case <-timer.C:
+			// if read or write took longer than configured timeout, then reset the stream
 			log.Error().Msg("ping timeout")
 			err := s.Reset()
 			if err != nil {
 				log.Error().Err(err).Msg("failed to reset stream")
 			}
 		case err, ok := <-errCh:
+			// if and error occur while reposning to a pind request, then reset the stream
 			if ok {
 				log.Error().Err(err)
 				err := s.Reset()
@@ -58,6 +63,7 @@ func (ps *PingService) PingHandler(s network.Stream) {
 				}
 				return
 			}
+			// if no error, then close the stream
 			err = s.Close()
 			if err != nil {
 				log.Error().Err(err).Msg("failed to close stream")
@@ -70,11 +76,14 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	// create the writer
 	writer := msgio.NewWriter(s)
 
+	// read request bytes
 	requestBytes, err := reader.ReadMsg()
 	if err != nil {
 		errCh <- err
 		return
 	}
+
+	// unmarshal bytes to PingRequest
 	pingRequest := &message.PingRequest{}
 	err = proto.Unmarshal(requestBytes, pingRequest)
 	if err != nil {
@@ -82,17 +91,20 @@ func (ps *PingService) PingHandler(s network.Stream) {
 		return
 	}
 
+	// create a PingResponse
 	pingResponse := &message.PingResponse{
 		Version: build.Semver(), // the semantic version of the build
 		// TODO populate BlockHeight:
 	}
 
+	// marshal the response to bytes
 	responseBytes, err := pingResponse.Marshal()
 	if err != nil {
 		errCh <- err
 		return
 	}
 
+	// send the response to the remote node.
 	err = writer.WriteMsg(responseBytes)
 	if err != nil {
 		errCh <- err
@@ -100,11 +112,16 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	}
 }
 
+// Ping sends a Ping request to the remote node and returns the response, rtt and error if any.
 func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingResponse, time.Duration, error) {
+
+	// create a new stream to the remote node
 	s, err := ps.host.NewStream(ctx, p, ps.pingProtocolID)
 	if err != nil {
 		return message.PingResponse{}, -1, err
 	}
+
+	// reset stream on completion
 	defer func() {
 		err := s.Reset()
 		ps.logger.Error().
@@ -119,18 +136,25 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 	// create the writer
 	writer := msgio.NewWriter(s)
 
+	// create a ping request
 	pingRequest := &message.PingRequest{}
+
+	// marshal request to bytes slice
 	requestBytes, err := proto.Marshal(pingRequest)
 	if err != nil {
 		return message.PingResponse{}, -1, err
 	}
 
+	// record start of ping
 	before := time.Now()
+
+	// send ping request bytes
 	_, err = writer.Write(requestBytes)
 	if err != nil {
 		return message.PingResponse{}, -1, err
 	}
 
+	// read the ping response from the remote node
 	responseBytes, err := reader.ReadMsg()
 	if err != nil {
 		return message.PingResponse{}, -1, err
