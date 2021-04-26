@@ -38,6 +38,9 @@ const (
 	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
 	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 	FlowLibP2PProtocolIDPrefix = "/flow/push/"
+
+	// Maximum time to wait for a ping reply from a remote node
+	PingTimeoutSecs = time.Second * 4
 )
 
 // maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -411,14 +414,17 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 		return message.PingResponse{}, -1, pingError(err)
 	}
 
+	pingCtx, cancel := context.WithTimeout(ctx, PingTimeoutSecs)
+	defer cancel()
+
 	// connect to the target node
-	err = n.host.Connect(ctx, targetInfo)
+	err = n.host.Connect(pingCtx, targetInfo)
 	if err != nil {
 		return message.PingResponse{}, -1, pingError(err)
 	}
 
 	// ping the target
-	resp, rtt, err := n.pingService.Ping(ctx, targetInfo.ID)
+	resp, rtt, err := n.pingService.Ping(pingCtx, targetInfo.ID)
 	if err != nil {
 		return message.PingResponse{}, -1, pingError(err)
 	}
