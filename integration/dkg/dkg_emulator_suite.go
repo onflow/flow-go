@@ -225,7 +225,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 		accountSigner:  accountSigner,
 		accountInfo: &bootstrap.NodeMachineAccountInfo{
 			Address:           newAccountAddress.String(),
-			EncodedPrivateKey: accountKey.PrivateKey.Encode(),
+			EncodedPrivateKey: accountPrivateKey.Encode(),
 			KeyIndex:          0,
 			SigningAlgorithm:  accountKey.SigAlgo,
 			HashAlgorithm:     accountKey.HashAlgo,

@@ -2,7 +2,7 @@ package dkg
 
 import (
 	"encoding/hex"
-	"fmt"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -92,6 +92,17 @@ func (s *DKGSuite) TestHappyPath() {
 	// the result is an array of public keys where the first item is the group
 	// public key
 	res := s.getResult()
+
+	assert.Equal(s.T(), len(s.nodes)+1, len(res))
+	pubKeys := make([]crypto.PublicKey, 0, len(res))
+	for _, r := range res {
+		pkBytes, err := hex.DecodeString(r)
+		assert.NoError(s.T(), err)
+		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pkBytes)
+		assert.NoError(s.T(), err)
+		pubKeys = append(pubKeys, pk)
+	}
+
 	groupPubKeyBytes, err := hex.DecodeString(res[0])
 	assert.NoError(s.T(), err)
 	groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupPubKeyBytes)
@@ -116,12 +127,19 @@ func (s *DKGSuite) TestHappyPath() {
 		indices = append(indices, uint(i))
 	}
 
+	// shuffle the signatures and indices before constructing the group
+	// signature (since it only uses the first half signatures)
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
+	rand.Shuffle(len(signatures), func(i, j int) {
+		signatures[i], signatures[j] = signatures[j], signatures[i]
+		indices[i], indices[j] = indices[j], indices[i]
+	})
+
 	groupSignature, err := signature.CombineThresholdShares(uint(len(s.nodes)), signatures, indices)
 	require.NoError(s.T(), err)
 
-	for i := range s.nodes {
-		ok, err := signers[i].Verify(sigData, groupSignature, groupPubKey)
-		require.NoError(s.T(), err)
-		assert.True(s.T(), ok, fmt.Sprintf("node %d fails to verify threshold signature", i))
-	}
+	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)
+	require.NoError(s.T(), err)
+	assert.True(s.T(), ok, "failed to verify threshold signature")
 }

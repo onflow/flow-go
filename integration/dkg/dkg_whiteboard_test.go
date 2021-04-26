@@ -1,7 +1,7 @@
 package dkg
 
 import (
-	"fmt"
+	"math/rand"
 	"os"
 	"testing"
 	"time"
@@ -247,15 +247,21 @@ func TestWithWhiteboard(t *testing.T) {
 		indices = append(indices, uint(i))
 	}
 
+	// shuffle the signatures and indices before constructing the group
+	// signature (since it only uses the first half signatures)
+	seed := time.Now().UnixNano()
+	rand.Seed(seed)
+	rand.Shuffle(len(signatures), func(i, j int) {
+		signatures[i], signatures[j] = signatures[j], signatures[i]
+		indices[i], indices[j] = indices[j], indices[i]
+	})
+
 	groupSignature, err := signature.CombineThresholdShares(uint(len(nodes)), signatures, indices)
 	require.NoError(t, err)
 
-	for i, n := range nodes {
-		result := whiteboard.resultBySubmitter[n.Me.NodeID()]
-		groupPk := result.groupKey
-		t.Logf("group public key of node %d is %s", i, groupPk)
-		ok, err := signers[i].Verify(sigData, groupSignature, groupPk)
-		require.NoError(t, err)
-		assert.True(t, ok, fmt.Sprintf("node %d fails to verify threshold signature", i))
-	}
+	result := whiteboard.resultBySubmitter[nodes[0].Me.NodeID()]
+	groupPk := result.groupKey
+	ok, err := signers[0].Verify(sigData, groupSignature, groupPk)
+	require.NoError(t, err)
+	assert.True(t, ok, "failed to verify threshold signature")
 }
