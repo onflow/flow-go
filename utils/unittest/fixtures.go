@@ -894,7 +894,7 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorList {
 	locators := chunks.LocatorList{}
 	for _, status := range statuses {
-		locator := ChunkLocatorFixture(status.ExecutionResultID, status.Chunk.Index)
+		locator := ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
 		locators = append(locators, locator)
 	}
 
@@ -915,11 +915,10 @@ func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int
 		copy(chunkList, result.Chunks)
 		rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
 
-		resultID := result.ID()
 		for _, chunk := range chunkList[:n] {
 			status := &verification.ChunkStatus{
-				Chunk:             chunk,
-				ExecutionResultID: resultID,
+				ChunkIndex:      chunk.Index,
+				ExecutionResult: result,
 			}
 			statuses = append(statuses, status)
 		}

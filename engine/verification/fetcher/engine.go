@@ -146,8 +146,8 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{
-		Chunk:             chunk,
-		ExecutionResultID: locator.ResultID,
+		ChunkIndex:      locator.Index,
+		ExecutionResult: result,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
@@ -190,29 +190,26 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 
+	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
+	resultID := status.ExecutionResult.ID()
+
 	lg = lg.With().
-		Uint64("chunk_index", status.Chunk.Index).
-		Hex("block_id", logging.ID(status.Chunk.BlockID)).
-		Hex("result_id", logging.ID(status.ExecutionResultID)).Logger()
+		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).
+		Hex("result_id", logging.ID(resultID)).
+		Uint64("chunk_index", status.ChunkIndex).
+		Logger()
 
 	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(status.Chunk, originID, chunkDataPack, collection)
+	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection)
 	if err != nil {
 		// TODO: this can be due to a byzantine behavior
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
 		return
 	}
 
-	result, err := e.results.ByID(status.ExecutionResultID)
-	if err != nil {
-		// potential database leakage or corruption.
-		lg.Fatal().Err(err).Msg("could not retrieve execution result of chunk status, possibly a bug")
-		return
-	}
-
 	lg = lg.With().
-		Hex("result_id", logging.ID(status.ExecutionResultID)).
-		Hex("block_id", logging.ID(status.Chunk.BlockID)).Logger()
+		Hex("result_id", logging.ID(resultID)).
+		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).Logger()
 
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
 	lg.Debug().Bool("removed", removed).Msg("removed chunk status")
@@ -224,7 +221,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
-	err = e.pushToVerifier(status.Chunk, result, chunkDataPack, collection)
+	err = e.pushToVerifier(chunk, status.ExecutionResult, chunkDataPack, collection)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
 		return
