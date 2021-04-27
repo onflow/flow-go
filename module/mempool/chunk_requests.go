@@ -27,6 +27,23 @@ func ExponentialBackoffWithCutoff(interval time.Duration, cutoff time.Duration) 
 	}
 }
 
+// ExponentialBackoff is a chunk request history updater factory that generates backoff of value
+// interval^attempts - 1. For example, if interval = 2, then it returns a request backoff generator
+// for the series of 2^attempt - 1.
+func ExponentialBackoff(interval time.Duration) ChunkRequestHistoryUpdaterFunc {
+	return ExponentialBackoffWithCutoff(interval, math.MaxUint64)
+}
+
+// IncrementalAttempt is a chunk request history updater factory that increments the attempt field of request status
+// and makes it instantly available against any retry after qualifier.
+func IncrementalAttempt() ChunkRequestHistoryUpdaterFunc {
+	return func(attempts uint64, retryAfter time.Duration) (uint64, time.Duration, bool) {
+		attempts++
+		retryAfter = +time.Nanosecond // makes request instantly qualified against any retry after qualifier.
+		return attempts, retryAfter, true
+	}
+}
+
 // ChunkRequests is an in-memory storage for maintaining chunk data pack requests.
 type ChunkRequests interface {
 	// ByID returns a chunk request by its chunk ID.
