@@ -319,21 +319,6 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 			continue
 		}
 
-		// If we got this far, height `block.Height` must be finalized, because
-		// maxHeightForRequesting is lower than the finalized height.
-
-		// Skip result if it is incorporated in a block that is _not_ part of
-		// the finalized fork.
-		//finalizedBlockAtHeight, err := c.state.AtHeight(block.Height).Head()
-		//if err != nil {
-		//	return fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
-		//}
-		// TODO: replace this check with cleanup while processing finalized blocks in approval processing core
-		//if finalizedBlockAtHeight.ID() != collector.IncorporatedBlockID {
-		//	// block is in an orphaned fork
-		//	continue
-		//}
-
 		for chunkIndex, verifiers := range collector.CollectMissingVerifiers() {
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
