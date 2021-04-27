@@ -53,7 +53,7 @@ func (d *TransactionFeeDeductor) deductFees(
 		proc.ServiceEvents = append(proc.ServiceEvents, feeTx.ServiceEvents...)
 	}
 	proc.Logs = append(proc.Logs, feeTx.Logs...)
-	proc.GasUsed = proc.GasUsed + feeTx.GasUsed
+	proc.ComputationUsed = proc.ComputationUsed + feeTx.ComputationUsed
 
 	return txErr, fatalErr
 }

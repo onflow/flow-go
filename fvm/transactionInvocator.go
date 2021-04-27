@@ -164,7 +164,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	proc.Logs = append(proc.Logs, env.getLogs()...)
-	proc.GasUsed = proc.GasUsed + env.GetComputationUsed()
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	if txError != nil {
 		// drop delta
