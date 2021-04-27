@@ -143,7 +143,7 @@ func NewEngine(
 	}
 
 	// register the core with the network layer and store the conduit
-	eng.con, err = net.Register(engine.ConsensusCommittee, handler)
+	eng.con, err = net.Register(engine.ConsensusCommittee, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register core: %w", err)
 	}

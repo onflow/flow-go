@@ -102,12 +102,6 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 	return
 }
 
-// no-op implementation of network.Engine
-// TODO: replace with single-method MessageProcessor interface
-func (e *MessageHandler) Submit(_ flow.Identifier, _ interface{}) { panic("not implemented") }
-func (e *MessageHandler) SubmitLocal(_ interface{})               { panic("not implemented") }
-func (e *MessageHandler) ProcessLocal(_ interface{}) error        { panic("not implemented") }
-
 // notify the handler to pick new message from the queue
 func (e *MessageHandler) doNotify() {
 	select {
