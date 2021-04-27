@@ -111,6 +111,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
+	assert.True(t, returnedComputationResult.ComputationUsed > 0)
 }
 
 func TestExecuteScript(t *testing.T) {
