@@ -42,6 +42,7 @@ func (d *TransactionFeeDeductor) deductFees(
 ) (errors.Error, error) {
 
 	feeTx := deductTransactionFeeTransaction(proc.Transaction.Payer, ctx.Chain.ServiceAddress())
+	feeTx.SetTraceSpan(proc.TraceSpan)
 	txErr, fatalErr := vm.invokeMetaTransaction(
 		*ctx,
 		feeTx,
