@@ -145,7 +145,7 @@ func TestProcessedIndexDeletion(t *testing.T) {
 	}
 
 	setup(t, func(c *Consumer, jobs *MockJobs) {
-		jobs.PushN(10)
+		require.NoError(t, jobs.PushN(10))
 		require.NoError(t, c.Start(0))
 
 		require.Eventually(t, func() bool {
