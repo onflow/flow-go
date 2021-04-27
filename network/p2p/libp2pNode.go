@@ -26,6 +26,7 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/build"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -97,7 +98,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}
 
-	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
+	flowLibP2PProtocolID := generateFlowProtocolID(rootBlockID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -114,8 +115,8 @@ func NewLibP2PNode(logger zerolog.Logger,
 		return nil, fmt.Errorf("could not bootstrap libp2p host: %w", err)
 	}
 
-	pingLibP2PProtocolID := generateProtocolID(rootBlockID)
-	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, logger)
+	pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
+	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, build.Semver(), logger)
 
 	n := &Node{
 		connGater:            connGater,
@@ -414,14 +415,15 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 		return message.PingResponse{}, -1, pingError(err)
 	}
 
-	pingCtx, cancel := context.WithTimeout(ctx, PingTimeoutSecs)
-	defer cancel()
-
 	// connect to the target node
-	err = n.host.Connect(pingCtx, targetInfo)
+	err = n.host.Connect(ctx, targetInfo)
 	if err != nil {
 		return message.PingResponse{}, -1, pingError(err)
 	}
+
+	// create a context that expires in PingTimeoutSecs
+	pingCtx, cancel := context.WithTimeout(ctx, PingTimeoutSecs)
+	defer cancel()
 
 	// ping the target
 	resp, rtt, err := n.pingService.Ping(pingCtx, targetInfo.ID)

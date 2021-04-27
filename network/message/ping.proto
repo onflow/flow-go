@@ -6,6 +6,6 @@ message PingRequest {
 }
 
 message PingResponse {
-    string version = 1;
-    uint64 blockHeight = 2;
+    string version = 1;     // node software version
+    uint64 blockHeight = 2; // current block height
 }

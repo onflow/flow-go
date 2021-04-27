@@ -31,8 +31,8 @@ const (
 )
 
 const (
-	_ = iota
-	_ = 1 << (10 * iota)
+	_  = iota
+	kb = 1 << (10 * iota)
 	mb
 	gb
 )

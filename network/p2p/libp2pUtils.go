@@ -159,11 +159,11 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateProtocolID(rootBlockID string) protocol.ID {
+func generateFlowProtocolID(rootBlockID string) protocol.ID {
 	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
 }
 
-func generateID(rootBlockID string) protocol.ID {
+func generatePingProtcolID(rootBlockID string) protocol.ID {
 	return protocol.ID(FlowLibP2PPingPrefix + rootBlockID)
 }
 

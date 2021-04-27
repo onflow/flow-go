@@ -11,8 +11,6 @@ import (
 
 	swarmt "github.com/libp2p/go-libp2p-swarm/testing"
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-
-	"github.com/onflow/flow-go/cmd/bootstrap/build"
 )
 
 // TestPing tests PingService by creating two libp2p hosts and ping each one from the other
@@ -32,11 +30,10 @@ func TestPing(t *testing.T) {
 	}
 
 	logger := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-	protocolID := generateID("1234")
+	protocolID := generatePingProtcolID("1234")
 	version := "version_1"
-	build.SetSemver(version)
-	ps1 := NewPingService(h1, protocolID, logger)
-	ps2 := NewPingService(h2, protocolID, logger)
+	ps1 := NewPingService(h1, protocolID, version, logger)
+	ps2 := NewPingService(h2, protocolID, version, logger)
 
 	testPing(t, ps1, h2.ID(), version)
 	testPing(t, ps2, h1.ID(), version)
