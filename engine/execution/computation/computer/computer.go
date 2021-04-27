@@ -327,10 +327,9 @@ func (e *blockComputer) executeTransaction(
 		if err != nil {
 			return err
 		}
+		res.AddEvents(tx.Events)
+		res.AddServiceEvents(tx.ServiceEvents)
 	}
-
-	res.AddEvents(tx.Events)
-	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
 	res.AddGasUsed(tx.GasUsed)
 
