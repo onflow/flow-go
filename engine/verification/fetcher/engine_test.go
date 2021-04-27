@@ -532,12 +532,12 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 		require.True(t, ok)
 
 		// there should be a matching chunk status with the received one.
-		statusID := actual.Chunk.ID()
+		statusID := actual.ID()
 
 		for _, expected := range list {
-			expectedID := expected.Chunk.ID()
+			expectedID := expected.ID()
 			if expectedID == statusID {
-				require.Equal(t, expected.ExecutionResultID, actual.ExecutionResultID)
+				require.Equal(t, expected.ExecutionResult, actual.ExecutionResult)
 				return
 			}
 		}
@@ -562,7 +562,7 @@ func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 
 		// there should be a matching chunk status with the received one.
 		for _, expected := range list {
-			expectedID := expected.Chunk.ID()
+			expectedID := expected.ID()
 			if expectedID == actual {
 				return
 			}
@@ -583,7 +583,7 @@ func mockPendingChunksByID(pendingChunks *mempool.ChunkStatuses, list []*verific
 			defer mu.Unlock()
 
 			for _, expected := range list {
-				expectedID := expected.Chunk.ID()
+				expectedID := expected.ID()
 				if expectedID == chunkID {
 					return expected
 				}
@@ -592,7 +592,7 @@ func mockPendingChunksByID(pendingChunks *mempool.ChunkStatuses, list []*verific
 		},
 		func(chunkID flow.Identifier) bool {
 			for _, expected := range list {
-				expectedID := expected.Chunk.ID()
+				expectedID := expected.ID()
 				if expectedID == chunkID {
 					return true
 				}
