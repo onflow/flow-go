@@ -22,10 +22,7 @@ func MaxAttemptQualifier(maxAttempts uint64) RequestQualifierFunc {
 func RetryAfterQualifier() RequestQualifierFunc {
 	return func(_ uint64, lastAttempt time.Time, retryAfter time.Duration) bool {
 		cutoff := lastAttempt.Add(retryAfter)
-		if cutoff.After(time.Now()) {
-			return true
-		}
-		return false
+		return cutoff.After(time.Now())
 	}
 }
 

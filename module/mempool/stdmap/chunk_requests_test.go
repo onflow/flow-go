@@ -45,9 +45,8 @@ func TestIncrementStatus(t *testing.T) {
 		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish increments on time")
 
 		// retrieves updated status
-		expectedReq, attempt, ok := requests.ByID(request.ID())
+		expectedReq, ok := requests.ByID(request.ID())
 		require.True(t, ok)
 		require.Equal(t, request, expectedReq)
-		require.Equal(t, attempt, increments)
 	})
 }
