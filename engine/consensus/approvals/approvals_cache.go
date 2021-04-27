@@ -34,23 +34,13 @@ func (c *ApprovalsCache) TakeIf(approvalID flow.Identifier, predicate func(*flow
 	return approval
 }
 
-func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
-	approval, cached := c.cache.Peek(approvalID)
-	if !cached {
-		return nil
-	}
-
-	c.cache.Remove(approvalID)
-	return approval.(*flow.ResultApproval)
-}
-
 func (c *ApprovalsCache) Ids() []flow.Identifier {
 	keys := c.cache.Keys()
 	approvalIDs := make([]flow.Identifier, len(keys))
 	for i, key := range keys {
-		result[i] = key.(flow.Identifier)
+		approvalIDs[i] = key.(flow.Identifier)
 	}
-	return result
+	return approvalIDs
 }
 
 func (c *ApprovalsCache) Peek(approvalID flow.Identifier) *flow.ResultApproval {

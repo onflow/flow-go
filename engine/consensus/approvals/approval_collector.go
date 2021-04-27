@@ -96,7 +96,7 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 		return engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)
 	}
 	// there is no need to process approval if we have already enough info for sealing
-	if c.hasEnoughApprovals(chunkIndex) {
+	if c.chunkHasEnoughApprovals(chunkIndex) {
 		return nil
 	}
 
@@ -124,7 +124,7 @@ func (c *ApprovalCollector) trySealResult() error {
 }
 
 func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collector *ChunkApprovalCollector) {
-	if c.hasEnoughApprovals(chunkIndex) {
+	if c.chunkHasEnoughApprovals(chunkIndex) {
 		return
 	}
 

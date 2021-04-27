@@ -90,6 +90,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
 
 	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Once()
 
 	s.core.OnFinalizedBlock(s.Block.ID())
 
@@ -106,6 +107,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExe
 	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
 
 	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Once()
 
 	s.core.OnFinalizedBlock(s.Block.ID())
 
@@ -154,6 +156,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 
 	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 	s.state.On("AtHeight", blockB1.Height).Return(unittest.StateSnapshotForKnownBlock(&blockB1, nil))
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
 	// blockB1 becomes finalized
 	s.core.OnFinalizedBlock(blockB1.ID())
@@ -195,6 +198,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 		unittest.Seal.WithResult(s.IncorporatedResult.Result))
 	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
 
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil))
 	s.payloads.On("ByBlockID", candidate.ID()).Return(&payload, nil).Once()
 
 	s.core.OnFinalizedBlock(candidate.ID())
@@ -225,6 +229,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CleanupOrphanColl
 	payload := unittest.PayloadFixture()
 	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 	s.state.On("AtHeight", blockB1.Height).Return(unittest.StateSnapshotForKnownBlock(&blockB1, nil))
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
 	// blockB1 becomes finalized
 	s.core.OnFinalizedBlock(blockB1.ID())

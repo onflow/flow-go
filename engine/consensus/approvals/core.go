@@ -132,24 +132,18 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.lastFinalizedBlockHeight, finalized.Height)
 
+	lastSealed, err := c.state.Sealed().Head()
+	if err != nil {
+		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block")
+	}
+
+	// it's important to use atomic operation to make sure that we have correct ordering
+	atomic.StoreUint64(&c.lastSealedBlockHeight, lastSealed.Height)
+
 	sealsCount := len(payload.Seals)
 	sealedResultIds := make([]flow.Identifier, sealsCount)
-	lastSealedBlockHeight := uint64(0)
 	for i, seal := range payload.Seals {
 		sealedResultIds[i] = seal.ResultID
-
-		// update last sealed height
-		if i == sealsCount-1 {
-			head, err := c.state.AtBlockID(seal.BlockID).Head()
-			if err != nil {
-				c.log.Fatal().Err(err).Msgf("could not retrieve state for finalized block %s", seal.BlockID)
-			}
-
-			lastSealedBlockHeight = head.Height
-
-			// it's important to use atomic operation to make sure that we have correct ordering
-			atomic.StoreUint64(&c.lastSealedBlockHeight, head.Height)
-		}
 	}
 
 	// cleanup collectors for already sealed results
@@ -162,7 +156,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 		c.log.Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
-	collectors = c.cleanupStaleCollectors(collectors, lastSealedBlockHeight)
+	collectors = c.cleanupStaleCollectors(collectors, lastSealed.Height)
 	// to those collectors that are not stale, report finalization event to cleanup orphan blocks
 	for _, collector := range collectors {
 		collector.OnBlockFinalizedAtHeight(finalizedBlockID, finalized.Height)

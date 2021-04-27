@@ -14,6 +14,7 @@ import (
 type BaseApprovalsTestSuite struct {
 	suite.Suite
 
+	ParentBlock         flow.Header     // parent of sealing candidate
 	Block               flow.Header     // candidate for sealing
 	IncorporatedBlock   flow.Header     // block that incorporated result
 	VerID               flow.Identifier // for convenience, node id of first verifier
@@ -24,7 +25,8 @@ type BaseApprovalsTestSuite struct {
 }
 
 func (s *BaseApprovalsTestSuite) SetupTest() {
-	s.Block = unittest.BlockHeaderFixture()
+	s.ParentBlock = unittest.BlockHeaderFixture()
+	s.Block = unittest.BlockHeaderWithParentFixture(&s.ParentBlock)
 	verifiers := make(flow.IdentifierList, 0)
 	s.AuthorizedVerifiers = make(map[flow.Identifier]*flow.Identity)
 	s.ChunksAssignment = chunks.NewAssignment()
