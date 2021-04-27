@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// BrokenContractMigration fixes some of the early contracts that has been broken due to cadence upgrades.
+// BrokenContractMigration fixes some of the early contracts that have been broken due to Cadence upgrades.
 func BrokenContractMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := NewView(payloads)
 	st := state.NewState(l)
