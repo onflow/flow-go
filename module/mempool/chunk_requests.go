@@ -1,7 +1,6 @@
 package mempool
 
 import (
-	"math"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -18,14 +17,19 @@ type ChunkRequestHistoryUpdaterFunc func(uint64, time.Duration) (uint64, time.Du
 //
 // The generated backoff is substituted with the given cutoff value for backoff longer than the cutoff.
 // This is to make sure that we do not backoff indefinitely.
-func ExponentialBackoffWithCutoffUpdater(interval time.Duration, cutoff time.Duration) ChunkRequestHistoryUpdaterFunc {
+func ExponentialBackoffWithCutoffUpdater(multiplier float64, maxInterval time.Duration, minInterval time.Duration) ChunkRequestHistoryUpdaterFunc {
 	return func(attempts uint64, retryAfter time.Duration) (uint64, time.Duration, bool) {
-		backoff := time.Duration(math.Pow(float64(interval), float64(attempts)) - 1)
-		attempts++
-		if backoff > cutoff {
-			return attempts, cutoff, true
+		if float64(retryAfter) >= float64(maxInterval)/multiplier {
+			retryAfter = maxInterval
+		} else {
+			retryAfter = time.Duration(float64(retryAfter) * multiplier)
+
+			if retryAfter < minInterval {
+				retryAfter = minInterval
+			}
 		}
-		return attempts, backoff, true
+
+		return attempts + 1, retryAfter, true
 	}
 }
 
