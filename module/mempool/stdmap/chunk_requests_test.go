@@ -1,7 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
 	"math"
 	"sync"
 	"testing"
@@ -14,8 +13,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestIncrementStatus evaluates that calling increment attempt several times updates the status attempts.
-func TestIncrementStatus(t *testing.T) {
+// TestChunkRequests_UpdateRequestHistory evaluates behavior of ChuckRequests against updating request histories with
+// different updaters.
+func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 	t.Run("10 chunks- 10 times incremental updater ", func(t *testing.T) {
 		incUpdater := mempool.IncrementalAttemptUpdater()
 		chunks := 10
@@ -28,8 +28,10 @@ func TestIncrementStatus(t *testing.T) {
 	})
 
 	t.Run("10 chunks- 10 times exponential updater", func(t *testing.T) {
-		interval := 2 * time.Second
-		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(interval, 10*time.Hour)
+		// sets an exponential backoff updater with a maximum backoff of 1 hour, and minimum of a second.
+		minInterval := time.Second
+		maxInterval := time.Hour // intentionally is set high to avoid overflow in this test.
+		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(2, maxInterval, minInterval)
 		chunks := 10
 		expectedAttempts := 10
 
@@ -40,11 +42,58 @@ func TestIncrementStatus(t *testing.T) {
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
 			require.True(t, lastTried.Add(retryAfter).After(time.Now()))
 
-			expectedRetryAfter := time.Duration(math.Pow(float64(interval), float64(expectedAttempts)) - 1)
-			require.GreaterOrEqual(t, retryAfter, expectedRetryAfter)
+			// retryAfter should be equal to 2^(attempts-1) * minInterval.
+			// note that after the first attempt, retry after is set to minInterval.
+			multiplier := time.Duration(math.Pow(2, float64(expectedAttempts-1)))
+			expectedRetryAfter := minInterval * multiplier
+			require.Equal(t, expectedRetryAfter, retryAfter)
 		})
 	})
 
+	t.Run("10 chunks- 10 times exponential updater- underflow", func(t *testing.T) {
+		// sets an exponential backoff updater with a maximum backoff of 1 hour, and minimum of a second.
+		minInterval := time.Second
+		maxInterval := time.Hour // intentionally is set high to avoid overflow in this test.
+		// exponential multiplier is set to a very small number so that backoff always underflow, and set to
+		// minInterval.
+		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(0.001, maxInterval, minInterval)
+		chunks := 10
+		expectedAttempts := 10
+
+		withUpdaterScenario(t, chunks, expectedAttempts, expUpdater, func(t *testing.T, attempts uint64, lastTried time.Time,
+			retryAfter time.Duration) {
+			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
+
+			// request should NOT be immediately qualified for retrial due to exponential backoff.
+			require.True(t, lastTried.Add(retryAfter).After(time.Now()))
+
+			// expected retry after should be equal to the min interval, since updates should always underflow due
+			// to the very small multiplier.
+			require.Equal(t, minInterval, retryAfter)
+		})
+	})
+
+	t.Run("10 chunks- 10 times exponential updater- overflow", func(t *testing.T) {
+		// sets an exponential backoff updater with a maximum backoff of 1 hour, and minimum of a second.
+		minInterval := time.Second
+		maxInterval := time.Minute
+		// with exponential multiplier of 2, we expect to hit the overflow after 10 attempts.
+		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(2, maxInterval, minInterval)
+		chunks := 10
+		expectedAttempts := 10
+
+		withUpdaterScenario(t, chunks, expectedAttempts, expUpdater, func(t *testing.T, attempts uint64, lastTried time.Time,
+			retryAfter time.Duration) {
+			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
+
+			// request should NOT be immediately qualified for retrial due to exponential backoff.
+			require.True(t, lastTried.Add(retryAfter).After(time.Now()))
+
+			// expected retry after should be equal to the max interval, since updates should eventually overflow due
+			// to the very small maxInterval and quite noticeable multiplier (2).
+			require.Equal(t, maxInterval, retryAfter)
+		})
+	})
 }
 
 func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.ChunkRequestHistoryUpdaterFunc,
@@ -53,7 +102,6 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 	// initializations: creating mempool and populating it.
 	requests := NewChunkRequests(uint(chunks))
 	chunkReqs := unittest.ChunkDataPackRequestListFixture(chunks)
-	fmt.Println(flow.GetIDs(chunkReqs))
 	for _, request := range chunkReqs {
 		ok := requests.Add(request)
 		require.True(t, ok)
@@ -72,8 +120,7 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 			}(request.ID())
 		}
 	}
-	wg.Wait()
-	// unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
 
 	// performs custom validation of test.
 	for _, chunk := range chunkReqs {
