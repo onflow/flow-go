@@ -1,4 +1,4 @@
-package qualifier
+package requester
 
 import (
 	"math"

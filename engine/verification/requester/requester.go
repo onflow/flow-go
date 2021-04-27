@@ -37,10 +37,11 @@ type Engine struct {
 	handler fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
 
 	// internal logic
-	retryInterval    time.Duration             // determines time in milliseconds for retrying chunk data requests.
-	requestTargets   uint                      // maximum number of execution nodes being asked for a chunk data pack.
-	pendingRequests  mempool.ChunkRequests     // used to track requested chunks.
-	requestQualifier ChunkDataRequestQualifier // used to decide whether to dispatch a chunk request.
+	retryInterval    time.Duration         // determines time in milliseconds for retrying chunk data requests.
+	requestTargets   uint                  // maximum number of execution nodes being asked for a chunk data pack.
+	pendingRequests  mempool.ChunkRequests // used to track requested chunks.
+	reqQualifierFunc RequestQualifierFunc
+	reqUpdaterFunc   mempool.ChunkRequestHistoryUpdaterFunc
 }
 
 func New(log zerolog.Logger,
@@ -51,7 +52,8 @@ func New(log zerolog.Logger,
 	pendingRequests mempool.ChunkRequests,
 	handler fetcher.ChunkDataPackHandler,
 	retryInterval time.Duration,
-	requestQualifier ChunkDataRequestQualifier,
+	reqQualifierFunc RequestQualifierFunc,
+	reqUpdaterFunc mempool.ChunkRequestHistoryUpdaterFunc,
 	requestTargets uint) (*Engine, error) {
 
 	e := &Engine{
@@ -64,7 +66,8 @@ func New(log zerolog.Logger,
 		retryInterval:    retryInterval,
 		requestTargets:   requestTargets,
 		pendingRequests:  pendingRequests,
-		requestQualifier: requestQualifier,
+		reqUpdaterFunc:   reqUpdaterFunc,
+		reqQualifierFunc: reqQualifierFunc,
 	}
 
 	if e.handler == nil {
@@ -207,7 +210,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		qualified := e.requestQualifier.CanDispatchRequest(request.ChunkID)
+		qualified := e.canDispatchRequest(request.ChunkID)
 		if !qualified {
 			lg.Debug().Bool("qualified_request", qualified).
 				Msg("chunk data pack request is not qualified for dispatching at this round")
@@ -219,7 +222,7 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		updated := e.requestQualifier.OnRequestDispatched(request.ChunkID)
+		updated := e.onRequestDispatched(request.ChunkID)
 		lg.Info().
 			Bool("pending_request_updated", updated).
 			Msg("chunk data pack requested")
@@ -241,4 +244,19 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 	}
 
 	return nil
+}
+
+// canDispatchRequest returns whether chunk data request for this chunk ID can be dispatched.
+func (e *Engine) canDispatchRequest(chunkID flow.Identifier) bool {
+	attempts, lastAttempt, retryAfter, exists := e.pendingRequests.RequestInfo(chunkID)
+	if !exists {
+		return false
+	}
+
+	return e.reqQualifierFunc(attempts, lastAttempt, retryAfter)
+}
+
+// onRequestDispatched encapsulates the logic of updating the chunk data request post a successful dispatch.
+func (e *Engine) onRequestDispatched(chunkID flow.Identifier) bool {
+	return e.pendingRequests.UpdateRequestHistory(chunkID, e.reqUpdaterFunc)
 }

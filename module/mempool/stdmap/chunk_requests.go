@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // ChunkRequests is an implementation of in-memory storage for maintaining chunk requests data objects.
@@ -97,22 +98,28 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	return err == nil
 }
 
-// UpdateRetryAfter updates the retryAfter field of the chunk request to the specified values.
-// It also increments the number of time this chunk has been attempted, and the last time this chunk
-// has been attempted to the current time.
+// UpdateRequestHistory updates the request history of the specified chunk ID. If the update was successful, i.e.,
+// the updater returns true, the result of update is committed to the mempool, and the time stamp of the chunk request
+// is updated to the current time. Otherwise, it aborts and returns false.
 //
-// If such chunk ID does not exist in the memory pool, it returns false.
 // The updates under this method are atomic, thread-safe, and done in isolation.
-func (cs *ChunkRequests) UpdateRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
+func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) bool {
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkID]
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
 		chunk := toChunkRequestStatus(entity)
-		chunk.Attempt++
+
+		attempt, retryAfter, ok := updater(chunk.Attempt, chunk.RetryAfter)
+		if !ok {
+			return fmt.Errorf("updater failed")
+		}
+
 		chunk.LastAttempt = time.Now()
 		chunk.RetryAfter = retryAfter
+		chunk.Attempt = attempt
+
 		return nil
 	})
 

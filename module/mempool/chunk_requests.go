@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
+type ChunkRequestHistoryUpdaterFunc func(uint64, time.Duration) (uint64, time.Duration, bool)
+
 // ChunkRequests is an in-memory storage for maintaining chunk data pack requests.
 type ChunkRequests interface {
 	// ByID returns a chunk request by its chunk ID.
@@ -40,13 +42,12 @@ type ChunkRequests interface {
 	// The increments are done atomically, thread-safe, and in isolation.
 	IncrementAttempt(chunkID flow.Identifier) bool
 
-	// UpdateRetryAfter updates the retryAfter field of the chunk request to the specified values.
-	// It also increments the number of time this chunk has been attempted, and the last time this chunk
-	// has been attempted to the current time.
+	// UpdateRequestHistory updates the request history of the specified chunk ID. If the update was successful, i.e.,
+	// the updater returns true, the result of update is committed to the mempool, and the time stamp of the chunk request
+	// is updated to the current time. Otherwise, it aborts and returns false.
 	//
-	// If such chunk ID does not exist in the memory pool, it returns false.
 	// The updates under this method are atomic, thread-safe, and done in isolation.
-	UpdateRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool
+	UpdateRequestHistory(chunkID flow.Identifier, updater ChunkRequestHistoryUpdaterFunc) bool
 
 	// All returns all chunk requests stored in this memory pool.
 	All() []*verification.ChunkDataPackRequest
