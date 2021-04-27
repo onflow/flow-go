@@ -58,6 +58,7 @@ func extractExecutionState(dir string,
 	if migrate {
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
+			mgr.BrokenContractMigration,
 			mgr.StorageFormatV4Migration,
 		}
 	}
