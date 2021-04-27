@@ -45,7 +45,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 	}
 }
 
-func (c *ApprovalCollector) hasEnoughApprovals(chunkIndex uint64) bool {
+func (c *ApprovalCollector) chunkHasEnoughApprovals(chunkIndex uint64) bool {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	_, found := c.aggregatedSignatures[chunkIndex]

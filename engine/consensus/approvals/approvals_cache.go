@@ -46,7 +46,7 @@ func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
 
 func (c *ApprovalsCache) Ids() []flow.Identifier {
 	keys := c.cache.Keys()
-	result := make([]flow.Identifier, len(keys))
+	approvalIDs := make([]flow.Identifier, len(keys))
 	for i, key := range keys {
 		result[i] = key.(flow.Identifier)
 	}

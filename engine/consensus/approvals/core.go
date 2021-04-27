@@ -215,6 +215,9 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 	}
 
 	// process pending approvals only if it's a new collector
+	// pending approvals are those we haven't received its result yet,
+	// once we received a result and created a new collector, we find the pending
+	// approvals for this result, and process them
 	if newIncorporatedResult {
 		err = c.processPendingApprovals(collector)
 		if err != nil {
