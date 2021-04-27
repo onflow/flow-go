@@ -303,7 +303,8 @@ func (e *blockComputer) executeTransaction(
 		e.metrics.TransactionInterpreted(txMetrics.Interpreted())
 	}
 	txResult := flow.TransactionResult{
-		TransactionID: tx.ID,
+		TransactionID:   tx.ID,
+		ComputationUsed: tx.GasUsed,
 	}
 
 	if tx.Err != nil {
