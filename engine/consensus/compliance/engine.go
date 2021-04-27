@@ -7,6 +7,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -17,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/fifoqueue"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -78,14 +78,10 @@ func NewEngine(
 		log,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				switch msg.Payload.(type) {
-				case *messages.BlockProposal:
-					return true
-				default:
-					return false
-				}
+				_, ok := msg.Payload.(*messages.BlockProposal)
+				return ok
 			},
-			OnStore: []engine.OnMessageFunc{
+			BeforeStore: []engine.OnMessageFunc{
 				func(_ *engine.Message) {
 					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
 				},
@@ -94,12 +90,8 @@ func NewEngine(
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				switch msg.Payload.(type) {
-				case *events.SyncedBlock:
-					return true
-				default:
-					return false
-				}
+				_, ok := msg.Payload.(*events.SyncedBlock)
+				return ok
 			},
 			Map: func(msg *engine.Message) *engine.Message {
 				syncedBlock := msg.Payload.(*events.SyncedBlock)
@@ -111,7 +103,7 @@ func NewEngine(
 					},
 				}
 			},
-			OnStore: []engine.OnMessageFunc{
+			BeforeStore: []engine.OnMessageFunc{
 				func(_ *engine.Message) {
 					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
 				},
@@ -120,14 +112,10 @@ func NewEngine(
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				switch msg.Payload.(type) {
-				case *messages.BlockVote:
-					return true
-				default:
-					return false
-				}
+				_, ok := msg.Payload.(*messages.BlockVote)
+				return ok
 			},
-			OnStore: []engine.OnMessageFunc{
+			BeforeStore: []engine.OnMessageFunc{
 				func(_ *engine.Message) {
 					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
 				},

@@ -88,42 +88,60 @@ func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
 // Push appends the given value to the tail of the queue.
 // If queue capacity is reached, the message is silently dropped.
 func (q *FifoQueue) Push(element interface{}) bool {
+	length, pushed := q.push(element)
+
+	if pushed {
+		q.lengthObserver(length)
+	}
+	return pushed
+}
+
+func (q *FifoQueue) push(element interface{}) (int, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if q.queue.Len() < q.maxCapacity {
+
+	length := q.queue.Len()
+	if length < q.maxCapacity {
 		q.queue.PushBack(element)
-		q.lengthObserver(q.queue.Len())
-		return true
+		return length, true
 	}
-	return false
+	return length, false
 }
 
 // Front peeks message at the head of the queue (without removing the head).
 func (q *FifoQueue) Front() (interface{}, bool) {
 	q.mu.RLock()
 	defer q.mu.RLock()
+
 	return q.queue.Front()
 }
 
 // Pop removes and returns the queue's head element.
 // If the queue is empty, (nil, false) is returned.
 func (q *FifoQueue) Pop() (interface{}, bool) {
-	q.mu.Lock()
-	event, ok := q.queue.PopFront()
-	length := q.queue.Len()
-	q.mu.Unlock()
-
-	q.lengthObserver(length)
+	event, length, ok := q.pop()
 	if !ok {
 		return nil, false
 	}
+
+	q.lengthObserver(length)
 	return event, true
+}
+
+func (q *FifoQueue) pop() (interface{}, int, bool) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+
+	event, ok := q.queue.PopFront()
+	length := q.queue.Len()
+	return event, length, ok
 }
 
 // Len returns the current length of the queue.
 func (q *FifoQueue) Len() int {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
+
 	return q.queue.Len()
 }
 

@@ -26,8 +26,8 @@ type Pattern struct {
 	Map MapFunc
 	// Store is an abstract message store where we will store the message upon receipt.
 	Store MessageStore
-	// OnStore is a hook for functions to be called when a message is stored.
-	OnStore []OnMessageFunc
+	// BeforeStore is a hook for functions to be called when a message is stored.
+	BeforeStore []OnMessageFunc
 }
 
 type OnMessageFunc func(*Message)
@@ -81,7 +81,7 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 				msg = pattern.Map(msg)
 			}
 
-			for _, apply := range pattern.OnStore {
+			for _, apply := range pattern.BeforeStore {
 				apply(msg)
 			}
 
