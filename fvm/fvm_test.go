@@ -1730,47 +1730,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		}),
 	)
 
-	t.Run("Transaction sequence number check fails and sequence number is not incremented", newVMTest().withBootstrapProcedureOptions(
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-	).
-		run(
-			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
-
-				// Create an account private key.
-				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-				require.NoError(t, err)
-
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
-				require.NoError(t, err)
-
-				txBody := transferTokensTx(chain).
-					AddAuthorizer(accounts[0]).
-					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
-
-				// set wrong sequence number
-				txBody.SetProposalKey(accounts[0], 0, 10)
-				txBody.SetPayer(accounts[0])
-
-				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
-				require.NoError(t, err)
-
-				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
-				require.NoError(t, err)
-
-				tx := fvm.Transaction(txBody, 0)
-
-				err = vm.Run(ctx, tx, view, programs)
-				require.NoError(t, err)
-				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
-				require.Equal(t, uint64(0), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
-			}),
-	)
-
-	t.Run("Transaction invocation fails but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
+	t.Run("Transaction fails but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),

@@ -65,8 +65,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 		return fmt.Errorf("checking sequence number failed: %w", err)
 	}
 
-	// Note that proposal key verification happens at the txVerifier and not here.
-
 	valid := accountKey.SeqNumber == proposalKey.SequenceNumber
 
 	if !valid {
