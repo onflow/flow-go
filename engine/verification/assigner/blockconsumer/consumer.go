@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
@@ -20,7 +19,6 @@ import (
 type BlockConsumer struct {
 	consumer     module.JobConsumer
 	defaultIndex uint64
-	unit         *engine.Unit
 }
 
 // defaultProcessedIndex returns the last sealed block height from the protocol state.
@@ -61,7 +59,6 @@ func NewBlockConsumer(log zerolog.Logger,
 	blockConsumer := &BlockConsumer{
 		consumer:     consumer,
 		defaultIndex: defaultIndex,
-		unit:         engine.NewUnit(),
 	}
 	worker.withBlockConsumer(blockConsumer)
 
@@ -81,15 +78,13 @@ func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 // The consumer retrieves the new blocks from its block reader module, hence it does not need to use the parameter
 // of OnFinalizedBlock here.
 func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
-	c.unit.Launch(func() {
-		c.consumer.Check()
-	})
+	c.consumer.Check()
 }
 
-// OnBlockIncorporated is to implement FinalizationConsumer
+// To implement FinalizationConsumer
 func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
 
-// OnDoubleProposeDetected is to implement FinalizationConsumer
+// To implement FinalizationConsumer
 func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 func (c *BlockConsumer) Ready() <-chan struct{} {
@@ -104,12 +99,9 @@ func (c *BlockConsumer) Ready() <-chan struct{} {
 }
 
 func (c *BlockConsumer) Done() <-chan struct{} {
+	c.consumer.Stop()
+
 	ready := make(chan struct{})
-	go func() {
-		completeChan := c.unit.Done()
-		c.consumer.Stop()
-		<-completeChan
-		close(ready)
-	}()
+	close(ready)
 	return ready
 }

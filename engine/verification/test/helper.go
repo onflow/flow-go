@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
-	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -548,13 +547,4 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*u
 	}
 
 	return blocks
-}
-
-// MockLastSealedHeight mocks the protocol state for the specified last sealed height.
-func MockLastSealedHeight(state *mockprotocol.State, height uint64) {
-	snapshot := &mockprotocol.Snapshot{}
-	header := unittest.BlockHeaderFixture()
-	header.Height = height
-	state.On("Sealed").Return(snapshot)
-	snapshot.On("Head").Return(&header, nil)
 }

@@ -11,10 +11,11 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/model/verification"
+	vermodel "github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
@@ -248,7 +249,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 
 	// stores the result as a result data pack in the mempool
 	// and only store it if there is at least one chunk assigned to me
-	rdp := &verification.ResultDataPack{
+	rdp := &vermodel.ResultDataPack{
 		ExecutorID:      originID,
 		ExecutionResult: result,
 	}
