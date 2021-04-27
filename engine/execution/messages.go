@@ -23,7 +23,7 @@ type ComputationResult struct {
 	Events             []flow.Event
 	ServiceEvents      []flow.Event
 	TransactionResults []flow.TransactionResult
-	GasUsed            uint64
+	ComputationUsed    uint64
 	StateReads         uint64
 }
 
@@ -39,8 +39,8 @@ func (cr *ComputationResult) AddTransactionResult(inp *flow.TransactionResult) {
 	cr.TransactionResults = append(cr.TransactionResults, *inp)
 }
 
-func (cr *ComputationResult) AddGasUsed(inp uint64) {
-	cr.GasUsed += inp
+func (cr *ComputationResult) AddComputationUsed(inp uint64) {
+	cr.ComputationUsed += inp
 }
 
 func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {
