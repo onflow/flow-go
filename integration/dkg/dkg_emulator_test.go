@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -125,6 +126,10 @@ func (s *DKGSuite) TestHappyPath() {
 
 		signatures = append(signatures, signature)
 		indices = append(indices, uint(i))
+
+		ok, err := signer.Verify(sigData, signature, pubKeys[1+i])
+		require.NoError(s.T(), err)
+		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i+1))
 	}
 
 	// shuffle the signatures and indices before constructing the group
