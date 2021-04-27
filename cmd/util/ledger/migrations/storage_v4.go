@@ -242,6 +242,16 @@ var tokenForwardingLocationMainnet = common.AddressLocation{
 	Name:    "TokenForwarding",
 }
 
+var tokenHolderKeyManagerLocationMainnet1 = common.AddressLocation{
+	Address: common.BytesToAddress([]byte{0x93, 0x7c, 0xbd, 0xee, 0x13, 0x5c, 0x65, 0x6c}),
+	Name:    "TokenHolderKeyManager",
+}
+
+var tokenHolderKeyManagerLocationMainnet2 = common.AddressLocation{
+	Address: common.BytesToAddress([]byte{0x7f, 0x56, 0x0d, 0x7e, 0x3f, 0xf0, 0x4a, 0x31}),
+	Name:    "TokenHolderKeyManager",
+}
+
 func isTokenForwardingLocation(location common.Location) bool {
 	return common.LocationsMatch(location, tokenForwardingLocationTestnet) ||
 		common.LocationsMatch(location, tokenForwardingLocationMainnet)
