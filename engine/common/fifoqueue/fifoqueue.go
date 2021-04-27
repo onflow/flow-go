@@ -103,7 +103,7 @@ func (q *FifoQueue) push(element interface{}) (int, bool) {
 	length := q.queue.Len()
 	if length < q.maxCapacity {
 		q.queue.PushBack(element)
-		return length, true
+		return q.queue.Len(), true
 	}
 	return length, false
 }
@@ -111,7 +111,7 @@ func (q *FifoQueue) push(element interface{}) (int, bool) {
 // Front peeks message at the head of the queue (without removing the head).
 func (q *FifoQueue) Front() (interface{}, bool) {
 	q.mu.RLock()
-	defer q.mu.RLock()
+	defer q.mu.RUnlock()
 
 	return q.queue.Front()
 }
@@ -133,8 +133,7 @@ func (q *FifoQueue) pop() (interface{}, int, bool) {
 	defer q.mu.Unlock()
 
 	event, ok := q.queue.PopFront()
-	length := q.queue.Len()
-	return event, length, ok
+	return event, q.queue.Len(), ok
 }
 
 // Len returns the current length of the queue.
