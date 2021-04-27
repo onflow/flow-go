@@ -43,7 +43,6 @@ type Engine struct {
 	core           *Core
 	pendingBlocks  *fifoqueue.FifoQueue
 	pendingVotes   *fifoqueue.FifoQueue
-	notify         <-chan struct{} // when new message is added to queue
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
 }
@@ -74,7 +73,7 @@ func NewEngine(
 	}
 
 	// define message queueing behaviour
-	handler, notify := engine.NewMessageHandler(
+	handler := engine.NewMessageHandler(
 		log,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
@@ -138,7 +137,6 @@ func NewEngine(
 		tracer:         core.tracer,
 		prov:           prov,
 		core:           core,
-		notify:         notify,
 		messageHandler: handler,
 	}
 
@@ -212,7 +210,7 @@ func (e *Engine) loop() {
 		select {
 		case <-e.unit.Quit():
 			return
-		case <-e.notify:
+		case <-e.messageHandler.GetNotifier():
 			err := e.processAvailableMessages()
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing message from the fifo queue")

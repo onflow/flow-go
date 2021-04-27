@@ -60,7 +60,7 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 	}
 
 	// define message queueing behaviour
-	handler, notify := engine.NewMessageHandler(
+	handler := engine.NewMessageHandler(
 		log,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
@@ -99,7 +99,6 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 		unit:           engine.NewUnit(),
 		log:            log,
 		messageHandler: handler,
-		notify:         notify,
 		queueA:         queueA,
 		queueB:         queueB,
 	}

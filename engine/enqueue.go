@@ -38,11 +38,11 @@ type MapFunc func(*Message) *Message
 
 type MessageHandler struct {
 	log      zerolog.Logger
-	notify   chan<- struct{}
+	notify   chan struct{}
 	patterns []Pattern
 }
 
-func NewMessageHandler(log zerolog.Logger, patterns ...Pattern) (*MessageHandler, <-chan struct{}) {
+func NewMessageHandler(log zerolog.Logger, patterns ...Pattern) *MessageHandler {
 	// the 1 message buffer is important to avoid the race condition.
 	// the consumer might decide to listen to the notify channel, and drain the messages in the
 	// message store, however there is a blind period start from the point the consumer learned
@@ -59,7 +59,7 @@ func NewMessageHandler(log zerolog.Logger, patterns ...Pattern) (*MessageHandler
 		notify:   notifier,
 		patterns: patterns,
 	}
-	return enqueuer, notifier
+	return enqueuer
 }
 
 func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) (err error) {
@@ -110,4 +110,8 @@ func (e *MessageHandler) doNotify() {
 	case e.notify <- struct{}{}:
 	default:
 	}
+}
+
+func (e *MessageHandler) GetNotifier() <-chan struct{} {
+	return e.notify
 }
