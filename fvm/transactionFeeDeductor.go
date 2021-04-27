@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
@@ -24,7 +25,12 @@ func (d *TransactionFeeDeductor) Process(
 		defer span.Finish()
 	}
 
-	return d.deductFees(vm, ctx, proc, sth, programs)
+	txErr, fatalErr := d.deductFees(vm, ctx, proc, sth, programs)
+	// TODO handle deduct fee failures, for now just return as error
+	if txErr != nil {
+		return txErr
+	}
+	return fatalErr
 }
 
 func (d *TransactionFeeDeductor) deductFees(
@@ -33,10 +39,10 @@ func (d *TransactionFeeDeductor) deductFees(
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) error {
-	feeTx := deductTransactionFeeTransaction(proc.Transaction.Payer, ctx.Chain.ServiceAddress())
+) (errors.Error, error) {
 
-	txErr := vm.invokeMetaTransaction(
+	feeTx := deductTransactionFeeTransaction(proc.Transaction.Payer, ctx.Chain.ServiceAddress())
+	txErr, fatalErr := vm.invokeMetaTransaction(
 		*ctx,
 		feeTx,
 		sth,
@@ -49,5 +55,5 @@ func (d *TransactionFeeDeductor) deductFees(
 		proc.GasUsed = proc.GasUsed + feeTx.GasUsed
 	}
 
-	return txErr
+	return txErr, fatalErr
 }
