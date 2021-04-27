@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 )
 
+// ChunkRequestHistoryUpdaterFunc is a function type that used by ChunkRequests mempool to perform atomic and isolated updates on the
+// underlying chunk requests history.
 type ChunkRequestHistoryUpdaterFunc func(uint64, time.Duration) (uint64, time.Duration, bool)
 
 // ExponentialBackoffWithCutoff is a chunk request history updater factory that generates backoff of value
