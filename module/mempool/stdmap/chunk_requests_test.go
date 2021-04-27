@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -32,10 +33,13 @@ func TestIncrementStatus(t *testing.T) {
 		wg := &sync.WaitGroup{}
 		wg.Add(increments)
 
+		// updater
+		incUpdater := mempool.IncrementalAttemptUpdater()
+
 		// increments attempts
 		for i := 0; i < increments; i++ {
 			go func() {
-				ok = requests.IncrementAttempt(request.ID())
+				ok = requests.UpdateRequestHistory(request.ID(), incUpdater)
 				require.True(t, ok)
 
 				wg.Done()
