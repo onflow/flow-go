@@ -55,8 +55,8 @@ type approvalProcessingCore struct {
 	lock                                 sync.RWMutex                             // lock for collectors
 	approvalsCache                       *ApprovalsCache                          // in-memory cache of approvals that weren't verified
 	blockHeightLookupCache               *lru.Cache                               // cache for block height lookups
-	lastSealedBlockHeight                uint64                                   // atomic variable for last sealed block height
-	lastFinalizedBlockHeight             uint64                                   // atomic variable for last finalized block height
+	atomicLastSealedHeight               uint64                                   // atomic variable for last sealed block height
+	atomicLastFinalizedHeight            uint64                                   // atomic variable for last finalized block height
 	requiredApprovalsForSealConstruction uint                                     // min number of approvals required for constructing a candidate seal
 	emergencySealingActive               bool                                     // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 	assigner                             module.ChunkAssigner                     // used by AssignmentCollector to build chunk assignment
@@ -116,6 +116,14 @@ func NewApprovalProcessingCore(payloads storage.Payloads, state protocol.State, 
 	return core
 }
 
+func (c *approvalProcessingCore) lastSealedHeight() uint64 {
+	return atomic.LoadUint64(&c.atomicLastSealedHeight)
+}
+
+func (c *approvalProcessingCore) lastFinalizedHeight() uint64 {
+	return atomic.LoadUint64(&c.atomicLastFinalizedHeight)
+}
+
 // WARNING: this function is implemented in a way that we expect blocks strictly in parent-child order
 // Caller has to ensure that it doesn't feed blocks that were already processed or in wrong order.
 func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
@@ -130,7 +138,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering
-	atomic.StoreUint64(&c.lastFinalizedBlockHeight, finalized.Height)
+	atomic.StoreUint64(&c.atomicLastFinalizedHeight, finalized.Height)
 
 	lastSealed, err := c.state.Sealed().Head()
 	if err != nil {
@@ -138,7 +146,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering
-	atomic.StoreUint64(&c.lastSealedBlockHeight, lastSealed.Height)
+	atomic.StoreUint64(&c.atomicLastSealedHeight, lastSealed.Height)
 
 	sealsCount := len(payload.Seals)
 	sealedResultIds := make([]flow.Identifier, sealsCount)
@@ -175,7 +183,7 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 			result.IncorporatedBlockID, err)
 	}
 
-	lastFinalizedBlockHeight := atomic.LoadUint64(&c.lastFinalizedBlockHeight)
+	lastFinalizedBlockHeight := c.lastFinalizedHeight()
 
 	// check if we are dealing with finalized block or an orphan
 	if incorporatedAtHeight <= lastFinalizedBlockHeight {
@@ -190,17 +198,13 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 		}
 	}
 
-	collector := c.getCollector(result.Result.ID())
-	newIncorporatedResult := collector == nil
-	if newIncorporatedResult {
-		// in case block is not finalized we will create collector and start processing approvals
-		// no checks for orphans can be made at this point
-		// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
+	// in case block is not finalized we will create collector and start processing approvals
+	// no checks for orphans can be made at this point
+	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
 
-		collector, err = c.createCollector(result.Result)
-		if err != nil {
-			return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
-		}
+	collector, newIncorporatedResult, err := c.getOrCreateCollector(result.Result)
+	if err != nil {
+		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
 	}
 
 	err = collector.ProcessIncorporatedResult(result)
@@ -212,6 +216,8 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 	// pending approvals are those we haven't received its result yet,
 	// once we received a result and created a new collector, we find the pending
 	// approvals for this result, and process them
+	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
+	// time, ensuring that processing of pending approvals happens once for particular assignment
 	if newIncorporatedResult {
 		err = c.processPendingApprovals(collector)
 		if err != nil {
@@ -235,10 +241,10 @@ func (c *approvalProcessingCore) checkBlockOutdated(blockID flow.Identifier) err
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering
-	lastSealedHeight := atomic.LoadUint64(&c.lastSealedBlockHeight)
+	lastSealedHeight := c.lastSealedHeight()
 	// drop approval, if it is for block whose height is lower or equal to already sealed height
 	if lastSealedHeight >= height {
-		return engine.NewOutdatedInputErrorf("result is for already sealed and finalized block height")
+		return engine.NewOutdatedInputErrorf("requested processing for already sealed block height")
 	}
 
 	return nil
@@ -247,7 +253,7 @@ func (c *approvalProcessingCore) checkBlockOutdated(blockID flow.Identifier) err
 func (c *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) error {
 	err := c.checkBlockOutdated(approval.Body.BlockID)
 	if err != nil {
-		return err
+		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
 	}
 
 	if collector := c.getCollector(approval.Body.ExecutionResultID); collector != nil {
@@ -323,17 +329,34 @@ func (c *approvalProcessingCore) getCollector(resultID flow.Identifier) *Assignm
 	return c.collectors[resultID]
 }
 
-func (c *approvalProcessingCore) createCollector(result *flow.ExecutionResult) (*AssignmentCollector, error) {
+// getOrCreateCollector performs lazy initialization of AssignmentCollector using double checked locking
+// Returns, (AssignmentCollector, true or false whenever it was created, error)
+func (c *approvalProcessingCore) getOrCreateCollector(result *flow.ExecutionResult) (*AssignmentCollector, bool, error) {
 	resultID := result.ID()
+	// first let's check if we have a collector already
+	collector := c.getCollector(resultID)
+	if collector != nil {
+		return collector, false, nil
+	}
+
+	// fast check shows that there is no collector, need to create one
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
+	// we need to check again, since it's possible that after checking for existing collector but before taking a lock
+	// new collector was created by concurrent goroutine
+	collector, ok := c.collectors[resultID]
+	if ok {
+		return collector, false, nil
+	}
+
 	collector, err := NewAssignmentCollector(result, c.state, c.assigner, c.seals, c.verifier, c.approvalConduit,
 		c.requestTracker, c.getCachedBlockHeight, c.requiredApprovalsForSealConstruction)
 	if err != nil {
-		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
+		return nil, false, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 	c.collectors[resultID] = collector
-	return collector, nil
+	return collector, true, nil
 }
 
 func (c *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {

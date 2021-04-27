@@ -156,6 +156,11 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 		return nil
 	}
 
+	// This function is not exactly thread safe, it can perform double computation of assignment and authorized verifiers
+	// It is safe in regards that only one collector will be stored to the cache
+	// In terms of locking time it's better to perform extra computation in edge cases than lock this logic with mutex
+	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously
+
 	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
