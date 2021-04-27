@@ -20,7 +20,6 @@ import (
 type TestEngine struct {
 	unit           *engine.Unit
 	log            zerolog.Logger
-	notify         <-chan struct{} // when new message is added to queue
 	ready          sync.WaitGroup
 	messageHandler *engine.MessageHandler
 	queueA         *fifoqueue.FifoQueue
@@ -132,7 +131,7 @@ func (e *TestEngine) loop() {
 		select {
 		case <-e.unit.Quit():
 			return
-		case <-e.notify:
+		case <-e.messageHandler.GetNotifier():
 			e.log.Info().Msg("new message arrived")
 			err := e.processAvailableMessages()
 			if err != nil {
