@@ -85,7 +85,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
 		EventCollectionEnabled:           true,
-		ServiceEventCollectionEnabled:    true, // TODO(ramtin) later change this to false and only set it by options
+		ServiceEventCollectionEnabled:    false,
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
 		SetValueHandler:                  nil,
@@ -174,6 +174,14 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
 	return func(ctx Context) Context {
 		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		return ctx
+	}
+}
+
+// WithServiceEventCollectionEnabled enables service event collection
+func WithServiceEventCollectionEnabled() Option {
+	return func(ctx Context) Context {
+		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }
