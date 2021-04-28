@@ -1,8 +1,9 @@
 package cmd
 
 import (
-	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
+	"math/rand"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
@@ -26,19 +27,13 @@ func constructRootResultAndSeal(
 
 	participants := model.ToIdentityList(participantNodes)
 
-	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err = rand.Read(randomSource)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not generate random source for epoch setup event")
-	}
-
 	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
 		FirstView:    block.Header.View,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  assignments,
-		RandomSource: randomSource,
+		RandomSource: getRandomSource(block.ID()),
 	}
 
 	dkgLookup := model.ToDKGLookup(dkgData, participants)
@@ -58,4 +53,21 @@ func constructRootResultAndSeal(
 	}
 
 	return result, seal
+}
+
+// getRandomSource produces the random source which is included in the root
+// EpochSetup event and is used for leader selection. The random source is
+// generated deterministically based on the root block ID, so that the
+// bootstrapping files are deterministic across runs for the same inputs.
+func getRandomSource(rootBlockID flow.Identifier) []byte {
+
+	seed := int64(binary.BigEndian.Uint64(rootBlockID[:]))
+	rng := rand.New(rand.NewSource(seed))
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	_, err := rng.Read(randomSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not generate random source for epoch setup event")
+	}
+
+	return randomSource
 }

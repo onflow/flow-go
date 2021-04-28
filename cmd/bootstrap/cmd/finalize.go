@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -143,7 +144,9 @@ func finalize(cmd *cobra.Command, args []string) {
 			parseChainID(flagRootChain).Chain(),
 			fvm.WithInitialTokenSupply(value),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee))
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		)
 		if err != nil {
 			log.Fatal().Err(err).Msg("unable to generate execution state")
 		}
@@ -153,6 +156,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	blockID := block.ID()
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
@@ -165,7 +169,8 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("computing collection node clusters")
-	assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes)
+	clusterAssignmentSeed := binary.BigEndian.Uint64(blockID[:])
+	assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes, int64(clusterAssignmentSeed))
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root blocks for collection node clusters")

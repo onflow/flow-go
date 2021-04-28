@@ -705,7 +705,7 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
 			// verify that all receipts already included in blocks are filtered out:
 			for _, block := range bs.blocks {
-				resultByID := block.Payload.ResultsById()
+				resultByID := block.Payload.Results.Lookup()
 				for _, meta := range block.Payload.Receipts {
 					result := resultByID[meta.ResultID]
 					rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -847,7 +847,7 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -861,8 +861,8 @@ func (bs *BuilderSuite) TestIntegration_PayloadReceiptNoParentResult() {
 
 	_, err := bs.build.BuildOn(blockSABC[3].ID(), bs.setter)
 	bs.Require().NoError(err)
-	expectedReceipts := []*flow.ExecutionReceiptMeta{receiptSABC[1].Meta()}
-	expectedResults := []*flow.ExecutionResult{&receiptSABC[1].ExecutionResult}
+	expectedReceipts := flow.ExecutionReceiptMetaList{receiptSABC[1].Meta()}
+	expectedResults := flow.ExecutionResultList{&receiptSABC[1].ExecutionResult}
 	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain only receipt for block a")
 	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "payload should contain only result for block a")
 }
@@ -901,7 +901,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -924,8 +924,8 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnSameFork(
 
 	_, err := bs.build.BuildOn(B.ID(), bs.setter)
 	bs.Require().NoError(err)
-	expectedReceipts := []*flow.ExecutionReceiptMeta{recB1.Meta(), recB2.Meta()}
-	expectedResults := []*flow.ExecutionResult{&recB1.ExecutionResult, &recB2.ExecutionResult}
+	expectedReceipts := flow.ExecutionReceiptMetaList{recB1.Meta(), recB2.Meta()}
+	expectedResults := flow.ExecutionResultList{&recB1.ExecutionResult, &recB2.ExecutionResult}
 	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain receipts from valid execution forks")
 	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "payload should contain results from valid execution forks")
 }
@@ -985,7 +985,7 @@ func (bs *BuilderSuite) TestIntegration_ExtendDifferentExecutionPathsOnDifferent
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -1043,7 +1043,7 @@ func (bs *BuilderSuite) TestIntegration_DuplicateReceipts() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
@@ -1081,7 +1081,7 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	// Instantiate real Execution Tree mempool;
 	bs.build.recPool = mempoolImpl.NewExecutionTree()
 	for _, block := range bs.blocks {
-		resultByID := block.Payload.ResultsById()
+		resultByID := block.Payload.Results.Lookup()
 		for _, meta := range block.Payload.Receipts {
 			result := resultByID[meta.ResultID]
 			rcpt := flow.ExecutionReceiptFromMeta(*meta, *result)
