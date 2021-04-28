@@ -323,10 +323,12 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
-// testRequestPendingChunkDataPack is a test helper that evaluates happy path of having a number of chunk requests pending.
-// The test waits enough so that the required number of attempts is made on the chunks.
-// The chunks belongs to a non-sealed block.
-func testUnqualifiedChunkDataRequests(t *testing.T, count int, attempts int) {
+// TestDispatchingRequests_Hybrid evaluates the behavior of requester when it has different request dispatch timelines, i.e.,
+// some requests should be dispatched instantly to the network. Some others are old and planned for late dispatch (out of this test timeline),
+// and some other should not be dispatched since they no longer are needed (and will be cleaned on next iteration).
+//
+// The test evaluates that only requests that are instantly planned are getting dispatched to the network.
+func TestDispatchingRequests_Hybrid(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
@@ -335,23 +337,46 @@ func testUnqualifiedChunkDataRequests(t *testing.T, count int, attempts int) {
 	// the chunk request should be dispatched.
 	agrees := unittest.IdentifierListFixture(2)
 	disagrees := unittest.IdentifierListFixture(3)
-	requests := unittest.ChunkDataPackRequestListFixture(count,
+
+	// Generates 30 requests, 10 of each type.
+	// models requests that are just added to the mempool and are ready to dispatch
+	instantQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
 		unittest.WithHeightGreaterThan(5),
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
-	test.MockLastSealedHeight(s.state, 5)
-	s.pendingRequests.On("All").Return(requests)
+	// models old requests that stayed long in the mempool and are not dispatched anytime soon.
+	lateQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
+		unittest.WithHeightGreaterThan(5),
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	// models requests that their chunk data pack arrives during the dispatch processing and hence
+	// are no longer needed to dispatch.
+	disQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
+		unittest.WithHeightGreaterThan(5),
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
 
-	// makes all chunk requests being qualified for dispatch only in far future (e.g., an hour).
+	allRequests := append(instantQualifiedRequests, lateQualifiedRequests...)
+	allRequests = append(allRequests, disQualifiedRequests...)
+
+	test.MockLastSealedHeight(s.state, 5)
+	s.pendingRequests.On("All").Return(allRequests)
+
+	attempts := 10
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
-		s.pendingRequests, flow.IdentifierList{}, flow.GetIDs(requests), flow.IdentifierList{}, 1)
+		s.pendingRequests,
+		flow.GetIDs(instantQualifiedRequests),
+		flow.GetIDs(lateQualifiedRequests),
+		flow.GetIDs(disQualifiedRequests),
+		attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
+	// mocks only instant qualified requests are dispatched.
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
+
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval, "did not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
-
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
@@ -501,8 +526,8 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 		require.False(t, ok)
 		removedRequests[chunkID] = struct{}{}
 	}).
-		Return(true)
-	// Times(len(chunkIDs))
+		Return(true).
+		Times(len(chunkIDs))
 }
 
 // mockPendingRequestInfoAndUpdate mocks pending requests mempool regarding three sets of chunk IDs: the instant, late, and disqualified ones.
