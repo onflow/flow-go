@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -32,7 +33,7 @@ type Context struct {
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
 	SetValueHandler                  SetValueHandler
-	SignatureVerifier                SignatureVerifier
+	SignatureVerifier                crypto.SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
 	Logger                           zerolog.Logger
@@ -89,7 +90,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
 		SetValueHandler:                  nil,
-		SignatureVerifier:                NewDefaultSignatureVerifier(),
+		SignatureVerifier:                crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),

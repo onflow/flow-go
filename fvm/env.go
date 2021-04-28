@@ -16,6 +16,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -23,8 +24,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
-
-	"github.com/onflow/flow-go-sdk/crypto"
 )
 
 var _ runtime.Interface = &hostEnv{}
@@ -37,6 +36,7 @@ type hostEnv struct {
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
 	programs         *handler.ProgramsHandler
+	accountKeys      *handler.AccountKeyHandler
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *state.UUIDGenerator
 	metrics          runtime.Metrics
@@ -67,6 +67,8 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		ctx.EventCollectionByteSizeLimit,
 	)
 
+	accountKeys := handler.NewAccountKeyHandler(accounts)
+
 	env := &hostEnv{
 		ctx:              ctx,
 		sth:              sth,
@@ -74,6 +76,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		metrics:          &noopMetricsCollector{},
 		accounts:         accounts,
 		contracts:        contracts,
+		accountKeys:      accountKeys,
 		addressGenerator: generator,
 		uuidGenerator:    uuidGenerator,
 		eventHandler:     eventHandler,
@@ -107,6 +110,7 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		e.programs,
 		e.accounts,
 		e.contracts,
+		e.accountKeys,
 		e.addressGenerator,
 		tx,
 		txIndex,
@@ -541,17 +545,13 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 		defer sp.Finish()
 	}
 
-	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	if hashAlgo == crypto.UnknownHashAlgorithm {
+	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	if hashAlgo == crypto.UnknownHashingAlgorithm {
 		err := errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
 
-	hasher, err := crypto.NewHasher(hashAlgo)
-	if err != nil {
-		return nil, errors.NewHasherFailuref("failed to create a hasher for env.Hash: %w", err)
-	}
-
+	hasher := crypto.NewHasher(hashAlgo)
 	return hasher.ComputeHash(data), nil
 }
 
@@ -568,7 +568,7 @@ func (e *hostEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
-	valid, err := verifySignatureFromRuntime(
+	valid, err := crypto.VerifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
@@ -935,6 +935,7 @@ type transactionEnv struct {
 	programs         *handler.ProgramsHandler
 	accounts         *state.Accounts
 	contracts        *handler.ContractHandler
+	accountKeys      *handler.AccountKeyHandler
 	addressGenerator flow.AddressGenerator
 	tx               *flow.TransactionBody
 	txIndex          uint32
@@ -950,6 +951,7 @@ func newTransactionEnv(
 	programs *handler.ProgramsHandler,
 	accounts *state.Accounts,
 	contracts *handler.ContractHandler,
+	accountKeys *handler.AccountKeyHandler,
 	addressGenerator flow.AddressGenerator,
 	tx *flow.TransactionBody,
 	txIndex uint32,
@@ -961,6 +963,7 @@ func newTransactionEnv(
 		programs:         programs,
 		accounts:         accounts,
 		contracts:        contracts,
+		accountKeys:      accountKeys,
 		addressGenerator: addressGenerator,
 		tx:               tx,
 		txIndex:          txIndex,
@@ -1025,77 +1028,6 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	return runtime.Address(flowAddress), nil
 }
 
-// AddEncodedAccountKey adds an encoded public key to an existing account.
-//
-// This function returns an error if the specified account does not exist or
-// if the key insertion fails.
-func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
-	accountAddress := flow.Address(address)
-
-	ok, err := e.accounts.Exists(accountAddress)
-	if err != nil {
-		return fmt.Errorf("adding encoded account key failed: %w", err)
-	}
-
-	if !ok {
-		return errors.NewAccountNotFoundError(accountAddress)
-	}
-
-	var publicKey flow.AccountPublicKey
-
-	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
-	if err != nil {
-		err = errors.NewValueErrorf(string(encodedPublicKey), "invalid encoded public key value: %w", err)
-		return fmt.Errorf("adding encoded account key failed: %w", err)
-	}
-
-	err = e.accounts.AppendPublicKey(accountAddress, publicKey)
-	if err != nil {
-		return fmt.Errorf("adding encoded account key failed: %w", err)
-	}
-
-	return nil
-}
-
-// RemoveAccountKey revokes a public key by index from an existing account.
-//
-// This function returns an error if the specified account does not exist, the
-// provided key is invalid, or if key revoking fails.
-func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int) (encodedPublicKey []byte, err error) {
-	accountAddress := flow.Address(address)
-
-	ok, err := e.accounts.Exists(accountAddress)
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	if !ok {
-		issue := errors.NewAccountNotFoundError(accountAddress)
-		return nil, fmt.Errorf("remove account key failed: %w", issue)
-	}
-
-	if keyIndex < 0 {
-		err = errors.NewValueErrorf(fmt.Sprint(keyIndex), "key index must be positive")
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	var publicKey flow.AccountPublicKey
-	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	// mark this key as revoked
-	publicKey.Revoked = true
-
-	encodedPublicKey, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("remove account key failed: %w", err)
-	}
-
-	return encodedPublicKey, nil
-}
-
 func (e *transactionEnv) isAuthorizerServiceAccount() bool {
 	return e.isAuthorizer(runtime.Address(e.ctx.Chain.ServiceAddress()))
 }
@@ -1117,6 +1049,22 @@ func (e *transactionEnv) RemoveAccountContractCode(address runtime.Address, name
 	return e.contracts.RemoveContract(address, name, e.GetSigningAccounts())
 }
 
+// AddEncodedAccountKey adds an encoded public key to an existing account.
+//
+// This function returns an error if the specified account does not exist or
+// if the key insertion fails.
+func (e *transactionEnv) AddEncodedAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
+	return e.accountKeys.AddEncodedAccountKey(address, encodedPublicKey)
+}
+
+// RemoveAccountKey revokes a public key by index from an existing account.
+//
+// This function returns an error if the specified account does not exist, the
+// provided key is invalid, or if key revoking fails.
+func (e *transactionEnv) RemoveAccountKey(address runtime.Address, keyIndex int) (encodedPublicKey []byte, err error) {
+	return e.accountKeys.RemoveAccountKey(address, keyIndex)
+}
+
 // AddAccountKey adds a public key to an existing account.
 //
 // This function returns an error if the specified account does not exist or
@@ -1129,62 +1077,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 	*runtime.AccountKey,
 	error,
 ) {
-	accountAddress := flow.Address(address)
-
-	ok, err := e.accounts.Exists(accountAddress)
-	if err != nil {
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-	if !ok {
-		issue := errors.NewAccountNotFoundError(accountAddress)
-		return nil, fmt.Errorf("adding account key failed: %w", issue)
-	}
-
-	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgorithm == crypto.UnknownSignatureAlgorithm {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.Name(), "signature algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
-	if hashAlgorithm == crypto.UnknownHashAlgorithm {
-		err = errors.NewValueErrorf(hashAlgo.Name(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
-	if err != nil {
-		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	keyIndex, err := e.accounts.GetPublicKeyCount(accountAddress)
-	if err != nil {
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	accountPublicKey := flow.AccountPublicKey{
-		Index:     int(keyIndex),
-		PublicKey: decodedPublicKey,
-		SignAlgo:  signAlgorithm,
-		HashAlgo:  hashAlgorithm,
-		SeqNumber: 0,
-		Weight:    weight,
-		Revoked:   false,
-	}
-
-	err = e.accounts.AppendPublicKey(accountAddress, accountPublicKey)
-	if err != nil {
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	return &runtime.AccountKey{
-		KeyIndex:  accountPublicKey.Index,
-		PublicKey: publicKey,
-		HashAlgo:  hashAlgo,
-		Weight:    accountPublicKey.Weight,
-		IsRevoked: accountPublicKey.Revoked,
-	}, nil
+	return e.accountKeys.AddAccountKey(address, publicKey, hashAlgo, weight)
 }
 
 // RevokeAccountKey revokes a public key by index from an existing account,
@@ -1194,67 +1087,7 @@ func (e *transactionEnv) AddAccountKey(address runtime.Address,
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key revoking fails.
 func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	accountAddress := flow.Address(address)
-
-	ok, err := e.accounts.Exists(accountAddress)
-	if err != nil {
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
-	}
-
-	if !ok {
-		issue := errors.NewAccountNotFoundError(accountAddress)
-		return nil, fmt.Errorf("revoking account key failed: %w", issue)
-	}
-
-	// Don't return an error for invalid key indices
-	if keyIndex < 0 {
-		return nil, nil
-	}
-
-	var publicKey flow.AccountPublicKey
-	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
-	if err != nil {
-		// If a key is not found at a given index, then return a nil key with no errors.
-		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
-		// distinguish between a 'key not found error' vs other internal errors.
-		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
-	}
-
-	// mark this key as revoked
-	publicKey.Revoked = true
-
-	_, err = e.accounts.SetPublicKey(accountAddress, uint64(keyIndex), publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
-	}
-
-	// Prepare the account key to return
-
-	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
-	}
-
-	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
-	if hashAlgo == runtime.HashAlgorithmUnknown {
-		err = errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("revoking account key failed: %w", err)
-	}
-
-	return &runtime.AccountKey{
-		KeyIndex: publicKey.Index,
-		PublicKey: &runtime.PublicKey{
-			PublicKey: publicKey.PublicKey.Encode(),
-			SignAlgo:  signAlgo,
-		},
-		HashAlgo:  hashAlgo,
-		Weight:    publicKey.Weight,
-		IsRevoked: publicKey.Revoked,
-	}, nil
+	return e.accountKeys.RevokeAccountKey(address, keyIndex)
 }
 
 // GetAccountKey retrieves a public key by index from an existing account.
@@ -1263,58 +1096,5 @@ func (e *transactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key retrieval fails.
 func (e *transactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
-	accountAddress := flow.Address(address)
-
-	ok, err := e.accounts.Exists(accountAddress)
-	if err != nil {
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	if !ok {
-		issue := errors.NewAccountNotFoundError(accountAddress)
-		return nil, fmt.Errorf("getting account key failed: %w", issue)
-	}
-
-	// Don't return an error for invalid key indices
-	if keyIndex < 0 {
-		return nil, nil
-	}
-
-	var publicKey flow.AccountPublicKey
-	publicKey, err = e.accounts.GetPublicKey(accountAddress, uint64(keyIndex))
-	if err != nil {
-		// If a key is not found at a given index, then return a nil key with no errors.
-		// This is to be inline with the Cadence runtime. Otherwise Cadence runtime cannot
-		// distinguish between a 'key not found error' vs other internal errors.
-		if errors.IsAccountAccountPublicKeyNotFoundError(err) {
-			return nil, nil
-		}
-
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	// Prepare the account key to return
-
-	signAlgo := CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgo == runtime.SignatureAlgorithmUnknown {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	hashAlgo := CryptoToRuntimeHashingAlgorithm(publicKey.HashAlgo)
-	if hashAlgo == runtime.HashAlgorithmUnknown {
-		err = errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("getting account key failed: %w", err)
-	}
-
-	return &runtime.AccountKey{
-		KeyIndex: publicKey.Index,
-		PublicKey: &runtime.PublicKey{
-			PublicKey: publicKey.PublicKey.Encode(),
-			SignAlgo:  signAlgo,
-		},
-		HashAlgo:  hashAlgo,
-		Weight:    publicKey.Weight,
-		IsRevoked: publicKey.Revoked,
-	}, nil
+	return e.accountKeys.GetAccountKey(address, keyIndex)
 }
