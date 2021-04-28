@@ -102,36 +102,28 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 
 	collector := c.chunkCollectors[chunkIndex]
 	status := collector.ProcessApproval(approval)
-	if status.numberOfApprovals >= c.requiredApprovalsForSealConstruction {
-		c.collectAggregatedSignature(chunkIndex, collector)
-		return c.trySealResult()
+	if status.numberOfApprovals < c.requiredApprovalsForSealConstruction {
+		return nil
 	}
 
-	return nil
-}
-
-func (c *ApprovalCollector) trySealResult() error {
-	c.lock.RLock()
-	collectedSignatures := len(c.aggregatedSignatures)
-	c.lock.RUnlock()
-
-	if collectedSignatures < c.numberOfChunks {
-		// some signatures are missing
-		return nil
+	approvedChunks := c.collectAggregatedSignature(chunkIndex, collector)
+	if approvedChunks < c.numberOfChunks {
+		return nil // still missing approvals for some chunks
 	}
 
 	return c.SealResult()
 }
 
-func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collector *ChunkApprovalCollector) {
-	if c.chunkHasEnoughApprovals(chunkIndex) {
-		return
-	}
-
+// collectAggregatedSignature adds the AggregatedSignature from the collector to `aggregatedSignatures`.
+// The returned int is the resulting number of approved chunks.
+func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collector *ChunkApprovalCollector) int {
 	aggregatedSignature := collector.GetAggregatedSignature()
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.aggregatedSignatures[chunkIndex] = aggregatedSignature
+	if _, found := c.aggregatedSignatures[chunkIndex]; !found {
+		c.aggregatedSignatures[chunkIndex] = aggregatedSignature
+	}
+	return len(c.aggregatedSignatures)
 }
 
 func (c *ApprovalCollector) collectChunksWithMissingApprovals() []uint64 {
