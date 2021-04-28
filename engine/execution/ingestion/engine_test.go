@@ -64,11 +64,12 @@ type testingContext struct {
 	executionState      *state.ExecutionState
 	snapshot            *protocol.Snapshot
 	identity            *flow.Identity
+	mu                  sync.Mutex
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 }
 
-func runWithEngine(t *testing.T, f func(testingContext)) {
+func runWithEngine(t *testing.T, f func(*testingContext)) {
 
 	ctrl := gomock.NewController(t)
 
@@ -173,7 +174,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	)
 	require.NoError(t, err)
 
-	f(testingContext{
+	f(&testingContext{
 		t:                   t,
 		engine:              engine,
 		blocks:              blocks,
@@ -299,6 +300,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 				assert.True(ctx.t, valid)
 			}
 
+			ctx.mu.Lock()
+			defer ctx.mu.Unlock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
 		}).
 		Return(nil)
@@ -311,7 +314,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 }
 
-func (ctx testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) {
+func (ctx *testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) {
 	identity := *ctx.identity
 	identity.Stake = 0
 	if staked {
@@ -359,7 +362,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 }
 
 func TestExecuteOneBlock(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
@@ -398,7 +401,7 @@ func TestExecuteOneBlock(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		colSigner := unittest.IdentifierFixture()
 
@@ -498,7 +501,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		// block in the queue are removed only after the execution has finished
 		// this gives a brief window for multiple execution
@@ -624,7 +627,7 @@ func logBlocks(blocks map[string]*entity.ExecutableBlock) {
 }
 
 func TestExecuteBlockInOrder(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 		// create blocks with the following relations
 		// A <- B
 		// A <- C <- D
@@ -728,7 +731,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 }
 
 func TestExecuteScriptAtBlockID(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 		// Meaningless script
 		script := []byte{1, 1, 2, 3, 5, 8, 11}
 		scriptResult := []byte{1}
@@ -767,7 +770,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 }
 
 func Test_SPOCKGeneration(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		snapshots := []*delta.SpockSnapshot{
 			{
@@ -807,7 +810,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		// create blocks with the following relations
 		// A <- B <- C <- D
