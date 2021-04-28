@@ -90,6 +90,12 @@ func (c *ApprovalCollector) SealResult() error {
 	return nil
 }
 
+// ProcessApproval performs processing of result approvals and bookkeeping of aggregated signatures
+// for every chunk. Triggers sealing of execution result when processed last result approval needed for sealing.
+// Returns:
+// - engine.InvalidInputError - result approval is invalid
+// - exception in case of any other error, usually this is not expected
+// - nil on success
 func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	chunkIndex := approval.Body.ChunkIndex
 	if chunkIndex >= uint64(len(c.chunkCollectors)) {

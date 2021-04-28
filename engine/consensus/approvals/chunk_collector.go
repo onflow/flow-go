@@ -59,12 +59,11 @@ func (c *ChunkApprovalCollector) GetAggregatedSignature() flow.AggregatedSignatu
 
 // GetMissingSigners returns ids of approvers that are present in assignment but didn't provide approvals
 func (c *ChunkApprovalCollector) GetMissingSigners() flow.IdentifierList {
-   // provide capacity for worst-case
-   result := make(flow.IdentifierList, 0, len(c.assignment))
-	aggregatedSig := c.GetAggregatedSignature()
+	// provide capacity for worst-case
+	result := make(flow.IdentifierList, 0, len(c.assignment))
 	c.lock.Lock()
 	for id := range c.assignment {
-		if  _, hasSigned := c.chunkApprovals.BySigner(id); !hasSigned {
+		if _, hasSigned := c.chunkApprovals.BySigner(id); !hasSigned {
 			result = append(result, id)
 		}
 	}

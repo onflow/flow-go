@@ -259,7 +259,7 @@ func (c *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) 
 	if collector := c.getCollector(approval.Body.ExecutionResultID); collector != nil {
 		// if there is a collector it means that we have received execution result and we are ready
 		// to process approvals
-		err = collector.ProcessAssignment(approval)
+		err = collector.ProcessApproval(approval)
 		if err != nil {
 			return fmt.Errorf("could not process assignment: %w", err)
 		}
@@ -296,7 +296,7 @@ func (c *approvalProcessingCore) processPendingApprovals(collector *AssignmentCo
 	// filter cached approvals for concrete execution result
 	for _, approvalID := range c.approvalsCache.Ids() {
 		if approval := c.approvalsCache.TakeIf(approvalID, predicate); approval != nil {
-			err := collector.ProcessAssignment(approval)
+			err := collector.ProcessApproval(approval)
 			if err != nil {
 				if engine.IsInvalidInputError(err) {
 					c.log.Debug().

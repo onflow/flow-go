@@ -200,6 +200,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 // for orphan fork.
 func (c *AssignmentCollector) OnBlockFinalizedAtHeight(blockID flow.Identifier, blockHeight uint64) {
 	c.incorporatedAtHeightLock.Lock()
+	ids := c.incorporatedAtHeight[blockHeight]
 	delete(c.incorporatedAtHeight, blockHeight)
 	c.incorporatedAtHeightLock.Unlock()
 
@@ -275,23 +276,13 @@ func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) er
 	return nil
 }
 
-// validateAndCache performs validation of approval and saves it into cache
-// expects that execution result was discovered before calling this function
-func (c *AssignmentCollector) validateAndCache(approval *flow.ResultApproval) error {
+func (c *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	err := c.validateApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not validate approval: %w", err)
 	}
 
 	c.verifiedApprovalsCache.Put(approval)
-	return nil
-}
-
-func (c *AssignmentCollector) ProcessAssignment(approval *flow.ResultApproval) error {
-	err := c.validateAndCache(approval)
-	if err != nil {
-		return fmt.Errorf("could not validate and cache approval: %w", err)
-	}
 
 	for _, collector := range c.allCollectors() {
 		err := collector.ProcessApproval(approval)

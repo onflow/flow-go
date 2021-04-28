@@ -111,7 +111,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsAfterResul
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
-			err = s.collector.ProcessAssignment(approval)
+			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)
 		}
 	}
@@ -131,7 +131,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
-			err = s.collector.ProcessAssignment(approval)
+			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)
 		}
 	}
@@ -160,7 +160,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessAssignment_InvalidSignature() 
 	require.NoError(s.T(), err)
 
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
-	err = s.collector.ProcessAssignment(approval)
+	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
 }
@@ -270,11 +270,11 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 }
 
 // TestProcessAssignment_BeforeIncorporatedResult tests scenario when approval is submitted before execution result
-// is discovered, without execution result we are missing information for verification. Calling `ProcessAssignment` before `ProcessApproval`
+// is discovered, without execution result we are missing information for verification. Calling `ProcessApproval` before `ProcessApproval`
 // should result in error
 func (s *AssignmentCollectorTestSuite) TestProcessAssignment_BeforeIncorporatedResult() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
-	err := s.collector.ProcessAssignment(approval)
+	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
 }
