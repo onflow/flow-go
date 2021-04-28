@@ -103,27 +103,34 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 // is updated to the current time. Otherwise, it aborts and returns false.
 //
 // The updates under this method are atomic, thread-safe, and done in isolation.
-func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) bool {
+func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool) {
+	var lastAttempt time.Time
+	var retryAfter time.Duration
+	var attempts uint64
+
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkID]
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		chunk := toChunkRequestStatus(entity)
+		status := toChunkRequestStatus(entity)
 
-		attempt, retryAfter, ok := updater(chunk.Attempt, chunk.RetryAfter)
+		var ok bool
+		attempts, retryAfter, ok = updater(status.Attempt, status.RetryAfter)
 		if !ok {
 			return fmt.Errorf("updater failed")
 		}
+		lastAttempt = time.Now()
 
-		chunk.LastAttempt = time.Now()
-		chunk.RetryAfter = retryAfter
-		chunk.Attempt = attempt
+		// updates underlying request
+		status.LastAttempt = lastAttempt
+		status.RetryAfter = retryAfter
+		status.Attempt = attempts
 
 		return nil
 	})
 
-	return err == nil
+	return attempts, lastAttempt, retryAfter, err == nil
 }
 
 // All returns all chunk requests stored in this memory pool.

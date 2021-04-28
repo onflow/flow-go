@@ -84,8 +84,10 @@ type ChunkRequests interface {
 	// the updater returns true, the result of update is committed to the mempool, and the time stamp of the chunk request
 	// is updated to the current time. Otherwise, it aborts and returns false.
 	//
+	// It returns the updated request history values.
+	//
 	// The updates under this method are atomic, thread-safe, and done in isolation.
-	UpdateRequestHistory(chunkID flow.Identifier, updater ChunkRequestHistoryUpdaterFunc) bool
+	UpdateRequestHistory(chunkID flow.Identifier, updater ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool)
 
 	// All returns all chunk requests stored in this memory pool.
 	All() []*verification.ChunkDataPackRequest

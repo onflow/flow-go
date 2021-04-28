@@ -135,15 +135,36 @@ func (_m *ChunkRequests) RequestInfo(chunkID flow.Identifier) (uint64, time.Time
 }
 
 // UpdateRequestHistory provides a mock function with given fields: chunkID, updater
-func (_m *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) bool {
+func (_m *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool) {
 	ret := _m.Called(chunkID, updater)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, mempool.ChunkRequestHistoryUpdaterFunc) bool); ok {
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func(flow.Identifier, mempool.ChunkRequestHistoryUpdaterFunc) uint64); ok {
 		r0 = rf(chunkID, updater)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Get(0).(uint64)
 	}
 
-	return r0
+	var r1 time.Time
+	if rf, ok := ret.Get(1).(func(flow.Identifier, mempool.ChunkRequestHistoryUpdaterFunc) time.Time); ok {
+		r1 = rf(chunkID, updater)
+	} else {
+		r1 = ret.Get(1).(time.Time)
+	}
+
+	var r2 time.Duration
+	if rf, ok := ret.Get(2).(func(flow.Identifier, mempool.ChunkRequestHistoryUpdaterFunc) time.Duration); ok {
+		r2 = rf(chunkID, updater)
+	} else {
+		r2 = ret.Get(2).(time.Duration)
+	}
+
+	var r3 bool
+	if rf, ok := ret.Get(3).(func(flow.Identifier, mempool.ChunkRequestHistoryUpdaterFunc) bool); ok {
+		r3 = rf(chunkID, updater)
+	} else {
+		r3 = ret.Get(3).(bool)
+	}
+
+	return r0, r1, r2, r3
 }
