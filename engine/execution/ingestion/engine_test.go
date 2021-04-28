@@ -106,15 +106,6 @@ func runWithEngine(t *testing.T, f func(*testingContext)) {
 
 	var engine *Engine
 
-	defer func() {
-		<-engine.Done()
-		ctrl.Finish()
-		computationManager.AssertExpectations(t)
-		protocolState.AssertExpectations(t)
-		executionState.AssertExpectations(t)
-		providerEngine.AssertExpectations(t)
-	}()
-
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
 	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
@@ -173,6 +164,15 @@ func runWithEngine(t *testing.T, f func(*testingContext)) {
 		checkStakedAtBlock,
 	)
 	require.NoError(t, err)
+
+	defer func() {
+		<-engine.Done()
+		ctrl.Finish()
+		computationManager.AssertExpectations(t)
+		protocolState.AssertExpectations(t)
+		executionState.AssertExpectations(t)
+		providerEngine.AssertExpectations(t)
+	}()
 
 	f(&testingContext{
 		t:                   t,
