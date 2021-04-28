@@ -4,6 +4,7 @@ package mempool
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
+	mempool "github.com/onflow/flow-go/module/mempool"
 
 	mock "github.com/stretchr/testify/mock"
 
@@ -133,13 +134,13 @@ func (_m *ChunkRequests) RequestInfo(chunkID flow.Identifier) (uint64, time.Time
 	return r0, r1, r2, r3
 }
 
-// UpdateRetryAfter provides a mock function with given fields: chunkID, retryAfter
-func (_m *ChunkRequests) UpdateRetryAfter(chunkID flow.Identifier, retryAfter time.Duration) bool {
-	ret := _m.Called(chunkID, retryAfter)
+// UpdateRequestHistory provides a mock function with given fields: chunkID, updater
+func (_m *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) bool {
+	ret := _m.Called(chunkID, updater)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, time.Duration) bool); ok {
-		r0 = rf(chunkID, retryAfter)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, mempool.ChunkRequestHistoryUpdaterFunc) bool); ok {
+		r0 = rf(chunkID, updater)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
