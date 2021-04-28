@@ -7,58 +7,83 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-func IncludingBlock(lowestBlockId flow.Identifier) Terminal {
-	return terminalBlock{lowestBlockId, true}
-}
+// IncludingBlock returns a Terminal implementation where we explicitly
+// specify the ID of the lowest block that should be visited
+type IncludingBlock flow.Identifier
 
-func ExcludingBlock(lowestBlockId flow.Identifier) Terminal {
-	return terminalBlock{lowestBlockId, false}
-}
-
-type terminalBlock struct {
-	terminalBlockID flow.Identifier
-	inclusive       bool
-}
-
-func (t terminalBlock) Translate2Height(headers storage.Headers) (uint64, sanityCheckLowestVisitedBlock, error) {
-	terminalHeader, err := headers.ByBlockID(t.terminalBlockID)
+// LowestHeightToVisit computes the height of the lowest block that should be visited
+func (t IncludingBlock) LowestHeightToVisit(headers storage.Headers) (uint64, error) {
+	terminalHeader, err := headers.ByBlockID(flow.Identifier(t))
 	if err != nil {
-		return 0, noopSanityChecker, fmt.Errorf("failed to retrieve header of terminal block %x: %w", t.terminalBlockID, err)
+		return 0, fmt.Errorf("failed to retrieve header of terminal block %x: %w", flow.Identifier(t), err)
 	}
+	return terminalHeader.Height, nil
+}
 
-	if t.inclusive {
-		sanityChecker := func(header *flow.Header) error {
-			if header.ID() != t.terminalBlockID {
-				return fmt.Errorf("last visited block has ID %x but expecting %x", header.ID(), t.terminalBlockID)
-			}
-			return nil
-		}
-		return terminalHeader.Height, sanityChecker, nil
-	} else {
-		sanityChecker := func(header *flow.Header) error {
-			if header.ParentID != t.terminalBlockID {
-				return fmt.Errorf("parent of last visited block has ID %x but expecting %x", header.ParentID, t.terminalBlockID)
-			}
-			return nil
-		}
-		return terminalHeader.Height + 1, sanityChecker, nil
+// ConfirmTerminalReached is a self-consistency check that the lowest visited block is
+// in fact the expected terminal.
+func (t IncludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+	if lowestVisitedBlock.ID() != flow.Identifier(t) {
+		return fmt.Errorf("last visited block has ID %x but expecting %x", lowestVisitedBlock.ID(), flow.Identifier(t))
 	}
+	return nil
 }
 
-func IncludingHeight(lowestHeight uint64) Terminal {
-	return terminalHeight{lowestHeight}
+// ExcludingBlock returns a Terminal implementation where we explicitly
+// specify the ID of the lowest block that should _not_ be visited anymore
+type ExcludingBlock flow.Identifier
+
+// LowestHeightToVisit computes the height of the lowest block that should be visited
+func (t ExcludingBlock) LowestHeightToVisit(headers storage.Headers) (uint64, error) {
+	id := flow.Identifier(t)
+	terminalHeader, err := headers.ByBlockID(id)
+	if err != nil {
+		return 0, fmt.Errorf("failed to retrieve header of terminal block %x: %w", id, err)
+	}
+	return terminalHeader.Height + 1, nil
 }
 
-func ExcludingHeight(lowestHeight uint64) Terminal {
-	return terminalHeight{lowestHeight + 1}
+// ConfirmTerminalReached is a self-consistency check that the lowest visited block is
+// in fact the expected terminal.
+func (t ExcludingBlock) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+	if lowestVisitedBlock.ParentID != flow.Identifier(t) {
+		return fmt.Errorf("parent of last visited block has ID %x but expecting %x", lowestVisitedBlock.ParentID, flow.Identifier(t))
+	}
+	return nil
 }
 
-type terminalHeight struct {
-	lowestHeightToVisit uint64
+// IncludingHeight returns a Terminal implementation where we
+// specify the height of the lowest block that should be visited
+type IncludingHeight uint64
+
+// LowestHeightToVisit computes the height of the lowest block that should be visited
+func (t IncludingHeight) LowestHeightToVisit(storage.Headers) (uint64, error) {
+	return uint64(t), nil
 }
 
-func (t terminalHeight) Translate2Height(storage.Headers) (uint64, sanityCheckLowestVisitedBlock, error) {
-	return t.lowestHeightToVisit, noopSanityChecker, nil
+// ConfirmTerminalReached is a self-consistency check that the lowest visited block is
+// in fact the expected terminal.
+func (t IncludingHeight) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+	if lowestVisitedBlock.Height != uint64(t) {
+		return fmt.Errorf("expecting terminal block with height %d but got %d", uint64(t), lowestVisitedBlock.Height)
+	}
+	return nil
 }
 
-func noopSanityChecker(*flow.Header) error { return nil }
+// ExcludingHeight returns a Terminal implementation where we
+// specify the Height of the lowest block that should _not_ be visited anymore
+type ExcludingHeight uint64
+
+// LowestHeightToVisit computes the height of the lowest block that should be visited
+func (t ExcludingHeight) LowestHeightToVisit(storage.Headers) (uint64, error) {
+	return uint64(t) + 1, nil
+}
+
+// ConfirmTerminalReached is a self-consistency check that the lowest visited block is
+// in fact the expected terminal.
+func (t ExcludingHeight) ConfirmTerminalReached(headers storage.Headers, lowestVisitedBlock *flow.Header) error {
+	if lowestVisitedBlock.Height != uint64(t)+1 {
+		return fmt.Errorf("expecting terminal block with height %d but got %d", uint64(t)+1, lowestVisitedBlock.Height)
+	}
+	return nil
+}
