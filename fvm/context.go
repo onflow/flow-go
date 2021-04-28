@@ -212,7 +212,9 @@ func WithBlocks(blocks Blocks) Option {
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
 func WithMetricsReporter(mr handler.MetricsReporter) Option {
 	return func(ctx Context) Context {
-		ctx.Metrics = mr
+		if mr != nil {
+			ctx.Metrics = mr
+		}
 		return ctx
 	}
 }
