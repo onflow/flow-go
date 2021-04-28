@@ -4,25 +4,28 @@ import (
 	crand "crypto/rand"
 	"fmt"
 	"math/rand"
+	"testing"
 	"time"
 
-	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/inmem"
+	sdk "github.com/onflow/flow-go-sdk"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/engine/verification"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
@@ -300,15 +303,27 @@ func GenesisFixture(identities flow.IdentityList) *flow.Block {
 	return genesis
 }
 
-func BlockHeaderFixture() flow.Header {
+func WithHeaderHeight(height uint64) func(header *flow.Header) {
+	return func(header *flow.Header) {
+		header.Height = height
+	}
+}
+
+func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))
-	return BlockHeaderWithParentFixture(&flow.Header{
+	header := BlockHeaderWithParentFixture(&flow.Header{
 		ChainID:  flow.Emulator,
 		ParentID: IdentifierFixture(),
 		Height:   height,
 		View:     view,
 	})
+
+	for _, opt := range opts {
+		opt(&header)
+	}
+
+	return header
 }
 
 func BlockHeaderFixtureOnChain(chainID flow.ChainID) flow.Header {
@@ -542,6 +557,30 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	}
 }
 
+func WithChunks(n uint) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.Chunks = ChunkListFixture(n, result.BlockID)
+	}
+}
+
+func ExecutionResultListFixture(n int, opts ...func(*flow.ExecutionResult)) []*flow.ExecutionResult {
+	results := make([]*flow.ExecutionResult, 0, n)
+	for i := 0; i < n; i++ {
+		results = append(results, ExecutionResultFixture(opts...))
+	}
+
+	return results
+}
+
+func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.BlockID = blockID
+		for _, chunk := range result.Chunks {
+			chunk.BlockID = blockID
+		}
+	}
+}
+
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
@@ -553,6 +592,7 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 	for _, apply := range opts {
 		apply(result)
 	}
+
 	return result
 }
 
@@ -689,6 +729,21 @@ func RandomBytes(n int) []byte {
 	return b
 }
 
+func NodeInfoFixture(opts ...func(*flow.Identity)) bootstrap.NodeInfo {
+	opts = append(opts, WithKeys)
+	return bootstrap.NodeInfoFromIdentity(IdentityFixture(opts...))
+}
+
+func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+	opts = append(opts, WithKeys)
+	il := IdentityListFixture(n, opts...)
+	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	for _, identity := range il {
+		nodeInfos = append(nodeInfos, bootstrap.NodeInfoFromIdentity(identity))
+	}
+	return nodeInfos
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
@@ -704,10 +759,23 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	return &identity
 }
 
+func WithKeys(identity *flow.Identity) {
+	staking, err := StakingKey()
+	if err != nil {
+		panic(err)
+	}
+	networking, err := NetworkingKey()
+	if err != nil {
+		panic(err)
+	}
+	identity.StakingPubKey = staking.PublicKey()
+	identity.NetworkPubKey = networking.PublicKey()
+}
+
 // WithNodeID adds a node ID with the given first byte to an identity.
-func WithNodeID(b byte) func(*flow.Identity) {
+func WithNodeID(id flow.Identifier) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
-		identity.NodeID = flow.Identifier{b}
+		identity.NodeID = id
 	}
 }
 
@@ -820,6 +888,43 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 		ResultID: resultID,
 		Index:    index,
 	}
+}
+
+// ChunkStatusListToChunkLocatorFixture extracts chunk locators from a list of chunk statuses.
+func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorList {
+	locators := chunks.LocatorList{}
+	for _, status := range statuses {
+		locator := ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
+		locators = append(locators, locator)
+	}
+
+	return locators
+}
+
+// ChunkStatusListFixture receives a set of execution results, and samples `n` chunk out of each result and
+// creates a chunk status for them.
+// It returns the list of sampled chunk statuses for all results.
+func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int) verification.ChunkStatusList {
+	statuses := verification.ChunkStatusList{}
+
+	for _, result := range results {
+		// result should have enough chunk to sample
+		require.GreaterOrEqual(t, len(result.Chunks), n)
+
+		chunkList := make(flow.ChunkList, n)
+		copy(chunkList, result.Chunks)
+		rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
+
+		for _, chunk := range chunkList[:n] {
+			status := &verification.ChunkStatus{
+				ChunkIndex:      chunk.Index,
+				ExecutionResult: result,
+			}
+			statuses = append(statuses, status)
+		}
+	}
+
+	return statuses
 }
 
 func SignatureFixture() crypto.Signature {
@@ -964,18 +1069,125 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 	}
 }
 
-func ChunkDataPackFixture(identifier flow.Identifier) *flow.ChunkDataPack {
+// ChunkDataResponseFixture creates a chunk data response with a single-transaction collection, and random chunk ID.
+// Use options to customize the response.
+func ChunkDataResponseFixture(chunkID flow.Identifier, opts ...func(*messages.ChunkDataResponse)) *messages.ChunkDataResponse {
+	cdp := &messages.ChunkDataResponse{
+		ChunkDataPack: *ChunkDataPackFixture(chunkID),
+		Collection:    CollectionFixture(1),
+		Nonce:         rand.Uint64(),
+	}
 
+	for _, opt := range opts {
+		opt(cdp)
+	}
+
+	cdp.ChunkDataPack.CollectionID = cdp.Collection.ID()
+
+	return cdp
+}
+
+// ChunkDataResponsesFixture creates a list of chunk data responses each with a single-transaction collection, and random chunk ID.
+func ChunkDataResponsesFixture(n int, opts ...func(*messages.ChunkDataResponse)) []*messages.ChunkDataResponse {
+	lst := make([]*messages.ChunkDataResponse, 0, n)
+	for i := 0; i < n; i++ {
+		lst = append(lst, ChunkDataResponseFixture(IdentifierFixture(), opts...))
+	}
+	return lst
+}
+
+// ChunkDataPackRequestListFixture creates and returns a list of chunk data pack requests fixtures.
+func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
+	lst := make([]*verification.ChunkDataPackRequest, 0, n)
+	for i := 0; i < n; i++ {
+		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
+	}
+	return lst
+}
+
+func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Height = height
+	}
+}
+
+func WithHeightGreaterThan(height uint64) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Height = height + uint64(rand.Uint32()) + 1
+	}
+}
+
+func WithAgrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Agrees = list
+	}
+}
+
+func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackRequest) {
+	return func(request *verification.ChunkDataPackRequest) {
+		request.Disagrees = list
+	}
+}
+
+// ChunkDataPackRequestFixture creates a chunk data request with some default values, i.e., one agree execution node, one disagree execution node,
+// and height of zero.
+// Use options to customize the request.
+func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.ChunkDataPackRequest {
+
+	req := &verification.ChunkDataPackRequest{
+		ChunkID:   chunkID,
+		Height:    0,
+		Agrees:    IdentifierListFixture(1),
+		Disagrees: IdentifierListFixture(1),
+	}
+
+	for _, opt := range opts {
+		opt(req)
+	}
+
+	// creates identity fixtures for target ids as union of agrees and disagrees
+	// TODO: remove this inner fixture once we have filter for identifier list.
+	targets := flow.IdentityList{}
+	for _, id := range req.Agrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+	for _, id := range req.Disagrees {
+		targets = append(targets, IdentityFixture(WithNodeID(id), WithRole(flow.RoleExecution)))
+	}
+
+	req.Targets = targets
+
+	return req
+}
+
+func WithCollectionID(collectionID flow.Identifier) func(*flow.ChunkDataPack) {
+	return func(cdp *flow.ChunkDataPack) {
+		cdp.CollectionID = collectionID
+	}
+}
+
+func WithStartState(startState flow.StateCommitment) func(*flow.ChunkDataPack) {
+	return func(cdp *flow.ChunkDataPack) {
+		cdp.StartState = startState
+	}
+}
+
+func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataPack)) *flow.ChunkDataPack {
 	//ids := utils.GetRandomRegisterIDs(1)
 	//values := utils.GetRandomValues(1, 1, 32)
-
-	return &flow.ChunkDataPack{
-		ChunkID:    identifier,
+	cdp := &flow.ChunkDataPack{
+		ChunkID:    chunkID,
 		StartState: StateCommitmentFixture(),
 		//RegisterTouches: []flow.RegisterTouch{{RegisterID: ids[0], Value: values[0], Proof: []byte{'p'}}},
 		Proof:        []byte{'p'},
 		CollectionID: IdentifierFixture(),
 	}
+
+	for _, opt := range opts {
+		opt(cdp)
+	}
+
+	return cdp
 }
 
 // SeedFixture returns a random []byte with length n
