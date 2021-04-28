@@ -74,7 +74,7 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 
 			// create and assign fields to identity from cadence Struct
 			identity := new(Identity)
-			identity.Role = Role(nodeInfo[1].(cadence.UInt8))
+			identity.Role = Role(uint8(nodeInfo[1].(cadence.UInt8)))
 			identity.Address = string(nodeInfo[2].(cadence.String))
 			identity.Stake = uint64(nodeInfo[5].(cadence.UFix64))
 
@@ -83,8 +83,9 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 				return nil, fmt.Errorf("could not convert hex string to identifer: %w", err)
 			}
 
+			// TODO: Errors here as we have the incorrect key length, recieved 128 required 96
 			netPubKeyString := string(nodeInfo[3].(cadence.String))
-			identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(netPubKeyString))
+			identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, []byte(netPubKeyString))
 			if err != nil {
 				return nil, fmt.Errorf("could not decode network public key: %w", err)
 			}
@@ -108,7 +109,7 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 		ev := new(EpochCommit)
 		ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
 
-		// TODO: parse clusterQC
+		// TODO: parse cluster QC from event
 
 		// parse DKG group key and participants
 		// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
@@ -120,7 +121,7 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 			dkgKeys = append(dkgKeys, key)
 		}
 
-		// pop first element
+		// pop first element - group public key hex string
 		groupPubKeyString, dkgKeys := dkgKeys[0], dkgKeys[1:]
 
 		// decode group public key
@@ -129,19 +130,18 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 			return nil, fmt.Errorf("could not decode group public key: %w", err)
 		}
 
-		dkgParticipants := make(map[Identifier]DKGParticipant)
-		for index, pubKeyString := range dkgKeys {
+		// decode individual public keys
+		dkgParticipantKeys := make([]crypto.PublicKey, 0, len(dkgKeys))
+		for _, pubKeyString := range dkgKeys {
 
 			pubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(pubKeyString))
 			if err != nil {
 				return nil, fmt.Errorf("could not decode dkg public key: %w", err)
 			}
-
-			dkgParticipants[[32]byte{}] = DKGParticipant{
-				Index:    uint(index + 1),
-				KeyShare: pubKey,
-			}
+			dkgParticipantKeys = append(dkgParticipantKeys, pubKey)
 		}
+
+		// ev.DKGParticipantKeys = dkgParticipantKeys
 
 		serviceEv.Type = ServiceEventCommit
 		serviceEv.Event = ev
