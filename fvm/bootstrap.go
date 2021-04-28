@@ -8,6 +8,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -31,6 +32,8 @@ type BootstrapProcedure struct {
 	accountCreationFee        cadence.UFix64
 	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
+	epochTokenPayout          cadence.UFix64
+	rewardCut                 cadence.UFix64
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -132,6 +135,16 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
+
+	flowDKG := b.deployDKG()
+	b.setupDKGAdmin(service, flowDKG)
+
+	flowQC := b.deployQC()
+	b.setupQCAdmin(service, flowQC)
+
+	flowIDTableStaking := b.deployIDTableStaking(service, fungibleToken, flowToken, b.epochTokenPayout, b.rewardCut)
+	b.deployEpoch(service, fungibleToken, flowToken, flowIDTableStaking, flowQC, flowDKG)
+
 	return nil
 }
 
@@ -233,6 +246,120 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	}
 }
 
+func (b *BootstrapProcedure) deployDKG() flow.Address {
+	flowDKG := b.createAccount()
+
+	contract := contracts.FlowDKG()
+
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployContractTransaction(flowDKG, contract, "FlowDKG"),
+		b.sth,
+		b.programs,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy DKG contract: %s", err.Error()))
+	}
+
+	return flowDKG
+}
+
+func (b *BootstrapProcedure) setupDKGAdmin(service, dkg flow.Address) {
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		setupDKGAdminTransaction(service, dkg),
+		b.sth,
+		b.programs,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup DKG admin: %s", err.Error()))
+	}
+}
+
+func (b *BootstrapProcedure) deployQC() flow.Address {
+	flowQC := b.createAccount()
+
+	contract := contracts.FlowQC()
+
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployContractTransaction(flowQC, contract, "FlowEpochClusterQC"),
+		b.sth,
+		b.programs,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy QC contract: %s", err.Error()))
+	}
+
+	return flowQC
+}
+
+func (b *BootstrapProcedure) setupQCAdmin(service, qc flow.Address) {
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		setupQCAdminTransaction(service, qc),
+		b.sth,
+		b.programs,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to setup QC admin: %s", err.Error()))
+	}
+}
+
+func (b *BootstrapProcedure) deployIDTableStaking(
+	service, fungibleToken,
+	flowToken flow.Address,
+	epochTokenPayout cadence.UFix64,
+	rewardCut cadence.UFix64) flow.Address {
+
+	flowIDTableStaking := b.createAccount()
+
+	contract := contracts.FlowIDTableStaking(
+		fungibleToken.HexWithPrefix(),
+		flowToken.HexWithPrefix(),
+		true)
+
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployIDTableStakingTransaction(flowIDTableStaking, contract, epochTokenPayout, rewardCut),
+		b.sth,
+		b.programs,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy IDTableStaking contract: %s", err.Error()))
+	}
+
+	return flowIDTableStaking
+}
+
+func (b *BootstrapProcedure) deployEpoch(service,
+	fungibleToken,
+	flowToken,
+	idTableStaking,
+	qc,
+	dkg flow.Address) {
+
+	flowEpoch := b.createAccount()
+
+	contract := contracts.FlowEpoch(
+		fungibleToken.HexWithPrefix(),
+		flowToken.HexWithPrefix(),
+		idTableStaking.HexWithPrefix(),
+		qc.HexWithPrefix(),
+		dkg.HexWithPrefix(),
+	)
+
+	err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployEpochTransaction(flowEpoch, contract),
+		b.sth,
+		b.programs,
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to deploy Epoch contract: %s", err.Error()))
+	}
+}
+
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
 	contract := contracts.FlowServiceAccount(
 		fungibleToken.HexWithPrefix(),
@@ -328,6 +455,35 @@ const deployStorageFeesTransactionTemplate = `
 transaction {
   prepare(serviceAccount: AuthAccount) {
     serviceAccount.contracts.add(name: "FlowStorageFees", code: "%s".decodeHex())
+  }
+}
+`
+
+const deployIDTableStakingTransactionTemplate = `
+transaction {
+  prepare(serviceAccount: AuthAccount) {
+	serviceAccount.contracts.add(name: "FlowIDTableStaking", code: "%s".decodeHex(), epochTokenPayout: UFix64(%d), rewardCut: UFix64(%d))
+  }
+}
+`
+
+const deployEpochTransactionTemplate = `
+transaction {
+  prepare(serviceAccount: AuthAccount) {
+	serviceAccount.contracts.add(
+		name: "FlowEpoch",
+		code: "%s".decodeHex(),
+		currentEpochCounter: UInt64(%d),
+		numViewsInEpoch: UInt64(%d),
+		numViewsInStakingAuction: UInt64(%d),
+		numViewsInDKGPhase: UInt64(%d),
+		numCollectorClusters: UInt16(%d),
+		FLOWsupplyIncreasePercentage: UFix64(%d),
+		randomSource: "%s",
+		collectorClusters: [],
+		clusterQCs: [],
+		dkgPubKeys: [],
+	)
   }
 }
 `
@@ -450,6 +606,38 @@ func deployStorageFeesTransaction(service flow.Address, contract []byte) *Transa
 	)
 }
 
+func deployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(
+				deployIDTableStakingTransactionTemplate,
+				hex.EncodeToString(contract),
+				epochTokenPayout,
+				rewardCut))).
+			AddAuthorizer(service),
+		0,
+	)
+}
+
+func deployEpochTransaction(service flow.Address, contract []byte) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(
+				deployEpochTransactionTemplate,
+				hex.EncodeToString(contract),
+				0,        // currentEpochCounter
+				10,       // numViewsInEpoch
+				10,       // numViewsInStakingAuction
+				10,       // numViewsInDKGPhase
+				3,        // numCollectorClusters
+				10,       // FLOWtokenSupplyIncreasePercentage
+				"random", // randomSource
+			))).
+			AddAuthorizer(service),
+		0,
+	)
+}
+
 func mintFlowTokenTransaction(
 	fungibleToken, flowToken, service flow.Address,
 	initialSupply cadence.UFix64,
@@ -508,6 +696,30 @@ func setupStorageForServiceAccountsTransaction(
 			AddAuthorizer(fungibleToken).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(feeContract),
+		0,
+	)
+}
+
+func setupDKGAdminTransaction(service, dkg flow.Address) *TransactionProcedure {
+	env := templates.Environment{
+		DkgAddress: dkg.Hex(),
+	}
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(templates.GeneratePublishDKGParticipantScript(env))).
+			AddAuthorizer(service),
+		0,
+	)
+}
+
+func setupQCAdminTransaction(service, qc flow.Address) *TransactionProcedure {
+	env := templates.Environment{
+		QuorumCertificateAddress: qc.Hex(),
+	}
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(templates.GeneratePublishVoterScript(env))).
+			AddAuthorizer(service),
 		0,
 	)
 }
