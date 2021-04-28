@@ -81,9 +81,7 @@ func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 // The consumer retrieves the new blocks from its block reader module, hence it does not need to use the parameter
 // of OnFinalizedBlock here.
 func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
-	c.unit.Launch(func() {
-		c.consumer.Check()
-	})
+	c.unit.Launch(c.consumer.Check)
 }
 
 // OnBlockIncorporated is to implement FinalizationConsumer
