@@ -158,7 +158,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		programs := programs.NewEmptyPrograms()
 
 		// create BlockComputer
-		bc, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), log, committer)
+		bc, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), log, committer)
 		require.NoError(t, err)
 
 		completeColls := make(map[flow.Identifier]*entity.CompleteCollection)
