@@ -6,7 +6,10 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 )
 
-// MetricsReporter captures and reports execution metrics
+// MetricsReporter captures and reports metrics to back to the execution environment
+// it is a setup passed to the context.
+//
+// TODO expand this to more metrics
 type MetricsReporter interface {
 	TransactionParsed(time.Duration)
 	TransactionChecked(time.Duration)
@@ -14,9 +17,6 @@ type MetricsReporter interface {
 }
 
 // A MetricsHandler accumulates performance metrics reported by the Cadence runtime.
-//
-// A single collector instance will sum all reported values. For example, the "parsed" field will be
-// incremented each time a program is parsed.
 type MetricsHandler struct {
 	Reporter                 MetricsReporter
 	TimeSpentOnParsing       time.Duration
@@ -26,12 +26,13 @@ type MetricsHandler struct {
 	TimeSpentOnValueDecoding time.Duration
 }
 
+// NewMetricsHandler constructs a MetricsHandler
 func NewMetricsHandler(reporter MetricsReporter) *MetricsHandler {
 	return &MetricsHandler{Reporter: reporter}
 }
 
+// ProgramParsed captures time spent on parsing a code at specific location
 func (m *MetricsHandler) ProgramParsed(location common.Location, duration time.Duration) {
-
 	// These checks prevent re-reporting durations, the metrics collection is a bit counter-intuitive:
 	// The three functions (parsing, checking, interpretation) are not called in sequence, but in some cases as part of each other.
 	// We basically only measure the durations reported for the entry-point (the transaction), and not for child locations,
@@ -42,6 +43,7 @@ func (m *MetricsHandler) ProgramParsed(location common.Location, duration time.D
 	}
 }
 
+// ProgramChecked captures time spent on checking a code at specific location
 func (m *MetricsHandler) ProgramChecked(location common.Location, duration time.Duration) {
 	// see the comment for ProgramParsed
 	if _, ok := location.(common.TransactionLocation); ok {
@@ -50,6 +52,7 @@ func (m *MetricsHandler) ProgramChecked(location common.Location, duration time.
 	}
 }
 
+// ProgramInterpreted captures time spent on interpreting a code at specific location
 func (m *MetricsHandler) ProgramInterpreted(location common.Location, duration time.Duration) {
 	// see the comment for ProgramInterpreted
 	if _, ok := location.(common.TransactionLocation); ok {
@@ -58,16 +61,24 @@ func (m *MetricsHandler) ProgramInterpreted(location common.Location, duration t
 	}
 }
 
+// ValueEncoded accumulates time spend on runtime value encoding
 func (m *MetricsHandler) ValueEncoded(duration time.Duration) {
 	m.TimeSpentOnValueEncoding += duration
 }
 
+// ValueDecoded accumulates time spend on runtime value decoding
 func (m *MetricsHandler) ValueDecoded(duration time.Duration) {
 	m.TimeSpentOnValueDecoding += duration
 }
 
+// NoopMetricsReporter is a MetricReporter that does nothing.
 type NoopMetricsReporter struct{}
 
-func (NoopMetricsReporter) TransactionParsed(time.Duration)      {}
-func (NoopMetricsReporter) TransactionChecked(time.Duration)     {}
+// TransactionParsed is a noop
+func (NoopMetricsReporter) TransactionParsed(time.Duration) {}
+
+// TransactionChecked is a noop
+func (NoopMetricsReporter) TransactionChecked(time.Duration) {}
+
+// TransactionInterpreted is a noop
 func (NoopMetricsReporter) TransactionInterpreted(time.Duration) {}
