@@ -5,6 +5,7 @@ import (
 	//"encoding/json"
 	"testing"
 
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -150,4 +151,17 @@ func TestShuffle(t *testing.T) {
 		shuffled2 := il.DeterministicShuffle(seed)
 		assert.Equal(t, shuffled1, shuffled2)
 	})
+}
+
+// check that identities consistently hash to the same ID, even with different
+// public key implementations
+func TestIdentity_ID(t *testing.T) {
+	identity1 := unittest.IdentityFixture(unittest.WithKeys)
+	var identity2 = new(flow.Identity)
+	*identity2 = *identity1
+	identity2.StakingPubKey = encodable.StakingPubKey{PublicKey: identity1.StakingPubKey}
+
+	id1 := flow.MakeID(identity1)
+	id2 := flow.MakeID(identity2)
+	assert.Equal(t, id1, id2)
 }
