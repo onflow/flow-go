@@ -5,6 +5,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -14,7 +15,7 @@ import (
 type Context struct {
 	Chain                            flow.Chain
 	Blocks                           Blocks
-	Metrics                          *MetricsCollector
+	Metrics                          handler.MetricsReporter
 	Tracer                           module.Tracer
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
@@ -72,7 +73,7 @@ func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
 		Blocks:                           nil,
-		Metrics:                          nil,
+		Metrics:                          &handler.NoopMetricsReporter{},
 		Tracer:                           nil,
 		GasLimit:                         DefaultGasLimit,
 		MaxStateKeySize:                  state.DefaultMaxKeySize,
@@ -206,12 +207,12 @@ func WithBlocks(blocks Blocks) Option {
 	}
 }
 
-// WithMetricsCollector sets the metrics collector for a virtual machine context.
+// WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsCollector(mc *MetricsCollector) Option {
+func WithMetricsReporter(mr handler.MetricsReporter) Option {
 	return func(ctx Context) Context {
-		ctx.Metrics = mc
+		ctx.Metrics = mr
 		return ctx
 	}
 }

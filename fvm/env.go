@@ -37,9 +37,9 @@ type hostEnv struct {
 	contracts        *handler.ContractHandler
 	programs         *handler.ProgramsHandler
 	accountKeys      *handler.AccountKeyHandler
+	metrics          *handler.MetricsHandler
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *state.UUIDGenerator
-	metrics          runtime.Metrics
 	eventHandler     *handler.EventHandler
 	logs             []string
 	totalGasUsed     uint64
@@ -69,11 +69,13 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 
+	metrics := handler.NewMetricsHandler(ctx.Metrics)
+
 	env := &hostEnv{
 		ctx:              ctx,
 		sth:              sth,
 		vm:               vm,
-		metrics:          &noopMetricsCollector{},
+		metrics:          metrics,
 		accounts:         accounts,
 		contracts:        contracts,
 		accountKeys:      accountKeys,
@@ -85,10 +87,6 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
-	}
-
-	if ctx.Metrics != nil {
-		env.metrics = &metricsCollector{ctx.Metrics}
 	}
 
 	return env
