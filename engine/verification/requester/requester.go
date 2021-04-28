@@ -214,6 +214,7 @@ func (e *Engine) onTimer() {
 		if !qualified {
 			lg.Debug().Bool("qualified_request", qualified).
 				Msg("chunk data pack request is not qualified for dispatching at this round")
+			continue
 		}
 
 		err = e.requestChunkDataPack(request)
