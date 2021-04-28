@@ -222,9 +222,12 @@ func (e *Engine) onTimer() {
 			continue
 		}
 
-		updated := e.onRequestDispatched(request.ChunkID)
+		attempts, lastAttempt, retryAfter, updated := e.onRequestDispatched(request.ChunkID)
 		lg.Info().
 			Bool("pending_request_updated", updated).
+			Uint64("attempts_made", attempts).
+			Time("last_attempt", lastAttempt).
+			Dur("retry_after", retryAfter).
 			Msg("chunk data pack requested")
 	}
 }
@@ -257,6 +260,6 @@ func (e *Engine) canDispatchRequest(chunkID flow.Identifier) bool {
 }
 
 // onRequestDispatched encapsulates the logic of updating the chunk data request post a successful dispatch.
-func (e *Engine) onRequestDispatched(chunkID flow.Identifier) bool {
+func (e *Engine) onRequestDispatched(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
 	return e.pendingRequests.UpdateRequestHistory(chunkID, e.reqUpdaterFunc)
 }
