@@ -1,4 +1,4 @@
-package stdmap
+package stdmap_test
 
 import (
 	"math"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -96,11 +97,13 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 	})
 }
 
+// withUpdaterScenario is a test helper that creates a chunk requests mempool and fills it with specified number of chunks.
+// it then applies the updater on all of the chunks, and finally validates the chunks update history given the validator.
 func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.ChunkRequestHistoryUpdaterFunc,
 	validate func(*testing.T, uint64, time.Time, time.Duration)) {
 
 	// initializations: creating mempool and populating it.
-	requests := NewChunkRequests(uint(chunks))
+	requests := stdmap.NewChunkRequests(uint(chunks))
 	chunkReqs := unittest.ChunkDataPackRequestListFixture(chunks)
 	for _, request := range chunkReqs {
 		ok := requests.Add(request)
