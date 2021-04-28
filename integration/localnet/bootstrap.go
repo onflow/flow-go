@@ -280,6 +280,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
 				"TARGET": container.Role.String(),
+				"VERSION": "localnet_build",
 			},
 			Target: "production",
 		}
