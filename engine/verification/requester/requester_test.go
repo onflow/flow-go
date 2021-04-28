@@ -175,13 +175,17 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), 1)
+	// makes all chunk requests being qualified for dispatch instantly
+	// qualifyWG := mockPendingRequestQualifyInstantly(t,
+	//	s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
-	wg := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
-	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
+
+	// unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
 	// requester does not call publish to disseminate the request for this chunk.
 	s.con.AssertNotCalled(t, "Publish")
@@ -212,9 +216,12 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	// mocks the requester pipeline
 	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), 1)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
+
+	// makes all chunk requests being qualified for dispatch instantly
+	qualifyWG := mockPendingRequestQualifyInstantly(t,
+		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -223,6 +230,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 		err := e.Process(requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "did not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -254,7 +262,10 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 
 	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), 1)
+
+	// makes all chunk requests being qualified for dispatch instantly
+	qualifyWG := mockPendingRequestQualifyInstantly(t,
+		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -264,6 +275,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// unsealed requests should be submitted to the network once
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
 
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "did not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -279,7 +291,6 @@ func TestRequestPendingChunkDataPack(t *testing.T) {
 	testRequestPendingChunkDataPack(t, 10, 10) // 10 requests each 10 attempts
 }
 
-//
 // testRequestPendingChunkDataPack is a test helper that evaluates happy path of having a number of chunk requests pending.
 // The test waits enough so that the required number of attempts is made on the chunks.
 // The chunks belongs to a non-sealed block.
@@ -298,12 +309,48 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), attempts)
+
+	// makes all chunk requests being qualified for dispatch instantly
+	qualifyWG := mockPendingRequestQualifyInstantly(t,
+		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	wg := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
-	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
+
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+}
+
+// testRequestPendingChunkDataPack is a test helper that evaluates happy path of having a number of chunk requests pending.
+// The test waits enough so that the required number of attempts is made on the chunks.
+// The chunks belongs to a non-sealed block.
+func testUnqualifiedChunkDataRequests(t *testing.T, count int, attempts int) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	// creates 10 chunk request each with 2 agree targets and 3 disagree targets.
+	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
+	// the chunk request should be dispatched.
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	requests := unittest.ChunkDataPackRequestListFixture(count,
+		unittest.WithHeightGreaterThan(5),
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	test.MockLastSealedHeight(s.state, 5)
+	s.pendingRequests.On("All").Return(requests)
+
+	// makes all chunk requests being qualified for dispatch only in far future (e.g., an hour).
+	qualifyWG := mockPendingRequestQualifyInstantly(t,
+		s.pendingRequests, flow.IdentifierList{}, flow.GetIDs(requests), flow.IdentifierList{}, 1)
+
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
+
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
@@ -458,32 +505,47 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 		Times(len(chunkIDs))
 }
 
-// mockPendingRequestAlwaysQualify mocks request qualifier module of the requester to always qualify the attempts on given chunk ids.
-func mockPendingRequestAlwaysQualify(t *testing.T,
+// mockPendingRequestQualifyInstantly mocks pending chunk module of the requester to always qualify the attempts on given chunk ids right away.
+// It hence expects dispatching chunk requests very soon, and mocks updating the request info after dispatching chunks.
+func mockPendingRequestQualifyInstantly(t *testing.T,
 	pendingRequests *mempool.ChunkRequests,
-	chunkIDs flow.IdentifierList,
-	attempts int) {
+	instantQualifiedReqs flow.IdentifierList,
+	lateQualifiedReqs flow.IdentifierList,
+	disQualifiedReqs flow.IdentifierList,
+	attempts int) *sync.WaitGroup {
 
-	pendingRequests.On("RequestInfo", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
+	wg := &sync.WaitGroup{}
+	mu := &sync.Mutex{}
 
-	}). // makes chunk data pack instantly qualified for retry (imitates it tried only once, one hour ago, and can be
-		// retried anytime after that).
-		Return(uint64(1), time.Now().Add(-1*time.Hour), 1*time.Millisecond, true).
-		Times(len(chunkIDs) * attempts)
+	total := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
+	wg.Add(total)
 
-	pendingRequests.On("UpdateRequestHistory", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
+	pendingRequests.On("RequestInfo", testifymock.Anything).Return(
+		func(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
+			mu.Lock()
+			defer mu.Unlock()
 
-		_, ok = args[1].(flowmempool.ChunkRequestHistoryUpdaterFunc)
-		require.True(t, ok)
+			wg.Done()
 
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
+			if instantQualifiedReqs.Contains(chunkID) {
+				// makes chunk request instantly qualified for retry (imitates it tried only once, one hour ago, and can be
+				// retried anytime after that).
+				return uint64(1), time.Now().Add(-1 * time.Hour), 1 * time.Millisecond, true
+			}
 
-	}).Return(true).Times(len(chunkIDs) * attempts)
+			if lateQualifiedReqs.Contains(chunkID) {
+				// makes chunk request
+				return uint64(1), time.Now(), time.Hour, true
+			}
+
+			if disQualifiedReqs.Contains(chunkID) {
+				return uint64(0), time.Time{}, 0, false
+			}
+
+			require.Fail(t, "received unknown chunk ID for request info")
+			return uint64(0), time.Time{}, 0, false // to satisfy compile path.
+		},
+	).Times(total)
+
+	return wg
 }
