@@ -98,19 +98,21 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	require.NoError(s.T(), err)
 }
 
-// TestProcessAssignment_ApprovalsAfterResult tests a scenario when first we have discovered execution result
+// TestProcessApproval_ApprovalsAfterResult tests a scenario when first we have discovered execution result
 // and after that we started receiving approvals. In this scenario we should be able to create a seal right
 // after processing last needed approval to meet `requiredApprovalsForSealConstruction` threshold.
-func (s *AssignmentCollectorTestSuite) TestProcessAssignment_ApprovalsAfterResult() {
+func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult() {
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
 	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
+	blockID := s.Block.ID()
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
-			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID),
+				unittest.WithBlockID(blockID))
 			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)
 		}
@@ -128,9 +130,11 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Twice()
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
+	blockID := s.Block.ID()
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
-			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID),
+				unittest.WithBlockID(blockID))
 			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)
 		}
@@ -152,14 +156,45 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 
 }
 
-// TestProcessAssignment_InvalidSignature tests a scenario processing approval with invalid signature
-func (s *AssignmentCollectorTestSuite) TestProcessAssignment_InvalidSignature() {
-	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
+// TestProcessApproval_InvalidSignature tests a scenario processing approval with invalid signature
+func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidSignature() {
 
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+
+	// attestation signature is valid
+	s.sigVerifier.On("Verify", mock.Anything, approval.Body.AttestationSignature, mock.Anything).Return(true, nil).Once()
+	// approval signature is invalid
+	s.sigVerifier.On("Verify", mock.Anything, approval.VerifierSignature, mock.Anything).Return(false, nil).Once()
+
+	err = s.collector.ProcessApproval(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err))
+}
+
+// TestProcessApproval_InvalidBlockID tests a scenario processing approval with invalid block ID
+func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidBlockID() {
+
+	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
+
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+
+	err = s.collector.ProcessApproval(approval)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsInvalidInputError(err))
+}
+
+// TestProcessApproval_InvalidBlockChunkIndex tests a scenario processing approval with invalid chunk index
+func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidBlockChunkIndex() {
+
+	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
+
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(uint64(s.Chunks.Len())), unittest.WithApproverID(s.VerID))
+
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
@@ -269,10 +304,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 	})
 }
 
-// TestProcessAssignment_BeforeIncorporatedResult tests scenario when approval is submitted before execution result
+// TestProcessApproval_BeforeIncorporatedResult tests scenario when approval is submitted before execution result
 // is discovered, without execution result we are missing information for verification. Calling `ProcessApproval` before `ProcessApproval`
 // should result in error
-func (s *AssignmentCollectorTestSuite) TestProcessAssignment_BeforeIncorporatedResult() {
+func (s *AssignmentCollectorTestSuite) TestProcessApproval_BeforeIncorporatedResult() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
 	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)

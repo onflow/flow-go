@@ -29,7 +29,7 @@ type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
 // AssignmentCollector is responsible for validating approvals on result-level(checking signature, identity).
 type AssignmentCollector struct {
 	ResultID                             flow.Identifier                        // ID of execution result
-	BlockID                              flow.Identifier                        // ID of block targeted by execution result
+	result                               *flow.ExecutionResult                  // execution result that we are collecting approvals for
 	BlockHeight                          uint64                                 // height of block targeted by execution result
 	collectors                           map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
@@ -57,7 +57,7 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 	collector := &AssignmentCollector{
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
 		ResultID:                             result.ID(),
-		BlockID:                              result.BlockID,
+		result:                               result,
 		BlockHeight:                          blockHeight,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
 		incorporatedAtHeight:                 make(map[uint64][]flow.Identifier),
@@ -71,6 +71,10 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 	return collector, nil
+}
+
+func (c *AssignmentCollector) BlockID() flow.Identifier {
+	return c.result.BlockID
 }
 
 func (c *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
@@ -122,16 +126,16 @@ func (c *AssignmentCollector) emergencySealable(incorporatedBlockID flow.Identif
 
 func (c *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
 	for _, collector := range c.allCollectors() {
-		sealable, err := c.emergencySealable(collector.IncorporatedBlockID, finalizedBlockHeight)
+		sealable, err := c.emergencySealable(collector.IncorporatedBlockID(), finalizedBlockHeight)
 		if err != nil {
 			return fmt.Errorf("could not determnine if incorporated result %s is emergency sealable: %w",
-				collector.IncorporatedBlockID, err)
+				collector.IncorporatedBlockID(), err)
 		}
 		if sealable {
 			err = collector.SealResult()
 			if err != nil {
 				return fmt.Errorf("could not create emergency seal for incorporated result %s: %w",
-					collector.IncorporatedBlockID, err)
+					collector.IncorporatedBlockID(), err)
 			}
 		}
 	}
@@ -243,6 +247,20 @@ func (c *AssignmentCollector) allCollectors() []*ApprovalCollector {
 	return collectors
 }
 
+func (c *AssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
+	id := approval.Attestation.ID()
+	valid, err := c.verifier.Verify(id[:], approval.AttestationSignature, nodeIdentity.StakingPubKey)
+	if err != nil {
+		return fmt.Errorf("failed to verify attestation signature: %w", err)
+	}
+
+	if !valid {
+		return engine.NewInvalidInputErrorf("invalid attestation signature for (%x)", nodeIdentity.NodeID)
+	}
+
+	return nil
+}
+
 func (c *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
 	id := approval.Body.ID()
 	valid, err := c.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
@@ -259,16 +277,38 @@ func (c *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nod
 
 // validateApproval performs result level checks of flow.ResultApproval
 // checks:
-// 	verification node identity
-//  signature of verification node
-// returns nil on successful check
+// - verification node identity
+// - attestation signature
+// - signature of verification node
+// - chunk index sanity check
+// - block ID sanity check
+// Returns:
+// - engine.InvalidInputError - result approval is invalid
+// - exception in case of any other error, usually this is not expected
+// - nil on successful check
 func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
+	// approval has to refer same block as execution result
+	if approval.Body.BlockID != c.BlockID() {
+		return engine.NewInvalidInputErrorf("result approval for invalid block, expected (%x) vs (%x)",
+			c.BlockID(), approval.Body.BlockID)
+	}
+
+	chunkIndex := approval.Body.ChunkIndex
+	if chunkIndex >= uint64(c.result.Chunks.Len()) {
+		return engine.NewInvalidInputErrorf("chunk index out of range: %v", chunkIndex)
+	}
+
 	identity, found := c.authorizedApprovers[approval.Body.ApproverID]
 	if !found {
 		return engine.NewInvalidInputErrorf("approval not from authorized verifier")
 	}
 
-	err := c.verifySignature(approval, identity)
+	err := c.verifyAttestationSignature(&approval.Body, identity)
+	if err != nil {
+		return fmt.Errorf("invalid attestation signature: %w", err)
+	}
+
+	err = c.verifySignature(approval, identity)
 	if err != nil {
 		return fmt.Errorf("invalid approval signature: %w", err)
 	}
@@ -298,7 +338,7 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 	for _, collector := range c.allCollectors() {
 		// not finding the block that the result was incorporated in is a fatal
 		// error at this stage
-		blockHeight, err := c.getCachedBlockHeight(collector.IncorporatedBlockID)
+		blockHeight, err := c.getCachedBlockHeight(collector.IncorporatedBlockID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -311,7 +351,7 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := c.requestTracker.Get(c.ResultID, collector.IncorporatedBlockID, chunkIndex)
+			requestTrackerItem := c.requestTracker.Get(c.ResultID, collector.IncorporatedBlockID(), chunkIndex)
 			if requestTrackerItem.IsBlackout() {
 				continue
 			}
@@ -322,7 +362,7 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 			if requestTrackerItem.Requests >= 10 {
 				log.Debug().Msgf("requesting approvals for result %v, incorporatedBlockID %v chunk %d: %d requests",
 					c.ResultID,
-					collector.IncorporatedBlockID,
+					collector.IncorporatedBlockID(),
 					chunkIndex,
 					requestTrackerItem.Requests,
 				)
