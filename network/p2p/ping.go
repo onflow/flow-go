@@ -57,7 +57,7 @@ func (ps *PingService) PingHandler(s network.Stream) {
 		case err, ok := <-errCh:
 			// if and error occur while responding to a ping request, then reset the stream
 			if ok {
-				log.Error().Err(err)
+				log.Error().Err(err).Msg("failed to ping remote node")
 				err := s.Reset()
 				if err != nil {
 					log.Error().Err(err).Msg("failed to reset stream")
