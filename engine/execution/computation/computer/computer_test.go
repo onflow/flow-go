@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -194,7 +194,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := event.GetServiceEventWhitelist()
+		eventWhitelist := handler.GetServiceEventWhitelist()
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
