@@ -66,8 +66,9 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 		Payload:          payload,
 	}
 
-	if IsServiceEvent(event, h.chain) && h.serviceEventCollectionEnabled {
+	if h.serviceEventCollectionEnabled && IsServiceEvent(event, h.chain) {
 		h.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+		// we don't return and append the service event into event collection as well.
 	}
 
 	h.eventCollection.AppendEvent(flowEvent, payloadSize)
