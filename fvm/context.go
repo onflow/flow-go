@@ -27,6 +27,8 @@ type Context struct {
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
+	EventCollectionEnabled           bool
+	ServiceEventCollectionEnabled    bool
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
 	SetValueHandler                  SetValueHandler
@@ -82,6 +84,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
+		EventCollectionEnabled:           true,
+		ServiceEventCollectionEnabled:    true, // TODO(ramtin) later change this to false and only set it by options
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
 		SetValueHandler:                  nil,
