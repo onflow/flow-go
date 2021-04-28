@@ -175,7 +175,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithTransactionProcessors(
+		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(zerolog.Nop()), //we don't need to check signatures or sequence numbers
 		))
 
