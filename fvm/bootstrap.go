@@ -136,14 +136,15 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
-	flowDKG := b.deployDKG()
-	b.setupDKGAdmin(service, flowDKG)
+	b.deployDKG(service)
+	// NOTE: I don't think the SetupAdmin methods are required
+	//b.setupDKGAdmin(service, flowDKG)
 
-	flowQC := b.deployQC()
-	b.setupQCAdmin(service, flowQC)
+	b.deployQC(service)
+	//b.setupQCAdmin(service, flowQC)
 
-	flowIDTableStaking := b.deployIDTableStaking(service, fungibleToken, flowToken, b.epochTokenPayout, b.rewardCut)
-	b.deployEpoch(service, fungibleToken, flowToken, flowIDTableStaking, flowQC, flowDKG)
+	b.deployIDTableStaking(service, fungibleToken, flowToken, b.epochTokenPayout, b.rewardCut)
+	b.deployEpoch(service, fungibleToken, flowToken, service, service, service)
 
 	return nil
 }
@@ -246,22 +247,18 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	}
 }
 
-func (b *BootstrapProcedure) deployDKG() flow.Address {
-	flowDKG := b.createAccount()
-
+func (b *BootstrapProcedure) deployDKG(service flow.Address) {
 	contract := contracts.FlowDKG()
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(flowDKG, contract, "FlowDKG"),
+		deployContractTransaction(service, contract, "FlowDKG"),
 		b.sth,
 		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy DKG contract: %s", err.Error()))
 	}
-
-	return flowDKG
 }
 
 func (b *BootstrapProcedure) setupDKGAdmin(service, dkg flow.Address) {
@@ -276,22 +273,18 @@ func (b *BootstrapProcedure) setupDKGAdmin(service, dkg flow.Address) {
 	}
 }
 
-func (b *BootstrapProcedure) deployQC() flow.Address {
-	flowQC := b.createAccount()
-
+func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	contract := contracts.FlowQC()
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(flowQC, contract, "FlowEpochClusterQC"),
+		deployContractTransaction(service, contract, "FlowEpochClusterQC"),
 		b.sth,
 		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy QC contract: %s", err.Error()))
 	}
-
-	return flowQC
 }
 
 func (b *BootstrapProcedure) setupQCAdmin(service, qc flow.Address) {
@@ -307,12 +300,9 @@ func (b *BootstrapProcedure) setupQCAdmin(service, qc flow.Address) {
 }
 
 func (b *BootstrapProcedure) deployIDTableStaking(
-	service, fungibleToken,
-	flowToken flow.Address,
+	service, fungibleToken, flowToken flow.Address,
 	epochTokenPayout cadence.UFix64,
-	rewardCut cadence.UFix64) flow.Address {
-
-	flowIDTableStaking := b.createAccount()
+	rewardCut cadence.UFix64) {
 
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
@@ -321,15 +311,13 @@ func (b *BootstrapProcedure) deployIDTableStaking(
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployIDTableStakingTransaction(flowIDTableStaking, contract, epochTokenPayout, rewardCut),
+		deployIDTableStakingTransaction(service, contract, epochTokenPayout, rewardCut),
 		b.sth,
 		b.programs,
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to deploy IDTableStaking contract: %s", err.Error()))
 	}
-
-	return flowIDTableStaking
 }
 
 func (b *BootstrapProcedure) deployEpoch(service,
@@ -338,8 +326,6 @@ func (b *BootstrapProcedure) deployEpoch(service,
 	idTableStaking,
 	qc,
 	dkg flow.Address) {
-
-	flowEpoch := b.createAccount()
 
 	contract := contracts.FlowEpoch(
 		fungibleToken.HexWithPrefix(),
@@ -351,7 +337,7 @@ func (b *BootstrapProcedure) deployEpoch(service,
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployEpochTransaction(flowEpoch, contract),
+		deployEpochTransaction(service, contract),
 		b.sth,
 		b.programs,
 	)
