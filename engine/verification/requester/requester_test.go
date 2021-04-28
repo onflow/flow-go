@@ -12,12 +12,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"
-	mockrequester "github.com/onflow/flow-go/engine/verification/requester/mock"
 	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	flowmempool "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -30,14 +30,13 @@ import (
 // RequesterEngineTestSuite encapsulates data structures for running unittests on requester engine.
 type RequesterEngineTestSuite struct {
 	// modules
-	log              zerolog.Logger
-	handler          *mockfetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
-	pendingRequests  *mempool.ChunkRequests            // used to store all the pending chunks that assigned to this node
-	state            *protocol.State                   // used to check the last sealed height
-	con              *mocknetwork.Conduit              // used to send chunk data request, and receive the response
-	tracer           module.Tracer
-	metrics          module.VerificationMetrics
-	requestQualifier *mockrequester.ChunkDataRequestQualifier // used to decide whether to dispatch a request.
+	log             zerolog.Logger
+	handler         *mockfetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
+	pendingRequests *mempool.ChunkRequests            // used to store all the pending chunks that assigned to this node
+	state           *protocol.State                   // used to check the last sealed height
+	con             *mocknetwork.Conduit              // used to send chunk data request, and receive the response
+	tracer          module.Tracer
+	metrics         module.VerificationMetrics
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -50,17 +49,16 @@ type RequesterEngineTestSuite struct {
 // setupTest initiates a test suite prior to each test.
 func setupTest() *RequesterEngineTestSuite {
 	r := &RequesterEngineTestSuite{
-		log:              unittest.Logger(),
-		tracer:           &trace.NoopTracer{},
-		metrics:          &metrics.NoopCollector{},
-		handler:          &mockfetcher.ChunkDataPackHandler{},
-		retryInterval:    100 * time.Millisecond,
-		requestTargets:   2,
-		pendingRequests:  &mempool.ChunkRequests{},
-		state:            &protocol.State{},
-		verIdentity:      unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
-		con:              &mocknetwork.Conduit{},
-		requestQualifier: &mockrequester.ChunkDataRequestQualifier{},
+		log:             unittest.Logger(),
+		tracer:          &trace.NoopTracer{},
+		metrics:         &metrics.NoopCollector{},
+		handler:         &mockfetcher.ChunkDataPackHandler{},
+		retryInterval:   100 * time.Millisecond,
+		requestTargets:  2,
+		pendingRequests: &mempool.ChunkRequests{},
+		state:           &protocol.State{},
+		verIdentity:     unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification)),
+		con:             &mocknetwork.Conduit{},
 	}
 
 	return r
@@ -82,7 +80,8 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.pendingRequests,
 		s.handler,
 		s.retryInterval,
-		s.requestQualifier,
+		requester.RetryAfterQualifier(),
+		flowmempool.ExponentialUpdater(2, time.Hour, time.Second),
 		s.requestTargets)
 	require.NoError(t, err)
 	testifymock.AssertExpectationsForObjects(t, net)
@@ -176,7 +175,7 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
-	mockRequestQualifier(t, s.requestQualifier, flow.GetIDs(requests), 1)
+	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -213,7 +212,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	// mocks the requester pipeline
 	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
-	mockRequestQualifier(t, s.requestQualifier, flow.GetIDs(requests), 1)
+	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), 1)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
 
@@ -255,7 +254,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 
 	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
-	mockRequestQualifier(t, s.requestQualifier, flow.GetIDs(requests), 1)
+	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -299,7 +298,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(requests)
-	mockRequestQualifier(t, s.requestQualifier, flow.GetIDs(requests), attempts)
+	mockPendingRequestAlwaysQualify(t, s.pendingRequests, flow.GetIDs(requests), attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -459,20 +458,30 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 		Times(len(chunkIDs))
 }
 
-// mockRequestQualifier mocks request qualifier module of the requester to always qualify the attempts on given chunk ids.
-func mockRequestQualifier(t *testing.T, requestQualifier *mockrequester.ChunkDataRequestQualifier, chunkIDs flow.IdentifierList,
+// mockPendingRequestAlwaysQualify mocks request qualifier module of the requester to always qualify the attempts on given chunk ids.
+func mockPendingRequestAlwaysQualify(t *testing.T,
+	pendingRequests *mempool.ChunkRequests,
+	chunkIDs flow.IdentifierList,
 	attempts int) {
-	requestQualifier.On("CanDispatchRequest", testifymock.Anything).Run(func(args testifymock.Arguments) {
+
+	pendingRequests.On("RequestInfo", testifymock.Anything).Run(func(args testifymock.Arguments) {
 		chunkID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)
 		// we should have already requested this chunk data pack
 		require.Contains(t, chunkIDs, chunkID)
 
-	}).Return(true).Times(len(chunkIDs) * attempts)
+	}). // makes chunk data pack instantly qualified for retry (imitates it tried only once, one hour ago, and can be
+		// retried anytime after that).
+		Return(uint64(1), time.Now().Add(-1*time.Hour), 1*time.Millisecond, true).
+		Times(len(chunkIDs) * attempts)
 
-	requestQualifier.On("OnRequestDispatched", testifymock.Anything).Run(func(args testifymock.Arguments) {
+	pendingRequests.On("UpdateRequestHistory", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
 		chunkID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)
+
+		_, ok = args[1].(flowmempool.ChunkRequestHistoryUpdaterFunc)
+		require.True(t, ok)
+
 		// we should have already requested this chunk data pack
 		require.Contains(t, chunkIDs, chunkID)
 
