@@ -26,7 +26,7 @@ func TestEncodeDecode(t *testing.T) {
 	participants = append(participants, partner)
 	initialSnapshot := unittest.RootSnapshotFixture(participants)
 
-	// encode then decode the snapshto
+	// encode then decode the snapshot
 	var decodedSnapshot inmem.EncodableSnapshot
 	bz, err := json.Marshal(initialSnapshot.Encodable())
 	require.NoError(t, err)
