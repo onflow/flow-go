@@ -32,7 +32,7 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 		// sets an exponential backoff updater with a maximum backoff of 1 hour, and minimum of a second.
 		minInterval := time.Second
 		maxInterval := time.Hour // intentionally is set high to avoid overflow in this test.
-		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(2, maxInterval, minInterval)
+		expUpdater := mempool.ExponentialUpdater(2, maxInterval, minInterval)
 		chunks := 10
 		expectedAttempts := 10
 
@@ -57,7 +57,7 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 		maxInterval := time.Hour // intentionally is set high to avoid overflow in this test.
 		// exponential multiplier is set to a very small number so that backoff always underflow, and set to
 		// minInterval.
-		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(0.001, maxInterval, minInterval)
+		expUpdater := mempool.ExponentialUpdater(0.001, maxInterval, minInterval)
 		chunks := 10
 		expectedAttempts := 10
 
@@ -79,7 +79,7 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 		minInterval := time.Second
 		maxInterval := time.Minute
 		// with exponential multiplier of 2, we expect to hit the overflow after 10 attempts.
-		expUpdater := mempool.ExponentialBackoffWithCutoffUpdater(2, maxInterval, minInterval)
+		expUpdater := mempool.ExponentialUpdater(2, maxInterval, minInterval)
 		chunks := 10
 		expectedAttempts := 10
 

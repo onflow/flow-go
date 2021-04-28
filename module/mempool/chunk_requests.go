@@ -11,13 +11,17 @@ import (
 // underlying chunk requests history.
 type ChunkRequestHistoryUpdaterFunc func(uint64, time.Duration) (uint64, time.Duration, bool)
 
-// ExponentialBackoffWithCutoffUpdater is a chunk request history updater factory that generates backoff of value
-// interval^attempts - 1. For example, if interval = 2, then it returns a request backoff generator
-// for the series of 2^attempt - 1.
+// ExponentialUpdater is a chunk request history updater factory that generates retry after of value
+// multiplier * retryAfter. For example, if multiplier = 2,
+// then invoking it n times results in a retry after value of 2^n * retryAfter, which follows an exponential series.
 //
-// The generated backoff is substituted with the given cutoff value for backoff longer than the cutoff.
-// This is to make sure that we do not backoff indefinitely.
-func ExponentialBackoffWithCutoffUpdater(multiplier float64, maxInterval time.Duration, minInterval time.Duration) ChunkRequestHistoryUpdaterFunc {
+// It also keeps updated retryAfter value between the minInterval and maxInterval inclusive. It means that if updated retryAfter value
+// is below minInterval, it is bumped up to the minInterval. Also, if updated retryAfter value is above maxInterval, it is skimmed off back
+// to the maxInterval.
+//
+// Note: if initial retryAfter is below minInterval, the first call to this function returns minInterval, and after the nth invocations,
+// the retryAfter value is set to 2^(n-1) * minInterval.
+func ExponentialUpdater(multiplier float64, maxInterval time.Duration, minInterval time.Duration) ChunkRequestHistoryUpdaterFunc {
 	return func(attempts uint64, retryAfter time.Duration) (uint64, time.Duration, bool) {
 		if float64(retryAfter) >= float64(maxInterval)/multiplier {
 			retryAfter = maxInterval
