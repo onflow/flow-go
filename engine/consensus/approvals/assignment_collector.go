@@ -36,7 +36,7 @@ type AssignmentCollector struct {
 	incorporatedAtHeight                 map[uint64][]flow.Identifier           // mapping blockHeight -> []IncorporatedBlockID
 	lock                                 sync.RWMutex                           // lock for protecting collectors map
 	incorporatedAtHeightLock             sync.Mutex
-	verifiedApprovalsCache               *ApprovalsCache                 // in-memory cache of approvals were already verified
+	verifiedApprovalsCache               *ApprovalsCache                 // in-memory cache of approvals (already verified)
 	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
 	assigner                             module.ChunkAssigner            // used to build assignment
 	state                                protocol.State                  // used to access the  protocol state
@@ -200,10 +200,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 // for orphan fork.
 func (c *AssignmentCollector) OnBlockFinalizedAtHeight(blockID flow.Identifier, blockHeight uint64) {
 	c.incorporatedAtHeightLock.Lock()
-	ids, ok := c.incorporatedAtHeight[blockHeight]
-	if ok {
-		delete(c.incorporatedAtHeight, blockHeight)
-	}
+	delete(c.incorporatedAtHeight, blockHeight)
 	c.incorporatedAtHeightLock.Unlock()
 
 	orphanBlockIds := make([]flow.Identifier, 0)
