@@ -37,7 +37,7 @@ func (er ExecutionResult) ValidateChunksLength() bool {
 // FinalStateCommitment returns the Execution Result's commitment to the final
 // execution state of the block, i.e. the last chunk's output state.
 // Error returns:
-//  * NoChunksError: if there are no chunks (ExecutionResult is malformatted)
+//  * NoChunksError: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
 	if !er.ValidateChunksLength() {
 		return DummyStateCommitment, NoChunksError
@@ -48,7 +48,7 @@ func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
 // InitialStateCommit returns a commitment to the execution state used as input
 // for computing the block the block, i.e. the leading chunk's input state.
 // Error returns:
-//  * NoChunksError: if there are no chunks (ExecutionResult is malformatted)
+//  * NoChunksError: if there are no chunks (ExecutionResult is malformed)
 func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
 	if !er.ValidateChunksLength() {
 		return DummyStateCommitment, NoChunksError

@@ -209,27 +209,25 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		receiptSpan.Finish()
 	}()
 
-	resultID := receipt.ExecutionResult.ID()
-	initialState, err := receipt.ExecutionResult.InitialStateCommit()
-	if err != nil {
-		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
-		return false, nil
-	}
-	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
-	if err != nil {
-		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
-		return false, nil
-	}
-
+	// setup logger to capture basic information about the receipt
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", resultID[:]).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
-		Hex("initial_state", initialState[:]).
-		Hex("final_state", finalState[:]).
 		Logger()
+	initialState, finalState, err := getStartAndEndStates(receipt)
+	if err != nil {
+		if errors.Is(err, flow.NoChunksError) {
+			log.Error().Err(err).Msg("discarding malformed receipt")
+			return false, nil
+		}
+		return false, fmt.Errorf("internal problem retrieving start- and end-state commitment from receipt: %w", err)
+	}
+	log = log.With().
+		Hex("initial_state", initialState[:]).
+		Hex("final_state", finalState[:]).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
@@ -1183,4 +1181,20 @@ func (c *Core) requestPendingApprovals() (int, error) {
 	}
 
 	return requestCount, nil
+}
+
+// getStartAndEndStates returns the pair: (start state commitment; final state commitment)
+// Error returns:
+//  * NoChunksError: if there are no chunks, i.e. the ExecutionResult is malformed
+//  * all other errors are unexpected and symptoms of node-internal problems
+func getStartAndEndStates(receipt *flow.ExecutionReceipt) (initialState flow.StateCommitment, finalState flow.StateCommitment, err error) {
+	initialState, err = receipt.ExecutionResult.InitialStateCommit()
+	if err != nil {
+		return initialState, finalState, fmt.Errorf("could not get commitment for initial state from receipt: %w", err)
+	}
+	finalState, err = receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		return initialState, finalState, fmt.Errorf("could not get commitment for final state from receipt: %w", err)
+	}
+	return initialState, finalState, nil
 }
