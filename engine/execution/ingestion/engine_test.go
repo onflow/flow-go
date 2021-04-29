@@ -126,7 +126,6 @@ func runWithEngine(t *testing.T, f func(*testingContext)) {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
-	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	request.EXPECT().Force().Return().AnyTimes()
@@ -155,7 +154,7 @@ func runWithEngine(t *testing.T, f func(*testingContext)) {
 		providerEngine,
 		executionState,
 		metrics,
-		tracer,
+		trace.NewNoopTracer(),
 		false,
 		filter.Any,
 		deltas,
@@ -927,8 +926,6 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
-	tracer, err := trace.NewTracer(log, "test")
-	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
@@ -976,7 +973,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		providerEngine,
 		es,
 		metrics,
-		tracer,
+		trace.NewNoopTracer(),
 		false,
 		filter.Any,
 		deltas,
