@@ -96,7 +96,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(s.VerID),
 		unittest.WithChunk(s.Chunks[0].Index),
 		unittest.WithBlockID(s.Block.ID()))
-	err := s.core.ProcessApproval(approval)
+	err := s.core.processApproval(approval)
 	require.NoError(s.T(), err)
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
@@ -108,7 +108,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 
 	s.core.OnFinalizedBlock(s.Block.ID())
 
-	err = s.core.ProcessApproval(approval)
+	err = s.core.processApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
@@ -125,7 +125,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExe
 
 	s.core.OnFinalizedBlock(s.Block.ID())
 
-	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err := s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
@@ -134,14 +134,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExe
 // and approvals for blocks that we have no information about.
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectUnverifiableEntries() {
 	s.IncorporatedResult.Result.BlockID = unittest.IdentifierFixture() // replace blockID with random one
-	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err := s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsUnverifiableInputError(err))
 
 	approval := unittest.ResultApprovalFixture(unittest.WithApproverID(s.VerID),
 		unittest.WithChunk(s.Chunks[0].Index))
 
-	err = s.core.ProcessApproval(approval)
+	err = s.core.processApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsUnverifiableInputError(err))
 }
@@ -175,10 +175,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	// blockB1 becomes finalized
 	s.core.OnFinalizedBlock(blockB1.ID())
 
-	err := s.core.ProcessIncorporatedResult(IR1)
+	err := s.core.processIncorporatedResult(IR1)
 	require.NoError(s.T(), err)
 
-	err = s.core.ProcessIncorporatedResult(IR2)
+	err = s.core.processIncorporatedResult(IR2)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
@@ -198,7 +198,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 		incorporatedResult := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(result),
 			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()))
-		err := s.core.ProcessIncorporatedResult(incorporatedResult)
+		err := s.core.processIncorporatedResult(incorporatedResult)
 		require.NoError(s.T(), err)
 	}
 
@@ -234,10 +234,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CleanupOrphanColl
 		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
 		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
 
-	err := s.core.ProcessIncorporatedResult(IR1)
+	err := s.core.processIncorporatedResult(IR1)
 	require.NoError(s.T(), err)
 
-	err = s.core.ProcessIncorporatedResult(IR2)
+	err = s.core.processIncorporatedResult(IR2)
 	require.NoError(s.T(), err)
 
 	payload := unittest.PayloadFixture()
@@ -266,14 +266,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 				unittest.WithApproverID(verID),
 				unittest.WithBlockID(s.Block.ID()),
 				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
-			err := s.core.ProcessApproval(approval)
+			err := s.core.processApproval(approval)
 			require.NoError(s.T(), err)
 		}
 	}
 
 	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
-	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err := s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
 	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
@@ -287,7 +287,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfter
 
 	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
-	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err := s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
 	for _, chunk := range s.Chunks {
@@ -296,7 +296,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfter
 				unittest.WithApproverID(verID),
 				unittest.WithBlockID(s.Block.ID()),
 				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
-			err := s.core.ProcessApproval(approval)
+			err := s.core.processApproval(approval)
 			require.NoError(s.T(), err)
 		}
 	}
@@ -317,12 +317,12 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInva
 		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	// this approval has to be cached since execution result is not known yet
-	err := s.core.ProcessApproval(approval)
+	err := s.core.processApproval(approval)
 	require.NoError(s.T(), err)
 
 	// at this point approval has to be processed, even if it's invalid
 	// if it's an expected sentinel error, it has to be handled internally
-	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err = s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 }
 
@@ -339,11 +339,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	// this approval has to be cached since execution result is not known yet
-	err := s.core.ProcessApproval(approval)
+	err := s.core.processApproval(approval)
 	require.NoError(s.T(), err)
 
 	// at this point approval has to be processed, even if it's invalid
 	// if it's an expected sentinel error, it has to be handled internally
-	err = s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	err = s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.Error(s.T(), err)
 }

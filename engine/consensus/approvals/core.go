@@ -25,19 +25,13 @@ type ResultApprovalProcessor interface {
 	// ProcessApproval processes approval in blocking way, implementors need to ensure
 	// that this function is reentrant and can be safely used in concurrent environment.
 	// Returns:
-	// * engine.InvalidInputError - result approval is invalid
-	// * engine.UnverifiableInputError - result approval is unverifiable since referenced block cannot be found
-	// * engine.OutdatedInputError - result approval is outdated for instance block was already sealed
-	// * exception in case of any other error, usually this is not expected
+	// * exception in case of unexpected error
 	// * nil - successfully processed result approval
 	ProcessApproval(approval *flow.ResultApproval) error
 	// ProcessIncorporatedResult processes incorporated result in blocking way, implementors need to ensure
 	// that this function is reentrant.
 	// Returns:
-	// * engine.InvalidInputError - incorporated result is invalid
-	// * engine.UnverifiableInputError - result is unverifiable since referenced block cannot be found
-	// * engine.OutdatedInputError - result is outdated for instance block was already sealed
-	// * exception in case of any other error, usually this is not expected
+	// * exception in case of unexpected error
 	// * nil - successfully processed incorporated result
 	ProcessIncorporatedResult(result *flow.IncorporatedResult) error
 }
@@ -144,7 +138,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	}
 }
 
-func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
+func (c *approvalProcessingCore) processIncorporatedResult(result *flow.IncorporatedResult) error {
 	err := c.checkBlockOutdated(result.Result.BlockID)
 	if err != nil {
 		return fmt.Errorf("won't process outdated or unverifiable execution result %s: %w", result.Result.BlockID, err)
@@ -202,6 +196,18 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 	return nil
 }
 
+func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
+	err := c.processIncorporatedResult(result)
+
+	// we expect that only engine.UnverifiableInputError,
+	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
+	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
+		return nil
+	}
+
+	return err
+}
+
 // checkBlockOutdated performs a sanity check if block is outdated
 // Returns:
 // * engine.UnverifiableInputError - sentinel error in case we haven't discovered requested blockID
@@ -228,6 +234,18 @@ func (c *approvalProcessingCore) checkBlockOutdated(blockID flow.Identifier) err
 }
 
 func (c *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) error {
+	err := c.processApproval(approval)
+
+	// we expect that only engine.UnverifiableInputError,
+	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
+	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
+		return nil
+	}
+
+	return err
+}
+
+func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) error {
 	err := c.checkBlockOutdated(approval.Body.BlockID)
 	if err != nil {
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
