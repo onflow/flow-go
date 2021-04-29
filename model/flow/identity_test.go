@@ -2,19 +2,14 @@ package flow_test
 
 import (
 	"math/rand"
-	//"encoding/json"
 	"testing"
 
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	//"github.com/stretchr/testify/require"
-	//"github.com/vmihailenco/msgpack/v4"
-
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	//"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestHexStringToIdentifier(t *testing.T) {
