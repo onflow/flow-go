@@ -769,7 +769,7 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	finalState, err := incorporatedResult.Result.FinalStateCommitment()
 	if err != nil {
 		// message correctness should have been checked before: failure here is an internal implementation bug
-		return fmt.Errorf("failed to get final state commitment from Execution Result: %w", err)
+		return fmt.Errorf("processing malformed result, whose correctness should have been enforced before: %w", err)
 	}
 
 	// TODO: Check SPoCK proofs
