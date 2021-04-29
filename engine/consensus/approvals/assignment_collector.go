@@ -315,7 +315,7 @@ func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) er
 
 	err := c.verifyAttestationSignature(&approval.Body, identity)
 	if err != nil {
-		return fmt.Errorf("invalid attestation signature: %w", err)
+		return fmt.Errorf("validating attestation signature failed: %w", err)
 	}
 
 	err = c.verifySignature(approval, identity)
