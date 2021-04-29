@@ -178,6 +178,7 @@ func TestFailingUpdater(t *testing.T) {
 			require.False(t, result)
 
 			acAttempts, acLastTried, acRetryAfter, ok := requests.RequestHistory(requestID)
+			require.True(t, ok)
 			require.Equal(t, exAttempts, acAttempts)
 			require.Equal(t, exLastTried, acLastTried)
 			require.Equal(t, exRetryAfter, acRetryAfter)

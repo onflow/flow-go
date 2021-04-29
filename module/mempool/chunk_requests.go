@@ -40,10 +40,10 @@ func ExponentialUpdater(multiplier float64, maxInterval time.Duration, minInterv
 // IncrementalAttemptUpdater is a chunk request history updater factory that increments the attempt field of request status
 // and makes it instantly available against any retryAfter qualifier.
 func IncrementalAttemptUpdater() ChunkRequestHistoryUpdaterFunc {
-	return func(attempts uint64, retryAfter time.Duration) (uint64, time.Duration, bool) {
+	return func(attempts uint64, _ time.Duration) (uint64, time.Duration, bool) {
 		attempts++
-		retryAfter = time.Nanosecond // makes request instantly qualified against any retry after qualifier.
-		return attempts, retryAfter, true
+		// makes request instantly qualified against any retry after qualifier.
+		return attempts, time.Nanosecond, true
 	}
 }
 
