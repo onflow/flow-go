@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 func constructRootResultAndSeal(
@@ -31,7 +32,7 @@ func constructRootResultAndSeal(
 		Counter:      flagEpochCounter,
 		FirstView:    block.Header.View,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
-		Participants: participants,
+		Participants: participants.Order(order.Canonical),
 		Assignments:  assignments,
 		RandomSource: getRandomSource(block.ID()),
 	}
