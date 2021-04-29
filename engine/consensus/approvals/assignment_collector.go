@@ -337,7 +337,7 @@ func (c *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) err
 	for _, collector := range c.allCollectors() {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
-			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedResult.IncorporatedBlockID, err)
+			return fmt.Errorf("could not process approval: %w", err)
 		}
 	}
 
