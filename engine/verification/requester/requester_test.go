@@ -531,7 +531,7 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 }
 
 // mockPendingRequestInfoAndUpdate mocks pending requests mempool regarding three sets of chunk IDs: the instant, late, and disqualified ones.
-// The chunk IDs in the instant qualified requests will be instantly qualified for dispatching in the networking layer.
+// The chunk IDs in the instantly qualified requests will be instantly qualified for dispatching in the networking layer.
 // The chunk IDs in the late qualified requests will be postponed to a very later time for dispatching. The postponed time is set so long
 // that they literally never get the chance to dispatch within the test time, e.g., 1 hour.
 // The chunk IDs in the disqualified requests do not dispatch at all.
@@ -547,6 +547,8 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 	wg := &sync.WaitGroup{}
 
+	// for purpose of test and due to having a mocked mempool, we assume disqualified requests reside on the
+	// mempool, so their qualification is getting checked on each attempt iteration (and rejected).
 	total := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
 	wg.Add(total)
 
@@ -575,6 +577,7 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 		}, // last tried timestamp
 		func(chunkID flow.Identifier) time.Time {
 			if instantQualifiedReqs.Contains(chunkID) {
+				// mocks last tried long enough so they instantly get qualified.
 				return time.Now().Add(-1 * time.Hour)
 			}
 
@@ -586,13 +589,12 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 		}, // retry after duration
 		func(chunkID flow.Identifier) time.Duration {
 			if instantQualifiedReqs.Contains(chunkID) {
-				// makes chunk request instantly qualified for retry, i.e., can be
-				// retried anytime after on.
+				// mocks retry after very short so they instantly get qualified.
 				return 1 * time.Millisecond
 			}
 
 			if lateQualifiedReqs.Contains(chunkID) {
-				// makes chunk request qualified only after an hour.
+				// mocks retry after long so they never qualify soon.
 				return time.Hour
 			}
 
@@ -624,7 +626,8 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 	}). // makes chunk request instantly qualified for retry, i.e., can be
 		// retried anytime after on.
-		Return(uint64(1), time.Now(), 1*time.Millisecond, true).Times(attempts * len(instantQualifiedReqs))
+		Return(uint64(1), time.Now(), 1*time.Millisecond, true).
+		Times(attempts * len(instantQualifiedReqs))
 
 	return wg
 }
