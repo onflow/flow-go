@@ -121,29 +121,25 @@ func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier
 // ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of seal & verification is finished.
-func (c *AssignmentCollector) emergencySealable(incorporatedBlockID flow.Identifier, finalizedBlockHeight uint64) (bool, error) {
-	incorporatedBlock, err := c.headers.ByBlockID(incorporatedBlockID)
-	if err != nil {
-		return false, fmt.Errorf("could not get block %v: %w", incorporatedBlockID, err)
-	}
+func (c *AssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) (bool, error) {
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
 	// the block that _incorporates_ result and the latest finalized block
-	return incorporatedBlock.Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight, nil
+	return collector.IncorporatedBlock().Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight, nil
 }
 
 func (c *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
 	for _, collector := range c.allCollectors() {
-		sealable, err := c.emergencySealable(collector.IncorporatedBlockID(), finalizedBlockHeight)
+		sealable, err := c.emergencySealable(collector, finalizedBlockHeight)
 		if err != nil {
-			return fmt.Errorf("could not determnine if incorporated result %s is emergency sealable: %w",
-				collector.IncorporatedBlockID(), err)
+			return fmt.Errorf("could not determnine if result %x incorporated at %x is emergency sealable: %w",
+				c.ResultID, collector.IncorporatedBlockID(), err)
 		}
 		if sealable {
 			err = collector.SealResult()
 			if err != nil {
-				return fmt.Errorf("could not create emergency seal for incorporated result %s: %w",
-					collector.IncorporatedBlockID(), err)
+				return fmt.Errorf("could not create emergency seal for result %x incorporated at %x: %w",
+					c.ResultID, collector.IncorporatedBlockID(), err)
 			}
 		}
 	}
@@ -190,7 +186,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 			incorporatedBlockID, err)
 	}
 
-	collector := NewApprovalCollector(incorporatedResult, assignment, c.seals, c.requiredApprovalsForSealConstruction)
+	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, c.seals, c.requiredApprovalsForSealConstruction)
 
 	c.putCollector(incorporatedBlockID, collector)
 	c.putIncorporatedAtHeight(incorporatedBlock.Height, incorporatedBlockID)
@@ -348,14 +344,7 @@ func (c *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) err
 
 func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64) error {
 	for _, collector := range c.allCollectors() {
-		// not finding the block that the result was incorporated in is a fatal
-		// error at this stage
-		block, err := c.headers.ByBlockID(collector.IncorporatedBlockID())
-		if err != nil {
-			return fmt.Errorf("could not retrieve block: %w", err)
-		}
-
-		if block.Height > maxHeightForRequesting {
+		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
 			continue
 		}
 
@@ -387,7 +376,7 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 				ChunkIndex: chunkIndex,
 			}
 
-			err = c.approvalConduit.Publish(req, verifiers...)
+			err := c.approvalConduit.Publish(req, verifiers...)
 			if err != nil {
 				log.Error().Err(err).
 					Msgf("could not publish approval request for chunk %d", chunkIndex)

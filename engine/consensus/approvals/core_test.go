@@ -169,7 +169,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	payload := unittest.PayloadFixture()
 
 	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
-	s.state.On("AtHeight", blockB1.Height).Return(unittest.StateSnapshotForKnownBlock(&blockB1, nil))
+	s.headers.On("ByHeight", blockB1.Height).Return(&blockB1, nil)
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
 	// blockB1 becomes finalized

@@ -100,7 +100,7 @@ func (c *approvalProcessingCore) lastFinalizedHeight() uint64 {
 // WARNING: this function is implemented in a way that we expect blocks strictly in parent-child order
 // Caller has to ensure that it doesn't feed blocks that were already processed or in wrong order.
 func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	finalized, err := c.state.AtBlockID(finalizedBlockID).Head()
+	finalized, err := c.headers.ByBlockID(finalizedBlockID)
 	if err != nil {
 		c.log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
@@ -161,7 +161,7 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 
 	// check if we are dealing with finalized block or an orphan
 	if incorporatedAtHeight <= lastFinalizedBlockHeight {
-		finalized, err := c.state.AtHeight(incorporatedAtHeight).Head()
+		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
 		}
