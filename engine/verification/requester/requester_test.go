@@ -333,12 +333,13 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	// Generates 30 requests, 10 of each type.
 	//
-	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
+	// requests belong to the chunks of
+	// a block at heights greater than 5, but the last sealed block is at height 5, so
 	// the chunk request should be dispatched.
 	agrees := unittest.IdentifierListFixture(2)
 	disagrees := unittest.IdentifierListFixture(3)
-	//
-	// models requests that are just added to the mempool and are ready to dispatch
+	test.MockLastSealedHeight(s.state, 5)
+	// models requests that are just added to the mempool and are ready to dispatch.
 	instantQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
 		unittest.WithHeightGreaterThan(5),
 		unittest.WithAgrees(agrees),
@@ -357,11 +358,9 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	allRequests := append(instantQualifiedRequests, lateQualifiedRequests...)
 	allRequests = append(allRequests, disQualifiedRequests...)
-
-	test.MockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(allRequests)
 
-	attempts := 10
+	attempts := 10 // waits for 10 iterations of onTimer cycle in requester.
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests,
 		flow.GetIDs(instantQualifiedRequests),
@@ -371,12 +370,13 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	// mocks only instant qualified requests are dispatched.
+	// mocks only instantly qualified requests are dispatched in the network.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"cloud not check chunk requests qualification on time")
-	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"could not request and handle chunks on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
