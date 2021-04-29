@@ -15,6 +15,15 @@ func (il IdentifierList) Len() int {
 	return len(il)
 }
 
+// Lookup converts the Identifiers to a lookup table.
+func (il IdentifierList) Lookup() map[Identifier]struct{} {
+	lookup := make(map[Identifier]struct{}, len(il))
+	for _, id := range il {
+		lookup[id] = struct{}{}
+	}
+	return lookup
+}
+
 // Less returns true if element i in the IdentifierList is less than j based on its identifier.
 // Otherwise it returns true.
 // It satisfies the sort.Interface making the IdentifierList sortable.
