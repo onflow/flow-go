@@ -37,11 +37,11 @@ type Engine struct {
 	handler fetcher.ChunkDataPackHandler // contains callbacks for handling received chunk data packs.
 
 	// internal logic
-	retryInterval    time.Duration         // determines time in milliseconds for retrying chunk data requests.
-	requestTargets   uint                  // maximum number of execution nodes being asked for a chunk data pack.
-	pendingRequests  mempool.ChunkRequests // used to track requested chunks.
-	reqQualifierFunc RequestQualifierFunc
-	reqUpdaterFunc   mempool.ChunkRequestHistoryUpdaterFunc
+	retryInterval    time.Duration                          // determines time in milliseconds for retrying chunk data requests.
+	requestTargets   uint                                   // maximum number of execution nodes being asked for a chunk data pack.
+	pendingRequests  mempool.ChunkRequests                  // used to track requested chunks.
+	reqQualifierFunc RequestQualifierFunc                   // used to decide whether to dispatch a request at a certain cycle.
+	reqUpdaterFunc   mempool.ChunkRequestHistoryUpdaterFunc // used to atomically update chunk request info on mempool.
 }
 
 func New(log zerolog.Logger,
