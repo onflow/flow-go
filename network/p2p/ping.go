@@ -131,7 +131,7 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 		log := ps.streamLogger(s)
 		select {
 		case <-timer.C:
-			// context timed out, log an error
+			// time expired without a response, log an error and reset the stream
 			log.Error().Msg("context timed out on ping to remote node")
 			// reset the stream (to cause an error on the remote side as well)
 			err := s.Reset()
