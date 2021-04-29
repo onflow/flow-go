@@ -1022,11 +1022,11 @@ func (e *Engine) handleComputationResult(
 		return flow.DummyStateCommitment, nil, fmt.Errorf("could not save execution results: %w", err)
 	}
 
-	var finalState flow.StateCommitment
-	if receipt.ExecutionResult.ValidateChunksLength() {
-		finalState, _ = receipt.ExecutionResult.FinalStateCommitment()
-	} else {
+	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
+	if errors.Is(err, flow.NoChunksError) {
 		finalState = startState
+	} else if err != nil {
+		return flow.DummyStateCommitment, nil, fmt.Errorf("unexpected error accessing result's final state commitment: %w", err)
 	}
 	return finalState, receipt, nil
 }
