@@ -33,16 +33,15 @@ func (s *ChunkApprovalCollectorTestSuite) SetupTest() {
 	for _, verifier := range s.ChunksAssignment.Verifiers(s.chunk) {
 		s.chunkAssignment[verifier] = struct{}{}
 	}
-	s.collector = NewChunkApprovalCollector(s.chunkAssignment)
+	s.collector = NewChunkApprovalCollector(s.chunkAssignment, uint(len(s.chunkAssignment)))
 }
 
 // TestProcessApproval_ValidApproval tests processing a valid approval. Expected to process it without error
 // and report status to caller.
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
-	status := s.collector.ProcessApproval(approval)
-	require.True(s.T(), status.approvalProcessed)
-	require.Equal(s.T(), uint(1), status.numberOfApprovals)
+	_, collected := s.collector.ProcessApproval(approval)
+	require.False(s.T(), collected)
 	require.Equal(s.T(), uint(1), s.collector.chunkApprovals.NumberSignatures())
 }
 
@@ -51,26 +50,27 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssignment() {
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(s.VerID))
 	delete(s.chunkAssignment, s.VerID)
-	status := s.collector.ProcessApproval(approval)
-	require.False(s.T(), status.approvalProcessed)
-	require.Equal(s.T(), uint(0), status.numberOfApprovals)
+	_, collected := s.collector.ProcessApproval(approval)
+	require.False(s.T(), collected)
 	require.Equal(s.T(), uint(0), s.collector.chunkApprovals.NumberSignatures())
 }
 
 // TestGetAggregatedSignature_MultipleApprovals tests processing approvals from different verifiers. Expected to provide a valid
 // aggregated sig that has `AttestationSignature` for every approval.
 func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApprovals() {
-	var status ChunkProcessingStatus
+	var aggregatedSig flow.AggregatedSignature
+	var collected bool
 	sigCollector := flow.NewSignatureCollector()
 	for verID := range s.AuthorizedVerifiers {
 		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
-		status = s.collector.ProcessApproval(approval)
-		require.True(s.T(), status.approvalProcessed)
+		aggregatedSig, collected = s.collector.ProcessApproval(approval)
 		sigCollector.Add(approval.Body.ApproverID, approval.Body.AttestationSignature)
 	}
 
-	require.Equal(s.T(), uint(len(s.AuthorizedVerifiers)), status.numberOfApprovals)
-	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), s.collector.GetAggregatedSignature())
+	require.True(s.T(), collected)
+	require.NotNil(s.T(), aggregatedSig)
+	require.Equal(s.T(), uint(len(s.AuthorizedVerifiers)), s.collector.chunkApprovals.NumberSignatures())
+	require.Equal(s.T(), sigCollector.ToAggregatedSignature(), aggregatedSig)
 }
 
 // TestGetMissingSigners tests that missing signers returns correct IDs of approvers that haven't provided an approval

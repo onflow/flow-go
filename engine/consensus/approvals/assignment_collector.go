@@ -103,7 +103,7 @@ func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier
 		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
 	}
 	identities := make(map[flow.Identifier]*flow.Identity)
-	for _, identity := range authorizedVerifierList.Copy() {
+	for _, identity := range authorizedVerifierList {
 		identities[identity.NodeID] = identity
 	}
 	return identities, nil

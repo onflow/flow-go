@@ -30,7 +30,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.As
 		for _, id := range assignment.Verifiers(chunk) {
 			chunkAssignment[id] = struct{}{}
 		}
-		collector := NewChunkApprovalCollector(chunkAssignment)
+		collector := NewChunkApprovalCollector(chunkAssignment, requiredApprovalsForSealConstruction)
 		chunkCollectors = append(chunkCollectors, collector)
 	}
 	return &ApprovalCollector{
@@ -109,12 +109,12 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 	}
 
 	collector := c.chunkCollectors[chunkIndex]
-	status := collector.ProcessApproval(approval)
-	if status.numberOfApprovals < c.requiredApprovalsForSealConstruction {
+	aggregatedSignature, collected := collector.ProcessApproval(approval)
+	if !collected {
 		return nil
 	}
 
-	approvedChunks := c.collectAggregatedSignature(chunkIndex, collector)
+	approvedChunks := c.collectAggregatedSignature(chunkIndex, aggregatedSignature)
 	if approvedChunks < c.numberOfChunks {
 		return nil // still missing approvals for some chunks
 	}
@@ -124,8 +124,7 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 
 // collectAggregatedSignature adds the AggregatedSignature from the collector to `aggregatedSignatures`.
 // The returned int is the resulting number of approved chunks.
-func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, collector *ChunkApprovalCollector) int {
-	aggregatedSignature := collector.GetAggregatedSignature()
+func (c *ApprovalCollector) collectAggregatedSignature(chunkIndex uint64, aggregatedSignature flow.AggregatedSignature) int {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if _, found := c.aggregatedSignatures[chunkIndex]; !found {

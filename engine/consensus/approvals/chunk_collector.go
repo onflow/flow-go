@@ -6,55 +6,37 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ChunkProcessingStatus is a helper structure which is used to report
-// chunk processing status to caller
-type ChunkProcessingStatus struct {
-	numberOfApprovals uint
-	approvalProcessed bool
-}
-
 // ChunkApprovalCollector implements logic for checking chunks against assignments as
 // well as accumulating signatures of already checked approvals.
 type ChunkApprovalCollector struct {
-	assignment     map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
-	chunkApprovals *flow.SignatureCollector     // accumulator of signatures for current collector
-	lock           sync.Mutex                   // lock to protect `chunkApprovals`
+	assignment                           map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
+	chunkApprovals                       *flow.SignatureCollector     // accumulator of signatures for current collector
+	lock                                 sync.Mutex                   // lock to protect `chunkApprovals`
+	requiredApprovalsForSealConstruction uint                         // number of approvals that are required for each chunk to be sealed
 }
 
-func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{}) *ChunkApprovalCollector {
+func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{}, requiredApprovalsForSealConstruction uint) *ChunkApprovalCollector {
 	return &ChunkApprovalCollector{
-		assignment:     assignment,
-		chunkApprovals: flow.NewSignatureCollector(),
-		lock:           sync.Mutex{},
+		assignment:                           assignment,
+		chunkApprovals:                       flow.NewSignatureCollector(),
+		lock:                                 sync.Mutex{},
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 }
 
 // ProcessApproval performs processing and bookkeeping of single approval
-func (c *ChunkApprovalCollector) ProcessApproval(approval *flow.ResultApproval) ChunkProcessingStatus {
-	status := ChunkProcessingStatus{
-		numberOfApprovals: 0,
-		approvalProcessed: false,
-	}
-
+func (c *ChunkApprovalCollector) ProcessApproval(approval *flow.ResultApproval) (flow.AggregatedSignature, bool) {
 	approverID := approval.Body.ApproverID
-	if _, ok := c.assignment[approverID]; !ok {
-		return status
+	if _, ok := c.assignment[approverID]; ok {
+		c.lock.Lock()
+		defer c.lock.Unlock()
+		c.chunkApprovals.Add(approverID, approval.Body.AttestationSignature)
+		if c.chunkApprovals.NumberSignatures() >= c.requiredApprovalsForSealConstruction {
+			return c.chunkApprovals.ToAggregatedSignature(), true
+		}
 	}
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.chunkApprovals.Add(approverID, approval.Body.AttestationSignature)
-	status.approvalProcessed = true
-	status.numberOfApprovals = c.chunkApprovals.NumberSignatures()
-
-	return status
-}
-
-// GetAggregatedSignature returns an aggregated signature for this chunk
-func (c *ChunkApprovalCollector) GetAggregatedSignature() flow.AggregatedSignature {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	return c.chunkApprovals.ToAggregatedSignature()
+	return flow.AggregatedSignature{}, false
 }
 
 // GetMissingSigners returns ids of approvers that are present in assignment but didn't provide approvals

@@ -91,16 +91,17 @@ func (rt *RequestTracker) Get(resultID, incorporatedBlockID flow.Identifier, chu
 
 // Set inserts or updates the tracker item for a specific chunk.
 func (rt *RequestTracker) Set(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64, item *RequestTrackerItem) {
-	_, ok := rt.index[resultID]
-	if !ok {
-		rt.index[resultID] = make(map[flow.Identifier]map[uint64]*RequestTrackerItem)
+	level1, level1found := rt.index[resultID]
+	if !level1found {
+		level1 = make(map[flow.Identifier]map[uint64]*RequestTrackerItem)
+		rt.index[resultID] = level1
 	}
-	_, ok = rt.index[resultID][incorporatedBlockID]
-	if !ok {
-		rt.index[resultID][incorporatedBlockID] = make(map[uint64]*RequestTrackerItem)
+	level2, level2found := level1[incorporatedBlockID]
+	if !level2found {
+		level2 = make(map[uint64]*RequestTrackerItem)
+		level1[incorporatedBlockID] = level2
 	}
-
-	rt.index[resultID][incorporatedBlockID][chunkIndex] = item
+	level2[chunkIndex] = item
 }
 
 // Remove removes all entries pertaining to an execution result
