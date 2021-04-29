@@ -81,6 +81,7 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 	return collector, nil
 }
 
+// BlockID returns the ID of the executed block
 func (c *AssignmentCollector) BlockID() flow.Identifier {
 	return c.result.BlockID
 }
