@@ -133,7 +133,7 @@ func Test_Programs(t *testing.T) {
 
 	fmt.Printf("Account created\n")
 
-	context := fvm.NewContext(zerolog.Nop(), fvm.WithRestrictedDeployment(false), fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())), fvm.WithCadenceLogging(true))
+	ctx := context.NewContext(zerolog.Nop(), context.WithRestrictedDeployment(false), context.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())), context.WithCadenceLogging(true))
 
 	var contractAView *delta.View = nil
 	var contractBView *delta.View = nil
@@ -146,7 +146,7 @@ func Test_Programs(t *testing.T) {
 
 		// deploy contract A0
 		procContractA0 := fvm.Transaction(contractDeployTx("A", contractA0Code, addressA), 0)
-		err = vm.Run(context, procContractA0, mainView, programs)
+		err = vm.Run(ctx, procContractA0, mainView, programs)
 		require.NoError(t, err)
 
 		retrievedContractA, err = accounts.GetContract("A", addressA)
