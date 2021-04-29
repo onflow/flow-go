@@ -131,11 +131,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 		c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
-	collectors = c.cleanupStaleCollectors(collectors, lastSealed.Height)
-	// to those collectors that are not stale, report finalization event to cleanup orphan blocks
-	for _, collector := range collectors {
-		collector.OnBlockFinalizedAtHeight(finalizedBlockID, finalized.Height)
-	}
+	c.cleanupStaleCollectors(collectors, lastSealed.Height)
 }
 
 // processIncorporatedResult implements business logic for processing single incorporated result

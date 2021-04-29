@@ -219,41 +219,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 	require.Empty(s.T(), s.core.collectors)
 }
 
-func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CleanupOrphanCollectors() {
-	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
-	blockB2 := unittest.BlockHeaderWithParentFixture(&s.Block)
-
-	s.blocks[blockB1.ID()] = &blockB1
-	s.blocks[blockB2.ID()] = &blockB2
-
-	IR1 := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB1.ID()),
-		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
-
-	IR2 := unittest.IncorporatedResult.Fixture(
-		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
-		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
-
-	err := s.core.processIncorporatedResult(IR1)
-	require.NoError(s.T(), err)
-
-	err = s.core.processIncorporatedResult(IR2)
-	require.NoError(s.T(), err)
-
-	payload := unittest.PayloadFixture()
-	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
-	s.state.On("AtHeight", blockB1.Height).Return(unittest.StateSnapshotForKnownBlock(&blockB1, nil))
-	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
-
-	// blockB1 becomes finalized
-	s.core.OnFinalizedBlock(blockB1.ID())
-
-	resultCollector := s.core.collectors[IR1.Result.ID()]
-	require.NotNil(s.T(), resultCollector)
-	require.Len(s.T(), resultCollector.collectors, 1)
-	require.NotNil(s.T(), resultCollector.collectors[IR1.IncorporatedBlockID])
-}
-
 // TestProcessIncorporated_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
