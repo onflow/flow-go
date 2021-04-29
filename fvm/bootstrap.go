@@ -18,11 +18,12 @@ import (
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm       *VirtualMachine
-	ctx      Context
-	sth      *state.StateHolder
-	programs *programs.Programs
-	accounts *state.Accounts
+	vm        *VirtualMachine
+	ctx       Context
+	sth       *state.StateHolder
+	programs  *programs.Programs
+	accounts  *state.Accounts
+	rootBlock *flow.Header
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -92,6 +93,13 @@ func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedur
 	}
 }
 
+func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.rootBlock = rootBlock
+		return bp
+	}
+}
+
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
@@ -112,6 +120,7 @@ func Bootstrap(
 func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
+	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
 
@@ -303,8 +312,13 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken flow.
 		service.HexWithPrefix(),
 	)
 
+	context := NewContextFromParent(b.ctx,
+		WithBlockHeader(b.rootBlock),
+		WithBlocks(&NoopBlockFinder{}),
+	)
+
 	err := b.vm.invokeMetaTransaction(
-		b.ctx,
+		context,
 		deployEpochTransaction(service, contract),
 		b.sth,
 		b.programs,

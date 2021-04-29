@@ -596,20 +596,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 	}
 
-	// generate the initial execution state
-	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(
-		trieDir,
-		unittest.ServiceAccountPublicKey,
-		chain,
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-	)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
 	// define root block parameters
 	parentID := flow.ZeroID
 	height := uint64(0)
@@ -619,6 +605,21 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate root block
 	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
+
+	// generate the initial execution state
+	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(
+		trieDir,
+		unittest.ServiceAccountPublicKey,
+		chain,
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithRootBlock(root.Header),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
 
 	// generate QC
 	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
