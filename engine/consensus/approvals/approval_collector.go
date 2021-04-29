@@ -96,7 +96,6 @@ func (c *ApprovalCollector) SealResult() error {
 // - exception in case of any other error, usually this is not expected
 // - nil on success
 func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error {
-
 	chunkIndex := approval.Body.ChunkIndex
 	if chunkIndex >= uint64(len(c.chunkCollectors)) {
 		return engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)
