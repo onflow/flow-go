@@ -93,6 +93,20 @@ func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedur
 	}
 }
 
+func WithEpochTokenPayout(epochTokenPayout cadence.UFix64) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.epochTokenPayout = epochTokenPayout
+		return bp
+	}
+}
+
+func WithRewardCut(rewardCut cadence.UFix64) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.rewardCut = rewardCut
+		return bp
+	}
+}
+
 func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.rootBlock = rootBlock
