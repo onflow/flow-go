@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // helper functor that can be used to retrieve cached block height
@@ -35,21 +36,21 @@ type AssignmentCollector struct {
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
 	incorporatedAtHeight                 map[uint64][]flow.Identifier           // mapping blockHeight -> []IncorporatedBlockID
 	lock                                 sync.RWMutex                           // lock for protecting collectors map
-	incorporatedAtHeightLock             sync.Mutex
-	verifiedApprovalsCache               *ApprovalsCache                 // in-memory cache of approvals (already verified)
-	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
-	assigner                             module.ChunkAssigner            // used to build assignment
-	state                                protocol.State                  // used to access the  protocol state
-	verifier                             module.Verifier                 // used to validate result approvals
-	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
-	requestTracker                       *sealing.RequestTracker         // used to keep track of number of approval requests, and blackout periods, by chunk
-	getCachedBlockHeight                 GetCachedBlockHeight            // functor to get cached block height
+	incorporatedAtHeightLock             sync.Mutex                             // lock for incorporatedAtHeight
+	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals (already verified)
+	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
+	assigner                             module.ChunkAssigner                   // used to build assignment
+	headers                              storage.Headers                        // used to query headers from storage
+	state                                protocol.State                         // used to access the  protocol state
+	verifier                             module.Verifier                        // used to validate result approvals
+	seals                                mempool.IncorporatedResultSeals        // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	approvalConduit                      network.Conduit                        // used to request missing approvals from verification nodes
+	requestTracker                       *sealing.RequestTracker                // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
-func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, getCachedBlockHeight GetCachedBlockHeight, requiredApprovalsForSealConstruction uint) (*AssignmentCollector, error) {
-	blockHeight, err := getCachedBlockHeight(result.BlockID)
+func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint) (*AssignmentCollector, error) {
+	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +59,7 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		verifiedApprovalsCache:               NewApprovalsCache(1000),
 		ResultID:                             result.ID(),
 		result:                               result,
-		BlockHeight:                          blockHeight,
+		BlockHeight:                          block.Height,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
 		incorporatedAtHeight:                 make(map[uint64][]flow.Identifier),
 		state:                                state,
@@ -67,9 +68,16 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		verifier:                             sigVerifier,
 		requestTracker:                       requestTracker,
 		approvalConduit:                      approvalConduit,
-		getCachedBlockHeight:                 getCachedBlockHeight,
+		headers:                              headers,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
+
+	// pre-select all authorized verifiers at the block that is being sealed
+	collector.authorizedApprovers, err = collector.authorizedVerifiersAtBlock(result.BlockID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
+	}
+
 	return collector, nil
 }
 
@@ -114,14 +122,14 @@ func (c *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of seal & verification is finished.
 func (c *AssignmentCollector) emergencySealable(incorporatedBlockID flow.Identifier, finalizedBlockHeight uint64) (bool, error) {
-	incorporatedBlockHeight, err := c.getCachedBlockHeight(incorporatedBlockID)
+	incorporatedBlock, err := c.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get block %v: %w", incorporatedBlockID, err)
 	}
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
 	// the block that _incorporates_ result and the latest finalized block
-	return incorporatedBlockHeight+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight, nil
+	return incorporatedBlock.Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight, nil
 }
 
 func (c *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
@@ -176,13 +184,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 		return fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
 
-	// pre-select all authorized verifiers at the block that is being sealed
-	c.authorizedApprovers, err = c.authorizedVerifiersAtBlock(incorporatedResult.Result.BlockID)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
-	}
-
-	incorporatedAtHeight, err := c.getCachedBlockHeight(incorporatedBlockID)
+	incorporatedBlock, err := c.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not determine height of incorporated block %s: %w",
 			incorporatedBlockID, err)
@@ -191,7 +193,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	collector := NewApprovalCollector(incorporatedResult, assignment, c.seals, c.requiredApprovalsForSealConstruction)
 
 	c.putCollector(incorporatedBlockID, collector)
-	c.putIncorporatedAtHeight(incorporatedAtHeight, incorporatedBlockID)
+	c.putIncorporatedAtHeight(incorporatedBlock.Height, incorporatedBlockID)
 
 	// process approvals that have passed needed checks and are ready to be processed
 	for _, approvalID := range c.verifiedApprovalsCache.Ids() {
@@ -348,12 +350,12 @@ func (c *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uin
 	for _, collector := range c.allCollectors() {
 		// not finding the block that the result was incorporated in is a fatal
 		// error at this stage
-		blockHeight, err := c.getCachedBlockHeight(collector.IncorporatedBlockID())
+		block, err := c.headers.ByBlockID(collector.IncorporatedBlockID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve block: %w", err)
 		}
 
-		if blockHeight > maxHeightForRequesting {
+		if block.Height > maxHeightForRequesting {
 			continue
 		}
 

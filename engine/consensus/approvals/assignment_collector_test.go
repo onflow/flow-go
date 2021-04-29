@@ -20,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	realstorage "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -37,15 +39,15 @@ func TestAssignmentCollector(t *testing.T) {
 type AssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
-	blocks               map[flow.Identifier]*flow.Header
-	state                *protocol.State
-	assigner             *module.ChunkAssigner
-	sealsPL              *mempool.IncorporatedResultSeals
-	sigVerifier          *module.Verifier
-	conduit              *mocknetwork.Conduit
-	identitiesCache      map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	requestTracker       *sealing.RequestTracker
-	getCachedBlockHeight GetCachedBlockHeight
+	blocks          map[flow.Identifier]*flow.Header
+	state           *protocol.State
+	headers         *storage.Headers
+	assigner        *module.ChunkAssigner
+	sealsPL         *mempool.IncorporatedResultSeals
+	sigVerifier     *module.Verifier
+	conduit         *mocknetwork.Conduit
+	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	requestTracker  *sealing.RequestTracker
 
 	collector *AssignmentCollector
 }
@@ -58,6 +60,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.assigner = &module.ChunkAssigner{}
 	s.sigVerifier = &module.Verifier{}
 	s.conduit = &mocknetwork.Conduit{}
+	s.headers = &storage.Headers{}
 
 	s.requestTracker = sealing.NewRequestTracker(1, 3)
 
@@ -74,6 +77,17 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 		return s.ChunksAssignment
 	}, func(result *flow.ExecutionResult, blockID flow.Identifier) error { return nil })
 
+	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.Header {
+		return s.blocks[blockID]
+	}, func(blockID flow.Identifier) error {
+		_, found := s.blocks[blockID]
+		if found {
+			return nil
+		} else {
+			return realstorage.ErrNotFound
+		}
+	})
+
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
 			if block, found := s.blocks[blockID]; found {
@@ -84,17 +98,9 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 		},
 	)
 
-	s.getCachedBlockHeight = func(blockID flow.Identifier) (uint64, error) {
-		block, err := s.state.AtBlockID(blockID).Head()
-		if err != nil {
-			return 0, err
-		}
-		return block.Height, nil
-	}
-
 	var err error
-	s.collector, err = NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.assigner, s.sealsPL,
-		s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, uint(len(s.AuthorizedVerifiers)))
+	s.collector, err = NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.headers, s.assigner, s.sealsPL,
+		s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
 
@@ -225,8 +231,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, s.state, assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.headers, assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.NoError(s.T(), err)
 
 		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -234,13 +240,12 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	})
 
 	s.Run("invalid-verifier-identities", func() {
-		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		require.NoError(s.T(), err)
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
-		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, s.state, s.headers, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
+		require.Nil(s.T(), collector)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 }
@@ -263,11 +268,10 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		require.NoError(s.T(), err)
-		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
+		require.Nil(s.T(), collector)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 
@@ -285,10 +289,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		require.NoError(s.T(), err)
-		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
+		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
@@ -306,10 +309,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, s.getCachedBlockHeight, 1)
-		require.NoError(s.T(), err)
-		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
+		collector, err := NewAssignmentCollector(s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+			s.sigVerifier, s.conduit, s.requestTracker, 1)
+		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err))
 	})

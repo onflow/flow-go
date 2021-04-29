@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,6 +33,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	BaseApprovalsTestSuite
 
 	blocks          map[flow.Identifier]*flow.Header
+	headers         *storage.Headers
 	state           *protocol.State
 	assigner        *module.ChunkAssigner
 	sealsPL         *mempool.IncorporatedResultSeals
@@ -50,6 +52,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.assigner = &module.ChunkAssigner{}
 	s.sigVerifier = &module.Verifier{}
 	s.conduit = &mocknetwork.Conduit{}
+	s.headers = &storage.Headers{}
 
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)
@@ -62,6 +65,17 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
 
+	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.Header {
+		return s.blocks[blockID]
+	}, func(blockID flow.Identifier) error {
+		_, found := s.blocks[blockID]
+		if found {
+			return nil
+		} else {
+			return realstorage.ErrNotFound
+		}
+	})
+
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
 			if block, found := s.blocks[blockID]; found {
@@ -72,7 +86,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		},
 	)
 	s.payloads = &storage.Payloads{}
-	s.core = NewApprovalProcessingCore(s.payloads, s.state, s.assigner, s.sigVerifier, s.sealsPL, s.conduit,
+	s.core = NewApprovalProcessingCore(s.headers, s.payloads, s.state, s.assigner, s.sigVerifier, s.sealsPL, s.conduit,
 		uint(len(s.AuthorizedVerifiers)), false)
 }
 
