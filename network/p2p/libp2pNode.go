@@ -421,12 +421,8 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 		return message.PingResponse{}, -1, pingError(err)
 	}
 
-	// create a context that expires in PingTimeoutSecs
-	pingCtx, cancel := context.WithTimeout(ctx, PingTimeoutSecs)
-	defer cancel()
-
 	// ping the target
-	resp, rtt, err := n.pingService.Ping(pingCtx, targetInfo.ID)
+	resp, rtt, err := n.pingService.Ping(ctx, targetInfo.ID)
 	if err != nil {
 		return message.PingResponse{}, -1, pingError(err)
 	}

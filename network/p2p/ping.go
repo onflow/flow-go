@@ -3,6 +3,7 @@ package p2p
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
@@ -10,6 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/message"
@@ -55,9 +57,9 @@ func (ps *PingService) PingHandler(s network.Stream) {
 				log.Error().Err(err).Msg("failed to reset stream")
 			}
 		case err, ok := <-errCh:
-			// if and error occur while responding to a ping request, then reset the stream
+			// reset the stream if an error occur while responding to a ping request
 			if ok {
-				log.Error().Err(err).Msg("failed to ping remote node")
+				log.Error().Err(err).Msg("ping response failed")
 				err := s.Reset()
 				if err != nil {
 					log.Error().Err(err).Msg("failed to reset stream")
@@ -115,24 +117,33 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 	done := make(chan error, 1)
 	defer close(done)
 
+	timer := time.NewTimer(PingTimeoutSecs)
+	defer timer.Stop()
+
 	// create a new stream to the remote node
 	s, err := ps.host.NewStream(ctx, p, ps.pingProtocolID)
 	if err != nil {
-		return message.PingResponse{}, -1, err
+		return message.PingResponse{}, -1, fmt.Errorf("failed to create stream: %w", err)
 	}
 
-	// reset stream on completion
+	// if ping succeeded, close the stream else reset the stream
 	go func() {
 		log := ps.streamLogger(s)
 		select {
-		case <-ctx.Done():
+		case <-timer.C:
 			// context timed out, log an error
 			log.Error().Msg("context timed out on ping to remote node")
+			// reset the stream (to cause an error on the remote side as well)
+			err := s.Reset()
+			if err != nil {
+				log.Err(err).Msg("failed to reset stream")
+			}
 		case <-done:
-		}
-		err := s.Reset()
-		if err != nil {
-			log.Err(err).Msg("failed to reset stream")
+			// close the stream
+			err := s.Close()
+			if err != nil {
+				log.Err(err).Msg("failed to close stream")
+			}
 		}
 	}()
 
