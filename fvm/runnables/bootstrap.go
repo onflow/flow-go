@@ -1,4 +1,4 @@
-package procedures
+package runnables
 
 import (
 	"encoding/hex"

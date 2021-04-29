@@ -16,7 +16,7 @@ type ScriptInvocator struct{}
 func (i ScriptInvocator) Invocate(
 	vm context.VirtualMachine,
 	ctx context.Context,
-	proc context.Procedure,
+	proc context.Runnable,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (err error, logs []string, value cadence.Value) {

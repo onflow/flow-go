@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -25,19 +24,22 @@ func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
 	return &TransactionInvocator{}
 }
 
-func (TransactionInvocator) Invocate(
+func (i *TransactionInvocator) Invocate(
 	vm context.VirtualMachine,
 	ctx *context.Context,
-	proc context.Procedure,
+	proc context.Runnable,
 	sth *state.StateHolder,
 	programs *programs.Programs,
-) (processErr error, txErr error, events []flow.Event, serviceEvents []flow.Event) {
+	env *envs.TransactionEnvironment,
+	parentSpan opentracing.Span,
+	logger zerolog.Logger,
+) (processErr error) {
 
 	var span opentracing.Span
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
+	if parentSpan != nil {
+		span = ctx.Tracer.StartSpanFromParent(parentSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
-			traceLog.String("transaction.ID", proc.ID.String()),
+			traceLog.String("transaction.ID", proc.ID().String()),
 		)
 		defer span.Finish()
 	}
@@ -47,14 +49,12 @@ func (TransactionInvocator) Invocate(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *context.HostEnv
 	var txError error
 	retry := false
 	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = context.NewEnvironment(*ctx, vm, sth, programs)
 	predeclaredValues := i.valueDeclarations(ctx, env)
 
 	defer func() {
@@ -62,18 +62,14 @@ func (TransactionInvocator) Invocate(
 		if childState != sth.State() {
 			// error transaction
 			msg := "child state doesn't match the active state on the state holder"
-			vm.logger.Error().
-				Str("txHash", proc.ID.String()).
+			logger.Error().
+				Str("txHash", proc.ID().String()).
 				Uint64("blockHeight", blockHeight).
 				Msg(msg)
 
 			// drop delta
 			childState.View().DropDelta()
-			// TODO reset these on env
-			proc.Err = errors.NewFVMInternalErrorf(msg)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-			return
+			env.Reset()
 		}
 		if mergeError := parentState.MergeState(childState); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
@@ -89,8 +85,8 @@ func (TransactionInvocator) Invocate(
 			// force cleanup if retries
 			programs.ForceCleanup()
 
-			vm.logger.Warn().
-				Str("txHash", proc.ID.String()).
+			logger.Warn().
+				Str("txHash", proc.ID().String()).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
 				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
@@ -100,24 +96,19 @@ func (TransactionInvocator) Invocate(
 			// Warning right now the tx requires retry logic doesn't change
 			// anything on state but we might want to revert the state changes (or not commiting)
 			// if we decided to expand it furthur.
-			proc.Err = nil
-			proc.Logs = make([]string, 0)
-			proc.Events = make([]flow.Event, 0)
-			proc.ServiceEvents = make([]flow.Event, 0)
-
-			// reset env
-			env = newEnvironment(*ctx, vm, sth, programs)
+			processErr = nil
+			env.Reset()
 		}
 
-		env.setTransaction(proc.Transaction, proc.TxIndex)
 		env.setTraceSpan(span)
 
-		location := common.TransactionLocation(proc.ID[:])
+		txId := proc.ID()
+		location := common.TransactionLocation(txId[:])
 
-		err := vm.Runtime.ExecuteTransaction(
+		err := vm.Runtime().ExecuteTransaction(
 			runtime.Script{
-				Source:    proc.Transaction.Script,
-				Arguments: proc.Transaction.Arguments,
+				Source:    proc.Script(),
+				Arguments: proc.Arguments(),
 			},
 			runtime.Context{
 				Interface:         env,
@@ -130,12 +121,11 @@ func (TransactionInvocator) Invocate(
 		}
 
 		// break the loop
-		if !i.requiresRetry(err, proc) {
+		if !i.requiresRetry(err, proc, logger) {
 			break
 		}
 
 		retry = true
-		proc.Retried++
 	}
 
 	// (for future use) panic if we tried several times and still failing because of checking issue
@@ -153,16 +143,17 @@ func (TransactionInvocator) Invocate(
 
 	// check the storage limits
 	if ctx.LimitAccountStorage && txError == nil {
-		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+		txError = StorageLimiter{}.Process(vm, ctx, proc, sth, programs)
 	}
 
 	if txError != nil {
 		// drop delta
 		childState.View().DropDelta()
+		env.Reset()
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
-		vm.logger.Info().
-			Str("txHash", proc.ID.String()).
+		logger.Info().
+			Str("txHash", proc.ID().String()).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
@@ -174,22 +165,18 @@ func (TransactionInvocator) Invocate(
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
-	proc.Events = append(proc.Events, env.getEvents()...)
-	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
-	proc.Logs = append(proc.Logs, env.getLogs()...)
-	proc.GasUsed = proc.GasUsed + env.GetComputationUsed()
+	env.Commit()
 
-	vm.logger.Info().
-		Str("txHash", proc.ID.String()).
+	logger.Info().
+		Str("txHash", proc.ID().String()).
 		Uint64("blockHeight", blockHeight).
 		Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-		Int("retried", proc.Retried).
 		Msg("transaction executed successfully")
 
 	return nil
 }
 
-func (TransactionInvocator) valueDeclarations(ctx *context.Context, env *hostEnv) []runtime.ValueDeclaration {
+func (TransactionInvocator) valueDeclarations(ctx *context.Context, txEnv *env.TransactionEnvironment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
@@ -229,7 +216,7 @@ func (TransactionInvocator) valueDeclarations(ctx *context.Context, env *hostEnv
 						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
 							"second argument of setAccountFrozen must be a boolean"))
 					}
-					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+					err := txEnv.SetAccountFrozen(common.Address(address), bool(frozen))
 					if err != nil {
 						panic(err)
 					}

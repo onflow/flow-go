@@ -1,4 +1,4 @@
-package env
+package environments
 
 import (
 	"encoding/binary"

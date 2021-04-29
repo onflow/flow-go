@@ -1,11 +1,11 @@
-package procedures
+package runnables
 
 import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/context"
-	"github.com/onflow/flow-go/fvm/env"
+	"github.com/onflow/flow-go/fvm/environments"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/processors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -14,7 +14,7 @@ import (
 )
 
 type TransactionProcedure struct {
-	ID            flow.Identifier
+	TxID          flow.Identifier
 	Transaction   *flow.TransactionBody
 	TxIndex       uint32
 	Logs          []string
@@ -35,6 +35,18 @@ var (
 	txInvocator          processors.TransactionInvocator
 )
 
+func (proc TransactionProcedure) ID() flow.Identifier {
+	return proc.TxID
+}
+
+func (proc TransactionProcedure) Script() []byte {
+	return proc.Transaction.Script
+}
+
+func (proc TransactionProcedure) Arguments() [][]byte {
+	return proc.Transaction.Arguments
+}
+
 func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 	proc.TraceSpan = traceSpan
 }
@@ -42,7 +54,7 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 func (proc *TransactionProcedure) Run(vm context.VirtualMachine, ctx context.Context, sth *state.StateHolder, programs *programs.Programs) error {
 
 	accounts := state.NewAccounts(sth)
-	txEnv := env.NewTransactionEnvironment(ctx, vm, sth, accounts, programs, proc.Transaction, proc.TxIndex)
+	env := environments.NewTransactionEnvironment(ctx, vm, sth, accounts, programs, proc.Transaction, proc.TxIndex)
 
 	var err error
 	// check accounts not be frozen
@@ -52,6 +64,10 @@ func (proc *TransactionProcedure) Run(vm context.VirtualMachine, ctx context.Con
 		// TODO we should not break here we should continue for fee deductions
 		return nil
 	}
+
+	proc.Events = env.Events()
+	proc.ServiceEvents = env.ServiceEvents()
+	proc.GasUsed = env.GetComputationUsed()
 
 	// TODO rest of the steps
 	return nil

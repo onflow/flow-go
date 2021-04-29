@@ -1,4 +1,4 @@
-package procedures_test
+package runnables_test
 
 import (
 	"fmt"

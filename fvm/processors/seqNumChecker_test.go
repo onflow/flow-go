@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestTransactionSequenceNumProcess(t *testing.T) {
+func TestSequenceNumProcess(t *testing.T) {
 	t.Run("sequence number update (happy path)", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
 		sth := state.NewStateHolder(state.NewState(ledger))
@@ -31,7 +31,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 		tx.SetProposalKey(address, 0, 0)
 		proc := fvm.Transaction(&tx, 0)
 
-		seqChecker := &fvm.TransactionSequenceNumberChecker{}
+		seqChecker := &fvm.SequenceNumberChecker{}
 		err = seqChecker.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
 		require.NoError(t, err)
 

@@ -15,18 +15,18 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-// An Procedure is an operation (or set of operations) that reads or writes ledger state.
-type Procedure interface {
-	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
+// Runnable is anything that can be run by a virtual machine.
+type Runnable interface {
 	ID() flow.Identifier
 	Script() []byte
 	Arguments() [][]byte
+	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 }
 
 type VirtualMachine interface {
 	Runtime() runtime.Runtime
-	Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error)
-	Query(ctx Context, script []byte, v state.View, programs *programs.Programs) (cadence.Value, error)
+	Run(ctx Context, runnable Runnable, view state.View, programs *programs.Programs) (err error)
+	Query(ctx Context, script []byte, view state.View, programs *programs.Programs) (cadence.Value, error)
 	// TODO make GetAccount Special case of query
 	GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error)
 	InvokeMetaTransaction(ctx Context, metaTx *flow.TransactionBody, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error)

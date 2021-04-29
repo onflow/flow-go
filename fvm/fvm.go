@@ -9,9 +9,9 @@ import (
 
 	"github.com/onflow/flow-go/fvm/context"
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/procedures"
 	"github.com/onflow/flow-go/fvm/processors"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/runnables"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/hash"
@@ -79,7 +79,7 @@ func (vm *FlowVirtualMachine) GetAccount(ctx context.Context, address flow.Addre
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 
 	sth := state.NewStateHolder(st)
-	account, err := procedures.GetAccount(vm, ctx, sth, programs, address)
+	account, err := runnables.GetAccount(vm, ctx, sth, programs, address)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
@@ -97,18 +97,18 @@ func (vm *FlowVirtualMachine) InvokeMetaTransaction(ctx context.Context, tx *flo
 	return txErr, fatalErr
 }
 
-func Transaction(tx *flow.TransactionBody, txIndex uint32) *procedures.TransactionProcedure {
-	return &procedures.TransactionProcedure{
-		ID:          tx.ID(),
+func Transaction(tx *flow.TransactionBody, txIndex uint32) *runnables.TransactionProcedure {
+	return &runnables.TransactionProcedure{
+		TxID:        tx.ID(),
 		Transaction: tx,
 		TxIndex:     txIndex,
 	}
 }
 
-func Script(code []byte) *procedures.ScriptProcedure {
+func Script(code []byte) *runnables.ScriptProcedure {
 	scriptHash := hash.DefaultHasher.ComputeHash(code)
 
-	return &procedures.ScriptProcedure{
+	return &runnables.ScriptProcedure{
 		Script: code,
 		ID:     flow.HashToID(scriptHash),
 	}

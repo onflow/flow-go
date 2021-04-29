@@ -1,4 +1,4 @@
-package env
+package environments
 
 import (
 	"encoding/binary"
@@ -41,7 +41,6 @@ type TransactionEnv struct {
 	addressGenerator flow.AddressGenerator
 	uuidGenerator    *state.UUIDGenerator
 	eventHandler     *handler.EventHandler
-	logs             []string
 	totalGasUsed     uint64
 	rng              *rand.Rand
 	tx               *flow.TransactionBody
@@ -125,7 +124,6 @@ func (e *TransactionEnv) GetSigningAccounts() []runtime.Address {
 			e.authorizers[i] = runtime.Address(auth)
 		}
 	}
-
 	return e.authorizers
 }
 
@@ -209,10 +207,6 @@ func (e *TransactionEnv) getEvents() []flow.Event {
 
 func (e *TransactionEnv) getServiceEvents() []flow.Event {
 	return e.eventHandler.ServiceEvents()
-}
-
-func (e *TransactionEnv) getLogs() []string {
-	return e.logs
 }
 
 func (e *TransactionEnv) GetValue(owner, key []byte) ([]byte, error) {
@@ -523,10 +517,6 @@ func (e *TransactionEnv) ProgramLog(message string) error {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvProgramLog)
 		defer sp.Finish()
 	}
-
-	if e.ctx.CadenceLoggingEnabled {
-		e.logs = append(e.logs, message)
-	}
 	return nil
 }
 
@@ -606,8 +596,8 @@ func (e *TransactionEnv) Events() []flow.Event {
 	return e.eventHandler.Events()
 }
 
-func (e *TransactionEnv) Logs() []string {
-	return e.logs
+func (e *TransactionEnv) ServiceEvents() []flow.Event {
+	return e.eventHandler.ServiceEvents()
 }
 
 func (e *TransactionEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
@@ -954,5 +944,14 @@ func (e *TransactionEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	// commit events
+	e.eventHandler.Commit()
 	return e.contracts.Commit()
+}
+
+// Reset resets changes
+func (e *TransactionEnv) Reset() error {
+	e.eventHandler.Reset()
+	e.contracts.Rollback()
+	return nil
 }

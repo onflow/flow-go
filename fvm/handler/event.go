@@ -15,6 +15,7 @@ type EventHandler struct {
 	eventCollectionEnabled        bool
 	serviceEventCollectionEnabled bool
 	eventCollectionByteSizeLimit  uint64
+	draftCollection               *EventCollection
 	eventCollection               *EventCollection
 }
 
@@ -53,8 +54,10 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 
 	// skip limit if payer is service account
 	if payer != h.chain.ServiceAddress() {
-		if h.eventCollection.TotalByteSize()+payloadSize > h.eventCollectionByteSizeLimit {
-			return errors.NewEventLimitExceededError(h.eventCollection.TotalByteSize()+payloadSize, h.eventCollectionByteSizeLimit)
+		used := h.eventCollection.TotalByteSize() + h.draftCollection.TotalByteSize() + payloadSize
+		limit := h.eventCollectionByteSizeLimit
+		if used > limit {
+			return errors.NewEventLimitExceededError(used, limit)
 		}
 	}
 
@@ -67,11 +70,19 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 	}
 
 	if IsServiceEvent(event, h.chain) && h.serviceEventCollectionEnabled {
-		h.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+		h.draftCollection.AppendServiceEvent(flowEvent, payloadSize)
 	}
 
-	h.eventCollection.AppendEvent(flowEvent, payloadSize)
+	h.draftCollection.AppendEvent(flowEvent, payloadSize)
 	return nil
+}
+
+func (h *EventHandler) Commit() {
+	h.eventCollection.Merge(h.draftCollection)
+}
+
+func (h *EventHandler) Reset() {
+	h.draftCollection = NewEventCollection()
 }
 
 func (h *EventHandler) Events() []flow.Event {
