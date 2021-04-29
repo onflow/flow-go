@@ -161,7 +161,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	// check if there are stale results qualified for emergency sealing
 	err = c.checkEmergencySealing(collectors, finalized.Height)
 	if err != nil {
-		c.log.Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
+   	c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
 	collectors = c.cleanupStaleCollectors(collectors, lastSealed.Height)

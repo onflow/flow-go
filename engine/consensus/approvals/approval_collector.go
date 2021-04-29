@@ -26,10 +26,7 @@ type ApprovalCollector struct {
 func NewApprovalCollector(result *flow.IncorporatedResult, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
-		chunkAssignment := make(map[flow.Identifier]struct{})
-		for _, id := range assignment.Verifiers(chunk) {
-			chunkAssignment[id] = struct{}{}
-		}
+		chunkAssignment := assignment.Verifiers(chunk).Lookup()
 		collector := NewChunkApprovalCollector(chunkAssignment, requiredApprovalsForSealConstruction)
 		chunkCollectors = append(chunkCollectors, collector)
 	}

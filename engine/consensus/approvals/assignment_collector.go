@@ -155,6 +155,11 @@ func (c *AssignmentCollector) putIncorporatedAtHeight(incorporatdAtHeight uint64
 }
 
 func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
+	// check that result is the one that this AssignmentCollector manages
+	if irID := incorporatedResult.Result.ID(); irID != c.ResultID {
+		return fmt.Errorf("this AssignmentCollector manages result %x but got %x", c.ResultID, irID)
+	}
+
 	incorporatedBlockID := incorporatedResult.IncorporatedBlockID
 	if collector := c.collectorByBlockID(incorporatedBlockID); collector != nil {
 		return nil
@@ -168,7 +173,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := c.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
-		return engine.NewInvalidInputErrorf("could not determine chunk assignment: %w", err)
+		return fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
 
 	// pre-select all authorized verifiers at the block that is being sealed
@@ -179,7 +184,7 @@ func (c *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow
 
 	incorporatedAtHeight, err := c.getCachedBlockHeight(incorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("coulld not determine height of incorporated block %s: %w",
+		return fmt.Errorf("could not determine height of incorporated block %s: %w",
 			incorporatedBlockID, err)
 	}
 
@@ -287,6 +292,11 @@ func (c *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nod
 // - exception in case of any other error, usually this is not expected
 // - nil on successful check
 func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
+	// check that approval is for the expected result to reject incompatible inputs
+	if approval.Body.ExecutionResultID != c.ResultID {
+		return fmt.Errorf("this AssignmentCollector processes only approvals for result (%x) but got an approval for (%x)", c.ResultID, approval.Body.ExecutionResultID)
+	}
+
 	// approval has to refer same block as execution result
 	if approval.Body.BlockID != c.BlockID() {
 		return engine.NewInvalidInputErrorf("result approval for invalid block, expected (%x) vs (%x)",
@@ -305,12 +315,12 @@ func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) er
 
 	err := c.verifyAttestationSignature(&approval.Body, identity)
 	if err != nil {
-		return fmt.Errorf("invalid attestation signature: %w", err)
+		return fmt.Errorf("validating attestation signature failed: %w", err)
 	}
 
 	err = c.verifySignature(approval, identity)
 	if err != nil {
-		return fmt.Errorf("invalid approval signature: %w", err)
+		return fmt.Errorf("validating approval signature failed: %w", err)
 	}
 
 	return nil
@@ -327,7 +337,7 @@ func (c *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) err
 	for _, collector := range c.allCollectors() {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
-			return fmt.Errorf("could not process assignment for collector %v: %w", collector.incorporatedResult.IncorporatedBlockID, err)
+			return fmt.Errorf("could not process approval: %w", err)
 		}
 	}
 

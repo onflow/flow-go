@@ -109,10 +109,13 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	blockID := s.Block.ID()
+	resultID := s.IncorporatedResult.Result.ID()
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
-			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID),
-				unittest.WithBlockID(blockID))
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
+				unittest.WithApproverID(verID),
+				unittest.WithBlockID(blockID),
+				unittest.WithExecutionResultID(resultID))
 			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)
 		}
@@ -131,10 +134,13 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	blockID := s.Block.ID()
+	resultID := s.IncorporatedResult.Result.ID()
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
-			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID),
-				unittest.WithBlockID(blockID))
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index),
+				unittest.WithApproverID(verID),
+				unittest.WithBlockID(blockID),
+				unittest.WithExecutionResultID(resultID))
 			err = s.collector.ProcessApproval(approval)
 			require.NoError(s.T(), err)
 		}
@@ -162,7 +168,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidSignature() {
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
+		unittest.WithApproverID(s.VerID),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	// attestation signature is valid
 	s.sigVerifier.On("Verify", mock.Anything, approval.Body.AttestationSignature, mock.Anything).Return(true, nil).Once()
@@ -180,7 +188,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidBlockID() {
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
+		unittest.WithApproverID(s.VerID),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
@@ -193,7 +203,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidBlockChunkInde
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(uint64(s.Chunks.Len())), unittest.WithApproverID(s.VerID))
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(uint64(s.Chunks.Len())),
+		unittest.WithApproverID(s.VerID),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
@@ -219,7 +231,6 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 
 		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
 		require.Error(s.T(), err)
-		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 
 	s.Run("invalid-verifier-identities", func() {
@@ -308,7 +319,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 // is discovered, without execution result we are missing information for verification. Calling `ProcessApproval` before `ProcessApproval`
 // should result in error
 func (s *AssignmentCollectorTestSuite) TestProcessApproval_BeforeIncorporatedResult() {
-	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index), unittest.WithApproverID(s.VerID))
+	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
+		unittest.WithApproverID(s.VerID),
+		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 	err := s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsInvalidInputError(err))
