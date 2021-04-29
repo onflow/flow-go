@@ -17,7 +17,7 @@ import (
 // it generates and sorts a list of ids, and then evaluates sorting in ascending order
 func TestIdentifierListSort(t *testing.T) {
 	count := 10
-	// creates an identity list of 10 ids
+	// creates an identifier list of 10 ids
 	var ids flow.IdentifierList = unittest.IdentifierListFixture(count)
 
 	// shuffles array before sorting to enforce some pseudo-randomness
@@ -39,10 +39,10 @@ func TestIdentifierListSort(t *testing.T) {
 	}
 }
 
-// TestIdentifierListContains tests the IdentityList against its Contains method implementation.
+// TestIdentifierListContains tests the IdentifierList against its Contains method implementation.
 func TestIdentifierListContains(t *testing.T) {
 	count := 10
-	// creates an identity list of 10 ids
+	// creates an identifier list of 10 ids
 	var ids flow.IdentifierList = unittest.IdentifierListFixture(count)
 
 	// all identifiers in the list should have a valid Contains result.

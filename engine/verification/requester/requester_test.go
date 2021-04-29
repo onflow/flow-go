@@ -552,7 +552,7 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 	total := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
 	wg.Add(total)
 
-	pendingRequests.On("RequestInfo", testifymock.Anything).Run(func(args testifymock.Arguments) {
+	pendingRequests.On("RequestHistory", testifymock.Anything).Run(func(args testifymock.Arguments) {
 		// type assertion of input.
 		chunkID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)

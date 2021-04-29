@@ -127,7 +127,7 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 
 	// performs custom validation of test.
 	for _, chunk := range chunkReqs {
-		attempts, lastTried, retryAfter, ok := requests.RequestInfo(chunk.ID())
+		attempts, lastTried, retryAfter, ok := requests.RequestHistory(chunk.ID())
 		require.True(t, ok)
 		validate(t, attempts, lastTried, retryAfter)
 	}

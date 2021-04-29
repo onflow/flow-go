@@ -251,7 +251,7 @@ func (e *Engine) requestChunkDataPack(request *verification.ChunkDataPackRequest
 
 // canDispatchRequest returns whether chunk data request for this chunk ID can be dispatched.
 func (e *Engine) canDispatchRequest(chunkID flow.Identifier) bool {
-	attempts, lastAttempt, retryAfter, exists := e.pendingRequests.RequestInfo(chunkID)
+	attempts, lastAttempt, retryAfter, exists := e.pendingRequests.RequestHistory(chunkID)
 	if !exists {
 		return false
 	}

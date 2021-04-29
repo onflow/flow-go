@@ -11,15 +11,15 @@ import (
 // underlying chunk requests history.
 type ChunkRequestHistoryUpdaterFunc func(uint64, time.Duration) (uint64, time.Duration, bool)
 
-// ExponentialUpdater is a chunk request history updater factory that generates retry after of value
+// ExponentialUpdater is a chunk request history updater factory that updates the retryAfter value of a request to
 // multiplier * retryAfter. For example, if multiplier = 2,
-// then invoking it n times results in a retry after value of 2^n * retryAfter, which follows an exponential series.
+// then invoking it n times results in a retryAfter value of 2^n * retryAfter, which follows an exponential series.
 //
 // It also keeps updated retryAfter value between the minInterval and maxInterval inclusive. It means that if updated retryAfter value
 // is below minInterval, it is bumped up to the minInterval. Also, if updated retryAfter value is above maxInterval, it is skimmed off back
 // to the maxInterval.
 //
-// Note: if initial retryAfter is below minInterval, the first call to this function returns minInterval, and after the nth invocations,
+// Note: if initial retryAfter is below minInterval, the first call to this function returns minInterval, and hence after the nth invocations,
 // the retryAfter value is set to 2^(n-1) * minInterval.
 func ExponentialUpdater(multiplier float64, maxInterval time.Duration, minInterval time.Duration) ChunkRequestHistoryUpdaterFunc {
 	return func(attempts uint64, retryAfter time.Duration) (uint64, time.Duration, bool) {
@@ -38,11 +38,11 @@ func ExponentialUpdater(multiplier float64, maxInterval time.Duration, minInterv
 }
 
 // IncrementalAttemptUpdater is a chunk request history updater factory that increments the attempt field of request status
-// and makes it instantly available against any retry after qualifier.
+// and makes it instantly available against any retryAfter qualifier.
 func IncrementalAttemptUpdater() ChunkRequestHistoryUpdaterFunc {
 	return func(attempts uint64, retryAfter time.Duration) (uint64, time.Duration, bool) {
 		attempts++
-		retryAfter = +time.Nanosecond // makes request instantly qualified against any retry after qualifier.
+		retryAfter = time.Nanosecond // makes request instantly qualified against any retry after qualifier.
 		return attempts, retryAfter, true
 	}
 }
@@ -55,13 +55,13 @@ type ChunkRequests interface {
 	// their chunk ID.
 	ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool)
 
-	// RequestInfo returns the number of times the chunk has been requested,
-	// last time the chunk has been requested, and the retry-after time duration of the
+	// RequestHistory returns the number of times the chunk has been requested,
+	// last time the chunk has been requested, and the retryAfter duration of the
 	// underlying request status of this chunk.
 	//
 	// The last boolean parameter returns whether a chunk request for this chunk ID
 	// exists in memory-pool.
-	RequestInfo(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool)
+	RequestHistory(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool)
 
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate chunk request with the same
