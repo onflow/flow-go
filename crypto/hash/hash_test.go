@@ -124,21 +124,16 @@ func TestHashersAPI(t *testing.T) {
 		emptyHash := h.SumHash()
 		assert.Equal(t, expectedEmptyHash, emptyHash)
 
-		// ComputeHash output does not depend on the hasher state
+		// successive writes of data are equivalent to compute hash
+		// of the concatenated data
 		h = newFunction()
 		hash1 := h.ComputeHash(data)
-		hash2 := h.ComputeHash(data)
-		assert.Equal(t, hash1, hash2)
-
-		// Writes are equivalent to compute hash
-		h = newFunction()
-		hash1 = h.ComputeHash(data)
 
 		h.Reset()
 		_, _ = h.Write(data[:355])
 		_, _ = h.Write(data[355:902])
 		_, _ = h.Write(data[902:])
-		hash2 = h.SumHash()
+		hash2 := h.SumHash()
 		assert.Equal(t, hash1, hash2)
 
 		// ComputeHash output does not depend on the hasher state
