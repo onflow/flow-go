@@ -26,6 +26,7 @@ type ExecutableBlock struct {
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection // key is the collection ID.
 	StartState          flow.StateCommitment
+	Executing           bool // flag used to indicate if blog is being executed, to avoid
 }
 
 // BlocksByCollection represents a collection that the execution node
