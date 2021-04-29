@@ -249,12 +249,13 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 	mocked.RunFn =
 		func(args mock.Arguments) {
-			//lock.Lock()
-			//defer lock.Unlock()
-
 			blockID := args[1].(*flow.Header).ID()
 			commit := args[2].(flow.StateCommitment)
+
+			ctx.mu.Lock()
 			commits[blockID] = commit
+			ctx.mu.Unlock()
+
 			onPersisted(blockID, commit)
 		}
 
