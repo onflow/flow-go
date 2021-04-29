@@ -59,8 +59,6 @@ install-tools: crypto/relic/build check-go-version
 unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./engine/execution/ingestion/. -v -vv
-	$(MAKE) -C crypto test
-	$(MAKE) -C integration test
 
 .PHONY: test
 test: generate-mocks unittest
