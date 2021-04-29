@@ -134,3 +134,56 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 		validate(t, attempts, lastTried, retryAfter)
 	}
 }
+
+// TestFailingUpdater evaluates the atomicity of updating request history. If an update is failing, none of the history
+// attributes of a request should be altered.
+func TestFailingUpdater(t *testing.T) {
+	// initializations: creating mempool and populating it, also updating each chunk request
+	// with an incremental updater.
+	requests := stdmap.NewChunkRequests(10)
+	chunkReqs := unittest.ChunkDataPackRequestListFixture(10)
+	for _, request := range chunkReqs {
+		ok := requests.Add(request)
+		require.True(t, ok)
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(10)
+	updater := mempool.IncrementalAttemptUpdater()
+	for _, request := range chunkReqs {
+		go func(requestID flow.Identifier) {
+			attempts, _, _, ok := requests.UpdateRequestHistory(requestID, updater)
+			require.True(t, ok)
+			require.Equal(t, uint64(1), attempts)
+
+			wg.Done()
+		}(request.ID())
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
+
+	// execution and validation: updating request history of all chunks in mempool concurrently using
+	// an updater that always failing should not change the requests' history
+	failingUpdater := func(uint64, time.Duration) (uint64, time.Duration, bool) {
+		return 0, 0, false
+	}
+	wg.Add(10)
+	for _, request := range chunkReqs {
+		go func(requestID flow.Identifier) {
+			// takes request history before update
+			exAttempts, exLastTried, exRetryAfter, ok := requests.RequestHistory(requestID)
+			require.True(t, ok)
+
+			// failing an update should not change request history
+			_, _, _, result := requests.UpdateRequestHistory(requestID, failingUpdater)
+			require.False(t, result)
+
+			acAttempts, acLastTried, acRetryAfter, ok := requests.RequestHistory(requestID)
+			require.Equal(t, exAttempts, acAttempts)
+			require.Equal(t, exLastTried, acLastTried)
+			require.Equal(t, exRetryAfter, acRetryAfter)
+
+			wg.Done()
+		}(request.ID())
+	}
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
+}
