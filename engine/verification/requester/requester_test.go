@@ -331,13 +331,13 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	// creates 10 chunk request each with 2 agree targets and 3 disagree targets.
+	// Generates 30 requests, 10 of each type.
+	//
 	// chunk belongs to a block at heights greater than 5, but the last sealed block is at height 5, so
 	// the chunk request should be dispatched.
 	agrees := unittest.IdentifierListFixture(2)
 	disagrees := unittest.IdentifierListFixture(3)
-
-	// Generates 30 requests, 10 of each type.
+	//
 	// models requests that are just added to the mempool and are ready to dispatch
 	instantQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
 		unittest.WithHeightGreaterThan(5),
