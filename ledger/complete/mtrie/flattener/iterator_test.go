@@ -51,12 +51,12 @@ func TestPopulatedTrie(t *testing.T) {
 
 	require.True(t, itr.Next())
 	p1_leaf := itr.Value()
-	require.Equal(t, p1, p1_leaf.Path())
+	require.Equal(t, p1, *p1_leaf.Path())
 	require.Equal(t, v1, p1_leaf.Payload())
 
 	require.True(t, itr.Next())
 	p2_leaf := itr.Value()
-	require.Equal(t, p2, p2_leaf.Path())
+	require.Equal(t, p2, *p2_leaf.Path())
 	require.Equal(t, v2, p2_leaf.Payload())
 
 	require.True(t, itr.Next())

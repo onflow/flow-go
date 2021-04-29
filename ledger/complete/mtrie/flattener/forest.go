@@ -93,7 +93,7 @@ func toStorableNode(node *node.Node, indexForNode node2indexMap) (*StorableNode,
 	// if node is a leaf, path is a slice of 32 bytes, otherwise path is nil
 	var path []byte
 	if node.IsLeaf() {
-		temp := node.Path()
+		temp := *node.Path()
 		path = temp[:]
 	}
 	storableNode := &StorableNode{

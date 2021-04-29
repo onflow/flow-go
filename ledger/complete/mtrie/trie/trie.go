@@ -134,7 +134,7 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 	// reached a leaf node
 	if head.IsLeaf() {
 		for i, p := range paths {
-			if head.Path() == p {
+			if *head.Path() == p {
 				payloads[i] = head.Payload()
 			} else {
 				payloads[i] = ledger.EmptyPayload()
@@ -205,7 +205,7 @@ func update(
 		if compactLeaf != nil {
 			// create a new node for the compact leaf path and payload. The old node shouldn't
 			// be recycled as it is still used by the tree copy before the update.
-			return node.NewLeaf(compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+			return node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
 		}
 		return parentNode
 	}
@@ -216,7 +216,7 @@ func update(
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
 		// check if the parent node path is among the updated paths
-		parentPath := parentNode.Path()
+		parentPath := *parentNode.Path()
 		found := false
 		for i, p := range paths {
 			if p == parentPath {
@@ -256,7 +256,7 @@ func update(
 	var lcompactLeaf, rcompactLeaf *node.Node
 	if compactLeaf != nil {
 		// if yes, check which branch it will go to.
-		path := compactLeaf.Path()
+		path := *compactLeaf.Path()
 		if bitutils.Bit(path[:], depth) == 0 {
 			lcompactLeaf = compactLeaf
 		} else {
@@ -328,8 +328,8 @@ func prove(head *node.Node, paths []ledger.Path, proofs []*ledger.TrieProof) {
 	if head.IsLeaf() {
 		for i, path := range paths {
 			// value matches (inclusion proof)
-			if head.Path() == path {
-				proofs[i].Path = head.Path()
+			if *head.Path() == path {
+				proofs[i].Path = *head.Path()
 				proofs[i].Payload = head.Payload()
 				proofs[i].Inclusion = true
 			}

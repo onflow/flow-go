@@ -202,9 +202,13 @@ func (n *Node) RegCount() uint64 {
 	return n.regCount
 }
 
-// Path returns the the Node's register storage path.
-func (n *Node) Path() ledger.Path {
-	return n.path
+// Path returns a pointer to the Node's register storage path.
+// If the node is not a leaf, the function returns `nil`.
+func (n *Node) Path() *ledger.Path {
+	if n.IsLeaf() {
+		return &n.path
+	}
+	return nil
 }
 
 // Payload returns the the Node's payload.
