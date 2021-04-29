@@ -80,7 +80,10 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.pendingRequests,
 		s.handler,
 		s.retryInterval,
+		// requests are only qualified if their retryAfter is elapsed.
 		requester.RetryAfterQualifier(),
+		// exponential backoff with multiplier of 2, minimum interval of a second, and
+		// maximum interval of an hour.
 		flowmempool.ExponentialUpdater(2, time.Hour, time.Second),
 		s.requestTargets)
 	require.NoError(t, err)
@@ -175,16 +178,11 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
-	// makes all chunk requests being qualified for dispatch instantly
-	// qualifyWG := mockPendingRequestInfoAndUpdate(t,
-	//	s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
 	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
-
-	// unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "did not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
 	// requester does not call publish to disseminate the request for this chunk.
@@ -230,7 +228,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 		err := e.Process(requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -275,7 +273,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// unsealed requests should be submitted to the network once
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
 
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Second*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -317,7 +315,8 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -375,7 +374,8 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	// mocks only instant qualified requests are dispatched.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
 
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval, "did not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"cloud not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
