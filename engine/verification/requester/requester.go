@@ -212,14 +212,13 @@ func (e *Engine) onTimer() {
 
 		qualified := e.canDispatchRequest(request.ChunkID)
 		if !qualified {
-			lg.Debug().Bool("qualified_request", qualified).
-				Msg("chunk data pack request is not qualified for dispatching at this round")
+			lg.Debug().Msg("chunk data pack request is not qualified for dispatching at this round")
 			continue
 		}
 
 		err = e.requestChunkDataPack(request)
 		if err != nil {
-			lg.Warn().Err(err).Msg("could not request chunk data pack")
+			lg.Error().Err(err).Msg("could not request chunk data pack")
 			continue
 		}
 
