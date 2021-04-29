@@ -3,7 +3,7 @@
 // To use this package, simply import it in your program, then add build
 // arguments like the following:
 //
-//   go build -ldflags "-X github.com/dapperlabs/flow-go/version.semver=v1.0.0"
+//   go build -ldflags "-X github.com/onflow/flow-go/cmd/build.semver=v1.0.0"
 package build
 
 // Default value for build-time-injected version strings.

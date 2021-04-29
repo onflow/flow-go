@@ -22,15 +22,16 @@ import (
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
-	"github.com/libp2p/go-libp2p/p2p/protocol/ping"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/cmd/build"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -80,6 +81,7 @@ type Node struct {
 	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
+	pingService          *PingService
 }
 
 func NewLibP2PNode(logger zerolog.Logger,
@@ -96,7 +98,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}
 
-	flowLibP2PProtocolID := generateProtocolID(rootBlockID)
+	flowLibP2PProtocolID := generateFlowProtocolID(rootBlockID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -113,6 +115,9 @@ func NewLibP2PNode(logger zerolog.Logger,
 		return nil, fmt.Errorf("could not bootstrap libp2p host: %w", err)
 	}
 
+	pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
+	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, build.Semver(), logger)
+
 	n := &Node{
 		connGater:            connGater,
 		host:                 libP2PHost,
@@ -123,6 +128,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		subs:                 make(map[flownet.Topic]*pubsub.Subscription),
 		id:                   id,
 		flowLibP2PProtocolID: flowLibP2PProtocolID,
+		pingService:          pingService,
 	}
 
 	ip, port, err := n.GetIPPort()
@@ -397,41 +403,31 @@ func (n *Node) Publish(ctx context.Context, topic flownet.Topic, data []byte) er
 }
 
 // Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
-func (n *Node) Ping(ctx context.Context, identity flow.Identity) (time.Duration, error) {
+func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingResponse, time.Duration, error) {
 
-	pingError := func(err error) (time.Duration, error) {
-		return -1, fmt.Errorf("failed to ping %s (%s): %w", identity.NodeID.String(), identity.Address, err)
+	pingError := func(err error) error {
+		return fmt.Errorf("failed to ping %s (%s): %w", identity.NodeID.String(), identity.Address, err)
 	}
 
 	// convert the target node address to libp2p peer info
 	targetInfo, err := PeerAddressInfo(identity)
 	if err != nil {
-		return pingError(err)
+		return message.PingResponse{}, -1, pingError(err)
 	}
 
 	// connect to the target node
 	err = n.host.Connect(ctx, targetInfo)
 	if err != nil {
-		return pingError(err)
+		return message.PingResponse{}, -1, pingError(err)
 	}
-
-	// create a cancellable ping context
-	pctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// ping the target
-	resultChan := ping.Ping(pctx, n.host, targetInfo.ID)
-
-	// read the result channel
-	select {
-	case res := <-resultChan:
-		if res.Error != nil {
-			return pingError(err)
-		}
-		return res.RTT, nil
-	case <-time.After(PingTimeoutSecs):
-		return pingError(fmt.Errorf("timed out after %d seconds", PingTimeoutSecs))
+	resp, rtt, err := n.pingService.Ping(ctx, targetInfo.ID)
+	if err != nil {
+		return message.PingResponse{}, -1, pingError(err)
 	}
+
+	return resp, rtt, nil
 }
 
 // UpdateAllowList allows the peer allow list to be updated.
@@ -455,8 +451,13 @@ func (n *Node) Host() host.Host {
 	return n.host
 }
 
-// SetStreamHandler sets the stream handler of libp2p host of the node.
-func (n *Node) SetStreamHandler(handler libp2pnet.StreamHandler) {
+// SetFlowProtocolStreamHandler sets the stream handler of Flow libp2p Protocol
+func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
+	n.host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
+}
+
+// SetPingStreamHandler sets the stream handler for the Flow Ping protocol.
+func (n *Node) SetPingStreamHandler(handler libp2pnet.StreamHandler) {
 	n.host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
 }
 
