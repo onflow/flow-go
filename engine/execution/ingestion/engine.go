@@ -771,7 +771,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
-	fmt.Println("================")
 	lg.Info().Hex("sender", originID[:]).Msg("handle collection")
 
 	// TODO: bail if have seen this collection before.

@@ -414,7 +414,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		//blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
 
-		logBlocks(map[string]*entity.ExecutableBlock{
+		logBlocks(t, map[string]*entity.ExecutableBlock{
 			"B": blockB,
 			"C": blockC,
 		})
@@ -524,7 +524,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		blockD := unittest.ExecutableBlockFixtureWithParent(nil, blockC.Block.Header)
 		blockD.StartState = blockC.StartState
 
-		logBlocks(map[string]*entity.ExecutableBlock{
+		logBlocks(t, map[string]*entity.ExecutableBlock{
 			"B": blockB,
 			"C": blockC,
 			"D": blockD,
@@ -618,10 +618,9 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 	})
 }
 
-func logBlocks(blocks map[string]*entity.ExecutableBlock) {
-	log := unittest.Logger()
+func logBlocks(t *testing.T, blocks map[string]*entity.ExecutableBlock) {
 	for name, b := range blocks {
-		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
+		t.Logf("creating blocks for testing, block %v's ID:%v", name, b.ID())
 	}
 }
 
@@ -641,7 +640,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
-		logBlocks(blocks)
+		logBlocks(t, blocks)
 
 		// none of the blocks has any collection, so state is essentially the same
 		blocks["C"].StartState = blocks["A"].StartState
@@ -824,7 +823,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
-		logBlocks(blocks)
+		logBlocks(t, blocks)
 
 		// none of the blocks has any collection, so state is essentially the same
 		blocks["B"].StartState = blocks["A"].StartState
@@ -838,6 +837,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
+			t.Logf("block is persisted: %v", blockID)
 			wg.Done()
 		}
 
@@ -879,7 +879,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		require.NoError(t, err)
 
 		//// wait until all 4 blocks have been executed
-		unittest.AssertReturnsBefore(t, wg.Wait, 15*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
 
