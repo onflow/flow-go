@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -17,14 +18,15 @@ import (
 // TestChunkRequests_UpdateRequestHistory evaluates behavior of ChuckRequests against updating request histories with
 // different updaters.
 func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
+	qualifier := requester.RetryAfterQualifier()
 	t.Run("10 chunks- 10 times incremental updater ", func(t *testing.T) {
 		incUpdater := mempool.IncrementalAttemptUpdater()
 		chunks := 10
 		expectedAttempts := 10
 
 		withUpdaterScenario(t, chunks, expectedAttempts, incUpdater, func(t *testing.T, attempts uint64, lastTried time.Time, retryAfter time.Duration) {
-			require.Equal(t, expectedAttempts, int(attempts))             // each chunk request should be attempted 10 times.
-			require.True(t, lastTried.Add(retryAfter).Before(time.Now())) // request should be immediately qualified for retrial.
+			require.Equal(t, expectedAttempts, int(attempts))           // each chunk request should be attempted 10 times.
+			require.True(t, qualifier(attempts, lastTried, retryAfter)) // request should be immediately qualified for retrial.
 		})
 	})
 
@@ -41,7 +43,7 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, lastTried.Add(retryAfter).After(time.Now()))
+			require.True(t, !qualifier(attempts, lastTried, retryAfter))
 
 			// retryAfter should be equal to 2^(attempts-1) * minInterval.
 			// note that after the first attempt, retry after is set to minInterval.
@@ -66,7 +68,7 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, lastTried.Add(retryAfter).After(time.Now()))
+			require.True(t, !qualifier(attempts, lastTried, retryAfter))
 
 			// expected retry after should be equal to the min interval, since updates should always underflow due
 			// to the very small multiplier.
@@ -88,9 +90,9 @@ func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
 			require.Equal(t, expectedAttempts, int(attempts)) // each chunk request should be attempted 10 times.
 
 			// request should NOT be immediately qualified for retrial due to exponential backoff.
-			require.True(t, lastTried.Add(retryAfter).After(time.Now()))
+			require.True(t, !qualifier(attempts, lastTried, retryAfter))
 
-			// expected retry after should be equal to the max interval, since updates should eventually overflow due
+			// expected retry after should be equal to the maxInterval, since updates should eventually overflow due
 			// to the very small maxInterval and quite noticeable multiplier (2).
 			require.Equal(t, maxInterval, retryAfter)
 		})
@@ -116,7 +118,7 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 	for _, request := range chunkReqs {
 		for i := 0; i < times; i++ {
 			go func(requestID flow.Identifier) {
-				ok := requests.UpdateRequestHistory(requestID, updater)
+				_, _, _, ok := requests.UpdateRequestHistory(requestID, updater)
 				require.True(t, ok)
 
 				wg.Done()
