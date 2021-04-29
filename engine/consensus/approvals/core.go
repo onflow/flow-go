@@ -138,6 +138,13 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	}
 }
 
+// processIncorporatedResult implements business logic for processing single incorporated result
+// Returns:
+// * engine.InvalidInputError - incorporated result is invalid
+// * engine.UnverifiableInputError - result is unverifiable since referenced block cannot be found
+// * engine.OutdatedInputError - result is outdated for instance block was already sealed
+// * exception in case of any other error, usually this is not expected
+// * nil - successfully processed incorporated result
 func (c *approvalProcessingCore) processIncorporatedResult(result *flow.IncorporatedResult) error {
 	err := c.checkBlockOutdated(result.Result.BlockID)
 	if err != nil {
@@ -245,6 +252,13 @@ func (c *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) 
 	return err
 }
 
+// processApproval implements business logic for processing single approval
+// Returns:
+// * engine.InvalidInputError - result approval is invalid
+// * engine.UnverifiableInputError - result approval is unverifiable since referenced block cannot be found
+// * engine.OutdatedInputError - result approval is outdated for instance block was already sealed
+// * exception in case of any other error, usually this is not expected
+// * nil - successfully processed result approval
 func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) error {
 	err := c.checkBlockOutdated(approval.Body.BlockID)
 	if err != nil {
