@@ -320,7 +320,7 @@ func (c *AssignmentCollector) validateApproval(approval *flow.ResultApproval) er
 
 	err = c.verifySignature(approval, identity)
 	if err != nil {
-		return fmt.Errorf("invalid approval signature: %w", err)
+		return fmt.Errorf("validating approval signature failed: %w", err)
 	}
 
 	return nil
