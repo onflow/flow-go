@@ -22,8 +22,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/verification/assigner"
+	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
+	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
+	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -40,6 +45,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // StateFixture is a test helper struct that encapsulates a flow protocol state
@@ -196,14 +202,31 @@ type VerificationNode struct {
 	ReadyReceipts            mempool.ReceiptDataPacks
 	PendingReceipts          mempool.ReceiptDataPacks
 	PendingResults           mempool.ResultDataPacks
+	ChunkStatuses            mempool.ChunkStatuses
+	ChunkRequests            mempool.ChunkRequests
 	ProcessedResultIDs       mempool.Identifiers
 	DiscardedResultIDs       mempool.Identifiers
 	BlockIDsCache            mempool.Identifiers
+	Results                  storage.ExecutionResults
+	Receipts                 storage.ExecutionReceipts
 	PendingReceiptIDsByBlock mempool.IdentifierMap
 	ReceiptIDsByResult       mempool.IdentifierMap
 	ChunkIDsByResult         mempool.IdentifierMap
-	PendingChunks            *match.Chunks
-	VerifierEngine           network.Engine
-	FinderEngine             *finder.Engine
-	MatchEngine              network.Engine
+
+	// chunk consumer and processor for fetcher engine
+	ProcessedChunkIndex storage.ConsumerProgress
+	ChunksQueue         *bstorage.ChunksQueue
+	ChunkConsumer       *chunkconsumer.ChunkConsumer
+
+	// block consumer for chunk consumer
+	ProcessedBlockHeight storage.ConsumerProgress
+	BlockConsumer        *blockconsumer.BlockConsumer
+
+	PendingChunks   *match.Chunks // TODO: backward compatibility, remove once new verification node is active.
+	VerifierEngine  network.Engine
+	FinderEngine    *finder.Engine // TODO: backward compatibility, remove once new verification node is active.
+	MatchEngine     network.Engine // TODO: backward compatibility, remove once new verification node is active.
+	AssignerEngine  *assigner.Engine
+	FetcherEngine   *fetcher.Engine
+	RequesterEngine *verificationrequester.Engine
 }

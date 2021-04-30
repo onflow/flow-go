@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
-	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
@@ -25,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -136,6 +135,80 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 	}
 }
 
+//// withConsumers is a test helper that sets up the following pipeline:
+//// block reader -> block consumer (3 workers) -> assigner engine -> chunks queue -> chunks consumer (3 workers) -> mock chunk processor
+////
+//// The block consumer operates on a block reader with a chain of specified number of finalized blocks
+//// ready to read.
+//func withConsumers(t *testing.T,
+//	staked bool,
+//	blockCount int,
+//	withConsumers func(*blockconsumer.BlockConsumer,
+//		*chunkconsumer.ChunkConsumer,
+//		[]*flow.Block,
+//		*sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
+//	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+//		maxProcessing := int64(3)
+//
+//		// bootstraps
+//		s, me, verId := bootstrapSystem(t, staked)
+//
+//		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+//		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
+//		// Container blocks only contain receipts of their preceding reference blocks. But they do not
+//		// hold any guarantees.
+//		root, err := s.State.Final().Head()
+//		require.NoError(t, err)
+//		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+//		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
+//
+//		// mocks chunk assigner to assign even chunk indices to this verification node
+//		chunkAssigner := &mock.ChunkAssigner{}
+//		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{&verId}, completeERs, evenChunkIndexAssigner)
+//
+//		// chunk consumer and processor
+//		processedIndex := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
+//		chunksQueue := bstorage.NewChunkQueue(db)
+//		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
+//		require.NoError(t, err)
+//		require.True(t, ok)
+//
+//		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, staked)
+//		chunkConsumer := chunkconsumer.NewChunkConsumer(
+//			unittest.Logger(),
+//			processedIndex,
+//			chunksQueue,
+//			chunkProcessor,
+//			maxProcessing)
+//
+//		// assigner engine
+//		collector := &metrics.NoopCollector{}
+//		tracer := &trace.NoopTracer{}
+//		assignerEng := assigner.New(
+//			unittest.Logger(),
+//			collector,
+//			tracer,
+//			me,
+//			s.State,
+//			chunkAssigner,
+//			chunksQueue,
+//			chunkConsumer)
+//
+//		// block consumer
+//		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
+//		blockConsumer, _, err := blockconsumer.NewBlockConsumer(
+//			unittest.Logger(),
+//			processedHeight,
+//			s.Storage.Blocks,
+//			s.State,
+//			assignerEng,
+//			maxProcessing)
+//		require.NoError(t, err)
+//
+//		withConsumers(blockConsumer, chunkConsumer, blocks, chunksWg)
+//	})
+//}
+
 // withConsumers is a test helper that sets up the following pipeline:
 // block reader -> block consumer (3 workers) -> assigner engine -> chunks queue -> chunks consumer (3 workers) -> mock chunk processor
 //
@@ -152,7 +225,7 @@ func withConsumers(t *testing.T,
 		maxProcessing := int64(3)
 
 		// bootstraps
-		s, me, verId := bootstrapSystem(t, staked)
+		s, verId, participants := bootstrapSystem(t, staked)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -167,46 +240,39 @@ func withConsumers(t *testing.T,
 		chunkAssigner := &mock.ChunkAssigner{}
 		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{&verId}, completeERs, evenChunkIndexAssigner)
 
-		// chunk consumer and processor
-		processedIndex := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
-		chunksQueue := bstorage.NewChunkQueue(db)
-		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
-		require.NoError(t, err)
-		require.True(t, ok)
+		hub := stub.NewNetworkHub()
+		receiptsLimit := 100
+		chainID := flow.Testnet
+		genericNode := testutil.GenericNodeWithStateFixture(t,
+			s,
+			hub,
+			&verId,
+			unittest.Logger(),
+			&metrics.NoopCollector{},
+			&trace.NoopTracer{},
+			chainID)
+
+		verNode := testutil.NewVerificationNode(t,
+			hub,
+			&verId,
+			participants,
+			chunkAssigner,
+			uint(receiptsLimit),
+			uint(10*receiptsLimit), // chunksLimit
+			flow.Testnet,
+			&metrics.NoopCollector{},
+			&metrics.NoopCollector{},
+			testutil.WithGenericNode(&genericNode))
 
 		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, staked)
 		chunkConsumer := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
-			processedIndex,
-			chunksQueue,
+			verNode.ProcessedChunkIndex,
+			verNode.ChunksQueue,
 			chunkProcessor,
 			maxProcessing)
 
-		// assigner engine
-		collector := &metrics.NoopCollector{}
-		tracer := &trace.NoopTracer{}
-		assignerEng := assigner.New(
-			unittest.Logger(),
-			collector,
-			tracer,
-			me,
-			s.State,
-			chunkAssigner,
-			chunksQueue,
-			chunkConsumer)
-
-		// block consumer
-		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
-		blockConsumer, _, err := blockconsumer.NewBlockConsumer(
-			unittest.Logger(),
-			processedHeight,
-			s.Storage.Blocks,
-			s.State,
-			assignerEng,
-			maxProcessing)
-		require.NoError(t, err)
-
-		withConsumers(blockConsumer, chunkConsumer, blocks, chunksWg)
+		withConsumers(verNode.BlockConsumer, chunkConsumer, blocks, chunksWg)
 	})
 }
 
@@ -277,7 +343,7 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 // Otherwise, it bootstraps the verification node as unstaked in current epoch.
 //
 // As the return values, it returns the state, local module, and identity of verification node.
-func bootstrapSystem(t *testing.T, staked bool) (*testmock.StateFixture, module.Local, flow.Identity) {
+func bootstrapSystem(t *testing.T, staked bool) (*testmock.StateFixture, flow.Identity, flow.IdentityList) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	identities := unittest.CompleteIdentitySet(verID)
@@ -298,7 +364,5 @@ func bootstrapSystem(t *testing.T, staked bool) (*testmock.StateFixture, module.
 			BuildEpoch()
 	}
 
-	me := testutil.LocalFixture(t, verID)
-
-	return stateFixture, me, *verID
+	return stateFixture, *verID, identities
 }

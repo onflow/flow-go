@@ -31,8 +31,13 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
+	verificationassigner "github.com/onflow/flow-go/engine/verification/assigner"
+	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
+	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
+	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -593,6 +598,12 @@ func WithMatchEngine(eng network.Engine) VerificationOpt {
 	}
 }
 
+func WithChunkConsumer(chunkConsumer *chunkconsumer.ChunkConsumer) VerificationOpt {
+	return func(node *testmock.VerificationNode) {
+		node.ChunkConsumer = chunkConsumer
+	}
+}
+
 func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 	return func(node *testmock.VerificationNode) {
 		node.GenericNode = genericNode
@@ -722,6 +733,35 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.ChunkStatuses == nil {
+		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
+	}
+
+	if node.ChunkRequests == nil {
+		node.ChunkRequests = stdmap.NewChunkRequests(chunksLimit)
+	}
+
+	if node.Results == nil {
+		results := storage.NewExecutionResults(node.Metrics, node.DB)
+		node.Results = results
+		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	}
+
+	if node.ProcessedChunkIndex == nil {
+		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+	}
+
+	if node.ChunksQueue == nil {
+		node.ChunksQueue = storage.NewChunkQueue(node.DB)
+		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	if node.ProcessedBlockHeight == nil {
+		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+	}
+
 	if node.VerifierEngine == nil {
 		rt := fvm.NewInterpreterRuntime()
 
@@ -787,6 +827,299 @@ func VerificationNode(t testing.TB,
 			node.BlockIDsCache,
 			processInterval)
 		require.Nil(t, err)
+	}
+
+	if node.FetcherEngine == nil {
+		node.FetcherEngine = fetcher.New(node.Log,
+			collector,
+			node.Tracer,
+			node.VerifierEngine,
+			node.State,
+			node.ChunkStatuses,
+			node.Headers,
+			node.Results,
+			node.Receipts,
+			node.RequesterEngine,
+		)
+	}
+
+	if node.RequesterEngine == nil {
+		node.RequesterEngine, err = verificationrequester.New(node.Log,
+			node.State,
+			node.Net,
+			node.Tracer,
+			collector,
+			node.ChunkRequests,
+			node.FetcherEngine,
+			100*time.Millisecond,
+			// requests are only qualified if their retryAfter is elapsed.
+			verificationrequester.RetryAfterQualifier(),
+			// exponential backoff with multiplier of 2, minimum interval of a second, and
+			// maximum interval of an hour.
+			mempool.ExponentialUpdater(2, time.Hour, time.Second),
+			2)
+
+		require.NoError(t, err)
+	}
+
+	if node.ChunkConsumer == nil {
+		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+			node.ProcessedChunkIndex,
+			node.ChunksQueue,
+			node.FetcherEngine,
+			int64(3)) // defaults number of workers to 3.
+	}
+
+	if node.BlockConsumer == nil {
+		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
+			node.ProcessedBlockHeight,
+			node.Blocks,
+			node.State,
+			node.AssignerEngine,
+			int64(3)) // defaults number of workers to 3.
+		require.NoError(t, err)
+	}
+
+	return node
+}
+
+func NewVerificationNode(t testing.TB,
+	hub *stub.Hub,
+	identity *flow.Identity,
+	identities []*flow.Identity,
+	assigner module.ChunkAssigner,
+	receiptsLimit uint,
+	chunksLimit uint,
+	chainID flow.ChainID,
+	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
+	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
+	opts ...VerificationOpt) testmock.VerificationNode {
+
+	var err error
+	var node testmock.VerificationNode
+
+	for _, apply := range opts {
+		apply(&node)
+	}
+
+	if node.GenericNode == nil {
+		gn := GenericNode(t, hub, identity, identities, chainID)
+		node.GenericNode = &gn
+	}
+
+	if node.CachedReceipts == nil {
+		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
+		require.Nil(t, err)
+	}
+
+	if node.PendingReceipts == nil {
+		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ReadyReceipts == nil {
+		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
+		require.Nil(t, err)
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
+		require.Nil(t, err)
+	}
+
+	if node.PendingResults == nil {
+		node.PendingResults = stdmap.NewResultDataPacks(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
+		require.Nil(t, err)
+	}
+
+	if node.PendingChunks == nil {
+		node.PendingChunks = match.NewChunks(chunksLimit)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ProcessedResultIDs == nil {
+		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
+		require.Nil(t, err)
+	}
+
+	if node.DiscardedResultIDs == nil {
+		node.DiscardedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceDiscardedResultID, node.DiscardedResultIDs.Size)
+		require.Nil(t, err)
+	}
+
+	if node.BlockIDsCache == nil {
+		node.BlockIDsCache, err = stdmap.NewIdentifiers(1000)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceCachedBlockID, node.BlockIDsCache.Size)
+		require.Nil(t, err)
+	}
+
+	if node.PendingReceiptIDsByBlock == nil {
+		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.PendingReceiptIDsByBlock.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ReceiptIDsByResult == nil {
+		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(receiptsLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ChunkIDsByResult == nil {
+		node.ChunkIDsByResult, err = stdmap.NewIdentifierMap(chunksLimit)
+		require.Nil(t, err)
+
+		// registers size method of backend for metrics
+		err = mempoolCollector.Register(metrics.ResourceChunkIDsByResult, node.ChunkIDsByResult.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ChunkStatuses == nil {
+		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
+	}
+
+	if node.ChunkRequests == nil {
+		node.ChunkRequests = stdmap.NewChunkRequests(chunksLimit)
+	}
+
+	if node.Results == nil {
+		results := storage.NewExecutionResults(node.Metrics, node.DB)
+		node.Results = results
+		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	}
+
+	if node.ProcessedChunkIndex == nil {
+		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+	}
+
+	if node.ChunksQueue == nil {
+		node.ChunksQueue = storage.NewChunkQueue(node.DB)
+		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	if node.ProcessedBlockHeight == nil {
+		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+	}
+
+	if node.VerifierEngine == nil {
+		rt := fvm.NewInterpreterRuntime()
+
+		vm := fvm.NewVirtualMachine(rt)
+
+		blockFinder := fvm.NewBlockFinder(node.Headers)
+
+		vmCtx := fvm.NewContext(
+			node.Log,
+			fvm.WithChain(node.ChainID.Chain()),
+			fvm.WithBlocks(blockFinder),
+		)
+
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+
+		node.VerifierEngine, err = verifier.New(node.Log,
+			collector,
+			node.Tracer,
+			node.Net,
+			node.State,
+			node.Me,
+			chunkVerifier,
+			approvalStorage)
+		require.Nil(t, err)
+	}
+
+	if node.FetcherEngine == nil {
+		node.FetcherEngine = fetcher.New(node.Log,
+			collector,
+			node.Tracer,
+			node.VerifierEngine,
+			node.State,
+			node.ChunkStatuses,
+			node.Headers,
+			node.Results,
+			node.Receipts,
+			node.RequesterEngine,
+		)
+	}
+
+	if node.RequesterEngine == nil {
+		node.RequesterEngine, err = verificationrequester.New(node.Log,
+			node.State,
+			node.Net,
+			node.Tracer,
+			collector,
+			node.ChunkRequests,
+			node.FetcherEngine,
+			100*time.Millisecond,
+			// requests are only qualified if their retryAfter is elapsed.
+			verificationrequester.RetryAfterQualifier(),
+			// exponential backoff with multiplier of 2, minimum interval of a second, and
+			// maximum interval of an hour.
+			mempool.ExponentialUpdater(2, time.Hour, time.Second),
+			2)
+
+		require.NoError(t, err)
+	}
+
+	if node.ChunkConsumer == nil {
+		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+			node.ProcessedChunkIndex,
+			node.ChunksQueue,
+			node.FetcherEngine,
+			int64(3)) // defaults number of workers to 3.
+	}
+
+	if node.AssignerEngine == nil {
+		node.AssignerEngine = verificationassigner.New(node.Log,
+			collector,
+			node.Tracer,
+			node.Me,
+			node.State,
+			assigner,
+			node.ChunksQueue,
+			node.ChunkConsumer)
+	}
+
+	if node.BlockConsumer == nil {
+		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
+			node.ProcessedBlockHeight,
+			node.Blocks,
+			node.State,
+			node.AssignerEngine,
+			int64(3)) // defaults number of workers to 3.
+		require.NoError(t, err)
 	}
 
 	return node
