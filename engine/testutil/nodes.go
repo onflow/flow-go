@@ -610,6 +610,8 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 	}
 }
 
+// TODO: this is fixture for old verification node (i.e., the one currently in place)
+// remove it once we have the new verification node rolled-in.
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
@@ -803,6 +805,7 @@ func VerificationNode(t testing.TB,
 	return node
 }
 
+// TODO: refactor to VerificationNode once the old constuctor is dropped.
 func NewVerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
