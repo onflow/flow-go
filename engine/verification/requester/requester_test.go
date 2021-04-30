@@ -374,7 +374,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
-		"cloud not check chunk requests qualification on time")
+		"could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not request and handle chunks on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
