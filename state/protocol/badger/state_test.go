@@ -214,7 +214,7 @@ func TestBootstrap_InvalidIdentities(t *testing.T) {
 		}
 	})
 
-	t.Run("existing address", func(t *testing.T) {
+	t.Run("duplicate address", func(t *testing.T) {
 		participants := unittest.CompleteIdentitySet()
 		dupeAddressIdentity := unittest.IdentityFixture(unittest.WithAddress(participants[0].Address))
 		participants = append(participants, dupeAddressIdentity)
