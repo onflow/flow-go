@@ -3,6 +3,7 @@ package flow_test
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/stretchr/testify/assert"
@@ -164,7 +165,7 @@ func TestIdentity_ID(t *testing.T) {
 
 func TestIdentity_Order(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
-	random := il.Order(order.Random)
+	random := il.DeterministicShuffle(time.Now().UnixNano())
 	assert.False(t, random.Ordered(order.Canonical))
 
 	canonical := il.Order(order.Canonical)
