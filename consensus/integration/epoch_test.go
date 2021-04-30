@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -168,6 +169,8 @@ func withNextEpoch(snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityLi
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
 
+	nextEpochIdentities = nextEpochIdentities.Order(order.Canonical)
+
 	currEpoch := &encodableSnapshot.Epochs.Current                // take pointer so assignments apply
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
 	encodableSnapshot.Epochs.Next = &inmem.EncodableEpoch{
@@ -201,7 +204,7 @@ func withNextEpoch(snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityLi
 		nextEpochIdentities.
 			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
 			Map(mapfunc.WithStake(0))...,
-	)
+	).Order(order.Canonical)
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }
