@@ -37,13 +37,34 @@ func NewContractHandler(accounts *state.Accounts, restrictedDeploymentEnabled bo
 	}
 }
 
-func (h *ContractHandler) GetContractNames(address runtime.Address) (names []string, err error) {
-	names, err = h.accounts.GetContractNames(flow.Address(address))
-	return
+func (h *ContractHandler) GetContractNames(address runtime.Address) ([]string, error) {
+	add := flow.Address(address)
+
+	names, err := h.accounts.GetContractNames(add)
+	if err != nil {
+		return nil, err
+	}
+	// check if there are any pending drafts and add them
+	for k, v := range h.draftUpdates {
+		if k.Address != add {
+			continue
+		}
+		if len(v.Code) > 0 {
+			names.Add(k.Name)
+		} else {
+			names.Remove(k.Name)
+		}
+	}
+	return names, nil
 }
 
 func (h *ContractHandler) GetContract(address runtime.Address, name string) (code []byte, err error) {
-	code, err = h.accounts.GetContract(name, flow.Address(address))
+	draft, ok := h.draftUpdates[programs.ContractUpdateKey{Address: flow.Address(address), Name: name}]
+	if !ok {
+		// if there are no drafts for this contract, check what is currently saved.
+		return h.accounts.GetContract(name, flow.Address(address))
+	}
+	code = draft.Code
 	return
 }
 

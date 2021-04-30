@@ -26,24 +26,24 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	// no contract initially
 	names, err := contractHandler.GetContractNames(rAdd)
 	require.NoError(t, err)
-	require.Equal(t, len(names), 0)
+	require.Equal(t, 0, len(names))
 
 	// set contract no need for signing accounts
 	err = contractHandler.SetContract(rAdd, "testContract", []byte("ABC"), nil)
 	require.NoError(t, err)
 	require.True(t, contractHandler.HasUpdates())
 
-	// should not be readable from draft
+	// should be readable from draft
 	cont, err := contractHandler.GetContract(rAdd, "testContract")
 	require.NoError(t, err)
-	require.Equal(t, len(cont), 0)
+	require.Equal(t, 3, len(cont))
 
 	// commit
 	_, err = contractHandler.Commit()
 	require.NoError(t, err)
 	cont, err = contractHandler.GetContract(rAdd, "testContract")
 	require.NoError(t, err)
-	require.Equal(t, cont, []byte("ABC"))
+	require.Equal(t, []byte("ABC"), cont)
 
 	// rollback
 	err = contractHandler.SetContract(rAdd, "testContract2", []byte("ABC"), nil)
@@ -57,12 +57,12 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 	// test contract shouldn't be there
 	cont, err = contractHandler.GetContract(rAdd, "testContract2")
 	require.NoError(t, err)
-	require.Equal(t, len(cont), 0)
+	require.Equal(t, 0, len(cont))
 
 	// test contract should be there
 	cont, err = contractHandler.GetContract(rAdd, "testContract")
 	require.NoError(t, err)
-	require.Equal(t, cont, []byte("ABC"))
+	require.Equal(t, []byte("ABC"), cont)
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {

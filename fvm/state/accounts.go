@@ -54,7 +54,7 @@ func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {
 		return nil, errors.NewAccountNotFoundError(address)
 	}
 	contracts := make(map[string][]byte)
-	contractNames, err := a.getContractNames(address)
+	contractNames, err := a.GetContractNames(address)
 
 	if err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func (a *Accounts) setContract(contractName string, address flow.Address, contra
 	return nil
 }
 
-func (a *Accounts) setContractNames(contractNames contractNames, address flow.Address) error {
+func (a *Accounts) setContractNames(contractNames ContractNames, address flow.Address) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -450,7 +450,7 @@ func (a *Accounts) touch(address flow.Address, isController bool, key string) {
 }
 
 func (a *Accounts) TouchContract(contractName string, address flow.Address) {
-	contractNames, err := a.getContractNames(address)
+	contractNames, err := a.GetContractNames(address)
 	if err != nil {
 		panic(err)
 	}
@@ -462,11 +462,7 @@ func (a *Accounts) TouchContract(contractName string, address flow.Address) {
 }
 
 // GetContractNames gets a sorted list of names of contracts deployed on an address
-func (a *Accounts) GetContractNames(address flow.Address) ([]string, error) {
-	return a.getContractNames(address)
-}
-
-func (a *Accounts) getContractNames(address flow.Address) (contractNames, error) {
+func (a *Accounts) GetContractNames(address flow.Address) (ContractNames, error) {
 	// TODO return fatal error if can't fetch
 	encContractNames, err := a.getValue(address, true, KeyContractNames)
 	if err != nil {
@@ -485,7 +481,7 @@ func (a *Accounts) getContractNames(address flow.Address) (contractNames, error)
 }
 
 func (a *Accounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
-	contractNames, err := a.getContractNames(address)
+	contractNames, err := a.GetContractNames(address)
 	if err != nil {
 		return nil, err
 	}
@@ -496,7 +492,7 @@ func (a *Accounts) GetContract(contractName string, address flow.Address) ([]byt
 }
 
 func (a *Accounts) SetContract(contractName string, address flow.Address, contract []byte) error {
-	contractNames, err := a.getContractNames(address)
+	contractNames, err := a.GetContractNames(address)
 	if err != nil {
 		return err
 	}
@@ -504,12 +500,12 @@ func (a *Accounts) SetContract(contractName string, address flow.Address, contra
 	if err != nil {
 		return err
 	}
-	contractNames.add(contractName)
+	contractNames.Add(contractName)
 	return a.setContractNames(contractNames, address)
 }
 
 func (a *Accounts) DeleteContract(contractName string, address flow.Address) error {
-	contractNames, err := a.getContractNames(address)
+	contractNames, err := a.GetContractNames(address)
 	if err != nil {
 		return err
 	}
@@ -520,7 +516,7 @@ func (a *Accounts) DeleteContract(contractName string, address flow.Address) err
 	if err != nil {
 		return err
 	}
-	contractNames.remove(contractName)
+	contractNames.Remove(contractName)
 	return a.setContractNames(contractNames, address)
 }
 
@@ -585,15 +581,15 @@ func (a *Accounts) CheckAccountNotFrozen(address flow.Address) error {
 	return nil
 }
 
-// contractNames container for a list of contract names. Should always be sorted.
+// ContractNames container for a list of contract names. Should always be sorted.
 // To ensure this, don't sort while reading it from storage, but sort it while adding/removing elements
-type contractNames []string
+type ContractNames []string
 
-func (l contractNames) Has(contractNames string) bool {
+func (l ContractNames) Has(contractNames string) bool {
 	i := sort.SearchStrings(l, contractNames)
 	return i != len(l) && l[i] == contractNames
 }
-func (l *contractNames) add(contractNames string) {
+func (l *ContractNames) Add(contractNames string) {
 	i := sort.SearchStrings(*l, contractNames)
 	if i != len(*l) && (*l)[i] == contractNames {
 		// list already contains element
@@ -603,7 +599,7 @@ func (l *contractNames) add(contractNames string) {
 	copy((*l)[i+1:], (*l)[i:])
 	(*l)[i] = contractNames
 }
-func (l *contractNames) remove(contractName string) {
+func (l *ContractNames) Remove(contractName string) {
 	i := sort.SearchStrings(*l, contractName)
 	if i == len(*l) || (*l)[i] != contractName {
 		// list does not contain the element
