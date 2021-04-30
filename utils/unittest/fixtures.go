@@ -1465,7 +1465,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 // RootSnapshotFixture returns a snapshot representing a root chain state, for
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants, opts...)
+	block, result, seal := BootstrapFixture(participants.Order(order.Canonical), opts...)
 	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
