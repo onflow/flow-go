@@ -7,11 +7,13 @@ import (
 )
 
 const systemChunkTransactionTemplate = `
-import FlowServiceAccount from 0x%s
+import FlowEpoch from 0x%s
+
 transaction {
-  execute {
-    // TODO: replace with call to service account heartbeat
- 	log("pulse")
+  prepare(serviceAccount: AuthAccount) {
+    heartbeat = serviceAccount.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
+           ?? panic("Could not borrow heartbeat from storage path")
+    heartbeat.advanceBlock()
   }
 } 
 `
