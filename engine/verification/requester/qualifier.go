@@ -19,9 +19,7 @@ func MaxAttemptQualifier(maxAttempts uint64) RequestQualifierFunc {
 
 // RetryAfterQualifier only qualifies a chunk request if its retryAfter duration has been elapsed since the last time this
 // request has been dispatched.
-func RetryAfterQualifier() RequestQualifierFunc {
-	return func(_ uint64, lastAttempt time.Time, retryAfter time.Duration) bool {
-		nextTry := lastAttempt.Add(retryAfter)
-		return nextTry.Before(time.Now())
-	}
+func RetryAfterQualifier(_ uint64, lastAttempt time.Time, retryAfter time.Duration) bool {
+	nextTry := lastAttempt.Add(retryAfter)
+	return nextTry.Before(time.Now())
 }
