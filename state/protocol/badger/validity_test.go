@@ -82,12 +82,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// add an invalid DKG participant
-		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
-		commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{
-			KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-			Index:    1,
-		}
+		// add an extra DKG participant key
+		commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 
 		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)

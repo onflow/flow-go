@@ -102,19 +102,9 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 		return fmt.Errorf("missing DKG public group key")
 	}
 
-	participants := setup.Participants.Filter(filter.HasRole(flow.RoleConsensus))
-
-	// make sure each participant of the epoch has a DKG entry
-	for _, participant := range participants {
-		_, exists := commit.DKGParticipants[participant.NodeID]
-		if !exists {
-			return fmt.Errorf("missing DKG participant data (%x)", participant.NodeID)
-		}
-	}
-
-	// make sure that there is no extra data
-	if len(participants) != len(commit.DKGParticipants) {
-		return fmt.Errorf("DKG data contains extra entries")
+	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
+	if len(participants) != len(commit.DKGParticipantKeys) {
+		return fmt.Errorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}
 
 	return nil
