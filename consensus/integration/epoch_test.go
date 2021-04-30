@@ -169,7 +169,7 @@ func withNextEpoch(snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityLi
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
 
-	nextEpochIdentities = nextEpochIdentities.Order(order.Canonical)
+	nextEpochIdentities = nextEpochIdentities.Sort(order.Canonical)
 
 	currEpoch := &encodableSnapshot.Epochs.Current                // take pointer so assignments apply
 	currEpoch.FinalView = currEpoch.FirstView + curEpochViews - 1 // first epoch lasts curEpochViews
@@ -204,7 +204,7 @@ func withNextEpoch(snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityLi
 		nextEpochIdentities.
 			Filter(filter.Not(filter.In(encodableSnapshot.Identities))).
 			Map(mapfunc.WithStake(0))...,
-	).Order(order.Canonical)
+	).Sort(order.Canonical)
 
 	return inmem.SnapshotFromEncodable(encodableSnapshot)
 }

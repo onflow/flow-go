@@ -163,11 +163,11 @@ func TestIdentity_ID(t *testing.T) {
 	assert.Equal(t, id1, id2)
 }
 
-func TestIdentity_Order(t *testing.T) {
+func TestIdentity_Sort(t *testing.T) {
 	il := unittest.IdentityListFixture(20)
 	random := il.DeterministicShuffle(time.Now().UnixNano())
-	assert.False(t, random.Ordered(order.Canonical))
+	assert.False(t, random.Sorted(order.Canonical))
 
-	canonical := il.Order(order.Canonical)
-	assert.True(t, canonical.Ordered(order.Canonical))
+	canonical := il.Sort(order.Canonical)
+	assert.True(t, canonical.Sorted(order.Canonical))
 }

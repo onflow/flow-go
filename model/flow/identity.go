@@ -265,8 +265,8 @@ func (il IdentityList) Lookup() map[Identifier]struct{} {
 	return lookup
 }
 
-// Order will sort the list using the given sort function.
-func (il IdentityList) Order(less IdentityOrder) IdentityList {
+// Sort will sort the list using the given ordering.
+func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
@@ -274,8 +274,8 @@ func (il IdentityList) Order(less IdentityOrder) IdentityList {
 	return dup
 }
 
-// Ordered returns whether the list is ordered by the input ordering.
-func (il IdentityList) Ordered(less IdentityOrder) bool {
+// Sorted returns whether the list is sorted by the input ordering.
+func (il IdentityList) Sorted(less IdentityOrder) bool {
 	for i := 0; i < len(il)-1; i++ {
 		a := il[i]
 		b := il[i+1]

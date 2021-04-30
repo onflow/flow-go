@@ -407,7 +407,7 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	}
 
 	// sort nodes using the canonical ordering
-	nodes = model.Order(nodes, order.Canonical)
+	nodes = model.Sort(nodes, order.Canonical)
 
 	return nodes
 }

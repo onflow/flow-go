@@ -223,7 +223,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
 	// apply a deterministic sort to the participants
-	identities = identities.Order(order.ByNodeIDAsc)
+	identities = identities.Sort(order.ByNodeIDAsc)
 
 	return identities, nil
 }

@@ -594,7 +594,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// sort node infos to the canonical ordering
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	// this ordering defines the DKG participant's indices
-	nodeInfos := bootstrap.Order(toNodeInfos(confs), order.Canonical)
+	nodeInfos := bootstrap.Sort(toNodeInfos(confs), order.Canonical)
 
 	// write private key files for each DKG participant
 	consensusNodes := bootstrap.FilterByRole(nodeInfos, flow.RoleConsensus)

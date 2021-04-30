@@ -32,7 +32,7 @@ func constructRootResultAndSeal(
 		Counter:      flagEpochCounter,
 		FirstView:    block.Header.View,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
-		Participants: participants.Order(order.Canonical),
+		Participants: participants.Sort(order.Canonical),
 		Assignments:  assignments,
 		RandomSource: getRandomSource(block.ID()),
 	}

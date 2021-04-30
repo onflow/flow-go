@@ -47,7 +47,7 @@ func isValidEpochSetup(setup *flow.EpochSetup) error {
 	}
 
 	// the participants must be ordered by canonical order
-	if !setup.Participants.Ordered(order.Canonical) {
+	if !setup.Participants.Sorted(order.Canonical) {
 		return fmt.Errorf("participants are not canonically ordered")
 	}
 
@@ -154,7 +154,7 @@ func isValidRootSnapshot(snap protocol.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("could not get identities for root snapshot: %w", err)
 	}
-	if !identities.Ordered(order.Canonical) {
+	if !identities.Sorted(order.Canonical) {
 		return fmt.Errorf("identities are not canonically ordered")
 	}
 
