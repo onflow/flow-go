@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
 )
