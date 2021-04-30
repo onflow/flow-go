@@ -4,6 +4,7 @@ package order
 
 import (
 	"bytes"
+	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,4 +28,9 @@ func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Iden
 	return func(identity1 *flow.Identity, identity2 *flow.Identity) bool {
 		return indices[identity1.NodeID] < indices[identity2.NodeID]
 	}
+}
+
+// Random orders the list randomly.
+func Random(a, b *flow.Identity) bool {
+	return rand.Intn(2) == 1
 }

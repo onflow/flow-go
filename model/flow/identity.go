@@ -274,6 +274,18 @@ func (il IdentityList) Order(less IdentityOrder) IdentityList {
 	return dup
 }
 
+// Ordered returns whether the list is ordered by the input ordering.
+func (il IdentityList) Ordered(less IdentityOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		a := il[i]
+		b := il[i+1]
+		if !less(a, b) {
+			return false
+		}
+	}
+	return true
+}
+
 // NodeIDs returns the NodeIDs of the nodes in the list.
 func (il IdentityList) NodeIDs() []Identifier {
 	nodeIDs := make([]Identifier, 0, len(il))

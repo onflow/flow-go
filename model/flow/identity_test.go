@@ -4,6 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -159,4 +160,13 @@ func TestIdentity_ID(t *testing.T) {
 	id1 := flow.MakeID(identity1)
 	id2 := flow.MakeID(identity2)
 	assert.Equal(t, id1, id2)
+}
+
+func TestIdentity_Order(t *testing.T) {
+	il := unittest.IdentityListFixture(20)
+	random := il.Order(order.Random)
+	assert.False(t, random.Ordered(order.Canonical))
+
+	canonical := il.Order(order.Canonical)
+	assert.True(t, canonical.Ordered(order.Canonical))
 }
