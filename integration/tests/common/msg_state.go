@@ -99,5 +99,5 @@ func MsgIsExecutionStateDeltaWithChanges(msg interface{}) bool {
 		return false
 	}
 
-	return delta.StartState != delta.EndState
+	return *delta.StartState != delta.EndState
 }
