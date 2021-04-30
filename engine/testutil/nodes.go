@@ -733,35 +733,6 @@ func VerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
-	if node.ChunkStatuses == nil {
-		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
-	}
-
-	if node.ChunkRequests == nil {
-		node.ChunkRequests = stdmap.NewChunkRequests(chunksLimit)
-	}
-
-	if node.Results == nil {
-		results := storage.NewExecutionResults(node.Metrics, node.DB)
-		node.Results = results
-		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results)
-	}
-
-	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
-	}
-
-	if node.ChunksQueue == nil {
-		node.ChunksQueue = storage.NewChunkQueue(node.DB)
-		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
-		require.NoError(t, err)
-		require.True(t, ok)
-	}
-
-	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
-	}
-
 	if node.VerifierEngine == nil {
 		rt := fvm.NewInterpreterRuntime()
 
@@ -827,57 +798,6 @@ func VerificationNode(t testing.TB,
 			node.BlockIDsCache,
 			processInterval)
 		require.Nil(t, err)
-	}
-
-	if node.FetcherEngine == nil {
-		node.FetcherEngine = fetcher.New(node.Log,
-			collector,
-			node.Tracer,
-			node.VerifierEngine,
-			node.State,
-			node.ChunkStatuses,
-			node.Headers,
-			node.Results,
-			node.Receipts,
-			node.RequesterEngine,
-		)
-	}
-
-	if node.RequesterEngine == nil {
-		node.RequesterEngine, err = verificationrequester.New(node.Log,
-			node.State,
-			node.Net,
-			node.Tracer,
-			collector,
-			node.ChunkRequests,
-			node.FetcherEngine,
-			100*time.Millisecond,
-			// requests are only qualified if their retryAfter is elapsed.
-			verificationrequester.RetryAfterQualifier(),
-			// exponential backoff with multiplier of 2, minimum interval of a second, and
-			// maximum interval of an hour.
-			mempool.ExponentialUpdater(2, time.Hour, time.Second),
-			2)
-
-		require.NoError(t, err)
-	}
-
-	if node.ChunkConsumer == nil {
-		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
-			node.ProcessedChunkIndex,
-			node.ChunksQueue,
-			node.FetcherEngine,
-			int64(3)) // defaults number of workers to 3.
-	}
-
-	if node.BlockConsumer == nil {
-		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
-			node.ProcessedBlockHeight,
-			node.Blocks,
-			node.State,
-			node.AssignerEngine,
-			int64(3)) // defaults number of workers to 3.
-		require.NoError(t, err)
 	}
 
 	return node
