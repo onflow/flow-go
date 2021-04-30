@@ -19,24 +19,31 @@ type Middleware struct {
 }
 
 // Ping provides a mock function with given fields: targetID
-func (_m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+func (_m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
 	ret := _m.Called(targetID)
 
-	var r0 time.Duration
-	if rf, ok := ret.Get(0).(func(flow.Identifier) time.Duration); ok {
+	var r0 message.PingResponse
+	if rf, ok := ret.Get(0).(func(flow.Identifier) message.PingResponse); ok {
 		r0 = rf(targetID)
 	} else {
-		r0 = ret.Get(0).(time.Duration)
+		r0 = ret.Get(0).(message.PingResponse)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+	var r1 time.Duration
+	if rf, ok := ret.Get(1).(func(flow.Identifier) time.Duration); ok {
 		r1 = rf(targetID)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(time.Duration)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(flow.Identifier) error); ok {
+		r2 = rf(targetID)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
 
 // Publish provides a mock function with given fields: msg, channel

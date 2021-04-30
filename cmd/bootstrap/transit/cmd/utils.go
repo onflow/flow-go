@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/build"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"
