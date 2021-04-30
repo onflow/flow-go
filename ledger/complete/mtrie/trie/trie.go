@@ -94,6 +94,9 @@ func (mt *MTrie) RootNode() *node.Node {
 // String returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
+	if mt.IsEmpty() {
+		return fmt.Sprintf("Empty Trie with default root hash: %x\n", mt.RootHash())
+	}
 	trieStr := fmt.Sprintf("Trie root hash: %x\n", mt.RootHash())
 	return trieStr + mt.root.FmtStr("", "")
 }
@@ -216,10 +219,9 @@ func update(
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
 		// check if the parent node path is among the updated paths
-		parentPath := *parentNode.Path()
 		found := false
 		for i, p := range paths {
-			if p == parentPath {
+			if p == *parentNode.Path() {
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
 					if !parentNode.Payload().Equals(&payloads[i]) {
