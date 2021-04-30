@@ -33,8 +33,8 @@ type BootstrapProcedure struct {
 	accountCreationFee        cadence.UFix64
 	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
-	epochTokenPayout          cadence.UFix64
-	rewardCut                 cadence.UFix64
+
+	epochConfig flow.EpochConfig
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -93,16 +93,9 @@ func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedur
 	}
 }
 
-func WithEpochTokenPayout(epochTokenPayout cadence.UFix64) BootstrapProcedureOption {
+func WithEpochConfig(epochConfig flow.EpochConfig) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.epochTokenPayout = epochTokenPayout
-		return bp
-	}
-}
-
-func WithRewardCut(rewardCut cadence.UFix64) BootstrapProcedureOption {
-	return func(bp *BootstrapProcedure) *BootstrapProcedure {
-		bp.rewardCut = rewardCut
+		bp.epochConfig = epochConfig
 		return bp
 	}
 }
@@ -123,6 +116,7 @@ func Bootstrap(
 	bootstrapProcedure := &BootstrapProcedure{
 		serviceAccountPublicKey: serviceAccountPublicKey,
 		transactionFee:          0,
+		epochConfig:             flow.DefaultEpochConfig(),
 	}
 
 	for _, applyOption := range opts {
@@ -163,7 +157,9 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployQC(service)
 
-	b.deployIDTableStaking(service, fungibleToken, flowToken, b.epochTokenPayout, b.rewardCut)
+	b.deployIDTableStaking(service,
+		fungibleToken,
+		flowToken)
 
 	b.deployEpoch(service, fungibleToken, flowToken)
 
@@ -296,9 +292,7 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 
 func (b *BootstrapProcedure) deployIDTableStaking(
 	service, fungibleToken,
-	flowToken flow.Address,
-	epochTokenPayout cadence.UFix64,
-	rewardCut cadence.UFix64) {
+	flowToken flow.Address) {
 
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
@@ -307,7 +301,10 @@ func (b *BootstrapProcedure) deployIDTableStaking(
 
 	err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployIDTableStakingTransaction(service, contract, epochTokenPayout, rewardCut),
+		deployIDTableStakingTransaction(service,
+			contract,
+			b.epochConfig.EpochTokenPayout,
+			b.epochConfig.RewardCut),
 		b.sth,
 		b.programs,
 	)
@@ -333,7 +330,7 @@ func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken flow.
 
 	err := b.vm.invokeMetaTransaction(
 		context,
-		deployEpochTransaction(service, contract),
+		deployEpochTransaction(service, contract, b.epochConfig),
 		b.sth,
 		b.programs,
 	)
@@ -461,7 +458,7 @@ transaction {
 		numViewsInDKGPhase: UInt64(%d),
 		numCollectorClusters: UInt16(%d),
 		FLOWsupplyIncreasePercentage: UFix64(%d),
-		randomSource: "%s",
+		randomSource: %s,
 		collectorClusters: [],
 		clusterQCs: [],
 		dkgPubKeys: [],
@@ -601,19 +598,19 @@ func deployIDTableStakingTransaction(service flow.Address, contract []byte, epoc
 	)
 }
 
-func deployEpochTransaction(service flow.Address, contract []byte) *TransactionProcedure {
+func deployEpochTransaction(service flow.Address, contract []byte, epochConfig flow.EpochConfig) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(
 				deployEpochTransactionTemplate,
 				hex.EncodeToString(contract),
-				0,        // currentEpochCounter
-				10,       // numViewsInEpoch
-				10,       // numViewsInStakingAuction
-				10,       // numViewsInDKGPhase
-				3,        // numCollectorClusters
-				10,       // FLOWtokenSupplyIncreasePercentage
-				"random", // randomSource
+				epochConfig.CurrentEpochCounter,
+				epochConfig.NumViewsInEpoch,
+				epochConfig.NumViewsInStakingAuction,
+				epochConfig.NumViewsInDKGPhase,
+				epochConfig.NumCollectorClusters,
+				epochConfig.FLOWsupplyIncreasePercentage,
+				epochConfig.RandomSource,
 			))).
 			AddAuthorizer(service),
 		0,
