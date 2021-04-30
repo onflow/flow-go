@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -164,22 +163,17 @@ func Test_Rem(t *testing.T) {
 }
 
 // Test_RejectInvalidSeals verifies that ExecForkSuppressor rejects seals whose
-// end state is invalid. Specifically, this can happen if:
-//  * the end state of the last chunk is empty
-//  * there are no chunks in the result (invalid result, as system chunk is missing)
+// which don't have a chunk (i.e. their start and end state of the result cannot be determined)
 func Test_RejectInvalidSeals(t *testing.T) {
+	WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
+		irSeal := unittest.IncorporatedResultSeal.Fixture()
+		irSeal.IncorporatedResult.Result.Chunks = make(flow.ChunkList, 0)
+		irSeal.Seal.FinalState = flow.DummyStateCommitment
 
-	t.Run("reject seal without chunks", func(t *testing.T) {
-		WithExecStateForkSuppressor(t, func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock) {
-			irSeal := unittest.IncorporatedResultSeal.Fixture()
-			irSeal.IncorporatedResult.Result.Chunks = make(flow.ChunkList, 0)
-			irSeal.Seal.FinalState = flow.DummyStateCommitment
-
-			added, err := wrapper.Add(irSeal)
-			assert.Error(t, err)
-			assert.True(t, engine.IsInvalidInputError(err))
-			assert.False(t, added)
-		})
+		added, err := wrapper.Add(irSeal)
+		assert.Error(t, err)
+		assert.True(t, engine.IsInvalidInputError(err))
+		assert.False(t, added)
 	})
 }
 
