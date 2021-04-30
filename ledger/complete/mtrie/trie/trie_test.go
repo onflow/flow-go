@@ -22,11 +22,11 @@ import (
 func Test_EmptyTrie(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
-	rootHash := hash.Hash(emptyTrie.RootHash())
-	require.Equal(t, ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight), rootHash)
+	rootHash := emptyTrie.RootHash()
+	require.Equal(t, ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight), hash.Hash(rootHash))
 
 	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(rootHash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(rootHash))
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
@@ -40,8 +40,7 @@ func Test_TrieWithLeftRegister(t *testing.T) {
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "b30c99cc3e027a6ff463876c638041b1c55316ed935f1b3699e52a2c3e3eaaab"
-	hash := leftPopulatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(leftPopulatedTrie.RootHash()))
 }
 
 // Test_TrieWithRightRegister tests whether the root hash of trie with only the right-most
@@ -59,8 +58,7 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	rightPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "4313d22bcabbf21b1cfb833d38f1921f06a91e7198a6672bc68fa24eaaa1a961"
-	hash := rightPopulatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(rightPopulatedTrie.RootHash()))
 }
 
 // // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
@@ -75,8 +73,7 @@ func Test_TrieWithMiddleRegister(t *testing.T) {
 	leftPopulatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "4a29dad0b7ae091a1f035955e0c9aab0692b412f60ae83290b6290d4bf3eb296"
-	hash := leftPopulatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(leftPopulatedTrie.RootHash()))
 }
 
 // Test_TrieWithManyRegisters tests whether the root hash of a trie storing 12001 randomly selected registers
@@ -91,8 +88,7 @@ func Test_TrieWithManyRegisters(t *testing.T) {
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
 	expectedRootHashHex := "74f748dbe563bb5819d6c09a34362a048531fd9647b4b2ea0b6ff43f200198aa"
-	hash := updatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(updatedTrie.RootHash()))
 }
 
 // Test_FullTrie tests whether the root hash of a trie,
@@ -116,8 +112,7 @@ func Test_FullTrie(t *testing.T) {
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	require.NoError(t, err)
 	expectedRootHashHex := "6b3a48d672744f5586c571c47eae32d7a4a3549c1d4fa51a0acfd7b720471de9"
-	hash := updatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(updatedTrie.RootHash()))
 }
 
 // TestUpdateTrie tests whether iteratively updating a Trie matches the formal specification.
@@ -157,8 +152,7 @@ func Test_UpdateTrie(t *testing.T) {
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, []ledger.Path{path}, []ledger.Payload{*payload})
 	require.NoError(t, err)
 	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
-	hash := updatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(updatedTrie.RootHash()))
 
 	var paths []ledger.Path
 	var payloads []ledger.Payload
@@ -166,14 +160,12 @@ func Test_UpdateTrie(t *testing.T) {
 		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
 		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
 		require.NoError(t, err)
-		hash := updatedTrie.RootHash()
-		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(hash[:]))
+		require.Equal(t, expectedRootHashes[r], hash2String(updatedTrie.RootHash()))
 	}
 	// update with the same registers with the same values
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
 	require.NoError(t, err)
-	hash = updatedTrie.RootHash()
-	require.Equal(t, expectedRootHashes[19], hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashes[19], hash2String(updatedTrie.RootHash()))
 	// check the root node pointers are equal
 	require.True(t, updatedTrie.RootNode() == newTrie.RootNode())
 }
@@ -204,10 +196,8 @@ func Test_UnallocateRegisters(t *testing.T) {
 	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
 	comparisonTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
 	require.NoError(t, err)
-	hash := comparisonTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
-	hash = updatedTrie.RootHash()
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(hash[:]))
+	require.Equal(t, expectedRootHashHex, hash2String(comparisonTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, hash2String(updatedTrie.RootHash()))
 }
 
 // simple Linear congruential RNG
@@ -303,4 +293,8 @@ func TestSplitByPath(t *testing.T) {
 	for i := index; i < len(paths); i++ {
 		assert.Equal(t, paths[i], sortedPaths[i])
 	}
+}
+
+func hash2String(hash ledger.RootHash) string {
+	return hex.EncodeToString(hash[:])
 }
