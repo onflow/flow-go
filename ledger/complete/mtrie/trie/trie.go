@@ -476,8 +476,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 
 // splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
 // at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
-// is returned.
-// The same permutation is applied to the payloads slice.
+// is returned. The same permutation is applied to the payloads slice.
 //
 // This would be the partition step of an ascending quick sort of paths (lexicographic order)
 // with the pivot being the path with all zeros and 1 at bitIndex.
@@ -521,10 +520,9 @@ func SplitPaths(paths []ledger.Path, bitIndex int) int {
 	return i
 }
 
-// splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
-// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
-// is returned.
-// The same permutation is applied to the proofs slice.
+// splitTrieProofsByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths
+// with a zero bit at the input bitIndex, the second part contains paths with a one at the bitIndex. The index
+// of partition is returned. The same permutation is applied to the proofs slice.
 //
 // This would be the partition step of an ascending quick sort of paths (lexicographic order)
 // with the pivot being the path with all zeros and 1 at bitIndex.
