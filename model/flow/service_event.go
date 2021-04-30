@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
@@ -24,7 +25,7 @@ const (
 func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 
 	// create a service event
-	serviceEv := &ServiceEvent{}
+	serviceEv := new(ServiceEvent)
 
 	// decode bytes using jsoncdc
 	payload, err := jsoncdc.Decode(event.Payload)
@@ -84,14 +85,20 @@ func ConvertServiceEvent(event Event) (*ServiceEvent, error) {
 			}
 
 			// TODO: Errors here as we have the incorrect key length, recieved 128 required 96
-			netPubKeyString := string(nodeInfo[3].(cadence.String))
-			identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, []byte(netPubKeyString))
+			nkBytes, err := hex.DecodeString(string(nodeInfo[3].(cadence.String)))
+			if err != nil {
+				return nil, fmt.Errorf("could not decode network public key into bytes: %w", err)
+			}
+			identity.NetworkPubKey, err = crypto.DecodePublicKey(crypto.ECDSAP256, nkBytes)
 			if err != nil {
 				return nil, fmt.Errorf("could not decode network public key: %w", err)
 			}
 
-			stakingPubKeyString := string(nodeInfo[4].(cadence.String))
-			identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, []byte(stakingPubKeyString))
+			skBytes, err := hex.DecodeString(string(nodeInfo[4].(cadence.String)))
+			if err != nil {
+				return nil, fmt.Errorf("could not decode network public key into bytes: %w", err)
+			}
+			identity.StakingPubKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, skBytes)
 			if err != nil {
 				return nil, fmt.Errorf("could not decode staking public key: %w", err)
 			}
