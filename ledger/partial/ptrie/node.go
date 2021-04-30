@@ -21,7 +21,6 @@ type node struct {
 	lChild    *node           // Left Child
 	rChild    *node           // Right Child
 	height    int             // Height where the node is at
-	path      ledger.Path     // path
 	payload   *ledger.Payload // payload
 	hashValue hash.Hash       // hash value
 }

@@ -144,8 +144,7 @@ func NewPSMT(
 		}
 
 		currentNode.payload = payload
-		currentNode.path = path
-		// update node's hashvalue only for inclusion proofs (for others we assume default value)
+		// update node's hash value only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
 			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
 		}
