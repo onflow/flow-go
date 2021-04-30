@@ -81,7 +81,7 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.handler,
 		s.retryInterval,
 		// requests are only qualified if their retryAfter is elapsed.
-		requester.RetryAfterQualifier(),
+		requester.RetryAfterQualifier,
 		// exponential backoff with multiplier of 2, minimum interval of a second, and
 		// maximum interval of an hour.
 		flowmempool.ExponentialUpdater(2, time.Hour, time.Second),
