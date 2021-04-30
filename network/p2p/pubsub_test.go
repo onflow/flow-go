@@ -166,7 +166,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		psOption := pubsub.WithDiscovery(d)
 		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, psOption)
 		require.NoError(suite.T(), err)
-		n.SetStreamHandler(handlerFunc)
+		n.SetFlowProtocolStreamHandler(handlerFunc)
 
 		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()

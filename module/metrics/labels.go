@@ -11,6 +11,7 @@ const (
 	LabelNodeAddress = "nodeaddress"
 	LabelNodeRole    = "noderole"
 	LabelNodeInfo    = "nodeinfo"
+	LabelNodeVersion = "nodeversion"
 	LabelPriority    = "priority"
 )
 
