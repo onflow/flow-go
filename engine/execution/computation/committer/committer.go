@@ -55,7 +55,10 @@ func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCo
 	}
 
 	state, err := s.ldg.Set(update)
-	return flow.StateCommitment(state), fmt.Errorf("update operation on ledger failed: %w", err)
+	if err != nil {
+		return flow.DummyStateCommitment, fmt.Errorf("update operation on ledger failed: %w", err)
+	}
+	return flow.StateCommitment(state), nil
 }
 
 func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
