@@ -382,7 +382,7 @@ func internalStakesByAddress() map[string]uint64 {
 	return stakes
 }
 
-// mergeNodeInfos merges the inernal and partner nodes and checks if there is no
+// mergeNodeInfos merges the internal and partner nodes and checks if there are no
 // duplicate addresses or node Ids.
 //
 // IMPORTANT: node infos are returned in the canonical ordering, meaning this
