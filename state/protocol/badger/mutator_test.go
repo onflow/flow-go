@@ -4,7 +4,6 @@ package badger_test
 
 import (
 	"errors"
-
 	"math/rand"
 	"testing"
 	"time"
@@ -1048,12 +1047,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		t.Run("inconsistent DKG participants", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
-				// add the consensus node from epoch *1*, which was removed for epoch 2
-				epoch1CONNode := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
-				commit.DKGParticipants[epoch1CONNode.NodeID] = flow.DKGParticipant{
-					KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-					Index:    1,
-				}
+				// add an extra dkg key
+				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
