@@ -443,11 +443,13 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 			wg.Done()
 
 			wasBExecuted = true
+			t.Logf("block B has been executed", blockB.ID())
 		}, blockB, unittest.IdentifierFixture(), true, blockB.StartState)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
 			require.True(t, wasBExecuted)
+			t.Logf("block C has been executed", blockC.ID())
 		}, blockC, unittest.IdentifierFixture(), true, blockB.StartState)
 
 		// make sure collection requests are sent
@@ -480,11 +482,15 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 			err := ctx.engine.handleBlock(context.Background(), blockB.Block)
 			require.NoError(t, err)
 		}
+
+		t.Logf("handledblock for B: %v", blockB.Block.ID())
+
 		wg.Add(1) // wait for block C to be executed
 		// add extra block to ensure the execution can continue after duplicated blocks
 		err := ctx.engine.handleBlock(context.Background(), blockC.Block)
 		require.NoError(t, err)
 		wgPut.Done()
+		t.Logf("handledblock for C: %v", blockC.Block.ID())
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 
