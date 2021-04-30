@@ -294,13 +294,9 @@ func (c *approvalProcessingCore) checkEmergencySealing(collectors []*AssignmentC
 }
 
 func (c *approvalProcessingCore) processPendingApprovals(collector *AssignmentCollector) error {
-	predicate := func(approval *flow.ResultApproval) bool {
-		return approval.Body.ExecutionResultID == collector.ResultID
-	}
-
 	// filter cached approvals for concrete execution result
-	for _, approvalID := range c.approvalsCache.Ids() {
-		if approval := c.approvalsCache.TakeIf(approvalID, predicate); approval != nil {
+	for _, approvalID := range c.approvalsCache.ByResultID(collector.ResultID) {
+		if approval := c.approvalsCache.Take(approvalID); approval != nil {
 			err := collector.ProcessApproval(approval)
 			if err != nil {
 				if engine.IsInvalidInputError(err) {

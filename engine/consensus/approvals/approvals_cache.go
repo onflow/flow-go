@@ -1,51 +1,51 @@
 package approvals
 
 import (
-	"github.com/onflow/flow-go/model/flow"
+	"sync"
 
-	lru "github.com/hashicorp/golang-lru"
+	"github.com/hashicorp/golang-lru/simplelru"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// ApprovalsCache is a wrapper over `lru.Cache` that provides needed api for processing result approvals
-// Extends functionality of `lru.Cache` but mainly using grouping of calls and providing more user friendly interface.
+// ApprovalsCache is a wrapper over `simplelru.LRUCache` that provides needed api for processing result approvals
+// Extends functionality of `simplelru.LRUCache` by introducing additional index for quicker access.
 type ApprovalsCache struct {
-	cache *lru.Cache
+	lru  simplelru.LRUCache
+	lock sync.RWMutex
+	// secondary index by result id, since multiple approvals could
+	// reference same result
+	byResultID map[flow.Identifier]flow.IdentifierList
 }
 
 func NewApprovalsCache(limit uint) *ApprovalsCache {
-	cache, _ := lru.New(int(limit))
+	byResultID := make(map[flow.Identifier]flow.IdentifierList)
+	// callback has to be called while we are holding lock
+	lru, _ := simplelru.NewLRU(int(limit), func(key interface{}, value interface{}) {
+		approval := value.(*flow.ResultApproval)
+		delete(byResultID, approval.Body.ExecutionResultID)
+	})
 	return &ApprovalsCache{
-		cache: cache,
+		lru:        lru,
+		byResultID: byResultID,
 	}
 }
 
-func (c *ApprovalsCache) TakeIf(approvalID flow.Identifier, predicate func(*flow.ResultApproval) bool) *flow.ResultApproval {
-	approvalTmp, cached := c.cache.Peek(approvalID)
-	if !cached {
-		return nil
+func (c *ApprovalsCache) ByResultID(resultID flow.Identifier) flow.IdentifierList {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	ids, ok := c.byResultID[resultID]
+	if ok {
+		return ids.Copy()
 	}
-
-	approval := approvalTmp.(*flow.ResultApproval)
-	if !predicate(approval) {
-		return nil
-	}
-
-	c.cache.Remove(approvalID)
-	return approval
-}
-
-func (c *ApprovalsCache) Ids() []flow.Identifier {
-	keys := c.cache.Keys()
-	approvalIDs := make([]flow.Identifier, len(keys))
-	for i, key := range keys {
-		approvalIDs[i] = key.(flow.Identifier)
-	}
-	return approvalIDs
+	return nil
 }
 
 func (c *ApprovalsCache) Peek(approvalID flow.Identifier) *flow.ResultApproval {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 	// check if we have it in the cache
-	resource, cached := c.cache.Peek(approvalID)
+	resource, cached := c.lru.Peek(approvalID)
 	if cached {
 		return resource.(*flow.ResultApproval)
 	}
@@ -54,8 +54,10 @@ func (c *ApprovalsCache) Peek(approvalID flow.Identifier) *flow.ResultApproval {
 }
 
 func (c *ApprovalsCache) Get(approvalID flow.Identifier) *flow.ResultApproval {
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	// check if we have it in the cache
-	resource, cached := c.cache.Get(approvalID)
+	resource, cached := c.lru.Get(approvalID)
 	if cached {
 		return resource.(*flow.ResultApproval)
 	}
@@ -63,7 +65,30 @@ func (c *ApprovalsCache) Get(approvalID flow.Identifier) *flow.ResultApproval {
 	return nil
 }
 
+func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	// check if we have it in the cache
+	if resource, ok := c.lru.Peek(approvalID); ok {
+		_ = c.lru.Remove(approvalID)
+		return resource.(*flow.ResultApproval)
+	}
+
+	return nil
+}
+
 func (c *ApprovalsCache) Put(approval *flow.ResultApproval) {
+	approvalID := approval.ID()
+	resultID := approval.Body.ExecutionResultID
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	// cache the resource and eject least recently used one if we reached limit
-	_ = c.cache.Add(approval.ID(), approval)
+	_ = c.lru.Add(approvalID, approval)
+	ids, ok := c.byResultID[resultID]
+	if !ok {
+		c.byResultID[resultID] = []flow.Identifier{approvalID}
+	} else {
+		c.byResultID[resultID] = append(ids, approvalID)
+	}
 }
