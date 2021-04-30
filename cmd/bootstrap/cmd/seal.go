@@ -36,13 +36,11 @@ func constructRootResultAndSeal(
 		RandomSource: getRandomSource(block.ID()),
 	}
 
-	dkgLookup := model.ToDKGLookup(dkgData, participants)
-
 	epochCommit := &flow.EpochCommit{
-		Counter:         flagEpochCounter,
-		ClusterQCs:      clusterQCs,
-		DKGGroupKey:     dkgData.PubGroupKey,
-		DKGParticipants: dkgLookup,
+		Counter:            flagEpochCounter,
+		ClusterQCs:         clusterQCs,
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
 	}
 
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
