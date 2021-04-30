@@ -9,16 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/spf13/cobra"
-
 	"github.com/onflow/cadence"
+	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
