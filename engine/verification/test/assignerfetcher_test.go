@@ -214,18 +214,19 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 //
 // The block consumer operates on a block reader with a chain of specified number of finalized blocks
 // ready to read.
-func withConsumers(t *testing.T,
-	staked bool,
-	blockCount int,
-	withConsumers func(*blockconsumer.BlockConsumer,
-		*chunkconsumer.ChunkConsumer,
-		[]*flow.Block,
-		*sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
+func withConsumers(t *testing.T, staked bool, blockCount int,
+	withConsumers func(*blockconsumer.BlockConsumer, *chunkconsumer.ChunkConsumer, []*flow.Block, *sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
+
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
 		maxProcessing := int64(3)
+		collector := &metrics.NoopCollector{}
+		tracer := &trace.NoopTracer{}
+		lg := unittest.Logger().With().Str("role", "verification").Logger()
+		chainID := flow.Testnet
 
 		// bootstraps
-		s, verId, participants := bootstrapSystem(t, staked)
+		s, verId, participants := bootstrapSystem(t, collector, tracer, staked)
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -242,14 +243,13 @@ func withConsumers(t *testing.T,
 
 		hub := stub.NewNetworkHub()
 		receiptsLimit := 100
-		chainID := flow.Testnet
 		genericNode := testutil.GenericNodeWithStateFixture(t,
 			s,
 			hub,
 			&verId,
-			unittest.Logger(),
-			&metrics.NoopCollector{},
-			&trace.NoopTracer{},
+			lg,
+			collector,
+			tracer,
 			chainID)
 
 		verNode := testutil.NewVerificationNode(t,
@@ -259,14 +259,14 @@ func withConsumers(t *testing.T,
 			chunkAssigner,
 			uint(receiptsLimit),
 			uint(10*receiptsLimit), // chunksLimit
-			flow.Testnet,
-			&metrics.NoopCollector{},
-			&metrics.NoopCollector{},
+			chainID,
+			collector,
+			collector,
 			testutil.WithGenericNode(&genericNode))
 
 		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, staked)
 		chunkConsumer := chunkconsumer.NewChunkConsumer(
-			unittest.Logger(),
+			lg,
 			verNode.ProcessedChunkIndex,
 			verNode.ChunksQueue,
 			chunkProcessor,
@@ -343,14 +343,13 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 // Otherwise, it bootstraps the verification node as unstaked in current epoch.
 //
 // As the return values, it returns the state, local module, and identity of verification node.
-func bootstrapSystem(t *testing.T, staked bool) (*testmock.StateFixture, flow.Identity, flow.IdentityList) {
+func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer module.Tracer, staked bool) (*testmock.StateFixture, flow.Identity,
+	flow.IdentityList) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	identities := unittest.CompleteIdentitySet(verID)
 
 	// bootstraps the system
-	collector := &metrics.NoopCollector{}
-	tracer := &trace.NoopTracer{}
 	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
 
 	if !staked {
