@@ -64,11 +64,12 @@ type testingContext struct {
 	executionState      *state.ExecutionState
 	snapshot            *protocol.Snapshot
 	identity            *flow.Identity
+	mu                  sync.Mutex
 	broadcastedReceipts map[flow.Identifier]*flow.ExecutionReceipt
 	collectionRequester *module.MockRequester
 }
 
-func runWithEngine(t *testing.T, f func(testingContext)) {
+func runWithEngine(t *testing.T, f func(*testingContext)) {
 
 	ctrl := gomock.NewController(t)
 
@@ -105,15 +106,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 
 	var engine *Engine
 
-	defer func() {
-		<-engine.Done()
-		ctrl.Finish()
-		computationManager.AssertExpectations(t)
-		protocolState.AssertExpectations(t)
-		executionState.AssertExpectations(t)
-		providerEngine.AssertExpectations(t)
-	}()
-
 	identityList := flow.IdentityList{myIdentity, collection1Identity, collection2Identity, collection3Identity}
 
 	executionState.On("DiskSize").Return(int64(1024*1024), nil).Maybe()
@@ -134,7 +126,6 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
-	tracer, err := trace.NewTracer(log, "test")
 	require.NoError(t, err)
 
 	request.EXPECT().Force().Return().AnyTimes()
@@ -163,7 +154,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		providerEngine,
 		executionState,
 		metrics,
-		tracer,
+		trace.NewNoopTracer(),
 		false,
 		filter.Any,
 		deltas,
@@ -173,7 +164,16 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	)
 	require.NoError(t, err)
 
-	f(testingContext{
+	defer func() {
+		<-engine.Done()
+		ctrl.Finish()
+		computationManager.AssertExpectations(t)
+		protocolState.AssertExpectations(t)
+		executionState.AssertExpectations(t)
+		providerEngine.AssertExpectations(t)
+	}()
+
+	f(&testingContext{
 		t:                   t,
 		engine:              engine,
 		blocks:              blocks,
@@ -249,12 +249,13 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 	mocked.RunFn =
 		func(args mock.Arguments) {
-			//lock.Lock()
-			//defer lock.Unlock()
-
 			blockID := args[1].(*flow.Header).ID()
 			commit := args[2].(flow.StateCommitment)
+
+			ctx.mu.Lock()
 			commits[blockID] = commit
+			ctx.mu.Unlock()
+
 			onPersisted(blockID, commit)
 		}
 
@@ -299,6 +300,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 				assert.True(ctx.t, valid)
 			}
 
+			ctx.mu.Lock()
+			defer ctx.mu.Unlock()
 			ctx.broadcastedReceipts[receipt.ExecutionResult.BlockID] = receipt
 		}).
 		Return(nil)
@@ -311,7 +314,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 
 }
 
-func (ctx testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) {
+func (ctx *testingContext) mockStakedAtBlockID(blockID flow.Identifier, staked bool) {
 	identity := *ctx.identity
 	identity.Stake = 0
 	if staked {
@@ -359,7 +362,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 }
 
 func TestExecuteOneBlock(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		// A <- B
 		blockA := unittest.BlockHeaderFixture()
@@ -398,8 +401,7 @@ func TestExecuteOneBlock(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	t.Skip("flakey")
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		colSigner := unittest.IdentifierFixture()
 
@@ -413,7 +415,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		blockC := unittest.ExecutableBlockFixtureWithParent([][]flow.Identifier{{colSigner}}, blockB.Block.Header)
 		//blockC.StartState = blockB.StartState //blocks are empty, so no state change is expected
 
-		logBlocks(map[string]*entity.ExecutableBlock{
+		logBlocks(t, map[string]*entity.ExecutableBlock{
 			"B": blockB,
 			"C": blockC,
 		})
@@ -441,11 +443,13 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 			wg.Done()
 
 			wasBExecuted = true
+			t.Logf("block B has been executed", blockB.ID())
 		}, blockB, unittest.IdentifierFixture(), true, blockB.StartState)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
 			require.True(t, wasBExecuted)
+			t.Logf("block C has been executed", blockC.ID())
 		}, blockC, unittest.IdentifierFixture(), true, blockB.StartState)
 
 		// make sure collection requests are sent
@@ -478,11 +482,15 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 			err := ctx.engine.handleBlock(context.Background(), blockB.Block)
 			require.NoError(t, err)
 		}
+
+		t.Logf("handledblock for B: %v", blockB.Block.ID())
+
 		wg.Add(1) // wait for block C to be executed
 		// add extra block to ensure the execution can continue after duplicated blocks
 		err := ctx.engine.handleBlock(context.Background(), blockC.Block)
 		require.NoError(t, err)
 		wgPut.Done()
+		t.Logf("handledblock for C: %v", blockC.Block.ID())
 
 		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 
@@ -499,7 +507,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		// block in the queue are removed only after the execution has finished
 		// this gives a brief window for multiple execution
@@ -523,7 +531,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		blockD := unittest.ExecutableBlockFixtureWithParent(nil, blockC.Block.Header)
 		blockD.StartState = blockC.StartState
 
-		logBlocks(map[string]*entity.ExecutableBlock{
+		logBlocks(t, map[string]*entity.ExecutableBlock{
 			"B": blockB,
 			"C": blockC,
 			"D": blockD,
@@ -617,15 +625,14 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 	})
 }
 
-func logBlocks(blocks map[string]*entity.ExecutableBlock) {
-	log := unittest.Logger()
+func logBlocks(t *testing.T, blocks map[string]*entity.ExecutableBlock) {
 	for name, b := range blocks {
-		log.Debug().Msgf("creating blocks for testing, block %v's ID:%v", name, b.ID())
+		t.Logf("creating blocks for testing, block %v's ID:%v", name, b.ID())
 	}
 }
 
 func TestExecuteBlockInOrder(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 		// create blocks with the following relations
 		// A <- B
 		// A <- C <- D
@@ -640,7 +647,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
-		logBlocks(blocks)
+		logBlocks(t, blocks)
 
 		// none of the blocks has any collection, so state is essentially the same
 		blocks["C"].StartState = blocks["A"].StartState
@@ -729,7 +736,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 }
 
 func TestExecuteScriptAtBlockID(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 		// Meaningless script
 		script := []byte{1, 1, 2, 3, 5, 8, 11}
 		scriptResult := []byte{1}
@@ -768,7 +775,7 @@ func TestExecuteScriptAtBlockID(t *testing.T) {
 }
 
 func Test_SPOCKGeneration(t *testing.T) {
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		snapshots := []*delta.SpockSnapshot{
 			{
@@ -808,8 +815,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	t.Skip("flakey")
-	runWithEngine(t, func(ctx testingContext) {
+	runWithEngine(t, func(ctx *testingContext) {
 
 		// create blocks with the following relations
 		// A <- B <- C <- D
@@ -824,7 +830,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		blocks["D"] = unittest.ExecutableBlockFixtureWithParent(nil, blocks["C"].Block.Header)
 
 		// log the blocks, so that we can link the block ID in the log with the blocks in tests
-		logBlocks(blocks)
+		logBlocks(t, blocks)
 
 		// none of the blocks has any collection, so state is essentially the same
 		blocks["B"].StartState = blocks["A"].StartState
@@ -838,6 +844,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		ctx.mockStateCommitsWithMap(commits)
 
 		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
+			t.Logf("block is persisted: %v", blockID)
 			wg.Done()
 		}
 
@@ -879,7 +886,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 		require.NoError(t, err)
 
 		//// wait until all 4 blocks have been executed
-		unittest.AssertReturnsBefore(t, wg.Wait, 15*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
 
@@ -926,8 +933,6 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
-	tracer, err := trace.NewTracer(log, "test")
-	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
 	request := module.NewMockRequester(ctrl)
@@ -975,7 +980,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		providerEngine,
 		es,
 		metrics,
-		tracer,
+		trace.NewNoopTracer(),
 		false,
 		filter.Any,
 		deltas,
