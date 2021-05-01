@@ -9,15 +9,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-
 	"github.com/onflow/cadence"
+	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -382,8 +382,11 @@ func internalStakesByAddress() map[string]uint64 {
 	return stakes
 }
 
-// mergeNodeInfos merges the inernal and partner nodes and checks if there is no
-// duplicate addresses or node Ids
+// mergeNodeInfos merges the internal and partner nodes and checks if there are no
+// duplicate addresses or node Ids.
+//
+// IMPORTANT: node infos are returned in the canonical ordering, meaning this
+// is safe to use as the input to the DKG and protocol state.
 func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeInfo {
 	nodes := append(internalNodes, partnerNodes...)
 
@@ -402,6 +405,9 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 			log.Fatal().Str("NodeID", node.NodeID.String()).Msg("duplicate node ID")
 		}
 	}
+
+	// sort nodes using the canonical ordering
+	nodes = model.Sort(nodes, order.Canonical)
 
 	return nodes
 }

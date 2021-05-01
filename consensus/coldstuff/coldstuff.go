@@ -59,7 +59,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("could not get consensus participants: %w", err)
 	}
-	participants = participants.Order(order.ByNodeIDAsc)
+	participants = participants.Sort(order.ByNodeIDAsc)
 
 	cold := &ColdStuff{
 		log:          log,

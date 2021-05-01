@@ -1336,7 +1336,7 @@ func VoteFixture() *hotstuff.Vote {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Order(order.ByNodeIDAsc)
+		setup.Participants = participants.Sort(order.ByNodeIDAsc)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
@@ -1364,7 +1364,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	setup := &flow.EpochSetup{
 		Counter:      uint64(rand.Uint32()),
 		FinalView:    uint64(rand.Uint32() + 1000),
-		Participants: participants,
+		Participants: participants.Sort(order.Canonical),
 		RandomSource: SeedFixture(flow.EpochSetupRandomSourceLength),
 	}
 	for _, apply := range opts {
@@ -1465,7 +1465,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 // RootSnapshotFixture returns a snapshot representing a root chain state, for
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants, opts...)
+	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
 	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
