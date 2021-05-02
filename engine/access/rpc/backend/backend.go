@@ -285,7 +285,7 @@ func executionNodesForBlockID(
 			//retry after an exponential backoff
 		}
 
-		// if two or less execution receipts may have been received then re-query
+		// if one or less execution receipts may have been received then re-query
 		// in the hope that more might have been received by now
 		log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 			Int("execution_receipts_found", len(executorIDs)).
