@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
@@ -22,6 +23,12 @@ import (
 
 // maxExecutionNodesCnt is the max number of execution nodes that will be contacted to complete an execution api request
 const maxExecutionNodesCnt = 3
+
+// minExecutionNodesCnt is the minimum number of execution nodes expected to have sent the execution receipt for a block
+const minExecutionNodesCnt = 2
+
+// maxAttemptsForExecutionReceipt is the maximum number of attempts to find execution receipts for a given block ID
+const maxAttemptsForExecutionReceipt = 3
 
 // DefaultMaxHeightRange is the default maximum size of range requests.
 const DefaultMaxHeightRange = 250
@@ -251,66 +258,43 @@ func convertStorageError(err error) error {
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID. If no such execution node is found, an empty list is returned.
 func executionNodesForBlockID(
+	ctx context.Context,
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,
 	state protocol.State,
 	log zerolog.Logger) (flow.IdentityList, error) {
 
-	// lookup the receipts storage with the block ID
-	allReceipts, err := executionReceipts.ByBlockID(blockID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
-	}
-
-	// execution result ID to execution receipt map to keep track of receipts by their result id
-	var identicalReceipts = make(map[flow.Identifier][]*flow.ExecutionReceipt)
-
-	// maximum number of matching receipts found so far for any execution result id
-	maxMatchedReceiptCnt := 0
-	// execution result id key for the highest number of matching receipts in the identicalReceipts map
-	var maxMatchedReceiptResultID flow.Identifier
-
-	// find the largest list of receipts which have the same result ID
-	for _, receipt := range allReceipts {
-
-		resultID := receipt.ExecutionResult.ID()
-		identicalReceipts[resultID] = append(identicalReceipts[resultID], receipt)
-
-		currentMatchedReceiptCnt := len(identicalReceipts[resultID])
-		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
-			maxMatchedReceiptCnt = currentMatchedReceiptCnt
-			maxMatchedReceiptResultID = resultID
-		}
-	}
-
-	mismatchReceiptCnt := len(identicalReceipts)
-	// if there are more than one execution result for the same block ID, log as error
-	if mismatchReceiptCnt > 1 {
-		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
-		log.Error().
-			Str("block_id", blockID.String()).
-			Str("execution_receipts", identicalReceiptsStr).
-			Msg("execution receipt mismatch")
-	}
-
-	// pick the largest list of matching receipts
-	matchingReceipts := identicalReceipts[maxMatchedReceiptResultID]
-
-	// collect all unique execution node ids from the receipts
 	var executorIDs flow.IdentifierList
-	executorIDMap := make(map[flow.Identifier]bool)
-	for _, receipt := range matchingReceipts {
-		if executorIDMap[receipt.ExecutorID] {
-			continue
+	var err error
+	attempt := 0
+	// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
+	for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
+		executorIDs, err := findAllExecutionNodes(blockID, executionReceipts, log)
+		if err != nil {
+			return flow.IdentityList{}, err
 		}
-		executorIDs = append(executorIDs, receipt.ExecutorID)
-		executorIDMap[receipt.ExecutorID] = true
+
+		if len(executorIDs) >= minExecutionNodesCnt {
+			break
+		}
+
+		select {
+		case <-ctx.Done():
+			return flow.IdentityList{}, err
+		case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
+			//retry after an exponential backoff
+		}
+
+		// one or less execution receipt may have been received
+		// retry
 	}
 
-	// return if less than 2 unique execution node ids were found
-	// since we want matching receipts from at least 2 ENs
-	if len(executorIDs) < 2 {
-		return flow.IdentityList{}, nil
+	if attempt == maxAttemptsForExecutionReceipt {
+		return flow.IdentityList{},
+			fmt.Errorf("number of execution receipts found (%d) less than expected (%d) for block ID %v",
+				len(executorIDs),
+				minExecutionNodesCnt,
+				blockID)
 	}
 
 	// choose one of the preferred execution nodes
@@ -323,6 +307,60 @@ func executionNodesForBlockID(
 	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
 
 	return executionIdentitiesRandom, nil
+}
+
+func findAllExecutionNodes(
+	blockID flow.Identifier,
+	executionReceipts storage.ExecutionReceipts,
+	log zerolog.Logger) (flow.IdentifierList, error) {
+
+	// lookup the receipts storage with the block ID
+	allReceipts, err := executionReceipts.ByBlockID(blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
+	}
+
+	executionResultMetaLst := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
+	for _, r := range allReceipts {
+		executionResultMetaLst = append(executionResultMetaLst, r.Meta())
+	}
+	executionResultGroupedMetaLst := executionResultMetaLst.GroupByResultID()
+
+	// maximum number of matching receipts found so far for any execution result id
+	maxMatchedReceiptCnt := 0
+	// execution result id key for the highest number of matching receipts in the identicalReceipts map
+	var maxMatchedReceiptResultID flow.Identifier
+
+	// find the largest list of receipts which have the same result ID
+	for resultID, executionReceiptList := range executionResultGroupedMetaLst {
+		currentMatchedReceiptCnt := executionReceiptList.Size()
+		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
+			maxMatchedReceiptCnt = currentMatchedReceiptCnt
+			maxMatchedReceiptResultID = resultID
+		}
+	}
+
+	// if there are more than one execution result for the same block ID, log as error
+	if executionResultGroupedMetaLst.NumberGroups() > 1 {
+		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
+		log.Error().
+			Str("block_id", blockID.String()).
+			Str("execution_receipts", identicalReceiptsStr).
+			Msg("execution receipt mismatch")
+	}
+
+	// pick the largest list of matching receipts
+	matchingReceiptMetaList := executionResultGroupedMetaLst.GetGroup(maxMatchedReceiptResultID)
+
+	metaReceiptGroupedByExecutorID := matchingReceiptMetaList.GroupByExecutorID()
+
+	// collect all unique execution node ids from the receipts
+	var executorIDs flow.IdentifierList
+	for executorID := range metaReceiptGroupedByExecutorID {
+		executorIDs = append(executorIDs, executorID)
+	}
+
+	return executorIDs, nil
 }
 
 // chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first

@@ -82,7 +82,7 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
 	}

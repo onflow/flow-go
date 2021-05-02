@@ -1354,7 +1354,7 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		if fixedENs != nil {
 			fixedENIdentifiers = fixedENs.NodeIDs()
 		}
-		actualList, err := executionNodesForBlockID(block.ID(), suite.receipts, suite.state, suite.log)
+		actualList, err := executionNodesForBlockID(context.Background(), block.ID(), suite.receipts, suite.state, suite.log)
 		require.NoError(suite.T(), err)
 		if expectedENs == nil {
 			expectedENs = flow.IdentityList{}

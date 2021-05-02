@@ -87,7 +87,7 @@ func (b *backendScripts) executeScriptOnExecutionNode(
 	}
 
 	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
-	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node: %v", err)
 	}
