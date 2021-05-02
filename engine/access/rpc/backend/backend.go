@@ -269,7 +269,7 @@ func executionNodesForBlockID(
 	attempt := 0
 	// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 	for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
-		executorIDs, err := findAllExecutionNodes(blockID, executionReceipts, log)
+		executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 		if err != nil {
 			return flow.IdentityList{}, err
 		}
@@ -285,8 +285,12 @@ func executionNodesForBlockID(
 			//retry after an exponential backoff
 		}
 
-		// one or less execution receipt may have been received
-		// retry
+		// if two or less execution receipts may have been received then re-query
+		// in the hope that more might have been received by now
+		log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
+			Int("execution_receipts_found", len(executorIDs)).
+			Str("block_id", blockID.String()).
+			Msg("insufficient execution receipts")
 	}
 
 	if attempt == maxAttemptsForExecutionReceipt {
@@ -309,6 +313,8 @@ func executionNodesForBlockID(
 	return executionIdentitiesRandom, nil
 }
 
+// findAllExecutionNodes find all the execution nodes ids from the execution receipts that have been received for the
+// given blockID
 func findAllExecutionNodes(
 	blockID flow.Identifier,
 	executionReceipts storage.ExecutionReceipts,

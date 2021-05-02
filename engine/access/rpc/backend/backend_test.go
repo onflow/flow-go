@@ -1336,9 +1336,27 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 		r.ExecutionResult = er
 		receipts[j] = r
 	}
+
+	currentAttempt := 0
+	attempt1Receipts, attempt2Receipts, attempt3Receipts := receipts, receipts, receipts
+
+	// setup receipts storage mock to return different list of receipts on each call
 	suite.receipts.
-		On("ByBlockID", block.ID()).
-		Return(receipts, nil)
+		On("ByBlockID", block.ID()).Return(
+		func(id flow.Identifier) flow.ExecutionReceiptList {
+			switch currentAttempt {
+			case 0:
+				currentAttempt++
+				return attempt1Receipts
+			case 1:
+				currentAttempt++
+				return attempt2Receipts
+			default:
+				currentAttempt = 0
+				return attempt3Receipts
+			}
+		},
+		func(id flow.Identifier) error { return nil })
 
 	suite.snapshot.On("Identities", mock.Anything).Return(
 		func(filter flow.IdentityFilter) flow.IdentityList {
@@ -1400,13 +1418,27 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 	})
 	// if both are specified, but the preferred ENs don't match the ExecutorIDs in the ER,
 	// the ExecutionNodesForBlockID function should return the fixed ENs list
-	suite.Run("four fixed ENs of which two are preferred ENs", func() {
+	suite.Run("four fixed ENs of which two are preferred ENs but have not generated the ER", func() {
 		// mark the first two ENs as fixed
 		fixedENs := allExecutionNodes[0:2]
 		// specify two ENs not specified in the ERs as preferred
 		preferredENs := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		expectedList := fixedENs
 		testExecutionNodesForBlockID(preferredENs, fixedENs, expectedList)
+	})
+	// if execution receipts are not yet available, the ExecutionNodesForBlockID function should retry twice
+	suite.Run("retry execution receipt query", func() {
+		// on first attempt, no execution receipts are available
+		attempt1Receipts = flow.ExecutionReceiptList{}
+		// on second attempt ony one is available
+		attempt2Receipts = flow.ExecutionReceiptList{receipts[0]}
+		// on third attempt all receipts are available
+		attempt3Receipts = receipts
+		currentAttempt = 0
+		// mark the first two ENs as preferred
+		preferredENs := allExecutionNodes[0:2]
+		expectedList := preferredENs
+		testExecutionNodesForBlockID(preferredENs, nil, expectedList)
 	})
 }
 
