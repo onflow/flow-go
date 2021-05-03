@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -102,14 +101,14 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	root, err := verNode.State.Params().Root()
 	require.NoError(t, err)
 
-	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
+	completeER := CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	// stores block of execution result in state and mutate state accordingly
 	err = verNode.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
 	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity},
-		[]*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
+		[]*CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
@@ -122,13 +121,14 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode, exeEngine := SetupMockExeNode(t,
+	exeNode, exeEngine := setupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,
 		chainID,
-		[]*utils.CompleteExecutionReceipt{completeER},
-		expectedChunkIDs)
+		[]*CompleteExecutionReceipt{completeER},
+		expectedChunkIDs,
+		respondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// consensus node
 	// mock consensus node

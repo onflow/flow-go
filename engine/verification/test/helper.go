@@ -10,13 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/rand"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
-	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -24,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -104,7 +103,7 @@ func VerificationHappyPath(t *testing.T,
 	require.NoError(t, err)
 
 	// creates a child block of root, with its corresponding execution result.
-	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
+	completeER := CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 
 	// imitates follower engine on verification nodes
 	// received block of `completeER` and mutate state accordingly.
@@ -122,10 +121,17 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
+	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, CompleteExecutionReceiptList{completeER}, evenChunkIndexAssigner)
 
 	// mock execution node
-	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, identities, chainID, []*utils.CompleteExecutionReceipt{completeER}, expectedChunkIDs)
+	exeNode, exeEngine := setupChunkDataPackProvider(t,
+		hub,
+		exeIdentity,
+		identities,
+		chainID,
+		CompleteExecutionReceiptList{completeER},
+		expectedChunkIDs,
+		respondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// mock consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
@@ -213,19 +219,19 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath finishes")
 }
 
-// SetupMockExeNode creates and returns an execution node and its registered engine in the network (hub)
-// it mocks the process method of execution node that on receiving a chunk data pack request from
-// a certain verifier node (verIdentity) about a chunk that is assigned to it, replies the chunk back
-// data pack back to the node. Otherwise, if the request is not a chunk data pack request, or if the
-// requested chunk data pack is not about an assigned chunk to the verifier node (verIdentity), it fails the
-// test.
-func SetupMockExeNode(t *testing.T,
+// setupChunkDataPackProvider creates and returns an execution node that only has a chunk data pack provider engine.
+//
+// The mock chunk provider engine replies the chunk back requests by invoking the injected provider method. All chunk data pack
+// requests should come from a verification node, and should has one of the assigned chunk IDs. Otherwise, it fails the test.
+func setupChunkDataPackProvider(t *testing.T,
 	hub *stub.Hub,
 	exeIdentity *flow.Identity,
 	participants flow.IdentityList,
 	chainID flow.ChainID,
-	completeERs []*utils.CompleteExecutionReceipt,
-	assignedChunkIDs flow.IdentifierList) (*enginemock.GenericNode, *mocknetwork.Engine) {
+	completeERs CompleteExecutionReceiptList,
+	assignedChunkIDs flow.IdentifierList,
+	provider func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit)) (*enginemock.GenericNode,
+	*mocknetwork.Engine) {
 
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
@@ -244,41 +250,28 @@ func SetupMockExeNode(t *testing.T,
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
-			// finds the chunk data pack of the requested chunk and sends it back.
-			for _, completeER := range completeERs {
-				for _, result := range completeER.ContainerBlock.Payload.Results {
-					for _, chunk := range result.Chunks {
-						if chunk.ID() == req.ChunkID {
-
-							// publishes the chunk data pack response to the network
-							res := &messages.ChunkDataResponse{
-								ChunkDataPack: *completeER.ReceiptsData[0].ChunkDataPacks[chunk.Index],
-								Nonce:         rand.Uint64(),
-							}
-
-							// only non-system chunks have a collection
-							if !isSystemChunk(chunk.Index, len(result.Chunks)) {
-								res.Collection = *completeER.ReceiptsData[0].Collections[chunk.Index]
-							}
-
-							err := exeChunkDataConduit.Unicast(res, originID)
-							assert.Nil(t, err)
-
-							log.Debug().
-								Hex("origin_id", logging.ID(originID)).
-								Hex("chunk_id", logging.Entity(chunk)).
-								Msg("chunk data pack request answered by execution node")
-
-							return
-						}
-					}
-				}
-			}
-
-		}).
-		Return(nil)
+			provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+		}).Return(nil)
 
 	return &exeNode, exeEngine
+}
+
+func respondChunkDataPackRequest(t *testing.T,
+	completeERs CompleteExecutionReceiptList,
+	chunkID flow.Identifier,
+	verID flow.Identifier,
+	con network.Conduit) {
+
+	// finds the chunk data pack of the requested chunk and sends it back.
+	res := completeERs.ChunkDataResponse(t, chunkID)
+
+	err := con.Unicast(res, verID)
+	assert.Nil(t, err)
+
+	log.Debug().
+		Hex("origin_id", logging.ID(verID)).
+		Hex("chunk_id", logging.ID(chunkID)).
+		Msg("chunk data pack request answered by provider")
 }
 
 // SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
@@ -289,7 +282,7 @@ func SetupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER *utils.CompleteExecutionReceipt,
+	completeER *CompleteExecutionReceipt,
 	chainID flow.ChainID) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 	// determines the expected number of result approvals this node should receive
 	approvalsCount := 0
@@ -377,9 +370,9 @@ func SetupMockConsensusNode(t *testing.T,
 	return &conNode, conEngine, wg
 }
 
-// isSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
+// IsSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
 // the receipt.
-func isSystemChunk(index uint64, chunkNum int) bool {
+func IsSystemChunk(index uint64, chunkNum int) bool {
 	return int(index) == chunkNum-1
 }
 
@@ -442,7 +435,7 @@ type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 // All verification nodes are assigned the same chunks.
 func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
-	completeERs []*utils.CompleteExecutionReceipt,
+	completeERs CompleteExecutionReceiptList,
 	isAssigned ChunkAssignerFunc) (flow.IdentifierList, flow.IdentifierList) {
 
 	expectedLocatorIds := flow.IdentifierList{}
@@ -485,7 +478,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 // evenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
 // It also returns true if the index corresponds to the system chunk.
 func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
-	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
+	ok := index%2 == 0 || IsSystemChunk(index, chunkNum)
 	return ok
 }
 
@@ -495,7 +488,7 @@ func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
 // Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference blocks,
 // e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
-func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts []*utils.CompleteExecutionReceipt, state protocol.MutableState) []*flow.Block {
+func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList, state protocol.MutableState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
 	// tracks of duplicate reference blocks
