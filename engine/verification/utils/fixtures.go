@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -13,11 +14,13 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/messages"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -46,6 +49,35 @@ type CompleteExecutionReceipt struct {
 	// It should be removed once we replace finder engine.
 	Receipts     []*flow.ExecutionReceipt // copy of execution receipts in container block
 	ReceiptsData []*ExecutionReceiptData  // execution receipts data of the container block
+}
+
+type CompleteExecutionReceiptList []*CompleteExecutionReceipt
+
+func (c CompleteExecutionReceiptList) ChunkDataResponse(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
+	for _, completeER := range c {
+		for _, result := range completeER.ContainerBlock.Payload.Results {
+			for _, chunk := range result.Chunks {
+				if chunk.ID() == chunkID {
+
+					// publishes the chunk data pack response to the network
+					res := &messages.ChunkDataResponse{
+						ChunkDataPack: *completeER.ReceiptsData[0].ChunkDataPacks[chunk.Index],
+						Nonce:         rand.Uint64(),
+					}
+
+					// only non-system chunks have a collection
+					if !test.IsSystemChunk(chunk.Index, len(result.Chunks)) {
+						res.Collection = *completeER.ReceiptsData[0].Collections[chunk.Index]
+					}
+
+					return res
+				}
+			}
+		}
+	}
+
+	require.Fail(t, "could not find chunk data pack in the complete execution receipt")
+	return nil
 }
 
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
