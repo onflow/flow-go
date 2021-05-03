@@ -263,7 +263,7 @@ func respondChunkDataPackRequest(t *testing.T,
 	con network.Conduit) {
 
 	// finds the chunk data pack of the requested chunk and sends it back.
-	res := completeERs.ChunkDataResponse(t, chunkID)
+	res := completeERs.chunkDataResponseOf(t, chunkID)
 
 	err := con.Unicast(res, verID)
 	assert.Nil(t, err)

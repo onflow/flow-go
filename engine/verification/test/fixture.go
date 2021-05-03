@@ -52,31 +52,52 @@ type CompleteExecutionReceipt struct {
 
 type CompleteExecutionReceiptList []*CompleteExecutionReceipt
 
-func (c CompleteExecutionReceiptList) ChunkDataResponse(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
+func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
+	result, chunkIndex := c.resultOf(t, chunkID)
+	receiptData := c.receiptDataOf(t, chunkID)
+
+	// publishes the chunk data pack response to the network
+	res := &messages.ChunkDataResponse{
+		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
+		Nonce:         rand.Uint64(),
+	}
+
+	// only non-system chunks have a collection
+	if !IsSystemChunk(chunkIndex, len(result.Chunks)) {
+		res.Collection = *receiptData.Collections[chunkIndex]
+	}
+
+	return res
+}
+
+func (c CompleteExecutionReceiptList) receiptDataOf(t *testing.T, chunkID flow.Identifier) *ExecutionReceiptData {
 	for _, completeER := range c {
-		for _, result := range completeER.ContainerBlock.Payload.Results {
-			for _, chunk := range result.Chunks {
-				if chunk.ID() == chunkID {
-
-					// publishes the chunk data pack response to the network
-					res := &messages.ChunkDataResponse{
-						ChunkDataPack: *completeER.ReceiptsData[0].ChunkDataPacks[chunk.Index],
-						Nonce:         rand.Uint64(),
-					}
-
-					// only non-system chunks have a collection
-					if !IsSystemChunk(chunk.Index, len(result.Chunks)) {
-						res.Collection = *completeER.ReceiptsData[0].Collections[chunk.Index]
-					}
-
-					return res
+		for _, receiptData := range completeER.ReceiptsData {
+			for _, cdp := range receiptData.ChunkDataPacks {
+				if cdp.ChunkID == chunkID {
+					return receiptData
 				}
 			}
 		}
 	}
 
-	require.Fail(t, "could not find chunk data pack in the complete execution receipt")
+	require.Fail(t, "could not find receipt data of specified chunk in the complete execution result list")
 	return nil
+}
+
+func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identifier) (*flow.ExecutionResult, uint64) {
+	for _, completeER := range c {
+		for _, result := range completeER.ContainerBlock.Payload.Results {
+			for _, chunk := range result.Chunks {
+				if chunk.ID() == chunkID {
+					return result, chunk.Index
+				}
+			}
+		}
+	}
+
+	require.Fail(t, "could not find specified chunk in the complete execution result list")
+	return nil, uint64(0)
 }
 
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.

@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
-	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -41,7 +40,7 @@ import (
 func TestAssignerFetcherPipeline(t *testing.T) {
 	testcases := []struct {
 		blockCount      int
-		opts            []utils.CompleteExecutionReceiptBuilderOpt
+		opts            []CompleteExecutionReceiptBuilderOpt
 		msg             string
 		staked          bool
 		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
@@ -53,10 +52,10 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 			// The result has only one chunk.
 			// The verification node is staked
 			blockCount: 1,
-			opts: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(1),
-				utils.WithChunks(1),
-				utils.WithCopies(1),
+			opts: []CompleteExecutionReceiptBuilderOpt{
+				WithResults(1),
+				WithChunksCount(1),
+				WithCopies(1),
 			},
 			staked:          true,
 			eventRepetition: 1,
@@ -64,10 +63,10 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 1,
-			opts: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(1),
-				utils.WithChunks(1),
-				utils.WithCopies(1),
+			opts: []CompleteExecutionReceiptBuilderOpt{
+				WithResults(1),
+				WithChunksCount(1),
+				WithCopies(1),
 			},
 			staked:          false, // unstaked
 			eventRepetition: 1,
@@ -75,10 +74,10 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 1,
-			opts: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(5),
-				utils.WithChunks(5),
-				utils.WithCopies(1),
+			opts: []CompleteExecutionReceiptBuilderOpt{
+				WithResults(5),
+				WithChunksCount(5),
+				WithCopies(1),
 			},
 			staked:          true,
 			eventRepetition: 1,
@@ -86,10 +85,10 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 10,
-			opts: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(5),
-				utils.WithChunks(5),
-				utils.WithCopies(2),
+			opts: []CompleteExecutionReceiptBuilderOpt{
+				WithResults(5),
+				WithChunksCount(5),
+				WithCopies(2),
 			},
 			staked:          true,
 			eventRepetition: 1,
@@ -97,10 +96,10 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		},
 		{
 			blockCount: 10,
-			opts: []utils.CompleteExecutionReceiptBuilderOpt{
-				utils.WithResults(5),
-				utils.WithChunks(5),
-				utils.WithCopies(2),
+			opts: []CompleteExecutionReceiptBuilderOpt{
+				WithResults(5),
+				WithChunksCount(5),
+				WithCopies(2),
 			},
 			staked:          true,
 			eventRepetition: 3, // notifies consumer 3 times for each finalized block.
@@ -215,7 +214,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 // The block consumer operates on a block reader with a chain of specified number of finalized blocks
 // ready to read.
 func withConsumers(t *testing.T, staked bool, blockCount int,
-	withConsumers func(*blockconsumer.BlockConsumer, *chunkconsumer.ChunkConsumer, []*flow.Block, *sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
+	withConsumers func(*blockconsumer.BlockConsumer, *chunkconsumer.ChunkConsumer, []*flow.Block, *sync.WaitGroup), ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
@@ -227,6 +226,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 
 		// bootstraps
 		s, verId, participants := bootstrapSystem(t, collector, tracer, staked)
+		// exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -234,12 +234,13 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		// hold any guarantees.
 		root, err := s.State.Final().Head()
 		require.NoError(t, err)
-		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+		completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
 		// mocks chunk assigner to assign even chunk indices to this verification node
 		chunkAssigner := &mock.ChunkAssigner{}
-		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{&verId}, completeERs, evenChunkIndexAssigner)
+		expectedLocatorIds, _ := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{&verId}, completeERs,
+			evenChunkIndexAssigner)
 
 		hub := stub.NewNetworkHub()
 		receiptsLimit := 100
@@ -251,6 +252,25 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 			collector,
 			tracer,
 			chainID)
+
+		//// execution node
+		//exeNode, exeEngine := setupChunkDataPackProvider(t,
+		//	hub,
+		//	exeID,
+		//	flow.IdentityList{&verId},
+		//	participants,
+		//	chainID,
+		//	completeER)
+		//
+		//// consensus node
+		//// mock consensus node
+		//conNode, conEngine, conWG := SetupMockConsensusNode(t,
+		//	hub,
+		//	conIdentity,
+		//	flow.IdentityList{verIdentity},
+		//	identities,
+		//	completeER,
+		//	chainID)
 
 		verNode := testutil.NewVerificationNode(t,
 			hub,
