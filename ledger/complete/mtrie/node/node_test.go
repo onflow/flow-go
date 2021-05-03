@@ -135,6 +135,6 @@ func Test_VerifyCachedHash(t *testing.T) {
 	require.True(t, n5.VerifyCachedHash())
 }
 
-func hash2String(hash hash.Hash) string {
+func hashToString(hash hash.Hash) string {
 	return hex.EncodeToString(hash[:])
 }
