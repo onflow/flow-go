@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -38,10 +39,24 @@ type Ingress struct {
 }
 
 // New returns a new ingress server.
-func New(config Config, e *ingest.Engine, chainID flow.ChainID) *Ingress {
+func New(config Config, e *ingest.Engine, chainID flow.ChainID, rpcMetricsEnabled bool) *Ingress {
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
+
+	// create a GRPC server to serve GRPC clients
+	grpcOpts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	}
+
+	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
+	if rpcMetricsEnabled {
+		grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+	}
+
+	server := grpc.NewServer(grpcOpts...)
+
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
@@ -49,11 +64,13 @@ func New(config Config, e *ingest.Engine, chainID flow.ChainID) *Ingress {
 			engine:                       e,
 			chainID:                      chainID,
 		},
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
+		server: server,
 		config: config,
+	}
+
+	if rpcMetricsEnabled {
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(server)
 	}
 
 	access.RegisterAccessAPIServer(ingress.server, ingress.handler)
