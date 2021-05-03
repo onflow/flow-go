@@ -119,12 +119,12 @@ func (b *broker) Broadcast(data []byte) {
 
 // Disqualify implements the crypto.DKGProcessor interface.
 func (b *broker) Disqualify(node int, log string) {
-	b.logger.Debug().Msgf("node %d disqualified node %d: %s", b.id, node, log)
+	b.logger.Error().Msgf("node %d disqualified node %d: %s", b.id, node, log)
 }
 
 // FlagMisbehavior implements the crypto.DKGProcessor interface.
 func (b *broker) FlagMisbehavior(node int, logData string) {
-	b.logger.Debug().Msgf("node %d flagged node %d: %s", b.id, node, logData)
+	b.logger.Error().Msgf("node %d flagged node %d: %s", b.id, node, logData)
 }
 
 // GetIndex implements the DKGBroker interface.

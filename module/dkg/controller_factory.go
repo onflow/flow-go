@@ -44,7 +44,7 @@ func NewControllerFactory(
 func (f *ControllerFactory) Create(
 	dkgInstanceID string,
 	participants flow.IdentityList,
-	seed []byte) (*Controller, error) {
+	seed []byte) (module.DKGController, error) {
 
 	myIndex := -1
 	for i, id := range participants.NodeIDs() {
