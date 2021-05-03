@@ -220,8 +220,9 @@ func update(
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
 		// check if the parent node path is among the updated paths
 		found := false
+		parentPath := *parentNode.Path()
 		for i, p := range paths {
-			if p == *parentNode.Path() {
+			if p == parentPath {
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
 					if !parentNode.Payload().Equals(&payloads[i]) {
