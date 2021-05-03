@@ -17,4 +17,5 @@ type SDKClientWrapper interface {
 	GetLatestBlock(context.Context, bool, ...grpc.CallOption) (*sdk.Block, error)
 	GetTransactionResult(context.Context, sdk.Identifier, ...grpc.CallOption) (*sdk.TransactionResult, error)
 	ExecuteScriptAtLatestBlock(context.Context, []byte, []cadence.Value, ...grpc.CallOption) (cadence.Value, error)
+	ExecuteScriptAtBlockID(context.Context, sdk.Identifier, []byte, []cadence.Value, ...grpc.CallOption) (cadence.Value, error)
 }

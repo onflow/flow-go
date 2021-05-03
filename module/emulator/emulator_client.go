@@ -1,4 +1,4 @@
-package epochs
+package module
 
 import (
 	"context"
@@ -9,7 +9,9 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
+
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EmulatorClient is a wrapper around the emulator to implement the same interface
@@ -34,7 +36,8 @@ func (c *EmulatorClient) GetAccountAtLatestBlock(ctx context.Context, address sd
 }
 
 func (c *EmulatorClient) SendTransaction(ctx context.Context, tx sdk.Transaction, opts ...grpc.CallOption) error {
-	return c.Submit(&tx)
+	_, err := c.Submit(&tx)
+	return err
 }
 
 func (c *EmulatorClient) GetLatestBlock(ctx context.Context, isSealed bool, opts ...grpc.CallOption) (*sdk.Block, error) {
@@ -77,26 +80,46 @@ func (c *EmulatorClient) ExecuteScriptAtLatestBlock(ctx context.Context, script 
 	return scriptResult.Value, nil
 }
 
-func (c *EmulatorClient) Submit(tx *sdk.Transaction) error {
+func (c *EmulatorClient) ExecuteScriptAtBlockID(ctx context.Context, blockID sdk.Identifier, script []byte, args []cadence.Value, opts ...grpc.CallOption) (cadence.Value, error) {
+
+	arguments := [][]byte{}
+	for _, arg := range args {
+		val, err := jsoncdc.Encode(arg)
+		if err != nil {
+			return nil, fmt.Errorf("could not encode arguments: %w", err)
+		}
+		arguments = append(arguments, val)
+	}
+
+	// get block by ID
+	block, err := c.blockchain.GetBlockByID(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	scriptResult, err := c.blockchain.ExecuteScriptAtBlock(script, arguments, block.Header.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	if scriptResult.Error != nil {
+		return nil, fmt.Errorf("error in script: %w", scriptResult.Error)
+	}
+
+	return scriptResult.Value, nil
+}
+
+func (c *EmulatorClient) Submit(tx *sdk.Transaction) (*flow.Block, error) {
 	// submit the signed transaction
 	err := c.blockchain.AddTransaction(*tx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	result, err := c.blockchain.ExecuteNextTransaction()
+	block, _, err := c.blockchain.ExecuteAndCommitBlock()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if !result.Succeeded() {
-		return fmt.Errorf("transaction did not succeeded")
-	}
-
-	_, err = c.blockchain.CommitBlock()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return block, nil
 }

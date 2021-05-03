@@ -46,12 +46,39 @@ const EpochSetupRandomSourceLength = crypto.SignatureLenBLSBLS12381
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter      uint64         // the number of the epoch
-	FirstView    uint64         // the first view of the epoch
-	FinalView    uint64         // the final view of the epoch
-	Participants IdentityList   // all participants of the epoch
-	Assignments  AssignmentList // cluster assignment for the epoch
-	RandomSource []byte         // source of randomness for epoch-specific setup tasks
+	Counter            uint64         // the number of the epoch
+	FirstView          uint64         // the first view of the epoch
+	DKGPhase1FinalView uint64         // the final view of DKG phase 1
+	DKGPhase2FinalView uint64         // the final view of DKG phase 2
+	DKGPhase3FinalView uint64         // the final view of DKG phase 3
+	FinalView          uint64         // the final view of the epoch
+	Participants       IdentityList   // all participants of the epoch
+	Assignments        AssignmentList // cluster assignment for the epoch
+	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
+}
+
+// Body returns the canonical body of the EpochSetup event (notably omitting
+// the FirstView which is a computed property).
+func (setup *EpochSetup) Body() interface{} {
+	return struct {
+		Counter            uint64
+		DKGPhase1FinalView uint64
+		DKGPhase2FinalView uint64
+		DKGPhase3FinalView uint64
+		FinalView          uint64
+		Participants       IdentityList
+		Assignments        AssignmentList
+		RandomSource       []byte
+	}{
+		Counter:            setup.Counter,
+		DKGPhase1FinalView: setup.DKGPhase1FinalView,
+		DKGPhase2FinalView: setup.DKGPhase2FinalView,
+		DKGPhase3FinalView: setup.DKGPhase3FinalView,
+		FinalView:          setup.FinalView,
+		Participants:       setup.Participants,
+		Assignments:        setup.Assignments,
+		RandomSource:       setup.RandomSource,
+	}
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {

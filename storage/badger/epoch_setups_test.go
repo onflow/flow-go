@@ -16,22 +16,22 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-// TestEpochSetupStoreAndRetrieve tests that a commit can be stored, retrieved and attempted to be stored again without an error
+// TestEpochSetupStoreAndRetrieve tests that a setup can be stored, retrieved and attempted to be stored again without an error
 func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := badgerstorage.NewEpochSetups(metrics, db)
 
-		// attempt to get a invalid commit
+		// attempt to get a setup that doesn't exist
 		_, err := store.ByID(unittest.IdentifierFixture())
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
-		// store a commit in db
+		// store a setup in db
 		expected := unittest.EpochSetupFixture()
 		err = operation.RetryOnConflict(db.Update, store.StoreTx(expected))
 		require.NoError(t, err)
 
-		// retrieve the commit by ID
+		// retrieve the setup by ID
 		actual, err := store.ByID(expected.ID())
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)

@@ -705,6 +705,13 @@ func WithNodeID(b byte) func(*flow.Identity) {
 	}
 }
 
+// WithStakingPubKey adds a staking public key to the identity
+func WithStakingPubKey(pubKey crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.StakingPubKey = pubKey
+	}
+}
+
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
@@ -1307,5 +1314,26 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
 			}
 		}
+	}
+}
+
+// DKGMessageFixture creates a single DKG message with random fields
+func DKGMessageFixture() *messages.DKGMessage {
+	return &messages.DKGMessage{
+		Orig:          uint64(rand.Int()),
+		Data:          RandomBytes(10),
+		DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
+	}
+}
+
+// DKGBroadcastMessageFixture creates a single DKG broadcast message with random fields
+func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
+	return &messages.BroadcastDKGMessage{
+		DKGMessage: messages.DKGMessage{
+			Orig:          uint64(rand.Int()),
+			Data:          RandomBytes(10),
+			DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
+		},
+		Signature: SignatureFixture(),
 	}
 }

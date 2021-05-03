@@ -14,10 +14,17 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
+	module_mock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
 )
 
-func MakeSigners(t *testing.T, committee hotstuff.Committee, signerIDs []flow.Identifier, stakingKeys []crypto.PrivateKey, beaconKeys []crypto.PrivateKey) []hotstuff.SignerVerifier {
+const epochCounter = uint64(42)
+
+func MakeSigners(t *testing.T,
+	committee hotstuff.Committee,
+	signerIDs []flow.Identifier,
+	stakingKeys []crypto.PrivateKey,
+	beaconKeys []crypto.PrivateKey) []hotstuff.SignerVerifier {
 
 	// generate our consensus node identities
 	require.NotEmpty(t, signerIDs)
@@ -46,17 +53,28 @@ func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow
 	return signer
 }
 
-func MakeBeaconSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, stakingPriv crypto.PrivateKey, beaconPriv crypto.PrivateKey) *CombinedSigner {
+func MakeBeaconSigner(t *testing.T,
+	committee hotstuff.Committee,
+	signerID flow.Identifier,
+	stakingPriv crypto.PrivateKey,
+	beaconPriv crypto.PrivateKey) *CombinedSigner {
+
 	local, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
-	staking := signature.NewAggregationProvider("test_staking", local)
-	beacon := signature.NewThresholdProvider("test_beacon", beaconPriv)
+
 	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	signer := NewCombinedSigner(committee, staking, beacon, combiner, signerID)
+	staking := signature.NewAggregationProvider("test_staking", local)
+	thresholdVerifier := signature.NewThresholdVerifier("test_beacon")
+	thresholdSigner := signature.NewThresholdProvider("test_beacon", beaconPriv)
+	thresholdSignerStore := &module_mock.ThresholdSignerStore{}
+	thresholdSignerStore.On("GetThresholdSigner", mock.Anything).Return(thresholdSigner, nil)
+
+	signer := NewCombinedSigner(committee, staking, thresholdVerifier, combiner, thresholdSignerStore, signerID)
+
 	return signer
 }
 
-func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beaconEnabled bool) (hotstuff.Committee, []crypto.PrivateKey, []crypto.PrivateKey) {
+func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beaconEnabled bool, epochCounter uint64) (hotstuff.Committee, []crypto.PrivateKey, []crypto.PrivateKey) {
 
 	// program the MembersSnapshot
 	committee := &mocks.Committee{}
@@ -93,6 +111,7 @@ func MakeHotstuffCommitteeState(t *testing.T, identities flow.IdentityList, beac
 
 		dkg := &mocks.DKG{}
 		committee.On("DKG", mock.Anything).Return(dkg, nil)
+		dkg.On("Counter").Return(epochCounter)
 		dkg.On("Size").Return(uint(len(identities)))
 		dkg.On("GroupKey").Return(beaconGroupPK)
 		for i, node := range identities {

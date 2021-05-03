@@ -386,15 +386,7 @@ func main() {
 			}
 
 			// loads the private account info for this node from disk for use in the QCContractClient.
-			accountInfo, err := func() (*bootstrap.NodeMachineAccountInfo, error) {
-				data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
-				if err != nil {
-					return nil, err
-				}
-				var info bootstrap.NodeMachineAccountInfo
-				err = json.Unmarshal(data, &info)
-				return &info, err
-			}()
+			accountInfo, err := loadEpochQCPrivateData(node)
 			if err != nil {
 				return nil, err
 			}
@@ -412,10 +404,8 @@ func main() {
 				return nil, err
 			}
 
-			qcContractClient, err := epochs.NewQCContractClient(flowClient, node.Me.NodeID(), accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
-			if err != nil {
-				return nil, err
-			}
+			qcContractClient := epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
+				accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
@@ -457,4 +447,14 @@ func main() {
 			return manager, err
 		}).
 		Run()
+}
+
+func loadEpochQCPrivateData(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
+	data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+	if err != nil {
+		return nil, err
+	}
+	var info bootstrap.NodeMachineAccountInfo
+	err = json.Unmarshal(data, &info)
+	return &info, err
 }

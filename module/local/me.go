@@ -11,7 +11,7 @@ import (
 
 type Local struct {
 	me *flow.Identity
-	sk crypto.PrivateKey // instance of the node's private key
+	sk crypto.PrivateKey // instance of the node's private staking key
 }
 
 func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {
