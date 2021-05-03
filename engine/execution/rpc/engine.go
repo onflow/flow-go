@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -63,6 +64,7 @@ func New(
 			transactionResults: txResults,
 		},
 		server: grpc.NewServer(
+			grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
 			grpc.MaxRecvMsgSize(config.MaxMsgSize),
 			grpc.MaxSendMsgSize(config.MaxMsgSize),
 		),
@@ -70,6 +72,9 @@ func New(
 	}
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
+
+	grpc_prometheus.EnableHandlingTimeHistogram()
+	grpc_prometheus.Register(eng.server)
 
 	return eng
 }
