@@ -108,7 +108,8 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity}, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
+	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity},
+		[]*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
@@ -124,10 +125,10 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	exeNode, exeEngine := SetupMockExeNode(t,
 		hub,
 		exeIdentity,
-		flow.IdentityList{verIdentity},
 		identities,
 		chainID,
-		completeER)
+		[]*utils.CompleteExecutionReceipt{completeER},
+		expectedChunkIDs)
 
 	// consensus node
 	// mock consensus node

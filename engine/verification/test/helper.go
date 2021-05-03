@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mock"
@@ -121,10 +122,10 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	MockChunkAssignmentFixture(assigner, verIdentities, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
+	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
 
 	// mock execution node
-	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, verIdentities, identities, chainID, completeER)
+	exeNode, exeEngine := SetupMockExeNode(t, hub, exeIdentity, identities, chainID, []*utils.CompleteExecutionReceipt{completeER}, expectedChunkIDs)
 
 	// mock consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
@@ -221,53 +222,43 @@ func VerificationHappyPath(t *testing.T,
 func SetupMockExeNode(t *testing.T,
 	hub *stub.Hub,
 	exeIdentity *flow.Identity,
-	verIdentities flow.IdentityList,
-	othersIdentity flow.IdentityList,
+	participants flow.IdentityList,
 	chainID flow.ChainID,
-	completeER *utils.CompleteExecutionReceipt) (*enginemock.GenericNode, *mocknetwork.Engine) {
-	// mock the execution node with a generic node and mocked engine
-	// to handle request for chunk state
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, othersIdentity, chainID)
-	exeEngine := new(mocknetwork.Engine)
+	completeERs []*utils.CompleteExecutionReceipt,
+	assignedChunkIDs flow.IdentifierList) (*enginemock.GenericNode, *mocknetwork.Engine) {
 
-	// determines the expected number of result chunk data pack requests
-	chunkDataPackCount := 0
-	chunks := completeER.Receipts[0].ExecutionResult.Chunks
-	chunksNum := len(chunks)
-	for _, chunk := range chunks {
-		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
-			chunkDataPackCount++
-		}
-	}
+	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
+	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
-	chunkNum := len(completeER.ReceiptsData[0].ChunkDataPacks)
-
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			if originID, ok := args[0].(flow.Identifier); ok {
-				if req, ok := args[1].(*messages.ChunkDataRequest); ok {
-					require.True(t, ok)
-					for i := 0; i < chunkNum; i++ {
-						chunk, ok := chunks.ByIndex(uint64(i))
-						require.True(t, ok, "chunk out of range requested")
-						chunkID := chunk.ID()
-						if chunkID == req.ChunkID {
-							if !evenChunkIndexAssigner(chunk.Index, chunksNum) {
-								require.Error(t, fmt.Errorf(" requested an unassigned chunk data pack %x", req))
-							}
+			originID, ok := args[0].(flow.Identifier)
+			require.True(t, ok)
+			// request should be dispatched by a verification node.
+			require.Contains(t, participants.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs(), originID)
+
+			req, ok := args[1].(*messages.ChunkDataRequest)
+			require.True(t, ok)
+			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
+
+			// finds the chunk data pack of the requested chunk and sends it back.
+			for _, completeER := range completeERs {
+				for _, result := range completeER.ContainerBlock.Payload.Results {
+					for _, chunk := range result.Chunks {
+						if chunk.ID() == req.ChunkID {
 
 							// publishes the chunk data pack response to the network
 							res := &messages.ChunkDataResponse{
-								ChunkDataPack: *completeER.ReceiptsData[0].ChunkDataPacks[i],
+								ChunkDataPack: *completeER.ReceiptsData[0].ChunkDataPacks[chunk.Index],
 								Nonce:         rand.Uint64(),
 							}
 
 							// only non-system chunks have a collection
-							if !isSystemChunk(uint64(i), chunksNum) {
-								res.Collection = *completeER.ReceiptsData[0].Collections[i]
+							if !isSystemChunk(chunk.Index, len(result.Chunks)) {
+								res.Collection = *completeER.ReceiptsData[0].Collections[chunk.Index]
 							}
 
 							err := exeChunkDataConduit.Unicast(res, originID)
@@ -275,17 +266,14 @@ func SetupMockExeNode(t *testing.T,
 
 							log.Debug().
 								Hex("origin_id", logging.ID(originID)).
-								Hex("chunk_id", logging.ID(chunkID)).
+								Hex("chunk_id", logging.Entity(chunk)).
 								Msg("chunk data pack request answered by execution node")
 
 							return
 						}
 					}
-					require.Error(t, fmt.Errorf(" requested an unidentifed chunk data pack %v", req))
 				}
 			}
-
-			require.Error(t, fmt.Errorf("unknown request to execution node %v", args[1]))
 
 		}).
 		Return(nil)
@@ -450,14 +438,15 @@ type ChunkAssignerFunc func(chunkIndex uint64, chunks int) bool
 // MockChunkAssignmentFixture is a test helper that mocks a chunk assigner for a set of verification nodes for the
 // execution results in the given complete execution receipts, and based on the given chunk assigner function.
 //
-// It returns the list of chunk locator ids assigned to the input verification nodes.
+// It returns the list of chunk locator ids assigned to the input verification nodes, as well as the list of their chunk IDs.
 // All verification nodes are assigned the same chunks.
 func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	verIds flow.IdentityList,
 	completeERs []*utils.CompleteExecutionReceipt,
-	isAssigned ChunkAssignerFunc) flow.IdentifierList {
+	isAssigned ChunkAssignerFunc) (flow.IdentifierList, flow.IdentifierList) {
 
 	expectedLocatorIds := flow.IdentifierList{}
+	expectedChunkIds := flow.IdentifierList{}
 
 	// keeps track of duplicate results (receipts that share same result)
 	visited := make(map[flow.Identifier]struct{})
@@ -479,6 +468,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 						Index:    chunk.Index,
 					}.ID()
 					expectedLocatorIds = append(expectedLocatorIds, locatorID)
+					expectedChunkIds = append(expectedChunkIds, chunk.ID())
 					a.Add(chunk, verIds.NodeIDs())
 				}
 
@@ -489,7 +479,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 		}
 	}
 
-	return expectedLocatorIds
+	return expectedLocatorIds, expectedChunkIds
 }
 
 // evenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
