@@ -653,13 +653,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
-		NumViewsInEpoch:              cadence.UInt64(leader.EstimatedSixMonthOfViews),
-		NumViewsInStakingAuction:     cadence.UInt64(leader.EstimatedSixMonthOfViews / 3),
-		NumViewsInDKGPhase:           cadence.UInt64(leader.EstimatedSixMonthOfViews / 3),
+		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView - 1),
+		NumViewsInStakingAuction:     cadence.UInt64(100),
+		NumViewsInDKGPhase:           cadence.UInt64(100),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
 		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
 	}
+
+	// XXX
+	epochConfig.CollectorClusters = clusterAssignments
 
 	// generate the initial execution state
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)

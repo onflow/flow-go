@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -459,9 +460,9 @@ transaction {
 		numCollectorClusters: UInt16(%d),
 		FLOWsupplyIncreasePercentage: UFix64(%d),
 		randomSource: %s,
-		collectorClusters: [],
-		clusterQCs: [],
-		dkgPubKeys: [],
+		collectorClusters: %s,
+		clusterQCs: %s,
+		dkgPubKeys: %s,
 	)
   }
 }
@@ -599,7 +600,8 @@ func deployIDTableStakingTransaction(service flow.Address, contract []byte, epoc
 }
 
 func deployEpochTransaction(service flow.Address, contract []byte, epochConfig flow.EpochConfig) *TransactionProcedure {
-	return Transaction(
+
+	tx := Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(
 				deployEpochTransactionTemplate,
@@ -611,10 +613,66 @@ func deployEpochTransaction(service flow.Address, contract []byte, epochConfig f
 				epochConfig.NumCollectorClusters,
 				epochConfig.FLOWsupplyIncreasePercentage,
 				epochConfig.RandomSource,
+				encodeClusterAssignments(epochConfig.CollectorClusters, service),
+				cadence.Array{},
+				cadence.Array{},
 			))).
 			AddAuthorizer(service),
 		0,
 	)
+	return tx
+}
+
+func encodeClusterAssignments(clusterAssignments flow.AssignmentList, service flow.Address) cadence.Array {
+	collectorClusterValues := []cadence.Value{}
+
+	for i, cluster := range clusterAssignments {
+		clusterIndex := cadence.UInt16(i)
+
+		weightsByNodeID := []cadence.KeyValuePair{}
+		for _, id := range cluster {
+			kvp := cadence.KeyValuePair{
+				Key:   cadence.NewString(id.String()),
+				Value: cadence.NewUInt64(0),
+			}
+			weightsByNodeID = append(weightsByNodeID, kvp)
+		}
+
+		fields := []cadence.Value{
+			clusterIndex,
+			cadence.NewDictionary(weightsByNodeID),
+		}
+
+		clusterStruct := cadence.NewStruct(fields).
+			WithType(&cadence.StructType{
+				Location: common.AddressLocation{
+					Address: common.BytesToAddress(service.Bytes()),
+					Name:    "Service",
+				},
+				QualifiedIdentifier: "FlowEpochClusterQC.Cluster",
+				Fields: []cadence.Field{
+					{
+						Identifier: "index",
+						Type:       cadence.UInt16Type{},
+					},
+					{
+						Identifier: "nodeWeights",
+						Type: cadence.DictionaryType{
+							KeyType:     cadence.StringType{},
+							ElementType: cadence.UInt64Type{},
+						},
+					},
+				},
+			})
+
+		collectorClusterValues = append(collectorClusterValues, clusterStruct)
+	}
+
+	collectorClusters := cadence.NewArray(collectorClusterValues)
+
+	fmt.Printf("XXX collectorCluster: %#v\n", collectorClusters)
+
+	return collectorClusters
 }
 
 func mintFlowTokenTransaction(

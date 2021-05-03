@@ -360,9 +360,9 @@ type EpochConfig struct {
 	NumCollectorClusters         cadence.UInt16
 	FLOWsupplyIncreasePercentage cadence.UFix64
 	RandomSource                 cadence.String
-	CollectorClusters            []cadence.String
-	ClusterQCs                   []cadence.String
-	DKGPubKeys                   []cadence.String
+	CollectorClusters            AssignmentList
+	ClusterQCs                   []*QuorumCertificate
+	DKGPubKeys                   []crypto.PublicKey
 }
 
 // XXX sensible values?
