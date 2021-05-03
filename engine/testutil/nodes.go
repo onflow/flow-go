@@ -1007,7 +1007,7 @@ func NewVerificationNode(t testing.TB,
 			node.FetcherEngine,
 			100*time.Millisecond,
 			// requests are only qualified if their retryAfter is elapsed.
-			verificationrequester.RetryAfterQualifier(),
+			verificationrequester.RetryAfterQualifier,
 			// exponential backoff with multiplier of 2, minimum interval of a second, and
 			// maximum interval of an hour.
 			mempool.ExponentialUpdater(2, time.Hour, time.Second),
