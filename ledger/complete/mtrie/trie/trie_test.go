@@ -25,8 +25,12 @@ func Test_EmptyTrie(t *testing.T) {
 	rootHash := emptyTrie.RootHash()
 	require.Equal(t, ledger.GetDefaultHashForHeight(ledger.NodeMaxHeight), hash.Hash(rootHash))
 
+	// verify root hash
 	expectedRootHashHex := "568f4ec740fe3b5de88034cb7b1fbddb41548b068f31aebc8ae9189e429c5749"
 	require.Equal(t, expectedRootHashHex, hash2String(rootHash))
+
+	// check String() method does not panic:
+	emptyTrie.String()
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
