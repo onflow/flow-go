@@ -74,6 +74,23 @@ func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID 
 	return res
 }
 
+// chunkOf is a test helper method that returns the chunk of the specified index from the specified result that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no execution result with the specified identifier is found in this complete execution receipt list.
+func (c CompleteExecutionReceiptList) chunkOf(t *testing.T, resultID flow.Identifier, chunkIndex uint64) *flow.Chunk {
+	for _, completeER := range c {
+		for _, result := range completeER.ContainerBlock.Payload.Results {
+			if result.ID() == resultID {
+				return result.Chunks[chunkIndex]
+			}
+		}
+	}
+
+	require.Fail(t, "could not find receipt data of specified chunk in the complete execution result list")
+	return nil
+}
+
 // resultOf is a test helper method that returns the receipt data of the specified chunk ID that
 // should belong to this complete execution receipt list.
 //
