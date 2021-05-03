@@ -163,12 +163,20 @@ func Test_UpdateTrie(t *testing.T) {
 	expectedRootHashHex := "08db9aeed2b9fcc66b63204a26a4c28652e44e3035bd87ba0ed632a227b3f6dd"
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 
+	var paths []ledger.Path
+	var payloads []ledger.Payload
 	for r := 0; r < 20; r++ {
-		paths, payloads := deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
+		paths, payloads = deduplicateWrites(sampleRandomRegisterWrites(rng, r*100))
 		updatedTrie, err = trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
 		require.NoError(t, err)
 		require.Equal(t, expectedRootHashes[r], hex.EncodeToString(updatedTrie.RootHash()))
 	}
+	// update with the same registers with the same values
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(updatedTrie, paths, payloads)
+	require.NoError(t, err)
+	require.Equal(t, expectedRootHashes[19], hex.EncodeToString(updatedTrie.RootHash()))
+	// check the root node pointers are equal
+	require.True(t, updatedTrie.RootNode() == newTrie.RootNode())
 }
 
 // Test_UnallocateRegisters tests whether unallocating registers matches the formal specification.
@@ -196,9 +204,9 @@ func Test_UnallocateRegisters(t *testing.T) {
 
 	// this should be identical to the first 99 registers never been written
 	expectedRootHashHex := "d81e27a93f2bef058395f70e00fb5d3c8e426e22b3391d048b34017e1ecb483e"
-	comparisionTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
+	comparisonTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths2, payloads2)
 	require.NoError(t, err)
-	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisionTrie.RootHash()))
+	require.Equal(t, expectedRootHashHex, hex.EncodeToString(comparisonTrie.RootHash()))
 	require.Equal(t, expectedRootHashHex, hex.EncodeToString(updatedTrie.RootHash()))
 }
 

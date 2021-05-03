@@ -21,7 +21,7 @@ import (
 // to the DKG smart-contract to read broadcast messages.
 const DefaultPollStep = 10
 
-// XXX what should this be?
+// ATTENTION what should this be?
 var SeedIndices = []uint32{1, 1, 1}
 
 type epochInfo struct {
@@ -40,7 +40,7 @@ type ReactorEngine struct {
 	unit              *engine.Unit
 	log               zerolog.Logger
 	me                module.Local
-	state             protocol.State
+	State             protocol.State
 	keyStorage        storage.DKGKeys
 	controller        module.DKGController
 	controllerFactory module.DKGControllerFactory
@@ -62,7 +62,7 @@ func NewReactorEngine(
 		unit:              engine.NewUnit(),
 		log:               log,
 		me:                me,
-		state:             state,
+		State:             state,
 		keyStorage:        keyStorage,
 		controllerFactory: controllerFactory,
 		viewEvents:        viewEvents,
@@ -150,7 +150,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
-	epoch := e.state.AtBlockID(firstBlockID).Epochs().Next()
+	epoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
 	identities, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
@@ -199,8 +199,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 			log.Info().Msg("polling DKG smart-contract...")
 			err := e.controller.Poll(header.ID())
 			if err != nil {
-				log.Error().Err(err).Msg("failed to poll DKG smart-contract")
-				panic(err)
+				log.Fatal().Err(err).Msg("failed to poll DKG smart-contract")
 			}
 		})
 	})
@@ -223,7 +222,7 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 			log.Info().Msgf("ending %s...", fromState)
 			err := phaseTransition()
 			if err != nil {
-				log.Fatal().Err(err).Msgf("failed to end %s", fromState)
+				log.Fatal().Err(err).Msgf("node failed to end %s", fromState)
 			}
 			log.Info().Msgf("ended %s successfully", fromState)
 		})
