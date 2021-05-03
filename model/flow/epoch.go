@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 )
@@ -348,31 +347,4 @@ func (es *EpochStatus) Phase() (EpochPhase, error) {
 
 func (es *EpochStatus) HasPrevious() bool {
 	return es.PreviousEpoch.SetupID != ZeroID && es.PreviousEpoch.CommitID != ZeroID
-}
-
-type EpochConfig struct {
-	EpochTokenPayout             cadence.UFix64
-	RewardCut                    cadence.UFix64
-	CurrentEpochCounter          cadence.UInt64
-	NumViewsInEpoch              cadence.UInt64
-	NumViewsInStakingAuction     cadence.UInt64
-	NumViewsInDKGPhase           cadence.UInt64
-	NumCollectorClusters         cadence.UInt16
-	FLOWsupplyIncreasePercentage cadence.UFix64
-	RandomSource                 cadence.String
-	CollectorClusters            AssignmentList
-	ClusterQCs                   []*QuorumCertificate
-	DKGPubKeys                   []crypto.PublicKey
-}
-
-// XXX sensible values?
-func DefaultEpochConfig() EpochConfig {
-	return EpochConfig{
-		CurrentEpochCounter:          cadence.UInt64(0),
-		NumViewsInEpoch:              cadence.UInt64(100),
-		NumViewsInStakingAuction:     cadence.UInt64(10),
-		NumViewsInDKGPhase:           cadence.UInt64(10),
-		NumCollectorClusters:         cadence.UInt16(3),
-		FLOWsupplyIncreasePercentage: cadence.UFix64(5),
-	}
 }

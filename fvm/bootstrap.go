@@ -6,14 +6,13 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 )
 
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
@@ -35,7 +34,7 @@ type BootstrapProcedure struct {
 	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
 
-	epochConfig flow.EpochConfig
+	epochConfig epochs.EpochConfig
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -94,7 +93,7 @@ func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedur
 	}
 }
 
-func WithEpochConfig(epochConfig flow.EpochConfig) BootstrapProcedureOption {
+func WithEpochConfig(epochConfig epochs.EpochConfig) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.epochConfig = epochConfig
 		return bp
@@ -117,7 +116,7 @@ func Bootstrap(
 	bootstrapProcedure := &BootstrapProcedure{
 		serviceAccountPublicKey: serviceAccountPublicKey,
 		transactionFee:          0,
-		epochConfig:             flow.DefaultEpochConfig(),
+		epochConfig:             epochs.DefaultEpochConfig(),
 	}
 
 	for _, applyOption := range opts {
@@ -448,8 +447,13 @@ transaction {
 `
 
 const deployEpochTransactionTemplate = `
-transaction {
-  prepare(serviceAccount: AuthAccount) {
+import FlowEpochClusterQC from 0x%s
+
+transaction(collectorClusters: [FlowEpochClusterQC.Cluster],
+			clusterQCs: [FlowEpochClusterQC.ClusterQC],
+			dkgPubKeys: [String], 
+	) {
+  prepare(serviceAccount: AuthAccount)	{
 	serviceAccount.contracts.add(
 		name: "FlowEpoch",
 		code: "%s".decodeHex(),
@@ -460,9 +464,9 @@ transaction {
 		numCollectorClusters: UInt16(%d),
 		FLOWsupplyIncreasePercentage: UFix64(%d),
 		randomSource: %s,
-		collectorClusters: %s,
-		clusterQCs: %s,
-		dkgPubKeys: %s,
+		collectorClusters: collectorClusters,
+		clusterQCs: clusterQCs,
+		dkgPubKeys: dkgPubKeys,
 	)
   }
 }
@@ -599,12 +603,12 @@ func deployIDTableStakingTransaction(service flow.Address, contract []byte, epoc
 	)
 }
 
-func deployEpochTransaction(service flow.Address, contract []byte, epochConfig flow.EpochConfig) *TransactionProcedure {
-
+func deployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *TransactionProcedure {
 	tx := Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(
 				deployEpochTransactionTemplate,
+				service,
 				hex.EncodeToString(contract),
 				epochConfig.CurrentEpochCounter,
 				epochConfig.NumViewsInEpoch,
@@ -613,66 +617,14 @@ func deployEpochTransaction(service flow.Address, contract []byte, epochConfig f
 				epochConfig.NumCollectorClusters,
 				epochConfig.FLOWsupplyIncreasePercentage,
 				epochConfig.RandomSource,
-				encodeClusterAssignments(epochConfig.CollectorClusters, service),
-				cadence.Array{},
-				cadence.Array{},
 			))).
+			AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters, service)).
+			AddArgument(epochs.EncodeClusterQCs(epochConfig.ClusterQCs, service)).
+			AddArgument(epochs.EncodePubKeys(epochConfig.DKGPubKeys, service)).
 			AddAuthorizer(service),
 		0,
 	)
 	return tx
-}
-
-func encodeClusterAssignments(clusterAssignments flow.AssignmentList, service flow.Address) cadence.Array {
-	collectorClusterValues := []cadence.Value{}
-
-	for i, cluster := range clusterAssignments {
-		clusterIndex := cadence.UInt16(i)
-
-		weightsByNodeID := []cadence.KeyValuePair{}
-		for _, id := range cluster {
-			kvp := cadence.KeyValuePair{
-				Key:   cadence.NewString(id.String()),
-				Value: cadence.NewUInt64(0),
-			}
-			weightsByNodeID = append(weightsByNodeID, kvp)
-		}
-
-		fields := []cadence.Value{
-			clusterIndex,
-			cadence.NewDictionary(weightsByNodeID),
-		}
-
-		clusterStruct := cadence.NewStruct(fields).
-			WithType(&cadence.StructType{
-				Location: common.AddressLocation{
-					Address: common.BytesToAddress(service.Bytes()),
-					Name:    "Service",
-				},
-				QualifiedIdentifier: "FlowEpochClusterQC.Cluster",
-				Fields: []cadence.Field{
-					{
-						Identifier: "index",
-						Type:       cadence.UInt16Type{},
-					},
-					{
-						Identifier: "nodeWeights",
-						Type: cadence.DictionaryType{
-							KeyType:     cadence.StringType{},
-							ElementType: cadence.UInt64Type{},
-						},
-					},
-				},
-			})
-
-		collectorClusterValues = append(collectorClusterValues, clusterStruct)
-	}
-
-	collectorClusters := cadence.NewArray(collectorClusterValues)
-
-	fmt.Printf("XXX collectorCluster: %#v\n", collectorClusters)
-
-	return collectorClusters
 }
 
 func mintFlowTokenTransaction(
@@ -733,30 +685,6 @@ func setupStorageForServiceAccountsTransaction(
 			AddAuthorizer(fungibleToken).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(feeContract),
-		0,
-	)
-}
-
-func setupDKGAdminTransaction(service, dkg flow.Address) *TransactionProcedure {
-	env := templates.Environment{
-		DkgAddress: dkg.Hex(),
-	}
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(templates.GeneratePublishDKGParticipantScript(env))).
-			AddAuthorizer(service),
-		0,
-	)
-}
-
-func setupQCAdminTransaction(service, qc flow.Address) *TransactionProcedure {
-	env := templates.Environment{
-		QuorumCertificateAddress: qc.Hex(),
-	}
-	return Transaction(
-		flow.NewTransactionBody().
-			SetScript([]byte(templates.GeneratePublishVoterScript(env))).
-			AddAuthorizer(service),
 		0,
 	)
 }

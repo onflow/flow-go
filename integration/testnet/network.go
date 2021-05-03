@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/epochs"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -648,8 +649,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		DKGParticipants: dkgLookup,
 	}
 
-	// XXX sensible values?
-	epochConfig := flow.EpochConfig{
+	// TODO: choose sensible values
+	epochConfig := epochs.EpochConfig{
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
@@ -659,10 +660,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
 		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
+		CollectorClusters:            clusterAssignments,
+		ClusterQCs:                   clusterQCs,
+		DKGPubKeys:                   dkg.PubKeyShares,
 	}
-
-	// XXX
-	epochConfig.CollectorClusters = clusterAssignments
 
 	// generate the initial execution state
 	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
