@@ -52,6 +52,10 @@ type CompleteExecutionReceipt struct {
 
 type CompleteExecutionReceiptList []*CompleteExecutionReceipt
 
+// chunkDataResponseOf is a test helper method that returns a chunk data pack response message for the specified chunk ID that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
 func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
 	result, chunkIndex := c.resultOf(t, chunkID)
 	receiptData := c.receiptDataOf(t, chunkID)
@@ -70,6 +74,10 @@ func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID 
 	return res
 }
 
+// resultOf is a test helper method that returns the receipt data of the specified chunk ID that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
 func (c CompleteExecutionReceiptList) receiptDataOf(t *testing.T, chunkID flow.Identifier) *ExecutionReceiptData {
 	for _, completeER := range c {
 		for _, receiptData := range completeER.ReceiptsData {
@@ -85,6 +93,10 @@ func (c CompleteExecutionReceiptList) receiptDataOf(t *testing.T, chunkID flow.I
 	return nil
 }
 
+// resultOf is a test helper method that returns the execution result and chunk index of the specified chunk ID that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
 func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identifier) (*flow.ExecutionResult, uint64) {
 	for _, completeER := range c {
 		for _, result := range completeER.ContainerBlock.Payload.Results {
