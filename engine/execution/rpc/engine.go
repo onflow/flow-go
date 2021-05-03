@@ -53,11 +53,17 @@ func New(
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
-	server := grpc.NewServer(
-		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+	serverOptions := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
-	)
+	}
+
+	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
+	if rpcMetricsEnabled {
+		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+	}
+
+	server := grpc.NewServer(serverOptions...)
 
 	eng := &Engine{
 		log:  log,
