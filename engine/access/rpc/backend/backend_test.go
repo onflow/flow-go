@@ -1242,7 +1242,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	suite.receipts.
 		On("ByBlockID", mock.Anything).
-		Return(flow.ExecutionReceiptList{}, nil).Once()
+		Return(flow.ExecutionReceiptList{}, nil).Times(maxAttemptsForExecutionReceipt)
 
 	// create the expected execution API request
 	blockID := h.ID()
@@ -1282,7 +1282,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 
 	suite.Run("happy path - valid request and valid response", func() {
 		account, err := backend.GetAccountAtBlockHeight(ctx, address, height)
-		suite.checkResponse(account, err)
+ 		suite.checkResponse(account, err)
 
 		suite.Require().Equal(address, account.Address)
 
