@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -44,12 +45,19 @@ func New(
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
-	chainID flow.ChainID) *Engine {
+	chainID flow.ChainID,
+	rpcMetricsEnabled bool) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
+
+	server := grpc.NewServer(
+		grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor),
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	)
 
 	eng := &Engine{
 		log:  log,
@@ -62,11 +70,13 @@ func New(
 			exeResults:         exeResults,
 			transactionResults: txResults,
 		},
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
+		server: server,
 		config: config,
+	}
+
+	if rpcMetricsEnabled {
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(server)
 	}
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)

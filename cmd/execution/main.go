@@ -91,6 +91,7 @@ func main() {
 		extensiveLog                bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 		diskWAL                     *wal.DiskWAL
+		rpcMetricsEnabled           bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -113,6 +114,7 @@ func main() {
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -434,7 +436,7 @@ func main() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID, rpcMetricsEnabled)
 			return rpcEng, nil
 		}).Run()
 }
