@@ -137,8 +137,9 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		conIdentity,
 		flow.IdentityList{verIdentity},
 		identities,
-		completeER,
-		chainID)
+		CompleteExecutionReceiptList{completeER},
+		chainID,
+		expectedChunkIDs)
 
 	// send the ER from execution to verification node
 	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipts[0])

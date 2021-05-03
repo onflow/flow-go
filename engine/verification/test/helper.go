@@ -121,7 +121,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, CompleteExecutionReceiptList{completeER}, evenChunkIndexAssigner)
+	_, assignedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, CompleteExecutionReceiptList{completeER}, evenChunkIndexAssigner)
 
 	// mock execution node
 	exeNode, exeEngine := setupChunkDataPackProvider(t,
@@ -130,7 +130,7 @@ func VerificationHappyPath(t *testing.T,
 		identities,
 		chainID,
 		CompleteExecutionReceiptList{completeER},
-		expectedChunkIDs,
+		assignedChunkIDs,
 		respondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// mock consensus node
@@ -139,8 +139,9 @@ func VerificationHappyPath(t *testing.T,
 		conIdentity,
 		verIdentities,
 		identities,
-		completeER,
-		chainID)
+		CompleteExecutionReceiptList{completeER},
+		chainID,
+		assignedChunkIDs)
 
 	// sends execution receipt to each of verification nodes
 	verWG := sync.WaitGroup{}
@@ -282,24 +283,16 @@ func SetupMockConsensusNode(t *testing.T,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
 	othersIdentity flow.IdentityList,
-	completeER *CompleteExecutionReceipt,
-	chainID flow.ChainID) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
-	// determines the expected number of result approvals this node should receive
-	approvalsCount := 0
-	chunks := completeER.Receipts[0].ExecutionResult.Chunks
-	chunksNum := len(chunks)
-	for _, chunk := range chunks {
-		if evenChunkIndexAssigner(chunk.Index, chunksNum) {
-			approvalsCount++
-		}
-	}
+	completeERs CompleteExecutionReceiptList,
+	chainID flow.ChainID,
+	assignedChunkIDs flow.IdentifierList) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
 
 	wg := &sync.WaitGroup{}
-	// each verification node is assigned to `approvalsCount`-many independent chunks
+	// each verification node is assigned to issue one result approval per assigned chunk.
 	// and there are `len(verIdentities)`-many verification nodes
-	// so there is a total of len(verIdentities) * approvalsCount expected
-	// result approvals
-	wg.Add(len(verIdentities) * approvalsCount)
+	// so there is a total of len(verIdentities) * len*(assignedChunkIDs) expected
+	// result approvals.
+	wg.Add(len(verIdentities) * len(assignedChunkIDs))
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
@@ -334,8 +327,9 @@ func SetupMockConsensusNode(t *testing.T,
 			// marks result approval as seen
 			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
 
-			// asserts that the result approval is assigned to the verifier
-			assert.True(t, evenChunkIndexAssigner(resultApproval.Body.ChunkIndex, chunksNum))
+			// result approval should belong to an assigned chunk to the verification node.
+			chunk := completeERs.chunkOf(t, resultApproval.Body.ExecutionResultID, resultApproval.Body.ChunkIndex)
+			assert.Contains(t, assignedChunkIDs, chunk.ID())
 
 			// verifies SPoCK proof of result approval
 			// against the SPoCK secret of the execution result
@@ -355,7 +349,7 @@ func SetupMockConsensusNode(t *testing.T,
 			valid, err := crypto.SPOCKVerifyAgainstData(
 				pk,
 				resultApproval.Body.Spock,
-				completeER.ReceiptsData[0].SpockSecrets[resultApproval.Body.ChunkIndex],
+				completeERs.receiptDataOf(t, chunk.ID()).SpockSecrets[resultApproval.Body.ChunkIndex],
 				hasher,
 			)
 			assert.NoError(t, err)
