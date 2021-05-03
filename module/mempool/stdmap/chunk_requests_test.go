@@ -18,7 +18,7 @@ import (
 // TestChunkRequests_UpdateRequestHistory evaluates behavior of ChuckRequests against updating request histories with
 // different updaters.
 func TestChunkRequests_UpdateRequestHistory(t *testing.T) {
-	qualifier := requester.RetryAfterQualifier()
+	qualifier := requester.RetryAfterQualifier
 	t.Run("10 chunks- 10 times incremental updater ", func(t *testing.T) {
 		incUpdater := mempool.IncrementalAttemptUpdater()
 		chunks := 10
