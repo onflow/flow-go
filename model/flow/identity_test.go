@@ -3,12 +3,14 @@ package flow_test
 import (
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -159,4 +161,13 @@ func TestIdentity_ID(t *testing.T) {
 	id1 := flow.MakeID(identity1)
 	id2 := flow.MakeID(identity2)
 	assert.Equal(t, id1, id2)
+}
+
+func TestIdentity_Sort(t *testing.T) {
+	il := unittest.IdentityListFixture(20)
+	random := il.DeterministicShuffle(time.Now().UnixNano())
+	assert.False(t, random.Sorted(order.Canonical))
+
+	canonical := il.Sort(order.Canonical)
+	assert.True(t, canonical.Sorted(order.Canonical))
 }
