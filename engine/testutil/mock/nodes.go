@@ -3,7 +3,9 @@ package mock
 import (
 	"context"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -29,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
+	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -46,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // StateFixture is a test helper struct that encapsulates a flow protocol state
@@ -84,6 +88,23 @@ func (g *GenericNode) Done() {
 	_ = os.RemoveAll(g.DBDir)
 
 	<-g.Tracer.Done()
+}
+
+// RequireGenericNodesDoneBefore invokes the done method of all input generic nodes concurrently, and
+// fails the test if any generic node's shutdown takes longer than the specified duration.
+func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes ...*GenericNode) {
+	wg := &sync.WaitGroup{}
+	wg.Add(len(nodes))
+
+	for _, node := range nodes {
+		go func(n *GenericNode) {
+			n.Done()
+
+			wg.Done()
+		}(node)
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Wait, duration, "failed to shutdown all components on time")
 }
 
 // Closes closes the badger database of the node
@@ -223,7 +244,7 @@ type VerificationNode struct {
 	BlockConsumer        *blockconsumer.BlockConsumer
 
 	PendingChunks   *match.Chunks // TODO: backward compatibility, remove once new verification node is active.
-	VerifierEngine  network.Engine
+	VerifierEngine  *verifier.Engine
 	FinderEngine    *finder.Engine // TODO: backward compatibility, remove once new verification node is active.
 	MatchEngine     network.Engine // TODO: backward compatibility, remove once new verification node is active.
 	AssignerEngine  *assigner.Engine
