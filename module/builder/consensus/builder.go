@@ -8,12 +8,12 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/model/flow/filter/id"
-
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -91,7 +91,6 @@ func NewBuilder(
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-
 	b.tracer.StartSpan(parentID, trace.CONBuildOn)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
 
@@ -180,32 +179,26 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 	// limit and parent
 	receiptLookup := make(map[flow.Identifier]struct{})
 
-	// loop through the fork backwards, from parent to limit, and keep track of
-	// blocks and collections visited on the way
-	ancestorID := parentID
-	for {
-
-		ancestor, err := b.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
-		}
-
+	// loop through the fork backwards, from parent to limit (inclusive),
+	// and keep track of blocks and collections visited on the way
+	forkScanner := func(header *flow.Header) error {
+		ancestorID := header.ID()
 		blockLookup[ancestorID] = struct{}{}
 
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
 		}
 
 		for _, collID := range index.CollectionIDs {
 			receiptLookup[collID] = struct{}{}
 		}
 
-		if ancestor.Height <= limit {
-			break
-		}
-
-		ancestorID = ancestor.ParentID
+		return nil
+	}
+	err = fork.TraverseBackward(b.headers, parentID, forkScanner, fork.IncludingHeight(limit))
+	if err != nil {
+		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
 
 	// go through mempool and collect valid collections
@@ -239,59 +232,61 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 }
 
 // getInsertableSeals returns the list of Seals from the mempool that should be
-// inserted in the next payload. It looks in the seal mempool and applies the
-// following filters:
-//
-// 1) Do not collect more than maxSealCount items.
-//
-// 2) The seals should form a valid chain.
-//
-// 3) The seals should correspond to an incorporated result on this fork.
+// inserted in the next payload.
+// Per protocol definition, a specific result is only incorporated _once_ in each fork.
+// Specifically, the result is incorporated in the block that contains a receipt committing
+// to a result for the _first time_ in the respective fork.
+// We can seal a result if and only if _all_ of the following conditions are satisfied:
+//  (0) We have collected a sufficient number of approvals for each of the result's chunks.
+//  (1) The result must have been previously incorporated in the fork, which we are extending.
+//      Note: The protocol dictates that all incorporated results must be for ancestor blocks
+//            in the respective fork. Hence, a result being incorporated in the fork, implies
+//            that the result must be for a block in this fork.
+//  (2) The result must be for an _unsealed_ block.
+//  (3) The result's parent must have been previously sealed (either by a seal in an ancestor
+//      block or by a seal included earlier in the block that we are constructing).
+// To limit block size, we cap the number of seals to maxSealCount.
 func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
-
 	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
 
-	// get the parent's block seal, which constitutes the beginning of the
-	// sealing chain; this is where we need to start with our chain of seals
-	last, err := b.seals.ByBlockID(parentID)
+	// get the latest seal in the fork, which we are extending and
+	// the corresponding block, whose result is sealed
+	// Note: the last seal might not be included in a finalized block yet
+	lastSeal, err := b.seals.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
+		return nil, fmt.Errorf("could not retrieve latest seal in the fork, which we are extending: %w", err)
 	}
-
-	// get the last sealed block.
-	sealed, err := b.headers.ByBlockID(last.BlockID)
+	latestSealedBlockID := lastSeal.BlockID
+	latestSealedBlock, err := b.headers.ByBlockID(latestSealedBlockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", last.BlockID, err)
+		return nil, fmt.Errorf("could not retrieve sealed block %x: %w", lastSeal.BlockID, err)
 	}
+	latestSealedHeight := latestSealedBlock.Height
 
-	// the consensus matching engine can produce different seals for the same
-	// ExecutionResult if it appeared in different blocks. Here we only want to
-	// consider the seals that correspond to results and blocks on the current
-	// fork.
-
-	// filteredSeals is an index of block-height to seal, where we collect only
-	// those seals from the mempool that correspond to IncorporatedResults on
-	// this fork.
-	filteredSeals := make(map[uint64]*flow.IncorporatedResultSeal)
-
-	// Walk backwards along the fork, from parent to last sealed, inspect the
-	// payloads' ExecutionResults, and check for matching IncorporatedResultSeals
-	// in the mempool.
-	ancestorID := parentID
-	sealedID := sealed.ID()
-	for ancestorID != sealedID {
-
-		ancestor, err := b.blocks.ByID(ancestorID)
+	// STEP I: Collect the seals for all results that satisfy (0), (1), and (2).
+	//         The will give us a _superset_ of all seals that can be included.
+	// Implementation:
+	//  * We walk the fork backwards and check each block for incorporated results.
+	//    - Therefore, all results that we encounter satisfy condition (1).
+	//  * We only consider results, whose executed block has a height _strictly larger_
+	//    than the lastSealedHeight.
+	//    - Thereby, we guarantee that condition (2) is satisfied.
+	//  * We only consider results for which we have a candidate seals in the sealPool.
+	//    - Thereby, we guarantee that condition (0) is satisfied, because candidate seals
+	//      are only generated and stored in the mempool once sufficient approvals are collected.
+	// Furthermore, condition (2) imposes a limit on how far we have to walk back:
+	//  * A result can only be incorporated in a child of the block that it computes.
+	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
+	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
+	sealCollector := func(header *flow.Header) error {
+		block, err := b.blocks.ByID(header.ID())
 		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not retrieve block %x: %w", header.ID(), err)
 		}
 
-		// For each receipt in the block's payload, we recompose the
-		// corresponding IncorporatedResult an check if we have a matching seal
-		// in the mempool.
-		for _, receipt := range ancestor.Payload.Receipts {
-
+		// enforce condition (1): only consider seals for results that are incorporated in the fork
+		for _, result := range block.Payload.Results {
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
 			// ATTENTION:
@@ -301,72 +296,87 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			// are still using a temporary sealing logic where the
 			// IncorporatedBlockID is expected to be the result's block ID.
 			incorporatedResult := flow.NewIncorporatedResult(
-				receipt.ExecutionResult.BlockID,
-				&receipt.ExecutionResult,
+				result.BlockID,
+				result,
 			)
 
-			// look for a seal that corresponds to this specific incorporated
-			// result. This tells us that the seal is for a result on this fork,
-			// and that it was calculated using the correct block ID for chunk
-			// assignment (the IncorporatedBlockID).
+			// enforce condition (0): candidate seals are only constructed once sufficient
+			// have been collected. Hence, any incorporated result for which we find a
+			// candidate seal satisfy condition (0)
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if !ok {
 				continue
 			}
 
-			header, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
+			// enforce condition (2): the block is unsealed (in this fork) if and only if
+			// its height is _strictly larger_ than the lastSealedHeight.
+			executedBlock, err := b.headers.ByBlockID(incorporatedResult.Result.BlockID)
 			if err != nil {
-				return nil, fmt.Errorf("could not get block for id (%x): %w", incorporatedResult.Result.BlockID, err)
+				return fmt.Errorf("could not get header of block %x: %w", incorporatedResult.Result.BlockID, err)
 			}
-			filteredSeals[header.Height] = irSeal
+			if executedBlock.Height <= latestSealedHeight {
+				continue
+			}
+
+			// The following is a subtle but important protocol edge case: There can be multiple
+			// candidate seals for the same block. We have to include all to guarantee sealing liveness!
+			sealsSuperset[executedBlock.Height] = append(sealsSuperset[executedBlock.Height], irSeal)
 		}
 
-		ancestorID = ancestor.Header.ParentID
+		return nil
 	}
+	err = fork.TraverseBackward(b.headers, parentID, sealCollector, fork.ExcludingBlock(latestSealedBlockID))
+	if err != nil {
+		return nil, fmt.Errorf("internal error traversing unsealed section of fork: %w", err)
+	}
+	// All the seals in sealsSuperset are for results that satisfy (0), (1), and (2).
 
-	// now we need to collect only the seals that form a valid chain on top of
-	// the last seal
-	chain := make([]*flow.Seal, 0, len(filteredSeals))
-
-	// start at last sealed height and stop when we have no seal for the next
-	// block
-	nextSealHeight := sealed.Height + 1
-	nextSeal, ok := filteredSeals[nextSealHeight]
-
-	var count uint = 0
-	for ok {
-		// don't include more than maxSealCount seals
-		if count >= b.cfg.maxSealCount {
+	// STEP II: Select only the seals from sealsSuperset that also satisfy condition (3).
+	// We do this by starting with the last sealed result in the fork. Then, we check whether we
+	// have a seal for the child block (at latestSealedBlock.Height +1), which connects to the
+	// sealed result. If we find such a seal, we can now consider the child block sealed.
+	// We continue until we stop finding a seal for the child.
+	seals := make([]*flow.Seal, 0, len(sealsSuperset))
+	for {
+		// cap the number of seals
+		if uint(len(seals)) >= b.cfg.maxSealCount {
 			break
 		}
 
-		//  enforce that execution results form chain
-		nextResultToBeSealed := nextSeal.IncorporatedResult.Result
-
-		// at this point we are safe just to check this condition since every
-		// ER gets validated by `module.ReceiptValidator` which checks if
-		// results form a valid chain.
-		if nextResultToBeSealed.PreviousResultID != last.ResultID {
-			return nil, fmt.Errorf(
-				"sealed execution results do not form chain, expect result ID %v, but got %v",
-				last.ResultID,
-				nextResultToBeSealed.PreviousResultID,
-			)
+		// enforce condition (3):
+		candidateSeal, ok := connectingSeal(sealsSuperset[latestSealedHeight+1], lastSeal)
+		if !ok {
+			break
 		}
-
-		last = nextSeal.Seal
-		chain = append(chain, nextSeal.Seal)
-		nextSealHeight++
-		count++
-		nextSeal, ok = filteredSeals[nextSealHeight]
+		seals = append(seals, candidateSeal)
+		lastSeal = candidateSeal
+		latestSealedHeight += 1
 	}
-
-	return chain, nil
+	return seals, nil
 }
 
-// getInsertableReceipts returns the list of ExecutionReceipts that should be
-// inserted in the next payload. It looks in the receipts mempool and applies
-// the following filter:
+// connectingSeal looks through `sealsForNextBlock`. It checks whether the
+// sealed result directly descends from the lastSealed result.
+func connectingSeal(sealsForNextBlock []*flow.IncorporatedResultSeal, lastSealed *flow.Seal) (*flow.Seal, bool) {
+	for _, candidateSeal := range sealsForNextBlock {
+		if candidateSeal.IncorporatedResult.Result.PreviousResultID == lastSealed.ResultID {
+			return candidateSeal.Seal, true
+		}
+	}
+	return nil, false
+}
+
+type InsertableReceipts struct {
+	receipts []*flow.ExecutionReceiptMeta
+	results  []*flow.ExecutionResult
+}
+
+// getInsertableReceipts constructs:
+//  (i)  the meta information of the ExecutionReceipts (i.e. ExecutionReceiptMeta)
+//       that should be inserted in the next payload
+//  (ii) the ExecutionResults the receipts from step (i) commit to
+//       (deduplicated w.r.t. the block under construction as well as ancestor blocks)
+// It looks in the receipts mempool and applies the following filter:
 //
 // 1) If it doesn't correspond to an unsealed block on the fork, skip it.
 //
@@ -375,7 +385,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 // 3) Otherwise, this receipt can be included in the payload.
 //
 // Receipts have to be ordered by block height.
-func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.ExecutionReceipt, error) {
+func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
 	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 
@@ -389,7 +399,8 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
 	}
-	sealed, err := b.headers.ByBlockID(latestSeal.BlockID)
+	sealedBlockID := latestSeal.BlockID
+	sealedBlock, err := b.headers.ByBlockID(sealedBlockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
 	}
@@ -401,29 +412,31 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	// includedReceipts is a set of all receipts that are contained in unsealed blocks along the fork.
 	includedReceipts := make(map[flow.Identifier]struct{})
 
+	// includedResults is a set of all unsealed results that were incorporated into fork
+	includedResults := make(map[flow.Identifier]struct{})
+
 	// loop through the fork backwards, from parent to last sealed (including),
 	// and keep track of blocks and receipts visited on the way.
-	sealedBlockID := sealed.ID()
-	ancestorID := parentID
-	for {
-		ancestor, err := b.headers.ByBlockID(ancestorID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor header (%x): %w", ancestorID, err)
-		}
+	forkScanner := func(ancestor *flow.Header) error {
+		ancestorID := ancestor.ID()
 		ancestors[ancestorID] = struct{}{}
 
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get ancestor payload (%x): %w", ancestorID, err)
+			return fmt.Errorf("could not get payload index of block %x: %w", ancestorID, err)
 		}
 		for _, recID := range index.ReceiptIDs {
 			includedReceipts[recID] = struct{}{}
 		}
-
-		if ancestorID == sealedBlockID {
-			break
+		for _, resID := range index.ResultIDs {
+			includedResults[resID] = struct{}{}
 		}
-		ancestorID = ancestor.ParentID
+
+		return nil
+	}
+	err = fork.TraverseBackward(b.headers, parentID, forkScanner, fork.IncludingBlock(sealedBlockID))
+	if err != nil {
+		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
 
 	// After recovering from a crash, the mempools are wiped and the sealed results will not
@@ -431,7 +444,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 	// a vertex in the tree without attaching any Execution Receipts to it. Thereby, we can
 	// traverse to receipts committing to derived results without having to find the receipts
 	// for the sealed result.
-	err = b.recPool.AddResult(sealedResult, sealed) // no-op, if result is already in Execution Tree
+	err = b.recPool.AddResult(sealedResult, sealedBlock) // no-op, if result is already in Execution Tree
 	if err != nil {
 		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
 	}
@@ -445,12 +458,41 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 
+	insertables := toInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
+
+	return insertables, nil
+}
+
+// toInsertables separates the provided receipts into ExecutionReceiptMeta and
+// ExecutionResult. Results that are in includedResults are skipped.
+// We also limit the number of receipts to maxReceiptCount.
+func toInsertables(receipts []*flow.ExecutionReceipt, includedResults map[flow.Identifier]struct{}, maxReceiptCount uint) *InsertableReceipts {
+	results := make([]*flow.ExecutionResult, 0)
+
+	count := uint(len(receipts))
 	// don't collect more than maxReceiptCount receipts
-	if uint(len(receipts)) > b.cfg.maxReceiptCount {
-		receipts = receipts[:b.cfg.maxReceiptCount]
+	if count > maxReceiptCount {
+		count = maxReceiptCount
 	}
 
-	return receipts, nil
+	filteredReceipts := make([]*flow.ExecutionReceiptMeta, 0, count)
+
+	for i := uint(0); i < count; i++ {
+		receipt := receipts[i]
+		meta := receipt.Meta()
+		resultID := meta.ResultID
+		if _, inserted := includedResults[resultID]; !inserted {
+			results = append(results, &receipt.ExecutionResult)
+			includedResults[resultID] = struct{}{}
+		}
+
+		filteredReceipts = append(filteredReceipts, meta)
+	}
+
+	return &InsertableReceipts{
+		receipts: filteredReceipts,
+		results:  results,
+	}
 }
 
 // createProposal assembles a block with the provided header and payload
@@ -458,7 +500,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) ([]*flow.Execu
 func (b *Builder) createProposal(parentID flow.Identifier,
 	guarantees []*flow.CollectionGuarantee,
 	seals []*flow.Seal,
-	receipts []*flow.ExecutionReceipt,
+	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error) (*flow.Block, error) {
 
 	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
@@ -468,7 +510,8 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	payload := &flow.Payload{
 		Guarantees: guarantees,
 		Seals:      seals,
-		Receipts:   receipts,
+		Receipts:   insertableReceipts.receipts,
+		Results:    insertableReceipts.results,
 	}
 
 	parent, err := b.headers.ByBlockID(parentID)

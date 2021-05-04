@@ -290,7 +290,7 @@ func TestLatestSealedResult(t *testing.T) {
 			t.Run("reference block contains seal", func(t *testing.T) {
 				gotResult, gotSeal, err := state.AtBlockID(block2.ID()).SealedResult()
 				require.NoError(t, err)
-				assert.Equal(t, &block2.Payload.Receipts[0].ExecutionResult, gotResult)
+				assert.Equal(t, block2.Payload.Results[0], gotResult)
 				assert.Equal(t, block2.Payload.Seals[0], gotSeal)
 			})
 

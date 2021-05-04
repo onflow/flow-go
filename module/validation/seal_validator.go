@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -29,12 +29,13 @@ type sealValidator struct {
 	verifier                             module.Verifier
 	seals                                storage.Seals
 	headers                              storage.Headers
-	payloads                             storage.Payloads
+	index                                storage.Index
+	results                              storage.ExecutionResults
 	requiredApprovalsForSealVerification uint
 	metrics                              module.ConsensusMetrics
 }
 
-func NewSealValidator(state protocol.State, headers storage.Headers, payloads storage.Payloads, seals storage.Seals,
+func NewSealValidator(state protocol.State, headers storage.Headers, index storage.Index, results storage.ExecutionResults, seals storage.Seals,
 	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ConsensusMetrics) *sealValidator {
 
 	rv := &sealValidator{
@@ -42,8 +43,9 @@ func NewSealValidator(state protocol.State, headers storage.Headers, payloads st
 		assigner:                             assigner,
 		verifier:                             verifier,
 		headers:                              headers,
+		results:                              results,
 		seals:                                seals,
-		payloads:                             payloads,
+		index:                                index,
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
 		metrics:                              metrics,
 	}
@@ -99,6 +101,9 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 // => Therefore, only seals whose results pass the sub-graph check will be
 //    allowed.
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
+	header := candidate.Header
+	payload := candidate.Payload
+
 	// Get the latest seal in the fork that ends with the candidate's parent.
 	// The protocol state saves this information for each block that has been
 	// successfully added to the chain tree (even when the added block does not
@@ -107,20 +112,15 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// attached to the main chain, we store the latest seal in the fork that ends with B.
 	// Therefore, _not_ finding the latest sealed block of the parent constitutes
 	// a fatal internal error.
-	lastSealUpToParent, err := s.seals.ByBlockID(candidate.Header.ParentID)
+	lastSealUpToParent, err := s.seals.ByBlockID(header.ParentID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
 	}
 
-	header := candidate.Header
-	payload := candidate.Payload
-
-	last := lastSealUpToParent
-
 	// if there is no seal in the block payload, use the last sealed block of
 	// the parent block as the last sealed block of the given block.
 	if len(payload.Seals) == 0 {
-		return last, nil
+		return lastSealUpToParent, nil
 	}
 
 	// map each seal to the block it is sealing for easy lookup; we will need to
@@ -134,93 +134,79 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		return nil, engine.NewInvalidInputError("multiple seals for the same block")
 	}
 
-	// unsealedResults collects the _first_ appearance of unsealed execution
-	// results on the fork, along with the ID of the block in which they are
-	// incorporated.
-	unsealedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
+	// incorporatedResults collects execution results that are incorporated in unsealed
+	// blocks; CAUTION: some of these incorporated results might already be sealed.
+	incorporatedResults := make(map[flow.Identifier]*flow.IncorporatedResult)
 
-	// collect IDs of blocks on the fork (from parent to last sealed)
-	var blockIDs []flow.Identifier
+	// IDs of unsealed blocks on the fork
+	var unsealedBlockIDs []flow.Identifier
 
-	// loop through the fork backwards from the parent block
-	// up to last sealed block and collect
-	// IncorporatedResults as well as the IDs of blocks visited
-	sealedID := last.BlockID
-	err = state.TraverseBackward(s.headers, header.ParentID, func(header *flow.Header) error {
+	// Traverse fork starting from the lowest unsealed block (included) up to the parent block (included).
+	// For each visited block collect: IncorporatedResults and block ID
+	forkCollector := func(header *flow.Header) error {
 		blockID := header.ID()
 		// keep track of blocks on the fork
-		blockIDs = append(blockIDs, blockID)
+		unsealedBlockIDs = append(unsealedBlockIDs, blockID)
 
-		payload, err := s.payloads.ByBlockID(blockID)
+		// Collect incorporated results
+		payloadIndex, err := s.index.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get block payload %x: %w", blockID, err)
 		}
-
-		// Collect execution results from receipts.
-		for _, receipt := range payload.Receipts {
-			resultID := receipt.ExecutionResult.ID()
-			// unsealedResults should contain the _first_ appearance of the
-			// ExecutionResult. We are traversing the fork backwards, so we can
-			// overwrite any previously recorded result.
-
+		for _, resultID := range payloadIndex.ResultIDs {
+			result, err := s.results.ByID(resultID)
+			if err != nil {
+				return fmt.Errorf("internal error fetching result %v incorporated in stored block %v: %w", resultID, blockID, err)
+			}
 			// ATTENTION:
 			// Here, IncorporatedBlockID (the first argument) should be set
 			// to ancestorID, because that is the block that contains the
 			// ExecutionResult. However, in phase 2 of the sealing roadmap,
 			// we are still using a temporary sealing logic where the
 			// IncorporatedBlockID is expected to be the result's block ID.
-			unsealedResults[resultID] = flow.NewIncorporatedResult(
-				receipt.ExecutionResult.BlockID,
-				&receipt.ExecutionResult,
-			)
-
+			incorporatedResults[resultID] = flow.NewIncorporatedResult(result.BlockID, result)
 		}
 		return nil
-	}, func(header *flow.Header) bool {
-		return sealedID != header.ParentID
-	})
+	}
+	err = fork.TraverseForward(s.headers, header.ParentID, forkCollector, fork.ExcludingBlock(lastSealUpToParent.BlockID))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("internal error collecting incorporated results from unsealed fork: %w", err)
 	}
 
-	// We do not include the receipts in the same payload to the unsealedResults.
+	// We do _not_ add the results from the candidate block's own payload to incorporatedResults.
 	// That's because a result requires to be added to a bock first in order to determine
-	// its chunk assignment for verification. Therefore a seal can only be added in
-	// the next block or after. In other words, a receipt and its seal can't be
-	// added in the same block.
+	// its chunk assignment for verification. Therefore a seal can only be added in the
+	// next block or after. In other words, a receipt and its seal can't be the same block.
 
-	// Loop forward across the fork and try to create a valid chain of seals.
-	// blockIDs, as populated by the previous loop, is in reverse order.
-	for i := len(blockIDs) - 1; i >= 0; i-- {
+	// Iterate through the unsealed blocks, starting at the one with lowest
+	// height and try to create a chain of valid seals.
+	latestSeal := lastSealUpToParent
+	for _, blockID := range unsealedBlockIDs {
 		// if there are no more seals left, we can exit earlier
 		if len(byBlock) == 0 {
-			return last, nil
+			return latestSeal, nil
 		}
 
-		// return an error if there are still seals to consider, but they break
-		// the chain
-		blockID := blockIDs[i]
+		// the chain of seals should not skip blocks
 		seal, found := byBlock[blockID]
 		if !found {
-			return nil, engine.NewInvalidInputErrorf("chain of seals broken (missing: %x)", blockID)
+			return nil, engine.NewInvalidInputErrorf("chain of seals broken (missing seal for block %x)", blockID)
 		}
-
 		delete(byBlock, blockID)
 
-		// check if we have an incorporatedResult for this seal
-		incorporatedResult, ok := unsealedResults[seal.ResultID]
+		// the sealed result must be previously incorporated in the fork:
+		incorporatedResult, ok := incorporatedResults[seal.ResultID]
 		if !ok {
 			return nil, engine.NewInvalidInputErrorf("seal %x does not correspond to a result on this fork", seal.ID())
 		}
 
-		// check the integrity of the seal
+		// check the integrity of the seal (by itself)
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
 				// Skip fail on an invalid seal. We don't put this earlier in the function
 				// because we still want to test that the above code doesn't panic.
-				// TODO: this is only here temporarily to ease the migration to new chunk
-				// based sealing.
+				// TODO: this is only here temporarily to ease the migration to chunk-based sealing.
 				if s.requiredApprovalsForSealVerification == 0 {
 					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x): %s", seal.ID(), err.Error())
 				} else {
@@ -231,15 +217,20 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			}
 		}
 
-		last = seal
+		// check that the sealed execution results form a chain
+		if incorporatedResult.Result.PreviousResultID != latestSeal.ResultID {
+			return nil, engine.NewInvalidInputErrorf("sealed execution results for block %x does not connect to previously sealed result", blockID)
+		}
+
+		latestSeal = seal
 	}
 
-	// at this point no seals should be left
+	// it is illegal to include more seals than there are unsealed blocks in the fork
 	if len(byBlock) > 0 {
-		return nil, engine.NewInvalidInputErrorf("not all seals connected to state (left: %d)", len(byBlock))
+		return nil, engine.NewInvalidInputErrorf("more seals then unsealed blocks in fork (left: %d)", len(byBlock))
 	}
 
-	return last, nil
+	return latestSeal, nil
 }
 
 // validateSeal performs integrity checks of single seal. To be valid, we

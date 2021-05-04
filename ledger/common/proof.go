@@ -18,9 +18,10 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		return false
 	}
 	// We start with the leaf and hash our way upwards towards the root
-	proofIndex := len(p.Interims) - 1                              // the index of the last non-default value furthest down the tree (-1 if there is none)
-	computed := ComputeCompactValue(p.Path, p.Payload, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
-	for h := leafHeight + 1; h <= treeHeight; h++ {                // then, we hash our way upwards until we hit the root (at height `treeHeight`)
+	proofIndex := len(p.Interims) - 1
+	computed := make([]byte, HashLen)                             // the index of the last non-default value furthest down the tree (-1 if there is none)
+	ComputeCompactValue(&computed, p.Path, p.Payload, leafHeight) // we first compute the hash of the fully-expanded leaf (at height 0)
+	for h := leafHeight + 1; h <= treeHeight; h++ {               // then, we hash our way upwards until we hit the root (at height `treeHeight`)
 		// we are currently at a node n (initially the leaf). In this iteration, we want to compute the
 		// parent's hash. Here, h is the height of the parent, whose hash want to compute.
 		// The parent has two children: child n, whose hash we have already computed (aka `computed`);
@@ -42,9 +43,9 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		bit := utils.Bit(p.Path, treeHeight-h)
 		// hashing is order dependant
 		if bit == 1 { // we hash our way up to the parent along the parent's right branch
-			computed = HashInterNode(siblingHash, computed)
+			HashInterNodeIn(&computed, siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch
-			computed = HashInterNode(computed, siblingHash)
+			HashInterNodeIn(&computed, computed, siblingHash)
 		}
 	}
 	return bytes.Equal(computed, expectedState) == p.Inclusion

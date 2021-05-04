@@ -275,7 +275,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 // tx1 will deploy a contract
 // tx2 will always panic
 // tx3 will be succeed and change statecommitment
-// and then create 2 EN nodes, both have tx1 executed. To test the synchronisation,
+// and then create 2 EN nodes, both have tx1 executed. To test the synchronization,
 // we send tx2 and tx3 in 2 blocks to only EN1, and check that tx2 will not change statecommitment for
 // verifying behavior (1);
 // and check EN2 should have the same statecommitment as EN1 since they sync
@@ -312,7 +312,8 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// genesis <- block1 [tx1] <- block2 [tx2] <- block3 [tx3] <- child
 	_, col1, block1, proposal1, seq := deployContractBlock(t, conID, colID, chain, seq, genesis, genesis)
 
-	_, col2, block2, proposal2, seq := makePanicBlock(t, conID, colID, chain, seq, block1.Header, genesis)
+	// we don't set the proper sequence number of this one
+	_, col2, block2, proposal2, _ := makePanicBlock(t, conID, colID, chain, uint64(0), block1.Header, genesis)
 
 	_, col3, block3, proposal3, seq := makeSuccessBlock(t, conID, colID, chain, seq, block2.Header, genesis)
 
@@ -379,7 +380,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	exe1Node.AssertHighestExecutedBlock(t, block3.Header)
 	// exe2Node.AssertHighestExecutedBlock(t, block3.Header)
 
-	// verify state commitment of block 2 is the same as block 1, since tx failed
+	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
 	assert.NoError(t, err)
 	assert.Equal(t, scExe1Block1, scExe1Block2)

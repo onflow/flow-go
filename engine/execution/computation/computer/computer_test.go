@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -40,16 +41,20 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Times(2 + 1) // 2 txs in collection + system chunk
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		committer := new(computermock.ViewCommitter)
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Times(2 + 1) // 2 txs in collection + system chunk
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
 		block := generateBlock(1, 2, rag)
-
-		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-			Return(nil).
-			Times(2 + 1) // 2 txs in collection + system chunk
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -67,8 +72,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
+		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -79,6 +85,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil).
 			Once() // just system chunk
 
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Once() // just system chunk
+
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
@@ -86,7 +96,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
-		assert.Len(t, result.TransactionResult, 1)
+		assert.Len(t, result.TransactionResults, 1)
 
 		vm.AssertExpectations(t)
 	})
@@ -95,8 +105,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop())
 
 		vm := new(computermock.VirtualMachine)
+		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -119,6 +130,10 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}).
 			Return(nil).
 			Times(totalTransactionCount)
+
+		committer.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Times(collectionCount + 1)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -149,12 +164,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			for _, t := range c.Transactions {
 				txResult := flow.TransactionResult{
 					TransactionID: t.ID(),
-					ErrorMessage:  "[Error Code: 1053] invalid address (0000000000000000): no payer address provided",
+					ErrorMessage:  fvmErrors.NewInvalidAddressErrorf(flow.Address{}, "no payer address provided").Error(),
 				}
 				expectedResults = append(expectedResults, txResult)
 			}
 		}
-		assert.ElementsMatch(t, expectedResults, result.TransactionResult[0:len(result.TransactionResult)-1]) //strip system chunk
+		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
 
 		vm.AssertExpectations(t)
 	})
@@ -220,7 +235,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
@@ -281,7 +296,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -350,7 +365,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -370,6 +385,8 @@ type testRuntime struct {
 	executeTransaction func(runtime.Script, runtime.Context) error
 }
 
+var _ runtime.Runtime = &testRuntime{}
+
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)
 }
@@ -388,6 +405,14 @@ func (*testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 
 func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
+}
+
+func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadStored not expected")
+}
+
+func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadLinked not expected")
 }
 
 type RandomAddressGenerator struct{}
@@ -446,7 +471,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {

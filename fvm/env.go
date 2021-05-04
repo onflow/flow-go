@@ -259,6 +259,34 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 
 	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+	if script.Err == nil {
+		balance = script.Value.ToGoValue().(uint64)
+	}
+
+	return balance, nil
+}
+
+func (e *hostEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountBalance)
+		defer sp.Finish()
+	}
+
+	script := getFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+
+	// TODO similar to the one above
+	err = e.vm.Run(
+		e.ctx,
+		script,
+		e.sth.State().View(),
+		e.programs.Programs,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	var balance uint64
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if script.Err == nil {
@@ -272,7 +300,7 @@ func (e *hostEnv) ResolveLocation(
 	identifiers []runtime.Identifier,
 	location runtime.Location,
 ) ([]runtime.ResolvedLocation, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvResolveLocation)
 		defer sp.Finish()
 	}
@@ -400,7 +428,7 @@ func (e *hostEnv) SetProgram(location common.Location, program *interpreter.Prog
 }
 
 func (e *hostEnv) ProgramLog(message string) error {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvProgramLog)
 		defer sp.Finish()
 	}
@@ -412,7 +440,8 @@ func (e *hostEnv) ProgramLog(message string) error {
 }
 
 func (e *hostEnv) EmitEvent(event cadence.Event) error {
-	if e.isTraceable() {
+	// only trace when extensive tracing
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvEmitEvent)
 		defer sp.Finish()
 	}
@@ -452,7 +481,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGenerateUUID)
 		defer sp.Finish()
 	}
@@ -507,7 +536,7 @@ func (e *hostEnv) SetAccountFrozen(address common.Address, frozen bool) error {
 }
 
 func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvDecodeArgument)
 		defer sp.Finish()
 	}
@@ -595,7 +624,7 @@ func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadenc
 
 // GetCurrentBlockHeight returns the current block height.
 func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
 		defer sp.Finish()
 	}
@@ -609,7 +638,7 @@ func (e *hostEnv) GetCurrentBlockHeight() (uint64, error) {
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically
 // secure.
 func (e *hostEnv) UnsafeRandom() (uint64, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvUnsafeRandom)
 		defer sp.Finish()
 	}
@@ -841,7 +870,7 @@ func (e *hostEnv) RemoveAccountContractCode(address runtime.Address, name string
 }
 
 func (e *hostEnv) GetSigningAccounts() ([]runtime.Address, error) {
-	if e.isTraceable() {
+	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetSigningAccounts)
 		defer sp.Finish()
 	}
@@ -998,7 +1027,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		err := e.vm.invokeMetaTransaction(
+		txErr, err := e.vm.invokeMetaTransaction(
 			e.ctx,
 			initAccountTransaction(
 				flow.Address(payer),
@@ -1009,7 +1038,10 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			e.programs.Programs,
 		)
 		if err != nil {
-			return address, fmt.Errorf("creating account failed: %w", err)
+			return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
+		}
+		if txErr != nil {
+			return address, fmt.Errorf("meta-transaction for creating account failed: %w", txErr)
 		}
 	}
 

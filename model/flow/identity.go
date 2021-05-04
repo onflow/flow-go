@@ -3,12 +3,14 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
@@ -133,6 +135,18 @@ func (iy Identity) MarshalMsgpack() ([]byte, error) {
 	return data, nil
 }
 
+func (iy Identity) EncodeRLP(w io.Writer) error {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	err = rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
+}
+
 func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
@@ -251,13 +265,25 @@ func (il IdentityList) Lookup() map[Identifier]struct{} {
 	return lookup
 }
 
-// Order will sort the list using the given sort function.
-func (il IdentityList) Order(less IdentityOrder) IdentityList {
+// Sort will sort the list using the given ordering.
+func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
 	})
 	return dup
+}
+
+// Sorted returns whether the list is sorted by the input ordering.
+func (il IdentityList) Sorted(less IdentityOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		a := il[i]
+		b := il[i+1]
+		if !less(a, b) {
+			return false
+		}
+	}
+	return true
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
@@ -324,6 +350,17 @@ func (il IdentityList) Sample(size uint) IdentityList {
 func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
 	rand.Seed(seed)
 	return il.Sample(size)
+}
+
+// DeterministicShuffle randomly and deterministically shuffles the identity
+// list, returning the shuffled list without modifying the receiver.
+func (il IdentityList) DeterministicShuffle(seed int64) IdentityList {
+	dup := il.Copy()
+	rng := rand.New(rand.NewSource(seed))
+	rng.Shuffle(len(il), func(i, j int) {
+		dup[i], dup[j] = dup[j], dup[i]
+	})
+	return dup
 }
 
 // SamplePct returns a random sample from the receiver identity list. The

@@ -56,7 +56,7 @@ type Middleware interface {
 	Unsubscribe(channel Channel) error
 
 	// Ping pings the target node and returns the ping RTT or an error
-	Ping(targetID flow.Identifier) (time.Duration, error)
+	Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error)
 
 	// UpdateAllowList fetches the most recent identity of the nodes from overlay
 	// and updates the underlying libp2p node.

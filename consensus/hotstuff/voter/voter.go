@@ -1,6 +1,7 @@
 package voter
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -12,15 +13,24 @@ type Voter struct {
 	signer        hotstuff.SignerVerifier
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
-	lastVotedView uint64 // need to keep track of the last view we voted for so we don't double vote accidentally
+	committee     hotstuff.Committee // only produce votes when we are valid committee members
+	lastVotedView uint64             // need to keep track of the last view we voted for so we don't double vote accidentally
 }
 
 // New creates a new Voter instance
-func New(signer hotstuff.SignerVerifier, forks hotstuff.ForksReader, persist hotstuff.Persister, lastVotedView uint64) *Voter {
+func New(
+	signer hotstuff.SignerVerifier,
+	forks hotstuff.ForksReader,
+	persist hotstuff.Persister,
+	committee hotstuff.Committee,
+	lastVotedView uint64,
+) *Voter {
+
 	return &Voter{
 		signer:        signer,
 		forks:         forks,
 		persist:       persist,
+		committee:     committee,
 		lastVotedView: lastVotedView,
 	}
 }
@@ -43,6 +53,18 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 
 	if curView <= v.lastVotedView {
 		return nil, model.NoVoteError{Msg: "not above the last voted view"}
+	}
+
+	// Do not produce a vote for blocks where we are not a valid committee
+	// member. HotStuff will ask for a vote for the first block of the next epoch, even if we are unstaked in
+	// the next epoch.
+	// These votes can't be used to produce valid QCs.
+	_, err := v.committee.Identity(block.BlockID, v.committee.Self())
+	if errors.Is(model.ErrInvalidSigner, err) {
+		return nil, model.NoVoteError{Msg: "not voting committee member for block"}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("could not get self identity: %w", err)
 	}
 
 	vote, err := v.signer.CreateVote(block)

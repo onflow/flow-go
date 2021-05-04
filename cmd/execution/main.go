@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
@@ -81,6 +82,7 @@ func main() {
 		checkpointsToKeep           uint
 		stateDeltasLimit            uint
 		cadenceExecutionCache       uint
+		chdpCacheSize               uint
 		requestInterval             time.Duration
 		preferredExeNodeIDStr       string
 		syncByBlocks                bool
@@ -98,11 +100,12 @@ func main() {
 
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
-			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 1000, "cache size for MTrie")
-			flags.UintVar(&checkpointDistance, "checkpoint-distance", 10, "number of WAL segments between checkpoints")
+			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
+			flags.UintVar(&checkpointDistance, "checkpoint-distance", 40, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
-			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 1000, "maximum number of state deltas in the memory pool")
+			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
+			flags.UintVar(&chdpCacheSize, "chdp-cache", 100, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
@@ -116,7 +119,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
@@ -125,34 +128,6 @@ func main() {
 				node.Tracer,
 				node.ProtocolEvents,
 			)
-			return err
-		}).
-		Module("computation manager", func(node *cmd.FlowNodeBuilder) error {
-			extraLogPath := path.Join(triedir, "extralogs")
-			err := os.MkdirAll(extraLogPath, 0777)
-			if err != nil {
-				return fmt.Errorf("cannot create %s path for extrealogs: %w", extraLogPath, err)
-			}
-
-			extralog.ExtraLogDumpPath = extraLogPath
-
-			rt := fvm.NewInterpreterRuntime()
-
-			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-
-			manager, err := computation.New(
-				node.Logger,
-				collector,
-				node.Tracer,
-				node.Me,
-				node.State,
-				vm,
-				vmCtx,
-				cadenceExecutionCache,
-			)
-			computationManager = manager
-
 			return err
 		}).
 		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -179,7 +154,7 @@ func main() {
 		}).
 		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
 			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
-				return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 			}
 			return nil
 		}).
@@ -236,7 +211,37 @@ func main() {
 			return compactor, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkDataPacks := storage.NewChunkDataPacks(node.DB)
+			extraLogPath := path.Join(triedir, "extralogs")
+			err := os.MkdirAll(extraLogPath, 0777)
+			if err != nil {
+				return nil, fmt.Errorf("cannot create %s path for extra logs: %w", extraLogPath, err)
+			}
+
+			extralog.ExtraLogDumpPath = extraLogPath
+
+			rt := fvm.NewInterpreterRuntime()
+
+			vm := fvm.NewVirtualMachine(rt)
+			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+
+			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			manager, err := computation.New(
+				node.Logger,
+				collector,
+				node.Tracer,
+				node.Me,
+				node.State,
+				vm,
+				vmCtx,
+				cadenceExecutionCache,
+				committer,
+			)
+			if err != nil {
+				return nil, err
+			}
+			computationManager = manager
+
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, chdpCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -454,8 +459,8 @@ func copyBootstrapState(dir, trie string) error {
 	}
 
 	// if there is a root checkpoint file, then copy that file over
-	if fileExists(wal.RootCheckpointFilename) {
-		filename = wal.RootCheckpointFilename
+	if fileExists(bootstrapFilenames.FilenameWALRootCheckpoint) {
+		filename = bootstrapFilenames.FilenameWALRootCheckpoint
 	} else if fileExists(firstCheckpointFilename) {
 		// else if there is a checkpoint file, then copy that file over
 		filename = firstCheckpointFilename

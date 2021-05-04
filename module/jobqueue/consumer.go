@@ -23,10 +23,10 @@ type Consumer struct {
 
 	// Storage
 	jobs     module.Jobs              // storage to read jobs from
-	progress storage.ConsumerProgress // storing the last processed job, so that we can resume after restarting
+	progress storage.ConsumerProgress // to resume from first unprocessed job after restarting
 
 	// dependency
-	worker Worker // defines how jobs will be processed
+	worker Worker // to process job and notify consumer when finish processing a job
 
 	// Config
 	maxProcessing int64 // max number of jobs to be processed concurrently
@@ -219,6 +219,17 @@ func (c *Consumer) run() (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("could not set processed index %v, %w", processedTo, err)
 	}
+
+	for index := c.processedIndex + 1; index <= processedTo; index++ {
+		jobStatus, ok := c.processings[index]
+		if !ok {
+			continue
+		}
+
+		delete(c.processings, index)
+		delete(c.processingsIndex, jobStatus.jobID)
+	}
+
 	c.processedIndex = processedTo
 
 	return int64(len(processables)), nil

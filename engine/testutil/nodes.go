@@ -25,6 +25,7 @@ import (
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	executionprovider "github.com/onflow/flow-go/engine/execution/provider"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
@@ -253,7 +254,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Index, resultsDB, signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
+		signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
 
 	sealingEngine, err := sealing.NewEngine(
@@ -324,12 +326,12 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
 	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
-		return protocol.IsNodeStakedAtBlockID(node.State, blockID, node.Me.NodeID())
+		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
 
 	protoState, ok := node.State.(*badgerstate.MutableState)
@@ -393,6 +395,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithChain(node.ChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
 	)
+	committer := committer.NewLedgerViewCommitter(ls, node.Tracer)
 
 	computationEngine, err := computation.New(
 		node.Log,
@@ -403,6 +406,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		vm,
 		vmCtx,
 		computation.DefaultProgramsCacheSize,
+		committer,
 	)
 	require.NoError(t, err)
 

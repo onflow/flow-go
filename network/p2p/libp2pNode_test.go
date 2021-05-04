@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ipfs/go-log"
+	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
@@ -55,7 +55,7 @@ func TestLibP2PNodesTestSuite(t *testing.T) {
 // SetupTests initiates the test setups prior to each test
 func (suite *LibP2PNodeTestSuite) SetupTest() {
 	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-	log.SetAllLoggers(log.LevelError)
+	golog.SetAllLoggers(golog.LevelError)
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
@@ -206,7 +206,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	id2 := identities[1]
 
-	flowProtocolID := generateProtocolID(rootBlockID)
+	flowProtocolID := generateFlowProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
@@ -491,11 +491,11 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 	node2Id := *identities[1]
 
 	// test node1 can ping node 2
-	_, err := node1.Ping(suite.ctx, node2Id)
+	_, _, err := node1.Ping(suite.ctx, node2Id)
 	require.NoError(suite.T(), err)
 
 	// test node 2 can ping node 1
-	_, err = node2.Ping(suite.ctx, node1Id)
+	_, _, err = node2.Ping(suite.ctx, node1Id)
 	require.NoError(suite.T(), err)
 }
 
@@ -606,7 +606,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		allowList,
 		rootID)
 	require.NoError(t, err)
-	n.SetStreamHandler(handlerFunc)
+	n.SetFlowProtocolStreamHandler(handlerFunc)
 
 	require.Eventuallyf(t, func() bool {
 		ip, p, err := n.GetIPPort()

@@ -155,14 +155,20 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	l.metrics.UpdateCount()
 	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
-	err = l.wal.RecordUpdate(trieUpdate)
-	if err != nil {
-		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
-	}
+	walChan := make(chan error)
+
+	go func() {
+		walChan <- l.wal.RecordUpdate(trieUpdate)
+	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
+	walError := <-walChan
+
 	if err != nil {
 		return nil, fmt.Errorf("cannot update state: %w", err)
+	}
+	if walError != nil {
+		return nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -267,10 +273,19 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		if err != nil {
 			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
-		if payloadSize != len(payloads) {
-			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
+
+		newPayloadSize := len(payloads)
+
+		if payloadSize != newPayloadSize {
+			l.logger.Warn().
+				Int("migration_step", i).
+				Int("expected_size", payloadSize).
+				Int("outcome_size", newPayloadSize).
+				Msg("payload counts has changed during migration, make sure this is expected.")
 		}
 		l.logger.Info().Msgf("migration %d is done", i)
+
+		payloadSize = newPayloadSize
 	}
 
 	// run reporters
@@ -320,6 +335,12 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	writer.Close()
 
 	return newTrie.RootHash(), nil
+}
+
+// MostRecentTouchedState returns a state which is most recently touched.
+func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
+	root, err := l.forest.MostRecentTouchedRootHash()
+	return ledger.State(root), err
 }
 
 // DumpTrieAsJSON export trie at specific state as a jsonl file, each line is json encode of a payload

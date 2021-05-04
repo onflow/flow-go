@@ -218,7 +218,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 // assertListsEqual asserts that two identity list are equal ignoring the order
 func assertListsEqual(t *testing.T, list1, list2 flow.IdentityList) {
-	list1 = list1.Order(order.ByNodeIDAsc)
-	list2 = list2.Order(order.ByNodeIDAsc)
+	list1 = list1.Sort(order.ByNodeIDAsc)
+	list2 = list2.Sort(order.ByNodeIDAsc)
 	assert.Equal(t, list1, list2)
 }
