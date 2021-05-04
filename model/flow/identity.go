@@ -3,12 +3,14 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
@@ -131,6 +133,18 @@ func (iy Identity) MarshalMsgpack() ([]byte, error) {
 		return nil, fmt.Errorf("could not encode msgpack: %w", err)
 	}
 	return data, nil
+}
+
+func (iy Identity) EncodeRLP(w io.Writer) error {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	err = rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
 }
 
 func identityFromEncodable(ie encodableIdentity, identity *Identity) error {

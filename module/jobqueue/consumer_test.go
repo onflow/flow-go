@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"sync"
 	"testing"
+	"time"
 
+	badgerdb "github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -121,6 +124,37 @@ func TestProcessableJobs(t *testing.T) {
 		assertJobs(t, []uint64{
 			7,
 		}, jobsToRun)
+	})
+
+}
+
+// Test after jobs have been processed, the job status are removed to prevent from memory-leak
+func TestProcessedIndexDeletion(t *testing.T) {
+	setup := func(t *testing.T, f func(c *Consumer, jobs *MockJobs)) {
+		unittest.RunWithBadgerDB(t, func(db *badgerdb.DB) {
+			log := unittest.Logger().With().Str("module", "consumer").Logger()
+			jobs := NewMockJobs()
+			progress := badger.NewConsumerProgress(db, "consumer")
+			worker := newMockWorker()
+			maxProcessing := int64(3)
+			c := NewConsumer(log, jobs, progress, worker, maxProcessing)
+			worker.WithConsumer(c)
+
+			f(c, jobs)
+		})
+	}
+
+	setup(t, func(c *Consumer, jobs *MockJobs) {
+		require.NoError(t, jobs.PushN(10))
+		require.NoError(t, c.Start(0))
+
+		require.Eventually(t, func() bool {
+			return c.processedIndex == uint64(10)
+		}, 2*time.Second, 10*time.Millisecond)
+
+		// should have no processing after all jobs are processed
+		require.Len(t, c.processings, 0)
+		require.Len(t, c.processingsIndex, 0)
 	})
 }
 
@@ -249,4 +283,21 @@ func (j *JobMaker) Next() module.Job {
 	}
 	j.index++
 	return job
+}
+
+type mockWorker struct {
+	consumer *Consumer
+}
+
+func newMockWorker() *mockWorker {
+	return &mockWorker{}
+}
+
+func (w *mockWorker) WithConsumer(c *Consumer) {
+	w.consumer = c
+}
+
+func (w *mockWorker) Run(job module.Job) error {
+	w.consumer.NotifyJobIsDone(job.ID())
+	return nil
 }

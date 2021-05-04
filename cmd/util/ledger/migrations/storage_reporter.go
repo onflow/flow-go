@@ -159,6 +159,7 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	}
 
 	storedData, version := interpreter.StripMagic(vaultResource)
+
 	commonAddress := common.BytesToAddress([]byte(vaultId.Owner))
 	storedValue, err := interpreter.DecodeValue(storedData, &commonAddress, []string{vaultId.Key}, version, nil)
 	if err != nil {
