@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -121,7 +120,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 					blockConsumer.OnFinalizedBlock(&model.Block{})
 				}
 
-				unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Second, "could not receive result approvals on time")
+				unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, 5*time.Second, "could not receive result approvals on time")
 
 			}, tc.opts...)
 		})
@@ -211,109 +210,111 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	collector := &metrics.NoopCollector{}
+	tracer := &trace.NoopTracer{}
+	lg := unittest.Logger().With().Str("role", "verification").Logger()
+	chainID := flow.Testnet
 
-		collector := &metrics.NoopCollector{}
-		tracer := &trace.NoopTracer{}
-		lg := unittest.Logger().With().Str("role", "verification").Logger()
-		chainID := flow.Testnet
+	// bootstraps system with one node of each role.
+	s, verID, participants := bootstrapSystem(t, collector, tracer, staked)
+	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
 
-		// bootstraps system with one node of each role.
-		s, participants := bootstrapSystem(t, collector, tracer, staked)
-		exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
-		conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
-		verID := participants.Filter(filter.HasRole(flow.RoleVerification))[0]
+	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
+	// Container blocks only contain receipts of their preceding reference blocks. But they do not
+	// hold any guarantees.
+	root, err := s.State.Final().Head()
+	require.NoError(t, err)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
-		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
-		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
-		// Container blocks only contain receipts of their preceding reference blocks. But they do not
-		// hold any guarantees.
-		root, err := s.State.Final().Head()
-		require.NoError(t, err)
-		completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
-		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
-
-		// mocks chunk assigner to assign even chunk indices to this verification node
-		chunkAssigner := &mock.ChunkAssigner{}
-		_, assignedChunkIDs := MockChunkAssignmentFixture(chunkAssigner,
+	// chunk assignment
+	chunkAssigner := &mock.ChunkAssigner{}
+	assignedChunkIDs := flow.IdentifierList{}
+	if staked {
+		// only staked verification node has some chunks assigned to it.
+		_, assignedChunkIDs = MockChunkAssignmentFixture(chunkAssigner,
 			flow.IdentityList{verID},
 			completeERs,
 			evenChunkIndexAssigner)
+	}
 
-		hub := stub.NewNetworkHub()
-		receiptsLimit := 100
-		genericNode := testutil.GenericNodeWithStateFixture(t,
-			s,
-			hub,
-			verID,
-			lg,
-			collector,
-			tracer,
-			chainID)
+	fmt.Println("total assigned chunks: ", len(assignedChunkIDs))
 
-		// execution node
-		exeNode, _ := setupChunkDataPackProvider(t,
-			hub,
-			exeID,
-			participants,
-			chainID,
-			completeERs,
-			assignedChunkIDs,
-			respondChunkDataPackRequest)
+	hub := stub.NewNetworkHub()
+	receiptsLimit := 100
+	genericNode := testutil.GenericNodeWithStateFixture(t,
+		s,
+		hub,
+		verID,
+		lg,
+		collector,
+		tracer,
+		chainID)
 
-		// consensus node
-		conNode, _, conWG := setupMockConsensusNode(t,
-			hub,
-			conID,
-			flow.IdentityList{verID},
-			participants,
-			completeERs,
-			chainID,
-			assignedChunkIDs)
+	// execution node
+	exeNode, _ := setupChunkDataPackProvider(t,
+		hub,
+		exeID,
+		participants,
+		chainID,
+		completeERs,
+		assignedChunkIDs,
+		respondChunkDataPackRequest)
 
-		verNode := testutil.NewVerificationNode(t,
-			hub,
-			verID,
-			participants,
-			chunkAssigner,
-			uint(receiptsLimit),
-			uint(10*receiptsLimit), // chunksLimit
-			chainID,
-			collector,
-			collector,
-			testutil.WithGenericNode(&genericNode))
+	// consensus node
+	conNode, _, conWG := setupMockConsensusNode(t,
+		hub,
+		conID,
+		flow.IdentityList{verID},
+		participants,
+		completeERs,
+		chainID,
+		assignedChunkIDs)
 
-		// turns on components and network
-		verNet, ok := hub.GetNetwork(verID.NodeID)
-		assert.True(t, ok)
-		unittest.RequireReturnsBefore(t, func() {
-			verNet.StartConDev(100*time.Millisecond, true)
-		}, 100*time.Millisecond, "failed to start verification network")
+	verNode := testutil.NewVerificationNode(t,
+		hub,
+		verID,
+		participants,
+		chunkAssigner,
+		uint(receiptsLimit),
+		uint(10*receiptsLimit), // chunksLimit
+		chainID,
+		collector,
+		collector,
+		testutil.WithGenericNode(&genericNode))
 
-		unittest.RequireComponentsReadyBefore(t, 1*time.Second,
-			verNode.BlockConsumer,
-			verNode.ChunkConsumer,
-			verNode.AssignerEngine,
-			verNode.FetcherEngine,
-			verNode.RequesterEngine,
-			verNode.VerifierEngine)
+	// turns on components and network
+	verNet, ok := hub.GetNetwork(verID.NodeID)
+	assert.True(t, ok)
+	unittest.RequireReturnsBefore(t, func() {
+		verNet.StartConDev(100*time.Millisecond, true)
+	}, 100*time.Millisecond, "failed to start verification network")
 
-		withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second,
+		verNode.BlockConsumer,
+		verNode.ChunkConsumer,
+		verNode.AssignerEngine,
+		verNode.FetcherEngine,
+		verNode.RequesterEngine,
+		verNode.VerifierEngine)
 
-		// tears down engines and nodes
-		unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
-		unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond,
-			verNode.BlockConsumer,
-			verNode.ChunkConsumer,
-			verNode.AssignerEngine,
-			verNode.FetcherEngine,
-			verNode.RequesterEngine,
-			verNode.VerifierEngine)
+	withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
 
-		testmock.RequireGenericNodesDoneBefore(t, 100*time.Millisecond,
-			conNode,
-			exeNode)
-	})
+	// tears down engines and nodes
+	unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
+	unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond,
+		verNode.BlockConsumer,
+		verNode.ChunkConsumer,
+		verNode.AssignerEngine,
+		verNode.FetcherEngine,
+		verNode.RequesterEngine,
+		verNode.VerifierEngine)
+
+	testmock.RequireGenericNodesDoneBefore(t, 1*time.Second,
+		conNode,
+		exeNode)
 }
 
 // mockChunkProcessor sets up a mock chunk processor that asserts the followings:
@@ -383,7 +384,7 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 // Otherwise, it bootstraps the verification node as unstaked in current epoch.
 //
 // As the return values, it returns the state, local module, and list of identities in system.
-func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer module.Tracer, staked bool) (*testmock.StateFixture,
+func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer module.Tracer, staked bool) (*testmock.StateFixture, *flow.Identity,
 	flow.IdentityList) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -403,5 +404,5 @@ func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer modu
 			BuildEpoch()
 	}
 
-	return stateFixture, identities
+	return stateFixture, verID, identities
 }
