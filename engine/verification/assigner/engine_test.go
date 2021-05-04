@@ -1,4 +1,4 @@
-package assigner
+package assigner_test
 
 import (
 	"testing"
@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/verification/assigner"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -103,9 +104,9 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 }
 
 // NewAssignerEngine returns an assigner engine for testing.
-func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
+func NewAssignerEngine(s *AssignerEngineTestSuite) *assigner.Engine {
 
-	e := New(zerolog.Logger{},
+	e := assigner.New(zerolog.Logger{},
 		s.metrics,
 		s.tracer,
 		s.me,

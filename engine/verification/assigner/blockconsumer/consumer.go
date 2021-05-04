@@ -52,7 +52,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	blockProcessor.WithBlockConsumerNotifier(worker)
 
 	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
-	jobs := newFinalizedBlockReader(state, blocks)
+	jobs := NewFinalizedBlockReader(state, blocks)
 
 	consumer := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing)
 	defaultIndex, err := defaultProcessedIndex(state)

@@ -1,4 +1,4 @@
-package blockconsumer
+package blockconsumer_test
 
 import (
 	"sync"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -23,7 +24,7 @@ import (
 // and its corresponding job can be converted back to the same block.
 func TestBlockToJob(t *testing.T) {
 	block := unittest.BlockFixture()
-	actual, err := jobToBlock(blockToJob(&block))
+	actual, err := blockconsumer.JobToBlock(blockconsumer.BlockToJob(&block))
 	require.NoError(t, err)
 	require.Equal(t, &block, actual)
 }
@@ -44,7 +45,7 @@ func TestProduceConsume(t *testing.T) {
 			// hence from consumer perspective, it is blocking on each received block.
 		}
 
-		withConsumer(t, 10, 3, neverFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 10, 3, neverFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 
 			for i := 0; i < len(blocks); i++ {
@@ -82,7 +83,7 @@ func TestProduceConsume(t *testing.T) {
 			}()
 		}
 
-		withConsumer(t, 100, 3, alwaysFinish, func(consumer *BlockConsumer, blocks []*flow.Block) {
+		withConsumer(t, 100, 3, alwaysFinish, func(consumer *blockconsumer.BlockConsumer, blocks []*flow.Block) {
 			unittest.RequireCloseBefore(t, consumer.Ready(), time.Second, "could not start consumer")
 			processAll.Add(len(blocks))
 
@@ -112,7 +113,7 @@ func withConsumer(
 	blockCount int,
 	workerCount int,
 	process func(notifier module.ProcessingNotifier, block *flow.Block),
-	withBlockConsumer func(*BlockConsumer, []*flow.Block),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		maxProcessing := int64(workerCount)
@@ -127,7 +128,7 @@ func withConsumer(
 			process: process,
 		}
 
-		consumer, _, err := NewBlockConsumer(unittest.Logger(),
+		consumer, _, err := blockconsumer.NewBlockConsumer(unittest.Logger(),
 			processedHeight,
 			s.Storage.Blocks,
 			s.State,

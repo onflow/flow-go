@@ -64,6 +64,8 @@ func setupTest() *FetcherEngineTestSuite {
 
 // newFetcherEngine returns a fetcher engine for testing.
 func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
+	s.requester.On("WithChunkDataPackHandler", mock.AnythingOfType("*fetcher.Engine")).Return()
+
 	e := fetcher.New(s.log,
 		s.metrics,
 		s.tracer,

@@ -31,7 +31,7 @@ func (w *worker) withBlockConsumer(consumer *BlockConsumer) {
 // It then converts the job to a block and passes it to the underlying engine
 // for processing.
 func (w *worker) Run(job module.Job) error {
-	block, err := jobToBlock(job)
+	block, err := JobToBlock(job)
 	if err != nil {
 		return err
 	}
@@ -45,6 +45,6 @@ func (w *worker) Run(job module.Job) error {
 // The worker translates the block ID into job ID and notifies the consumer
 // that the job is done.
 func (w *worker) Notify(blockID flow.Identifier) {
-	jobID := jobID(blockID)
+	jobID := JobID(blockID)
 	w.consumer.NotifyJobIsDone(jobID)
 }

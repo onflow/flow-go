@@ -15,8 +15,8 @@ type FinalizedBlockReader struct {
 	blocks storage.Blocks
 }
 
-// newFinalizedBlockReader creates and returns a FinalizedBlockReader.
-func newFinalizedBlockReader(state protocol.State, blocks storage.Blocks) *FinalizedBlockReader {
+// NewFinalizedBlockReader creates and returns a FinalizedBlockReader.
+func NewFinalizedBlockReader(state protocol.State, blocks storage.Blocks) *FinalizedBlockReader {
 	return &FinalizedBlockReader{
 		state:  state,
 		blocks: blocks,
@@ -30,7 +30,7 @@ func (r FinalizedBlockReader) AtIndex(index uint64) (module.Job, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get block by index %v: %w", index, err)
 	}
-	return blockToJob(block), nil
+	return BlockToJob(block), nil
 }
 
 // blockByHeight returns the block at the given height.
