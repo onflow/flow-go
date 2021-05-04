@@ -311,7 +311,6 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 			verNode.VerifierEngine)
 
 		testmock.RequireGenericNodesDoneBefore(t, 100*time.Millisecond,
-			verNode.GenericNode,
 			conNode,
 			exeNode)
 	})
