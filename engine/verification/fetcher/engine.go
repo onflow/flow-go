@@ -202,7 +202,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 
 	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection)
+	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection, status.ExecutionResult)
 	if err != nil {
 		// TODO: this can be due to a byzantine behavior
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
@@ -238,7 +238,11 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // given collection.
 //
 // Regarding the authenticity: the chunk data pack should be coming from a sender that is an staked execution node at the block of the chunk.
-func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
+	senderID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+	result *flow.ExecutionResult) error {
 	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
@@ -252,7 +256,13 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifi
 	}
 
 	// 3. collection id must match
-	collID := collection.ID()
+	var collID flow.Identifier
+	if IsSystemChunk(chunk.Index, result) {
+		collID = flow.ZeroID // for system chunk, the collection ID should be always zero ID.
+	} else {
+		collID = collection.ID()
+	}
+
 	if chunkDataPack.CollectionID != collID {
 		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
 	}
