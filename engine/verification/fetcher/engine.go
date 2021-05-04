@@ -78,6 +78,8 @@ func New(
 		requester:     requester,
 	}
 
+	e.requester.WithChunkDataPackHandler(e)
+
 	return e
 }
 
