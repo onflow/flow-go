@@ -278,27 +278,31 @@ func executionNodesForBlockID(
 			break
 		}
 
+		// if one or less execution receipts may have been received then re-query
+		// in the hope that more might have been received by now
+
+		// log the attempt
+		log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
+			Int("execution_receipts_found", len(executorIDs)).
+			Str("block_id", blockID.String()).
+			Msg("insufficient execution receipts")
+
 		select {
 		case <-ctx.Done():
 			return flow.IdentityList{}, err
 		case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
 			//retry after an exponential backoff
 		}
-
-		// if one or less execution receipts may have been received then re-query
-		// in the hope that more might have been received by now
-		log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
-			Int("execution_receipts_found", len(executorIDs)).
-			Str("block_id", blockID.String()).
-			Msg("insufficient execution receipts")
 	}
 
 	if attempt == maxAttemptsForExecutionReceipt {
-		return flow.IdentityList{},
-			fmt.Errorf("number of execution receipts found (%d) less than expected (%d) for block ID %v",
-				len(executorIDs),
-				minExecutionNodesCnt,
-				blockID)
+		log.Info().Int("attempt", attempt).Msg("not enough execution receipt found")
+		// TODO: should we just throw an error instead?
+		//return flow.IdentityList{},
+		//	fmt.Errorf("number of execution receipts found (%d) less than expected (%d) for block ID %v",
+		//		len(executorIDs),
+		//		minExecutionNodesCnt,
+		//		blockID)
 	}
 
 	// choose one of the preferred execution nodes
@@ -381,9 +385,21 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
 	}
 
-	// If there are no preferred or fixed ENs, have the default behaviour be that
-	// we just return all the executor IDs, i.e. no preferrence at all.
+	// if no executor IDs were found (since no execution receipt has been received), then return all the preferred ENs
+	// if defined or all the fixed ENs, if the preferred ENs are not defined
+	if len(executorIDs) == 0 {
+		if len(preferredENIdentifiers) > 0 {
+			return allENs.Filter(filter.HasNodeID(preferredENIdentifiers...)), nil
+		}
+		return allENs.Filter(filter.HasNodeID(fixedENIdentifiers...)), nil
+	}
+
+	// If there are no preferred or fixed ENs, then return all executor IDs i.e. no preference at all
 	if len(preferredENIdentifiers) == 0 && len(fixedENIdentifiers) == 0 {
+		// if no executor IDs have been found, then return all executor IDs i.e. no preference at all
+		if len(executorIDs) == 0 {
+			return allENs, nil
+		}
 		return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
 	}
 
