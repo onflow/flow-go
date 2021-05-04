@@ -337,7 +337,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				ChunkID:      chunk.ID(),
 				StartState:   chunk.StartState,
 				Proof:        proof,
-				CollectionID: collection.ID(),
+				CollectionID: collectionID,
 			}
 
 			chunks = append(chunks, chunk)
