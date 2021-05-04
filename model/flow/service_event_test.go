@@ -109,7 +109,6 @@ func TestEventConversion(t *testing.T) {
 
 		groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupKeybytes)
 		require.NoError(t, err)
-
 		testassert.Equal(t, actual.DKGGroupKey, groupPubKey)
 
 		// TODO: Validate individual keys match

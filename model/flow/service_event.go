@@ -11,6 +11,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 const (
@@ -229,7 +230,7 @@ func ConvertServiceEventEpochSetup(event Event) (*ServiceEvent, error) {
 			return nil, fmt.Errorf("could not decode staking public key: %w", err)
 		}
 	}
-	ev.Participants = participants
+	ev.Participants = participants.Sort(order.Canonical)
 
 	serviceEv.Type = ServiceEventSetup
 	serviceEv.Event = ev
