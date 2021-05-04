@@ -27,7 +27,7 @@ import (
 
 // TestAssignmentCollector tests behavior of AssignmentCollector in different scenarios
 // AssignmentCollector is responsible collecting approvals that satisfy one assignment, meaning that we will
-// have multiple collectors for one execution result as same result can be incorporated in multiple forks.
+// have multiple collectorTree for one execution result as same result can be incorporated in multiple forks.
 // AssignmentCollector has a strict ordering of processing, before processing approvals at least one incorporated result has to be
 // processed.
 // AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments

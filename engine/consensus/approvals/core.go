@@ -3,7 +3,6 @@ package approvals
 import (
 	"errors"
 	"fmt"
-	"sync"
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
@@ -41,46 +40,59 @@ type ResultApprovalProcessor interface {
 // 	- collecting approvals for execution results
 // 	- processing multiple incorporated results
 // 	- pre-validating approvals(if they are outdated or non-verifiable)
-// 	- pruning already processed collectors
+// 	- pruning already processed collectorTree
 type approvalProcessingCore struct {
-	log                                  zerolog.Logger                           // used to log relevant actions with context
-	collectors                           map[flow.Identifier]*AssignmentCollector // mapping of ResultID to AssignmentCollector
-	lock                                 sync.RWMutex                             // lock for collectors
-	approvalsCache                       *ApprovalsCache                          // in-memory cache of approvals that weren't verified
-	atomicLastSealedHeight               uint64                                   // atomic variable for last sealed block height
-	atomicLastFinalizedHeight            uint64                                   // atomic variable for last finalized block height
-	requiredApprovalsForSealConstruction uint                                     // min number of approvals required for constructing a candidate seal
-	emergencySealingActive               bool                                     // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	assigner                             module.ChunkAssigner                     // used by AssignmentCollector to build chunk assignment
-	headers                              storage.Headers                          // used to access headers in storage
-	state                                protocol.State                           // used to access protocol state
-	verifier                             module.Verifier                          // used to validate result approvals
-	seals                                mempool.IncorporatedResultSeals          // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	payloads                             storage.Payloads                         // used to access seals in finalized block
-	approvalConduit                      network.Conduit                          // used to request missing approvals from verification nodes
-	requestTracker                       *sealing.RequestTracker                  // used to keep track of number of approval requests, and blackout periods, by chunk
+	log                                  zerolog.Logger                  // used to log relevant actions with context
+	collectorTree                        *AssignmentCollectorTree        // levelled forest for assignment collectors
+	approvalsCache                       *ApprovalsCache                 // in-memory cache of approvals that weren't verified
+	atomicLastSealedHeight               uint64                          // atomic variable for last sealed block height
+	atomicLastFinalizedHeight            uint64                          // atomic variable for last finalized block height
+	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
+	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	assigner                             module.ChunkAssigner            // used by AssignmentCollector to build chunk assignment
+	headers                              storage.Headers                 // used to access headers in storage
+	state                                protocol.State                  // used to access protocol state
+	verifier                             module.Verifier                 // used to validate result approvals
+	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
+	requestTracker                       *sealing.RequestTracker         // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
-func NewApprovalProcessingCore(headers storage.Headers, payloads storage.Payloads, state protocol.State, assigner module.ChunkAssigner,
-	verifier module.Verifier, seals mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint, emergencySealingActive bool) *approvalProcessingCore {
+func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, assigner module.ChunkAssigner,
+	verifier module.Verifier, seals mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint, emergencySealingActive bool) (*approvalProcessingCore, error) {
+
+	lastFinalized, err := state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve last finalized block: %w", err)
+	}
 
 	core := &approvalProcessingCore{
-		collectors:                           make(map[flow.Identifier]*AssignmentCollector),
 		approvalsCache:                       NewApprovalsCache(1000),
-		lock:                                 sync.RWMutex{},
 		assigner:                             assigner,
 		headers:                              headers,
 		state:                                state,
 		verifier:                             verifier,
 		seals:                                seals,
-		payloads:                             payloads,
 		approvalConduit:                      approvalConduit,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		emergencySealingActive:               emergencySealingActive,
 		requestTracker:                       sealing.NewRequestTracker(10, 30),
 	}
 
-	return core
+	factoryMethod := func(result *flow.ExecutionResult) (*AssignmentCollector, error) {
+		return NewAssignmentCollector(result, core.state, core.headers, core.assigner, core.seals, core.verifier,
+			core.approvalConduit, core.requestTracker, core.requiredApprovalsForSealConstruction)
+	}
+
+	collectors := NewAssignmentCollectorTree(factoryMethod)
+	err = collectors.PruneUpToHeight(lastFinalized.Height)
+	if err != nil {
+		return nil, fmt.Errorf("could not prune tree to initial height")
+	}
+
+	core.collectorTree = collectors
+
+	return core, nil
 }
 
 func (c *approvalProcessingCore) lastSealedHeight() uint64 {
@@ -99,11 +111,6 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 		c.log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
 
-	payload, err := c.payloads.ByBlockID(finalizedBlockID)
-	if err != nil {
-		c.log.Fatal().Err(err).Msgf("could not retrieve payload for finalized block %s", finalizedBlockID)
-	}
-
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.atomicLastFinalizedHeight, finalized.Height)
 
@@ -115,23 +122,16 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.atomicLastSealedHeight, lastSealed.Height)
 
-	sealsCount := len(payload.Seals)
-	sealedResultIds := make([]flow.Identifier, sealsCount)
-	for i, seal := range payload.Seals {
-		sealedResultIds[i] = seal.ResultID
-	}
-
-	// cleanup collectors for already sealed results
-	c.eraseCollectors(sealedResultIds)
-	collectors := c.allCollectors()
-
-	// check if there are stale results qualified for emergency sealing
-	err = c.checkEmergencySealing(collectors, finalized.Height)
+	err = c.collectorTree.PruneUpToHeight(finalized.Height)
 	if err != nil {
-		c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
+		c.log.Fatal().Err(err).Msgf("could not prune collectorTree tree at block %v", finalizedBlockID)
 	}
 
-	c.cleanupStaleCollectors(collectors, lastSealed.Height)
+	//// check if there are stale results qualified for emergency sealing
+	//err = c.checkEmergencySealing(collectorTree, finalized.Height)
+	//if err != nil {
+	//	c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
+	//}
 }
 
 // processIncorporatedResult implements business logic for processing single incorporated result
@@ -173,7 +173,7 @@ func (c *approvalProcessingCore) processIncorporatedResult(result *flow.Incorpor
 	// no checks for orphans can be made at this point
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
 
-	collector, newIncorporatedResult, err := c.getOrCreateCollector(result.Result)
+	collector, newIncorporatedResult, err := c.collectorTree.GetOrCreateCollector(result.Result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
 	}
@@ -261,7 +261,7 @@ func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) 
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
 	}
 
-	if collector := c.getCollector(approval.Body.ExecutionResultID); collector != nil {
+	if collector := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
 		// if there is a collector it means that we have received execution result and we are ready
 		// to process approvals
 		err = collector.ProcessApproval(approval)
@@ -312,82 +312,4 @@ func (c *approvalProcessingCore) processPendingApprovals(collector *AssignmentCo
 	}
 
 	return nil
-}
-
-func (c *approvalProcessingCore) allCollectors() []*AssignmentCollector {
-	collectors := make([]*AssignmentCollector, 0, len(c.collectors))
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	for _, collector := range c.collectors {
-		collectors = append(collectors, collector)
-	}
-	return collectors
-}
-
-func (c *approvalProcessingCore) getCollector(resultID flow.Identifier) *AssignmentCollector {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	return c.collectors[resultID]
-}
-
-// getOrCreateCollector performs lazy initialization of AssignmentCollector using double checked locking
-// Returns, (AssignmentCollector, true or false whenever it was created, error)
-func (c *approvalProcessingCore) getOrCreateCollector(result *flow.ExecutionResult) (*AssignmentCollector, bool, error) {
-	resultID := result.ID()
-	// first let's check if we have a collector already
-	collector := c.getCollector(resultID)
-	if collector != nil {
-		return collector, false, nil
-	}
-
-	// fast check shows that there is no collector, need to create one
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	// we need to check again, since it's possible that after checking for existing collector but before taking a lock
-	// new collector was created by concurrent goroutine
-	collector, ok := c.collectors[resultID]
-	if ok {
-		return collector, false, nil
-	}
-
-	collector, err := NewAssignmentCollector(result, c.state, c.headers, c.assigner, c.seals, c.verifier, c.approvalConduit,
-		c.requestTracker, c.requiredApprovalsForSealConstruction)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
-	}
-	c.collectors[resultID] = collector
-	return collector, true, nil
-}
-
-func (c *approvalProcessingCore) eraseCollectors(resultIDs []flow.Identifier) {
-	if len(resultIDs) == 0 {
-		return
-	}
-
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	for _, resultID := range resultIDs {
-		delete(c.collectors, resultID)
-	}
-}
-
-func (c *approvalProcessingCore) cleanupStaleCollectors(collectors []*AssignmentCollector, lastSealedHeight uint64) []*AssignmentCollector {
-	// We create collector only if we know about block that is being sealed. If we don't know anything about referred block
-	// we will just discard it. This means even if someone tries to spam us with incorporated results with same blockID it
-	// will get eventually cleaned when we discover a seal for this block.
-	staleCollectors := make([]flow.Identifier, 0)
-	filteredCollectors := make([]*AssignmentCollector, 0)
-	for _, collector := range collectors {
-		// we have collector for already sealed block
-		if lastSealedHeight >= collector.BlockHeight {
-			staleCollectors = append(staleCollectors, collector.ResultID)
-		} else {
-			filteredCollectors = append(filteredCollectors, collector)
-		}
-	}
-
-	c.eraseCollectors(staleCollectors)
-
-	return filteredCollectors
 }

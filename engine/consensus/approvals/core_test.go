@@ -21,7 +21,7 @@ import (
 )
 
 // TestApprovalProcessingCore performs testing of approval processing core
-// approvalProcessingCore is responsible for delegating processing to assignment collectors for each separate execution result
+// approvalProcessingCore is responsible for delegating processing to assignment collectorTree for each separate execution result
 // approvalProcessingCore performs height based checks and decides if approval or incorporated result has to be processed at all
 // or rejected as outdated or unverifiable.
 // approvalProcessingCore maintains a LRU cache of known approvals that cannot be verified at the moment/
@@ -40,7 +40,6 @@ type ApprovalProcessingCoreTestSuite struct {
 	sigVerifier     *module.Verifier
 	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	payloads        *storage.Payloads
 	core            *approvalProcessingCore
 }
 
@@ -56,6 +55,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)
+	s.blocks[s.ParentBlock.ID()] = &s.ParentBlock
 	s.blocks[s.Block.ID()] = &s.Block
 	s.blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
 
@@ -76,6 +76,8 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		}
 	})
 
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Twice().Once()
+
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
 			if block, found := s.blocks[blockID]; found {
@@ -85,9 +87,10 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 			}
 		},
 	)
-	s.payloads = &storage.Payloads{}
-	s.core = NewApprovalProcessingCore(s.headers, s.payloads, s.state, s.assigner, s.sigVerifier, s.sealsPL, s.conduit,
+	var err error
+	s.core, err = NewApprovalProcessingCore(s.headers, s.state, s.assigner, s.sigVerifier, s.sealsPL, s.conduit,
 		uint(len(s.AuthorizedVerifiers)), false)
+	require.NoError(s.T(), err)
 }
 
 // TestOnBlockFinalized_RejectOutdatedApprovals tests that approvals will be rejected as outdated
@@ -99,11 +102,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 	err := s.core.processApproval(approval)
 	require.NoError(s.T(), err)
 
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
-		unittest.Seal.WithResult(s.IncorporatedResult.Result))
-	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
-
-	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Once()
 
 	s.core.OnFinalizedBlock(s.Block.ID())
@@ -116,11 +114,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 // TestOnBlockFinalized_RejectOutdatedExecutionResult tests that incorporated result will be rejected as outdated
 // if the block which is targeted by execution result is already sealed.
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExecutionResult() {
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
-		unittest.Seal.WithResult(s.IncorporatedResult.Result))
-	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
-
-	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Once()
 
 	s.core.OnFinalizedBlock(s.Block.ID())
@@ -166,9 +159,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
 		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
 
-	payload := unittest.PayloadFixture()
-
-	s.payloads.On("ByBlockID", mock.Anything).Return(&payload, nil).Once()
 	s.headers.On("ByHeight", blockB1.Height).Return(&blockB1, nil)
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
@@ -183,18 +173,19 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
 
-// TestOnFinalizedBlock_CollectorsCleanup tests that stale collectors are cleaned up for
+// TestOnFinalizedBlock_CollectorsCleanup tests that stale collectorTree are cleaned up for
 // already sealed blocks.
 func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup() {
 	blockID := s.Block.ID()
-	numResults := 10
-	for i := 0; i < numResults; i++ {
+	numResults := uint(10)
+	for i := uint(0); i < numResults; i++ {
 		// all results incorporated in different blocks
 		incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.IncorporatedBlock)
 		s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
 		// create different incorporated results for same block ID
 		result := unittest.ExecutionResultFixture()
 		result.BlockID = blockID
+		result.PreviousResultID = s.IncorporatedResult.Result.ID()
 		incorporatedResult := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(result),
 			unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()))
@@ -202,21 +193,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 		require.NoError(s.T(), err)
 	}
 
-	require.Len(s.T(), s.core.collectors, numResults)
+	require.Equal(s.T(), numResults, s.core.collectorTree.GetSize())
 
 	candidate := unittest.BlockHeaderWithParentFixture(&s.Block)
 
 	s.blocks[candidate.ID()] = &candidate
 
-	seal := unittest.Seal.Fixture(unittest.Seal.WithBlockID(s.Block.ID()),
-		unittest.Seal.WithResult(s.IncorporatedResult.Result))
-	payload := unittest.PayloadFixture(unittest.WithSeals(seal))
-
-	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil))
-	s.payloads.On("ByBlockID", candidate.ID()).Return(&payload, nil).Once()
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Once()
 
 	s.core.OnFinalizedBlock(candidate.ID())
-	require.Empty(s.T(), s.core.collectors)
+	require.Equal(s.T(), uint(0), s.core.collectorTree.GetSize())
 }
 
 // TestProcessIncorporated_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown

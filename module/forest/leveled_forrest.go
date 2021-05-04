@@ -51,14 +51,21 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 	if level < f.LowestLevel {
 		return fmt.Errorf("new lowest level %d cannot be smaller than previous last retained level %d", level, f.LowestLevel)
 	}
-	for l := f.LowestLevel; l < level; l++ {
-		for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
-			delete(f.vertices, v.id)
+	if f.GetSize() > 0 {
+		for l := f.LowestLevel; l < level; l++ {
+			for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
+				delete(f.vertices, v.id)
+			}
+			delete(f.verticesAtLevel, l)
 		}
-		delete(f.verticesAtLevel, l)
 	}
 	f.LowestLevel = level
 	return nil
+}
+
+// GetSize returns number of vertices that are present in tree
+func (f *LevelledForest) GetSize() uint {
+	return uint(len(f.vertices))
 }
 
 // HasVertex returns true iff full vertex exists

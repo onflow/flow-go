@@ -10,13 +10,13 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
-// ApprovalCollector is responsible for distributing work to chunk collectors,
+// ApprovalCollector is responsible for distributing work to chunk collectorTree,
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
 	incorporatedBlock                    *flow.Header                        // block that incorporates execution result
 	incorporatedResult                   *flow.IncorporatedResult            // incorporated result that is being sealed
-	chunkCollectors                      []*ChunkApprovalCollector           // slice of chunk collectors that is created on construction and doesn't change
+	chunkCollectors                      []*ChunkApprovalCollector           // slice of chunk collectorTree that is created on construction and doesn't change
 	aggregatedSignatures                 map[uint64]flow.AggregatedSignature // aggregated signature for each chunk
 	lock                                 sync.RWMutex                        // lock for modifying aggregatedSignatures
 	seals                                mempool.IncorporatedResultSeals     // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
