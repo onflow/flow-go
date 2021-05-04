@@ -44,6 +44,8 @@ func NewBlockConsumer(log zerolog.Logger,
 	blockProcessor assigner.FinalizedBlockProcessor,
 	maxProcessing int64) (*BlockConsumer, uint64, error) {
 
+	lg := log.With().Str("module", "block_consumer").Logger()
+
 	// wires blockProcessor as the worker. The block consumer will
 	// invoke instances of worker concurrently to process block jobs.
 	worker := newWorker(blockProcessor)
@@ -52,7 +54,7 @@ func NewBlockConsumer(log zerolog.Logger,
 	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
 	jobs := newFinalizedBlockReader(state, blocks)
 
-	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
+	consumer := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing)
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
