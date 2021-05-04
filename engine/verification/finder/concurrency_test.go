@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/engine/testutil/mock"
+	"github.com/onflow/flow-go/engine/verification/test"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -176,10 +177,10 @@ func (suite *ConcurrencyTestSuite) testConcurrency(receiptCount, senderCount, ch
 	parent, err := verNode.State.Final().Head()
 	require.NoError(suite.T(), err)
 
-	receipts := make([]*utils.CompleteExecutionReceipt, receiptCount)
+	receipts := make([]*test.CompleteExecutionReceipt, receiptCount)
 	results := make([]flow.ExecutionResult, receiptCount)
 	for i := 0; i < receiptCount; i++ {
-		completeER := utils.CompleteExecutionReceiptFixture(suite.T(), chunkCount, chainID.Chain(), parent)
+		completeER := test.CompleteExecutionReceiptFixture(suite.T(), chunkCount, chainID.Chain(), parent)
 		receipts[i] = completeER
 		results[i] = completeER.Receipts[0].ExecutionResult
 	}
