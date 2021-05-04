@@ -15,10 +15,10 @@ import (
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
-	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -111,12 +111,8 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		t.Run(tc.msg, func(t *testing.T) {
 			withConsumers(t, tc.staked, tc.blockCount, func(
 				blockConsumer *blockconsumer.BlockConsumer,
-				chunkConsumer *chunkconsumer.ChunkConsumer,
 				blocks []*flow.Block,
-				wg *sync.WaitGroup) {
-
-				unittest.RequireCloseBefore(t, chunkConsumer.Ready(), time.Second, "could not start chunk consumer")
-				unittest.RequireCloseBefore(t, blockConsumer.Ready(), time.Second, "could not start block consumer")
+				resultApprovalsWG *sync.WaitGroup) {
 
 				for i := 0; i < len(blocks)*tc.eventRepetition; i++ {
 					// consumer is only required to be "notified" that a new finalized block available.
@@ -125,9 +121,7 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 					blockConsumer.OnFinalizedBlock(&model.Block{})
 				}
 
-				unittest.RequireReturnsBefore(t, wg.Wait, time.Second, "could not receive all chunk locators on time")
-				unittest.RequireCloseBefore(t, blockConsumer.Done(), time.Second, "could not terminate block consumer")
-				unittest.RequireCloseBefore(t, chunkConsumer.Done(), time.Second, "could not terminate chunk consumer")
+				unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Second, "could not receive result approvals on time")
 
 			}, tc.opts...)
 		})
@@ -214,19 +208,21 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 // The block consumer operates on a block reader with a chain of specified number of finalized blocks
 // ready to read.
 func withConsumers(t *testing.T, staked bool, blockCount int,
-	withConsumers func(*blockconsumer.BlockConsumer, *chunkconsumer.ChunkConsumer, []*flow.Block, *sync.WaitGroup), ops ...CompleteExecutionReceiptBuilderOpt) {
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup),
+	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		maxProcessing := int64(3)
 		collector := &metrics.NoopCollector{}
 		tracer := &trace.NoopTracer{}
 		lg := unittest.Logger().With().Str("role", "verification").Logger()
 		chainID := flow.Testnet
 
-		// bootstraps
-		s, verId, participants := bootstrapSystem(t, collector, tracer, staked)
-		// exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+		// bootstraps system with one node of each role.
+		s, participants := bootstrapSystem(t, collector, tracer, staked)
+		exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+		conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+		verID := participants.Filter(filter.HasRole(flow.RoleVerification))[0]
 
 		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -239,7 +235,9 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 
 		// mocks chunk assigner to assign even chunk indices to this verification node
 		chunkAssigner := &mock.ChunkAssigner{}
-		expectedLocatorIds, _ := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{&verId}, completeERs,
+		_, assignedChunkIDs := MockChunkAssignmentFixture(chunkAssigner,
+			flow.IdentityList{verID},
+			completeERs,
 			evenChunkIndexAssigner)
 
 		hub := stub.NewNetworkHub()
@@ -247,34 +245,35 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		genericNode := testutil.GenericNodeWithStateFixture(t,
 			s,
 			hub,
-			&verId,
+			verID,
 			lg,
 			collector,
 			tracer,
 			chainID)
 
-		//// execution node
-		//exeNode, exeEngine := setupChunkDataPackProvider(t,
-		//	hub,
-		//	exeID,
-		//	flow.IdentityList{&verId},
-		//	participants,
-		//	chainID,
-		//	completeER)
-		//
-		//// consensus node
-		//// mock consensus node
-		//conNode, conEngine, conWG := SetupMockConsensusNode(t,
-		//	hub,
-		//	conIdentity,
-		//	flow.IdentityList{verIdentity},
-		//	identities,
-		//	completeER,
-		//	chainID)
+		// execution node
+		exeNode, _ := setupChunkDataPackProvider(t,
+			hub,
+			exeID,
+			participants,
+			chainID,
+			completeERs,
+			assignedChunkIDs,
+			respondChunkDataPackRequest)
+
+		// consensus node
+		conNode, _, conWG := setupMockConsensusNode(t,
+			hub,
+			conID,
+			flow.IdentityList{verID},
+			participants,
+			completeERs,
+			chainID,
+			assignedChunkIDs)
 
 		verNode := testutil.NewVerificationNode(t,
 			hub,
-			&verId,
+			verID,
 			participants,
 			chunkAssigner,
 			uint(receiptsLimit),
@@ -284,15 +283,37 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 			collector,
 			testutil.WithGenericNode(&genericNode))
 
-		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, staked)
-		chunkConsumer := chunkconsumer.NewChunkConsumer(
-			lg,
-			verNode.ProcessedChunkIndex,
-			verNode.ChunksQueue,
-			chunkProcessor,
-			maxProcessing)
+		// turns on components and network
+		verNet, ok := hub.GetNetwork(verID.NodeID)
+		assert.True(t, ok)
+		unittest.RequireReturnsBefore(t, func() {
+			verNet.StartConDev(100*time.Millisecond, true)
+		}, 100*time.Millisecond, "failed to start verification network")
 
-		withConsumers(verNode.BlockConsumer, chunkConsumer, blocks, chunksWg)
+		unittest.RequireComponentsReadyBefore(t, 1*time.Second,
+			verNode.BlockConsumer,
+			verNode.ChunkConsumer,
+			verNode.AssignerEngine,
+			verNode.FetcherEngine,
+			verNode.RequesterEngine,
+			verNode.VerifierEngine)
+
+		withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
+
+		// tears down engines and nodes
+		unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
+		unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond,
+			verNode.BlockConsumer,
+			verNode.ChunkConsumer,
+			verNode.AssignerEngine,
+			verNode.FetcherEngine,
+			verNode.RequesterEngine,
+			verNode.VerifierEngine)
+
+		testmock.RequireGenericNodesDoneBefore(t, 100*time.Millisecond,
+			verNode.GenericNode,
+			conNode,
+			exeNode)
 	})
 }
 
@@ -362,8 +383,8 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 // If staked set to true, it bootstraps verification node as an staked one.
 // Otherwise, it bootstraps the verification node as unstaked in current epoch.
 //
-// As the return values, it returns the state, local module, and identity of verification node.
-func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer module.Tracer, staked bool) (*testmock.StateFixture, flow.Identity,
+// As the return values, it returns the state, local module, and list of identities in system.
+func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer module.Tracer, staked bool) (*testmock.StateFixture,
 	flow.IdentityList) {
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
@@ -383,5 +404,5 @@ func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer modu
 			BuildEpoch()
 	}
 
-	return stateFixture, *verID, identities
+	return stateFixture, identities
 }
