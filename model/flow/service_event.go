@@ -255,6 +255,7 @@ func ConvertServiceEventEpochCommit(event Event) (*ServiceEvent, error) {
 	ev.Counter = uint64(payload.(cadence.Event).Fields[0].(cadence.UInt64))
 
 	// TODO: parse cluster QC from event
+	// Note: Please refer to this issue https://github.com/dapperlabs/flow-go/issues/5505
 
 	// parse DKG group key and participants
 	// Note: this is read in the same order as `DKGClient.SubmitResult` ie. with the group public key first followed by individual keys
@@ -294,7 +295,7 @@ func ConvertServiceEventEpochCommit(event Event) (*ServiceEvent, error) {
 		dkgParticipantKeys = append(dkgParticipantKeys, pubKey)
 	}
 
-	// ev.DKGParticipantKeys = dkgParticipantKeys
+	ev.DKGParticipantKeys = dkgParticipantKeys
 
 	serviceEv.Type = ServiceEventCommit
 	serviceEv.Event = ev
