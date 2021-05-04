@@ -188,6 +188,7 @@ func ConvertServiceEventEpochSetup(event Event) (*ServiceEvent, error) {
 			assignments[clusterIndex] = append(assignments[clusterIndex], nodeID)
 		}
 	}
+	ev.Assignments = assignments
 
 	// parse epoch participants
 	epochParticipants := payload.(cadence.Event).Fields[1].(cadence.Array).Values
@@ -228,8 +229,6 @@ func ConvertServiceEventEpochSetup(event Event) (*ServiceEvent, error) {
 			return nil, fmt.Errorf("could not decode staking public key: %w", err)
 		}
 	}
-
-	ev.Assignments = assignments
 	ev.Participants = participants
 
 	serviceEv.Type = ServiceEventSetup
