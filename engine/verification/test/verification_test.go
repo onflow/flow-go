@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -51,7 +52,7 @@ func TestHappyPath(t *testing.T) {
 			defer mu.Unlock()
 
 			collector := metrics.NewNoopCollector()
-			VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount, collector, collector)
+			vertestutils.VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount, collector, collector)
 		})
 	}
 }
@@ -101,14 +102,14 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	root, err := verNode.State.Params().Root()
 	require.NoError(t, err)
 
-	completeER := CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
+	completeER := vertestutils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	// stores block of execution result in state and mutate state accordingly
 	err = verNode.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	_, expectedChunkIDs := MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity},
-		[]*CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
+	_, expectedChunkIDs := vertestutils.MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity},
+		[]*vertestutils.CompleteExecutionReceipt{completeER}, vertestutils.EvenChunkIndexAssigner)
 
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
@@ -121,23 +122,23 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode, exeEngine := setupChunkDataPackProvider(t,
+	exeNode, exeEngine := vertestutils.SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,
 		chainID,
-		[]*CompleteExecutionReceipt{completeER},
+		[]*vertestutils.CompleteExecutionReceipt{completeER},
 		expectedChunkIDs,
-		respondChunkDataPackRequest) // always responds to chunk data pack requests.
+		vertestutils.RespondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// consensus node
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t,
+	conNode, conEngine, conWG := vertestutils.SetupMockConsensusNode(t,
 		hub,
 		conIdentity,
 		flow.IdentityList{verIdentity},
 		identities,
-		CompleteExecutionReceiptList{completeER},
+		vertestutils.CompleteExecutionReceiptList{completeER},
 		chainID,
 		expectedChunkIDs)
 

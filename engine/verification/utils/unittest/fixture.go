@@ -1,4 +1,4 @@
-package test
+package vertestutils
 
 import (
 	"context"
@@ -56,9 +56,9 @@ type CompleteExecutionReceiptList []*CompleteExecutionReceipt
 // should belong to this complete execution receipt list.
 //
 // It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
-func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
+func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
 	result, chunkIndex := c.resultOf(t, chunkID)
-	receiptData := c.receiptDataOf(t, chunkID)
+	receiptData := c.ReceiptDataOf(t, chunkID)
 
 	// publishes the chunk data pack response to the network
 	res := &messages.ChunkDataResponse{
@@ -67,7 +67,7 @@ func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID 
 	}
 
 	// only non-system chunks have a collection
-	if !IsSystemChunk(chunkIndex, len(result.Chunks)) {
+	if !isSystemChunk(chunkIndex, len(result.Chunks)) {
 		res.Collection = *receiptData.Collections[chunkIndex]
 	}
 
@@ -78,7 +78,7 @@ func (c CompleteExecutionReceiptList) chunkDataResponseOf(t *testing.T, chunkID 
 // should belong to this complete execution receipt list.
 //
 // It fails the test if no execution result with the specified identifier is found in this complete execution receipt list.
-func (c CompleteExecutionReceiptList) chunkOf(t *testing.T, resultID flow.Identifier, chunkIndex uint64) *flow.Chunk {
+func (c CompleteExecutionReceiptList) ChunkOf(t *testing.T, resultID flow.Identifier, chunkIndex uint64) *flow.Chunk {
 	for _, completeER := range c {
 		for _, result := range completeER.ContainerBlock.Payload.Results {
 			if result.ID() == resultID {
@@ -95,7 +95,7 @@ func (c CompleteExecutionReceiptList) chunkOf(t *testing.T, resultID flow.Identi
 // should belong to this complete execution receipt list.
 //
 // It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
-func (c CompleteExecutionReceiptList) receiptDataOf(t *testing.T, chunkID flow.Identifier) *ExecutionReceiptData {
+func (c CompleteExecutionReceiptList) ReceiptDataOf(t *testing.T, chunkID flow.Identifier) *ExecutionReceiptData {
 	for _, completeER := range c {
 		for _, receiptData := range completeER.ReceiptsData {
 			for _, cdp := range receiptData.ChunkDataPacks {

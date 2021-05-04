@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -672,9 +672,9 @@ func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier
 func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, header *flow.Header, sealed bool) {
 	headers.On("ByBlockID", header.ID()).Return(header, nil)
 	if sealed {
-		test.MockLastSealedHeight(state, header.Height+1)
+		vertestutils.MockLastSealedHeight(state, header.Height+1)
 	} else {
-		test.MockLastSealedHeight(state, header.Height-1)
+		vertestutils.MockLastSealedHeight(state, header.Height-1)
 	}
 }
 

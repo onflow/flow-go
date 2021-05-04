@@ -1,4 +1,4 @@
-package test
+package vertestutils
 
 import (
 	"fmt"
@@ -121,20 +121,21 @@ func VerificationHappyPath(t *testing.T,
 
 	// mocks the assignment to only assign "some" chunks to each verification node.
 	// the assignment is done based on `isAssigned` function
-	_, assignedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, CompleteExecutionReceiptList{completeER}, evenChunkIndexAssigner)
+	_, assignedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, CompleteExecutionReceiptList{completeER},
+		EvenChunkIndexAssigner)
 
 	// mock execution node
-	exeNode, exeEngine := setupChunkDataPackProvider(t,
+	exeNode, exeEngine := SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,
 		chainID,
 		CompleteExecutionReceiptList{completeER},
 		assignedChunkIDs,
-		respondChunkDataPackRequest) // always responds to chunk data pack requests.
+		RespondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// mock consensus node
-	conNode, conEngine, conWG := setupMockConsensusNode(t,
+	conNode, conEngine, conWG := SetupMockConsensusNode(t,
 		hub,
 		conIdentity,
 		verIdentities,
@@ -220,11 +221,11 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath finishes")
 }
 
-// setupChunkDataPackProvider creates and returns an execution node that only has a chunk data pack provider engine.
+// SetupChunkDataPackProvider creates and returns an execution node that only has a chunk data pack provider engine.
 //
 // The mock chunk provider engine replies the chunk back requests by invoking the injected provider method. All chunk data pack
 // requests should come from a verification node, and should has one of the assigned chunk IDs. Otherwise, it fails the test.
-func setupChunkDataPackProvider(t *testing.T,
+func SetupChunkDataPackProvider(t *testing.T,
 	hub *stub.Hub,
 	exeIdentity *flow.Identity,
 	participants flow.IdentityList,
@@ -257,14 +258,14 @@ func setupChunkDataPackProvider(t *testing.T,
 	return &exeNode, exeEngine
 }
 
-func respondChunkDataPackRequest(t *testing.T,
+func RespondChunkDataPackRequest(t *testing.T,
 	completeERs CompleteExecutionReceiptList,
 	chunkID flow.Identifier,
 	verID flow.Identifier,
 	con network.Conduit) {
 
 	// finds the chunk data pack of the requested chunk and sends it back.
-	res := completeERs.chunkDataResponseOf(t, chunkID)
+	res := completeERs.ChunkDataResponseOf(t, chunkID)
 
 	err := con.Unicast(res, verID)
 	assert.Nil(t, err)
@@ -275,10 +276,10 @@ func respondChunkDataPackRequest(t *testing.T,
 		Msg("chunk data pack request answered by provider")
 }
 
-// setupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
+// SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
 // network (hub). It mocks the process method of the consensus engine to receive a message from a certain
 // verification node (verIdentity) evaluates whether it is a result approval about an assigned chunk to that verifier node.
-func setupMockConsensusNode(t *testing.T,
+func SetupMockConsensusNode(t *testing.T,
 	hub *stub.Hub,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
@@ -328,7 +329,7 @@ func setupMockConsensusNode(t *testing.T,
 			resultApprovalSeen[originID][resultApproval.ID()] = struct{}{}
 
 			// result approval should belong to an assigned chunk to the verification node.
-			chunk := completeERs.chunkOf(t, resultApproval.Body.ExecutionResultID, resultApproval.Body.ChunkIndex)
+			chunk := completeERs.ChunkOf(t, resultApproval.Body.ExecutionResultID, resultApproval.Body.ChunkIndex)
 			assert.Contains(t, assignedChunkIDs, chunk.ID())
 
 			// verifies SPoCK proof of result approval
@@ -349,7 +350,7 @@ func setupMockConsensusNode(t *testing.T,
 			valid, err := crypto.SPOCKVerifyAgainstData(
 				pk,
 				resultApproval.Body.Spock,
-				completeERs.receiptDataOf(t, chunk.ID()).SpockSecrets[resultApproval.Body.ChunkIndex],
+				completeERs.ReceiptDataOf(t, chunk.ID()).SpockSecrets[resultApproval.Body.ChunkIndex],
 				hasher,
 			)
 			assert.NoError(t, err)
@@ -364,9 +365,9 @@ func setupMockConsensusNode(t *testing.T,
 	return &conNode, conEngine, wg
 }
 
-// IsSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
+// isSystemChunk returns true if the index corresponds to the system chunk, i.e., last chunk in
 // the receipt.
-func IsSystemChunk(index uint64, chunkNum int) bool {
+func isSystemChunk(index uint64, chunkNum int) bool {
 	return int(index) == chunkNum-1
 }
 
@@ -469,10 +470,10 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 	return expectedLocatorIds, expectedChunkIds
 }
 
-// evenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
+// EvenChunkIndexAssigner is a helper function that returns true for the even indices in [0, chunkNum-1]
 // It also returns true if the index corresponds to the system chunk.
-func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
-	ok := index%2 == 0 || IsSystemChunk(index, chunkNum)
+func EvenChunkIndexAssigner(index uint64, chunkNum int) bool {
+	ok := index%2 == 0 || isSystemChunk(index, chunkNum)
 	return ok
 }
 
@@ -482,7 +483,8 @@ func evenChunkIndexAssigner(index uint64, chunkNum int) bool {
 // Reference blocks contain guarantees, and container blocks contain execution receipt for their preceding reference blocks,
 // e.g., C1 contains receipts for R1,1, R1,2, etc.
 // Note: for sake of simplicity we do not include guarantees in the container blocks for now.
-func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList, state protocol.MutableState) []*flow.Block {
+func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts CompleteExecutionReceiptList,
+	state protocol.MutableState) []*flow.Block {
 	blocks := make([]*flow.Block, 0)
 
 	// tracks of duplicate reference blocks

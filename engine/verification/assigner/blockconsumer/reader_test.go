@@ -7,8 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/engine/verification/test"
-	"github.com/onflow/flow-go/engine/verification/utils"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -61,8 +60,8 @@ func withReader(
 		// hold any guarantees.
 		root, err := s.State.Params().Root()
 		require.NoError(t, err)
-		results := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
-		blocks := test.ExtendStateWithFinalizedBlocks(t, results, s.State)
+		results := vertestutils.CompleteExecutionReceiptChainFixture(t, root, blockCount/2)
+		blocks := vertestutils.ExtendStateWithFinalizedBlocks(t, results, s.State)
 
 		withBlockReader(reader, blocks)
 	})
