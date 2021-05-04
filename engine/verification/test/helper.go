@@ -92,7 +92,7 @@ func VerificationHappyPath(t *testing.T,
 		// starts all the engines
 		<-verNode.FinderEngine.Ready()
 		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-		<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+		<-verNode.VerifierEngine.Ready()
 
 		verNodes = append(verNodes, verNode)
 	}
@@ -134,7 +134,7 @@ func VerificationHappyPath(t *testing.T,
 		respondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// mock consensus node
-	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+	conNode, conEngine, conWG := setupMockConsensusNode(t,
 		hub,
 		conIdentity,
 		verIdentities,
@@ -189,7 +189,7 @@ func VerificationHappyPath(t *testing.T,
 		// stops all the engines
 		<-verNode.FinderEngine.Done()
 		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-		<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+		<-verNode.VerifierEngine.Done()
 	}
 
 	// stops continuous delivery of nodes
@@ -275,10 +275,10 @@ func respondChunkDataPackRequest(t *testing.T,
 		Msg("chunk data pack request answered by provider")
 }
 
-// SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
+// setupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
 // network (hub). It mocks the process method of the consensus engine to receive a message from a certain
 // verification node (verIdentity) evaluates whether it is a result approval about an assigned chunk to that verifier node.
-func SetupMockConsensusNode(t *testing.T,
+func setupMockConsensusNode(t *testing.T,
 	hub *stub.Hub,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,

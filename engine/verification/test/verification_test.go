@@ -113,7 +113,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// starts all the engines
 	<-verNode.FinderEngine.Ready()
 	<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-	<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+	<-verNode.VerifierEngine.Ready()
 
 	// starts verification node's network in continuous mode
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
@@ -132,7 +132,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 
 	// consensus node
 	// mock consensus node
-	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+	conNode, conEngine, conWG := setupMockConsensusNode(t,
 		hub,
 		conIdentity,
 		flow.IdentityList{verIdentity},
@@ -161,7 +161,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// the process method of Ingest engines is done working.
 	<-verNode.FinderEngine.Done()
 	<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-	<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+	<-verNode.VerifierEngine.Done()
 
 	// receipt ID should be added to the ingested results mempool
 	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipts[0].ExecutionResult.ID()))
