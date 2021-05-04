@@ -8,6 +8,7 @@ import (
 type ChunkStatus struct {
 	ChunkIndex      uint64
 	ExecutionResult *flow.ExecutionResult
+	ChunkLocatorID  flow.Identifier // used to notify back chunk consumer once processing chunk is done.
 }
 
 func (s ChunkStatus) ID() flow.Identifier {

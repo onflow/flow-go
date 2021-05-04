@@ -150,6 +150,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	status := &verification.ChunkStatus{
 		ChunkIndex:      locator.Index,
 		ExecutionResult: result,
+		ChunkLocatorID:  locator.ID(),
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
@@ -229,7 +230,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID)
 	lg.Info().Msg("chunk verification is done")
 }
 
