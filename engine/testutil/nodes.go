@@ -586,12 +586,6 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 
 type VerificationOpt func(*testmock.VerificationNode)
 
-func WithVerifierEngine(eng network.Engine) VerificationOpt {
-	return func(node *testmock.VerificationNode) {
-		node.VerifierEngine = eng
-	}
-}
-
 func WithMatchEngine(eng network.Engine) VerificationOpt {
 	return func(node *testmock.VerificationNode) {
 		node.MatchEngine = eng
@@ -983,6 +977,24 @@ func NewVerificationNode(t testing.TB,
 		require.Nil(t, err)
 	}
 
+	if node.RequesterEngine == nil {
+		node.RequesterEngine, err = verificationrequester.New(node.Log,
+			node.State,
+			node.Net,
+			node.Tracer,
+			collector,
+			node.ChunkRequests,
+			100*time.Millisecond,
+			// requests are only qualified if their retryAfter is elapsed.
+			verificationrequester.RetryAfterQualifier,
+			// exponential backoff with multiplier of 2, minimum interval of a second, and
+			// maximum interval of an hour.
+			mempool.ExponentialUpdater(2, time.Hour, time.Second),
+			2)
+
+		require.NoError(t, err)
+	}
+
 	if node.FetcherEngine == nil {
 		node.FetcherEngine = fetcher.New(node.Log,
 			collector,
@@ -995,25 +1007,6 @@ func NewVerificationNode(t testing.TB,
 			node.Receipts,
 			node.RequesterEngine,
 		)
-	}
-
-	if node.RequesterEngine == nil {
-		node.RequesterEngine, err = verificationrequester.New(node.Log,
-			node.State,
-			node.Net,
-			node.Tracer,
-			collector,
-			node.ChunkRequests,
-			node.FetcherEngine,
-			100*time.Millisecond,
-			// requests are only qualified if their retryAfter is elapsed.
-			verificationrequester.RetryAfterQualifier,
-			// exponential backoff with multiplier of 2, minimum interval of a second, and
-			// maximum interval of an hour.
-			mempool.ExponentialUpdater(2, time.Hour, time.Second),
-			2)
-
-		require.NoError(t, err)
 	}
 
 	if node.ChunkConsumer == nil {
