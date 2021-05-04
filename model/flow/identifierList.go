@@ -59,3 +59,13 @@ func (il IdentifierList) Copy() IdentifierList {
 	cpy := make(IdentifierList, 0, il.Len())
 	return append(cpy, il...)
 }
+
+// Contains returns whether this identifier list contains the target identifier.
+func (il IdentifierList) Contains(target Identifier) bool {
+	for _, id := range il {
+		if target == id {
+			return true
+		}
+	}
+	return false
+}

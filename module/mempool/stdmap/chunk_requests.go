@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // ChunkRequests is an implementation of in-memory storage for maintaining chunk requests data objects.
@@ -31,17 +32,33 @@ func toChunkRequestStatus(entity flow.Entity) *chunkRequestStatus {
 	return status
 }
 
-// ByID returns a chunk request by its chunk ID as well as the attempt field of its underlying
-// chunk request status.
+// ByID returns a chunk request by its chunk ID.
+//
 // There is a one-to-one correspondence between the chunk requests in memory, and
 // their chunk ID.
-func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, int, bool) {
+func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
 	entity, exists := cs.Backend.ByID(chunkID)
 	if !exists {
-		return nil, -1, false
+		return nil, false
 	}
 	request := toChunkRequestStatus(entity)
-	return request.ChunkDataPackRequest, request.Attempt, true
+	return request.ChunkDataPackRequest, true
+}
+
+// RequestHistory returns the number of times the chunk has been requested,
+// last time the chunk has been requested, and the retryAfter duration of the
+// underlying request status of this chunk.
+//
+// The last boolean parameter returns whether a chunk request for this chunk ID
+// exists in memory-pool.
+func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
+	entity, exists := cs.Backend.ByID(chunkID)
+	if !exists {
+		return 0, time.Time{}, time.Duration(0), false
+	}
+	request := toChunkRequestStatus(entity)
+
+	return request.Attempt, request.LastAttempt, request.RetryAfter, true
 }
 
 // Add provides insertion functionality into the memory pool.
@@ -81,6 +98,43 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	return err == nil
 }
 
+// UpdateRequestHistory updates the request history of the specified chunk ID. If the update was successful, i.e.,
+// the updater returns true, the result of update is committed to the mempool, and the time stamp of the chunk request
+// is updated to the current time. Otherwise, it aborts and returns false.
+//
+// It returns the updated request history values.
+//
+// The updates under this method are atomic, thread-safe, and done in isolation.
+func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool) {
+	var lastAttempt time.Time
+	var retryAfter time.Duration
+	var attempts uint64
+
+	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[chunkID]
+		if !exists {
+			return fmt.Errorf("not exist")
+		}
+		status := toChunkRequestStatus(entity)
+
+		var ok bool
+		attempts, retryAfter, ok = updater(status.Attempt, status.RetryAfter)
+		if !ok {
+			return fmt.Errorf("updater failed")
+		}
+		lastAttempt = time.Now()
+
+		// updates underlying request
+		status.LastAttempt = lastAttempt
+		status.RetryAfter = retryAfter
+		status.Attempt = attempts
+
+		return nil
+	})
+
+	return attempts, lastAttempt, retryAfter, err == nil
+}
+
 // All returns all chunk requests stored in this memory pool.
 func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 	all := cs.Backend.All()
@@ -96,8 +150,9 @@ func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 // some auxiliary attributes that are internal to ChunkRequests.
 type chunkRequestStatus struct {
 	*verification.ChunkDataPackRequest
-	LastAttempt time.Time
-	Attempt     int
+	LastAttempt time.Time     // timestamp of last request dispatched for this chunk id.
+	RetryAfter  time.Duration // interval until request should be retried.
+	Attempt     uint64        // number of times this chunk request has been dispatched in the network.
 }
 
 func (c chunkRequestStatus) ID() flow.Identifier {

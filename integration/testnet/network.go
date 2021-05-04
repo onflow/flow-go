@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -590,18 +591,23 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
+	// sort node infos to the canonical ordering
+	// IMPORTANT: we must use this ordering when writing the DKG keys as
+	// this ordering defines the DKG participant's indices
+	nodeInfos := bootstrap.Sort(toNodeInfos(confs), order.Canonical)
+
 	// write private key files for each DKG participant
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.FilterByRole(nodeInfos, flow.RoleConsensus)
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticpant := bootstrap.DKGParticipantPriv{
+		privParticipant := bootstrap.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
 			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticpant)
+		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticipant)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -643,14 +649,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	height := uint64(0)
 	timestamp := time.Now().UTC()
 	epochCounter := uint64(0)
-	participants := bootstrap.ToIdentityList(toNodeInfos(confs))
+	participants := bootstrap.ToIdentityList(nodeInfos)
 
 	// generate root block
 	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
 	// generate QC
-	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
-	signerData, err := run.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
+	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -680,12 +685,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RandomSource: randomSource,
 	}
 
-	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
 	epochCommit := &flow.EpochCommit{
-		Counter:         epochCounter,
-		ClusterQCs:      clusterQCs,
-		DKGGroupKey:     dkg.PubGroupKey,
-		DKGParticipants: dkgLookup,
+		Counter:            epochCounter,
+		ClusterQCs:         clusterQCs,
+		DKGGroupKey:        dkg.PubGroupKey,
+		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
 	// generate execution result and block seal
