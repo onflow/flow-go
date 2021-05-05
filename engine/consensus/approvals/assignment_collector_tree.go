@@ -2,9 +2,10 @@ package approvals
 
 import (
 	"fmt"
+	"sync"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
-	"sync"
 )
 
 type assignmentCollectorVertex = AssignmentCollector
@@ -19,6 +20,10 @@ func (rsr *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
 
 type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
 
+// AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
+// formed by the execution results. The mempool supports pruning by height: only collectors
+// descending from the latest finalized block are relevant.
+// Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type AssignmentCollectorTree struct {
 	forest            *forest.LevelledForest
 	lock              sync.RWMutex
@@ -45,6 +50,26 @@ func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) *Assign
 		return nil
 	}
 	return vertex.(*assignmentCollectorVertex)
+}
+
+// GetCollectorsUpToLevel returns all collectors that satisfy interval [from; to)
+func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollector {
+	var vertices []*AssignmentCollector
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	if from < t.forest.LowestLevel {
+		from = t.forest.LowestLevel
+	}
+
+	for l := from; l < to; l++ {
+		iter := t.forest.GetVerticesAtLevel(l)
+		for iter.HasNext() {
+			vertices = append(vertices, iter.NextVertex().(*assignmentCollectorVertex))
+		}
+	}
+
+	return vertices
 }
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double checked locking

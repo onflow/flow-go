@@ -61,9 +61,9 @@ type approvalProcessingCore struct {
 func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, assigner module.ChunkAssigner,
 	verifier module.Verifier, seals mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint, emergencySealingActive bool) (*approvalProcessingCore, error) {
 
-	lastFinalized, err := state.Final().Head()
+	lastSealed, err := state.Sealed().Head()
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve last finalized block: %w", err)
+		return nil, fmt.Errorf("could not retrieve last sealed block: %w", err)
 	}
 
 	core := &approvalProcessingCore{
@@ -85,7 +85,7 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, as
 	}
 
 	collectors := NewAssignmentCollectorTree(factoryMethod)
-	err = collectors.PruneUpToHeight(lastFinalized.Height)
+	err = collectors.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
 		return nil, fmt.Errorf("could not prune tree to initial height")
 	}
@@ -122,16 +122,17 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.atomicLastSealedHeight, lastSealed.Height)
 
-	err = c.collectorTree.PruneUpToHeight(finalized.Height)
+	// check if there are stale results qualified for emergency sealing
+	err = c.checkEmergencySealing(lastSealed.Height, finalized.Height)
+	if err != nil {
+		c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
+	}
+
+	// as soon as we discover new sealed height, proceed with pruning collectors
+	err = c.collectorTree.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
 		c.log.Fatal().Err(err).Msgf("could not prune collectorTree tree at block %v", finalizedBlockID)
 	}
-
-	//// check if there are stale results qualified for emergency sealing
-	//err = c.checkEmergencySealing(collectorTree, finalized.Height)
-	//if err != nil {
-	//	c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
-	//}
 }
 
 // processIncorporatedResult implements business logic for processing single incorporated result
@@ -276,18 +277,28 @@ func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) 
 	return nil
 }
 
-func (c *approvalProcessingCore) checkEmergencySealing(collectors []*AssignmentCollector, lastFinalizedHeight uint64) error {
+func (c *approvalProcessingCore) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint64) error {
 	if !c.emergencySealingActive {
 		return nil
 	}
 
-	for _, collector := range collectors {
-		// let's check at least that candidate block is deep enough for emergency sealing.
-		if collector.BlockHeight+sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight {
-			err := collector.CheckEmergencySealing(lastFinalizedHeight)
-			if err != nil {
-				return err
-			}
+	emergencySealingHeight := lastSealedHeight + sealing.DefaultEmergencySealingThreshold
+
+	// we are interested in all collectors that match condition:
+	// lastSealedBlock + sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight
+	// in other words we should check for emergency sealing only if threshold was reached
+	if emergencySealingHeight >= lastFinalizedHeight {
+		return nil
+	}
+
+	delta := lastFinalizedHeight - emergencySealingHeight
+	// if block is emergency sealable depends on it's incorporated block height
+	// collectors tree stores collector by executed block height
+	// we need to select multiple levels to find eligible collectors for emergency sealing
+	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
+		err := collector.CheckEmergencySealing(lastFinalizedHeight)
+		if err != nil {
+			return err
 		}
 	}
 	return nil

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
@@ -76,7 +77,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		}
 	})
 
-	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Twice().Once()
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
@@ -192,14 +193,15 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 		err := s.core.processIncorporatedResult(incorporatedResult)
 		require.NoError(s.T(), err)
 	}
-
-	require.Equal(s.T(), numResults, s.core.collectorTree.GetSize())
+	// there will be numResults + 1 vertices since all of them share same parent
+	require.Equal(s.T(), numResults+1, s.core.collectorTree.GetSize())
 
 	candidate := unittest.BlockHeaderWithParentFixture(&s.Block)
-
 	s.blocks[candidate.ID()] = &candidate
 
-	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil)).Once()
+	// candidate becomes new sealed and finalized block, it means that
+	// we will need to cleanup our tree till new height, removing all outdated collectors
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&candidate, nil)).Once()
 
 	s.core.OnFinalizedBlock(candidate.ID())
 	require.Equal(s.T(), uint(0), s.core.collectorTree.GetSize())
@@ -297,4 +299,24 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 	// if it's an expected sentinel error, it has to be handled internally
 	err = s.core.processIncorporatedResult(s.IncorporatedResult)
 	require.Error(s.T(), err)
+}
+
+// TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
+	s.core.emergencySealingActive = true
+	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Times(sealing.DefaultEmergencySealingThreshold)
+
+	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
+	require.NoError(s.T(), err)
+
+	lastFinalizedBlock := &s.IncorporatedBlock
+	for i := 0; i < sealing.DefaultEmergencySealingThreshold; i++ {
+		finalizedBlock := unittest.BlockHeaderWithParentFixture(lastFinalizedBlock)
+		s.blocks[finalizedBlock.ID()] = &finalizedBlock
+		s.core.OnFinalizedBlock(finalizedBlock.ID())
+		lastFinalizedBlock = &finalizedBlock
+	}
+
+	s.sealsPL.AssertExpectations(s.T())
 }
