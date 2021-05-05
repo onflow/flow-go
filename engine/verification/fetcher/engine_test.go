@@ -24,7 +24,6 @@ import (
 	flowprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -772,7 +771,6 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 			Collection:    collections[chunkID],
 			ChunkDataPack: chunkDataPack,
 		}
-		fmt.Printf("%d, %x\n", verifiableChunks[chunkID].Collection.Len(), logging.ID(chunkID))
 	}
 
 	return chunkDataPacks, collections, verifiableChunks

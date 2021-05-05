@@ -267,8 +267,7 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 }
 
 // validateCollectionID returns error for an invalid collection against a chunk data pack,
-// and returns nil otherwise. A collection is valid against a chunk data pack if its id is the same
-// as the one in the chunk data pack.
+// and returns nil otherwise.
 func (e Engine) validateCollectionID(collection *flow.Collection,
 	chunkDataPack *flow.ChunkDataPack,
 	chunkIndex uint64,
@@ -297,7 +296,7 @@ func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunk
 	return nil
 }
 
-// validateNonSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
+// validateNonSystemChunkCollection returns nil if the collection is matching the non-system chunk data pack.
 // A collection is valid against a non-system chunk if it has a matching collection ID with system chunk's collection ID field.
 //
 // TODO: collection ID should also be checked against its block.
