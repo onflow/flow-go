@@ -16,7 +16,6 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -339,7 +338,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				assert.True(t, isValid)
 
 				// validate proofs as a batch
-				_, err = ptrie.NewPSMT(hash.Hash(newState), bProof)
+				_, err = ptrie.NewPSMT(ledger.RootHash(newState), bProof)
 				assert.NoError(t, err)
 
 				// query all exising keys (check no drop)

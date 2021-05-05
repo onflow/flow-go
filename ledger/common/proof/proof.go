@@ -39,7 +39,7 @@ func VerifyTrieProof(p *ledger.TrieProof, expectedState ledger.State) bool {
 		}
 
 		bit := bitutils.Bit(p.Path[:], treeHeight-h)
-		// hashing is order dependant
+		// hashing is order dependent
 		if bit == 1 { // we hash our way up to the parent along the parent's right branch
 			computed = hash.HashInterNode(siblingHash, computed)
 		} else { // we hash our way up to the parent along the parent's left branch

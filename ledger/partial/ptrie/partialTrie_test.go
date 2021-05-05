@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/module/metrics"
@@ -43,22 +43,17 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting proofs values")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
-
+		psmt, err := NewPSMT(rootHash, bp)
 		require.NoError(t, err, "error building partial trie")
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [before set]")
-		}
+		ensureRootHash(t, rootHash, psmt)
+
 		u := &ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads}
 		rootHash, err = f.Update(u)
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [after set]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 
 		updatedPayload1 := utils.LightPayload('B', 'b')
 		payloads = []*ledger.Payload{updatedPayload1}
@@ -69,11 +64,7 @@ func TestPartialTrieEmptyTrie(t *testing.T) {
 
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
-
+		ensureRootHash(t, rootHash, psmt)
 	})
 }
 
@@ -101,12 +92,9 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 		bp, err := f.Proofs(r)
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
+		psmt, err := NewPSMT(rootHash, bp)
 		require.NoError(t, err, "error building partial trie")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2}
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
@@ -114,10 +102,7 @@ func TestPartialTrieLeafUpdates(t *testing.T) {
 
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 	})
 
 }
@@ -146,22 +131,17 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
+		psmt, err := NewPSMT(rootHash, bp)
 		require.NoError(t, err, "error building partial trie")
+		ensureRootHash(t, f.GetEmptyRootHash(), psmt)
 
-		if hash.Hash(f.GetEmptyRootHash()) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
 		// first update
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
 		require.NoError(t, err, "error updating trie")
 
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 
 		// second update
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2, updatedPayload3}
@@ -170,10 +150,7 @@ func TestPartialTrieMiddleBranching(t *testing.T) {
 
 		_, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 	})
 
 }
@@ -198,12 +175,9 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
+		psmt, err := NewPSMT(rootHash, bp)
 		require.NoError(t, err, "error building partial trie")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 
 		// first update
 		rootHash, err = f.Update(&ledger.TrieUpdate{RootHash: rootHash, Paths: paths, Payloads: payloads})
@@ -211,9 +185,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 
 		pRootHash, err := psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-		if hash.Hash(rootHash) != pRootHash {
-			t.Fatal("rootNode hash doesn't match [after update]")
-		}
+		assert.Equal(t, rootHash, pRootHash, "rootNode hash doesn't match [after update]")
 
 		// second update
 		payloads = []*ledger.Payload{updatedPayload1, updatedPayload2}
@@ -222,9 +194,7 @@ func TestPartialTrieRootUpdates(t *testing.T) {
 
 		pRootHash, err = psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating psmt")
-		if hash.Hash(rootHash) != pRootHash {
-			t.Fatal("rootNode hash doesn't match [after second update]")
-		}
+		assert.Equal(t, rootHash, pRootHash, "rootNode hash doesn't match [after second update]")
 	})
 
 }
@@ -254,12 +224,9 @@ func TestMixProof(t *testing.T) {
 		bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 		require.NoError(t, err, "error getting batch proof")
 
-		psmt, err := NewPSMT(hash.Hash(rootHash), bp)
+		psmt, err := NewPSMT(rootHash, bp)
 		require.NoError(t, err, "error building partial trie")
-
-		if hash.Hash(rootHash) != psmt.root.HashValue() {
-			t.Fatal("rootNode hash doesn't match [before update]")
-		}
+		ensureRootHash(t, rootHash, psmt)
 
 		paths = []ledger.Path{path2, path3}
 		payloads = []*ledger.Payload{updatedPayload2, updatedPayload2}
@@ -269,11 +236,8 @@ func TestMixProof(t *testing.T) {
 
 		pRootHash, err := psmt.Update(paths, payloads)
 		require.NoError(t, err, "error updating partial trie")
-
-		if hash.Hash(rootHash) != pRootHash {
-			t.Fatalf("root2 hash doesn't match [%x] != [%x]", rootHash, pRootHash)
-		}
-
+		ensureRootHash(t, rootHash, psmt)
+		assert.Equal(t, rootHash, pRootHash, "root2 hash doesn't match [%x] != [%x]", rootHash, pRootHash)
 	})
 
 }
@@ -310,12 +274,9 @@ func TestRandomProofs(t *testing.T) {
 			bp, err := f.Proofs(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 			require.NoError(t, err, "error getting batch proof")
 
-			psmt, err := NewPSMT(hash.Hash(rootHash), bp)
+			psmt, err := NewPSMT(rootHash, bp)
 			require.NoError(t, err, "error building partial trie")
-
-			if hash.Hash(rootHash) != psmt.root.HashValue() {
-				t.Fatal("root hash doesn't match")
-			}
+			ensureRootHash(t, rootHash, psmt)
 
 			// select a subset of shuffled paths for random updates
 			split = rand.Intn(numberOfPaths)
@@ -331,14 +292,22 @@ func TestRandomProofs(t *testing.T) {
 
 			pRootHash2, err := psmt.Update(updatePaths, updatePayloads)
 			require.NoError(t, err, "error updating partial trie")
-
-			if hash.Hash(rootHash2) != pRootHash2 {
-				t.Fatalf("root2 hash doesn't match [%x] != [%x]", rootHash2, pRootHash2)
-			}
-
+			assert.Equal(t, pRootHash2, rootHash2, "root2 hash doesn't match [%x] != [%x]", rootHash2, pRootHash2)
 		})
 	}
 }
 
 // TODO add test for incompatible proofs [Byzantine milestone]
 // TODO add test key not exist [Byzantine milestone]
+
+func ensureRootHash(t *testing.T, expectedRootHash ledger.RootHash, psmt *PSMT) {
+	if expectedRootHash != ledger.RootHash(psmt.root.Hash()) {
+		t.Fatal("rootNode hash doesn't match")
+	}
+	if expectedRootHash != psmt.RootHash() {
+		t.Fatal("rootNode hash doesn't match")
+	}
+	if expectedRootHash != ledger.RootHash(psmt.root.forceComputeHash()) {
+		t.Fatal("rootNode hash doesn't match")
+	}
+}

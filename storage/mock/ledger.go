@@ -49,8 +49,8 @@ func (_m *Ledger) Done() <-chan struct{} {
 	return r0
 }
 
-// DummyStateCommitment provides a mock function with given fields:
-func (_m *Ledger) DummyStateCommitment() flow.StateCommitment {
+// EmptyStateCommitment provides a mock function with given fields:
+func (_m *Ledger) EmptyStateCommitment() flow.StateCommitment {
 	ret := _m.Called()
 
 	var r0 flow.StateCommitment

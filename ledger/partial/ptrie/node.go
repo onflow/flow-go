@@ -21,7 +21,6 @@ type node struct {
 	lChild    *node           // Left Child
 	rChild    *node           // Right Child
 	height    int             // Height where the node is at
-	path      ledger.Path     // path
 	payload   *ledger.Payload // payload
 	hashValue hash.Hash       // hash value
 }
@@ -36,9 +35,12 @@ func newNode(v hash.Hash, height int) *node {
 	return n
 }
 
-// TODO: revisit this
-// ComputeValue recomputes value for this node in recursive manner
-func (n *node) HashValue() hash.Hash {
+// Hash returns the node's pre-computed hash value
+func (n *node) Hash() hash.Hash { return n.hashValue }
+
+// forceComputeHash computes (and updates) the hashes of _all interior nodes_
+// of this sub-trie. Caution: this is an expensive operation!
+func (n *node) forceComputeHash() hash.Hash {
 	// leaf node
 	if n.lChild == nil && n.rChild == nil {
 		return n.hashValue
@@ -46,17 +48,16 @@ func (n *node) HashValue() hash.Hash {
 	// otherwise compute
 	var h1, h2 hash.Hash
 	if n.lChild != nil {
-		h1 = n.lChild.HashValue()
+		h1 = n.lChild.forceComputeHash()
 	} else {
 		h1 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
 
 	if n.rChild != nil {
-		h2 = n.rChild.HashValue()
+		h2 = n.rChild.forceComputeHash()
 	} else {
 		h2 = ledger.GetDefaultHashForHeight(n.height - 1)
 	}
-	// For debugging purpose uncomment this
-	// n.value = HashInterNode(h1, h2)
-	return hash.HashInterNode(h1, h2)
+	n.hashValue = hash.HashInterNode(h1, h2)
+	return n.hashValue
 }

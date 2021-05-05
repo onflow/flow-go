@@ -99,7 +99,7 @@ func Test_WAL(t *testing.T) {
 			fmt.Printf("Querying with %x\n", state)
 
 			var ledgerState ledger.State
-			copy(ledgerState[:], []byte(state))
+			copy(ledgerState[:], state)
 			query, err := ledger.NewQuery(ledgerState, keys)
 			require.NoError(t, err)
 			values, err := led2.Get(query)

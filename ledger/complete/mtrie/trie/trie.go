@@ -94,6 +94,9 @@ func (mt *MTrie) RootNode() *node.Node {
 // String returns the trie's string representation.
 // Concurrency safe (as Tries are immutable structures by convention)
 func (mt *MTrie) String() string {
+	if mt.IsEmpty() {
+		return fmt.Sprintf("Empty Trie with default root hash: %x\n", mt.RootHash())
+	}
 	trieStr := fmt.Sprintf("Trie root hash: %x\n", mt.RootHash())
 	return trieStr + mt.root.FmtStr("", "")
 }
@@ -216,8 +219,8 @@ func update(
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
 		// check if the parent node path is among the updated paths
-		parentPath := *parentNode.Path()
 		found := false
+		parentPath := *parentNode.Path()
 		for i, p := range paths {
 			if p == parentPath {
 				// the case where the recursion stops: only one path to update
@@ -474,8 +477,7 @@ func (mt *MTrie) IsAValidTrie() bool {
 
 // splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
 // at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
-// is returned.
-// The same permutation is applied to the payloads slice.
+// is returned. The same permutation is applied to the payloads slice.
 //
 // This would be the partition step of an ascending quick sort of paths (lexicographic order)
 // with the pivot being the path with all zeros and 1 at bitIndex.
@@ -519,10 +521,9 @@ func SplitPaths(paths []ledger.Path, bitIndex int) int {
 	return i
 }
 
-// splitByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths with a zero bit
-// at the input bitIndex, the second part contains paths with a one at the bitIndex. The index of partition
-// is returned.
-// The same permutation is applied to the proofs slice.
+// splitTrieProofsByPath permutes the input paths to be partitioned into 2 parts. The first part contains paths
+// with a zero bit at the input bitIndex, the second part contains paths with a one at the bitIndex. The index
+// of partition is returned. The same permutation is applied to the proofs slice.
 //
 // This would be the partition step of an ascending quick sort of paths (lexicographic order)
 // with the pivot being the path with all zeros and 1 at bitIndex.

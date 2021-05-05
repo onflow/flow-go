@@ -77,6 +77,6 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 		return
 	default:
 		err = fmt.Errorf("unknown operation type, given: %x", operation)
+		return
 	}
-	return
 }

@@ -42,6 +42,7 @@ func (st *SystemChunkTestSuite) TestSystemChunkIDsShouldBeDifferent() {
 	require.NoError(st.T(), err)
 	stateB, err := receiptB.ExecutionResult.FinalStateCommitment()
 	require.NoError(st.T(), err)
+	require.Equal(st.T(), stateA, stateB)
 
 	// computes ids of system chunk for result A and B
 	systemChunkAId := receiptA.ExecutionResult.Chunks[0].ID()

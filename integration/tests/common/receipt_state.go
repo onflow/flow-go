@@ -66,6 +66,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 
 	// get the state commitment for the highest finalized block
 	initialFinalizedSC := unittest.GenesisStateCommitment
+	var err error
 	b1, ok := bs.HighestFinalized()
 	if ok {
 		r1 := rs.WaitForReceiptFromAny(t, b1.Header.ID())
@@ -87,7 +88,9 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 		}
 		currentID = b2.Header.ID()
 		r2 = rs.WaitForReceiptFromAny(t, b2.Header.ID())
-		if initialFinalizedSC == r2.ExecutionResult.FinalStateCommitment() {
+		r2finalState, err := r2.ExecutionResult.FinalStateCommitment()
+		require.NoError(t, err)
+		if initialFinalizedSC == r2finalState {
 			// received a new execution result for the next finalized block, but it has the same final state commitment
 			// check the next finalized block
 			currentHeight++
