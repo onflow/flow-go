@@ -24,6 +24,7 @@ import (
 	flowprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -153,7 +154,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	// fetcher engine should create and pass a verifiable chunk to verifier engine upon receiving each
 	// chunk data responses, and notify the consumer that it is done with processing chunk.
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses.Chunks()))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -227,6 +228,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
+	mockPendingChunksByID(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
@@ -243,7 +245,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	})
 
 	// fetcher engine should notify
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses.Chunks()))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -632,7 +634,7 @@ func mockVerifierEngine(t *testing.T,
 
 		if vc.IsSystemChunk {
 			// system chunk has an empty collection
-			require.Equal(t, flow.Collection{}.ID(), vc.Collection.ID())
+			require.Equal(t, vc.Collection.Len(), 0)
 		} else {
 			require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
 		}
@@ -656,7 +658,7 @@ func mockVerifierEngine(t *testing.T,
 
 // mockChunkConsumerNotifier mocks the notify method of processing notifier to be notified exactly once per
 // given chunk IDs.
-func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier, chunkIDs flow.IdentifierList) {
+func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier, locatorIDs flow.IdentifierList) {
 	mu := &sync.Mutex{}
 	seen := make(map[flow.Identifier]struct{})
 	notifier.On("Notify", mock.Anything).Run(func(args mock.Arguments) {
@@ -664,16 +666,16 @@ func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier
 		mu.Lock()
 		defer mu.Unlock()
 
-		chunkID, ok := args[0].(flow.Identifier)
+		locatorID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)
-		require.Contains(t, chunkIDs, chunkID, "tried calling notifier on an unexpected chunk ID")
+		require.Contains(t, locatorIDs, locatorID, "tried calling notifier on an unexpected locator ID")
 
 		// each chunk should be notified once
-		_, ok = seen[chunkID]
+		_, ok = seen[locatorID]
 		require.False(t, ok)
-		seen[chunkID] = struct{}{}
+		seen[locatorID] = struct{}{}
 
-	}).Return().Times(len(chunkIDs))
+	}).Return().Times(len(locatorIDs))
 }
 
 // mockBlockSealingStatus mocks protocol state sealing status at height of given block header.
@@ -756,21 +758,21 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 	for _, chunk := range chunks {
 		chunkID := chunk.ID()
 
-		collection := collections[chunkID]
 		chunkDataPack := chunkDataPacks[chunkID]
 
 		if fetcher.IsSystemChunk(chunk.Index, result) {
-			collection = &flow.Collection{} // system chunk has an empty collection
 			chunkDataPack.CollectionID = flow.ZeroID
+			collections[chunkID] = &flow.Collection{Transactions: nil}
 		}
 
 		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
 			Chunk:         chunk,
 			Header:        block.Header,
 			Result:        result,
-			Collection:    collection,
+			Collection:    collections[chunkID],
 			ChunkDataPack: chunkDataPack,
 		}
+		fmt.Printf("%d, %x\n", verifiableChunks[chunkID].Collection.Len(), logging.ID(chunkID))
 	}
 
 	return chunkDataPacks, collections, verifiableChunks
