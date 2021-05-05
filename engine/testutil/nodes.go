@@ -805,7 +805,6 @@ func NewVerificationNode(t testing.TB,
 	identity *flow.Identity,
 	identities []*flow.Identity,
 	assigner module.ChunkAssigner,
-	receiptsLimit uint,
 	chunksLimit uint,
 	chainID flow.ChainID,
 	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
@@ -822,102 +821,6 @@ func NewVerificationNode(t testing.TB,
 	if node.GenericNode == nil {
 		gn := GenericNode(t, hub, identity, identities, chainID)
 		node.GenericNode = &gn
-	}
-
-	if node.CachedReceipts == nil {
-		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ReadyReceipts == nil {
-		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingResults == nil {
-		node.PendingResults = stdmap.NewResultDataPacks(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingChunks == nil {
-		node.PendingChunks = match.NewChunks(chunksLimit)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ProcessedResultIDs == nil {
-		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
-		require.Nil(t, err)
-	}
-
-	if node.DiscardedResultIDs == nil {
-		node.DiscardedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceDiscardedResultID, node.DiscardedResultIDs.Size)
-		require.Nil(t, err)
-	}
-
-	if node.BlockIDsCache == nil {
-		node.BlockIDsCache, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceCachedBlockID, node.BlockIDsCache.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingReceiptIDsByBlock == nil {
-		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.PendingReceiptIDsByBlock.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ReceiptIDsByResult == nil {
-		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkIDsByResult == nil {
-		node.ChunkIDsByResult, err = stdmap.NewIdentifierMap(chunksLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceChunkIDsByResult, node.ChunkIDsByResult.Size)
-		require.Nil(t, err)
 	}
 
 	if node.ChunkStatuses == nil {

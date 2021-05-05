@@ -220,19 +220,19 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 type VerificationNode struct {
 	*GenericNode
 	CachedReceipts           mempool.ReceiptDataPacks
-	ReadyReceipts            mempool.ReceiptDataPacks
-	PendingReceipts          mempool.ReceiptDataPacks
-	PendingResults           mempool.ResultDataPacks
+	ReadyReceipts            mempool.ReceiptDataPacks // TODO: backward compatibility, remove once new verification node is active.
+	PendingReceipts          mempool.ReceiptDataPacks // TODO: backward compatibility, remove once new verification node is active.
+	PendingResults           mempool.ResultDataPacks  // TODO: backward compatibility, remove once new verification node is active.
 	ChunkStatuses            mempool.ChunkStatuses
 	ChunkRequests            mempool.ChunkRequests
-	ProcessedResultIDs       mempool.Identifiers
-	DiscardedResultIDs       mempool.Identifiers
-	BlockIDsCache            mempool.Identifiers
+	ProcessedResultIDs       mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
+	DiscardedResultIDs       mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
+	BlockIDsCache            mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
 	Results                  storage.ExecutionResults
 	Receipts                 storage.ExecutionReceipts
-	PendingReceiptIDsByBlock mempool.IdentifierMap
-	ReceiptIDsByResult       mempool.IdentifierMap
-	ChunkIDsByResult         mempool.IdentifierMap
+	PendingReceiptIDsByBlock mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
+	ReceiptIDsByResult       mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
+	ChunkIDsByResult         mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
 
 	// chunk consumer and processor for fetcher engine
 	ProcessedChunkIndex storage.ConsumerProgress

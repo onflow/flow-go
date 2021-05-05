@@ -7,16 +7,13 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
-	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -283,7 +280,6 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		participants,
 		chunkAssigner,
 		uint(receiptsLimit),
-		uint(10*receiptsLimit), // chunksLimit
 		chainID,
 		collector,
 		collector,
@@ -319,68 +315,6 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 	testmock.RequireGenericNodesDoneBefore(t, 1*time.Second,
 		conNode,
 		exeNode)
-}
-
-// mockChunkProcessor sets up a mock chunk processor that asserts the followings:
-// - in a staked verification node:
-// -- that a set of chunk locators are delivered to it.
-// -- that each chunk locator is delivered only once.
-// - in an unstaked verification node:
-// -- no chunk locator is passed to it.
-//
-// mockChunkProcessor returns the mock chunk processor and a wait group that unblocks when all expected locators received.
-func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
-	staked bool) (*mockfetcher.AssignedChunkProcessor, *sync.WaitGroup) {
-	processor := &mockfetcher.AssignedChunkProcessor{}
-
-	// keeps track of which locators it has received
-	receivedLocators := make(map[flow.Identifier]struct{})
-
-	var (
-		// decrements the wait group per distinct chunk locator received
-		wg sync.WaitGroup
-		// serializes processing locators (just for sake of test)
-		mu sync.Mutex
-	)
-
-	if staked {
-		// in staked mode, it expects chunk locators coming
-		wg.Add(len(expectedLocatorIDs))
-	}
-
-	var notifier module.ProcessingNotifier
-	processor.On("WithChunkConsumerNotifier", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		processingNotifier, ok := args[0].(module.ProcessingNotifier)
-		require.True(t, ok)
-		notifier = processingNotifier
-	})
-
-	processor.On("ProcessAssignedChunk", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		mu.Lock()
-		defer mu.Unlock()
-
-		// chunk processor (i.e., fetcher engine) should only receive a locator if the verification node is staked.
-		require.True(t, staked, "unstaked fetcher engine received chunk locator")
-
-		// the received entity should be an chunk locator
-		locator, ok := args[0].(*chunks.Locator)
-		assert.True(t, ok)
-
-		locatorID := locator.ID()
-
-		// verifies that it has not seen this locator
-		_, duplicate := receivedLocators[locatorID]
-		require.False(t, duplicate, fmt.Sprintf("chunk processor received duplicate locator: %x", locatorID))
-
-		// ensures the received locator matches one we expect
-		require.Contains(t, expectedLocatorIDs, locatorID, fmt.Sprintf("chunk processor unexpected locator: %x", locatorID))
-
-		notifier.Notify(locatorID)
-
-		wg.Done()
-	})
-
-	return processor, &wg
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).
