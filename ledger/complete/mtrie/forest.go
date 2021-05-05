@@ -1,6 +1,7 @@
 package mtrie
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -333,6 +334,20 @@ func (f *Forest) RemoveTrie(rootHash ledger.RootHash) {
 // GetEmptyRootHash returns the rootHash of empty Trie
 func (f *Forest) GetEmptyRootHash() ledger.RootHash {
 	return trie.EmptyTrieRootHash()
+}
+
+// MostRecentTouchedRootHash returns the rootHash of the most recently touched trie
+func (f *Forest) MostRecentTouchedRootHash() (ledger.RootHash, error) {
+	keys := f.tries.Keys()
+	if len(keys) > 0 {
+		encodedRootHash := keys[len(keys)-1].(string)
+		rootHashBytes, err := hex.DecodeString(encodedRootHash)
+		if err != nil {
+			return ledger.RootHash(hash.DummyHash), fmt.Errorf("failed to decode the root string: %w", err)
+		}
+		return ledger.ToRootHash(rootHashBytes)
+	}
+	return ledger.RootHash(hash.DummyHash), fmt.Errorf("no trie is stored in the forest")
 }
 
 // Size returns the number of active tries in this store

@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T) {
+func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)) func(*testing.T) {
 	return func(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(badgerDB *badger.DB) {
 			metricsCollector := &metrics.NoopCollector{}
@@ -53,7 +53,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState)) func(*testing.T)
 				ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, receipts, myReceipts, events, serviceEvents, txResults, badgerDB, trace.NewNoopTracer(),
 			)
 
-			f(t, es)
+			f(t, es, ls)
 		})
 	}
 }
@@ -63,7 +63,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 	registerID2 := "vegetable"
 
-	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState) {
+	t.Run("commit write and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
 		// TODO: use real block ID
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
@@ -75,7 +75,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, "", "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
-		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		view2 := es.NewView(sc2)
@@ -89,7 +89,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, flow.RegisterValue("carrot"), b2)
 	}))
 
-	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState) {
+	t.Run("commit write and read previous state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
 		// TODO: use real block ID
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
@@ -98,8 +98,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		err = view1.Set(registerID1, "", "", []byte("apple"))
 		assert.NoError(t, err)
-
-		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -107,7 +106,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view2.Set(registerID1, "", "", []byte("orange"))
 		assert.NoError(t, err)
 
-		sc3, err := es.CommitDelta(context.Background(), view2.Delta(), sc2)
+		sc3, err := state.CommitDelta(l, view2.Delta(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -127,7 +126,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Equal(t, flow.RegisterValue("orange"), b2)
 	}))
 
-	t.Run("commit delete and read new state", prepareTest(func(t *testing.T, es state.ExecutionState) {
+	t.Run("commit delete and read new state", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
 		// TODO: use real block ID
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
@@ -139,7 +138,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, "", "", []byte("apple"))
 		assert.NoError(t, err)
 
-		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -147,7 +146,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view2.Delete(registerID1, "", "")
 		assert.NoError(t, err)
 
-		sc3, err := es.CommitDelta(context.Background(), view2.Delta(), sc2)
+		sc3, err := state.CommitDelta(l, view2.Delta(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -167,7 +166,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		assert.Empty(t, b2)
 	}))
 
-	t.Run("commit delta and persist state commit for the second time should be OK", prepareTest(func(t *testing.T, es state.ExecutionState) {
+	t.Run("commit delta and persist state commit for the second time should be OK", prepareTest(func(t *testing.T, es state.ExecutionState, l *ledger.Ledger) {
 		// TODO: use real block ID
 		sc1, err := es.StateCommitmentByBlockID(context.Background(), flow.Identifier{})
 		assert.NoError(t, err)
@@ -179,11 +178,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, "", "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
-		sc2, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// committing for the second time should be OK
-		sc2Same, err := es.CommitDelta(context.Background(), view1.Delta(), sc1)
+		sc2Same, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)

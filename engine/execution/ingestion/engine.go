@@ -454,7 +454,8 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// if it's not added, it means the block is not a new block, it already
 	// exists in the queue, then bail
 	if !added {
-		log.Debug().Msg("block already exists in the execution queue")
+		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
+			Msg("block already exists in the execution queue")
 		return nil
 	}
 
@@ -692,6 +693,10 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 // return a bool indicates whether the block was completed
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 
+	if eb.Executing {
+		return false
+	}
+
 	// if the eb has parent statecommitment, and we have the delta for this block
 	// then apply the delta
 	// note the block ID is the delta's ID
@@ -721,6 +726,9 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 		if e.extensiveLogging {
 			e.logExecutableBlock(eb)
 		}
+
+		// no external synchronisation is used because this method must be run in a thread-safe context
+		eb.Executing = true
 
 		e.unit.Launch(func() {
 			e.executeBlock(e.unit.Ctx(), eb)
@@ -752,7 +760,7 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // a block can't be executed if its collection is missing.
 // since a collection can belong to multiple blocks, we need to
 // find all the blocks that are needing this collection, and then
-// check if any of these block becomes executable and execut it if
+// check if any of these block becomes executable and execute it if
 // is.
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
 
@@ -800,6 +808,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
 
+				fmt.Printf("handled collection\n")
+
 				// check if the block becomes executable
 				_ = e.executeBlockIfComplete(executableBlock)
 			}
@@ -839,8 +849,8 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // G
 func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	for _, queue := range queues.All() {
-		if queue.TryAdd(blockify) {
-			return queue, true
+		if stored, isNew := queue.TryAdd(blockify); stored {
+			return queue, isNew
 		}
 	}
 	return newQueue(blockify, queues)

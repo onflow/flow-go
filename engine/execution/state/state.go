@@ -61,9 +61,6 @@ type ReadOnlyExecutionState interface {
 type ExecutionState interface {
 	ReadOnlyExecutionState
 
-	// CommitDelta commits a register delta and returns the new state commitment.
-	CommitDelta(context.Context, delta.Delta, flow.StateCommitment) (flow.StateCommitment, error)
-
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
 	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
@@ -211,8 +208,12 @@ func (s *state) NewView(commitment flow.StateCommitment) *delta.View {
 	return delta.NewView(LedgerGetRegister(s.ls, commitment))
 }
 
-func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-	ids, values := delta.RegisterUpdates()
+type RegisterUpdatesHolder interface {
+	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
+}
+
+func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+	ids, values := ruh.RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
 		ledger.State(baseState),
@@ -232,12 +233,12 @@ func CommitDelta(ldg ledger.Ledger, delta delta.Delta, baseState flow.StateCommi
 	return flow.StateCommitment(commit), nil
 }
 
-func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
-	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
-	defer span.Finish()
-
-	return CommitDelta(s.ls, delta, baseState)
-}
+//func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+//	span, _ := s.tracer.StartSpanFromContext(ctx, trace.EXECommitDelta)
+//	defer span.Finish()
+//
+//	return CommitDelta(s.ls, delta, baseState)
+//}
 
 func (s *state) getRegisters(commit flow.StateCommitment, registerIDs []flow.RegisterID) (*ledger.Query, []ledger.Value, error) {
 

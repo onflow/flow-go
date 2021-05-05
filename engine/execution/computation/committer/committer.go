@@ -44,18 +44,7 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 }
 
 func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, err error) {
-	ids, values := view.RegisterUpdates()
-	update, err := ledger.NewUpdate(
-		ledger.State(baseState),
-		execState.RegisterIDSToKeys(ids),
-		execState.RegisterValuesToValues(values),
-	)
-	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
-	}
-
-	state, err := s.ldg.Set(update)
-	return flow.StateCommitment(state), err
+	return execState.CommitDelta(s.ldg, view, baseState)
 }
 
 func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {

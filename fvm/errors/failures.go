@@ -149,3 +149,27 @@ func (e HasherFailure) FailureCode() FailureCode {
 func (e HasherFailure) Unwrap() error {
 	return e.err
 }
+
+// MetaTransactionFailure captures a fatal caused by invoking a meta transaction
+type MetaTransactionFailure struct {
+	err error
+}
+
+// NewMetaTransactionFailuref constructs a new hasherFailure
+func NewMetaTransactionFailuref(msg string, args ...interface{}) *MetaTransactionFailure {
+	return &MetaTransactionFailure{err: fmt.Errorf(msg, args...)}
+}
+
+func (e MetaTransactionFailure) Error() string {
+	return fmt.Sprintf("%s meta transaction failed: %s", e.FailureCode().String(), e.err.Error())
+}
+
+// FailureCode returns the failure code
+func (e MetaTransactionFailure) FailureCode() FailureCode {
+	return FailureCodeMetaTransactionFailure
+}
+
+// Unwrap unwraps the error
+func (e MetaTransactionFailure) Unwrap() error {
+	return e.err
+}

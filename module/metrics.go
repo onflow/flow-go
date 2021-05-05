@@ -59,8 +59,13 @@ type CleanerMetrics interface {
 }
 
 type CacheMetrics interface {
+	// report the total number of cached items
 	CacheEntries(resource string, entries uint)
+	// report the number of times the queried item is found in the cache
 	CacheHit(resource string)
+	// report the number of items the queried item is not found in the cache, nor found in the database
+	CacheNotFound(resource string)
+	// report the number of items the queried item is not found in the cache, but found in the database
 	CacheMiss(resource string)
 }
 
@@ -344,5 +349,6 @@ type TransactionMetrics interface {
 type PingMetrics interface {
 	// NodeReachable tracks the round trip time in milliseconds taken to ping a node
 	// The nodeInfo provides additional information about the node such as the name of the node operator
-	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration)
+	// version is the software version the target node is running
+	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration, version string)
 }

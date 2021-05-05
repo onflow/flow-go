@@ -181,10 +181,10 @@ func (i *TransactionInvocator) Process(
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
-	proc.Events = env.getEvents()
-	proc.ServiceEvents = env.getServiceEvents()
-	proc.Logs = env.getLogs()
-	proc.GasUsed = env.GetComputationUsed()
+	proc.Events = append(proc.Events, env.getEvents()...)
+	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
+	proc.Logs = append(proc.Logs, env.getLogs()...)
+	proc.GasUsed = proc.GasUsed + env.GetComputationUsed()
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).

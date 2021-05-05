@@ -26,9 +26,10 @@ type ExecutableBlock struct {
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection // key is the collection ID.
 	StartState          *flow.StateCommitment
+	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
-// BlocksByCollection represents a collection that the execution node
+// BlocksByCollection represents a collection that the execution node.
 // has not received its transactions yet.
 // it also holds references to the blocks that contains this collection
 // and are waiting to be executed.

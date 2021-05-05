@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -213,11 +213,6 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest sealed result %x: %w", lastSeal.ResultID, err)
 	}
-	sealedBlock, err := v.headers.ByBlockID(lastSeal.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve sealed block (%x): %w", lastSeal.BlockID, err)
-	}
-	sealedHeight := sealedBlock.Height
 
 	// forkBlocks is the set of all _unsealed_ blocks on the fork. We
 	// use it to identify receipts that are for blocks not in the fork.
@@ -264,11 +259,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-	visitParent := func(header *flow.Header) bool {
-		parentHeight := header.Height - 1
-		return parentHeight > sealedHeight
-	}
-	err = state.TraverseForward(v.headers, header.ParentID, bookKeeper, visitParent)
+	err = fork.TraverseForward(v.headers, header.ParentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}

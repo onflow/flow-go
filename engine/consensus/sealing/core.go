@@ -162,8 +162,8 @@ func (c *Core) OnReceipt(originID flow.Identifier, receipt *flow.ExecutionReceip
 
 	processed, err := c.processReceipt(receipt)
 	if err != nil {
-		marshalled, err := json.Marshal(receipt)
-		if err != nil {
+		marshalled, encErr := json.Marshal(receipt)
+		if encErr != nil {
 			marshalled = []byte("json_marshalling_failed")
 		}
 		c.log.Error().Err(err).

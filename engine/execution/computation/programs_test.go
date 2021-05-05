@@ -64,7 +64,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 
 	// tx6 calls the method of the contract (version 2 expected)
 	tx6 := testutil.CreateEmitEventTransaction(account, account)
-	prepareTx(t, tx6, account, privKey, 4, chain)
+	prepareTx(t, tx6, account, privKey, 5, chain)
 
 	transactions := []*flow.TransactionBody{tx1, tx2, tx3, tx4, tx5, tx6}
 
