@@ -68,7 +68,7 @@ func extractExecutionState(dir string,
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
-		targetHash,
+		ledger.State(targetHash),
 		migrations,
 		reporters,
 		complete.DefaultPathFinderVersion,

@@ -275,7 +275,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		executableBlock := &entity.ExecutableBlock{
 			Block:               &referenceBlock,
 			CompleteCollections: completeColls,
-			StartState:          startStateCommitment,
+			StartState:          &startStateCommitment,
 		}
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
@@ -286,7 +286,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			keys := state.RegisterIDSToKeys(ids)
 			flowValues := state.RegisterValuesToValues(values)
 
-			update, err := ledger.NewUpdate(startStateCommitment, keys, flowValues)
+			update, err := ledger.NewUpdate(ledger.State(startStateCommitment), keys, flowValues)
 			require.NoError(t, err)
 
 			// TODO: update CommitDelta to also return proofs
@@ -319,14 +319,14 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 					NumberOfTransactions: 0,
 				},
 				Index:    uint64(i),
-				EndState: endStateCommitment,
+				EndState: flow.StateCommitment(endStateCommitment),
 			}
 
 			// chunkDataPack
 			allRegisters := view.Interactions().AllRegisters()
 			allKeys := state.RegisterIDSToKeys(allRegisters)
 
-			query, err := ledger.NewQuery(chunk.StartState, allKeys)
+			query, err := ledger.NewQuery(ledger.State(chunk.StartState), allKeys)
 			require.NoError(t, err)
 
 			//values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
@@ -343,7 +343,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			chunks = append(chunks, chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
 			spockSecrets = append(spockSecrets, stateSnapshot.SpockSecret)
-			startStateCommitment = endStateCommitment
+			startStateCommitment = flow.StateCommitment(endStateCommitment)
 		}
 
 	})
