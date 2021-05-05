@@ -12,18 +12,18 @@ import (
 // Node defines an Mtrie node
 //
 // DEFINITIONS:
-//     * HEIGHT of a node v in a tree is the number of edges on the longest
-//       downward path between v and a tree leaf.
+//   * HEIGHT of a node v in a tree is the number of edges on the longest
+//     downward path between v and a tree leaf.
 //
-// Conceptually, an MTrie is a sparse Merkle Trie, which has three different types of nodes:
-//    * LEAF node: fully defined by a storage path, a key-value pair and a height
-//      hash is pre-computed, lChild and rChild are nil)
-//    * INTERIOR node: at least one of lChild or rChild is not nil.
-//      Height, and Hash value are set; (key-value is nil)
-// Currently, we represent both data structures by Node instances
+// Conceptually, an MTrie is a sparse Merkle Trie, which has two node types:
+//   * INTERIOR node: has at least one child (i.e. lChild or rChild is not
+//     nil). Interior nodes do not store a path and have no payload.
+//   * LEAF node: has _no_ children.
+// Per convention, we also consider nil as a leaf. Formally, nil is the generic
+// representative for any empty (sub)-trie (i.e. a trie without allocated
+// registers).
 //
-// Nodes are supposed to be used in READ-ONLY fashion. However,
-// for performance reasons, we not not copy read.
+// Nodes are supposed to be treated as _immutable_ data structures.
 // TODO: optimized data structures might be able to reduce memory consumption
 type Node struct {
 	// Implementation Comments:
@@ -34,7 +34,7 @@ type Node struct {
 	lChild    *Node           // Left Child
 	rChild    *Node           // Right Child
 	height    int             // height where the Node is at
-	path      ledger.Path     // the storage path (leaf nodes only)
+	path      ledger.Path     // the storage path (dummy value for interior nodes)
 	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
 	hashValue hash.Hash       // hash value of node (cached)
 	// TODO : Atm, we don't support trees with dynamic depth.
@@ -115,7 +115,7 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		rChild:   rchild,
 		height:   height,
 		payload:  nil,
-		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + uint16(1),
+		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + 1,
 		regCount: lRegCount + rRegCount,
 	}
 	n.computeAndStoreHash()
@@ -229,7 +229,7 @@ func (n *Node) RightChild() *Node { return n.rChild }
 
 // IsLeaf returns true if and only if Node is a LEAF.
 func (n *Node) IsLeaf() bool {
-	// Per definition, a node is a leaf if and only if it has defined path
+	// Per definition, a node is a leaf if and only it has no children
 	return n == nil || (n.lChild == nil && n.rChild == nil)
 }
 

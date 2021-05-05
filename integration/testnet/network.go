@@ -663,12 +663,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot")
+		return nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot")
+		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
 	err = writeJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())

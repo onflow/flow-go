@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
-	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
@@ -764,7 +763,7 @@ func TestRandomUpdateReadProof(t *testing.T) {
 		require.NoError(t, err, "error generating proofs")
 		require.True(t, proof.VerifyTrieBatchProof(batchProof, ledger.State(activeRoot)))
 
-		psmt, err := ptrie.NewPSMT(hash.Hash(activeRoot), batchProof)
+		psmt, err := ptrie.NewPSMT(activeRoot, batchProof)
 		require.NoError(t, err, "error building partial trie")
 		require.Equal(t, psmt.RootHash(), activeRoot)
 

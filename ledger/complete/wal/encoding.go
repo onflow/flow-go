@@ -67,6 +67,7 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 		rootHashBytes, _, err = utils.ReadShortData(data[1:])
 		if err != nil {
 			err = fmt.Errorf("cannot read state commitment: %w", err)
+			return
 		}
 		rootHash, err = ledger.ToRootHash(rootHashBytes)
 		if err != nil {
@@ -75,6 +76,6 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 		return
 	default:
 		err = fmt.Errorf("unknown operation type, given: %x", operation)
+		return
 	}
-	return
 }
