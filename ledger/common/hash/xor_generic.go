@@ -37,10 +37,6 @@ import (
 	"encoding/binary"
 )
 
-var (
-//copyIn512 = copyIn512Generic
-)
-
 // copyOut copies 32 bytes to a hash array.
 func copyOut(d *state) Hash {
 	var out Hash
@@ -53,7 +49,7 @@ func copyOut(d *state) Hash {
 // copyIn512 copies two 32 bytes slices into the state; it
 // makes no non-portable assumptions about memory layout
 // or alignment.
-/*func copyIn512Generic(d *state, buf1, buf2 Hash) {
+func copyIn512(d *state, buf1, buf2 Hash) {
 	sliceBuf1, sliceBuf2 := buf1[:], buf2[:]
 
 	var i int
@@ -71,4 +67,3 @@ func copyOut(d *state) Hash {
 	// copy the last padding bit
 	d.a[16] = paddingEnd
 }
-*/

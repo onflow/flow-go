@@ -40,6 +40,9 @@ const (
 	// rate is size of the internal buffer.
 	rate = 136
 
+	// state size in 64-bit words
+	stateSize = 1600 / 64
+
 	// dsbyte contains the "domain separation" bits and the first bit of
 	// the padding. Sections 6.1 and 6.2 of [1] separate the outputs of the
 	// SHA-3 and SHAKE functions by appending bitstrings to the message.
@@ -127,17 +130,15 @@ func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 // hash256plus256 absorbs two 256 bits slices of data into the hash's state
 // applies the permutation, and outpute the result in out
 func (d *state) hash256plus256(p1, p2 Hash) Hash {
-	xorIn512(d, p1, p2)
+	copyIn512(d, p1, p2)
 	// permute
 	keccakF1600(&d.a)
 	// reverse the endianess to the output
 	return copyOut(d)
 }
 
-// xorIn256 xors two 32 bytes slices into the state; it
-// makes no non-portable assumptions about memory layout
-// or alignment.
-func xorIn512(d *state, buf1, buf2 Hash) {
+/*
+func copyIn512(d *state, buf1, buf2 Hash) {
 	sliceBuf1, sliceBuf2 := buf1[:], buf2[:]
 
 	var i int
@@ -154,4 +155,4 @@ func xorIn512(d *state, buf1, buf2 Hash) {
 	d.a[8] = 0x6
 	// xor the last padding bit
 	d.a[16] = paddingEnd
-}
+}*/
