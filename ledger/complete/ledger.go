@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -39,13 +40,59 @@ const DefaultPathFinderVersion = 1
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
 	forest  *mtrie.Forest
-	wal     *wal.LedgerWAL
+	wal     *RootOnlyWAL
 	metrics module.LedgerMetrics
 	logger  zerolog.Logger
 	// disk size reading can be time consuming, so limit how often its read
 	diskUpdateLimiter *time.Ticker
 	pathFinderVersion uint8
 }
+
+type RootOnlyWAL struct {
+	dir string
+}
+
+func (w *RootOnlyWAL) RecordDelete(hash []byte) error { return nil }
+
+func (w *RootOnlyWAL) PauseRecord() {}
+
+func (w *RootOnlyWAL) UnpauseRecord() {
+
+}
+
+func (w *RootOnlyWAL) ReplayOnForest(forest *mtrie.Forest) error {
+	log.Debug().Msg("Loading root.checkpoint")
+
+	filepath := path.Join(w.dir, "root.checkpoint")
+	file, err := os.Open(filepath)
+	if err != nil {
+		log.Fatal().Msgf("cannot open checkpoint file %s: %w", filepath, err)
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	flattenedForest, err := wal.ReadCheckpoint(file)
+	if err != nil {
+		log.Fatal().Msgf("cannot read checkpoint file %s: %w", filepath, err)
+	}
+
+	rebuiltTries, err := flattener.RebuildTries(flattenedForest)
+	if err != nil {
+		return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
+	}
+	err = forest.AddTries(rebuiltTries)
+
+	log.Debug().Msg("Finished loading root.checkpoint")
+
+	return nil
+}
+
+func (w *RootOnlyWAL) Close() error { return nil }
+
+func (w *RootOnlyWAL) RecordUpdate(update *ledger.TrieUpdate) error { return nil }
+
+func (w *RootOnlyWAL) NewCheckpointer() (*wal.Checkpointer, error) { return nil, nil }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
 func NewLedger(dbDir string,
@@ -55,10 +102,13 @@ func NewLedger(dbDir string,
 	reg prometheus.Registerer,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
+	//w, err := wal.NewWAL(log, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
+	w := &RootOnlyWAL{
+		dir: dbDir,
 	}
+	//if err != nil {
+	//	return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
+	//}
 
 	forest, err := mtrie.NewForest(pathfinder.PathByteSize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return w.RecordDelete(evictedTrie.RootHash())

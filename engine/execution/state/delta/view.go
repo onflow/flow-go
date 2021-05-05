@@ -24,6 +24,9 @@ type View struct {
 	// for views other than collection views to improve performance
 	spockSecretHasher hash.Hasher
 	readFunc          GetRegisterFunc
+
+	Reads  map[string]flow.RegisterID
+	Writes map[string]flow.RegisterID
 }
 
 type Snapshot struct {
@@ -48,6 +51,9 @@ func NewView(readFunc GetRegisterFunc) *View {
 		regTouchSet:       make(map[string]flow.RegisterID),
 		readFunc:          readFunc,
 		spockSecretHasher: hash.NewSHA3_256(),
+
+		Reads:  make(map[string]flow.RegisterID),
+		Writes: make(map[string]flow.RegisterID),
 	}
 }
 
@@ -111,6 +117,11 @@ func (v *View) DropDelta() {
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
 func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
+
+	registerID := toRegisterID(owner, controller, key)
+
+	v.Reads[registerID.String()] = registerID
+
 	value, exists := v.delta.Get(owner, controller, key)
 	if exists {
 		// every time we read a value (order preserving) we update spock
@@ -125,8 +136,6 @@ func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	registerID := toRegisterID(owner, controller, key)
 
 	// capture register touch
 	v.regTouchSet[registerID.String()] = registerID
@@ -151,6 +160,10 @@ func (v *View) Peek(owner, controller, key string) (flow.RegisterValue, error) {
 
 // Set sets a register value in this view.
 func (v *View) Set(owner, controller, key string, value flow.RegisterValue) error {
+
+	registerID := toRegisterID(owner, controller, key)
+	v.Writes[registerID.String()] = registerID
+
 	// every time we write something to delta (order preserving) we update spock
 	// TODO return the error and handle it properly on other places
 
@@ -160,7 +173,7 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) erro
 	}
 
 	// capture register touch
-	registerID := toRegisterID(owner, controller, key)
+	//registerID := toRegisterID(owner, controller, key)
 
 	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
@@ -180,6 +193,8 @@ func (v *View) updateSpock(value []byte) error {
 func (v *View) Touch(owner, controller, key string) error {
 
 	k := toRegisterID(owner, controller, key)
+
+	v.Reads[k.String()] = k
 
 	// capture register touch
 	v.regTouchSet[k.String()] = k

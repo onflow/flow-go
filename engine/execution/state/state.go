@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/dgraph-io/badger/v2"
 
@@ -191,6 +192,8 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 
 	readCache := make(map[flow.RegisterID]flow.RegisterEntry)
 
+	mutex := sync.RWMutex{}
+
 	return func(owner, controller, key string) (flow.RegisterValue, error) {
 		regID := flow.RegisterID{
 			Owner:      owner,
@@ -198,9 +201,12 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 			Key:        key,
 		}
 
+		mutex.RLock()
 		if value, ok := readCache[regID]; ok {
+			mutex.RUnlock()
 			return value.Value, nil
 		}
+		mutex.RUnlock()
 
 		query, err := makeSingleValueQuery(commitment, owner, controller, key)
 
@@ -219,6 +225,8 @@ func LedgerGetRegister(ldg ledger.Ledger, commitment flow.StateCommitment) delta
 		}
 
 		// don't cache value with len zero
+		mutex.Lock()
+		defer mutex.Unlock()
 		readCache[regID] = flow.RegisterEntry{Key: regID, Value: values[0]}
 
 		return values[0], nil

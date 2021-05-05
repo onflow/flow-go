@@ -23,4 +23,10 @@ type ComputationResult struct {
 	TransactionResult []flow.TransactionResult
 	GasUsed           uint64
 	StateReads        uint64
+
+	CollectionConflicts      [][]flow.RegisterID
+	BlockConflicts           [][]flow.RegisterID
+	TotalTx                  int
+	ConflictingBlockTxs      int
+	ConflictingCollectionTxs int
 }

@@ -62,6 +62,64 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.AssertExpectations(t)
 	})
 
+	t.Run("conflicting collections", func(t *testing.T) {
+
+		execCtx := fvm.NewContext(zerolog.Nop())
+
+		vm := new(computermock.VirtualMachine)
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop())
+		require.NoError(t, err)
+
+		colCount := 2
+
+		// create a block with 2 collection with 2 transactions
+		block := generateBlock(colCount, 2, rag)
+
+		n := 0
+
+		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Run(func(args mock.Arguments) {
+
+				view := args[2].(state.View)
+
+				switch n {
+				//collection 1
+				case 0:
+					view.Get("a", "a", "a")
+					view.Set("a", "a", "a", []byte{1, 2, 3})
+				case 1:
+					view.Get("a", "a", "a") // conflicts in block and collection
+				//collection 2
+				case 2:
+					view.Set("b", "b", "b", []byte{1, 2, 3})
+					view.Get("a", "a", "a") // conflicts in block but not collection
+
+				case 3:
+					view.Get("a", "a", "a") // conflicts in block and collection
+					view.Get("b", "b", "b") // conflicts in block and collection
+				}
+
+				n++
+
+			}).
+			Times((colCount * 2) + 1) // 2 txs in collection + system chunk
+
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, colCount+1) // +1 system chunk
+
+		assert.Equal(t, 3, result.ConflictingBlockTxs)
+		assert.Equal(t, 2, result.ConflictingCollectionTxs)
+
+		vm.AssertExpectations(t)
+	})
+
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
 		execCtx := fvm.NewContext(zerolog.Nop())

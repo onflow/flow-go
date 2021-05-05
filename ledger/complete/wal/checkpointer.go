@@ -356,12 +356,19 @@ func ReadCheckpoint(r io.Reader) (*flattener.FlattenedForest, error) {
 	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
 	tries := make([]*flattener.StorableTrie, triesCount)
 
+	nodesProgress := 0
 	for i := uint64(1); i <= nodesCount; i++ {
 		storableNode, err := flattener.ReadStorableNode(reader)
 		if err != nil {
 			return nil, fmt.Errorf("cannot read storable node %d: %w", i, err)
 		}
 		nodes[i] = storableNode
+
+		if nodesProgress%1_000_000 == 0 {
+			fmt.Printf("loaded nodes %09d/%09d\n", nodesProgress, nodesCount)
+		}
+
+		nodesProgress++
 	}
 
 	// TODO version ?
