@@ -34,7 +34,9 @@
 
 package hash
 
-import "unsafe"
+import (
+	"unsafe"
+)
 
 // copyOutUnaligned copies 32 bytes to a hash array.
 func copyOut(d *state) Hash {
@@ -44,7 +46,8 @@ func copyOut(d *state) Hash {
 	return out
 }
 
-// copyIn512 copies two 32 bytes slices into the state
+// copyIn512 copies two 32 bytes arrays into the state
+// and writes the padding.
 func copyIn512(d *state, buf1, buf2 Hash) {
 	ab := (*[stateSize << 3]uint8)(unsafe.Pointer(&d.a[0]))
 	copy(ab[:], buf1[:])
@@ -54,4 +57,10 @@ func copyIn512(d *state, buf1, buf2 Hash) {
 	d.a[8] = 0x6
 	// copy the last padding bit
 	d.a[16] = paddingEnd
+}
+
+// copyIn256 copies a 32 bytes array into the state without padding.
+func copyIn256(d *state, buf Hash) {
+	ab := (*[stateSize << 3]uint8)(unsafe.Pointer(&d.a[0]))
+	copy(ab[:], buf[:])
 }

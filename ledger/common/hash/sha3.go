@@ -71,15 +71,7 @@ func new256() *state {
 	return d
 }
 
-// copyOut copies ulint64s to a byte buffer.
-/*func copyOut(d *state) Hash {
-	var out Hash
-	for i := 0; i < 4; i++ {
-		binary.LittleEndian.PutUint64(out[i<<3:], d.a[i])
-	}
-	return out
-}*/
-
+// xor a buffer into the state at a given index.
 func xorInAtIndex(d *state, buf []byte, index int) {
 	n := len(buf) >> 3
 	aAtIndex := d.a[index:]
@@ -92,18 +84,18 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 }
 
 func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
-	//xorIn since p1 length is a multiple of 8
-	xorInAtIndex(d, p1[:], 0)
-	written := 32 // written uint64s in the state
+	//write p1 into the state
+	copyIn256(d, p1)
+	written := 32 // written bytes in the state
 
 	for len(p2)+written >= rate {
 		xorInAtIndex(d, p2[:rate-written], written>>3)
 		keccakF1600(&d.a)
 		p2 = p2[rate-written:]
-		written = 0 // to avoid
+		written = 0
 	}
 
-	// xorIn the left over of p2, 64 bits at a time
+	// xorIn the left over bytes of p2, 64 bits at a time
 	for len(p2) >= 8 {
 		a := binary.LittleEndian.Uint64(p2[:8])
 		d.a[written>>3] ^= a
@@ -136,23 +128,3 @@ func (d *state) hash256plus256(p1, p2 Hash) Hash {
 	// reverse the endianess to the output
 	return copyOut(d)
 }
-
-/*
-func copyIn512(d *state, buf1, buf2 Hash) {
-	sliceBuf1, sliceBuf2 := buf1[:], buf2[:]
-
-	var i int
-	for ; i < 4; i++ {
-		d.a[i] = binary.LittleEndian.Uint64(sliceBuf1)
-		sliceBuf1 = sliceBuf1[8:]
-	}
-	for ; i < 8; i++ {
-		d.a[i] = binary.LittleEndian.Uint64(sliceBuf2)
-		sliceBuf2 = sliceBuf2[8:]
-	}
-	// xor with the dsbyte
-	// dsbyte also contains the first one bit for the padding.
-	d.a[8] = 0x6
-	// xor the last padding bit
-	d.a[16] = paddingEnd
-}*/

@@ -46,8 +46,8 @@ func copyOut(d *state) Hash {
 	return out
 }
 
-// copyIn512 copies two 32 bytes slices into the state; it
-// makes no non-portable assumptions about memory layout
+// copyIn512 copies two 32 bytes arrays into the state and writes the padding;
+// it makes no non-portable assumptions about memory layout
 // or alignment.
 func copyIn512(d *state, buf1, buf2 Hash) {
 	sliceBuf1, sliceBuf2 := buf1[:], buf2[:]
@@ -66,4 +66,16 @@ func copyIn512(d *state, buf1, buf2 Hash) {
 	d.a[8] = 0x6
 	// copy the last padding bit
 	d.a[16] = paddingEnd
+}
+
+// copyIn256 copies a 32 bytes array into the state without padding.
+// it makes no non-portable assumptions about memory layout
+// or alignment.
+func copyIn256(d *state, buf Hash) {
+	sliceBuf := buf[:]
+
+	for i = 0; i < 4; i++ {
+		d.a[i] = binary.LittleEndian.Uint64(sliceBuf)
+		sliceBuf = sliceBuf[8:]
+	}
 }
