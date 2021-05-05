@@ -630,8 +630,14 @@ func mockVerifierEngine(t *testing.T,
 		expected, ok := verifiableChunks[vc.Chunk.ID()]
 		require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
+		if vc.IsSystemChunk {
+			// system chunk has an empty collection
+			require.Equal(t, flow.Collection{}.ID(), vc.Collection.ID())
+		} else {
+			require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
+		}
+
 		require.Equal(t, *expected.ChunkDataPack, *vc.ChunkDataPack)
-		require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
 		require.Equal(t, expected.Result.ID(), vc.Result.ID())
 		require.Equal(t, expected.Header.ID(), vc.Header.ID())
 
@@ -749,12 +755,21 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, chunk := range chunks {
 		chunkID := chunk.ID()
+
+		collection := collections[chunkID]
+		chunkDataPack := chunkDataPacks[chunkID]
+
+		if fetcher.IsSystemChunk(chunk.Index, result) {
+			collection = &flow.Collection{} // system chunk has an empty collection
+			chunkDataPack.CollectionID = flow.ZeroID
+		}
+
 		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
 			Chunk:         chunk,
 			Header:        block.Header,
 			Result:        result,
-			Collection:    collections[chunkID],
-			ChunkDataPack: chunkDataPacks[chunkID],
+			Collection:    collection,
+			ChunkDataPack: chunkDataPack,
 		}
 	}
 
