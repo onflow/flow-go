@@ -115,7 +115,9 @@ func (e *Engine) Done() <-chan struct{} {
 // the chunk consumer in order to process the next chunk.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	// TODO: add tracing and metrics.
+	locatorID := locator.ID()
 	lg := e.log.With().
+		Hex("locator_id", logging.ID(locatorID)).
 		Hex("result_id", logging.ID(locator.ResultID)).
 		Uint64("chunk_index", locator.Index).
 		Logger()
@@ -150,7 +152,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	status := &verification.ChunkStatus{
 		ChunkIndex:      locator.Index,
 		ExecutionResult: result,
-		ChunkLocatorID:  locator.ID(),
+		ChunkLocatorID:  locatorID,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
@@ -257,9 +259,27 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 	}
 
 	// 3. collection id must match
+	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (e Engine) validateCollectionID(collection *flow.Collection,
+	chunkDataPack *flow.ChunkDataPack,
+	chunkIndex uint64,
+	result *flow.ExecutionResult) error {
+
 	var collID flow.Identifier
-	if IsSystemChunk(chunk.Index, result) {
+	if IsSystemChunk(chunkIndex, result) {
 		collID = flow.ZeroID // for system chunk, the collection ID should be always zero ID.
+		if collection.Len() != 0 {
+			return engine.NewInvalidInputErrorf("non-empty collection for system chunk, found on chunk data pack: %v, actual collection: %v, len: %d",
+				chunkDataPack.CollectionID, collection.ID(), collection.Len())
+		}
+
 	} else {
 		collID = collection.ID()
 	}
@@ -295,7 +315,16 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 // through HandleChunkDataPack).
 func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 	// we need to report that the job has been finished eventually
-	defer e.chunkConsumerNotifier.Notify(chunkID)
+	status, exists := e.pendingChunks.ByID(chunkID)
+	if !exists {
+		e.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
+		return
+	}
+
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID)
+
 	removed := e.pendingChunks.Rem(chunkID)
 	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")
 }
