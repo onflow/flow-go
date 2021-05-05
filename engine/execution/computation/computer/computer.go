@@ -160,8 +160,6 @@ func (e *blockComputer) executeBlock(
 	totalConflictingBlockTxs := 0
 	totalConflictingCollectionTxs := 0
 
-	blockRW := NewReadWrites()
-
 	wg := sync.WaitGroup{}
 
 	blockView := stateView.NewChild()
@@ -199,7 +197,7 @@ func (e *blockComputer) executeBlock(
 			freshBlockView := blockView.NewChild()
 
 			collEvents, collServiceEvents, txResults, nextIndex, gas, _, _, txNumber, conflictingBlockTxs, conflictingCollectionTxs, err := e.executeCollection(
-				ctx, txIndex, blockCtx, collectionView, freshBlockView, programs, collectionC, blockRW,
+				ctx, txIndex, blockCtx, collectionView, freshBlockView, programs, collectionC,
 			)
 
 			if err != nil {
@@ -309,15 +307,9 @@ func (e *blockComputer) executeBlock(
 
 	txMetrics := fvm.NewMetricsCollector()
 
-	txEvents, txServiceEvents, txResult, txGas, rw, err := e.executeTransaction(tx, colSpan, txMetrics, systemChunkView, programs, e.systemChunkCtx, txIndex)
+	txEvents, txServiceEvents, txResult, txGas, err := e.executeTransaction(tx, colSpan, txMetrics, systemChunkView, programs, e.systemChunkCtx, txIndex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
-	}
-
-	systemChunkConflicts := blockRW.Conflicts(rw)
-	if len(systemChunkConflicts) > 0 {
-		totalConflictingBlockTxs += 1
-		fmt.Printf("system conflict!")
 	}
 
 	totalTx += 1
@@ -358,7 +350,6 @@ func (e *blockComputer) executeCollection(
 	alternativeBlockView state.View,
 	programs *programs.Programs,
 	collection *entity.CompleteCollection,
-	blockRW *ReadWrites,
 ) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, []flow.RegisterID, []flow.RegisterID, int, int, int, error) {
 
 	// call tracing
@@ -384,8 +375,6 @@ func (e *blockComputer) executeCollection(
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
 
-	cumulativeRW := NewReadWrites()
-
 	cumulativeBlockConflicts := make([]flow.RegisterID, 0)
 	cumulativeCollectionConflicts := make([]flow.RegisterID, 0)
 
@@ -397,7 +386,7 @@ func (e *blockComputer) executeCollection(
 
 	for _, txBody := range collection.Transactions {
 
-		txEvents, txServiceEvents, txResult, txGasUsed, rw, err :=
+		txEvents, txServiceEvents, txResult, txGasUsed, err :=
 			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, programs, txCtx, txIndex)
 		if err != nil {
 			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
@@ -405,7 +394,7 @@ func (e *blockComputer) executeCollection(
 
 		alternativeCollectionView := baseCollectionView.NewChild()
 
-		_, _, _, _, _, err =
+		_, _, _, _, err =
 			e.executeTransaction(txBody, colSpan, txMetrics, alternativeCollectionView, programs, txCtx, txIndex)
 		if err != nil {
 			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
@@ -413,7 +402,7 @@ func (e *blockComputer) executeCollection(
 
 		blockView := alternativeBlockView.NewChild()
 
-		_, _, _, _, _, err =
+		_, _, _, _, err =
 			e.executeTransaction(txBody, colSpan, txMetrics, blockView, programs, txCtx, txIndex)
 		if err != nil {
 			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
@@ -439,9 +428,6 @@ func (e *blockComputer) executeCollection(
 		if len(d) > 0 {
 			conflictingBlockTxs++
 		}
-
-		cumulativeRW.Merge(rw)
-		blockRW.Merge(rw)
 
 		totalTx++
 	}
@@ -473,7 +459,7 @@ func (e *blockComputer) executeTransaction(
 	programs *programs.Programs,
 	ctx fvm.Context,
 	txIndex uint32,
-) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, *ReadWrites, error) {
+) ([]flow.Event, []flow.Event, flow.TransactionResult, uint64, error) {
 
 	startedAt := time.Now()
 	var txSpan opentracing.Span
@@ -509,10 +495,8 @@ func (e *blockComputer) executeTransaction(
 		e.metrics.TransactionInterpreted(txMetrics.Interpreted())
 	}
 
-	rw := NewReadWrites()
-
 	if err != nil {
-		return nil, nil, flow.TransactionResult{}, 0, nil, fmt.Errorf("failed to execute transaction: %w", err)
+		return nil, nil, flow.TransactionResult{}, 0, fmt.Errorf("failed to execute transaction: %w", err)
 	}
 
 	txResult := flow.TransactionResult{
@@ -538,7 +522,7 @@ func (e *blockComputer) executeTransaction(
 	if tx.Err == nil {
 		err := collectionView.MergeView(txView)
 		if err != nil {
-			return nil, nil, txResult, 0, nil, err
+			return nil, nil, txResult, 0, err
 		}
 
 	}
@@ -548,5 +532,5 @@ func (e *blockComputer) executeTransaction(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 
-	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, rw, nil
+	return tx.Events, tx.ServiceEvents, txResult, tx.GasUsed, nil
 }
