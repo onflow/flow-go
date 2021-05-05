@@ -16,6 +16,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -265,6 +266,10 @@ func (fnb *FlowNodeBuilder) parseAndPrintFlags() {
 	})
 
 	log.Msg("flags loaded")
+}
+
+func (fnb *FlowNodeBuilder) printBuildVersionDetails() {
+	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() {
@@ -688,6 +693,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)
 	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
+
+	fnb.printBuildVersionDetails()
 
 	fnb.parseAndPrintFlags()
 

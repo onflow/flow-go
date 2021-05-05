@@ -1289,6 +1289,23 @@ func KeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 	return key
 }
 
+func KeysFixture(n int, algo crypto.SigningAlgorithm) []crypto.PrivateKey {
+	keys := make([]crypto.PrivateKey, 0, n)
+	for i := 0; i < n; i++ {
+		keys = append(keys, KeyFixture(algo))
+	}
+	return keys
+}
+
+func PublicKeysFixture(n int, algo crypto.SigningAlgorithm) []crypto.PublicKey {
+	pks := make([]crypto.PublicKey, 0, n)
+	sks := KeysFixture(n, algo)
+	for _, sk := range sks {
+		pks = append(pks, sk.PublicKey())
+	}
+	return pks
+}
+
 func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
 		View:      uint64(rand.Uint32()),
@@ -1319,7 +1336,7 @@ func VoteFixture() *hotstuff.Vote {
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
-		setup.Participants = participants.Order(order.ByNodeIDAsc)
+		setup.Participants = participants.Sort(order.ByNodeIDAsc)
 		setup.Assignments = ClusterAssignment(1, participants)
 	}
 }
@@ -1347,7 +1364,7 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	setup := &flow.EpochSetup{
 		Counter:      uint64(rand.Uint32()),
 		FinalView:    uint64(rand.Uint32() + 1000),
-		Participants: participants,
+		Participants: participants.Sort(order.Canonical),
 		RandomSource: SeedFixture(flow.EpochSetupRandomSourceLength),
 	}
 	for _, apply := range opts {
@@ -1383,8 +1400,9 @@ func IndexFixture() *flow.Index {
 }
 
 func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCommit) {
+	count := len(participants.Filter(filter.IsValidDKGParticipant))
 	return func(commit *flow.EpochCommit) {
-		commit.DKGParticipants = DKGParticipantLookup(participants)
+		commit.DKGParticipantKeys = PublicKeysFixture(count, crypto.BLSBLS12381)
 	}
 }
 
@@ -1407,10 +1425,10 @@ func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
 
 func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	commit := &flow.EpochCommit{
-		Counter:         uint64(rand.Uint32()),
-		ClusterQCs:      []*flow.QuorumCertificate{QuorumCertificateFixture()},
-		DKGGroupKey:     KeyFixture(crypto.BLSBLS12381).PublicKey(),
-		DKGParticipants: make(map[flow.Identifier]flow.DKGParticipant),
+		Counter:            uint64(rand.Uint32()),
+		ClusterQCs:         []*flow.QuorumCertificate{QuorumCertificateFixture()},
+		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
+		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
 	}
 	for _, apply := range opts {
 		apply(commit)
@@ -1447,7 +1465,7 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 // RootSnapshotFixture returns a snapshot representing a root chain state, for
 // example one as returned from BootstrapFixture.
 func RootSnapshotFixture(participants flow.IdentityList, opts ...func(*flow.Block)) *inmem.Snapshot {
-	block, result, seal := BootstrapFixture(participants, opts...)
+	block, result, seal := BootstrapFixture(participants.Sort(order.Canonical), opts...)
 	qc := QuorumCertificateFixture(QCWithBlockID(block.ID()))
 	root, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
 	if err != nil {
