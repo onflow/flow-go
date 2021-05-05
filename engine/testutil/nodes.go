@@ -805,8 +805,8 @@ func VerificationNode(t testing.TB,
 // TODO: refactor to VerificationNode once the old constructor is dropped.
 func NewVerificationNode(t testing.TB,
 	hub *stub.Hub,
-	identity *flow.Identity,
-	identities flow.IdentityList,
+	verIdentity *flow.Identity, // identity of this verification node.
+	participants flow.IdentityList, // identity of all nodes in system including this verification node.
 	assigner module.ChunkAssigner,
 	chunksLimit uint,
 	chainID flow.ChainID,
@@ -822,7 +822,7 @@ func NewVerificationNode(t testing.TB,
 	}
 
 	if node.GenericNode == nil {
-		gn := GenericNode(t, hub, identity, identities, chainID)
+		gn := GenericNode(t, hub, verIdentity, participants, chainID)
 		node.GenericNode = &gn
 	}
 
