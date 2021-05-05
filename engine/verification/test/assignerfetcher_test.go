@@ -86,8 +86,8 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		{
 			blockCount: 10,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(5),
-				vertestutils.WithChunksCount(5),
+				vertestutils.WithResults(2),
+				vertestutils.WithChunksCount(2),
 				vertestutils.WithCopies(2),
 			},
 			staked:          true,
@@ -97,8 +97,8 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 		{
 			blockCount: 10,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
-				vertestutils.WithResults(5),
-				vertestutils.WithChunksCount(5),
+				vertestutils.WithResults(2),
+				vertestutils.WithChunksCount(2),
 				vertestutils.WithCopies(2),
 			},
 			staked:          true,
@@ -121,7 +121,8 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 					blockConsumer.OnFinalizedBlock(&model.Block{})
 				}
 
-				unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, 5*time.Second, "could not receive result approvals on time")
+				unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*tc.blockCount)*time.Second,
+					"could not receive result approvals on time")
 
 			}, tc.opts...)
 		})
@@ -220,6 +221,8 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 	s, verID, participants := bootstrapSystem(t, collector, tracer, staked)
 	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+	ops = append(ops, vertestutils.WithExecutorIDs(
+		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()))
 
 	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
 	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
@@ -380,7 +383,7 @@ func mockChunkProcessor(t testing.TB, expectedLocatorIDs flow.IdentifierList,
 	return processor, &wg
 }
 
-// bootstrapSystem is a test helper that bootstraps a flow system with one node of each main roles.
+// bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).
 // If staked set to true, it bootstraps verification node as an staked one.
 // Otherwise, it bootstraps the verification node as unstaked in current epoch.
 //
@@ -390,6 +393,7 @@ func bootstrapSystem(t *testing.T, collector *metrics.NoopCollector, tracer modu
 	// creates identities to bootstrap system with
 	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 	identities := unittest.CompleteIdentitySet(verID)
+	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
 
 	// bootstraps the system
 	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
