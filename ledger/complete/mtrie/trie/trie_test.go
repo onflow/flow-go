@@ -30,7 +30,7 @@ func Test_EmptyTrie(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(rootHash))
 
 	// check String() method does not panic:
-	emptyTrie.String()
+	_ = emptyTrie.String()
 }
 
 // Test_TrieWithLeftRegister tests whether the root hash of trie with only the left-most
