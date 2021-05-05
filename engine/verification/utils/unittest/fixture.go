@@ -135,6 +135,7 @@ type CompleteExecutionReceiptBuilder struct {
 	copyCount    int // number of times each execution result is copied in a block (by different receipts).
 	chunksCount  int // number of chunks in each execution result.
 	chain        flow.Chain
+	executorIDs  flow.IdentifierList // identifier of execution nodes in the test.
 }
 
 type CompleteExecutionReceiptBuilderOpt func(builder *CompleteExecutionReceiptBuilder)
@@ -160,6 +161,12 @@ func WithCopies(count int) CompleteExecutionReceiptBuilderOpt {
 func WithChain(chain flow.Chain) CompleteExecutionReceiptBuilderOpt {
 	return func(builder *CompleteExecutionReceiptBuilder) {
 		builder.chain = chain
+	}
+}
+
+func WithExecutorIDs(executorIDs flow.IdentifierList) CompleteExecutionReceiptBuilderOpt {
+	return func(builder *CompleteExecutionReceiptBuilder) {
+		builder.executorIDs = executorIDs
 	}
 }
 
@@ -470,11 +477,18 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 		apply(builder)
 	}
 
+	if len(builder.executorIDs) == 0 {
+		builder.executorIDs = unittest.IdentifierListFixture(builder.copyCount)
+	}
+
+	require.GreaterOrEqual(t, len(builder.executorIDs), builder.copyCount,
+		"number of executors in the tests should be greater than or equal to the number of receipts per block")
+
 	for i := 0; i < count; i++ {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
-		allResults, allData, head := ExecutionResultsFromParentBlockFixture(t, parent, builder)
-		containerBlock, receipts := ContainerBlockFixture(head, allResults)
+		receipts, allData, head := ExecutionReceiptsFromParentBlockFixture(t, parent, builder)
+		containerBlock := ContainerBlockFixture(head, receipts)
 		completeERs = append(completeERs, &CompleteExecutionReceipt{
 			ContainerBlock: containerBlock,
 			Receipts:       receipts,
@@ -486,29 +500,35 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 	return completeERs
 }
 
-// ExecutionResultsFromParentBlockFixture creates a chain of results from a parent block.
+// ExecutionReceiptsFromParentBlockFixture creates a chain of receipts from a parent block.
 //
 // By default each result refers to a distinct reference block, and it extends the block chain after generating each
 // result (i.e., for the next result).
 //
 // Each result may appear in more than one receipt depending on the builder parameters.
-func ExecutionResultsFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) ([]*flow.ExecutionResult,
+func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (
+	[]*flow.ExecutionReceipt,
 	[]*ExecutionReceiptData, *flow.Header) {
-	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount)
-	allResults := make([]*flow.ExecutionResult, 0, builder.resultsCount)
+
+	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount*builder.copyCount)
+	allReceipts := make([]*flow.ExecutionReceipt, 0, builder.resultsCount*builder.copyCount)
 
 	for i := 0; i < builder.resultsCount; i++ {
 		result, data := ExecutionResultFromParentBlockFixture(t, parent, builder)
 
 		// makes several copies of the same result
 		for cp := 0; cp < builder.copyCount; cp++ {
+			allReceipts = append(allReceipts, &flow.ExecutionReceipt{
+				ExecutorID:      builder.executorIDs[cp],
+				ExecutionResult: *result,
+			})
+
 			allData = append(allData, data)
-			allResults = append(allResults, result)
 		}
 		parent = data.ReferenceBlock.Header
 	}
 
-	return allResults, allData, parent
+	return allReceipts, allData, parent
 }
 
 // ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
@@ -518,21 +538,11 @@ func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, bu
 	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader)
 }
 
-// ContainerBlockFixture builds and returns a block that contains an execution receipt for the
-// input result.
-func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult) (*flow.Block, []*flow.ExecutionReceipt) {
-	receipts := make([]*flow.ExecutionReceipt, 0, len(results))
-
-	for _, result := range results {
-		receipts = append(receipts, &flow.ExecutionReceipt{
-			ExecutorID:      unittest.IdentifierFixture(),
-			ExecutionResult: *result,
-		})
-	}
-
+// ContainerBlockFixture builds and returns a block that contains input execution receipts.
+func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceipt) *flow.Block {
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(parent)
 	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
-	return &containerBlock, receipts
+	return &containerBlock
 }
