@@ -330,6 +330,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--access-address=localnet_access_1_1:9000"),     // XXX
+		fmt.Sprintf("--qc-contract-address=%s", "qccontractaddress"), // XXX
 	)
 
 	return service

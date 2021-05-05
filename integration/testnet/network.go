@@ -22,6 +22,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/fvm"
@@ -597,6 +598,22 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
+
+		// XXX
+		info := bootstrap.NodeMachineAccountInfo{
+			Address:           nodeConfig.Address,
+			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
+			KeyIndex:          0,
+			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
+			HashAlgorithm:     crypto.SHA3_256,
+		}
+
+		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeConfig.NodeID))
+
+		err = writeJSON(infoPath, info)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
 	}
 
 	// define root block parameters
@@ -676,6 +693,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithRootBlock(root.Header),
 		fvm.WithEpochConfig(epochConfig),
+		fvm.WithIdentities(participants),
 	)
 	if err != nil {
 		return nil, nil, nil, nil, err

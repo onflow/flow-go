@@ -8,6 +8,7 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -35,6 +36,8 @@ type BootstrapProcedure struct {
 	minimumStorageReservation cadence.UFix64
 
 	epochConfig epochs.EpochConfig
+
+	identities flow.IdentityList
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -107,6 +110,13 @@ func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
 	}
 }
 
+func WithIdentities(identities flow.IdentityList) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.identities = identities
+		return bp
+	}
+}
+
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
@@ -147,6 +157,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
 	}
+
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
 	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation)
@@ -162,6 +173,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		flowToken)
 
 	b.deployEpoch(service, fungibleToken, flowToken)
+
+	b.registerNodes(service, flowToken)
 
 	return nil
 }
@@ -401,6 +414,22 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to setup storage for service accounts: %s", err.Error()))
+	}
+}
+
+func (b *BootstrapProcedure) registerNodes(service, token flow.Address) {
+	for _, id := range b.identities {
+		err := b.vm.invokeMetaTransaction(
+			b.ctx,
+			registerNodeTransaction(service,
+				id,
+				token),
+			b.sth,
+			b.programs,
+		)
+		if err != nil {
+			panic(fmt.Sprintf("failed to register node: %s", err.Error()))
+		}
 	}
 }
 
@@ -685,6 +714,37 @@ func setupStorageForServiceAccountsTransaction(
 			AddAuthorizer(fungibleToken).
 			AddAuthorizer(flowToken).
 			AddAuthorizer(feeContract),
+		0,
+	)
+}
+
+// registerNodeTransaction creates a new node struct object.
+// Then, if the node is a collector node, creates a new account and adds a QC object to it
+// If the node is a consensus node, it creates a new account and adds a DKG object to it
+func registerNodeTransaction(
+	service flow.Address,
+	id *flow.Identity,
+	flowTokenAddress flow.Address) *TransactionProcedure {
+
+	env := templates.Environment{
+		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
+		IDTableAddress:           service.HexWithPrefix(),
+		QuorumCertificateAddress: service.HexWithPrefix(),
+		DkgAddress:               service.HexWithPrefix(),
+		EpochAddress:             service.HexWithPrefix(),
+	}
+
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NodeID.String()))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.Address))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NetworkPubKey.String()[2:]))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
+			AddArgument(jsoncdc.MustEncode(cadence.UFix64(id.Stake))).
+			AddArgument(jsoncdc.MustEncode(cadence.Array{})).
+			AddAuthorizer(service),
 		0,
 	)
 }
