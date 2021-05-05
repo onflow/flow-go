@@ -266,22 +266,43 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 	return nil
 }
 
+// validateCollectionID returns error for an invalid collection against a chunk data pack,
+// and returns nil otherwise. A collection is valid against a chunk data pack if its id is the same
+// as the one in the chunk data pack.
 func (e Engine) validateCollectionID(collection *flow.Collection,
 	chunkDataPack *flow.ChunkDataPack,
 	chunkIndex uint64,
 	result *flow.ExecutionResult) error {
 
-	var collID flow.Identifier
 	if IsSystemChunk(chunkIndex, result) {
-		collID = flow.ZeroID // for system chunk, the collection ID should be always zero ID.
-		if collection.Len() != 0 {
-			return engine.NewInvalidInputErrorf("non-empty collection for system chunk, found on chunk data pack: %v, actual collection: %v, len: %d",
-				chunkDataPack.CollectionID, collection.ID(), collection.Len())
-		}
-
-	} else {
-		collID = collection.ID()
+		return e.validateSystemChunkCollection(collection, chunkDataPack)
 	}
+
+	return e.validateNonSystemChunkCollection(collection, chunkDataPack)
+}
+
+// validateSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
+// A collection is valid against a system chunk if collection is empty of transactions, and chunk data pack has a zero ID collection.
+func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
+	collID := flow.ZeroID // for system chunk, the collection ID should be always zero ID.
+	if collection.Len() != 0 {
+		return engine.NewInvalidInputErrorf("non-empty collection for system chunk, found on chunk data pack: %v, actual collection: %v, len: %d",
+			chunkDataPack.CollectionID, collection.ID(), collection.Len())
+	}
+
+	if chunkDataPack.CollectionID != collID {
+		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
+	}
+
+	return nil
+}
+
+// validateNonSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
+// A collection is valid against a non-system chunk if it has a matching collection ID with system chunk's collection ID field.
+//
+// TODO: collection ID should also be checked against its block.
+func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
+	collID := collection.ID()
 
 	if chunkDataPack.CollectionID != collID {
 		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
