@@ -17,11 +17,11 @@ import (
 )
 
 type backendAccounts struct {
-	state              protocol.State
-	headers            storage.Headers
-	executionReceipts  storage.ExecutionReceipts
-	connFactory        ConnectionFactory
-	log                zerolog.Logger
+	state             protocol.State
+	headers           storage.Headers
+	executionReceipts storage.ExecutionReceipts
+	connFactory       ConnectionFactory
+	log               zerolog.Logger
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
