@@ -89,7 +89,7 @@ func (suite *Suite) SetupTest() {
 	blocksToMarkExecuted, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 
-	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, nil, suite.blocks, suite.headers, suite.collections,
+	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
 		suite.transactions, suite.receipts, flow.Testnet, metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,

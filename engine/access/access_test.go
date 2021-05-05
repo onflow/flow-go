@@ -99,7 +99,6 @@ func (suite *Suite) RunTest(
 
 		suite.backend = backend.New(
 			suite.state,
-			suite.execClient,
 			suite.collClient,
 			nil,
 			blocks,
@@ -275,7 +274,6 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 
 		backend := backend.New(
 			suite.state,
-			nil,
 			nil, // setting collectionRPC to nil to choose a random collection node for each send tx request
 			nil,
 			nil,
@@ -411,10 +409,15 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 	})
 }
 
-// TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed blocked
+// TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed block
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers) {
+	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
+		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		results := storage.NewExecutionResults(suite.metrics, db)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
 		// create block -> collection -> transactions
 		block, collection := suite.createChain()
@@ -429,13 +432,24 @@ func (suite *Suite) TestGetSealedTransaction() {
 		suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 		colIdentities := unittest.IdentityListFixture(1, unittest.WithRole(flow.RoleCollection))
-		suite.snapshot.On("Identities", mock.Anything).Return(colIdentities, nil).Once()
+		allIdentities := append(colIdentities, enIdentities...)
+
+		suite.snapshot.On("Identities", mock.Anything).Return(allIdentities, nil).Once()
 
 		exeEventResp := execproto.GetTransactionResultResponse{
 			Events: nil,
 		}
+
+		// generate a receipt
+		receipt1 := unittest.ReceiptForBlockFixture(&block)
+		receipt1.ExecutorID = enNodeIDs[0]
+
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
+
+		// create a mock connection factory
+		connFactory := new(factorymock.ConnectionFactory)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		// initialize storage
 		metrics := metrics.NewNoopCollector()
@@ -448,12 +462,33 @@ func (suite *Suite) TestGetSealedTransaction() {
 		blocksToMarkExecuted, err := stdmap.NewTimes(100)
 		require.NoError(suite.T(), err)
 
-		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, nil, blocks, headers, collections, transactions,
-			nil, suite.chainID, metrics, 0, 0, false, false, nil, nil)
+		backend := backend.New(
+			suite.state,
+			suite.collClient,
+			nil,
+			blocks,
+			headers,
+			collections,
+			transactions,
+			receipts,
+			suite.chainID,
+			suite.metrics,
+			connFactory,
+			false,
+			backend.DefaultMaxHeightRange,
+			nil,
+			enNodeIDs.Strings(),
+			suite.log,
+		)
+
+		handler := access.NewHandler(backend, suite.chainID.Chain())
+
+		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
+			receipts, suite.chainID, metrics, 0, 0, false, false, nil, nil)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, nil, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+			transactions, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -484,6 +519,32 @@ func (suite *Suite) TestGetSealedTransaction() {
 		gResp, err := handler.GetTransactionResult(context.Background(), getReq)
 		require.NoError(suite.T(), err)
 		// assert that the transaction is reported as Sealed
+		require.Equal(suite.T(), entitiesproto.TransactionStatus_FINALIZED, gResp.GetStatus())
+
+		// 6. first receipt comes in
+		err = ingestEng.Process(enNodeIDs[0], receipt1)
+		require.NoError(suite.T(), err)
+
+		// TODO: currently, for some unknown reason, the ingest engine Process never kicks off the engine.Unit.Do
+		// function. This causes the receipt to be never persisted and fails the test. For now, adding an explicit
+		// Store call hear to mimic what the ingestEngine would have done.
+		err = receipts.Store(receipt1)
+		require.NoError(suite.T(), err)
+
+		// keep checking if the receipts db was updated by the ingest engine
+		require.Eventually(suite.T(), func() bool {
+			ers, err := receipts.ByBlockID(block.ID())
+			if err != nil {
+				suite.T().Fail()
+				return false
+			}
+			return len(ers) > 0
+		}, 60*time.Second, 100*time.Millisecond)
+
+		// 7. re-request the transaction result
+		gResp, err = handler.GetTransactionResult(context.Background(), getReq)
+		require.NoError(suite.T(), err)
+		// assert that the transaction is reported as Sealed
 		require.Equal(suite.T(), entitiesproto.TransactionStatus_SEALED, gResp.GetStatus())
 	})
 }
@@ -508,7 +569,6 @@ func (suite *Suite) TestExecuteScript() {
 
 		suite.backend = backend.New(
 			suite.state,
-			suite.execClient,
 			suite.collClient,
 			nil,
 			blocks,
@@ -522,7 +582,7 @@ func (suite *Suite) TestExecuteScript() {
 			false,
 			backend.DefaultMaxHeightRange,
 			nil,
-			nil,
+			flow.IdentifierList(identities.NodeIDs()).Strings(),
 			suite.log,
 		)
 

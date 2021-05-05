@@ -7,7 +7,6 @@ import (
 	"time"
 
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -56,7 +55,6 @@ type Backend struct {
 	backendBlockDetails
 	backendAccounts
 
-	executionRPC      execproto.ExecutionAPIClient
 	state             protocol.State
 	chainID           flow.ChainID
 	collections       storage.Collections
@@ -66,7 +64,6 @@ type Backend struct {
 
 func New(
 	state protocol.State,
-	executionRPC execproto.ExecutionAPIClient,
 	collectionRPC accessproto.AccessAPIClient,
 	historicalAccessNodes []accessproto.AccessAPIClient,
 	blocks storage.Blocks,
@@ -89,20 +86,17 @@ func New(
 	}
 
 	b := &Backend{
-		executionRPC: executionRPC,
-		state:        state,
+		state: state,
 		// create the sub-backends
 		backendScripts: backendScripts{
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			staticExecutionRPC: executionRPC,
-			connFactory:        connFactory,
-			state:              state,
-			log:                log,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			state:             state,
+			log:               log,
 		},
 		backendTransactions: backendTransactions{
 			staticCollectionRPC:  collectionRPC,
-			executionRPC:         executionRPC,
 			state:                state,
 			chainID:              chainID,
 			collections:          collections,
@@ -117,13 +111,12 @@ func New(
 			log:                  log,
 		},
 		backendEvents: backendEvents{
-			staticExecutionRPC: executionRPC,
-			state:              state,
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			log:                log,
-			maxHeightRange:     maxHeightRange,
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
+			maxHeightRange:    maxHeightRange,
 		},
 		backendBlockHeaders: backendBlockHeaders{
 			headers: headers,
@@ -134,12 +127,11 @@ func New(
 			state:  state,
 		},
 		backendAccounts: backendAccounts{
-			staticExecutionRPC: executionRPC,
-			state:              state,
-			headers:            headers,
-			executionReceipts:  executionReceipts,
-			connFactory:        connFactory,
-			log:                log,
+			state:             state,
+			headers:           headers,
+			executionReceipts: executionReceipts,
+			connFactory:       connFactory,
+			log:               log,
 		},
 		collections:       collections,
 		executionReceipts: executionReceipts,
@@ -194,14 +186,10 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 
 // Ping responds to requests when the server is up.
 func (b *Backend) Ping(ctx context.Context) error {
-	_, err := b.executionRPC.Ping(ctx, &execproto.PingRequest{})
-	if err != nil {
-		return fmt.Errorf("could not ping execution node: %w", err)
-	}
 
 	// staticCollectionRPC is only set if a collection node address was provided at startup
 	if b.staticCollectionRPC != nil {
-		_, err = b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
+		_, err := b.staticCollectionRPC.Ping(ctx, &accessproto.PingRequest{})
 		if err != nil {
 			return fmt.Errorf("could not ping collection node: %w", err)
 		}
@@ -256,7 +244,8 @@ func convertStorageError(err error) error {
 }
 
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
-// which have executed the given block ID. If no such execution node is found, an empty list is returned.
+// which have executed the given block ID.
+// If no such execution node is found, an ExecutionReceiptNotFound error is returned.
 func executionNodesForBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -269,6 +258,7 @@ func executionNodesForBlockID(
 	attempt := 0
 	// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
 	for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
+
 		executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
 		if err != nil {
 			return flow.IdentityList{}, err
@@ -278,14 +268,14 @@ func executionNodesForBlockID(
 			break
 		}
 
-		// if one or less execution receipts may have been received then re-query
-		// in the hope that more might have been received by now
-
 		// log the attempt
 		log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
 			Int("execution_receipts_found", len(executorIDs)).
 			Str("block_id", blockID.String()).
 			Msg("insufficient execution receipts")
+
+		// if one or less execution receipts may have been received then re-query
+		// in the hope that more might have been received by now
 
 		select {
 		case <-ctx.Done():
@@ -295,17 +285,12 @@ func executionNodesForBlockID(
 		}
 	}
 
-	if attempt == maxAttemptsForExecutionReceipt {
-		log.Info().Int("attempt", attempt).Msg("not enough execution receipt found")
-		// TODO: should we just throw an error instead?
-		//return flow.IdentityList{},
-		//	fmt.Errorf("number of execution receipts found (%d) less than expected (%d) for block ID %v",
-		//		len(executorIDs),
-		//		minExecutionNodesCnt,
-		//		blockID)
+	// if no execution receipts have been received so far, then throw an error
+	if len(executorIDs) == 0 {
+		return flow.IdentityList{}, ExecutionReceiptNotFound{blockID: blockID}
 	}
 
-	// choose one of the preferred execution nodes
+	// choose from the preferred or fixed execution nodes
 	subsetENs, err := chooseExecutionNodes(state, executorIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
@@ -313,6 +298,11 @@ func executionNodesForBlockID(
 
 	// randomly choose upto maxExecutionNodesCnt identities
 	executionIdentitiesRandom := subsetENs.Sample(maxExecutionNodesCnt)
+
+	if len(executionIdentitiesRandom) == 0 {
+		return flow.IdentityList{},
+			fmt.Errorf("no matching execution node could for block ID %v", blockID)
+	}
 
 	return executionIdentitiesRandom, nil
 }
@@ -376,6 +366,7 @@ func findAllExecutionNodes(
 // chooseExecutionNodes finds the subset of execution nodes defined in the identity table by first
 // choosing the preferred execution nodes which have executed the transaction. If no such preferred
 // execution nodes are found, then the fixed execution nodes defined in the identity table are returned
+// If neither preferred nor fixed nodes are defined, then all execution node matching the executor IDs are returned.
 // e.g. If execution nodes in identity table are {1,2,3,4}, preferred ENs are defined as {2,3,4}
 // and the executor IDs is {1,2,3}, then {2, 3} is returned as the chosen subset of ENs
 func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList) (flow.IdentityList, error) {
@@ -385,34 +376,24 @@ func chooseExecutionNodes(state protocol.State, executorIDs flow.IdentifierList)
 		return nil, fmt.Errorf("failed to retreive all execution IDs: %w", err)
 	}
 
-	// if no executor IDs were found (since no execution receipt has been received), then return all the preferred ENs
-	// if defined or all the fixed ENs, if the preferred ENs are not defined
-	if len(executorIDs) == 0 {
-		if len(preferredENIdentifiers) > 0 {
-			return allENs.Filter(filter.HasNodeID(preferredENIdentifiers...)), nil
-		}
-		return allENs.Filter(filter.HasNodeID(fixedENIdentifiers...)), nil
-	}
-
-	// If there are no preferred or fixed ENs, then return all executor IDs i.e. no preference at all
+	// If no preferred or fixed ENs have been specified, then return all executor IDs i.e. no preference at all
 	if len(preferredENIdentifiers) == 0 && len(fixedENIdentifiers) == 0 {
-		// if no executor IDs have been found, then return all executor IDs i.e. no preference at all
-		if len(executorIDs) == 0 {
-			return allENs, nil
-		}
 		return allENs.Filter(filter.HasNodeID(executorIDs...)), nil
 	}
 
-	// find the preferred execution node IDs which have executed the transaction
-	preferredENIDs := allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
-		filter.HasNodeID(executorIDs...)))
-
-	if len(preferredENIDs) > 0 {
-		return preferredENIDs, nil
+	// first try and choose from the preferred EN IDs
+	var chosenIDs flow.IdentityList
+	if len(preferredENIdentifiers) > 0 {
+		// find the preferred execution node IDs which have executed the transaction
+		chosenIDs = allENs.Filter(filter.And(filter.HasNodeID(preferredENIdentifiers...),
+			filter.HasNodeID(executorIDs...)))
+		if len(chosenIDs) > 0 {
+			return chosenIDs, nil
+		}
 	}
 
-	// if no such preferred ID is found, then choose the fixed EN IDs
-	fixedENIDs := allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
+	// if no preferred EN ID is found, then choose from the fixed EN IDs
+	chosenIDs = allENs.Filter(filter.HasNodeID(fixedENIdentifiers...))
 
-	return fixedENIDs, nil
+	return chosenIDs, nil
 }

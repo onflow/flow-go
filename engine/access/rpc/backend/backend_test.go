@@ -79,7 +79,6 @@ func (suite *Suite) TestPing() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
 		suite.colClient,
 		nil, nil, nil, nil, nil, nil,
 		suite.chainID,
@@ -105,7 +104,6 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
 		nil, nil, nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -137,7 +135,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil,
 		nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -157,8 +155,6 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 	convertedSnapshot, err := convert.SnapshotToBytes(snap)
 	suite.Require().NoError(err)
 	suite.Require().Equal(bytes, convertedSnapshot)
-
-	// suite.assertAllExpectations()
 }
 
 func (suite *Suite) TestGetLatestSealedBlockHeader() {
@@ -170,7 +166,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil,
 		nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -207,7 +203,7 @@ func (suite *Suite) TestGetTransaction() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
 		suite.transactions,
 		nil,
 		suite.chainID,
@@ -240,7 +236,7 @@ func (suite *Suite) TestGetCollection() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil,
+		nil, nil, nil, nil,
 		suite.collections,
 		suite.transactions,
 		nil,
@@ -274,7 +270,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	block.Header.Height = 2
 	headBlock := unittest.BlockFixture()
 	headBlock.Header.Height = block.Header.Height - 1 // head is behind the current block
-	fixedENIDs := flow.IdentifierList{}
 
 	suite.snapshot.
 		On("Head").
@@ -299,10 +294,8 @@ func (suite *Suite) TestTransactionStatusTransition() {
 
 	txID := transactionBody.ID()
 	blockID := block.ID()
-	receipts := suite.setupReceipts(&block)
-	fixedENIDs = append(fixedENIDs, receipts[0].ExecutorID)
-
-	suite.setupReceipts(&block)
+	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -321,7 +314,6 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.state,
 		nil,
 		nil,
-		nil,
 		suite.blocks,
 		suite.headers,
 		suite.collections,
@@ -333,11 +325,9 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		false,
 		DefaultMaxHeightRange,
 		nil,
-		nil,
+		flow.IdentifierList(fixedENIDs.NodeIDs()).Strings(),
 		suite.log,
 	)
-
-	preferredENIdentifiers = fixedENIDs
 
 	// Successfully return empty event list
 	suite.execClient.
@@ -438,7 +428,6 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
 		nil,
 		nil,
 		suite.blocks,
@@ -534,9 +523,14 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	snapshotAtBlock := new(protocol.Snapshot)
 	snapshotAtBlock.On("Head").Return(refBlock.Header, nil)
 
+	_, enIDs := suite.setupReceipts(&block)
+	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
+
 	suite.state.
 		On("AtBlockID", refBlockID).
 		Return(snapshotAtBlock, nil)
+
+	suite.state.On("Final").Return(snapshotAtBlock, nil).Maybe()
 
 	// transaction storage returns the corresponding transaction
 	suite.transactions.
@@ -566,7 +560,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		On("ByCollectionID", collection.ID()).
 		Return(&block, nil)
 
-	receipts := suite.setupReceipts(&block)
+	receipts, _ := suite.setupReceipts(&block)
 
 	exeEventReq := execproto.GetTransactionResultRequest{
 		BlockId:       blockID[:],
@@ -588,7 +582,6 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
 		nil,
 		nil,
 		suite.blocks,
@@ -602,7 +595,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		false,
 		100,
 		nil,
-		nil,
+		flow.IdentifierList(enIDs.NodeIDs()).Strings(),
 		suite.log,
 	)
 
@@ -649,7 +642,6 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		nil,
 		nil,
-		nil,
 		suite.transactions,
 		nil,
 		suite.chainID,
@@ -689,7 +681,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil,
+		nil, nil,
 		suite.blocks,
 		nil, nil, nil, nil,
 		suite.chainID,
@@ -730,7 +722,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			b := unittest.BlockFixture()
 			suite.headers.
 				On("ByBlockID", b.ID()).
-				Return(b.Header, nil).Twice()
+				Return(b.Header, nil).Once()
 
 			headers[i] = b.Header
 
@@ -803,43 +795,13 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.execClient.
 		On("GetEventsForBlockIDs", ctx, exeReq).
 		Return(&exeResp, nil).
-		Twice()
+		Once()
 
-	suite.Run("with a fixed execution node", func() {
-
-		connFactory := suite.setupConnectionFactory()
+	suite.Run("with an execution node chosen using block ID form the list of Fixed ENs", func() {
 
 		// create the handler
 		backend := New(
 			suite.state,
-			nil,
-			nil, nil,
-			nil,
-			suite.headers, nil, nil,
-			receipts,
-			suite.chainID,
-			metrics.NewNoopCollector(),
-			connFactory,
-			false,
-			DefaultMaxHeightRange,
-			nil,
-			validENIDs.Strings(),
-			suite.log,
-		)
-
-		// execute request
-		actual, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), blockIDs)
-		suite.checkResponse(actual, err)
-
-		suite.Require().Equal(expected, actual)
-	})
-
-	suite.Run("with an execution node chosen using block ID", func() {
-
-		// create the handler
-		backend := New(
-			suite.state,
-			nil,
 			nil, nil,
 			nil,
 			suite.headers, nil, nil,
@@ -866,7 +828,6 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		// create the handler
 		backend := New(
 			suite.state,
-			nil, // no default client, hence the receipts storage should be looked up
 			nil, nil,
 			nil,
 			suite.headers, nil, nil,
@@ -881,7 +842,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			suite.log,
 		)
 
-		// execute request with an empty block id list and expect an error (not a panic)
+		// execute request with an empty block id list and expect an empty list of events and no error
 		resp, err := backend.GetEventsForBlockIDs(ctx, string(flow.EventAccountCreated), []flow.Identifier{})
 		require.NoError(suite.T(), err)
 		require.Empty(suite.T(), resp)
@@ -891,23 +852,32 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 }
 
 func (suite *Suite) TestGetEventsForHeightRange() {
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	const minHeight uint64 = 5
 	const maxHeight uint64 = 10
 	var headHeight uint64
 	var blockHeaders []*flow.Header
-	var executionNodeIDs flow.IdentifierList
+	var nodeIdentifiers flow.IdentityList
 
 	headersDB := make(map[uint64]*flow.Header) // backend for storage.Headers
 	var head *flow.Header                      // backend for Snapshot.Head
 
+	state := new(protocol.State)
+	snapshot := new(protocol.Snapshot)
+	state.On("Final").Return(snapshot, nil)
+	state.On("Sealed").Return(snapshot, nil)
 	// mock snapshot to return head backend
-	suite.snapshot.On("Head").Return(
+	snapshot.On("Head").Return(
 		func() *flow.Header { return head },
 		func() error { return nil },
-	).Maybe()
+	)
+	snapshot.On("Identities", mock.Anything).Return(
+		func(_ flow.IdentityFilter) flow.IdentityList {
+			return nodeIdentifiers
+		},
+		func(flow.IdentityFilter) error { return nil },
+	)
 
 	// mock headers to pull from headers backend
 	suite.headers.On("ByHeight", mock.Anything).Return(
@@ -928,24 +898,21 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 		head = &header
 	}
 
-	setupStorage := func(min uint64, max uint64) ([]*flow.Header, []*flow.ExecutionReceipt, flow.IdentifierList) {
+	setupStorage := func(min uint64, max uint64) ([]*flow.Header, []*flow.ExecutionReceipt, flow.IdentityList) {
 		headersDB = make(map[uint64]*flow.Header) // reset backend
 
 		var headers []*flow.Header
 		var ers []*flow.ExecutionReceipt
-		var enIDs flow.IdentifierList
+		var enIDs flow.IdentityList
 		for i := min; i <= max; i++ {
 			block := unittest.BlockFixture()
 			header := block.Header
 			headersDB[i] = header
 			headers = append(headers, header)
-			newErs := suite.setupReceipts(&block)
+			newErs, ids := suite.setupReceipts(&block)
 			ers = append(ers, newErs...)
-			for _, e := range ers {
-				enIDs = append(enIDs, e.ExecutorID)
-			}
+			enIDs = append(enIDs, ids...)
 		}
-
 		return headers, ers, enIDs
 	}
 
@@ -997,7 +964,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request max height < min height", func() {
 		backend := New(
 			suite.state,
-			nil, nil, nil, nil, suite.headers, nil, nil,
+			nil, nil, nil, suite.headers, nil, nil,
 			suite.receipts,
 			suite.chainID,
 			metrics.NewNoopCollector(),
@@ -1021,13 +988,13 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		// setup mocks
 		setupHeadHeight(headHeight)
-		blockHeaders, _, executionNodeIDs = setupStorage(minHeight, maxHeight)
+		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, maxHeight)
 		expectedResp := setupExecClient()
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
 
 		// create handler
 		backend := New(
-			suite.state,
-			nil,
+			state,
 			nil, nil,
 			suite.blocks,
 			suite.headers,
@@ -1039,7 +1006,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			executionNodeIDs.Strings(),
+			fixedENIdentifiersStr,
 			suite.log,
 		)
 
@@ -1055,12 +1022,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("valid request with max_height > last_sealed_block_height", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
-		blockHeaders, _, executionNodeIDs = setupStorage(minHeight, headHeight)
+		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, headHeight)
 		expectedResp := setupExecClient()
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
 
 		backend := New(
-			suite.state,
-			suite.execClient,
+			state,
 			nil, nil,
 			suite.blocks,
 			suite.headers,
@@ -1072,7 +1039,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			executionNodeIDs.Strings(),
+			fixedENIdentifiersStr,
 			suite.log,
 		)
 
@@ -1087,12 +1054,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request exceeding max height range", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
-		blockHeaders, _, executionNodeIDs = setupStorage(minHeight, headHeight)
+		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, headHeight)
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
 
 		// create handler
 		backend := New(
-			suite.state,
-			suite.execClient,
+			state,
 			nil, nil,
 			suite.blocks,
 			suite.headers,
@@ -1104,7 +1071,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			false,
 			1, // set maximum range to 1
 			nil,
-			executionNodeIDs.Strings(),
+			fixedENIdentifiersStr,
 			suite.log,
 		)
 
@@ -1119,12 +1086,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		// setup mocks
 		setupHeadHeight(headHeight)
-		blockHeaders, _, executionNodeIDs = setupStorage(minHeight, maxHeight)
+		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, maxHeight)
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
 
 		// create handler
 		backend := New(
-			suite.state,
-			suite.execClient,
+			state,
 			nil, nil,
 			suite.blocks,
 			suite.headers,
@@ -1136,7 +1103,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			false,
 			DefaultMaxHeightRange,
 			nil,
-			executionNodeIDs.Strings(),
+			fixedENIdentifiersStr,
 			suite.log,
 		)
 
@@ -1186,7 +1153,9 @@ func (suite *Suite) TestGetAccount() {
 		Return(exeResp, nil).
 		Once()
 
-	receipts := suite.setupReceipts(&block)
+	receipts, ids := suite.setupReceipts(&block)
+
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
@@ -1194,7 +1163,6 @@ func (suite *Suite) TestGetAccount() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil,
 		nil, nil, nil,
 		suite.headers,
 		nil, nil,
@@ -1241,7 +1209,8 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		Return(h, nil).
 		Once()
 
-	receipts := suite.setupReceipts(&b)
+	receipts, ids := suite.setupReceipts(&b)
+	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
 
 	// create a mock connection factory
 	connFactory := new(backendmock.ConnectionFactory)
@@ -1268,7 +1237,6 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 	// create the handler with the mock
 	backend := New(
 		suite.state,
-		nil,
 		nil, nil, nil,
 		suite.headers,
 		nil, nil,
@@ -1301,7 +1269,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 	expectedChainID := flow.Mainnet
 
 	backend := New(
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 		nil,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
@@ -1462,7 +1430,7 @@ func (suite *Suite) checkResponse(resp interface{}, err error) {
 	suite.Require().NotNil(resp)
 }
 
-func (suite *Suite) setupReceipts(block *flow.Block) []*flow.ExecutionReceipt {
+func (suite *Suite) setupReceipts(block *flow.Block) ([]*flow.ExecutionReceipt, flow.IdentityList) {
 	ids := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 	receipt1 := unittest.ReceiptForBlockFixture(block)
 	receipt1.ExecutorID = ids[0].NodeID
@@ -1474,8 +1442,8 @@ func (suite *Suite) setupReceipts(block *flow.Block) []*flow.ExecutionReceipt {
 	suite.receipts.
 		On("ByBlockID", block.ID()).
 		Return(receipts, nil)
-	suite.snapshot.On("Identities", mock.Anything).Return(ids, nil)
-	return receipts
+
+	return receipts, ids
 }
 
 func (suite *Suite) setupConnectionFactory() ConnectionFactory {
@@ -1484,6 +1452,7 @@ func (suite *Suite) setupConnectionFactory() ConnectionFactory {
 	connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 	return connFactory
 }
+
 func getEvents(n int) []flow.Event {
 	events := make([]flow.Event, n)
 	for i := range events {

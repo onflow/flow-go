@@ -19,13 +19,12 @@ import (
 )
 
 type backendEvents struct {
-	staticExecutionRPC execproto.ExecutionAPIClient
-	headers            storage.Headers
-	executionReceipts  storage.ExecutionReceipts
-	state              protocol.State
-	connFactory        ConnectionFactory
-	log                zerolog.Logger
-	maxHeightRange     uint
+	headers           storage.Headers
+	executionReceipts storage.ExecutionReceipts
+	state             protocol.State
+	connFactory       ConnectionFactory
+	log               zerolog.Logger
+	maxHeightRange    uint
 }
 
 // GetEventsForHeightRange retrieves events for all sealed blocks between the start block height and
@@ -133,27 +132,15 @@ func (b *backendEvents) getBlockEventsFromExecutionNode(
 	}
 
 	var resp *execproto.GetEventsForBlockIDsResponse
-	if len(execNodes) == 0 {
-		if b.staticExecutionRPC == nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node")
-		}
-
-		// call the execution node gRPC
-		resp, err = b.staticExecutionRPC.GetEventsForBlockIDs(ctx, &req)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution node: %v", err)
-		}
-	} else {
-		var successfulNode *flow.Identity
-		resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution nodes %s: %v", execNodes, err)
-		}
-		b.log.Trace().
-			Str("execution_id", successfulNode.String()).
-			Str("last_block_id", lastBlockID.String()).
-			Msg("successfully got events")
+	var successfulNode *flow.Identity
+	resp, successfulNode, err = b.getEventsFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to retrieve events from execution nodes %s: %v", execNodes, err)
 	}
+	b.log.Trace().
+		Str("execution_id", successfulNode.String()).
+		Str("last_block_id", lastBlockID.String()).
+		Msg("successfully got events")
 
 	// convert execution node api result to access node api result
 	results, err := verifyAndConvertToAccessEvents(resp.GetResults(), blockHeaders)
