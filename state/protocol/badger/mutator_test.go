@@ -4,7 +4,6 @@ package badger_test
 
 import (
 	"errors"
-
 	"math/rand"
 	"testing"
 	"time"
@@ -471,7 +470,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Order(order.ByNodeIDAsc)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(
@@ -887,7 +886,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Order(order.ByNodeIDAsc)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
 
 		// this function will return a VALID setup event and seal, we will modify
 		// in different ways in each test case
@@ -971,7 +970,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		epoch2Participants := append(
 			participants.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))),
 			epoch2NewParticipant,
-		).Order(order.ByNodeIDAsc)
+		).Sort(order.ByNodeIDAsc)
 
 		createSetup := func(block *flow.Block) (*flow.EpochSetup, *flow.ExecutionReceipt, *flow.Seal) {
 			setup := unittest.EpochSetupFixture(
@@ -1048,12 +1047,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		t.Run("inconsistent DKG participants", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
-				// add the consensus node from epoch *1*, which was removed for epoch 2
-				epoch1CONNode := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
-				commit.DKGParticipants[epoch1CONNode.NodeID] = flow.DKGParticipant{
-					KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-					Index:    1,
-				}
+				// add an extra dkg key
+				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
@@ -1091,7 +1086,7 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// add a participant for the next epoch
 		epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-		epoch2Participants := append(participants, epoch2NewParticipant).Order(order.ByNodeIDAsc)
+		epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
 
 		// create the epoch setup event for the second epoch
 		epoch2Setup := unittest.EpochSetupFixture(

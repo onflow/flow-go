@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 func constructRootResultAndSeal(
@@ -31,22 +32,24 @@ func constructRootResultAndSeal(
 		Counter:      flagEpochCounter,
 		FirstView:    block.Header.View,
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
-		Participants: participants,
+		Participants: participants.Sort(order.Canonical),
 		Assignments:  assignments,
 		RandomSource: getRandomSource(block.ID()),
 	}
 
-	dkgLookup := model.ToDKGLookup(dkgData, participants)
-
 	epochCommit := &flow.EpochCommit{
-		Counter:         flagEpochCounter,
-		ClusterQCs:      clusterQCs,
-		DKGGroupKey:     dkgData.PubGroupKey,
-		DKGParticipants: dkgLookup,
+		Counter:            flagEpochCounter,
+		ClusterQCs:         clusterQCs,
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
 	}
 
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
 	seal := run.GenerateRootSeal(result)
+
+	if seal.ResultID != result.ID() {
+		log.Fatal().Msgf("root block seal (%v) mismatch with result id: (%v)", seal.ResultID, result.ID())
+	}
 
 	return result, seal
 }
