@@ -1,7 +1,6 @@
 package fetcher
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -245,7 +244,7 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifi
 	}
 
 	// 2. start state must match
-	if !bytes.Equal(chunkDataPack.StartState, chunk.ChunkBody.StartState) {
+	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
 		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x", chunk.ChunkBody.StartState, chunkDataPack.StartState)
 	}
 
@@ -299,7 +298,7 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk, result *flow.ExecutionResult,
 
 	vchunk, err := e.makeVerifiableChunkData(chunk, header, result, chunkDataPack, collection)
 	if err != nil {
-		return fmt.Errorf("could not make verifiable chunk data: %w", err)
+		return fmt.Errorf("could not verify chunk: %w", err)
 	}
 
 	err = e.verifier.ProcessLocal(vchunk)
@@ -423,11 +422,11 @@ func executorsOf(receipts []*flow.ExecutionReceipt, resultID flow.Identifier) (f
 func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemChunk bool) (flow.StateCommitment, error) {
 	var endState flow.StateCommitment
 	if systemChunk {
+		var err error
 		// last chunk in a result is the system chunk and takes final state commitment
-		var ok bool
-		endState, ok = result.FinalStateCommitment()
-		if !ok {
-			return nil, fmt.Errorf("can not read final state commitment, likely a bug")
+		endState, err = result.FinalStateCommitment()
+		if err != nil {
+			return flow.DummyStateCommitment, fmt.Errorf("can not read final state commitment, likely a bug:%w", err)
 		}
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
