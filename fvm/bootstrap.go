@@ -734,6 +734,12 @@ func registerNodeTransaction(
 		EpochAddress:             service.HexWithPrefix(),
 	}
 
+	// XXX use the StakingPubKey as the public key of the machine account.
+	// Is this correct?
+	publicKeys := make([]cadence.Value, 1)
+	publicKeys[0] = bytesToCadenceArray(id.StakingPubKey.Encode())
+	cadencePublicKeys := cadence.NewArray(publicKeys)
+
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
@@ -743,10 +749,18 @@ func registerNodeTransaction(
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NetworkPubKey.String()[2:]))).
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
 			AddArgument(jsoncdc.MustEncode(cadence.UFix64(id.Stake))).
-			AddArgument(jsoncdc.MustEncode(cadence.Array{})).
+			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
 			AddAuthorizer(service),
 		0,
 	)
+}
+
+func bytesToCadenceArray(b []byte) cadence.Array {
+	values := make([]cadence.Value, len(b))
+	for i, v := range b {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values)
 }
 
 const (
