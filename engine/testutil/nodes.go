@@ -799,11 +799,14 @@ func VerificationNode(t testing.TB,
 	return node
 }
 
-// TODO: refactor to VerificationNode once the old constuctor is dropped.
+// NewVerificationNode creates a verification node with all functional engines and actual modules for purpose of
+// (integration) testing.
+//
+// TODO: refactor to VerificationNode once the old constructor is dropped.
 func NewVerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
-	identities []*flow.Identity,
+	identities flow.IdentityList,
 	assigner module.ChunkAssigner,
 	chunksLimit uint,
 	chainID flow.ChainID,

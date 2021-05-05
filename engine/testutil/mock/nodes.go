@@ -99,7 +99,6 @@ func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes .
 	for _, node := range nodes {
 		go func(n *GenericNode) {
 			n.Done()
-
 			wg.Done()
 		}(node)
 	}
@@ -107,7 +106,7 @@ func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes .
 	unittest.RequireReturnsBefore(t, wg.Wait, duration, "failed to shutdown all components on time")
 }
 
-// Closes closes the badger database of the node
+// CloseDB closes the badger database of the node
 func (g *GenericNode) CloseDB() error {
 	return g.DB.Close()
 }

@@ -244,7 +244,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 	fmt.Println("total assigned chunks: ", len(assignedChunkIDs))
 
 	hub := stub.NewNetworkHub()
-	receiptsLimit := 100
+	chunksLimit := 100
 	genericNode := testutil.GenericNodeWithStateFixture(t,
 		s,
 		hub,
@@ -279,7 +279,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		verID,
 		participants,
 		chunkAssigner,
-		uint(receiptsLimit),
+		uint(chunksLimit),
 		chainID,
 		collector,
 		collector,
