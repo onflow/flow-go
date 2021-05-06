@@ -4,7 +4,6 @@ import (
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -26,7 +25,7 @@ func (d *TransactionFeeDeductor) Process(
 		defer span.Finish()
 	}
 
-	txErr, fatalErr := d.deductFees(vm, ctx, proc.Transaction, sth, programs)
+	txErr, fatalErr := d.deductFees(vm, ctx, proc, sth, programs)
 	// TODO handle deduct fee failures, for now just return as error
 	if txErr != nil {
 		return txErr
@@ -37,14 +36,24 @@ func (d *TransactionFeeDeductor) Process(
 func (d *TransactionFeeDeductor) deductFees(
 	vm *VirtualMachine,
 	ctx *Context,
-	tx *flow.TransactionBody,
+	proc *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (errors.Error, error) {
-	return vm.invokeMetaTransaction(
+
+	feeTx := deductTransactionFeeTransaction(proc.Transaction.Payer, ctx.Chain.ServiceAddress())
+	txErr, fatalErr := vm.invokeMetaTransaction(
 		*ctx,
-		deductTransactionFeeTransaction(tx.Payer, ctx.Chain.ServiceAddress()),
+		feeTx,
 		sth,
 		programs,
 	)
+	if txErr == nil {
+		proc.Events = append(proc.Events, feeTx.Events...)
+		proc.ServiceEvents = append(proc.ServiceEvents, feeTx.ServiceEvents...)
+		proc.Logs = append(proc.Logs, feeTx.Logs...)
+		proc.GasUsed = proc.GasUsed + feeTx.GasUsed
+	}
+
+	return txErr, fatalErr
 }

@@ -168,7 +168,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		prevResults = []*flow.ExecutionResult{
 			&receiptA.ExecutionResult,
 		}
-		resultByID := aBlock.Payload.ResultsById()
+		resultByID := aBlock.Payload.Results.Lookup()
 		sealsForPrev = []*flow.Seal{
 			Seal.Fixture(Seal.WithResult(resultByID[aBlock.Payload.Receipts[0].ResultID])),
 		}

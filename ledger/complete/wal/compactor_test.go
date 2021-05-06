@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -32,13 +33,13 @@ func Test_Compactor(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
 
 		//saved data after updates
-		savedData := make(map[string]map[string]*ledger.Payload)
+		savedData := make(map[ledger.RootHash]map[ledger.Path]*ledger.Payload)
 
 		t.Run("Compactor creates checkpoints eventually", func(t *testing.T) {
 
@@ -59,7 +60,7 @@ func Test_Compactor(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := utils.RandomPaths(numInsPerStep, pathByteSize)
+				paths0 := utils.RandomPaths(numInsPerStep)
 				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
@@ -77,12 +78,12 @@ func Test_Compactor(t *testing.T) {
 
 				require.FileExists(t, path.Join(dir, NumberToFilenamePart(i)))
 
-				data := make(map[string]*ledger.Payload, len(paths))
+				data := make(map[ledger.Path]*ledger.Payload, len(paths))
 				for j, path := range paths {
-					data[string(path)] = payloads[j]
+					data[path] = payloads[j]
 				}
 
-				savedData[string(rootHash)] = data
+				savedData[rootHash] = data
 			}
 
 			assert.Eventually(t, func() bool {
@@ -127,7 +128,7 @@ func Test_Compactor(t *testing.T) {
 			}
 		})
 
-		f2, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
@@ -158,12 +159,11 @@ func Test_Compactor(t *testing.T) {
 			for rootHash, data := range savedData {
 
 				paths := make([]ledger.Path, 0, len(data))
-				for pathString := range data {
-					path := []byte(pathString)
+				for path := range data {
 					paths = append(paths, path)
 				}
 
-				read := &ledger.TrieRead{RootHash: ledger.RootHash(rootHash), Paths: paths}
+				read := &ledger.TrieRead{RootHash: rootHash, Paths: paths}
 				payloads, err := f.Read(read)
 				require.NoError(t, err)
 
@@ -171,8 +171,8 @@ func Test_Compactor(t *testing.T) {
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[string(path)].Equals(payloads[i]))
-					require.True(t, data[string(path)].Equals(payloads2[i]))
+					require.True(t, data[path].Equals(payloads[i]))
+					require.True(t, data[path].Equals(payloads2[i]))
 				}
 			}
 
@@ -202,7 +202,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
@@ -222,7 +222,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
 
-				paths0 := utils.RandomPaths(numInsPerStep, pathByteSize)
+				paths0 := utils.RandomPaths(numInsPerStep)
 				payloads0 := utils.RandomPayloads(numInsPerStep, minPayloadByteSize, maxPayloadByteSize)
 
 				var paths []ledger.Path
@@ -247,7 +247,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			}
 
 			// assert precisely creation of checkpoint files
-			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
+			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
 			require.FileExists(t, path.Join(dir, "checkpoint.00000003"))
@@ -272,7 +272,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			err = compactor.cleanupCheckpoints()
 			require.NoError(t, err)
 
-			require.NoFileExists(t, path.Join(dir, RootCheckpointFilename))
+			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000003"))
