@@ -144,7 +144,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectUnverifiabl
 // are rejected as outdated in next situation
 // A <- B_1
 // 	 <- B_2
-// B_1 is finalized rending B_2 as orphan, submitting IR[ER[A], B_1] is a success, submitting IR[ER[A], B_2] is an outdated incorporated result
+// B_1 is finalized rendering B_2 as orphan, submitting IR[ER[A], B_1] is a success, submitting IR[ER[A], B_2] is an outdated incorporated result
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncorporatedResults() {
 	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
 	blockB2 := unittest.BlockHeaderWithParentFixture(&s.Block)
@@ -319,4 +319,73 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	}
 
 	s.sealsPL.AssertExpectations(s.T())
+}
+
+// TestOnBlockFinalized_ProcessingOrphanApprovals tests that approvals for orphan forks are rejected as outdated entries without processing
+// A <- B_1 <- C_1
+//	 <- B_2 <- C_2 <- D_2
+// 	 <- B_3 <- C_3 <- D_3 <- E_3
+// B_1 becomes finalized rendering forks starting at B_2 and B_3 as orphans
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanApprovals() {
+	forks := make([][]*flow.Block, 3)
+	forkResults := make([][]*flow.ExecutionResult, len(forks))
+	for forkIndex := range forks {
+		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+2, &s.Block)
+		fork := forks[forkIndex]
+
+		previousResult := s.IncorporatedResult.Result
+		for blockIndex, block := range fork {
+			s.blocks[block.ID()] = block.Header
+			s.identitiesCache[block.ID()] = s.AuthorizedVerifiers
+
+			// incorporate result for fork[0] in every block in fork
+			if blockIndex > 0 {
+				// create chain of results for every block in fork
+				result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
+				result.BlockID = block.Header.ParentID
+				result.Chunks = s.Chunks
+				forkResults[forkIndex] = append(forkResults[forkIndex], result)
+				previousResult = result
+
+				IR := unittest.IncorporatedResult.Fixture(
+					unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+					unittest.IncorporatedResult.WithResult(result))
+
+				err := s.core.processIncorporatedResult(IR)
+				require.NoError(s.T(), err)
+			}
+		}
+	}
+
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
+
+	// block B_1 becomes finalized
+	s.core.OnFinalizedBlock(forks[0][0].ID())
+
+	// verify will be called twice for every approval in first fork
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
+
+	// try submitting approvals for each result
+	for forkIndex, results := range forkResults {
+		for _, result := range results {
+			executedBlockID := result.BlockID
+			resultID := result.ID()
+
+			approval := unittest.ResultApprovalFixture(unittest.WithChunk(0),
+				unittest.WithApproverID(s.VerID),
+				unittest.WithBlockID(executedBlockID),
+				unittest.WithExecutionResultID(resultID))
+
+			err := s.core.processApproval(approval)
+
+			// for first fork all results should be valid, since it's a finalized fork
+			// all others forks are orphans and approvals for those should be outdated
+			if forkIndex == 0 {
+				require.NoError(s.T(), err)
+			} else {
+				require.Error(s.T(), err)
+				require.True(s.T(), engine.IsOutdatedInputError(err))
+			}
+		}
+	}
 }

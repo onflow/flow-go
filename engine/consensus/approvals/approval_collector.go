@@ -61,10 +61,10 @@ func (c *ApprovalCollector) chunkHasEnoughApprovals(chunkIndex uint64) bool {
 
 func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
-	finalState, ok := c.incorporatedResult.Result.FinalStateCommitment()
-	if !ok {
+	finalState, err := c.incorporatedResult.Result.FinalStateCommitment()
+	if err != nil {
 		// message correctness should have been checked before: failure here is an internal implementation bug
-		return fmt.Errorf("failed to get final state commitment from Execution Result")
+		return fmt.Errorf("failed to get final state commitment from Execution Result: %w", err)
 	}
 
 	aggregatedSigs := make([]flow.AggregatedSignature, c.numberOfChunks)
@@ -86,7 +86,7 @@ func (c *ApprovalCollector) SealResult() error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err := c.seals.Add(&flow.IncorporatedResultSeal{
+	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: c.incorporatedResult,
 		Seal:               seal,
 	})

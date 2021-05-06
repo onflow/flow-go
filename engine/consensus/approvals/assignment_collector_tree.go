@@ -8,14 +8,19 @@ import (
 	"github.com/onflow/flow-go/module/forest"
 )
 
-type assignmentCollectorVertex = AssignmentCollector
+// AssignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
+// AssignmentCollector and if it's orphan or not
+type AssignmentCollectorVertex struct {
+	Collector *AssignmentCollector
+	Orphan    bool
+}
 
 /* Methods implementing LevelledForest's Vertex interface */
 
-func (rsr *assignmentCollectorVertex) VertexID() flow.Identifier { return rsr.ResultID }
-func (rsr *assignmentCollectorVertex) Level() uint64             { return rsr.BlockHeight }
-func (rsr *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
-	return rsr.result.PreviousResultID, rsr.BlockHeight - 1
+func (rsr *AssignmentCollectorVertex) VertexID() flow.Identifier { return rsr.Collector.ResultID }
+func (rsr *AssignmentCollectorVertex) Level() uint64             { return rsr.Collector.BlockHeight }
+func (rsr *AssignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
+	return rsr.Collector.result.PreviousResultID, rsr.Collector.BlockHeight - 1
 }
 
 type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
@@ -42,19 +47,42 @@ func (t *AssignmentCollectorTree) GetSize() uint {
 	return t.forest.GetSize()
 }
 
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) *AssignmentCollector {
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) *AssignmentCollectorVertex {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
 	if !found {
 		return nil
 	}
-	return vertex.(*assignmentCollectorVertex)
+	return vertex.(*AssignmentCollectorVertex)
+}
+
+// FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
+// can mark other forks as orphan and stop processing approvals for it. Eventually all forks will be cleaned up by height
+func (t *AssignmentCollectorTree) FinalizeForkAtLevel(level uint64, finalizedBlockID flow.Identifier) {
+	t.lock.Lock()
+	defer t.lock.Unlock()
+	iter := t.forest.GetVerticesAtLevel(level)
+	for iter.HasNext() {
+		vertex := iter.NextVertex().(*AssignmentCollectorVertex)
+		if finalizedBlockID != vertex.Collector.BlockID() {
+			t.markOrphanFork(vertex)
+		}
+	}
+}
+
+// markOrphanFork takes starting vertex of some fork and marks it as orphan in recursive manner
+func (t *AssignmentCollectorTree) markOrphanFork(vertex *AssignmentCollectorVertex) {
+	vertex.Orphan = true
+	iter := t.forest.GetChildren(vertex.VertexID())
+	for iter.HasNext() {
+		t.markOrphanFork(iter.NextVertex().(*AssignmentCollectorVertex))
+	}
 }
 
 // GetCollectorsUpToLevel returns all collectors that satisfy interval [from; to)
-func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollector {
-	var vertices []*AssignmentCollector
+func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollectorVertex {
+	var vertices []*AssignmentCollectorVertex
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -65,7 +93,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 	for l := from; l < to; l++ {
 		iter := t.forest.GetVerticesAtLevel(l)
 		for iter.HasNext() {
-			vertices = append(vertices, iter.NextVertex().(*assignmentCollectorVertex))
+			vertices = append(vertices, iter.NextVertex().(*AssignmentCollectorVertex))
 		}
 	}
 
@@ -77,9 +105,9 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*AssignmentCollector, bool, error) {
 	resultID := result.ID()
 	// first let's check if we have a collector already
-	collector := t.GetCollector(resultID)
-	if collector != nil {
-		return collector, false, nil
+	cachedCollector := t.GetCollector(resultID)
+	if cachedCollector != nil {
+		return cachedCollector.Collector, false, nil
 	}
 
 	// fast check shows that there is no collector, need to create one
@@ -90,7 +118,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	// new collector was created by concurrent goroutine
 	vertex, found := t.forest.GetVertex(resultID)
 	if found {
-		return vertex.(*assignmentCollectorVertex), false, nil
+		return vertex.(*AssignmentCollectorVertex).Collector, false, nil
 	}
 
 	collector, err := t.onCreateCollector(result)
@@ -98,15 +126,23 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, false, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 
-	err = t.forest.VerifyVertex(collector)
+	vertex = &AssignmentCollectorVertex{
+		Collector: collector,
+		Orphan:    false,
+	}
+
+	err = t.forest.VerifyVertex(vertex)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
 	}
 
-	t.forest.AddVertex(collector)
+	t.forest.AddVertex(vertex)
 	return collector, true, nil
 }
 
+// PruneUpToHeight prunes all results for all assignment collectors with height up to but
+// NOT INCLUDING `limit`. Errors if limit is lower than
+// the previous value (as we cannot recover previously pruned results).
 func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()

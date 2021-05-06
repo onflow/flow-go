@@ -128,6 +128,9 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 		c.log.Fatal().Err(err).Msgf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
+	// finalize forks to stop collecting approvals for orphan collectors
+	c.collectorTree.FinalizeForkAtLevel(finalized.Height, finalizedBlockID)
+
 	// as soon as we discover new sealed height, proceed with pruning collectors
 	err = c.collectorTree.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
@@ -263,9 +266,13 @@ func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) 
 	}
 
 	if collector := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
+		if collector.Orphan {
+			return engine.NewOutdatedInputErrorf("collector for %s is marked as orphan", approval.Body.ExecutionResultID)
+		}
+
 		// if there is a collector it means that we have received execution result and we are ready
 		// to process approvals
-		err = collector.ProcessApproval(approval)
+		err = collector.Collector.ProcessApproval(approval)
 		if err != nil {
 			return fmt.Errorf("could not process assignment: %w", err)
 		}
@@ -296,7 +303,7 @@ func (c *approvalProcessingCore) checkEmergencySealing(lastSealedHeight, lastFin
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
-		err := collector.CheckEmergencySealing(lastFinalizedHeight)
+		err := collector.Collector.CheckEmergencySealing(lastFinalizedHeight)
 		if err != nil {
 			return err
 		}
