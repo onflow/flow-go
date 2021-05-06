@@ -322,9 +322,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 }
 
 // TestOnBlockFinalized_ProcessingOrphanApprovals tests that approvals for orphan forks are rejected as outdated entries without processing
-// A <- B_1 <- C_1
-//	 <- B_2 <- C_2 <- D_2
-// 	 <- B_3 <- C_3 <- D_3 <- E_3
+// A <- B_1 <- C_1{ IER[B_1] }
+//	 <- B_2 <- C_2{ IER[B_2] } <- D_2{ IER[C_2] }
+// 	 <- B_3 <- C_3{ IER[B_3] } <- D_3{ IER[C_3] } <- E_3{ IER[D_3] }
 // B_1 becomes finalized rendering forks starting at B_2 and B_3 as orphans
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanApprovals() {
 	forks := make([][]*flow.Block, 3)
@@ -338,15 +338,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 			s.blocks[block.ID()] = block.Header
 			s.identitiesCache[block.ID()] = s.AuthorizedVerifiers
 
-			// incorporate result for fork[0] in every block in fork
+			// create and incorporate result for every block in fork except last one
 			if blockIndex > 0 {
-				// create chain of results for every block in fork
+				// create a result
 				result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
 				result.BlockID = block.Header.ParentID
 				result.Chunks = s.Chunks
 				forkResults[forkIndex] = append(forkResults[forkIndex], result)
 				previousResult = result
 
+				// incorporate in fork
 				IR := unittest.IncorporatedResult.Fixture(
 					unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 					unittest.IncorporatedResult.WithResult(result))
@@ -357,6 +358,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 		}
 	}
 
+	// same block sealed
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
 	// block B_1 becomes finalized

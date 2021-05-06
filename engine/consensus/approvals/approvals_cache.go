@@ -71,6 +71,10 @@ func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
 
 	// check if we have it in the cache
 	if resource, ok := c.lru.Peek(approvalID); ok {
+
+		// no need to cleanup secondary index since it will be
+		// cleaned up in evict callback
+
 		_ = c.lru.Remove(approvalID)
 		return resource.(*flow.ResultApproval)
 	}
