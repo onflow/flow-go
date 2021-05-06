@@ -24,19 +24,13 @@ import (
 const defaultTimeout = time.Second * 10
 
 func TestMVP_Network(t *testing.T) {
-	baseCollectionConfigs := []func(*testnet.NodeConfig){
+	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
-	// TODO: replace these with actual values. Curerntly using random values as they are not required by the MVP tests
-	collectionConfigs := append(baseCollectionConfigs,
-		testnet.WithAdditionalFlag("--access-address=null"),
-		testnet.WithAdditionalFlag("--qc-contract-address=null"),
-	)
-
-	consensusConfigs := append(baseCollectionConfigs,
+	consensusConfigs := append(collectionConfigs,
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.DebugLevel),

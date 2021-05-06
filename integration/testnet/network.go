@@ -448,6 +448,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
 
+			nodeContainer.addFlag("access-address", "access_1:9000")
+			nodeContainer.addFlag("qc-contract-address", unittest.ServiceAccountPublicKey.PublicKey.String())
+
 		case flow.RoleExecution:
 
 			hostPort := testingdock.RandomPort(t)
