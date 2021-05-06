@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -442,6 +443,10 @@ func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
 }
 
 func (f *FixedAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+func (e *testRuntime) InvokeContractFunction(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) error {
 	panic("not implemented")
 }
 

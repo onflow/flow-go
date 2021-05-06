@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
+
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -92,4 +95,37 @@ func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProc
 	err := invocator.Process(vm, &ctx, tx, sth, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
+}
+
+func (vm *VirtualMachine) invokeContractFunction(
+	contractLocation common.AddressLocation,
+	functionName string,
+	arguments []interpreter.Value,
+	argumentTypes []sema.Type,
+	ctx *Context,
+	sth *state.StateHolder, programs *programs.Programs,
+) (errors.Error, error) {
+
+	env := newEnvironment(*ctx, vm, sth, programs)
+
+	_ = vm.Runtime.InvokeContractFunction(
+		contractLocation,
+		functionName,
+		arguments,
+		argumentTypes,
+		runtime.Context{
+			Interface:         env,
+			Location:          common.StringLocation("MetaTransaction"),
+			PredeclaredValues: nil,
+		},
+	)
+	defer func() {
+		if err := recover(); err != nil {
+			// all good :)
+		}
+	}()
+
+	// txErr, fatalErr := errors.SplitErrorTypes(err)
+
+	return nil, nil
 }

@@ -1,6 +1,10 @@
 package fvm
 
 import (
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -40,20 +44,22 @@ func (d *TransactionFeeDeductor) deductFees(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (errors.Error, error) {
-
-	feeTx := deductTransactionFeeTransaction(proc.Transaction.Payer, ctx.Chain.ServiceAddress())
-	txErr, fatalErr := vm.invokeMetaTransaction(
-		*ctx,
-		feeTx,
+	txErr, fatalErr := vm.invokeContractFunction(
+		common.AddressLocation{
+			Address: common.BytesToAddress(ctx.Chain.ServiceAddress().Bytes()),
+			Name:    "FlowServiceAccount",
+		},
+		"deductTransactionFee",
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
+		},
+		[]sema.Type{
+			sema.AuthAccountType,
+		},
+		ctx,
 		sth,
 		programs,
 	)
-	if txErr == nil {
-		proc.Events = append(proc.Events, feeTx.Events...)
-		proc.ServiceEvents = append(proc.ServiceEvents, feeTx.ServiceEvents...)
-		proc.Logs = append(proc.Logs, feeTx.Logs...)
-		proc.GasUsed = proc.GasUsed + feeTx.GasUsed
-	}
 
 	return txErr, fatalErr
 }

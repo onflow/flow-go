@@ -318,6 +318,10 @@ func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ r
 	panic("ReadLinked not expected")
 }
 
+func (e *ErrorReturningRuntime) InvokeContractFunction(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) error {
+	panic("InvokeContractFunction not expected")
+}
+
 func encodeContractNames(contractNames []string) ([]byte, error) {
 	sort.Strings(contractNames)
 	var buf bytes.Buffer
