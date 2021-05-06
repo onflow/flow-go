@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -24,17 +23,26 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestAssignerFetcherPipeline evaluates behavior of the pipeline of
-// block reader -> block consumer -> assigner engine -> chunks queue -> chunks consumer -> chunks processor (i.e., fetcher engine)
+// TestVerificationHappyPath evaluates behavior of the pipeline of verification node engines as:
+// block reader -> block consumer -> assigner engine -> chunks queue -> chunks consumer -> fetcher engine -> verifier engine
 // block reader receives (container) finalized blocks that contain execution receipts preceding (reference) blocks.
 // some receipts have duplicate results.
 // - in a staked verification node:
-// -- for each distinct result assigner engine receives, it does the chunk assignment and passes the
-// chunk locators of assigned chunks to chunk queue, which in turn delivers to chunks processor though the chunks consumer.
+// -- in assigner engine, for each distinct result it receives:
+// --- it does the chunk assignment.
+// --- it passes the chunk locators of assigned chunks to chunk queue.
+// --- the chunk queue in turn delivers the assigned chunk to the fetcher engine.
+// -- in fetcher engine, for each arriving chunk locator:
+// --- it asks the chunk data pack from requester engine.
+// --- requester engine asks and retrieves chunk data pack from (mocked) execution node.
+// --- once chunk data pack arrives, forms a verifiable chunk and passes it to verifier node.
+// -- in verifier engine, for each arriving verifiable chunk:
+// --- it verifies the chunk, shapes a result approval, and emits it to (mock) consensus node.
+// -- the test is passed if (mock) consensus node receives a single result approval per assigned chunk in a timely manner.
 // - in an unstaked verification node:
 // -- execution results are discarded.
-// - it does a correct resource clean up of the pipeline after handling all incoming receipts
-func TestAssignerFetcherPipeline(t *testing.T) {
+// -- the test is passed if no result approval is emitted for any of the chunks in a timely manner.
+func TestVerificationHappyPath(t *testing.T) {
 	testcases := []struct {
 		blockCount      int
 		opts            []vertestutils.CompleteExecutionReceiptBuilderOpt
@@ -126,80 +134,6 @@ func TestAssignerFetcherPipeline(t *testing.T) {
 	}
 }
 
-//// withConsumers is a test helper that sets up the following pipeline:
-//// block reader -> block consumer (3 workers) -> assigner engine -> chunks queue -> chunks consumer (3 workers) -> mock chunk processor
-////
-//// The block consumer operates on a block reader with a chain of specified number of finalized blocks
-//// ready to read.
-//func withConsumers(t *testing.T,
-//	staked bool,
-//	blockCount int,
-//	withConsumers func(*blockconsumer.BlockConsumer,
-//		*chunkconsumer.ChunkConsumer,
-//		[]*flow.Block,
-//		*sync.WaitGroup), ops ...utils.CompleteExecutionReceiptBuilderOpt) {
-//	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-//		maxProcessing := int64(3)
-//
-//		// bootstraps
-//		s, me, verId := bootstrapSystem(t, staked)
-//
-//		// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
-//		// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
-//		// Container blocks only contain receipts of their preceding reference blocks. But they do not
-//		// hold any guarantees.
-//		root, err := s.State.Final().Head()
-//		require.NoError(t, err)
-//		completeERs := utils.CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
-//		blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
-//
-//		// mocks chunk assigner to assign even chunk indices to this verification node
-//		chunkAssigner := &mock.ChunkAssigner{}
-//		expectedLocatorIds := MockChunkAssignmentFixture(chunkAssigner, flow.IdentityList{&verId}, completeERs, evenChunkIndexAssigner)
-//
-//		// chunk consumer and processor
-//		processedIndex := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
-//		chunksQueue := bstorage.NewChunkQueue(db)
-//		ok, err := chunksQueue.Init(chunkconsumer.DefaultJobIndex)
-//		require.NoError(t, err)
-//		require.True(t, ok)
-//
-//		chunkProcessor, chunksWg := mockChunkProcessor(t, expectedLocatorIds, staked)
-//		chunkConsumer := chunkconsumer.NewChunkConsumer(
-//			unittest.Logger(),
-//			processedIndex,
-//			chunksQueue,
-//			chunkProcessor,
-//			maxProcessing)
-//
-//		// assigner engine
-//		collector := &metrics.NoopCollector{}
-//		tracer := &trace.NoopTracer{}
-//		assignerEng := assigner.New(
-//			unittest.Logger(),
-//			collector,
-//			tracer,
-//			me,
-//			s.State,
-//			chunkAssigner,
-//			chunksQueue,
-//			chunkConsumer)
-//
-//		// block consumer
-//		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
-//		blockConsumer, _, err := blockconsumer.NewBlockConsumer(
-//			unittest.Logger(),
-//			processedHeight,
-//			s.Storage.Blocks,
-//			s.State,
-//			assignerEng,
-//			maxProcessing)
-//		require.NoError(t, err)
-//
-//		withConsumers(blockConsumer, chunkConsumer, blocks, chunksWg)
-//	})
-//}
-
 // withConsumers is a test helper that sets up the following pipeline:
 // block reader -> block consumer (3 workers) -> assigner engine -> chunks queue -> chunks consumer (3 workers) -> mock chunk processor
 //
@@ -240,8 +174,6 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 			completeERs,
 			vertestutils.EvenChunkIndexAssigner)
 	}
-
-	fmt.Println("total assigned chunks: ", len(assignedChunkIDs))
 
 	hub := stub.NewNetworkHub()
 	chunksLimit := 100
@@ -311,6 +243,8 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		verNode.FetcherEngine,
 		verNode.RequesterEngine,
 		verNode.VerifierEngine)
+
+	require.Equal(t, verNode.ChunkRequests)
 
 	testmock.RequireGenericNodesDoneBefore(t, 1*time.Second,
 		conNode,
