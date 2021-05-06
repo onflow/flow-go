@@ -315,6 +315,7 @@ func (rsr *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting u
 				continue
 			}
 			requestTrackerItem.Update()
+			rsr.requestTracker.Set(rsr.ResultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10

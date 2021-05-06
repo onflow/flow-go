@@ -882,13 +882,13 @@ func (c *Core) clearPools(sealedIDs []flow.Identifier) error {
 
 	// clear the request tracker of all items corresponding to results that are
 	// no longer in the incorporated-results mempool
-	for resultID, byIncorporatedBlockID := range c.requestTracker.GetAll() {
+	var removedResultIDs []flow.Identifier
+	for _, resultID := range c.requestTracker.GetAllIds() {
 		if _, _, ok := c.incorporatedResults.ByResultID(resultID); !ok {
-			for incorporatedBlockID := range byIncorporatedBlockID {
-				c.requestTracker.Remove(resultID, incorporatedBlockID)
-			}
+			removedResultIDs = append(removedResultIDs, resultID)
 		}
 	}
+	c.requestTracker.Remove(removedResultIDs...)
 
 	// for each missing block that we are tracking, remove it from tracking if
 	// we now know that block or if we have just cleared related resources; then
@@ -1138,6 +1138,7 @@ func (c *Core) requestPendingApprovals() (int, error) {
 				continue
 			}
 			requestTrackerItem.Update()
+			c.requestTracker.Set(resultID, incorporatedBlockID, chunk.Index, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10

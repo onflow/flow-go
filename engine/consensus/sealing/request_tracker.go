@@ -2,6 +2,7 @@ package sealing
 
 import (
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -24,8 +25,8 @@ type RequestTrackerItem struct {
 // NewRequestTrackerItem instantiates a new RequestTrackerItem where the
 // NextTimeout is evaluated to the current time plus a random blackout period
 // contained between min and max.
-func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) *RequestTrackerItem {
-	item := &RequestTrackerItem{
+func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) RequestTrackerItem {
+	item := RequestTrackerItem{
 		blackoutPeriodMin: blackoutPeriodMin,
 		blackoutPeriodMax: blackoutPeriodMax,
 	}
@@ -55,33 +56,31 @@ RequestTracker
 
 // RequestTracker is an index of RequestTrackerItems indexed by execution result
 // ID, incorporated block ID and chunk index.
-// It is not concurrency-safe.
+// Is concurrency-safe.
 type RequestTracker struct {
-	index             map[flow.Identifier]map[flow.Identifier]map[uint64]*RequestTrackerItem
+	index             map[flow.Identifier]map[flow.Identifier]map[uint64]RequestTrackerItem
 	blackoutPeriodMin int
 	blackoutPeriodMax int
+	lock              sync.RWMutex
 }
 
 // NewRequestTracker instantiates a new RequestTracker with blackout periods
 // between min and max seconds.
 func NewRequestTracker(blackoutPeriodMin, blackoutPeriodMax int) *RequestTracker {
 	return &RequestTracker{
-		index:             make(map[flow.Identifier]map[flow.Identifier]map[uint64]*RequestTrackerItem),
+		index:             make(map[flow.Identifier]map[flow.Identifier]map[uint64]RequestTrackerItem),
 		blackoutPeriodMin: blackoutPeriodMin,
 		blackoutPeriodMax: blackoutPeriodMax,
 	}
 }
 
-// GetAll returns a map of all the items in the tracker indexed by execution
-// result ID, incorporated block ID and chunk index.
-func (rt *RequestTracker) GetAll() map[flow.Identifier]map[flow.Identifier]map[uint64]*RequestTrackerItem {
-	return rt.index
-}
-
 // Get returns the tracker item for a specific chunk, and creates a new one if
 // it doesn't exist.
-func (rt *RequestTracker) Get(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64) *RequestTrackerItem {
+func (rt *RequestTracker) Get(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64) RequestTrackerItem {
+	rt.lock.RLock()
 	item, ok := rt.index[resultID][incorporatedBlockID][chunkIndex]
+	rt.lock.RUnlock()
+
 	if !ok {
 		item = NewRequestTrackerItem(rt.blackoutPeriodMin, rt.blackoutPeriodMax)
 		rt.Set(resultID, incorporatedBlockID, chunkIndex, item)
@@ -90,28 +89,41 @@ func (rt *RequestTracker) Get(resultID, incorporatedBlockID flow.Identifier, chu
 }
 
 // Set inserts or updates the tracker item for a specific chunk.
-func (rt *RequestTracker) Set(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64, item *RequestTrackerItem) {
+func (rt *RequestTracker) Set(resultID, incorporatedBlockID flow.Identifier, chunkIndex uint64, item RequestTrackerItem) {
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
 	level1, level1found := rt.index[resultID]
 	if !level1found {
-		level1 = make(map[flow.Identifier]map[uint64]*RequestTrackerItem)
+		level1 = make(map[flow.Identifier]map[uint64]RequestTrackerItem)
 		rt.index[resultID] = level1
 	}
 	level2, level2found := level1[incorporatedBlockID]
 	if !level2found {
-		level2 = make(map[uint64]*RequestTrackerItem)
+		level2 = make(map[uint64]RequestTrackerItem)
 		level1[incorporatedBlockID] = level2
 	}
 	level2[chunkIndex] = item
 }
 
+// GetAllIds returns all result IDs that we are indexing
+func (rt *RequestTracker) GetAllIds() []flow.Identifier {
+	rt.lock.RUnlock()
+	defer rt.lock.RUnlock()
+	ids := make([]flow.Identifier, 0, len(rt.index))
+	for resultID := range rt.index {
+		ids = append(ids, resultID)
+	}
+	return ids
+}
+
 // Remove removes all entries pertaining to an execution result
-func (rt *RequestTracker) Remove(resultID, incorporatedBlockID flow.Identifier) {
-	index, ok := rt.index[resultID]
-	if !ok {
+func (rt *RequestTracker) Remove(resultIDs ...flow.Identifier) {
+	if len(resultIDs) == 0 {
 		return
 	}
-	delete(index, incorporatedBlockID)
-	if len(index) == 0 {
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+	for _, resultID := range resultIDs {
 		delete(rt.index, resultID)
 	}
 }
