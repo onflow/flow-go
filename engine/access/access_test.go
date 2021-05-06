@@ -440,9 +440,8 @@ func (suite *Suite) TestGetSealedTransaction() {
 			Events: nil,
 		}
 
-		// generate a receipt
-		receipt1 := unittest.ReceiptForBlockFixture(&block)
-		receipt1.ExecutorID = enNodeIDs[0]
+		// generate receipts
+		executionReceipts := unittest.ReceiptsForBlockFixture(&block, enNodeIDs)
 
 		// assume execution node returns an empty list of events
 		suite.execClient.On("GetTransactionResult", mock.Anything, mock.Anything).Return(&exeEventResp, nil)
@@ -506,43 +505,22 @@ func (suite *Suite) TestGetSealedTransaction() {
 		// 3. Request engine is used to request missing collection
 		suite.request.On("EntityByID", collection.ID(), mock.Anything).Return()
 
-		// 4. Ingest engine receives the requested collection and finishes processing
+		// 4. Ingest engine receives the requested collection and all the execution receipts
 		ingestEng.OnCollection(originID, &collection)
-		<-ingestEng.Done()
 
-		// 5. client requests a transaction
+		for _, r := range executionReceipts {
+			err = ingestEng.Process(enNodeIDs[0], r)
+			require.NoError(suite.T(), err)
+		}
+		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
+
+		// 5. Client requests a transaction
 		tx := collection.Transactions[0]
 		txID := tx.ID()
 		getReq := &accessproto.GetTransactionRequest{
 			Id: txID[:],
 		}
 		gResp, err := handler.GetTransactionResult(context.Background(), getReq)
-		require.NoError(suite.T(), err)
-		// assert that the transaction is reported as Sealed
-		require.Equal(suite.T(), entitiesproto.TransactionStatus_FINALIZED, gResp.GetStatus())
-
-		// 6. first receipt comes in
-		err = ingestEng.Process(enNodeIDs[0], receipt1)
-		require.NoError(suite.T(), err)
-
-		// TODO: currently, for some unknown reason, the ingest engine Process never kicks off the engine.Unit.Do
-		// function. This causes the receipt to be never persisted and fails the test. For now, adding an explicit
-		// Store call hear to mimic what the ingestEngine would have done.
-		err = receipts.Store(receipt1)
-		require.NoError(suite.T(), err)
-
-		// keep checking if the receipts db was updated by the ingest engine
-		require.Eventually(suite.T(), func() bool {
-			ers, err := receipts.ByBlockID(block.ID())
-			if err != nil {
-				suite.T().Fail()
-				return false
-			}
-			return len(ers) > 0
-		}, 60*time.Second, 100*time.Millisecond)
-
-		// 7. re-request the transaction result
-		gResp, err = handler.GetTransactionResult(context.Background(), getReq)
 		require.NoError(suite.T(), err)
 		// assert that the transaction is reported as Sealed
 		require.Equal(suite.T(), entitiesproto.TransactionStatus_SEALED, gResp.GetStatus())
@@ -559,13 +537,12 @@ func (suite *Suite) TestExecuteScript() {
 		results := storage.NewExecutionResults(suite.metrics, db)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
 
-		identities := unittest.IdentityListFixture(1)
+		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
-		executionNodeIdentity := identities[0]
 
 		// create a mock connection factory
 		connFactory := new(factorymock.ConnectionFactory)
-		connFactory.On("GetExecutionAPIClient", executionNodeIdentity.Address).Return(suite.execClient, &mockCloser{}, nil)
+		connFactory.On("GetExecutionAPIClient", mock.Anything).Return(suite.execClient, &mockCloser{}, nil)
 
 		suite.backend = backend.New(
 			suite.state,
@@ -614,13 +591,13 @@ func (suite *Suite) TestExecuteScript() {
 		require.NoError(suite.T(), err)
 		suite.snapshot.On("Head").Return(lastBlock.Header, nil).Once()
 
-		// create an execution receipt for the block
-		executionReceiptLast := unittest.ReceiptForBlockFixture(&lastBlock)
-		executionReceiptLast.ExecutorID = identities[0].NodeID
-
-		// notify the ingestion engine about the receipt
-		err = ingestEng.ProcessLocal(executionReceiptLast)
-		require.NoError(suite.T(), err)
+		// create execution receipts for each of the execution node and the last block
+		executionReceipts := unittest.ReceiptsForBlockFixture(&lastBlock, identities.NodeIDs())
+		// notify the ingest engine about the receipts
+		for _, r := range executionReceipts {
+			err = ingestEng.ProcessLocal(r)
+			require.NoError(suite.T(), err)
+		}
 
 		// create another block as a predecessor of the block created earlier
 		prevBlock := unittest.BlockFixture()
@@ -630,15 +607,17 @@ func (suite *Suite) TestExecuteScript() {
 		err = db.Update(operation.IndexBlockHeight(prevBlock.Header.Height, prevBlock.ID()))
 		require.NoError(suite.T(), err)
 
-		// create an execution receipt for the block
-		executionReceiptPrev := unittest.ReceiptForBlockFixture(&prevBlock)
-		executionReceiptPrev.ExecutorID = identities[0].NodeID
+		// create execution receipts for each of the execution node and the previous block
+		executionReceipts = unittest.ReceiptsForBlockFixture(&prevBlock, identities.NodeIDs())
+		// notify the ingest engine about the receipts
+		for _, r := range executionReceipts {
+			err = ingestEng.ProcessLocal(r)
+			require.NoError(suite.T(), err)
+		}
 
-		// notify the ingestion engine about the receipt
-		err = ingestEng.ProcessLocal(executionReceiptPrev)
-		require.NoError(suite.T(), err)
 		// wait for the receipt to be persisted
 		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
+
 		ctx := context.Background()
 
 		script := []byte("dummy script")

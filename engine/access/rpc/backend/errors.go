@@ -6,11 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ExecutionReceiptNotFound indicates that no execution receipt were found for a given block ID
-type ExecutionReceiptNotFound struct {
-	blockID flow.Identifier
+// InsufficientExecutionReceipts indicates that no execution receipt were found for a given block ID
+type InsufficientExecutionReceipts struct {
+	blockID      flow.Identifier
+	receiptCount int
 }
 
-func (e ExecutionReceiptNotFound) Error() string {
-	return fmt.Sprintf("no execution receipt found for block ID: %s", e.blockID.String())
+func (e InsufficientExecutionReceipts) Error() string {
+	return fmt.Sprintf("insufficient execution receipts found (%d) for block ID: %s", e.receiptCount, e.blockID.String())
 }

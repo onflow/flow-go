@@ -444,7 +444,7 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
 		// if no execution receipt were found, return a NotFound GRPC error
-		if errors.As(err, &ExecutionReceiptNotFound{}) {
+		if errors.As(err, &InsufficientExecutionReceipts{}) {
 			return nil, 0, "", status.Errorf(codes.NotFound, err.Error())
 		}
 		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)

@@ -245,7 +245,7 @@ func convertStorageError(err error) error {
 
 // executionNodesForBlockID returns upto maxExecutionNodesCnt number of randomly chosen execution node identities
 // which have executed the given block ID.
-// If no such execution node is found, an ExecutionReceiptNotFound error is returned.
+// If no such execution node is found, an InsufficientExecutionReceipts error is returned.
 func executionNodesForBlockID(
 	ctx context.Context,
 	blockID flow.Identifier,
@@ -285,9 +285,10 @@ func executionNodesForBlockID(
 		}
 	}
 
-	// if no execution receipts have been received so far, then throw an error
-	if len(executorIDs) == 0 {
-		return flow.IdentityList{}, ExecutionReceiptNotFound{blockID: blockID}
+	receiptCnt := len(executorIDs)
+	// if less than minExecutionNodesCnt execution receipts have been received so far, then throw an error
+	if receiptCnt < minExecutionNodesCnt {
+		return flow.IdentityList{}, InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCnt}
 	}
 
 	// choose from the preferred or fixed execution nodes
