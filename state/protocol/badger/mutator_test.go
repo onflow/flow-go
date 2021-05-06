@@ -1034,7 +1034,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
-				commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
+				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)

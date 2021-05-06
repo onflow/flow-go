@@ -46,7 +46,7 @@ func constructRootResultAndSeal(
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
-		ClusterQCs:         clusterQCs,
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
 	}
