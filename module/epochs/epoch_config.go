@@ -99,6 +99,8 @@ func EncodeClusterQCs(qcs []*flow.QuorumCertificate, service flow.Address) []byt
 	for i, qc := range qcs {
 		qcIndex := cadence.UInt16(i)
 
+		// Here we are adding signer IDs rather than votes. It doesn't matter
+		// because these initial values aren't used by the contract.
 		qcVotes := []cadence.Value{}
 		for _, v := range qc.SignerIDs {
 			qcVotes = append(qcVotes, cadence.NewString(v.String()))
