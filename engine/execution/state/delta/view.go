@@ -242,6 +242,14 @@ func (v *View) MergeView(ch state.View) error {
 
 	v.readsCount += child.readsCount
 
+	for k, va := range child.Reads {
+		v.Reads[k] = va
+	}
+
+	for k, va := range child.Writes {
+		v.Writes[k] = va
+	}
+
 	return nil
 }
 

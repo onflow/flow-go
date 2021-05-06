@@ -2,7 +2,11 @@ package computer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	filepath "path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -197,7 +201,7 @@ func (e *blockComputer) executeBlock(
 			freshBlockView := blockView.NewChild()
 
 			collEvents, collServiceEvents, txResults, nextIndex, gas, _, _, txNumber, conflictingBlockTxs, conflictingCollectionTxs, err := e.executeCollection(
-				ctx, txIndex, blockCtx, collectionView, freshBlockView, programs, collectionC,
+				ctx, txIndex, blockCtx, collectionView, freshBlockView, programs, collectionC, block.Block.Header, ii,
 			)
 
 			if err != nil {
@@ -342,15 +346,7 @@ func (e *blockComputer) executeBlock(
 	}, nil
 }
 
-func (e *blockComputer) executeCollection(
-	ctx context.Context,
-	txIndex uint32,
-	blockCtx fvm.Context,
-	collectionView state.View,
-	alternativeBlockView state.View,
-	programs *programs.Programs,
-	collection *entity.CompleteCollection,
-) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, []flow.RegisterID, []flow.RegisterID, int, int, int, error) {
+func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, blockCtx fvm.Context, collectionView state.View, alternativeBlockView state.View, programs *programs.Programs, collection *entity.CompleteCollection, header *flow.Header, collectionIndex int) ([]flow.Event, []flow.Event, []flow.TransactionResult, uint32, uint64, []flow.RegisterID, []flow.RegisterID, int, int, int, error) {
 
 	// call tracing
 	startedAt := time.Now()
@@ -384,10 +380,12 @@ func (e *blockComputer) executeCollection(
 
 	baseCollectionView := collectionView.NewChild()
 
+	workingCollectionView := collectionView.NewChild()
+
 	for _, txBody := range collection.Transactions {
 
 		txEvents, txServiceEvents, txResult, txGasUsed, err :=
-			e.executeTransaction(txBody, colSpan, txMetrics, collectionView, programs, txCtx, txIndex)
+			e.executeTransaction(txBody, colSpan, txMetrics, workingCollectionView, programs, txCtx, txIndex)
 		if err != nil {
 			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
 		}
@@ -414,20 +412,22 @@ func (e *blockComputer) executeCollection(
 		txResults = append(txResults, txResult)
 		gasUsed += txGasUsed
 
-		interactions := collectionView.(*delta.View).Interactions().Delta
+		interactions := baseCollectionView.(*delta.View).Interactions().Delta
 		collectionInteractions := alternativeCollectionView.(*delta.View).Interactions().Delta
 		blockInteractionsInteractions := blockView.(*delta.View).Interactions().Delta
 
-		d, err := diff.Diff(interactions, collectionInteractions)
+		collectionD, err := diff.Diff(interactions, collectionInteractions)
 
-		if len(d) > 0 {
+		if len(collectionD) > 0 {
 			conflictingCollectionTxs++
 		}
 
-		d, err = diff.Diff(interactions, blockInteractionsInteractions)
-		if len(d) > 0 {
+		blockD, err := diff.Diff(interactions, blockInteractionsInteractions)
+		if len(blockD) > 0 {
 			conflictingBlockTxs++
 		}
+
+		writeTxRegisters(txIndex, txBody, header, workingCollectionView, collectionIndex, collection.Collection(), collectionD, blockD)
 
 		totalTx++
 	}
@@ -441,7 +441,90 @@ func (e *blockComputer) executeCollection(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
 
+	collectionView.MergeView(workingCollectionView)
+
 	return events, serviceEvents, txResults, txIndex, gasUsed, cumulativeBlockConflicts, cumulativeCollectionConflicts, totalTx, conflictingBlockTxs, conflictingCollectionTxs, nil
+}
+
+type TransactionBody struct {
+	ReferenceBlockID flow.Identifier
+	Script           string
+	Arguments        [][]byte
+	GasLimit         uint64
+	ProposalKey      flow.ProposalKey
+	Payer            flow.Address
+	Authorizers      []flow.Address
+}
+
+type TxJson struct {
+	Transaction         TransactionBody
+	Reads               map[string]flow.RegisterID
+	Writes              map[string]flow.RegisterID
+	CollectionConflicts []string
+	BlockConflicts      []string
+}
+
+func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow.Header, view state.View, collectionIndex int, collection flow.Collection, collectionD diff.Changelog, blockD diff.Changelog) {
+
+	basedir := "/mnt/data-out/blocks"
+
+	block_path := fmt.Sprintf("%08d_%s", header.Height, header.ID())
+
+	collection_path := fmt.Sprintf("%02d_%s", collectionIndex, collection.ID())
+
+	conflictSuffix := ""
+
+	if len(collectionD) > 0 || len(blockD) > 0 {
+		conflictSuffix = "_conflicts"
+	}
+
+	tx_path := fmt.Sprintf("%02d_%s%s.json", txIndex-1, txBody.ID(), conflictSuffix)
+
+	dir := filepath.Join(basedir, block_path, collection_path)
+
+	path := filepath.Join(dir, tx_path)
+
+	reads := view.(*delta.View).Reads
+	writes := view.(*delta.View).Writes
+
+	s := TxJson{
+		Transaction: TransactionBody{
+			ReferenceBlockID: txBody.ReferenceBlockID,
+			Script:           string(txBody.Script),
+			Arguments:        txBody.Arguments,
+			GasLimit:         txBody.GasLimit,
+			ProposalKey:      txBody.ProposalKey,
+			Payer:            txBody.Payer,
+			Authorizers:      txBody.Authorizers,
+		},
+		Reads:               reads,
+		Writes:              writes,
+		CollectionConflicts: make([]string, len(collectionD)),
+		BlockConflicts:      make([]string, len(blockD)),
+	}
+
+	for i, change := range collectionD {
+		s.CollectionConflicts[i] = strings.Join(change.Path, "/")
+	}
+
+	for i, change := range blockD {
+		s.BlockConflicts[i] = strings.Join(change.Path, "/")
+	}
+
+	data, err := json.MarshalIndent(s, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		panic(err)
+	}
+
+	err = ioutil.WriteFile(path, data, 0755)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func NewReadWrites() *ReadWrites {
