@@ -87,7 +87,7 @@ func (c CompleteExecutionReceiptList) ChunkOf(t *testing.T, resultID flow.Identi
 		}
 	}
 
-	require.Fail(t, "could not find receipt data of specified chunk in the complete execution result list")
+	require.Fail(t, "could not find specified chunk in the complete execution result list")
 	return nil
 }
 
