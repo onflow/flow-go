@@ -249,11 +249,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		conNode,
 		exeNode)
 
-	// asserts expected number of calls.
-	if staked {
-		conEngine.AssertExpectations(t)
-		exeEngine.AssertExpectations(t)
-	} else {
+	if !staked {
 		// in unstaked mode, no message should be received by consensus and execution node.
 		conEngine.AssertNotCalled(t, "Process")
 		exeEngine.AssertNotCalled(t, "Process")
