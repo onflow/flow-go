@@ -51,7 +51,7 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 		for _, id := range cluster {
 			kvp := cadence.KeyValuePair{
 				Key:   cadence.NewString(id.String()),
-				Value: cadence.NewUInt64(0),
+				Value: cadence.NewUInt64(1),
 			}
 			weightsByNodeID = append(weightsByNodeID, kvp)
 		}
