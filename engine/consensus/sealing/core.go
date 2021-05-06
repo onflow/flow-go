@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -210,24 +209,25 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		receiptSpan.Finish()
 	}()
 
-	resultID := receipt.ExecutionResult.ID()
+	// setup logger to capture basic information about the receipt
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", resultID[:]).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
 		Logger()
-
-	initialState, finalState, err := validation.IntegrityCheck(receipt)
+	initialState, finalState, err := getStartAndEndStates(receipt)
 	if err != nil {
-		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
-		return false, nil
+		if errors.Is(err, flow.NoChunksError) {
+			log.Error().Err(err).Msg("discarding malformed receipt")
+			return false, nil
+		}
+		return false, fmt.Errorf("internal problem retrieving start- and end-state commitment from receipt: %w", err)
 	}
-
 	log = log.With().
-		Hex("initial_state", initialState).
-		Hex("final_state", finalState).Logger()
+		Hex("initial_state", initialState[:]).
+		Hex("final_state", finalState[:]).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
@@ -766,10 +766,10 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
 	// get final state of execution result
-	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
-	if !ok {
+	finalState, err := incorporatedResult.Result.FinalStateCommitment()
+	if err != nil {
 		// message correctness should have been checked before: failure here is an internal implementation bug
-		return fmt.Errorf("failed to get final state commitment from Execution Result")
+		return fmt.Errorf("processing malformed result, whose correctness should have been enforced before: %w", err)
 	}
 
 	// TODO: Check SPoCK proofs
@@ -783,7 +783,7 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err := c.seals.Add(&flow.IncorporatedResultSeal{
+	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
@@ -1184,4 +1184,20 @@ func (c *Core) requestPendingApprovals() (int, error) {
 	}
 
 	return requestCount, nil
+}
+
+// getStartAndEndStates returns the pair: (start state commitment; final state commitment)
+// Error returns:
+//  * NoChunksError: if there are no chunks, i.e. the ExecutionResult is malformed
+//  * all other errors are unexpected and symptoms of node-internal problems
+func getStartAndEndStates(receipt *flow.ExecutionReceipt) (initialState flow.StateCommitment, finalState flow.StateCommitment, err error) {
+	initialState, err = receipt.ExecutionResult.InitialStateCommit()
+	if err != nil {
+		return initialState, finalState, fmt.Errorf("could not get commitment for initial state from receipt: %w", err)
+	}
+	finalState, err = receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		return initialState, finalState, fmt.Errorf("could not get commitment for final state from receipt: %w", err)
+	}
+	return initialState, finalState, nil
 }

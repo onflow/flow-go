@@ -92,6 +92,7 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 				Transactions: transactions,
 			},
 		},
+		StartState: unittest.StateCommitmentPointerFixture(),
 	}
 
 	me := new(module.Local)
@@ -199,7 +200,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		}
 		block1View = view.NewChild()
 		executableBlock := &entity.ExecutableBlock{
-			Block: block1,
+			Block:      block1,
+			StartState: unittest.StateCommitmentPointerFixture(),
 		}
 		_, err := engine.ComputeBlock(context.Background(), executableBlock, block1View)
 		require.NoError(t, err)
@@ -359,6 +361,7 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 				Transactions: col.Transactions,
 			},
 		},
+		StartState: unittest.StateCommitmentPointerFixture(),
 	}
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
 	require.NoError(t, err)

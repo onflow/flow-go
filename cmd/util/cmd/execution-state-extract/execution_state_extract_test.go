@@ -83,7 +83,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 			//saved data after updates
 			keysValuesByCommit := make(map[string]map[string]keyPair)
-			commitsByBlocks := make(map[flow.Identifier][]byte)
+			commitsByBlocks := make(map[flow.Identifier]ledger.State)
 			blocksInOrder := make([]flow.Identifier, size)
 
 			for i := 0; i < size; i++ {
@@ -98,7 +98,7 @@ func TestExtractExecutionState(t *testing.T) {
 
 				// generate random block and map it to state commitment
 				blockID := unittest.IdentifierFixture()
-				err = commits.Store(blockID, stateCommitment)
+				err = commits.Store(blockID, flow.StateCommitment(stateCommitment))
 				require.NoError(t, err)
 
 				data := make(map[string]keyPair, len(keys))
@@ -109,7 +109,7 @@ func TestExtractExecutionState(t *testing.T) {
 					}
 				}
 
-				keysValuesByCommit[string(stateCommitment)] = data
+				keysValuesByCommit[string(stateCommitment[:])] = data
 				commitsByBlocks[blockID] = stateCommitment
 				blocksInOrder[i] = blockID
 			}
@@ -141,7 +141,7 @@ func TestExtractExecutionState(t *testing.T) {
 					storage, err := complete.NewLedger(diskWal, 1000, metr, zerolog.Nop(), complete.DefaultPathFinderVersion)
 					require.NoError(t, err)
 
-					data := keysValuesByCommit[string(stateCommitment)]
+					data := keysValuesByCommit[string(stateCommitment[:])]
 
 					keys := make([]ledger.Key, 0, len(data))
 					for _, v := range data {
