@@ -253,7 +253,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
 			provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
-		}).Return(nil)
+		}).Return(nil).Times(len(assignedChunkIDs))
 
 	return &exeNode, exeEngine
 }
@@ -357,7 +357,7 @@ func SetupMockConsensusNode(t *testing.T,
 			assert.True(t, valid)
 
 			wg.Done()
-		}).Return(nil)
+		}).Return(nil).Times(len(assignedChunkIDs))
 
 	_, err := conNode.Net.Register(engine.ReceiveApprovals, conEngine)
 	assert.Nil(t, err)

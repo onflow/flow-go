@@ -187,7 +187,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		chainID)
 
 	// execution node
-	exeNode, _ := vertestutils.SetupChunkDataPackProvider(t,
+	exeNode, exeEngine := vertestutils.SetupChunkDataPackProvider(t,
 		hub,
 		exeID,
 		participants,
@@ -197,7 +197,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		vertestutils.RespondChunkDataPackRequest)
 
 	// consensus node
-	conNode, _, conWG := vertestutils.SetupMockConsensusNode(t,
+	conNode, conEngine, conWG := vertestutils.SetupMockConsensusNode(t,
 		hub,
 		conID,
 		flow.IdentityList{verID},
@@ -232,6 +232,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		verNode.RequesterEngine,
 		verNode.VerifierEngine)
 
+	// plays test scenario
 	withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
 
 	// tears down engines and nodes
@@ -244,11 +245,19 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		verNode.RequesterEngine,
 		verNode.VerifierEngine)
 
-	require.Equal(t, verNode.ChunkRequests)
-
 	testmock.RequireGenericNodesDoneBefore(t, 1*time.Second,
 		conNode,
 		exeNode)
+
+	// asserts expected number of calls.
+	if staked {
+		conEngine.AssertExpectations(t)
+		exeEngine.AssertExpectations(t)
+	} else {
+		// in unstaked mode, no message should be received by consensus and execution node.
+		conEngine.AssertNotCalled(t, "Process")
+		exeEngine.AssertNotCalled(t, "Process")
+	}
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).
