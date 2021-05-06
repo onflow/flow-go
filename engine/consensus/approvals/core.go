@@ -85,7 +85,7 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, as
 	}
 
 	collectors := NewAssignmentCollectorTree(factoryMethod)
-	err = collectors.PruneUpToHeight(lastSealed.Height)
+	_, err = collectors.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
 		return nil, fmt.Errorf("could not prune tree to initial height")
 	}
@@ -132,10 +132,13 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	c.collectorTree.FinalizeForkAtLevel(finalized.Height, finalizedBlockID)
 
 	// as soon as we discover new sealed height, proceed with pruning collectors
-	err = c.collectorTree.PruneUpToHeight(lastSealed.Height)
+	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
 	if err != nil {
 		c.log.Fatal().Err(err).Msgf("could not prune collectorTree tree at block %v", finalizedBlockID)
 	}
+
+	// remove all pending items that we might have requested
+	c.requestTracker.Remove(pruned...)
 }
 
 // processIncorporatedResult implements business logic for processing single incorporated result

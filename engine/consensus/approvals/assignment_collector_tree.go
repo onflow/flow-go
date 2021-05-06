@@ -80,7 +80,7 @@ func (t *AssignmentCollectorTree) markOrphanFork(vertex *AssignmentCollectorVert
 	}
 }
 
-// GetCollectorsUpToLevel returns all collectors that satisfy interval [from; to)
+// GetCollectorsByInterval returns all collectors that satisfy interval [from; to)
 func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollectorVertex {
 	var vertices []*AssignmentCollectorVertex
 	t.lock.RLock()
@@ -143,12 +143,25 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 // PruneUpToHeight prunes all results for all assignment collectors with height up to but
 // NOT INCLUDING `limit`. Errors if limit is lower than
 // the previous value (as we cannot recover previously pruned results).
-func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) error {
+// Returns list of resultIDs that were pruned
+func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifier, error) {
+	var pruned []flow.Identifier
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	// collect IDs of vertices that were pruned
+	for l := t.forest.LowestLevel; l < limit; l++ {
+		iterator := t.forest.GetVerticesAtLevel(l)
+		for iterator.HasNext() {
+			vertex := iterator.NextVertex()
+			pruned = append(pruned, vertex.VertexID())
+		}
+	}
+
+	// remove vertices and adjust size
 	err := t.forest.PruneUpToLevel(limit)
 	if err != nil {
-		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
+		return nil, fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
-	return nil
+	return pruned, nil
 }

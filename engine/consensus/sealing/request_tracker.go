@@ -107,7 +107,7 @@ func (rt *RequestTracker) Set(resultID, incorporatedBlockID flow.Identifier, chu
 
 // GetAllIds returns all result IDs that we are indexing
 func (rt *RequestTracker) GetAllIds() []flow.Identifier {
-	rt.lock.RUnlock()
+	rt.lock.RLock()
 	defer rt.lock.RUnlock()
 	ids := make([]flow.Identifier, 0, len(rt.index))
 	for resultID := range rt.index {
