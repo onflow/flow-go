@@ -529,6 +529,15 @@ func ReceiptForBlockExecutorFixture(block *flow.Block, executor flow.Identifier)
 	return receipt
 }
 
+func ReceiptsForBlockFixture(block *flow.Block, ids []flow.Identifier) []*flow.ExecutionReceipt {
+	result := ExecutionResultFixture(WithBlock(block))
+	var ers []*flow.ExecutionReceipt
+	for _, id := range ids {
+		ers = append(ers, ExecutionReceiptFixture(WithResult(result), WithExecutorID(id)))
+	}
+	return ers
+}
+
 func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.PreviousResultID = prevResult.ID()
