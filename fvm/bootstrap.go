@@ -734,8 +734,8 @@ func registerNodeTransaction(
 		EpochAddress:             service.HexWithPrefix(),
 	}
 
-	// XXX use the StakingPubKey as the public key of the machine account.
-	// Is this correct?
+	// Use NetworkingKey as the public key of the machine account.
+	// We do this for tests/localnet but normally it should be a separate key.
 	publicKeys := make([]cadence.Value, 1)
 	publicKeys[0] = bytesToCadenceArray(id.StakingPubKey.Encode())
 	cadencePublicKeys := cadence.NewArray(publicKeys)

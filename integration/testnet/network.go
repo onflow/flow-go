@@ -599,12 +599,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 			return nil, nil, nil, nil, err
 		}
 
-		// XXX use the staking key for the machine account
+		// We use the network key for the machine account. Normally it would be
+		// a separate key.
 		info := bootstrap.NodeMachineAccountInfo{
 			Address:           nodeConfig.Address,
-			EncodedPrivateKey: private.StakingPrivKey.Encode(),
+			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
 			KeyIndex:          0,
-			SigningAlgorithm:  private.StakingPrivKey.Algorithm(),
+			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
 			HashAlgorithm:     crypto.SHA3_256,
 		}
 
