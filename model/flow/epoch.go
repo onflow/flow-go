@@ -69,15 +69,36 @@ func (setup *EpochSetup) ID() Identifier {
 // When an EpochCommit event is emitted, the network is ready to transition to
 // the epoch.
 type EpochCommit struct {
-	Counter            uint64             // the number of the epoch
-	ClusterQCs         []ClusterQCVotes   // quorum certificates for each cluster, as raw votes
-	DKGGroupKey        crypto.PublicKey   // group key from DKG
-	DKGParticipantKeys []crypto.PublicKey // public keys for DKG participants
+	Counter            uint64              // the number of the epoch
+	ClusterQCs         []ClusterQCVoteData // quorum certificates for each cluster
+	DKGGroupKey        crypto.PublicKey    // group key from DKG
+	DKGParticipantKeys []crypto.PublicKey  // public keys for DKG participants
 }
 
-type ClusterQCVotes struct {
-	Votes    [][]byte
-	VoterIDs []Identifier
+// ClusterQCVoteData represents the votes for a cluster quorum certificate, as
+// gathered by the ClusterQC smart contract. It contains the aggregated
+// signature over the root block for the cluster as well as the set of voters.
+type ClusterQCVoteData struct {
+	SigData  crypto.Signature // the aggregated signature over all the votes
+	VoterIDs []Identifier     // the set of voters that contributed to the qc
+}
+
+// ClusterQCVoteDataFromQC converts a quorum certificate to the representation
+// used by the smart contract, essentially discarding the block ID and view
+// (which are protocol-defined given the EpochSetup event).
+func ClusterQCVoteDataFromQC(qc *QuorumCertificate) ClusterQCVoteData {
+	return ClusterQCVoteData{
+		SigData:  qc.SigData,
+		VoterIDs: qc.SignerIDs,
+	}
+}
+
+func ClusterQCVoteDatasFromQCs(qcs []*QuorumCertificate) []ClusterQCVoteData {
+	qcVotes := make([]ClusterQCVoteData, 0, len(qcs))
+	for _, qc := range qcs {
+		qcVotes = append(qcVotes, ClusterQCVoteDataFromQC(qc))
+	}
+	return qcVotes
 }
 
 func (commit *EpochCommit) ServiceEvent() ServiceEvent {
@@ -89,7 +110,7 @@ func (commit *EpochCommit) ServiceEvent() ServiceEvent {
 
 type encodableCommit struct {
 	Counter            uint64
-	ClusterQCs         []ClusterQCVotes
+	ClusterQCs         []ClusterQCVoteData
 	DKGGroupKey        encodable.RandomBeaconPubKey
 	DKGParticipantKeys []encodable.RandomBeaconPubKey
 }
@@ -156,7 +177,7 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	rlpEncodable := struct {
 		Counter            uint64
-		ClusterQCs         []ClusterQCVotes
+		ClusterQCs         []ClusterQCVoteData
 		DKGGroupKey        []byte
 		DKGParticipantKeys [][]byte
 	}{
