@@ -248,7 +248,7 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get look up sealed commit: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("could not retrieve sealed state commit: %w", err)
 	}
 	return seal.FinalState, nil
 }
