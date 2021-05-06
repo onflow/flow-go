@@ -69,10 +69,15 @@ func (setup *EpochSetup) ID() Identifier {
 // When an EpochCommit event is emitted, the network is ready to transition to
 // the epoch.
 type EpochCommit struct {
-	Counter            uint64               // the number of the epoch
-	ClusterQCs         []*QuorumCertificate // quorum certificates for each cluster
-	DKGGroupKey        crypto.PublicKey     // group key from DKG
-	DKGParticipantKeys []crypto.PublicKey   // public keys for DKG participants
+	Counter            uint64             // the number of the epoch
+	ClusterQCs         []ClusterQCVotes   // quorum certificates for each cluster, as raw votes
+	DKGGroupKey        crypto.PublicKey   // group key from DKG
+	DKGParticipantKeys []crypto.PublicKey // public keys for DKG participants
+}
+
+type ClusterQCVotes struct {
+	Votes    [][]byte
+	VoterIDs []Identifier
 }
 
 func (commit *EpochCommit) ServiceEvent() ServiceEvent {
@@ -84,7 +89,7 @@ func (commit *EpochCommit) ServiceEvent() ServiceEvent {
 
 type encodableCommit struct {
 	Counter            uint64
-	ClusterQCs         []*QuorumCertificate
+	ClusterQCs         []ClusterQCVotes
 	DKGGroupKey        encodable.RandomBeaconPubKey
 	DKGParticipantKeys []encodable.RandomBeaconPubKey
 }
@@ -151,7 +156,7 @@ func (commit *EpochCommit) UnmarshalMsgpack(b []byte) error {
 func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	rlpEncodable := struct {
 		Counter            uint64
-		ClusterQCs         []*QuorumCertificate
+		ClusterQCs         []ClusterQCVotes
 		DKGGroupKey        []byte
 		DKGParticipantKeys [][]byte
 	}{
