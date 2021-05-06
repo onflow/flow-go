@@ -253,7 +253,8 @@ func SetupChunkDataPackProvider(t *testing.T,
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
 			provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
-		}).Return(nil).Times(len(assignedChunkIDs))
+		}).Return(nil).
+		Times(len(assignedChunkIDs))
 
 	return &exeNode, exeEngine
 }

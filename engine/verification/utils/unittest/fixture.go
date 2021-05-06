@@ -52,7 +52,7 @@ type CompleteExecutionReceipt struct {
 
 type CompleteExecutionReceiptList []*CompleteExecutionReceipt
 
-// chunkDataResponseOf is a test helper method that returns a chunk data pack response message for the specified chunk ID that
+// ChunkDataResponseOf is a test helper method that returns a chunk data pack response message for the specified chunk ID that
 // should belong to this complete execution receipt list.
 //
 // It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
@@ -74,7 +74,7 @@ func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID 
 	return res
 }
 
-// chunkOf is a test helper method that returns the chunk of the specified index from the specified result that
+// ChunkOf is a test helper method that returns the chunk of the specified index from the specified result that
 // should belong to this complete execution receipt list.
 //
 // It fails the test if no execution result with the specified identifier is found in this complete execution receipt list.
@@ -91,7 +91,7 @@ func (c CompleteExecutionReceiptList) ChunkOf(t *testing.T, resultID flow.Identi
 	return nil
 }
 
-// resultOf is a test helper method that returns the receipt data of the specified chunk ID that
+// ReceiptDataOf is a test helper method that returns the receipt data of the specified chunk ID that
 // should belong to this complete execution receipt list.
 //
 // It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
