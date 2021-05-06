@@ -257,13 +257,11 @@ func executionNodesForBlockID(
 	var err error
 	attempt := 0
 
-
-
 	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
 	// will not be present for the root block.
 	rootBlock, err := state.Params().Root()
 	if err != nil {
-	return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+		return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
 	if rootBlock.ID() == blockID {
@@ -339,11 +337,11 @@ func findAllExecutionNodes(
 		return nil, fmt.Errorf("failed to retreive execution receipts for block ID %v: %w", blockID, err)
 	}
 
-	executionResultMetaLst := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
+	executionResultMetaList := make(flow.ExecutionReceiptMetaList, 0, len(allReceipts))
 	for _, r := range allReceipts {
-		executionResultMetaLst = append(executionResultMetaLst, r.Meta())
+		executionResultMetaList = append(executionResultMetaList, r.Meta())
 	}
-	executionResultGroupedMetaLst := executionResultMetaLst.GroupByResultID()
+	executionResultGroupedMetaList := executionResultMetaList.GroupByResultID()
 
 	// maximum number of matching receipts found so far for any execution result id
 	maxMatchedReceiptCnt := 0
@@ -351,7 +349,7 @@ func findAllExecutionNodes(
 	var maxMatchedReceiptResultID flow.Identifier
 
 	// find the largest list of receipts which have the same result ID
-	for resultID, executionReceiptList := range executionResultGroupedMetaLst {
+	for resultID, executionReceiptList := range executionResultGroupedMetaList {
 		currentMatchedReceiptCnt := executionReceiptList.Size()
 		if currentMatchedReceiptCnt > maxMatchedReceiptCnt {
 			maxMatchedReceiptCnt = currentMatchedReceiptCnt
@@ -360,7 +358,7 @@ func findAllExecutionNodes(
 	}
 
 	// if there are more than one execution result for the same block ID, log as error
-	if executionResultGroupedMetaLst.NumberGroups() > 1 {
+	if executionResultGroupedMetaList.NumberGroups() > 1 {
 		identicalReceiptsStr := fmt.Sprintf("%v", flow.GetIDs(allReceipts))
 		log.Error().
 			Str("block_id", blockID.String()).
@@ -369,7 +367,7 @@ func findAllExecutionNodes(
 	}
 
 	// pick the largest list of matching receipts
-	matchingReceiptMetaList := executionResultGroupedMetaLst.GetGroup(maxMatchedReceiptResultID)
+	matchingReceiptMetaList := executionResultGroupedMetaList.GetGroup(maxMatchedReceiptResultID)
 
 	metaReceiptGroupedByExecutorID := matchingReceiptMetaList.GroupByExecutorID()
 

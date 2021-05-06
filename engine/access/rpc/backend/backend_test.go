@@ -862,7 +862,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	const maxHeight uint64 = 10
 	var headHeight uint64
 	var blockHeaders []*flow.Header
-	var nodeIdentifiers flow.IdentityList
+	var nodeIdentities flow.IdentityList
 
 	headersDB := make(map[uint64]*flow.Header) // backend for storage.Headers
 	var head *flow.Header                      // backend for Snapshot.Head
@@ -884,7 +884,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	)
 	snapshot.On("Identities", mock.Anything).Return(
 		func(_ flow.IdentityFilter) flow.IdentityList {
-			return nodeIdentifiers
+			return nodeIdentities
 		},
 		func(flow.IdentityFilter) error { return nil },
 	)
@@ -998,9 +998,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		// setup mocks
 		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, maxHeight)
+		blockHeaders, _, nodeIdentities = setupStorage(minHeight, maxHeight)
 		expectedResp := setupExecClient()
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		// create handler
 		backend := New(
@@ -1032,9 +1032,9 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("valid request with max_height > last_sealed_block_height", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, headHeight)
+		blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
 		expectedResp := setupExecClient()
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		backend := New(
 			state,
@@ -1064,8 +1064,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	suite.Run("invalid request exceeding max height range", func() {
 		headHeight = maxHeight - 1
 		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, headHeight)
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
+		blockHeaders, _, nodeIdentities = setupStorage(minHeight, headHeight)
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		// create handler
 		backend := New(
@@ -1096,8 +1096,8 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 		// setup mocks
 		setupHeadHeight(headHeight)
-		blockHeaders, _, nodeIdentifiers = setupStorage(minHeight, maxHeight)
-		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentifiers.NodeIDs()).Strings()
+		blockHeaders, _, nodeIdentities = setupStorage(minHeight, maxHeight)
+		fixedENIdentifiersStr := flow.IdentifierList(nodeIdentities.NodeIDs()).Strings()
 
 		// create handler
 		backend := New(

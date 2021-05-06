@@ -60,6 +60,7 @@ func main() {
 		rpcConf                      rpc.Config
 		rpcEng                       *rpc.Engine
 		collectionRPC                access.AccessAPIClient
+		executionNodeAddress         string // deprecated
 		historicalAccessRPCs         []access.AccessAPIClient
 		err                          error
 		conCache                     *buffer.PendingBlocks // pending block cache for follower
@@ -86,6 +87,7 @@ func main() {
 			flags.StringVarP(&rpcConf.GRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
+			flags.StringVarP(&executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
 			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
 			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
