@@ -56,6 +56,10 @@ func (suite *Suite) SetupTest() {
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+	header := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("Root").Return(&header, nil)
+	suite.state.On("Params").Return(params).Maybe()
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
@@ -867,6 +871,12 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 	snapshot := new(protocol.Snapshot)
 	state.On("Final").Return(snapshot, nil)
 	state.On("Sealed").Return(snapshot, nil)
+
+	rootHeader := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("Root").Return(&rootHeader, nil)
+	state.On("Params").Return(params).Maybe()
+
 	// mock snapshot to return head backend
 	snapshot.On("Head").Return(
 		func() *flow.Header { return head },

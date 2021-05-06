@@ -69,6 +69,10 @@ func (suite *Suite) SetupTest() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+	header := unittest.BlockHeaderFixture()
+	params := new(protocol.Params)
+	params.On("Root").Return(&header, nil)
+	suite.state.On("Params").Return(params).Maybe()
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)

@@ -256,39 +256,57 @@ func executionNodesForBlockID(
 	var executorIDs flow.IdentifierList
 	var err error
 	attempt := 0
-	// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
-	for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
 
-		executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
-		if err != nil {
-			return flow.IdentityList{}, err
-		}
 
-		if len(executorIDs) >= minExecutionNodesCnt {
-			break
-		}
 
-		// log the attempt
-		log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
-			Int("execution_receipts_found", len(executorIDs)).
-			Str("block_id", blockID.String()).
-			Msg("insufficient execution receipts")
-
-		// if one or less execution receipts may have been received then re-query
-		// in the hope that more might have been received by now
-
-		select {
-		case <-ctx.Done():
-			return flow.IdentityList{}, err
-		case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
-			//retry after an exponential backoff
-		}
+	// check if the block ID is of the root block. If it is then don't look for execution receipts since they
+	// will not be present for the root block.
+	rootBlock, err := state.Params().Root()
+	if err != nil {
+	return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
 	}
 
-	receiptCnt := len(executorIDs)
-	// if less than minExecutionNodesCnt execution receipts have been received so far, then throw an error
-	if receiptCnt < minExecutionNodesCnt {
-		return flow.IdentityList{}, InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCnt}
+	if rootBlock.ID() == blockID {
+		executorIdentities, err := state.Final().Identities(filter.HasRole(flow.RoleExecution))
+		if err != nil {
+			return nil, fmt.Errorf("failed to retreive execution IDs for block ID %v: %w", blockID, err)
+		}
+		executorIDs = executorIdentities.NodeIDs()
+	} else {
+		// try to find atleast minExecutionNodesCnt execution node ids from the execution receipts for the given blockID
+		for ; attempt < maxAttemptsForExecutionReceipt; attempt++ {
+
+			executorIDs, err = findAllExecutionNodes(blockID, executionReceipts, log)
+			if err != nil {
+				return flow.IdentityList{}, err
+			}
+
+			if len(executorIDs) >= minExecutionNodesCnt {
+				break
+			}
+
+			// log the attempt
+			log.Debug().Int("attempt", attempt).Int("max_attempt", maxAttemptsForExecutionReceipt).
+				Int("execution_receipts_found", len(executorIDs)).
+				Str("block_id", blockID.String()).
+				Msg("insufficient execution receipts")
+
+			// if one or less execution receipts may have been received then re-query
+			// in the hope that more might have been received by now
+
+			select {
+			case <-ctx.Done():
+				return flow.IdentityList{}, err
+			case <-time.After(100 * time.Millisecond << time.Duration(attempt)):
+				//retry after an exponential backoff
+			}
+		}
+
+		receiptCnt := len(executorIDs)
+		// if less than minExecutionNodesCnt execution receipts have been received so far, then throw an error
+		if receiptCnt < minExecutionNodesCnt {
+			return flow.IdentityList{}, InsufficientExecutionReceipts{blockID: blockID, receiptCount: receiptCnt}
+		}
 	}
 
 	// choose from the preferred or fixed execution nodes
