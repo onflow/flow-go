@@ -145,7 +145,6 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 
 	collector := &metrics.NoopCollector{}
 	tracer := &trace.NoopTracer{}
-	lg := unittest.Logger().With().Str("role", "verification").Logger()
 	chainID := flow.Testnet
 
 	// bootstraps system with one node of each role.
@@ -181,7 +180,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 		s,
 		hub,
 		verID,
-		lg,
+		unittest.Logger().With().Str("role", "verification").Logger(),
 		collector,
 		tracer,
 		chainID)
@@ -198,6 +197,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 
 	// consensus node
 	conNode, conEngine, conWG := vertestutils.SetupMockConsensusNode(t,
+		unittest.Logger(),
 		hub,
 		conID,
 		flow.IdentityList{verID},

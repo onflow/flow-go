@@ -134,6 +134,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// consensus node
 	// mock consensus node
 	conNode, conEngine, conWG := vertestutils.SetupMockConsensusNode(t,
+		unittest.Logger(),
 		hub,
 		conIdentity,
 		flow.IdentityList{verIdentity},

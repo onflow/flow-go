@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	testifymock "github.com/stretchr/testify/mock"
@@ -136,6 +137,7 @@ func VerificationHappyPath(t *testing.T,
 
 	// mock consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+		unittest.Logger(),
 		hub,
 		conIdentity,
 		verIdentities,
@@ -281,6 +283,7 @@ func RespondChunkDataPackRequest(t *testing.T,
 // network (hub). It mocks the process method of the consensus engine to receive a message from a certain
 // verification node (verIdentity) evaluates whether it is a result approval about an assigned chunk to that verifier node.
 func SetupMockConsensusNode(t *testing.T,
+	log zerolog.Logger,
 	hub *stub.Hub,
 	conIdentity *flow.Identity,
 	verIdentities flow.IdentityList,
@@ -288,6 +291,8 @@ func SetupMockConsensusNode(t *testing.T,
 	completeERs CompleteExecutionReceiptList,
 	chainID flow.ChainID,
 	assignedChunkIDs flow.IdentifierList) (*enginemock.GenericNode, *mocknetwork.Engine, *sync.WaitGroup) {
+
+	lg := log.With().Str("role", "mock-consensus").Logger()
 
 	wg := &sync.WaitGroup{}
 	// each verification node is assigned to issue one result approval per assigned chunk.
@@ -318,7 +323,7 @@ func SetupMockConsensusNode(t *testing.T,
 			resultApproval, ok := args[1].(*flow.ResultApproval)
 			assert.True(t, ok)
 
-			log.Debug().
+			lg.Debug().
 				Hex("result_approval_id", logging.ID(resultApproval.ID())).
 				Msg("result approval received")
 
