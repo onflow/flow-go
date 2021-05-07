@@ -188,7 +188,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		trimmedGroupHexString := trim0x(groupPublicKey.String())
 		finalSubmission = append(finalSubmission, cadence.NewString(trimmedGroupHexString))
 	} else {
-		finalSubmission = append(finalSubmission, cadence.NewOptional(cadence.String("")))
+		finalSubmission = append(finalSubmission, cadence.String(""))
 	}
 
 	for _, publicKey := range publicKeys {
@@ -198,7 +198,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 			trimmedHexString := trim0x(publicKey.String())
 			finalSubmission = append(finalSubmission, cadence.NewString(trimmedHexString))
 		} else {
-			finalSubmission = append(finalSubmission, cadence.NewOptional(cadence.String("")))
+			finalSubmission = append(finalSubmission, cadence.NewString(""))
 		}
 	}
 

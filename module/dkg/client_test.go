@@ -147,6 +147,35 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	assert.Equal(s.T(), msg.Signature, broadcastedMsg.Signature)
 }
 
+// TestNilDKGSubmission tests that even with `nil` DKG public keys the `SubmitResult`
+// still proceeds with no errors
+func (s *ClientSuite) TestNilDKGSubmission() {
+	nodeID := unittest.IdentifierFixture()
+	dkgNodeIDStrings := make([]flow.Identifier, 1)
+	dkgNodeIDStrings[0] = nodeID
+
+	// start dkf with 1 participant
+	s.startDKGWithParticipants(dkgNodeIDStrings)
+
+	// create participant resource
+	s.createParticipant(nodeID)
+
+	// generate list of public keys
+	numberOfNodes := len(dkgNodeIDStrings)
+	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes)
+	for i := 0; i < numberOfNodes; i++ {
+		publicKeys = append(publicKeys, nil)
+	}
+
+	// create a group public key
+	var groupPublicKey crypto.PublicKey
+
+	err := s.contractClient.SubmitResult(groupPublicKey, publicKeys)
+	require.NoError(s.T(), err)
+}
+
+// TestSubmitResult creates random DKG public key submission and verifys that transaction was
+// submitted with no errors
 func (s *ClientSuite) TestSubmitResult() {
 	nodeID := unittest.IdentifierFixture()
 	dkgNodeIDStrings := make([]flow.Identifier, 1)
