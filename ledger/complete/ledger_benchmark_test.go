@@ -29,7 +29,6 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 // BenchmarkStorage benchmarks the performance of the storage layer
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
-	pathByteSize := 32
 	numInsPerStep := 1000
 	keyNumberOfParts := 10
 	keyPartMinByteSize := 1
@@ -111,7 +110,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		p, _ := encoding.DecodeTrieBatchProof(proof)
 
 		// construct a partial trie using proofs
-		_, err = ptrie.NewPSMT(newState, pathByteSize, p)
+		_, err = ptrie.NewPSMT(ledger.RootHash(newState), p)
 		if err != nil {
 			b.Fatal("failed to create PSMT")
 		}
@@ -135,8 +134,8 @@ func benchmarkStorage(steps int, b *testing.B) {
 
 }
 
-// BenchmarkStorage benchmarks the performance of the storage layer
-func BenchmarkUpdate(b *testing.B) {
+// BenchmarkTrieUpdate benchmarks the performance of a trie update
+func BenchmarkTrieUpdate(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
 	keyNumberOfParts := 10
@@ -183,8 +182,8 @@ func BenchmarkUpdate(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkStorage benchmarks the performance of the storage layer
-func BenchmarkRead(b *testing.B) {
+// BenchmarkTrieUpdate benchmarks the performance of a trie read
+func BenchmarkTrieRead(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
 	keyNumberOfParts := 10
@@ -241,8 +240,8 @@ func BenchmarkRead(b *testing.B) {
 	b.StopTimer()
 }
 
-// BenchmarkStorage benchmarks the performance of the storage layer
-func BenchmarkProve(b *testing.B) {
+// BenchmarkTrieUpdate benchmarks the performance of a trie prove
+func BenchmarkTrieProve(b *testing.B) {
 	// key updates per iteration
 	numInsPerStep := 10000
 	keyNumberOfParts := 10

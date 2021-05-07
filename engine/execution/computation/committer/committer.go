@@ -54,7 +54,7 @@ func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.Stat
 		keys[i] = execState.RegisterIDToKey(id)
 	}
 
-	query, err := ledger.NewQuery(baseState, keys)
+	query, err := ledger.NewQuery(ledger.State(baseState), keys)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
