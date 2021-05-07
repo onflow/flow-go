@@ -7,10 +7,16 @@ NCLUSTERS=1
 PROFILER=false
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
+# The Git commit hash
+COMMIT=$(shell git rev-parse HEAD)
+VERSION=localnetbuild
 
 .PHONY: init
 init:
-	go run -tags relic bootstrap.go \
+	go run -tags relic \
+		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
+		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
+		bootstrap.go \
 		-collection=$(COLLECTION) \
 		-consensus=$(CONSENSUS) \
 		-execution=$(EXECUTION) \
@@ -19,7 +25,7 @@ init:
 		-nclusters=$(NCLUSTERS) \
 		-profiler=$(PROFILER) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
-		-collection-delay=$(COLLECTION_DELAY) \
+		-collection-delay=$(COLLECTION_DELAY)
 
 # Creates a light version of the localnet with just 1 instance for each node type
 .PHONY: init-light

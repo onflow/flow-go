@@ -51,7 +51,6 @@ type BuilderSuite struct {
 
 	// storage for dbs
 	headers map[flow.Identifier]*flow.Header
-	heights map[uint64]*flow.Header
 	index   map[flow.Identifier]*flow.Index
 	blocks  map[flow.Identifier]*flow.Block
 
@@ -84,7 +83,6 @@ type BuilderSuite struct {
 
 func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	bs.headers[block.ID()] = block.Header
-	bs.heights[block.Header.Height] = block.Header
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
 }
@@ -189,7 +187,7 @@ func (bs *BuilderSuite) SetupTest() {
 	// initialise the dbs
 	bs.lastSeal = nil
 	bs.headers = make(map[flow.Identifier]*flow.Header)
-	bs.heights = make(map[uint64]*flow.Header)
+	//bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
 	bs.blocks = make(map[flow.Identifier]*flow.Block)
 
@@ -277,18 +275,6 @@ func (bs *BuilderSuite) SetupTest() {
 			return nil
 		},
 	)
-	bs.headerDB.On("ByHeight", mock.Anything).Return(
-		func(height uint64) *flow.Header {
-			return bs.heights[height]
-		},
-		func(height uint64) error {
-			_, exists := bs.heights[height]
-			if !exists {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	)
 
 	bs.indexDB = &storage.Index{}
 	bs.indexDB.On("ByBlockID", mock.Anything).Return(
@@ -317,11 +303,6 @@ func (bs *BuilderSuite) SetupTest() {
 			return nil
 		},
 	)
-	bs.blockDB.On("Store", mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(0).(*flow.Block)
-		bs.Assert().Equal(bs.sentinel, block.Header.View)
-		bs.assembled = block.Payload
-	}).Return(nil)
 
 	bs.resultDB = &storage.ExecutionResults{}
 	bs.resultDB.On("ByID", mock.Anything).Return(
@@ -478,9 +459,16 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 	bs.Assert().ElementsMatch(valid, bs.assembled.Guarantees, "should have valid from mempool in payload")
 }
 
-func (bs *BuilderSuite) TestPayloadSealAllValid() {
-
-	// use valid chain of seals in mempool
+// TestPayloadSeals_AllValid checks that builder seals as many blocks as possible (happy path):
+//  [S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+// Where block
+//   * [S] is sealed and finalized
+//   * [F0] ... [F3] are finalized, unsealed blocks with candidate seals are included in mempool
+//   * [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+// Expected behaviour:
+//  * builder should only include seals [F0], ..., [A3]
+func (bs *BuilderSuite) TestPayloadSeals_AllValid() {
+	// populate seals mempool with valid chain of seals for blocks [F0], ..., [A3]
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -489,14 +477,13 @@ func (bs *BuilderSuite) TestPayloadSealAllValid() {
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
-// Test maxSealLimit is enforced
-func (bs *BuilderSuite) TestPayloadSealLimit() {
-
+// TestPayloadSeals_Limit verifies that builder does not exceed  maxSealLimit
+func (bs *BuilderSuite) TestPayloadSeals_Limit() {
 	// use valid chain of seals in mempool
 	bs.pendingSeals = bs.irsMap
 
 	// change maxSealCount to one less than the number of items in the mempool
-	limit := uint(len(bs.irsMap) - 1)
+	limit := uint(2)
 	bs.build.cfg.maxSealCount = limit
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -505,9 +492,9 @@ func (bs *BuilderSuite) TestPayloadSealLimit() {
 	bs.Assert().Equal(bs.chain[:limit], bs.assembled.Seals, "should have excluded seals above maxSealCount")
 }
 
-// TestPayloadSealOnlyFork checks that the builder only includes seals corresponding
+// TestPayloadSeals_OnlyFork checks that the builder only includes seals corresponding
 // to blocks on the current fork (and _not_ seals for sealable blocks on other forks)
-func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
+func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	// in the test setup, we already created a single fork
 	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
 	// Where block
@@ -535,18 +522,22 @@ func (bs *BuilderSuite) TestPayloadSealOnlyFork() {
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 }
 
-// Test that seals for blocks that already have seals on the fork are rejected
-func (bs *BuilderSuite) TestPayloadSealDuplicate() {
-
+// TestPayloadSeals_Duplicates verifies that the builder does not duplicate seals for already sealed blocks:
+//  ... <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+// Where block
+//   * [F0] ... [F3] sealed blocks but their candidate seals are still included in mempool
+//   * [A0] ... [A3] unsealed blocks with candidate seals are included in mempool
+// Expected behaviour:
+//  * builder should only include seals [A0], ..., [A3]
+func (bs *BuilderSuite) TestPayloadSeals_Duplicate() {
 	// pretend that the first n blocks are already sealed
 	n := 4
 	lastSeal := bs.chain[n-1]
-	// trick the builder into thinking this is the last seal on the fork
 	mockSealDB := &storage.Seals{}
 	mockSealDB.On("ByBlockID", mock.Anything).Return(lastSeal, nil)
 	bs.build.seals = mockSealDB
 
-	// submit all the seals (containing n duplicates)
+	// seals for all blocks [F0], ..., [A3] are still in the mempool:
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
@@ -554,31 +545,121 @@ func (bs *BuilderSuite) TestPayloadSealDuplicate() {
 	bs.Assert().Equal(bs.chain[n:], bs.assembled.Seals, "should have rejected duplicate seals")
 }
 
-func (bs *BuilderSuite) TestPayloadSealCutoffChain() {
-
-	// remove the seal at the start
+// TestPayloadSeals_MissingNextSeal checks how the builder handles the fork
+//    [S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+// Where block
+//   * [S] is sealed and finalized
+//   * [F0] finalized, unsealed block but _without_ candidate seal in mempool
+//   * [F1] ... [F3] are finalized, unsealed blocks with candidate seals are included in mempool
+//   * [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+// Expected behaviour:
+//  * builder should not include any seals as the immediately next seal is not in mempool
+func (bs *BuilderSuite) TestPayloadSeals_MissingNextSeal() {
+	// remove the seal for block [F0]
 	firstSeal := bs.irsList[0]
 	delete(bs.irsMap, firstSeal.ID())
 	bs.pendingSeals = bs.irsMap
 
-	// use both valid and non-valid seals for chain
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().Empty(bs.assembled.Seals, "should not have included any seals from cutoff chain")
 }
 
-func (bs *BuilderSuite) TestPayloadSealBrokenChain() {
-	// remove a seal in the middle
+// TestPayloadSeals_MissingInterimSeal checks how the builder handles the fork
+//   [S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+// Where block
+//   * [S] is sealed and finalized
+//   * [F0] ... [F2] are finalized, unsealed blocks with candidate seals are included in mempool
+//   * [F4] finalized, unsealed block but _without_ candidate seal in mempool
+//   * [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+// Expected behaviour:
+//  * builder should only include candidate seals for [F0], [F1], [F2]
+func (bs *BuilderSuite) TestPayloadSeals_MissingInterimSeal() {
+	// remove a seal for block [F4]
 	seal := bs.irsList[3]
 	delete(bs.irsMap, seal.ID())
 	bs.pendingSeals = bs.irsMap
 
-	// use both valid and non-valid seals for chain
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 	bs.Assert().ElementsMatch(bs.chain[:3], bs.assembled.Seals, "should have included only beginning of broken chain")
+}
+
+// TestValidatePayloadSeals_ExecutionForks checks how the builder's seal-inclusion logic
+// handles execution forks.
+//  * we have the chain in storage:
+//     F <- A{Result[F]_1, Result[F]_2, ReceiptMeta[F]_1, ReceiptMeta[F]_2}
+//           <- B{Result[A]_1, Result[A]_2, ReceiptMeta[A]_1, ReceiptMeta[A]_2}
+//             <- C{Result[B]_1, Result[B]_2, ReceiptMeta[B]_1, ReceiptMeta[B]_2}
+//                 <- D{Seal for Result[F]_1}
+//     here F is the latest finalized block (with ID bs.finalID)
+//  * Note that we are explicitly testing the handling of an execution fork that
+//    was incorporated _before_ the seal
+//       Blocks:      F  <-----------   A    <-----------   B
+//      Results:   Result[F]_1  <-  Result[A]_1  <-  Result[B]_1 :: the root of this execution tree is sealed
+//                 Result[F]_2  <-  Result[A]_2  <-  Result[B]_2 :: the root of this execution tree conflicts with sealed result
+// The builder is tasked with creating the payload for block X:
+//     F <- A{..} <- B{..} <- C{..} <- D{..} <- X
+// We test the two distinct cases:
+//   (i) verify that execution fork conflicting with sealed result is not sealed
+//  (ii) verify that multiple execution forks are properly handled
+func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
+	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
+
+	blockF := bs.blocks[bs.finalID]
+	blocks := []*flow.Block{blockF}
+	blocks = append(blocks, unittest.ChainFixtureFrom(4, blockF.Header)...)              // elements  [F, A, B, C, D]
+	receiptChain1 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_1, Result[A]_1, Result[B]_1, ...]
+	receiptChain2 := unittest.ReceiptChainFor(blocks, unittest.ExecutionResultFixture()) // elements  [Result[F]_2, Result[A]_2, Result[B]_2, ...]
+
+	for i := 1; i <= 3; i++ { // set payload for blocks A, B, C
+		blocks[i].SetPayload(flow.Payload{
+			Results:  []*flow.ExecutionResult{&receiptChain1[i-1].ExecutionResult, &receiptChain2[i-1].ExecutionResult},
+			Receipts: []*flow.ExecutionReceiptMeta{receiptChain1[i-1].Meta(), receiptChain2[i-1].Meta()},
+		})
+	}
+	sealedResult := receiptChain1[0].ExecutionResult
+	sealF := unittest.Seal.Fixture(unittest.Seal.WithResult(&sealedResult))
+	blocks[4].SetPayload(flow.Payload{ // set payload for block D
+		Seals: []*flow.Seal{sealF},
+	})
+	for i := 0; i <= 4; i++ {
+		// we need to run this several times, as in each iteration as we have _multiple_ execution chains.
+		// In each iteration, we only mange to reconnect one additional height
+		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain1)
+		unittest.ReconnectBlocksAndReceipts(blocks, receiptChain2)
+	}
+
+	for _, b := range blocks {
+		bs.storeBlock(b)
+	}
+	bs.sealDB = &storage.Seals{}
+	bs.build.seals = bs.sealDB
+	bs.sealDB.On("ByBlockID", mock.Anything).Return(sealF, nil)
+	bs.resultByID[sealedResult.ID()] = &sealedResult
+
+	bs.T().Run("verify that execution fork conflicting with sealed result is not sealed", func(t *testing.T) {
+		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+
+		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
+		bs.Require().NoError(err)
+		bs.Assert().Empty(bs.assembled.Seals, "should not have included seal for conflicting execution fork")
+	})
+
+	bs.T().Run("verify that multiple execution forks are properly handled", func(t *testing.T) {
+		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+		sealResultA_1 := storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		sealResultB_1 := storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+
+		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
+		bs.Require().NoError(err)
+		bs.Assert().ElementsMatch([]*flow.Seal{sealResultA_1.Seal, sealResultB_1.Seal}, bs.assembled.Seals, "valid fork should have been sealed")
+	})
 }
 
 // TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult tests the receipt selection:
@@ -1099,4 +1180,20 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 	expectedResults := []*flow.ExecutionResult{}
 	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "builder should include receipt metas for results that were already incorporated")
 	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "builder should not include results that were already incorporated")
+}
+
+func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingBlockID flow.Identifier, pendingSeals map[flow.Identifier]*flow.IncorporatedResultSeal) *flow.IncorporatedResultSeal {
+	// ATTENTION: For sealing phase 2, the value for IncorporatedBlockID
+	// is the block the result pertains to (here parentBlock). In later
+	// development phases, we will change the logic such that IncorporatedBlockID
+	// references the block which actually incorporates the result.
+	// Then, the following line can simply be removed
+	incorporatingBlockID = result.BlockID
+
+	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
+		unittest.IncorporatedResultSeal.WithResult(result),
+		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),
+	)
+	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
+	return incorporatedResultSeal
 }

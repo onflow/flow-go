@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
+	flowmempool "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -79,6 +80,11 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.pendingRequests,
 		s.handler,
 		s.retryInterval,
+		// requests are only qualified if their retryAfter is elapsed.
+		requester.RetryAfterQualifier,
+		// exponential backoff with multiplier of 2, minimum interval of a second, and
+		// maximum interval of an hour.
+		flowmempool.ExponentialUpdater(2, time.Hour, time.Second),
 		s.requestTargets)
 	require.NoError(t, err)
 	testifymock.AssertExpectationsForObjects(t, net)
@@ -172,13 +178,12 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
-	wg := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
-	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
+	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
 	// requester does not call publish to disseminate the request for this chunk.
 	s.con.AssertNotCalled(t, "Publish")
@@ -209,9 +214,12 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	// mocks the requester pipeline
 	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
+
+	// makes all chunk requests being qualified for dispatch instantly
+	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -220,6 +228,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 		err := e.Process(requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -251,7 +260,10 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 
 	test.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), 1)
+
+	// makes all (unsealed) chunk requests being qualified for dispatch instantly
+	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -261,6 +273,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// unsealed requests should be submitted to the network once
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
 
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -276,7 +289,6 @@ func TestRequestPendingChunkDataPack(t *testing.T) {
 	testRequestPendingChunkDataPack(t, 10, 10) // 10 requests each 10 attempts
 }
 
-//
 // testRequestPendingChunkDataPack is a test helper that evaluates happy path of having a number of chunk requests pending.
 // The test waits enough so that the required number of attempts is made on the chunks.
 // The chunks belongs to a non-sealed block.
@@ -295,13 +307,76 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		unittest.WithDisagrees(disagrees))
 	test.MockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(requests)
-	mockPendingRequestsIncAttempt(t, s.pendingRequests, flow.GetIDs(requests), attempts)
+
+	// makes all chunk requests being qualified for dispatch instantly
+	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	wg := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
-	unittest.RequireReturnsBefore(t, wg.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+}
+
+// TestDispatchingRequests_Hybrid evaluates the behavior of requester when it has different request dispatch timelines, i.e.,
+// some requests should be dispatched instantly to the network. Some others are old and planned for late dispatch (out of this test timeline),
+// and some other should not be dispatched since they no longer are needed (and will be cleaned on next iteration).
+//
+// The test evaluates that only requests that are instantly planned are getting dispatched to the network.
+func TestDispatchingRequests_Hybrid(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	// Generates 30 requests, 10 of each type.
+	//
+	// requests belong to the chunks of
+	// a block at heights greater than 5, but the last sealed block is at height 5, so
+	// the chunk request should be dispatched.
+	agrees := unittest.IdentifierListFixture(2)
+	disagrees := unittest.IdentifierListFixture(3)
+	test.MockLastSealedHeight(s.state, 5)
+	// models requests that are just added to the mempool and are ready to dispatch.
+	instantQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
+		unittest.WithHeightGreaterThan(5),
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	// models old requests that stayed long in the mempool and are not dispatched anytime soon.
+	lateQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
+		unittest.WithHeightGreaterThan(5),
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+	// models requests that their chunk data pack arrives during the dispatch processing and hence
+	// are no longer needed to dispatch.
+	disQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
+		unittest.WithHeightGreaterThan(5),
+		unittest.WithAgrees(agrees),
+		unittest.WithDisagrees(disagrees))
+
+	allRequests := append(instantQualifiedRequests, lateQualifiedRequests...)
+	allRequests = append(allRequests, disQualifiedRequests...)
+	s.pendingRequests.On("All").Return(allRequests)
+
+	attempts := 10 // waits for 10 iterations of onTimer cycle in requester.
+	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+		s.pendingRequests,
+		flow.GetIDs(instantQualifiedRequests),
+		flow.GetIDs(lateQualifiedRequests),
+		flow.GetIDs(disQualifiedRequests),
+		attempts)
+
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
+
+	// mocks only instantly qualified requests are dispatched in the network.
+	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
+
+	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"could not request and handle chunks on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
@@ -455,16 +530,104 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 		Times(len(chunkIDs))
 }
 
-// mockPendingRequestsIncAttempt mocks chunk requests mempool for increasing the attempts on given chunk ids.
-func mockPendingRequestsIncAttempt(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList, attempts int) {
-	pendingRequests.On("IncrementAttempt", testifymock.Anything).Run(func(args testifymock.Arguments) {
+// mockPendingRequestInfoAndUpdate mocks pending requests mempool regarding three sets of chunk IDs: the instant, late, and disqualified ones.
+// The chunk IDs in the instantly qualified requests will be instantly qualified for dispatching in the networking layer.
+// The chunk IDs in the late qualified requests will be postponed to a very later time for dispatching. The postponed time is set so long
+// that they literally never get the chance to dispatch within the test time, e.g., 1 hour.
+// The chunk IDs in the disqualified requests do not dispatch at all.
+//
+// The disqualified ones represent the set of chunk requests that are cleaned from memory during the on timer iteration of the requester
+// engine, and are no longer needed.
+func mockPendingRequestInfoAndUpdate(t *testing.T,
+	pendingRequests *mempool.ChunkRequests,
+	instantQualifiedReqs flow.IdentifierList,
+	lateQualifiedReqs flow.IdentifierList,
+	disQualifiedReqs flow.IdentifierList,
+	attempts int) *sync.WaitGroup {
+
+	wg := &sync.WaitGroup{}
+
+	// for purpose of test and due to having a mocked mempool, we assume disqualified requests reside on the
+	// mempool, so their qualification is getting checked on each attempt iteration (and rejected).
+	total := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
+	wg.Add(total)
+
+	pendingRequests.On("RequestHistory", testifymock.Anything).Run(func(args testifymock.Arguments) {
+		// type assertion of input.
 		chunkID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
 
-	}).
-		Return(true).
-		Times(len(chunkIDs) * attempts)
+		// chunk ID should be one of the expected ones.
+		require.True(t,
+			instantQualifiedReqs.Contains(chunkID) ||
+				lateQualifiedReqs.Contains(chunkID) ||
+				disQualifiedReqs.Contains(chunkID))
 
+		wg.Done()
+
+	}).Return(
+		// number of attempts
+		func(chunkID flow.Identifier) uint64 {
+			if instantQualifiedReqs.Contains(chunkID) || lateQualifiedReqs.Contains(chunkID) {
+				return uint64(1)
+			}
+
+			return uint64(0)
+
+		}, // last tried timestamp
+		func(chunkID flow.Identifier) time.Time {
+			if instantQualifiedReqs.Contains(chunkID) {
+				// mocks last tried long enough so they instantly get qualified.
+				return time.Now().Add(-1 * time.Hour)
+			}
+
+			if lateQualifiedReqs.Contains(chunkID) {
+				return time.Now()
+			}
+
+			return time.Time{}
+		}, // retry after duration
+		func(chunkID flow.Identifier) time.Duration {
+			if instantQualifiedReqs.Contains(chunkID) {
+				// mocks retry after very short so they instantly get qualified.
+				return 1 * time.Millisecond
+			}
+
+			if lateQualifiedReqs.Contains(chunkID) {
+				// mocks retry after long so they never qualify soon.
+				return time.Hour
+			}
+
+			return 0
+
+		}, // request info existence
+		func(chunkID flow.Identifier) bool {
+			if instantQualifiedReqs.Contains(chunkID) || lateQualifiedReqs.Contains(chunkID) {
+				return true
+			}
+
+			return false
+		},
+	).Times(total)
+
+	pendingRequests.On("UpdateRequestHistory", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
+		// type assertion of inputs.
+		chunkID, ok := args[0].(flow.Identifier)
+		require.True(t, ok)
+
+		_, ok = args[1].(flowmempool.ChunkRequestHistoryUpdaterFunc)
+		require.True(t, ok)
+
+		// checks only instantly qualified chunk requests should reach to this step,
+		// i.e., invocation of UpdateRequestHistory
+		require.Contains(t, instantQualifiedReqs, chunkID)
+		require.NotContains(t, lateQualifiedReqs, chunkID)
+		require.NotContains(t, disQualifiedReqs, chunkID)
+
+	}). // makes chunk request instantly qualified for retry, i.e., can be
+		// retried anytime after on.
+		Return(uint64(1), time.Now(), 1*time.Millisecond, true).
+		Times(attempts * len(instantQualifiedReqs))
+
+	return wg
 }
