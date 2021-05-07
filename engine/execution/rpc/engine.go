@@ -23,8 +23,10 @@ import (
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
-	ListenAddr string
-	MaxMsgSize int // In bytes
+	ListenAddr        string
+	MaxMsgSize        int  // In bytes
+	RpcMetricsEnabled bool // enable GRPC metrics reporting
+
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -45,8 +47,7 @@ func New(
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
-	chainID flow.ChainID,
-	rpcMetricsEnabled bool) *Engine {
+	chainID flow.ChainID) *Engine {
 	log = log.With().Str("engine", "rpc").Logger()
 
 	if config.MaxMsgSize == 0 {
@@ -59,7 +60,7 @@ func New(
 	}
 
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
-	if rpcMetricsEnabled {
+	if config.RpcMetricsEnabled {
 		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
 	}
 
@@ -80,7 +81,7 @@ func New(
 		config: config,
 	}
 
-	if rpcMetricsEnabled {
+	if config.RpcMetricsEnabled {
 		grpc_prometheus.EnableHandlingTimeHistogram()
 		grpc_prometheus.Register(server)
 	}

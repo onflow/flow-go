@@ -73,7 +73,6 @@ func main() {
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
-		rpcMetricsEnabled bool
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -82,6 +81,8 @@ func main() {
 				"maximum number of transactions in the memory pool")
 			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
 				"the address the ingress server listens on")
+			flags.BoolVar(&ingressConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
+				"whether to enable the rpc metrics")
 			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
 				"maximum per-transaction computation limit (gas limit)")
 			flags.Uint64Var(&ingestConf.MaxTransactionByteSize, "ingest-max-tx-byte-size", flow.DefaultMaxTransactionByteSize,
@@ -123,8 +124,6 @@ func main() {
 				"additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
-			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false,
-				"whether to enable the rpc metrics")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -264,7 +263,7 @@ func main() {
 			return ing, err
 		}).
 		Component("transaction ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			server := ingress.New(ingressConf, ing, node.RootChainID, rpcMetricsEnabled)
+			server := ingress.New(ingressConf, ing, node.RootChainID)
 			return server, nil
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

@@ -24,8 +24,9 @@ import (
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	ListenAddr string
-	MaxMsgSize int // In bytes
+	ListenAddr        string
+	MaxMsgSize        int  // In bytes
+	RpcMetricsEnabled bool // enable GRPC metrics
 }
 
 // Ingress implements a gRPC server with a simplified version of the Observation
@@ -39,7 +40,7 @@ type Ingress struct {
 }
 
 // New returns a new ingress server.
-func New(config Config, e *ingest.Engine, chainID flow.ChainID, rpcMetricsEnabled bool) *Ingress {
+func New(config Config, e *ingest.Engine, chainID flow.ChainID) *Ingress {
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
@@ -51,7 +52,7 @@ func New(config Config, e *ingest.Engine, chainID flow.ChainID, rpcMetricsEnable
 	}
 
 	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
-	if rpcMetricsEnabled {
+	if config.RpcMetricsEnabled {
 		grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
 	}
 
@@ -68,7 +69,7 @@ func New(config Config, e *ingest.Engine, chainID flow.ChainID, rpcMetricsEnable
 		config: config,
 	}
 
-	if rpcMetricsEnabled {
+	if config.RpcMetricsEnabled {
 		grpc_prometheus.EnableHandlingTimeHistogram()
 		grpc_prometheus.Register(server)
 	}
