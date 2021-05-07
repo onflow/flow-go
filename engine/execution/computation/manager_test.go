@@ -89,6 +89,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 				Transactions: transactions,
 			},
 		},
+		StartState: unittest.StateCommitmentPointerFixture(),
 	}
 
 	me := new(module.Local)

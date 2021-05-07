@@ -1,7 +1,6 @@
 package mtrie
 
 import (
-	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/module"
 )
@@ -31,7 +31,6 @@ type Forest struct {
 	tries          *lru.Cache
 	forestCapacity int
 	onTreeEvicted  func(tree *trie.MTrie) error
-	pathByteSize   int // length [bytes] of register path
 	metrics        module.LedgerMetrics
 }
 
@@ -42,7 +41,7 @@ type Forest struct {
 // THIS IS A ROUGH HEURISTIC as it might evict tries that are still needed.
 // Make sure you chose a sufficiently large forestCapacity, such that, when reaching the capacity, the
 // Least Recently Used trie will never be needed again.
-func NewForest(pathByteSize int, forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
+func NewForest(forestCapacity int, metrics module.LedgerMetrics, onTreeEvicted func(tree *trie.MTrie) error) (*Forest, error) {
 	// init LRU cache as a SHORTCUT for a usage-related storage eviction policy
 	var cache *lru.Cache
 	var err error
@@ -62,23 +61,14 @@ func NewForest(pathByteSize int, forestCapacity int, metrics module.LedgerMetric
 		return nil, fmt.Errorf("cannot create forest cache: %w", err)
 	}
 
-	// init Forest and add an empty trie
-	if pathByteSize < 1 {
-		return nil, errors.New("trie's path size [in bytes] must be positive")
-	}
 	forest := &Forest{tries: cache,
 		forestCapacity: forestCapacity,
 		onTreeEvicted:  onTreeEvicted,
-		pathByteSize:   pathByteSize,
 		metrics:        metrics,
 	}
 
-	// add empty roothash
-	emptyTrie, err := trie.NewEmptyMTrie(pathByteSize)
-	if err != nil {
-		return nil, fmt.Errorf("constructing empty trie for forest failed: %w", err)
-	}
-
+	// add trie with no allocated registers
+	emptyTrie := trie.NewEmptyMTrie()
 	err = forest.AddTrie(emptyTrie)
 	if err != nil {
 		return nil, fmt.Errorf("adding empty trie to forest failed: %w", err)
@@ -105,19 +95,15 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	// TODO: We could take out the following de-duplication logic
 	//       Which increases the cost for duplicates but reduces read complexity without duplicates.
 	deduplicatedPaths := make([]ledger.Path, 0, len(r.Paths))
-	pathOrgIndex := make(map[string][]int)
+	pathOrgIndex := make(map[ledger.Path][]int)
 	for i, path := range r.Paths {
-		// check key sizes
-		if len(path) != f.pathByteSize {
-			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
-		}
 		// only collect duplicated keys once
-		indices, ok := pathOrgIndex[string(path)]
+		indices, ok := pathOrgIndex[path]
 		if !ok { // deduplication here is optional
 			deduplicatedPaths = append(deduplicatedPaths, path)
 		}
 		// append the index
-		pathOrgIndex[string(path)] = append(indices, i)
+		pathOrgIndex[path] = append(indices, i)
 	}
 
 	payloads := trie.UnsafeRead(deduplicatedPaths) // this sorts deduplicatedPaths IN-PLACE
@@ -127,7 +113,7 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 	totalPayloadSize := 0
 	for i, p := range deduplicatedPaths {
 		payload := payloads[i]
-		indices := pathOrgIndex[string(p)]
+		indices := pathOrgIndex[p]
 		for _, j := range indices {
 			orderedPayloads[j] = payload.DeepCopy()
 		}
@@ -143,10 +129,11 @@ func (f *Forest) Read(r *ledger.TrieRead) ([]*ledger.Payload, error) {
 // In case there are multiple updates to the same register, Update will persist the latest
 // written value.
 func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
+	emptyHash := ledger.RootHash(hash.DummyHash)
 
 	parentTrie, err := f.GetTrie(u.RootHash)
 	if err != nil {
-		return nil, err
+		return emptyHash, err
 	}
 
 	if len(u.Paths) == 0 { // no key no change
@@ -157,21 +144,17 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	// Generally, we expect the VM to deduplicate reads and writes.
 	deduplicatedPaths := make([]ledger.Path, 0, len(u.Paths))
 	deduplicatedPayloads := make([]ledger.Payload, 0, len(u.Paths))
-	payloadMap := make(map[string]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
+	payloadMap := make(map[ledger.Path]int) // index into deduplicatedPaths, deduplicatedPayloads with register update
 	totalPayloadSize := 0
 	for i, path := range u.Paths {
-		// check path sizes
-		if len(path) != f.pathByteSize {
-			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
-		}
 		payload := u.Payloads[i]
 		// check if we already have encountered an update for the respective register
-		if idx, ok := payloadMap[string(path)]; ok {
+		if idx, ok := payloadMap[path]; ok {
 			oldPayload := deduplicatedPayloads[idx]
 			deduplicatedPayloads[idx] = *payload
 			totalPayloadSize += -oldPayload.Size() + payload.Size()
 		} else {
-			payloadMap[string(path)] = len(deduplicatedPaths)
+			payloadMap[path] = len(deduplicatedPaths)
 			deduplicatedPaths = append(deduplicatedPaths, path)
 			deduplicatedPayloads = append(deduplicatedPayloads, *u.Payloads[i])
 			totalPayloadSize += payload.Size()
@@ -183,7 +166,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads)
 	if err != nil {
-		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
+		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	f.metrics.LatestTrieRegCount(newTrie.AllocatedRegCount())
@@ -193,7 +176,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 
 	err = f.AddTrie(newTrie)
 	if err != nil {
-		return nil, fmt.Errorf("adding updated trie to forest failed: %w", err)
+		return emptyHash, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
 
 	return ledger.RootHash(newTrie.RootHash()), nil
@@ -216,16 +199,12 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	deduplicatedPaths := make([]ledger.Path, 0)
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundPayloads := make([]ledger.Payload, 0)
-	pathOrgIndex := make(map[string][]int)
+	pathOrgIndex := make(map[ledger.Path][]int)
 	for i, path := range r.Paths {
-		// check key sizes
-		if len(path) != f.pathByteSize {
-			return nil, fmt.Errorf("path size doesn't match the trie height: %x", len(path))
-		}
 		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[string(path)]; !ok {
+		if _, ok := pathOrgIndex[path]; !ok {
 			deduplicatedPaths = append(deduplicatedPaths, path)
-			pathOrgIndex[string(path)] = []int{i}
+			pathOrgIndex[path] = []int{i}
 
 			// add it only once if is empty
 			if retPayloads[i].IsEmpty() {
@@ -234,7 +213,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 			}
 		} else {
 			// handles duplicated keys
-			pathOrgIndex[string(path)] = append(pathOrgIndex[string(path)], i)
+			pathOrgIndex[path] = append(pathOrgIndex[path], i)
 		}
 	}
 
@@ -251,8 +230,8 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		}
 
 		// rootHash shouldn't change
-		if !bytes.Equal(newTrie.RootHash(), r.RootHash) {
-			return nil, errors.New("root hash has changed during the operation")
+		if newTrie.RootHash() != r.RootHash {
+			return nil, fmt.Errorf("root hash has changed during the operation %x, %x", newTrie.RootHash(), r.RootHash)
 		}
 		stateTrie = newTrie
 	}
@@ -260,7 +239,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(deduplicatedPaths))
 
 	for _, p := range bp.Proofs {
-		p.Flags = make([]byte, f.pathByteSize)
+		p.Flags = make([]byte, ledger.PathLen)
 		p.Inclusion = false
 	}
 
@@ -269,7 +248,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	// reconstruct the proofs in the same key order that called the method
 	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))
 	for i, p := range deduplicatedPaths {
-		for _, j := range pathOrgIndex[string(p)] {
+		for _, j := range pathOrgIndex[p] {
 			retbp.Proofs[j] = bp.Proofs[i]
 		}
 	}
@@ -277,21 +256,18 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 	return retbp, nil
 }
 
-// PathLength return the length [in bytes] the trie operates with.
-// Concurrency safe (as Tries are immutable structures by convention)
-func (f *Forest) PathLength() int { return f.pathByteSize }
-
 // GetTrie returns trie at specific rootHash
 // warning, use this function for read-only operation
 func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
-	encRootHash := hex.EncodeToString(rootHash)
-
 	// if in memory
-	if ent, ok := f.tries.Get(encRootHash); ok {
-		return ent.(*trie.MTrie), nil
+	if ent, found := f.tries.Get(rootHash); found {
+		trie, ok := ent.(*trie.MTrie)
+		if !ok {
+			return nil, fmt.Errorf("forest contains an element of a wrong type")
+		}
+		return trie, nil
 	}
-
-	return nil, fmt.Errorf("trie with the given rootHash [%v] not found", encRootHash)
+	return nil, fmt.Errorf("trie with the given rootHash [%x] not found", rootHash)
 }
 
 // GetTries returns list of currently cached tree root hashes
@@ -304,7 +280,11 @@ func (f *Forest) GetTries() ([]*trie.MTrie, error) {
 		if !ok {
 			return nil, errors.New("concurrent Forest modification")
 		}
-		tries = append(tries, t.(*trie.MTrie))
+		trie, ok := t.(*trie.MTrie)
+		if !ok {
+			return nil, errors.New("forest contains an element of a wrong type")
+		}
+		tries = append(tries, trie)
 	}
 	return tries, nil
 }
@@ -325,47 +305,49 @@ func (f *Forest) AddTrie(newTrie *trie.MTrie) error {
 	if newTrie == nil {
 		return nil
 	}
-	if newTrie.PathLength() != f.pathByteSize {
-		return fmt.Errorf("forest has path length %d, but new trie has path length %d", f.pathByteSize, newTrie.PathLength())
-	}
 
 	// TODO: check Thread safety
-	// TODO what is this string root hash
-	hashString := newTrie.StringRootHash()
-	if storedTrie, found := f.tries.Get(hashString); found {
-		foo := storedTrie.(*trie.MTrie)
-		if foo.Equals(newTrie) {
+	rootHash := newTrie.RootHash()
+	if storedTrie, found := f.tries.Get(rootHash); found {
+		trie, ok := storedTrie.(*trie.MTrie)
+		if !ok {
+			return fmt.Errorf("forest contains an element of a wrong type")
+		}
+		if trie.Equals(newTrie) {
 			return nil
 		}
 		return fmt.Errorf("forest already contains a tree with same root hash but other properties")
 	}
-	f.tries.Add(hashString, newTrie)
+	f.tries.Add(rootHash, newTrie)
 	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 
 	return nil
 }
 
 // RemoveTrie removes a trie to the forest
-func (f *Forest) RemoveTrie(rootHash []byte) {
+func (f *Forest) RemoveTrie(rootHash ledger.RootHash) {
 	// TODO remove from the file as well
-	encRootHash := hex.EncodeToString(rootHash)
-	f.tries.Remove(encRootHash)
+	f.tries.Remove(rootHash)
 	f.metrics.ForestNumberOfTrees(uint64(f.tries.Len()))
 }
 
 // GetEmptyRootHash returns the rootHash of empty Trie
-func (f *Forest) GetEmptyRootHash() []byte {
-	return trie.EmptyTrieRootHash(f.pathByteSize)
+func (f *Forest) GetEmptyRootHash() ledger.RootHash {
+	return trie.EmptyTrieRootHash()
 }
 
 // MostRecentTouchedRootHash returns the rootHash of the most recently touched trie
-func (f *Forest) MostRecentTouchedRootHash() ([]byte, error) {
+func (f *Forest) MostRecentTouchedRootHash() (ledger.RootHash, error) {
 	keys := f.tries.Keys()
 	if len(keys) > 0 {
 		encodedRootHash := keys[len(keys)-1].(string)
-		return hex.DecodeString(encodedRootHash)
+		rootHashBytes, err := hex.DecodeString(encodedRootHash)
+		if err != nil {
+			return ledger.RootHash(hash.DummyHash), fmt.Errorf("failed to decode the root string: %w", err)
+		}
+		return ledger.ToRootHash(rootHashBytes)
 	}
-	return nil, fmt.Errorf("no trie is stored in the forest")
+	return ledger.RootHash(hash.DummyHash), fmt.Errorf("no trie is stored in the forest")
 }
 
 // Size returns the number of active tries in this store
