@@ -1820,7 +1820,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	)
 }
 func TestSigningWithTags(t *testing.T) {
-	t.Run("Signing Transactions without tag works (for now)", newVMTest().
+	t.Run("Signing Transactions without tag doesn't works", newVMTest().
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				// Create an account private key.
@@ -1848,7 +1848,8 @@ func TestSigningWithTags(t *testing.T) {
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
-				require.NoError(t, tx.Err)
+				require.Error(t, tx.Err)
+				require.ErrorIs(t, tx.Err, &errors.InvalidProposalSignatureError{})
 			}),
 	)
 }
