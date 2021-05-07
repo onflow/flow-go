@@ -1,6 +1,13 @@
 package flow
 
-// ExecutionResult ...
+import (
+	"errors"
+)
+
+var NoChunksError = errors.New("execution result has no chunks")
+
+// ExecutionResult is cryptographic commitment to the computation
+// result(s) from executing a block
 type ExecutionResult struct {
 	PreviousResultID Identifier // commit of the previous ER
 	BlockID          Identifier // commit of the current block
@@ -18,34 +25,35 @@ func (er ExecutionResult) Checksum() Identifier {
 	return MakeID(er)
 }
 
+// ValidateChunksLength checks whether the number of chuncks is zero.
+//
+// It returns false if the number of chunks is zero (invalid).
+// By protocol definition, each ExecutionReceipt must contain at least one
+// chunk (system chunk).
+func (er ExecutionResult) ValidateChunksLength() bool {
+	return er.Chunks.Len() != 0
+}
+
 // FinalStateCommitment returns the Execution Result's commitment to the final
 // execution state of the block, i.e. the last chunk's output state.
-//
-// By protocol definition, each ExecutionReceipt must contain at least one
-// chunk (system chunk). Convention: publishing an ExecutionReceipt without a
-// final state commitment is a slashable protocol violation.
-// TODO: change bool to error return with a sentinel error
-func (er ExecutionResult) FinalStateCommitment() (StateCommitment, bool) {
-	if er.Chunks.Len() == 0 {
-		return nil, false
+// Error returns:
+//  * NoChunksError: if there are no chunks (ExecutionResult is malformed)
+func (er ExecutionResult) FinalStateCommitment() (StateCommitment, error) {
+	if !er.ValidateChunksLength() {
+		return DummyStateCommitment, NoChunksError
 	}
-	s := er.Chunks[er.Chunks.Len()-1].EndState
-	return s, len(s) > 0
+	return er.Chunks[er.Chunks.Len()-1].EndState, nil
 }
 
 // InitialStateCommit returns a commitment to the execution state used as input
 // for computing the block the block, i.e. the leading chunk's input state.
-//
-// By protocol definition, each ExecutionReceipt must contain at least one
-// chunk (system chunk). Convention: publishing an ExecutionReceipt without an
-// initial state commitment is a slashable protocol violation.
-// TODO: change bool to error return with a sentinel error
-func (er ExecutionResult) InitialStateCommit() (StateCommitment, bool) {
-	if er.Chunks.Len() == 0 {
-		return nil, false
+// Error returns:
+//  * NoChunksError: if there are no chunks (ExecutionResult is malformed)
+func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
+	if !er.ValidateChunksLength() {
+		return DummyStateCommitment, NoChunksError
 	}
-	s := er.Chunks[0].StartState
-	return s, len(s) > 0
+	return er.Chunks[0].StartState, nil
 }
 
 /*******************************************************************************

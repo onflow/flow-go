@@ -12,8 +12,9 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/common"
-	ledgerCommon "github.com/onflow/flow-go/ledger/common"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/proof"
 	"github.com/onflow/flow-go/ledger/partial"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -35,8 +36,8 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// wait for execution receipt for blockA from execution node 1
 	erExe1BlockA := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockA.Header.ID(), gs.exe1ID)
-	finalStateErExec1BlockA, ok := erExe1BlockA.ExecutionResult.FinalStateCommitment()
-	require.True(gs.T(), ok)
+	finalStateErExec1BlockA, err := erExe1BlockA.ExecutionResult.FinalStateCommitment()
+	require.NoError(gs.T(), err)
 	gs.T().Logf("got erExe1BlockA with SC %x", finalStateErExec1BlockA)
 
 	// assert there were no ChunkDataRequests from the verification node yet
@@ -44,7 +45,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 		"expected no ChunkDataRequest to be sent before a transaction existed")
 
 	// send transaction
-	err := gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), common.CounterContract)
+	err = gs.AccessClient().DeployContract(context.Background(), sdk.Identifier(gs.net.Root().ID()), common.CounterContract)
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
@@ -53,8 +54,8 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
 	// wait for execution receipt for blockB from execution node 1
 	erExe1BlockB := gs.ReceiptState.WaitForReceiptFrom(gs.T(), blockB.Header.ID(), gs.exe1ID)
-	finalStateErExec1BlockB, ok := erExe1BlockB.ExecutionResult.FinalStateCommitment()
-	require.True(gs.T(), ok)
+	finalStateErExec1BlockB, err := erExe1BlockB.ExecutionResult.FinalStateCommitment()
+	require.NoError(gs.T(), err)
 	gs.T().Logf("got erExe1BlockB with SC %x", finalStateErExec1BlockB)
 
 	// extract chunk ID from execution receipt
@@ -85,10 +86,10 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	batchProof, err := encoding.DecodeTrieBatchProof(pack2.ChunkDataPack.Proof)
 	require.NoError(gs.T(), err)
 
-	isValid := ledgerCommon.VerifyTrieBatchProof(batchProof, erExe1BlockB.ExecutionResult.Chunks[0].StartState)
+	isValid := proof.VerifyTrieBatchProof(batchProof, ledger.State(erExe1BlockB.ExecutionResult.Chunks[0].StartState))
 	require.NoError(gs.T(), err, "error verifying chunk trie proofs")
 	require.True(gs.T(), isValid, "chunk trie proofs are not valid, but must be")
 
-	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, pack2.ChunkDataPack.StartState, partial.DefaultPathFinderVersion)
+	_, err = partial.NewLedger(pack2.ChunkDataPack.Proof, ledger.State(pack2.ChunkDataPack.StartState), partial.DefaultPathFinderVersion)
 	require.NoError(gs.T(), err, "error building PSMT")
 }
