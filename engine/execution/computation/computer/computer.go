@@ -412,7 +412,7 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 		txResults = append(txResults, txResult)
 		gasUsed += txGasUsed
 
-		interactions := baseCollectionView.(*delta.View).Interactions().Delta
+		interactions := workingCollectionView.(*delta.View).Interactions().Delta
 		collectionInteractions := alternativeCollectionView.(*delta.View).Interactions().Delta
 		blockInteractionsInteractions := blockView.(*delta.View).Interactions().Delta
 
