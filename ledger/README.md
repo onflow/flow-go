@@ -14,7 +14,7 @@ This package provides two ledger implementations:
 
 ![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree" )
 
-In this context a *binary Merkle tree* is defined as a full binary tree with an specific hight including three type of nodes:
+In this context a *binary Merkle tree* is defined as a full binary tree with an specific height including three type of nodes:
 
 - leaf nodes: holds a payload (data), a path (where the node is located), and a hash value (hash of path and payload content)
 
