@@ -151,11 +151,11 @@ func demo() {
 			// assigner
 			tryRandomCall(vc.OnExecutionReceiptReceived)
 			tryRandomCall(func() {
-				vc.OnChunksAssigned(rand.Int() % 10)
+				vc.OnChunksAssignmentDoneAtAssigner(rand.Int() % 10)
 			})
-			tryRandomCall(vc.OnChunkProcessed)
+			tryRandomCall(vc.OnAssignedChunkProcessedAtAssigner)
 			tryRandomCall(func() {
-				vc.OnAssignerProcessFinalizedBlock(uint64(i))
+				vc.OnFinalizedBlockArrivesAtAssigner(uint64(i))
 			})
 
 			// finder
@@ -168,7 +168,7 @@ func demo() {
 			tryRandomCall(vc.OnVerifiableChunkSent)
 
 			// verifier
-			tryRandomCall(vc.OnVerifiableChunkReceived)
+			tryRandomCall(vc.OnVerifiableChunkReceivedAtVerifierEngine)
 
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
@@ -229,7 +229,7 @@ func demo() {
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
 
-			tryRandomCall(vc.OnResultApproval)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetwork)
 		}
 	})
 }

@@ -189,64 +189,61 @@ func (vc *VerificationCollector) OnChunkDataPackRequested() {
 
 // OnVerifiableChunkReceived is called whenever a verifiable chunk is received by Verifier engine
 // from Match engine.It increments the total number of sent verifiable chunks.
-func (vc *VerificationCollector) OnVerifiableChunkReceived() {
+func (vc *VerificationCollector) OnVerifiableChunkReceivedAtVerifierEngine() {
 	vc.receivedVerifiableChunksTotal.Inc()
 }
 
 // OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
 // It increases the total number of result approvals.
-func (vc *VerificationCollector) OnResultApproval() {
+func (vc *VerificationCollector) OnResultApprovalDispatchedInNetwork() {
 	// increases the counter of disseminated result approvals
 	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
 	vc.resultApprovalsTotal.Inc()
 }
 
-// OnFinalizedBlockReceived is called whenever a finalized block arrives at the assigner engine.
-// It sets updates the latest finalized height processed at assigner engine.
-//
-// Note: it assumes blocks are coming to assigner engine in strictly increasing order of their height.
-func (vc *VerificationCollector) OnAssignerProcessFinalizedBlock(height uint64) {
+// OnFinalizedBlockArrivesAtAssigner sets a gauge that keeps track of number of the latest block height arrives
+// at assigner engine. Note that it assumes blocks are coming to assigner engine in strictly increasing order of their height.
+func (vc *VerificationCollector) OnFinalizedBlockArrivesAtAssigner(height uint64) {
 	vc.receivedFinalizedHeight.Set(float64(height))
 }
 
-// OnChunksAssigned is called whenever chunks assigned to this verification node by applying chunk assignment on an
-// execution result.
-// It increases the total number of assigned chunks by the input.
-func (vc *VerificationCollector) OnChunksAssigned(chunks int) {
+// OnChunksAssignmentDoneAtAssigner increments a counter that keeps track of the total number of assigned chunks to
+// the verification node.
+func (vc *VerificationCollector) OnChunksAssignmentDoneAtAssigner(chunks int) {
 	vc.assignedChunksTotal.Add(float64(chunks))
 }
 
-// OnChunkProcessed is called whenever a chunk is pushed to the chunks queue by the assigner engine.
-// It increments the total number of sent chunks.
-func (vc *VerificationCollector) OnChunkProcessed() {
+// OnAssignedChunkProcessedAtAssigner increments a counter that keeps track of the total number of assigned chunks pushed by
+// assigner engine to the fetcher engine.
+func (vc *VerificationCollector) OnAssignedChunkProcessedAtAssigner() {
 	vc.sentChunksTotal.Inc()
 }
 
-// OnAssignedChunkReceivedAtFetcher increases a counter that keeps track of number of assigned chunk arrive at fetcher engine.
+// OnAssignedChunkReceivedAtFetcher increments a counter that keeps track of number of assigned chunks arrive at fetcher engine.
 func (vc *VerificationCollector) OnAssignedChunkReceivedAtFetcher() {
 
 }
 
-// OnChunkDataPackRequestSubmitted increases a counter that keeps track of number of chunk data pack requests that fetcher engine
+// OnChunkDataPackRequestSubmittedAtFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
 // sends to requester engine.
-func (vc *VerificationCollector) OnChunkDataPackRequestSubmitted() {
+func (vc *VerificationCollector) OnChunkDataPackRequestSubmittedAtFetcher() {
 
 }
 
-// OnChunkDataPackRequestArrivedAtRequester increases a counter that keeps track of number of chunk data pack requests arrive at
-// arrive to the requester engine from the fetcher engine.
+// OnChunkDataPackRequestArrivedAtRequester increments a counter that keeps track of number of chunk data pack requests arrive at
+// arrive at the requester engine from the fetcher engine.
 func (vc *VerificationCollector) OnChunkDataPackRequestArrivedAtRequester() {
 
 }
 
-// OnChunkDataPackRequestDispatchedInNetwork increases a counter that keeps track of number of chunk data pack requests that the
+// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
 func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetwork() {
 
 }
 
-// OnChunkDataPackResponseReceivedFromNetwork increases a counter that keeps track of number of chunk data pack response that the
+// OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
 func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetwork() {
 
@@ -258,13 +255,13 @@ func (vc *VerificationCollector) OnChunkDataPackSentToFetcher() {
 
 }
 
-// OnChunkDataPackArrivedAtFetcher increases a counter that keeps track of number of chunk data packs arrived at fetcher engine from
+// OnChunkDataPackArrivedAtFetcher increments a counter that keeps track of number of chunk data packs arrived at fetcher engine from
 // requester engine.
 func (vc *VerificationCollector) OnChunkDataPackArrivedAtFetcher() {
 
 }
 
-// OnVerifiableChunkSentToVerifier increases a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
+// OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 func (vc *VerificationCollector) OnVerifiableChunkSentToVerifier() {
 
 }
