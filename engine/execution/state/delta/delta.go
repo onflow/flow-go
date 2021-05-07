@@ -4,19 +4,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // A Delta is a record of ledger mutations.
 type Delta struct {
-	Data map[string]flow.RegisterEntry
+	Data    map[string]flow.RegisterEntry
+	rwmutex *sync.RWMutex
 }
 
 // NewDelta returns an empty ledger delta.
 func NewDelta() Delta {
 	return Delta{
-		Data: make(map[string]flow.RegisterEntry),
+		Data:    make(map[string]flow.RegisterEntry),
+		rwmutex: &sync.RWMutex{},
 	}
 }
 
@@ -38,6 +41,8 @@ func toRegisterID(owner, controller, key string) flow.RegisterID {
 // This function will return nil if the given key has been deleted in this delta.
 // Second return parameters indicated if the value has been set/deleted in this delta
 func (d Delta) Get(owner, controller, key string) (flow.RegisterValue, bool) {
+	//d.rwmutex.RLock()
+	//defer d.rwmutex.RUnlock()
 	value, set := d.Data[toString(owner, controller, key)]
 	return value.Value, set
 }

@@ -64,8 +64,8 @@ func (p *Programs) ChildPrograms() *Programs {
 // Get returns stored program, state which contains changes which correspond to loading this program,
 // and boolean indicating if the value was found
 func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.State, bool) {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
+	//p.lock.RLock()
+	//defer p.lock.RUnlock()
 
 	programEntry, has := p.get(location)
 
@@ -77,6 +77,9 @@ func (p *Programs) Get(location common.Location) (*interpreter.Program, *state.S
 }
 
 func (p *Programs) get(location common.Location) (*ProgramEntry, bool) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
 	programEntry, ok := p.programs[location.ID()]
 	if !ok {
 		parentEntry, has := p.parentFunc(location)

@@ -384,26 +384,59 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 
 	for _, txBody := range collection.Transactions {
 
-		txEvents, txServiceEvents, txResult, txGasUsed, err :=
-			e.executeTransaction(txBody, colSpan, txMetrics, workingCollectionView, programs, txCtx, txIndex)
-		if err != nil {
-			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
-		}
+		wg := sync.WaitGroup{}
 
-		alternativeCollectionView := baseCollectionView.NewChild()
+		wg.Add(3)
 
-		_, _, _, _, err =
-			e.executeTransaction(txBody, colSpan, txMetrics, alternativeCollectionView, programs, txCtx, txIndex)
-		if err != nil {
-			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
-		}
+		var (
+			txEvents                  []flow.Event
+			txServiceEvents           []flow.Event
+			txResult                  flow.TransactionResult
+			txGasUsed                 uint64
+			err                       error
+			alternativeCollectionView state.View
+			blockView                 state.View
+		)
 
-		blockView := alternativeBlockView.NewChild()
+		wrong := false
 
-		_, _, _, _, err =
-			e.executeTransaction(txBody, colSpan, txMetrics, blockView, programs, txCtx, txIndex)
-		if err != nil {
-			return nil, nil, nil, txIndex, 0, nil, nil, 0, 0, 0, err
+		collectionPrograms := programs.ChildPrograms()
+		blockPrograms := programs.ChildPrograms()
+
+		go func() {
+			defer wg.Done()
+			txEvents, txServiceEvents, txResult, txGasUsed, err = e.executeTransaction(txBody, colSpan, txMetrics, workingCollectionView, programs, txCtx, txIndex)
+			if err != nil {
+				wrong = true
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			alternativeCollectionView = baseCollectionView.NewChild()
+
+			_, _, _, _, err =
+				e.executeTransaction(txBody, colSpan, txMetrics, alternativeCollectionView, collectionPrograms, txCtx, txIndex)
+			if err != nil {
+				wrong = true
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			blockView = alternativeBlockView.NewChild()
+
+			_, _, _, _, err =
+				e.executeTransaction(txBody, colSpan, txMetrics, blockView, blockPrograms, txCtx, txIndex)
+			if err != nil {
+				wrong = true
+			}
+		}()
+
+		wg.Wait()
+
+		if wrong {
+			return nil, nil, nil, 0, 0, nil, nil, 0, 0, 0, err
 		}
 
 		txIndex++

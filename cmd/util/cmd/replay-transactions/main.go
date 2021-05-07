@@ -269,7 +269,7 @@ func mainnet7() int {
 				Int("range_collection_conflicting_txs", rangeCollectionConflictingTxs).
 				Int("range_block_conflictable_txs", rangeBlockConflicatbleTxs).
 				Int("range_block_conflicting_txs", rangeBlockConflictingTxs).
-				Int("total_collection_conflectable_txs", totalCollectionConflictableTxs).
+				Int("total_collection_conflictable_txs", totalCollectionConflictableTxs).
 				Int("total_collection_conflicting_txs", totalCollectionConflictingTxs).
 				Int("total_block_conflictable_txs", totalBlockConflictableTxs).
 				Int("total_block_conflicting_txs", totalBlockConflictingTxs).
