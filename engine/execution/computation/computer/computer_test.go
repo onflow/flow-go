@@ -493,8 +493,42 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 	require.Contains(t, registerTouches, id.String())
 	require.Equal(t, id, registerTouches[id.String()])
-
 }
+
+func Test_ExecutingSystemCollection(t *testing.T) {
+
+	execCtx := fvm.NewContext(zerolog.Nop())
+
+	runtime := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(runtime)
+
+	rag := &RandomAddressGenerator{}
+
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+
+	committer := new(computermock.ViewCommitter)
+	committer.On("CommitView", mock.Anything, mock.Anything).
+		Return(nil, nil, nil).
+		Times(1) // only system chunk
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	require.NoError(t, err)
+
+	// create empty block, it will have system collection attached while executing
+	block := generateBlock(0, 0, rag)
+
+	view := delta.NewView(ledger.Get)
+
+	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+	assert.NoError(t, err)
+	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
+	assert.Len(t, result.TransactionResults, 1)
+
+	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+
+	committer.AssertExpectations(t)
+}
+
 func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
 	return generateBlockWithVisitor(collectionCount, transactionCount, addressGenerator, nil)
 }
