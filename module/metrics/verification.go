@@ -222,3 +222,49 @@ func (vc *VerificationCollector) OnChunksAssigned(chunks int) {
 func (vc *VerificationCollector) OnChunkProcessed() {
 	vc.sentChunksTotal.Inc()
 }
+
+// OnAssignedChunkReceivedAtFetcher increases a counter that keeps track of number of assigned chunk arrive at fetcher engine.
+func (vc *VerificationCollector) OnAssignedChunkReceivedAtFetcher() {
+
+}
+
+// OnChunkDataPackRequestSubmitted increases a counter that keeps track of number of chunk data pack requests that fetcher engine
+// sends to requester engine.
+func (vc *VerificationCollector) OnChunkDataPackRequestSubmitted() {
+
+}
+
+// OnChunkDataPackRequestArrivedAtRequester increases a counter that keeps track of number of chunk data pack requests arrive at
+// arrive to the requester engine from the fetcher engine.
+func (vc *VerificationCollector) OnChunkDataPackRequestArrivedAtRequester() {
+
+}
+
+// OnChunkDataPackRequestDispatchedInNetwork increases a counter that keeps track of number of chunk data pack requests that the
+// requester engine dispatches in the network (to the execution nodes).
+func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetwork() {
+
+}
+
+// OnChunkDataPackResponseReceivedFromNetwork increases a counter that keeps track of number of chunk data pack response that the
+// requester engine receives from execution nodes (through network).
+func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetwork() {
+
+}
+
+// OnChunkDataPackSentToFetcher increases a counter that keeps track of number of chunk data packs sent to the fetcher engine from
+// requester engine.
+func (vc *VerificationCollector) OnChunkDataPackSentToFetcher() {
+
+}
+
+// OnChunkDataPackArrivedAtFetcher increases a counter that keeps track of number of chunk data packs arrived at fetcher engine from
+// requester engine.
+func (vc *VerificationCollector) OnChunkDataPackArrivedAtFetcher() {
+
+}
+
+// OnVerifiableChunkSentToVerifier increases a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
+func (vc *VerificationCollector) OnVerifiableChunkSentToVerifier() {
+
+}

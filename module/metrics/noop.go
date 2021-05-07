@@ -84,6 +84,14 @@ func (nc *NoopCollector) OnResultApproval()                                     
 func (nc *NoopCollector) OnAssignerProcessFinalizedBlock(height uint64)                          {}
 func (nc *NoopCollector) OnChunksAssigned(chunks int)                                            {}
 func (nc *NoopCollector) OnChunkProcessed()                                                      {}
+func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetwork()                             {}
+func (nc *NoopCollector) OnChunkDataPackRequestSubmitted()                                       {}
+func (nc *NoopCollector) OnChunkDataPackRequestArrivedAtRequester()                              {}
+func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
+func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
+func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                                    {}
