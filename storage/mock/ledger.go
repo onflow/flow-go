@@ -50,15 +50,15 @@ func (_m *Ledger) Done() <-chan struct{} {
 }
 
 // EmptyStateCommitment provides a mock function with given fields:
-func (_m *Ledger) EmptyStateCommitment() []byte {
+func (_m *Ledger) EmptyStateCommitment() flow.StateCommitment {
 	ret := _m.Called()
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func() []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func() flow.StateCommitment); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
@@ -66,11 +66,11 @@ func (_m *Ledger) EmptyStateCommitment() []byte {
 }
 
 // GetRegisters provides a mock function with given fields: registerIDs, stateCommitment
-func (_m *Ledger) GetRegisters(registerIDs []flow.RegisterID, stateCommitment []byte) ([][]byte, error) {
+func (_m *Ledger) GetRegisters(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment) ([][]byte, error) {
 	ret := _m.Called(registerIDs, stateCommitment)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func([]flow.RegisterID, []byte) [][]byte); ok {
+	if rf, ok := ret.Get(0).(func([]flow.RegisterID, flow.StateCommitment) [][]byte); ok {
 		r0 = rf(registerIDs, stateCommitment)
 	} else {
 		if ret.Get(0) != nil {
@@ -79,7 +79,7 @@ func (_m *Ledger) GetRegisters(registerIDs []flow.RegisterID, stateCommitment []
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]flow.RegisterID, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func([]flow.RegisterID, flow.StateCommitment) error); ok {
 		r1 = rf(registerIDs, stateCommitment)
 	} else {
 		r1 = ret.Error(1)
@@ -89,11 +89,11 @@ func (_m *Ledger) GetRegisters(registerIDs []flow.RegisterID, stateCommitment []
 }
 
 // GetRegistersWithProof provides a mock function with given fields: registerIDs, stateCommitment
-func (_m *Ledger) GetRegistersWithProof(registerIDs []flow.RegisterID, stateCommitment []byte) ([][]byte, [][]byte, error) {
+func (_m *Ledger) GetRegistersWithProof(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment) ([][]byte, [][]byte, error) {
 	ret := _m.Called(registerIDs, stateCommitment)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func([]flow.RegisterID, []byte) [][]byte); ok {
+	if rf, ok := ret.Get(0).(func([]flow.RegisterID, flow.StateCommitment) [][]byte); ok {
 		r0 = rf(registerIDs, stateCommitment)
 	} else {
 		if ret.Get(0) != nil {
@@ -102,7 +102,7 @@ func (_m *Ledger) GetRegistersWithProof(registerIDs []flow.RegisterID, stateComm
 	}
 
 	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func([]flow.RegisterID, []byte) [][]byte); ok {
+	if rf, ok := ret.Get(1).(func([]flow.RegisterID, flow.StateCommitment) [][]byte); ok {
 		r1 = rf(registerIDs, stateCommitment)
 	} else {
 		if ret.Get(1) != nil {
@@ -111,7 +111,7 @@ func (_m *Ledger) GetRegistersWithProof(registerIDs []flow.RegisterID, stateComm
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func([]flow.RegisterID, []byte) error); ok {
+	if rf, ok := ret.Get(2).(func([]flow.RegisterID, flow.StateCommitment) error); ok {
 		r2 = rf(registerIDs, stateCommitment)
 	} else {
 		r2 = ret.Error(2)
@@ -137,20 +137,20 @@ func (_m *Ledger) Ready() <-chan struct{} {
 }
 
 // UpdateRegisters provides a mock function with given fields: registerIDs, values, stateCommitment
-func (_m *Ledger) UpdateRegisters(registerIDs []flow.RegisterID, values [][]byte, stateCommitment []byte) ([]byte, error) {
+func (_m *Ledger) UpdateRegisters(registerIDs []flow.RegisterID, values [][]byte, stateCommitment flow.StateCommitment) (flow.StateCommitment, error) {
 	ret := _m.Called(registerIDs, values, stateCommitment)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]flow.RegisterID, [][]byte, []byte) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func([]flow.RegisterID, [][]byte, flow.StateCommitment) flow.StateCommitment); ok {
 		r0 = rf(registerIDs, values, stateCommitment)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]flow.RegisterID, [][]byte, []byte) error); ok {
+	if rf, ok := ret.Get(1).(func([]flow.RegisterID, [][]byte, flow.StateCommitment) error); ok {
 		r1 = rf(registerIDs, values, stateCommitment)
 	} else {
 		r1 = ret.Error(1)
@@ -160,20 +160,20 @@ func (_m *Ledger) UpdateRegisters(registerIDs []flow.RegisterID, values [][]byte
 }
 
 // UpdateRegistersWithProof provides a mock function with given fields: registerIDs, values, stateCommitment
-func (_m *Ledger) UpdateRegistersWithProof(registerIDs []flow.RegisterID, values [][]byte, stateCommitment []byte) ([]byte, [][]byte, error) {
+func (_m *Ledger) UpdateRegistersWithProof(registerIDs []flow.RegisterID, values [][]byte, stateCommitment flow.StateCommitment) (flow.StateCommitment, [][]byte, error) {
 	ret := _m.Called(registerIDs, values, stateCommitment)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func([]flow.RegisterID, [][]byte, []byte) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func([]flow.RegisterID, [][]byte, flow.StateCommitment) flow.StateCommitment); ok {
 		r0 = rf(registerIDs, values, stateCommitment)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
 	var r1 [][]byte
-	if rf, ok := ret.Get(1).(func([]flow.RegisterID, [][]byte, []byte) [][]byte); ok {
+	if rf, ok := ret.Get(1).(func([]flow.RegisterID, [][]byte, flow.StateCommitment) [][]byte); ok {
 		r1 = rf(registerIDs, values, stateCommitment)
 	} else {
 		if ret.Get(1) != nil {
@@ -182,7 +182,7 @@ func (_m *Ledger) UpdateRegistersWithProof(registerIDs []flow.RegisterID, values
 	}
 
 	var r2 error
-	if rf, ok := ret.Get(2).(func([]flow.RegisterID, [][]byte, []byte) error); ok {
+	if rf, ok := ret.Get(2).(func([]flow.RegisterID, [][]byte, flow.StateCommitment) error); ok {
 		r2 = rf(registerIDs, values, stateCommitment)
 	} else {
 		r2 = ret.Error(2)
