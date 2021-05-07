@@ -14,6 +14,28 @@ type VerificationCollector struct {
 	assignedChunksTotal     prometheus.Counter // total chunks assigned to this verification node
 	sentChunksTotal         prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
 
+	// Fetcher Engine
+	//
+	// total assigned chunks received by fetcher engine from assigner engine (through chunk consumer),
+	receivedChunksTotal prometheus.Counter
+	// total chunk data pack requests sent to requester engine by fetcher engine.
+	sentChunkDataPackRequestsTotal prometheus.Counter
+	// total chunk data packs received by fetcher engine from requester engine.
+	receivedChunkDataPacksTotal prometheus.Counter
+	// total verifiable chunks sent by fetcher engine to verifier engine.
+	sentVerifiableChunksTotal prometheus.Counter
+
+	// Requester Engine
+	//
+	// total number of chunk data pack requests received by requester engine from fetcher engine.
+	receivedChunkDataPackRequestsTotal prometheus.Counter
+	// total number of chunk data request messages dispatched in the network by requester engine.
+	sentChunkDataRequestMessagesTotal prometheus.Counter
+	// total number of chunk data response messages received by fetcher from network.
+	receivedChunkDataResponseMessagesTotal prometheus.Counter
+	// total number of chunk data pack sent by requester to fetcher engine.
+	sentChunkDataPackTotal prometheus.Counter
+
 	// Finder Engine
 	receivedReceiptsTotal     prometheus.Counter // total execution receipts arrived at finder engine
 	sentExecutionResultsTotal prometheus.Counter // total execution results processed by finder engine
