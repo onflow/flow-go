@@ -419,7 +419,7 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	err = transaction.Update(m.db, func(tx *transaction.Tx) error {
+	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
 		err := m.blocks.StoreTxn(candidate)(tx)
 		if err != nil {
