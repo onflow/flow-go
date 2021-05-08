@@ -138,7 +138,7 @@ func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) err
 	}
 }
 
-// Put will return Badger tx which adds an resource to the cache with the given ID.
+// PutTxn will return Badger tx which adds an resource to the cache with the given ID.
 func (c *Cache) PutTxn(key interface{}, resource interface{}) func(*transaction.Tx) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 

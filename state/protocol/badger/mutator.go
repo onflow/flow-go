@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -418,21 +419,21 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
+	err = transaction.Update(m.db, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
-		err := m.blocks.StoreTx(candidate)(tx)
+		err := m.blocks.StoreTxn(candidate)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
 		// index the latest sealed block in this fork
-		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
+		err = operation.IndexBlockSeal(blockID, last.ID())(tx.DBTxn)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
 
 		// index the child block for recovery
-		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
+		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx.DBTxn)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -669,7 +670,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // includes an operation to index the epoch status for every block, and
 // operations to insert service events for blocks that include them.
 //
-func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) error, error) {
+func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
 
 	// Determine epoch status for block's CURRENT epoch.
 	//
@@ -688,7 +689,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 	counter := activeSetup.Counter
 
 	// keep track of DB operations to apply when inserting this block
-	var ops []func(*badger.Txn) error
+	var ops []func(*transaction.Tx) error
 
 	// we will apply service events from blocks which are sealed by this block's PARENT
 	parent, err := m.blocks.ByID(block.Header.ParentID)
@@ -743,7 +744,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
-				ops = append(ops, m.epoch.setups.StoreTx(ev))
+				ops = append(ops, m.epoch.setups.StoreTxn(ev))
 
 			case *flow.EpochCommit:
 
@@ -777,7 +778,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
-				ops = append(ops, m.epoch.commits.StoreTx(ev))
+				ops = append(ops, m.epoch.commits.StoreTxn(ev))
 
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
@@ -786,7 +787,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 	}
 
 	// we always index the epoch status, even when there are no service events
-	ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), epochStatus))
+	ops = append(ops, m.epoch.statuses.StoreTxn(block.ID(), epochStatus))
 
 	return ops, nil
 }
