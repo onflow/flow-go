@@ -30,3 +30,14 @@ func RetryOnConflict(action func(func(*badger.Txn) error) error, op func(tx *bad
 		return err
 	}
 }
+
+// func RetryOnConflictTx(db *badger.DB, action func(*badger.DB, func(*storagebadger.Tx) error) error, op func(*storagebadger.Tx) error) error {
+// 	for {
+// 		err := action(db, op)
+// 		if errors.Is(err, badger.ErrConflict) {
+// 			metrics.GetStorageCollector().RetryOnConflict()
+// 			continue
+// 		}
+// 		return err
+// 	}
+// }
