@@ -24,6 +24,8 @@ import (
 
 const collectionNodesToTry uint = 3
 
+const lastBlockHeightOfSpork uint64 = 13404173
+
 type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
 	executionRPC         execproto.ExecutionAPIClient
@@ -355,6 +357,11 @@ func (b *backendTransactions) lookupTransactionResult(
 			return false, nil, 0, "", nil
 		}
 		return false, nil, 0, "", convertStorageError(err)
+	}
+
+	// If the block is not in this spork (Mainnet6) then just return like we don't know about this block
+	if block.Header.Height > lastBlockHeightOfSpork {
+		return false, nil, 0, "", nil
 	}
 
 	blockID := block.ID()
