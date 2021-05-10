@@ -208,7 +208,7 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
 		accountKeys[index], addresses[index], signers[index] = accountKey, address, signer
 	}
 
-	// start dkf with 1 participant
+	// start DKG with participants
 	s.startDKGWithParticipants(nodeIDs)
 
 	for index := range participants {
