@@ -35,8 +35,11 @@ type BootstrapProcedure struct {
 	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
 
+	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
 
+	// list of initial network participants for whom we will create/stake flow
+	// accounts and retrieve epoch-related resources
 	identities flow.IdentityList
 }
 
@@ -737,7 +740,7 @@ func registerNodeTransaction(
 	// Use NetworkingKey as the public key of the machine account.
 	// We do this for tests/localnet but normally it should be a separate key.
 	publicKeys := make([]cadence.Value, 1)
-	publicKeys[0] = bytesToCadenceArray(id.StakingPubKey.Encode())
+	publicKeys[0] = bytesToCadenceArray(id.NetworkPubKey.Encode())
 	cadencePublicKeys := cadence.NewArray(publicKeys)
 
 	return Transaction(
