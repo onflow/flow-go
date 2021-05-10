@@ -446,7 +446,13 @@ func (f *FixedAddressGenerator) Bytes() []byte {
 	panic("not implemented")
 }
 
-func (e *testRuntime) InvokeContractFunction(contractLocation common.AddressLocation, functionName string, arguments []interpreter.Value, argumentTypes []sema.Type, context runtime.Context) error {
+func (e *testRuntime) InvokeContractFunction(
+	contractLocation common.AddressLocation,
+	functionName string,
+	arguments []interpreter.Value,
+	argumentTypes []sema.Type,
+	context runtime.Context,
+) (cadence.Value, error) {
 	panic("not implemented")
 }
 

@@ -3,17 +3,17 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
-
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 )
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
@@ -86,10 +86,6 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	return account, nil
 }
 
-// invokeMetaTransaction invokes a meta transaction inside the context of an outer transaction.
-//
-// Errors that occur in a meta transaction are propagated as a single error that can be
-// captured by the Cadence runtime and eventually disambiguated by the parent context.
 func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
 	invocator := NewTransactionInvocator(zerolog.Nop())
 	err := invocator.Process(vm, &ctx, tx, sth, programs)
@@ -103,29 +99,19 @@ func (vm *VirtualMachine) invokeContractFunction(
 	arguments []interpreter.Value,
 	argumentTypes []sema.Type,
 	ctx *Context,
-	sth *state.StateHolder, programs *programs.Programs,
-) (errors.Error, error) {
+	proc *TransactionProcedure,
+	sth *state.StateHolder,
+	programs *programs.Programs,
+) (fvmErr errors.Error, processErr error) {
 
-	env := newEnvironment(*ctx, vm, sth, programs)
-
-	_ = vm.Runtime.InvokeContractFunction(
+	invocator := NewTransactionContractFunctionInvocator(
 		contractLocation,
 		functionName,
 		arguments,
 		argumentTypes,
-		runtime.Context{
-			Interface:         env,
-			Location:          common.StringLocation("MetaTransaction"),
-			PredeclaredValues: nil,
-		},
+		zerolog.Nop(),
 	)
-	defer func() {
-		if err := recover(); err != nil {
-			// all good :)
-		}
-	}()
+	_, err := invocator.Invoke(vm, ctx, proc, sth, programs)
 
-	// txErr, fatalErr := errors.SplitErrorTypes(err)
-
-	return nil, nil
+	return errors.SplitErrorTypes(err)
 }

@@ -57,6 +57,7 @@ func (d *TransactionFeeDeductor) deductFees(
 			sema.AuthAccountType,
 		},
 		ctx,
+		proc,
 		sth,
 		programs,
 	)

@@ -63,7 +63,7 @@ func (i *TransactionInvocator) Process(
 	parentState := sth.State()
 	childState := sth.NewChild()
 	env = newEnvironment(*ctx, vm, sth, programs)
-	predeclaredValues := i.valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
 		// an extra check for state holder health, this should never happen
@@ -196,7 +196,7 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
+func valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
