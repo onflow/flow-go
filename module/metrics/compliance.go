@@ -19,7 +19,7 @@ type ComplianceCollector struct {
 	sealedPayload            *prometheus.CounterVec
 	lastBlockFinalizedAt     time.Time
 	finalizedBlocksPerSecond prometheus.Summary
-	committedEpochFinalView  prometheus.Counter
+	committedEpochFinalView  prometheus.Gauge
 }
 
 func NewComplianceCollector() *ComplianceCollector {
