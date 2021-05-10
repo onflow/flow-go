@@ -202,7 +202,6 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		}
 	}
 
-	fmt.Println(finalSubmission)
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
 	if err != nil {
