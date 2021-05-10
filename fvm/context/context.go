@@ -24,12 +24,12 @@ type Runnable interface {
 }
 
 type VirtualMachine interface {
-	Runtime() runtime.Runtime
 	Run(ctx Context, runnable Runnable, view state.View, programs *programs.Programs) (err error)
 	Query(ctx Context, script []byte, view state.View, programs *programs.Programs) (cadence.Value, error)
+	InvokeMetaTransaction(ctx Context, metaTx *flow.TransactionBody, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error)
 	// TODO make GetAccount Special case of query
 	GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error)
-	InvokeMetaTransaction(ctx Context, metaTx *flow.TransactionBody, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error)
+	Runtime() runtime.Runtime
 }
 
 type Blocks interface {
