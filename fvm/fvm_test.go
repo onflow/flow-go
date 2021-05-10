@@ -1849,7 +1849,7 @@ func TestSigningWithTags(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
-				require.ErrorIs(t, tx.Err, &errors.InvalidProposalSignatureError{})
+				require.Equal(t, errors.ErrCodeInvalidProposalSignatureError, tx.Err.(errors.Error).Code())
 			}),
 	)
 }
