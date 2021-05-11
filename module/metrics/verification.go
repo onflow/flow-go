@@ -17,7 +17,7 @@ type VerificationCollector struct {
 	// Fetcher Engine
 	//
 	// total assigned chunks received by fetcher engine from assigner engine (through chunk consumer),
-	receivedChunksTotal prometheus.Counter
+	receivedAssignedChunksTotal prometheus.Counter
 
 	// Requester Engine
 	//
@@ -70,7 +70,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	})
 
 	// Fetcher Engine
-	receivedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedAssignedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "assigned_chunk_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFetcherEngine,
@@ -183,7 +183,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		sentChunksTotal,
 
 		// fetcher engine
-		receivedChunksTotal,
+		receivedAssignedChunksTotal,
 
 		// requester engine
 		receivedChunkDataPackRequestsTotal,
@@ -217,7 +217,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		sentChunksTotal:         sentChunksTotal,
 
 		// fetcher
-		receivedChunksTotal: receivedChunksTotal,
+		receivedAssignedChunksTotal: receivedAssignedChunksTotal,
 
 		// requester
 		receivedChunkDataPackRequestsTotal:     receivedChunkDataPackRequestsTotal,
@@ -257,12 +257,14 @@ func (vc *VerificationCollector) OnVerifiableChunkSent() {
 
 // OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
 // It increments the total number of chunk data packs received.
+// TODO: remove this method once fetcher is removed.
 func (vc *VerificationCollector) OnChunkDataPackReceived() {
 	vc.receivedChunkDataPackTotal.Inc()
 }
 
 // OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
 // It increments the total number of chunk data packs requested.
+// TODO: remove this method once fetcher is removed.
 func (vc *VerificationCollector) OnChunkDataPackRequested() {
 	vc.requestedChunkDataPackTotal.Inc()
 }
@@ -302,43 +304,43 @@ func (vc *VerificationCollector) OnAssignedChunkProcessedAtAssigner() {
 
 // OnAssignedChunkReceivedAtFetcher increments a counter that keeps track of number of assigned chunks arrive at fetcher engine.
 func (vc *VerificationCollector) OnAssignedChunkReceivedAtFetcher() {
-
+	vc.receivedAssignedChunksTotal.Inc()
 }
 
 // OnChunkDataPackRequestSubmittedAtFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
 // sends to requester engine.
 func (vc *VerificationCollector) OnChunkDataPackRequestSubmittedAtFetcher() {
-
+	vc.requestedChunkDataPackTotal.Inc()
 }
 
 // OnChunkDataPackRequestArrivedAtRequester increments a counter that keeps track of number of chunk data pack requests arrive at
 // arrive at the requester engine from the fetcher engine.
 func (vc *VerificationCollector) OnChunkDataPackRequestArrivedAtRequester() {
-
+	vc.receivedChunkDataPackRequestsTotal.Inc()
 }
 
 // OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
 func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetwork() {
-
+	vc.sentChunkDataRequestMessagesTotal.Inc()
 }
 
 // OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
 func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetwork() {
-
+	vc.receivedChunkDataResponseMessagesTotal.Inc()
 }
 
 // OnChunkDataPackSentToFetcher increases a counter that keeps track of number of chunk data packs sent to the fetcher engine from
 // requester engine.
 func (vc *VerificationCollector) OnChunkDataPackSentToFetcher() {
-
+	vc.sentChunkDataPackTotal.Inc()
 }
 
 // OnChunkDataPackArrivedAtFetcher increments a counter that keeps track of number of chunk data packs arrived at fetcher engine from
 // requester engine.
 func (vc *VerificationCollector) OnChunkDataPackArrivedAtFetcher() {
-
+	vc.receivedChunkDataPackTotal.Inc()
 }
 
 // OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
