@@ -172,7 +172,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	unittest.RequireReturnsBefore(t, verifierWG.Wait, 1*time.Second, "could not push verifiable chunk on time")
 	unittest.RequireReturnsBefore(t, processWG.Wait, 1*time.Second, "could not process chunks on time")
 
-	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.verifier, s.chunkConsumerNotifier, s.metrics)
+	mock.AssertExpectationsForObjects(t, s.results, s.requester, s.pendingChunks, s.verifier, s.chunkConsumerNotifier, s.metrics)
 }
 
 // TestChunkResponse_RemovingStatusFails evaluates behavior of fetcher engine respect to receiving duplicate and concurrent
@@ -202,12 +202,14 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	chunkID := chunk.ID()
 	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
 
+	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Once()
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
 
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
 	s.chunkConsumerNotifier.AssertNotCalled(t, "Notify")
 	s.verifier.AssertNotCalled(t, "ProcessLocal")
+	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.verifier, s.chunkConsumerNotifier, s.metrics)
 }
 
 // TestProcessAssignChunkSealedAfterRequest evaluates behavior of fetcher engine respect to receiving an assigned chunk
