@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	flowmempool "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -51,7 +50,7 @@ func setupTest() *RequesterEngineTestSuite {
 	r := &RequesterEngineTestSuite{
 		log:             unittest.Logger(),
 		tracer:          &trace.NoopTracer{},
-		metrics:         &metrics.NoopCollector{},
+		metrics:         &mock.VerificationMetrics{},
 		handler:         &mockfetcher.ChunkDataPackHandler{},
 		retryInterval:   100 * time.Millisecond,
 		requestTargets:  2,
