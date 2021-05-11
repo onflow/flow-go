@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
+	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -112,9 +113,10 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		[]*vertestutils.CompleteExecutionReceipt{completeER}, vertestutils.EvenChunkIndexAssigner)
 
 	// starts all the engines
-	<-verNode.FinderEngine.Ready()
-	<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-	<-verNode.VerifierEngine.Ready()
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second,
+		verNode.FinderEngine,
+		verNode.MatchEngine.(module.ReadyDoneAware),
+		verNode.VerifierEngine)
 
 	// starts verification node's network in continuous mode
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
@@ -161,14 +163,16 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// stops verification node
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
-	<-verNode.FinderEngine.Done()
-	<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-	<-verNode.VerifierEngine.Done()
+	unittest.RequireComponentsDoneBefore(t, 1*time.Second,
+		verNode.FinderEngine,
+		verNode.MatchEngine.(module.ReadyDoneAware),
+		verNode.VerifierEngine)
 
 	// receipt ID should be added to the ingested results mempool
 	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipts[0].ExecutionResult.ID()))
 
-	verNode.Done()
-	conNode.Done()
-	exeNode.Done()
+	enginemock.RequireGenericNodesDoneBefore(t, 1*time.Second,
+		conNode,
+		exeNode,
+		verNode.GenericNode)
 }

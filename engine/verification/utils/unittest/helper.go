@@ -91,9 +91,10 @@ func VerificationHappyPath(t *testing.T,
 			mempoolCollector)
 
 		// starts all the engines
-		<-verNode.FinderEngine.Ready()
-		<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-		<-verNode.VerifierEngine.Ready()
+		unittest.RequireComponentsReadyBefore(t, 1*time.Second,
+			verNode.FinderEngine,
+			verNode.MatchEngine.(module.ReadyDoneAware),
+			verNode.VerifierEngine)
 
 		verNodes = append(verNodes, verNode)
 	}
@@ -190,9 +191,10 @@ func VerificationHappyPath(t *testing.T,
 	// the process method of Ingest engines is done working.
 	for _, verNode := range verNodes {
 		// stops all the engines
-		<-verNode.FinderEngine.Done()
-		<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-		<-verNode.VerifierEngine.Done()
+		unittest.RequireComponentsDoneBefore(t, 1*time.Second,
+			verNode.FinderEngine,
+			verNode.MatchEngine.(module.ReadyDoneAware),
+			verNode.VerifierEngine)
 	}
 
 	// stops continuous delivery of nodes
@@ -200,8 +202,9 @@ func VerificationHappyPath(t *testing.T,
 		verNet.StopConDev()
 	}
 
-	conNode.Done()
-	exeNode.Done()
+	enginemock.RequireGenericNodesDoneBefore(t, 1*time.Second,
+		conNode,
+		exeNode)
 
 	// asserts that all processing pipeline of verification node is fully
 	// cleaned up.
