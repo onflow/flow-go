@@ -2,12 +2,12 @@ package fvm
 
 import (
 	"fmt"
-	"github.com/onflow/cadence"
 
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
