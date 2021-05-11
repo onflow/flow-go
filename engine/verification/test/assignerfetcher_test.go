@@ -219,7 +219,7 @@ func withConsumers(t *testing.T, staked bool, blockCount int,
 
 	// turns on components and network
 	verNet, ok := hub.GetNetwork(verID.NodeID)
-	assert.True(t, ok)
+	require.True(t, ok)
 	unittest.RequireReturnsBefore(t, func() {
 		verNet.StartConDev(100*time.Millisecond, true)
 	}, 100*time.Millisecond, "failed to start verification network")
