@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
-	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -31,7 +30,7 @@ import (
 type FetcherEngineTestSuite struct {
 	// modules
 	log                   zerolog.Logger
-	metrics               *metrics.NoopCollector
+	metrics               *module.VerificationMetrics
 	tracer                *trace.NoopTracer
 	verifier              *mocknetwork.Engine                 // the verifier engine
 	state                 *protocol.State                     // used to verify the request origin
@@ -47,7 +46,7 @@ type FetcherEngineTestSuite struct {
 func setupTest() *FetcherEngineTestSuite {
 	s := &FetcherEngineTestSuite{
 		log:                   unittest.Logger(),
-		metrics:               &metrics.NoopCollector{},
+		metrics:               &module.VerificationMetrics{},
 		tracer:                &trace.NoopTracer{},
 		verifier:              &mocknetwork.Engine{},
 		state:                 &protocol.State{},
@@ -126,6 +125,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	block, result, statuses, locators := completeChunkStatusListFixture(t, chunkNum, assignedNum)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
+	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// the chunks belong to an unsealed block.
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
@@ -142,6 +142,8 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(statuses.Chunks(), block, result)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
+	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
+	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
 	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
@@ -152,6 +154,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 
 	// fetcher engine should create and pass a verifiable chunk to verifier engine upon receiving each
 	// chunk data responses, and notify the consumer that it is done with processing chunk.
+	s.metrics.On("OnVerifiableChunkSentToVerifier").Return().Times(len(verifiableChunks))
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
@@ -169,7 +172,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	unittest.RequireReturnsBefore(t, verifierWG.Wait, 1*time.Second, "could not push verifiable chunk on time")
 	unittest.RequireReturnsBefore(t, processWG.Wait, 1*time.Second, "could not process chunks on time")
 
-	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.verifier, s.chunkConsumerNotifier)
+	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.verifier, s.chunkConsumerNotifier, s.metrics)
 }
 
 // TestChunkResponse_RemovingStatusFails evaluates behavior of fetcher engine respect to receiving duplicate and concurrent
