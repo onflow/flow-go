@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -72,35 +73,15 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 // RequireComponentsDoneBefore invokes the done method of each of the input components concurrently, and
 // fails the test if any components shutdown takes longer than the specified duration.
 func RequireComponentsDoneBefore(t testing.TB, duration time.Duration, components ...module.ReadyDoneAware) {
-	wg := &sync.WaitGroup{}
-	wg.Add(len(components))
-
-	for _, component := range components {
-		go func(comp module.ReadyDoneAware) {
-			comp.Done()
-
-			wg.Done()
-		}(component)
-	}
-
-	RequireReturnsBefore(t, wg.Wait, duration, "failed to shutdown all components on time")
+	done := lifecycle.AllDone(components...)
+	RequireCloseBefore(t, done, duration, "failed to shutdown all components on time")
 }
 
 // RequireComponentsReadyBefore invokes the ready method of each of the input components concurrently, and
 // fails the test if any components startup takes longer than the specified duration.
 func RequireComponentsReadyBefore(t testing.TB, duration time.Duration, components ...module.ReadyDoneAware) {
-	wg := &sync.WaitGroup{}
-	wg.Add(len(components))
-
-	for _, component := range components {
-		go func(comp module.ReadyDoneAware) {
-			comp.Ready()
-
-			wg.Done()
-		}(component)
-	}
-
-	RequireReturnsBefore(t, wg.Wait, duration, "failed to start all components on time")
+	ready := lifecycle.AllReady(components...)
+	RequireCloseBefore(t, ready, duration, "failed to start all components on time")
 }
 
 // RequireCloseBefore requires that the given channel returns before the

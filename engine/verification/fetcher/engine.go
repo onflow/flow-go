@@ -151,7 +151,6 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	status := &verification.ChunkStatus{
 		ChunkIndex:      locator.Index,
 		ExecutionResult: result,
-		ChunkLocatorID:  locatorID,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
@@ -231,7 +230,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID)
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 	lg.Info().Msg("chunk verification is done")
 }
 
@@ -249,18 +248,31 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
-		return fmt.Errorf("unstaked execution node sender at block ID")
+		return fmt.Errorf("unstaked execution node sender at block ID: %x, resultID: %x, chunk ID: %x",
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	// 2. start state must match
 	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
-		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x", chunk.ChunkBody.StartState, chunkDataPack.StartState)
+		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x, block ID: %x, resultID: %x, chunk ID: %x",
+			chunk.ChunkBody.StartState,
+			chunkDataPack.StartState,
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	// 3. collection id must match
 	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
+			collection.ID(),
+			senderID,
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	return nil
@@ -342,10 +354,10 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 		return
 	}
 
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID)
-
 	removed := e.pendingChunks.Rem(chunkID)
-	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")
+
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
 }
 
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.
