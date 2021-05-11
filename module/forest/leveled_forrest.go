@@ -51,12 +51,31 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 	if level < f.LowestLevel {
 		return fmt.Errorf("new lowest level %d cannot be smaller than previous last retained level %d", level, f.LowestLevel)
 	}
-	if f.GetSize() > 0 {
+	if f.GetSize() == 0 {
+		f.LowestLevel = level
+		return nil
+	}
+
+	// to optimize the pruning large level-ranges, we compare:
+	//  * the number of levels for which we have stored vertex containers: len(f.verticesAtLevel)
+	//  * the number of levels that need to be pruned: level-f.LowestLevel
+	// We iterate over the dimension which is smaller.
+	if uint64(len(f.verticesAtLevel)) < level-f.LowestLevel {
+		for l, vertices := range f.verticesAtLevel {
+			if l < level {
+				for _, v := range vertices {
+					delete(f.vertices, v.id)
+				}
+				delete(f.verticesAtLevel, l)
+			}
+		}
+	} else {
 		for l := f.LowestLevel; l < level; l++ {
 			for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
 				delete(f.vertices, v.id)
 			}
 			delete(f.verticesAtLevel, l)
+
 		}
 	}
 	f.LowestLevel = level

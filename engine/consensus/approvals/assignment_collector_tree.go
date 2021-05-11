@@ -23,7 +23,8 @@ func (rsr *AssignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
 	return rsr.Collector.result.PreviousResultID, rsr.Collector.BlockHeight - 1
 }
 
-type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
+// NewCollector is a factory method to generate an AssignmentCollector for an execution result
+type NewCollector = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
 // formed by the execution results. The mempool supports pruning by height: only collectors
@@ -110,25 +111,28 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return cachedCollector.Collector, false, nil
 	}
 
+	collector, err := t.onCreateCollector(result)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
+	}
+	vertex := &AssignmentCollectorVertex{
+		Collector: collector,
+		Orphan:    false,
+	}
+
 	// fast check shows that there is no collector, need to create one
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	// we need to check again, since it's possible that after checking for existing collector but before taking a lock
 	// new collector was created by concurrent goroutine
-	vertex, found := t.forest.GetVertex(resultID)
+	v, found := t.forest.GetVertex(resultID)
 	if found {
-		return vertex.(*AssignmentCollectorVertex).Collector, false, nil
+		return v.(*AssignmentCollectorVertex).Collector, false, nil
 	}
-
-	collector, err := t.onCreateCollector(result)
-	if err != nil {
-		return nil, false, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
-	}
-
-	vertex = &AssignmentCollectorVertex{
-		Collector: collector,
-		Orphan:    false,
+	parent, parentFound := t.forest.GetVertex(result.PreviousResultID)
+	if parentFound {
+		vertex.Orphan = parent.(*AssignmentCollectorVertex).Orphan
 	}
 
 	err = t.forest.VerifyVertex(vertex)

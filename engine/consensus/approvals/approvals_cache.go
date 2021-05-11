@@ -83,7 +83,7 @@ func (c *ApprovalsCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
 }
 
 func (c *ApprovalsCache) Put(approval *flow.ResultApproval) {
-	approvalID := approval.ID()
+	approvalID := approval.Body.Attestation.ID()
 	resultID := approval.Body.ExecutionResultID
 	c.lock.Lock()
 	defer c.lock.Unlock()

@@ -21,14 +21,12 @@ import (
 // Accepts `flow.IncorporatedResult` to start processing approvals for particular result.
 // Whenever enough approvals are collected produces a candidate seal and adds it to the mempool.
 type ResultApprovalProcessor interface {
-	// ProcessApproval processes approval in blocking way, implementors need to ensure
-	// that this function is reentrant and can be safely used in concurrent environment.
+	// ProcessApproval processes approval in blocking way. Concurrency safe.
 	// Returns:
 	// * exception in case of unexpected error
 	// * nil - successfully processed result approval
 	ProcessApproval(approval *flow.ResultApproval) error
-	// ProcessIncorporatedResult processes incorporated result in blocking way, implementors need to ensure
-	// that this function is reentrant.
+	// ProcessIncorporatedResult processes incorporated result in blocking way. Concurrency safe.
 	// Returns:
 	// * exception in case of unexpected error
 	// * nil - successfully processed incorporated result
@@ -39,7 +37,7 @@ type ResultApprovalProcessor interface {
 // This struct is responsible for:
 // 	- collecting approvals for execution results
 // 	- processing multiple incorporated results
-// 	- pre-validating approvals(if they are outdated or non-verifiable)
+// 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type approvalProcessingCore struct {
 	log                                  zerolog.Logger                  // used to log relevant actions with context
@@ -50,10 +48,10 @@ type approvalProcessingCore struct {
 	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
 	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 	assigner                             module.ChunkAssigner            // used by AssignmentCollector to build chunk assignment
-	headers                              storage.Headers                 // used to access headers in storage
+	headers                              storage.Headers                 // used to access block headers in storage
 	state                                protocol.State                  // used to access protocol state
 	verifier                             module.Verifier                 // used to validate result approvals
-	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed without consideration of the sealability of parent results
 	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
 	requestTracker                       *sealing.RequestTracker         // used to keep track of number of approval requests, and blackout periods, by chunk
 }

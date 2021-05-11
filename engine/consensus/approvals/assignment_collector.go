@@ -50,7 +50,8 @@ type AssignmentCollector struct {
 }
 
 func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint) (*AssignmentCollector, error) {
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint,
+) (*AssignmentCollector, error) {
 	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
 		return nil, err
@@ -173,13 +174,16 @@ func (rsr *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *fl
 
 	incorporatedBlock, err := rsr.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not determine height of incorporated block %s: %w",
+		return fmt.Errorf("failed to retrieve header of incorporated block %s: %w",
 			incorporatedBlockID, err)
 	}
 
 	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, rsr.seals, rsr.requiredApprovalsForSealConstruction)
 
-	rsr.putCollector(incorporatedBlockID, collector)
+	isDuplicate := rsr.putCollector(incorporatedBlockID, collector)
+	if isDuplicate {
+		return nil
+	}
 
 	// process approvals that have passed needed checks and are ready to be processed
 	for _, approvalID := range rsr.verifiedApprovalsCache.ByResultID(rsr.ResultID) {
