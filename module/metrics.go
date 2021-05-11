@@ -204,13 +204,13 @@ type VerificationMetrics interface {
 	// OnAssignedChunkReceivedAtFetcher increments a counter that keeps track of number of assigned chunks arrive at fetcher engine.
 	OnAssignedChunkReceivedAtFetcher()
 
-	// OnChunkDataPackRequestSubmittedAtFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
+	// OnChunkDataPackRequestSentByFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
 	// sends to requester engine.
-	OnChunkDataPackRequestSubmittedAtFetcher()
+	OnChunkDataPackRequestSentByFetcher()
 
-	// OnChunkDataPackRequestArrivedAtRequester increments a counter that keeps track of number of chunk data pack requests arrive at
+	// OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests arrive at
 	// arrive at the requester engine from the fetcher engine.
-	OnChunkDataPackRequestArrivedAtRequester()
+	OnChunkDataPackRequestReceivedByRequester()
 
 	// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 	// requester engine dispatches in the network (to the execution nodes).

@@ -86,8 +86,8 @@ func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)           
 func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
 func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}
 func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetwork()                             {}
-func (nc *NoopCollector) OnChunkDataPackRequestSubmittedAtFetcher()                              {}
-func (nc *NoopCollector) OnChunkDataPackRequestArrivedAtRequester()                              {}
+func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                   {}
+func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                             {}
 func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
 func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
 func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}

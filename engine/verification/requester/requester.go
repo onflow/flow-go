@@ -157,6 +157,8 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 	lg.Debug().Msg("chunk data pack received")
 
+	e.metrics.OnChunkDataPackResponseReceivedFromNetwork()
+
 	// makes sure we still need this chunk, and we will not process duplicate chunk data packs.
 	removed := e.pendingRequests.Rem(chunkID)
 	if !removed {
@@ -165,12 +167,16 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	e.handler.HandleChunkDataPack(originID, chunkDataPack, collection)
+
+	e.metrics.OnChunkDataPackSentToFetcher()
 	lg.Info().Msg("successfully sent the chunk data pack to the handler")
 }
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
 	added := e.pendingRequests.Add(request)
+	e.metrics.OnChunkDataPackRequestReceivedByRequester()
+
 	e.log.Info().
 		Hex("chunk_id", logging.ID(request.ChunkID)).
 		Uint64("block_height", request.Height).
@@ -263,5 +269,6 @@ func (e *Engine) canDispatchRequest(chunkID flow.Identifier) bool {
 
 // onRequestDispatched encapsulates the logic of updating the chunk data request post a successful dispatch.
 func (e *Engine) onRequestDispatched(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
+	e.metrics.OnChunkDataPackRequestDispatchedInNetwork()
 	return e.pendingRequests.UpdateRequestHistory(chunkID, e.reqUpdaterFunc)
 }

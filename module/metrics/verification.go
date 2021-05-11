@@ -251,6 +251,7 @@ func (vc *VerificationCollector) OnExecutionResultReceived() {
 // OnVerifiableChunkSent is called on a successful submission of matched chunk
 // by Match engine to Verifier engine.
 // It increments the total number of chunks matched by match engine.
+// TODO: remove this method once fetcher is removed.
 func (vc *VerificationCollector) OnVerifiableChunkSent() {
 	vc.sentVerifiableChunksTotal.Inc()
 }
@@ -307,15 +308,15 @@ func (vc *VerificationCollector) OnAssignedChunkReceivedAtFetcher() {
 	vc.receivedAssignedChunksTotal.Inc()
 }
 
-// OnChunkDataPackRequestSubmittedAtFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
+// OnChunkDataPackRequestSentByFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
 // sends to requester engine.
-func (vc *VerificationCollector) OnChunkDataPackRequestSubmittedAtFetcher() {
+func (vc *VerificationCollector) OnChunkDataPackRequestSentByFetcher() {
 	vc.requestedChunkDataPackTotal.Inc()
 }
 
-// OnChunkDataPackRequestArrivedAtRequester increments a counter that keeps track of number of chunk data pack requests arrive at
+// OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests arrive at
 // arrive at the requester engine from the fetcher engine.
-func (vc *VerificationCollector) OnChunkDataPackRequestArrivedAtRequester() {
+func (vc *VerificationCollector) OnChunkDataPackRequestReceivedByRequester() {
 	vc.receivedChunkDataPackRequestsTotal.Inc()
 }
 

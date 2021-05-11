@@ -121,6 +121,8 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Uint64("chunk_index", locator.Index).
 		Logger()
 
+	e.metrics.OnAssignedChunkReceivedAtFetcher()
+
 	// retrieves result and chunk using the locator
 	result, err := e.results.ByID(locator.ResultID)
 	if err != nil {
@@ -186,6 +188,8 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 	lg.Info().Msg("chunk data pack arrived")
 
+	e.metrics.OnChunkDataPackArrivedAtFetcher()
+
 	// make sure we still need it
 	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
 	if !exists {
@@ -229,6 +233,9 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
 		return
 	}
+
+	e.metrics.OnVerifiableChunkSentToVerifier()
+
 	// we need to report that the job has been finished eventually
 	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 	lg.Info().Msg("chunk verification is done")
@@ -438,6 +445,8 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 	}
 
 	e.requester.Request(request)
+
+	e.metrics.OnChunkDataPackRequestSentByFetcher()
 	return nil
 }
 
