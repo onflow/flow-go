@@ -27,6 +27,7 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -597,6 +598,8 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		handlerFunc = func(network.Stream) {}
 	}
 
+	pingInfoProvider, _, _ := MockPingInfoProvider()
+
 	noopMetrics := metrics.NewNoopCollector()
 	n, err := NewLibP2PNode(log,
 		identity.NodeID,
@@ -604,7 +607,8 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		NewConnManager(log, noopMetrics),
 		key,
 		allowList,
-		rootID)
+		rootID,
+		pingInfoProvider)
 	require.NoError(t, err)
 	n.SetFlowProtocolStreamHandler(handlerFunc)
 
@@ -619,6 +623,15 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	identity.Address = ip + ":" + port
 
 	return n, *identity
+}
+
+func MockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64) {
+	version := "version_1"
+	height := uint64(5000)
+	pingInfoProvider := new(mocknetwork.PingInfoProvider)
+	pingInfoProvider.On("SoftwareVersion").Return(version)
+	pingInfoProvider.On("LatestFinalizedBlockHeight").Return(height)
+	return pingInfoProvider, version, height
 }
 
 // StopNodes stop all nodes in the input slice
