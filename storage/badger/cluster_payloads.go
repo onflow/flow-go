@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ClusterPayloads implements storage of block payloads for collection node
@@ -20,10 +21,10 @@ type ClusterPayloads struct {
 
 func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *ClusterPayloads {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		blockID := key.(flow.Identifier)
 		payload := val.(*cluster.Payload)
-		return procedure.InsertClusterPayload(blockID, payload)
+		return transaction.WithTx(procedure.InsertClusterPayload(blockID, payload))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -46,8 +47,8 @@ func NewClusterPayloads(cacheMetrics module.CacheMetrics, db *badger.DB) *Cluste
 	return cp
 }
 
-func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*badger.Txn) error {
-	return cp.cache.Put(blockID, payload)
+func (cp *ClusterPayloads) storeTx(blockID flow.Identifier, payload *cluster.Payload) func(*transaction.Tx) error {
+	return cp.cache.PutTxn(blockID, payload)
 }
 func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*cluster.Payload, error) {
 	return func(tx *badger.Txn) (*cluster.Payload, error) {
@@ -60,7 +61,7 @@ func (cp *ClusterPayloads) retrieveTx(blockID flow.Identifier) func(*badger.Txn)
 }
 
 func (cp *ClusterPayloads) Store(blockID flow.Identifier, payload *cluster.Payload) error {
-	return operation.RetryOnConflict(cp.db.Update, cp.storeTx(blockID, payload))
+	return operation.RetryOnConflictTx(cp.db, transaction.Update, cp.storeTx(blockID, payload))
 }
 
 func (cp *ClusterPayloads) ByBlockID(blockID flow.Identifier) (*cluster.Payload, error) {

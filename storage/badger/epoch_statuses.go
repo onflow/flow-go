@@ -18,10 +18,10 @@ type EpochStatuses struct {
 // NewEpochStatuses ...
 func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatuses {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		blockID := key.(flow.Identifier)
 		status := val.(*flow.EpochStatus)
-		return operation.InsertEpochStatus(blockID, status)
+		return transaction.WithTx(operation.InsertEpochStatus(blockID, status))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -44,11 +44,7 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 	return es
 }
 
-func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *badger.Txn) error {
-	return es.cache.Put(blockID, status)
-}
-
-func (es *EpochStatuses) StoreTxn(blockID flow.Identifier, status *flow.EpochStatus) func(tx *transaction.Tx) error {
+func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *transaction.Tx) error {
 	return es.cache.PutTxn(blockID, status)
 }
 

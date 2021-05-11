@@ -17,10 +17,10 @@ type EpochCommits struct {
 
 func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		id := key.(flow.Identifier)
 		commit := val.(*flow.EpochCommit)
-		return operation.SkipDuplicates(operation.InsertEpochCommit(id, commit))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochCommit(id, commit)))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -43,11 +43,7 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 	return ec
 }
 
-func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(tx *badger.Txn) error {
-	return ec.cache.Put(commit.ID(), commit)
-}
-
-func (ec *EpochCommits) StoreTxn(commit *flow.EpochCommit) func(tx *transaction.Tx) error {
+func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) error {
 	return ec.cache.PutTxn(commit.ID(), commit)
 }
 
@@ -63,7 +59,7 @@ func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn
 
 // TODO: can we remove this method? Its not contained in the interface.
 func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
-	return operation.RetryOnConflict(ec.db.Update, ec.StoreTx(commit))
+	return operation.RetryOnConflictTx(ec.db, transaction.Update, ec.StoreTx(commit))
 }
 
 func (ec *EpochCommits) ByID(commitID flow.Identifier) (*flow.EpochCommit, error) {

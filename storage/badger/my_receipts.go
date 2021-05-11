@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // MyExecutionReceipts holds and indexes Execution Receipts.
@@ -26,14 +27,14 @@ type MyExecutionReceipts struct {
 // NewMyExecutionReceipts creates instance of MyExecutionReceipts which is a wrapper wrapper around badger.ExecutionReceipts
 // It's useful for execution nodes to keep track of produced execution receipts.
 func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receipts *ExecutionReceipts) *MyExecutionReceipts {
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		receipt := val.(*flow.ExecutionReceipt)
 		// assemble DB operations to store receipt (no execution)
-		storeReceiptOps := receipts.store(receipt)
+		storeReceiptOps := receipts.storeTx(receipt)
 		// assemble DB operations to index receipt as one of my own (no execution)
 		blockID := receipt.ExecutionResult.BlockID
 		receiptID := receipt.ID()
-		indexOwnReceiptOps := func(tx *badger.Txn) error {
+		indexOwnReceiptOps := transaction.WithTx(func(tx *badger.Txn) error {
 			err := operation.IndexOwnExecutionReceipt(blockID, receiptID)(tx)
 			// check if we are storing same receipt
 			if errors.Is(err, storage.ErrAlreadyExists) {
@@ -46,15 +47,15 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 				if savedReceiptID == receiptID {
 					// if we are storing same receipt we shouldn't error
 					return nil
-				} else {
-					return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed", receiptID,
-						savedReceiptID, blockID)
 				}
+
+				return fmt.Errorf("indexing my receipt %v failed: different receipt %v for the same block %v is already indexed", receiptID,
+					savedReceiptID, blockID)
 			}
 			return err
-		}
+		})
 
-		return func(tx *badger.Txn) error {
+		return func(tx *transaction.Tx) error {
 			err := storeReceiptOps(tx) // execute operations to store receipt
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)
@@ -95,8 +96,8 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 }
 
 // storeMyReceipt assembles the operations to store the receipt and marks it as mine (trusted).
-func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
-	return m.cache.Put(receipt.ExecutionResult.BlockID, receipt)
+func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
+	return m.cache.PutTxn(receipt.ExecutionResult.BlockID, receipt)
 }
 
 // storeMyReceipt assembles the operations to retrieve my receipt for the given block ID.
@@ -116,7 +117,7 @@ func (m *MyExecutionReceipts) myReceipt(blockID flow.Identifier) func(*badger.Tx
 // we only support indexing a _single_ receipt per block. Attempting to
 // store conflicting receipts for the same block will error.
 func (m *MyExecutionReceipts) StoreMyReceipt(receipt *flow.ExecutionReceipt) error {
-	return operation.RetryOnConflict(m.db.Update, m.storeMyReceipt(receipt))
+	return operation.RetryOnConflictTx(m.db, transaction.Update, m.storeMyReceipt(receipt))
 }
 
 func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {

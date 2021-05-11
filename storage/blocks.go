@@ -3,8 +3,6 @@
 package storage
 
 import (
-	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -17,9 +15,7 @@ type Blocks interface {
 
 	// StoreTx allows us to store a new block, including its payload & header, as part of a DB transaction, while
 	// still going through the caching layer.
-	StoreTx(block *flow.Block) func(*badger.Txn) error
-
-	StoreTxn(block *flow.Block) func(*transaction.Tx) error
+	StoreTx(block *flow.Block) func(*transaction.Tx) error
 
 	// ByID returns the block with the given hash. It is available for
 	// finalized and ambiguous blocks.

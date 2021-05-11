@@ -22,9 +22,9 @@ type ExecutionResults struct {
 
 func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		result := val.(*flow.ExecutionResult)
-		return operation.SkipDuplicates(operation.InsertExecutionResult(result))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -47,8 +47,8 @@ func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *Executio
 	return res
 }
 
-func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*badger.Txn) error {
-	return r.cache.Put(result.ID(), result)
+func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*transaction.Tx) error {
+	return r.cache.PutTxn(result.ID(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*flow.ExecutionResult, error) {
@@ -72,7 +72,7 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) 
 	}
 }
 
-func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transction.Tx) error {
+func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		err := operation.IndexExecutionResult(blockID, resultID)(tx.DBTxn)
 		if err == nil {
@@ -86,7 +86,7 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transc
 		// when trying to index a result for a block, and there is already a result indexed for this block,
 		// double check if the indexed result is the same
 		var storedResultID flow.Identifier
-		err = operation.LookupExecutionResult(blockID, &storedResultID)(tx)
+		err = operation.LookupExecutionResult(blockID, &storedResultID)(tx.DBTxn)
 		if err != nil {
 			return fmt.Errorf("there is a result stored already, but cannot retrieve it: %w", err)
 		}
@@ -101,7 +101,7 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transc
 }
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	return operation.RetryOnConflict(r.db.Update, r.store(result))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.store(result))
 }
 
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {

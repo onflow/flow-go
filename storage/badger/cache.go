@@ -18,7 +18,7 @@ func withLimit(limit uint) func(*Cache) {
 	}
 }
 
-type storeFunc func(key interface{}, val interface{}) func(*badger.Txn) error
+type storeFunc func(key interface{}, val interface{}) func(*transaction.Tx) error
 
 func withStore(store storeFunc) func(*Cache) {
 	return func(c *Cache) {
@@ -26,14 +26,14 @@ func withStore(store storeFunc) func(*Cache) {
 	}
 }
 
-func noStore(key interface{}, val interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func noStore(key interface{}, val interface{}) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-func noopStore(key interface{}, val interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func noopStore(key interface{}, val interface{}) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		return nil
 	}
 }
@@ -123,27 +123,12 @@ func (c *Cache) Insert(key interface{}, resource interface{}) {
 	}
 }
 
-// Put will return Badger tx which adds an resource to the cache with the given ID.
-func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) error {
-	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
-
-	return func(tx *badger.Txn) error {
-		err := storeOps(tx) // execute operations to store recourse
-		if err != nil {
-			return fmt.Errorf("could not store resource: %w", err)
-		}
-
-		c.Insert(key, resource)
-		return nil
-	}
-}
-
 // PutTxn will return Badger tx which adds an resource to the cache with the given ID.
 func (c *Cache) PutTxn(key interface{}, resource interface{}) func(*transaction.Tx) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
 	return func(tx *transaction.Tx) error {
-		err := storeOps(tx.DBTxn) // execute operations to store recourse
+		err := storeOps(tx) // execute operations to store recourse
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}

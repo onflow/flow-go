@@ -421,7 +421,7 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 
 	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
-		err := m.blocks.StoreTxn(candidate)(tx)
+		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
@@ -744,7 +744,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
-				ops = append(ops, m.epoch.setups.StoreTxn(ev))
+				ops = append(ops, m.epoch.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
 
@@ -778,7 +778,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
-				ops = append(ops, m.epoch.commits.StoreTxn(ev))
+				ops = append(ops, m.epoch.commits.StoreTx(ev))
 
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
@@ -787,7 +787,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	}
 
 	// we always index the epoch status, even when there are no service events
-	ops = append(ops, m.epoch.statuses.StoreTxn(block.ID(), epochStatus))
+	ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
 }

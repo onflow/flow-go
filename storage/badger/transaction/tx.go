@@ -37,3 +37,9 @@ func Update(db *dbbadger.DB, f func(*Tx) error) error {
 	}
 	return nil
 }
+
+func WithTx(f func(*dbbadger.Txn) error) func(*Tx) error {
+	return func(tx *Tx) error {
+		return f(tx.DBTxn)
+	}
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type State struct {
@@ -55,7 +56,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
-	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
+	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 
 		// 1) insert each block in the root chain segment
 		err = state.bootstrapSealingSegment(root)(tx)
@@ -74,7 +75,7 @@ func Bootstrap(
 		tail := segment[0]              // last sealed block
 
 		// 2) insert the root execution result and seal into the database and index it
-		err = state.bootstrapSealedResult(root)(tx)
+		err = transaction.WithTx(state.bootstrapSealedResult(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealed result: %w", err)
 		}
@@ -84,13 +85,13 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = operation.InsertRootQuorumCertificate(qc)(tx)
+		err = transaction.WithTx(operation.InsertRootQuorumCertificate(qc))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
 
 		// 4) initialize the current protocol state height/view pointers
-		err = state.bootstrapStatePointers(root)(tx)
+		err = transaction.WithTx(state.bootstrapStatePointers(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
@@ -119,8 +120,8 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
@@ -135,18 +136,18 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
 			}
-			err = operation.InsertBlockValidity(blockID, true)(tx)
+			err = operation.InsertBlockValidity(blockID, true)(tx.DBTxn)
 			if err != nil {
 				return fmt.Errorf("could not mark root block as valid: %w", err)
 			}
-			err = operation.IndexBlockHeight(height, blockID)(tx)
+			err = operation.IndexBlockHeight(height, blockID)(tx.DBTxn)
 			if err != nil {
 				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(tx)
+				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(tx.DBTxn)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -154,7 +155,7 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = operation.InsertBlockChildren(head.ID(), nil)(tx)
+		err = operation.InsertBlockChildren(head.ID(), nil)(tx.DBTxn)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -240,8 +241,8 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
 		next := root.Epochs().Next()

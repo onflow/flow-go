@@ -36,7 +36,7 @@ func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Sea
 	return p
 }
 
-func (p *Payloads) storeTxn(blockID flow.Identifier, payload *flow.Payload) func(*transaction.Tx) error {
+func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*transaction.Tx) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
 	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
@@ -66,7 +66,7 @@ func (p *Payloads) storeTxn(blockID flow.Identifier, payload *flow.Payload) func
 
 		// make sure all payload guarantees are stored
 		for _, guarantee := range payload.Guarantees {
-			err := p.guarantees.storeTxn(guarantee)(tx)
+			err := p.guarantees.storeTx(guarantee)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store guarantee: %w", err)
 			}
@@ -74,7 +74,7 @@ func (p *Payloads) storeTxn(blockID flow.Identifier, payload *flow.Payload) func
 
 		// make sure all payload seals are stored
 		for _, seal := range payload.Seals {
-			err := p.seals.storeTxn(seal)(tx)
+			err := p.seals.storeTx(seal)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store seal: %w", err)
 			}
@@ -82,14 +82,14 @@ func (p *Payloads) storeTxn(blockID flow.Identifier, payload *flow.Payload) func
 
 		// store all payload receipts
 		for _, receipt := range fullReceipts {
-			err := p.receipts.storeTxn(receipt)(tx)
+			err := p.receipts.storeTx(receipt)(tx)
 			if err != nil {
 				return fmt.Errorf("could not store receipt: %w", err)
 			}
 		}
 
 		// store the index
-		err := p.index.storeTxn(blockID, payload.Index())(tx)
+		err := p.index.storeTx(blockID, payload.Index())(tx)
 		if err != nil {
 			return fmt.Errorf("could not store index: %w", err)
 		}
@@ -158,7 +158,7 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 }
 
 func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
-	return operation.RetryOnConflictTx(p.db, transaction.Update, p.storeTxn(blockID, payload))
+	return operation.RetryOnConflictTx(p.db, transaction.Update, p.storeTx(blockID, payload))
 }
 
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {
