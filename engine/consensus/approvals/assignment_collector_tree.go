@@ -36,9 +36,9 @@ type AssignmentCollectorTree struct {
 	onCreateCollector NewCollectorFactoryMethod
 }
 
-func NewAssignmentCollectorTree(onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
+func NewAssignmentCollectorTree(lowestLevel uint64, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
 	return &AssignmentCollectorTree{
-		forest:            forest.NewLevelledForest(),
+		forest:            forest.NewLevelledForest(lowestLevel),
 		lock:              sync.RWMutex{},
 		onCreateCollector: onCreateCollector,
 	}

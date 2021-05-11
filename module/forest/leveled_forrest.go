@@ -39,10 +39,11 @@ type vertexContainer struct {
 }
 
 // NewLevelledForest initializes a LevelledForest
-func NewLevelledForest() *LevelledForest {
+func NewLevelledForest(lowestLevel uint64) *LevelledForest {
 	return &LevelledForest{
 		vertices:        make(VertexSet),
 		verticesAtLevel: make(map[uint64]VertexList),
+		LowestLevel:     lowestLevel,
 	}
 }
 

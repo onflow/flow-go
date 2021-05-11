@@ -74,13 +74,7 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, se
 			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)
 	}
 
-	collectors := NewAssignmentCollectorTree(factoryMethod)
-	_, err = collectors.PruneUpToHeight(lastSealed.Height)
-	if err != nil {
-		return nil, fmt.Errorf("could not prune tree to initial height")
-	}
-
-	core.collectorTree = collectors
+	core.collectorTree = NewAssignmentCollectorTree(lastSealed.Height, factoryMethod)
 
 	return core, nil
 }
