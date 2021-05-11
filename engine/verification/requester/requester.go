@@ -50,7 +50,6 @@ func New(log zerolog.Logger,
 	tracer module.Tracer,
 	metrics module.VerificationMetrics,
 	pendingRequests mempool.ChunkRequests,
-	handler fetcher.ChunkDataPackHandler,
 	retryInterval time.Duration,
 	reqQualifierFunc RequestQualifierFunc,
 	reqUpdaterFunc mempool.ChunkRequestHistoryUpdaterFunc,
@@ -62,16 +61,11 @@ func New(log zerolog.Logger,
 		state:            state,
 		tracer:           tracer,
 		metrics:          metrics,
-		handler:          handler,
 		retryInterval:    retryInterval,
 		requestTargets:   requestTargets,
 		pendingRequests:  pendingRequests,
 		reqUpdaterFunc:   reqUpdaterFunc,
 		reqQualifierFunc: reqQualifierFunc,
-	}
-
-	if e.handler == nil {
-		return nil, fmt.Errorf("missing chunk data pack handler")
 	}
 
 	con, err := net.Register(engine.RequestChunks, e)
@@ -81,6 +75,10 @@ func New(log zerolog.Logger,
 	e.con = con
 
 	return e, nil
+}
+
+func (e *Engine) WithChunkDataPackHandler(handler fetcher.ChunkDataPackHandler) {
+	e.handler = handler
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -115,6 +113,10 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // Ready initializes the engine and returns a channel that is closed when the initialization is done.
 func (e *Engine) Ready() <-chan struct{} {
+	if e.handler == nil {
+		e.log.Fatal().Msg("could not start requester engine with missing chunk data pack handler")
+	}
+
 	delay := time.Duration(0)
 	// run a periodic check to retry requesting chunk data packs.
 	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous
