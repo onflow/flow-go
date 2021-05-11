@@ -439,6 +439,8 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(header.ID()))
 	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Once()
+
 	mockBlockSealingStatus(s.state, s.headers, &header, true)
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 
@@ -449,7 +451,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 
 	e.ProcessAssignedChunk(locators[0])
 
-	mock.AssertExpectationsForObjects(t, s.results)
+	mock.AssertExpectationsForObjects(t, s.results, s.metrics)
 	// we should not request a duplicate chunk status.
 	s.requester.AssertNotCalled(t, "Request")
 	// we should not try adding a chunk of a sealed block to chunk status mempool.
