@@ -151,7 +151,6 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	status := &verification.ChunkStatus{
 		ChunkIndex:      locator.Index,
 		ExecutionResult: result,
-		ChunkLocatorID:  locatorID,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
@@ -231,7 +230,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID)
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 	lg.Info().Msg("chunk verification is done")
 }
 
@@ -342,7 +341,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 		return
 	}
 
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID)
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 
 	removed := e.pendingChunks.Rem(chunkID)
 	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")

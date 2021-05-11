@@ -933,10 +933,6 @@ func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int
 			status := &verification.ChunkStatus{
 				ChunkIndex:      chunk.Index,
 				ExecutionResult: result,
-				ChunkLocatorID: chunks.Locator{
-					ResultID: result.ID(),
-					Index:    chunk.Index,
-				}.ID(),
 			}
 			statuses = append(statuses, status)
 		}
