@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -183,13 +182,23 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	// we have done here. Group Public key first followed by the individual public keys
 	finalSubmission := make([]cadence.Value, 0, len(publicKeys))
 
-	// initially append group public key
-	trimmedGroupHexString := trim0x(groupPublicKey.String())
-	finalSubmission = append(finalSubmission, cadence.NewString(trimmedGroupHexString))
+	// first append group public key
+	if groupPublicKey != nil {
+		trimmedGroupHexString := trim0x(groupPublicKey.String())
+		finalSubmission = append(finalSubmission, cadence.NewOptional(cadence.NewString(trimmedGroupHexString)))
+	} else {
+		finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+	}
 
 	for _, publicKey := range publicKeys {
-		trimmedHexString := trim0x(publicKey.String())
-		finalSubmission = append(finalSubmission, cadence.NewString(trimmedHexString))
+
+		// append individual public keys
+		if publicKey != nil {
+			trimmedHexString := trim0x(publicKey.String())
+			finalSubmission = append(finalSubmission, cadence.NewOptional(cadence.NewString(trimmedHexString)))
+		} else {
+			finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
+		}
 	}
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
