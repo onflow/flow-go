@@ -37,10 +37,10 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/onflow/cadence v0.15.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2-0.20210419145458-a0b4c8c13c89
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.2-0.20210419145458-a0b4c8c13c89
-	github.com/onflow/flow-emulator v0.17.2
-	github.com/onflow/flow-go-sdk v0.18.0
+	github.com/onflow/flow-emulator v0.19.0
+	github.com/onflow/flow-go-sdk v0.19.0
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
