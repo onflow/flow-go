@@ -1,4 +1,4 @@
-package utils
+package bitutils
 
 import (
 	"math/big"
@@ -8,7 +8,7 @@ import (
 
 	"testing"
 
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestBitTools(t *testing.T) {
@@ -26,7 +26,9 @@ func TestBitTools(t *testing.T) {
 		max.SetBit(&max, maxBits, 1)
 		// random big int less that 2^maxBits
 		b.Rand(rand.New(r), &max)
-		bytes := b.Bytes()
+		maxBitsLen := (maxBits + 7) / 8 // length in bytes needed for maxbits
+		bytes := make([]byte, maxBitsLen)
+		copy(bytes[maxBitsLen-len(b.Bytes()):], b.Bytes())
 
 		// reverse the endianness (both bits and bytes)
 		for j := 0; j < len(bytes)/2; j++ {

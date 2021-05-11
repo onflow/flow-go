@@ -1,13 +1,11 @@
 package ptrie
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common"
-	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/hash"
 )
 
 // PSMT (Partial Sparse Merkle Tree) holds a subset of an sparse merkle tree at specific
@@ -20,19 +18,13 @@ import (
 //     between v and a tree leaf. The height of a tree is the heights of its root.
 //     The height of a Trie is always the height of the fully-expanded tree.
 type PSMT struct {
-	root         *node // Root
-	pathByteSize int   // expected size [bytes] of path
-	pathLookUp   map[string]*node
-}
-
-// PathSize returns the expected expected size [bytes] of path
-func (p *PSMT) PathSize() int {
-	return p.pathByteSize
+	root       *node // Root
+	pathLookUp map[ledger.Path]*node
 }
 
 // RootHash returns the rootNode hash value of the SMT
-func (p *PSMT) RootHash() []byte {
-	return p.root.HashValue()
+func (p *PSMT) RootHash() ledger.RootHash {
+	return ledger.RootHash(p.root.Hash())
 }
 
 // Get returns an slice of payloads (same order), an slice of failed paths and errors (if any)
@@ -42,7 +34,7 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 	payloads := make([]*ledger.Payload, 0)
 	for _, path := range paths {
 		// lookup the path for the payload
-		node, found := p.pathLookUp[string(path)]
+		node, found := p.pathLookUp[path]
 		if !found {
 			payloads = append(payloads, nil)
 			failedPaths = append(failedPaths, path)
@@ -59,117 +51,95 @@ func (p *PSMT) Get(paths []ledger.Path) ([]*ledger.Payload, error) {
 
 // Update updates registers and returns rootValue after updates
 // in case of error, it returns a list of paths for which update failed
-func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) ([]byte, error) {
+func (p *PSMT) Update(paths []ledger.Path, payloads []*ledger.Payload) (ledger.RootHash, error) {
 	var failedKeys []ledger.Key
 	for i, path := range paths {
 		payload := payloads[i]
 		// lookup the path and update the value
-		node, found := p.pathLookUp[string(path)]
+		node, found := p.pathLookUp[path]
 		if !found {
 			failedKeys = append(failedKeys, payload.Key)
 			continue
 		}
-		node.hashValue = common.ComputeCompactValue(path, payload, node.height)
+		node.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, node.height)
 	}
 	if len(failedKeys) > 0 {
-		return nil, &ledger.ErrMissingKeys{Keys: failedKeys}
+		return ledger.RootHash(hash.DummyHash), &ledger.ErrMissingKeys{Keys: failedKeys}
 	}
 	// after updating all the nodes, compute the value recursively only once
-	return p.root.HashValue(), nil
+	return ledger.RootHash(p.root.forceComputeHash()), nil
 }
 
-// NewPSMT builds a Partial Sparse Merkle Tree (PMST) given a chunkdatapack registertouches
+// NewPSMT builds a Partial Sparse Merkle Tree (PSMT) given a chunkdatapack registertouches
 // TODO just accept batch proof as input
 func NewPSMT(
-	rootValue []byte, // rootHash
-	pathByteSize int,
+	rootValue ledger.RootHash,
 	batchProof *ledger.TrieBatchProof,
 ) (*PSMT, error) {
-
-	if pathByteSize < 1 {
-		return nil, errors.New("trie's path size [in bytes] must be positive")
-	}
-	psmt := PSMT{newNode(nil, pathByteSize*8), pathByteSize, make(map[string]*node)}
-
-	paths := batchProof.Paths()
-	payloads := batchProof.Payloads()
-
-	// check that size of path, size of payloads are consistent
-	if len(paths) != len(payloads) {
-		return nil, fmt.Errorf("paths' size (%d) and payloads' size (%d) doesn't match", len(paths), len(payloads))
-	}
-	// check that size of path, size of proofs are consistent
-	if len(paths) != batchProof.Size() {
-		return nil, fmt.Errorf("paths' size (%d) and proofs' size (%d) doesn't match", len(paths), batchProof.Size())
-	}
+	height := ledger.NodeMaxHeight
+	psmt := PSMT{newNode(ledger.GetDefaultHashForHeight(height), height), make(map[ledger.Path]*node)}
 
 	// iterating over proofs for building the tree
 	for i, pr := range batchProof.Proofs {
-		path := paths[i]
-		payload := payloads[i]
-		// check path size
-		if len(path) != pathByteSize {
-			return nil, fmt.Errorf("path [%x] size (%d) doesn't match the expected value (%d)", path, len(path), pathByteSize)
+		if pr == nil {
+			return nil, fmt.Errorf("proof at index %d is nil", i)
 		}
-
-		// we keep track of our progress through proofs by proofIndex
-		prValueIndex := 0
-
-		// start from the rootNode and walk down the tree
-		currentNode := psmt.root
+		path := pr.Path
+		payload := pr.Payload
 
 		// we process the path, bit by bit, until we reach the end of the proof (due to compactness)
+		prValueIndex := 0        // we keep track of our progress through proofs by proofIndex
+		currentNode := psmt.root // start from the rootNode and walk down the tree
 		for j := 0; j < int(pr.Steps); j++ {
 			// if a flag (bit j in flags) is false, the value is a default value
 			// otherwise the value is stored in the proofs
-			v := common.GetDefaultHashForHeight(currentNode.height - 1)
-			flag := utils.Bit(pr.Flags, j)
+			defaultHash := ledger.GetDefaultHashForHeight(currentNode.height - 1)
+			v := defaultHash
+			flag := bitutils.Bit(pr.Flags, j)
 			if flag == 1 {
 				// use the proof at index proofIndex
 				v = pr.Interims[prValueIndex]
 				prValueIndex++
 			}
-			bit := utils.Bit(path, j)
+			bit := bitutils.Bit(path[:], j)
 			// look at the bit number j (left to right) for branching
 			if bit == 1 { // right branching
 				if currentNode.lChild == nil { // check left child
 					currentNode.lChild = newNode(v, currentNode.height-1)
 				}
-				//  else if !bytes.Equal(currentNode.lChild.ComputeValue(), v) {
-				// 	return nil, fmt.Errorf("incompatible proof (left node value doesn't match) expected [%x], got [%x]", currentNode.lChild.ComputeValue(), v)
-				// }
 				if currentNode.rChild == nil { // create the right child if not exist
-					currentNode.rChild = newNode(nil, currentNode.height-1)
+					// Caution: we are temporarily initializing the node with default hash, which will later get updated to the
+					// proper value (if this is an interim node, its hash will be set when computing the root hash of the PTrie
+					// in the end; if this is a leaf, we'll set the hash at the end of processing the proof)
+					currentNode.rChild = newNode(defaultHash, currentNode.height-1)
 				}
 				currentNode = currentNode.rChild
 			} else { // left branching
 				if currentNode.rChild == nil { // check right child
 					currentNode.rChild = newNode(v, currentNode.height-1)
 				}
-				// else if !bytes.Equal(currentNode.rChild.ComputeValue(), v) {
-				// 	return nil, fmt.Errorf("incompatible proof (right node value doesn't match) expected [%x], got [%x]", currentNode.rChild.ComputeValue(), v)
-				// }
 				if currentNode.lChild == nil { // create the left child if not exist
-					currentNode.lChild = newNode(nil, currentNode.height-1)
+					// Caution: we are temporarily initializing the node with default hash, which will later get updated to the
+					// proper value (if this is an interim node, its hash will be set when computing the root hash of the PTrie
+					// in the end; if this is a leaf, we'll set the hash at the end of processing the proof)
+					currentNode.lChild = newNode(defaultHash, currentNode.height-1)
 				}
 				currentNode = currentNode.lChild
 			}
 		}
 
 		currentNode.payload = payload
-		currentNode.path = path
-		// update node's hashvalue only for inclusion proofs (for others we assume default value)
+		// update node's hash value only for inclusion proofs (for others we assume default value)
 		if pr.Inclusion {
-			currentNode.hashValue = common.ComputeCompactValue(path, payload, currentNode.height)
+			currentNode.hashValue = ledger.ComputeCompactValue(hash.Hash(path), payload.Value, currentNode.height)
 		}
 		// keep a reference to this node by path (for update purpose)
-		psmt.pathLookUp[string(path)] = currentNode
-
+		psmt.pathLookUp[path] = currentNode
 	}
 
 	// check if the rootHash matches the root node's hash value of the partial trie
-	if !bytes.Equal(psmt.root.HashValue(), rootValue) {
-		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.HashValue(), rootValue)
+	if ledger.RootHash(psmt.root.forceComputeHash()) != rootValue {
+		return nil, fmt.Errorf("rootNode hash doesn't match the proofs expected [%x], got [%x]", psmt.root.Hash(), rootValue)
 	}
 	return &psmt, nil
 }

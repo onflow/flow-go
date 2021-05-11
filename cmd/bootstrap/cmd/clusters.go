@@ -9,11 +9,18 @@ import (
 )
 
 // Construct cluster assignment with internal and partner nodes uniformly
-// distributed across clusters
-func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo) (flow.AssignmentList, flow.ClusterList) {
+// distributed across clusters. This function will produce the same cluster
+// assignments for the same partner and internal lists, and the same seed.
+func constructClusterAssignment(partnerNodes, internalNodes []model.NodeInfo, seed int64) (flow.AssignmentList, flow.ClusterList) {
 
 	partners := model.ToIdentityList(partnerNodes).Filter(filter.HasRole(flow.RoleCollection))
 	internals := model.ToIdentityList(internalNodes).Filter(filter.HasRole(flow.RoleCollection))
+
+	// deterministically shuffle both collector lists based on the input seed
+	// by using a different seed each spork, we will have different clusters
+	// even with the same collectors
+	partners = partners.DeterministicShuffle(seed)
+	internals = internals.DeterministicShuffle(seed)
 
 	nClusters := flagCollectionClusters
 	assignments := make(flow.AssignmentList, nClusters)

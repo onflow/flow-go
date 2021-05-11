@@ -354,7 +354,7 @@ func (lg *BatchLoadGenerator) rotateTokens() error {
 		j := (i + 1) % len(lg.accounts)
 		transferScript, err := TokenTransferScript(
 			lg.fungibleTokenAddress,
-			lg.accounts[i].address,
+			lg.flowTokenAddress,
 			lg.accounts[j].address,
 			10)
 		if err != nil {

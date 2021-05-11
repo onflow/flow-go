@@ -1,4 +1,4 @@
-package common
+package hash
 
 import (
 	"encoding/binary"
@@ -69,10 +69,12 @@ func new256() *state {
 }
 
 // copyOut copies ulint64s to a byte buffer.
-func (d *state) copyOut(out *[32]byte) {
+func (d *state) copyOut() Hash {
+	var out Hash
 	for i := 0; i < 4; i++ {
-		binary.LittleEndian.PutUint64((*out)[i<<3:], d.a[i])
+		binary.LittleEndian.PutUint64(out[i<<3:], d.a[i])
 	}
+	return out
 }
 
 func xorInAtIndex(d *state, buf []byte, index int) {
@@ -86,9 +88,9 @@ func xorInAtIndex(d *state, buf []byte, index int) {
 	}
 }
 
-func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
+func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 	//xorIn since p1 length is a multiple of 8
-	xorInAtIndex(d, p1, 0)
+	xorInAtIndex(d, p1[:], 0)
 	written := 32 // written uint64s in the state
 
 	for len(p2)+written >= rate {
@@ -119,31 +121,33 @@ func (d *state) hash256Plus(out *[32]byte, p1, p2 []byte) {
 	finalKeccakF1600(&d.a)
 
 	// reverse and output
-	d.copyOut(out)
+	return d.copyOut()
 }
 
 // hash256plus256 absorbs two 256 bits slices of data into the hash's state
 // applies the permutation, and outpute the result in out
-func (d *state) hash256plus256(out *[32]byte, p1, p2 []byte) {
+func (d *state) hash256plus256(p1, p2 Hash) Hash {
 	xorIn512(d, p1, p2)
 	// permute
 	finalKeccakF1600(&d.a)
-	// reverese the endianess to the output
-	d.copyOut(out)
+	// reverse the endianess to the output
+	return d.copyOut()
 }
 
 // xorIn256 xors two 32 bytes slices into the state; it
 // makes no non-portable assumptions about memory layout
 // or alignment.
-func xorIn512(d *state, buf1, buf2 []byte) {
+func xorIn512(d *state, buf1, buf2 Hash) {
+	sliceBuf1, sliceBuf2 := buf1[:], buf2[:]
+
 	var i int
 	for ; i < 4; i++ {
-		d.a[i] = binary.LittleEndian.Uint64(buf1)
-		buf1 = buf1[8:]
+		d.a[i] = binary.LittleEndian.Uint64(sliceBuf1)
+		sliceBuf1 = sliceBuf1[8:]
 	}
 	for ; i < 8; i++ {
-		d.a[i] = binary.LittleEndian.Uint64(buf2)
-		buf2 = buf2[8:]
+		d.a[i] = binary.LittleEndian.Uint64(sliceBuf2)
+		sliceBuf2 = sliceBuf2[8:]
 	}
 	// xor with the dsbyte
 	// dsbyte also contains the first one bit for the padding.

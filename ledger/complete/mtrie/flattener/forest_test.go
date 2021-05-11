@@ -14,10 +14,9 @@ import (
 )
 
 func TestForestStoreAndLoad(t *testing.T) {
-	pathByteSize := 32
 
 	metricsCollector := &metrics.NoopCollector{}
-	mForest, err := mtrie.NewForest(pathByteSize, 5, metricsCollector, nil)
+	mForest, err := mtrie.NewForest(5, metricsCollector, nil)
 	require.NoError(t, err)
 	rootHash := mForest.GetEmptyRootHash()
 
@@ -48,7 +47,7 @@ func TestForestStoreAndLoad(t *testing.T) {
 	forestSequencing, err := flattener.FlattenForest(mForest)
 	require.NoError(t, err)
 
-	newForest, err := mtrie.NewForest(pathByteSize, 5, metricsCollector, nil)
+	newForest, err := mtrie.NewForest(5, metricsCollector, nil)
 	require.NoError(t, err)
 
 	//forests are different
