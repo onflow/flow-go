@@ -27,6 +27,9 @@ func constructRootResultAndSeal(
 		log.Fatal().Err(err).Msg("could not decode state commitment")
 	}
 	stateCommit, err := flow.ToStateCommitment(stateCommitBytes)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not convert state commitment")
+	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)
