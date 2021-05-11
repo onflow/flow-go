@@ -248,18 +248,31 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
-		return fmt.Errorf("unstaked execution node sender at block ID")
+		return fmt.Errorf("unstaked execution node sender at block ID: %x, resultID: %x, chunk ID: %x",
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	// 2. start state must match
 	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
-		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x", chunk.ChunkBody.StartState, chunkDataPack.StartState)
+		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x, block ID: %x, resultID: %x, chunk ID: %x",
+			chunk.ChunkBody.StartState,
+			chunkDataPack.StartState,
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	// 3. collection id must match
 	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
+			collection.ID(),
+			senderID,
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	return nil
