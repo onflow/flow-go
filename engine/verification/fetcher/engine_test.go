@@ -227,6 +227,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	block, result, statuses, locators := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 	mockBlockSealingStatus(s.state, s.headers, block.Header, false)
+	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
@@ -242,6 +243,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	// as the response it receives a notification that chunk belongs to a sealed block.
 	// we mock this as the block is getting sealed after request dispatch.
+	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
 	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collections, func(originID flow.Identifier,
 		cdp *flow.ChunkDataPack,
 		collection *flow.Collection) {
@@ -264,7 +266,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	unittest.RequireReturnsBefore(t, requesterWg.Wait, time.Second, "could not handle sealed chunks notification on time")
 	unittest.RequireReturnsBefore(t, processWG.Wait, 1*time.Second, "could not process chunks on time")
 
-	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.chunkConsumerNotifier)
+	mock.AssertExpectationsForObjects(t, s.requester, s.pendingChunks, s.chunkConsumerNotifier, s.metrics)
 	// no verifiable chunk should be passed to verifier engine
 	s.verifier.AssertNotCalled(t, "ProcessLocal")
 }
