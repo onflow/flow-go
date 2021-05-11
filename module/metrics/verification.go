@@ -22,8 +22,6 @@ type VerificationCollector struct {
 	sentChunkDataPackRequestsTotal prometheus.Counter
 	// total chunk data packs received by fetcher engine from requester engine.
 	receivedChunkDataPacksTotal prometheus.Counter
-	// total verifiable chunks sent by fetcher engine to verifier engine.
-	sentVerifiableChunksTotal prometheus.Counter
 
 	// Requester Engine
 	//
@@ -42,7 +40,7 @@ type VerificationCollector struct {
 
 	// Match Engine
 	receivedExecutionResultsTotal prometheus.Counter // total execution results received by match engine
-	sntVerifiableChunksTotal      prometheus.Counter // total chunks matched by match engine and sent to verifier engine
+	sentVerifiableChunksTotal     prometheus.Counter // total chunks matched by match engine and sent to verifier engine
 	receivedChunkDataPackTotal    prometheus.Counter // total chunk data packs received by match engine
 	requestedChunkDataPackTotal   prometheus.Counter // total number of chunk data packs requested by match engine
 
@@ -73,6 +71,14 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number chunks sent by assigner engine to chunk consumer",
+	})
+
+	// Fetcher Engine
+	receivedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+		Name:      "assigned_chunk_received_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemFetcherEngine,
+		Help:      "total number of chunks received by fetcher engine from assigner engine through chunk consumer",
 	})
 
 	// till new pipeline of assigner-fetcher-verifier is in place, we need to keep these metrics
@@ -144,6 +150,10 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		receivedFinalizedHeight,
 		assignedChunksTotal,
 		sentChunksTotal,
+
+		// fetcher engine
+		receivedChunksTotal,
+
 		receivedReceiptsTotals,
 		sentExecutionResultsTotal,
 		receivedExecutionResultsTotal,
@@ -161,11 +171,13 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		receivedReceiptsTotal:         receivedReceiptsTotals,
 		sentExecutionResultsTotal:     sentExecutionResultsTotal,
 		receivedExecutionResultsTotal: receivedExecutionResultsTotal,
-		sntVerifiableChunksTotal:      sentVerifiableChunksTotal,
+		sentVerifiableChunksTotal:     sentVerifiableChunksTotal,
 		receivedVerifiableChunksTotal: receivedVerifiableChunksTotal,
 		resultApprovalsTotal:          sentResultApprovalTotal,
 		receivedChunkDataPackTotal:    receivedChunkDataPackTotal,
 		requestedChunkDataPackTotal:   requestedChunkDataPackTotal,
+		// fetcher
+		receivedChunksTotal: receivedChunksTotal,
 	}
 
 	return vc
@@ -194,7 +206,7 @@ func (vc *VerificationCollector) OnExecutionResultReceived() {
 // by Match engine to Verifier engine.
 // It increments the total number of chunks matched by match engine.
 func (vc *VerificationCollector) OnVerifiableChunkSent() {
-	vc.sntVerifiableChunksTotal.Inc()
+	vc.sentVerifiableChunksTotal.Inc()
 }
 
 // OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
@@ -285,5 +297,5 @@ func (vc *VerificationCollector) OnChunkDataPackArrivedAtFetcher() {
 
 // OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 func (vc *VerificationCollector) OnVerifiableChunkSentToVerifier() {
-
+	vc.sentVerifiableChunksTotal.Inc()
 }
