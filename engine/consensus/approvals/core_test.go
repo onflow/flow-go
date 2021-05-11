@@ -198,8 +198,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 		err := s.core.processIncorporatedResult(incorporatedResult)
 		require.NoError(s.T(), err)
 	}
-	// there will be numResults + 1 vertices since all of them share same parent
-	require.Equal(s.T(), numResults+1, s.core.collectorTree.GetSize())
+	require.Equal(s.T(), uint64(numResults), s.core.collectorTree.size)
 
 	candidate := unittest.BlockHeaderWithParentFixture(&s.Block)
 	s.blocks[candidate.ID()] = &candidate
@@ -210,7 +209,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnFinalizedBlock_CollectorsCleanup
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
 	s.core.OnFinalizedBlock(candidate.ID())
-	require.Equal(s.T(), uint(0), s.core.collectorTree.GetSize())
+	require.Equal(s.T(), uint64(0), s.core.collectorTree.size)
 }
 
 // TestProcessIncorporated_ApprovalsBeforeResult tests a scenario when first we have received approvals for unknown

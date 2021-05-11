@@ -34,6 +34,7 @@ type AssignmentCollectorTree struct {
 	forest            *forest.LevelledForest
 	lock              sync.RWMutex
 	onCreateCollector NewCollectorFactoryMethod
+	size              uint64
 }
 
 func NewAssignmentCollectorTree(lowestLevel uint64, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
@@ -41,11 +42,8 @@ func NewAssignmentCollectorTree(lowestLevel uint64, onCreateCollector NewCollect
 		forest:            forest.NewLevelledForest(lowestLevel),
 		lock:              sync.RWMutex{},
 		onCreateCollector: onCreateCollector,
+		size:              0,
 	}
-}
-
-func (t *AssignmentCollectorTree) GetSize() uint {
-	return t.forest.GetSize()
 }
 
 func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) *AssignmentCollectorVertex {
@@ -147,6 +145,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	}
 
 	t.forest.AddVertex(vertex)
+	t.size += 1
 	return collector, true, nil
 }
 
@@ -159,7 +158,7 @@ func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifi
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	if t.forest.GetSize() > 0 {
+	if t.size > 0 {
 		// collect IDs of vertices that were pruned
 		for l := t.forest.LowestLevel; l < limit; l++ {
 			iterator := t.forest.GetVerticesAtLevel(l)
@@ -175,5 +174,6 @@ func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifi
 	if err != nil {
 		return nil, fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
+	t.size -= uint64(len(pruned))
 	return pruned, nil
 }
