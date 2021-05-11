@@ -40,24 +40,20 @@ type ResultApprovalProcessor interface {
 // 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type approvalProcessingCore struct {
-	log                                  zerolog.Logger                  // used to log relevant actions with context
-	collectorTree                        *AssignmentCollectorTree        // levelled forest for assignment collectors
-	approvalsCache                       *ApprovalsCache                 // in-memory cache of approvals that weren't verified
-	atomicLastSealedHeight               uint64                          // atomic variable for last sealed block height
-	atomicLastFinalizedHeight            uint64                          // atomic variable for last finalized block height
-	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
-	emergencySealingActive               bool                            // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	assigner                             module.ChunkAssigner            // used by AssignmentCollector to build chunk assignment
-	headers                              storage.Headers                 // used to access block headers in storage
-	state                                protocol.State                  // used to access protocol state
-	verifier                             module.Verifier                 // used to validate result approvals
-	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed without consideration of the sealability of parent results
-	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
-	requestTracker                       *sealing.RequestTracker         // used to keep track of number of approval requests, and blackout periods, by chunk
+	log                       zerolog.Logger           // used to log relevant actions with context
+	collectorTree             *AssignmentCollectorTree // levelled forest for assignment collectors
+	approvalsCache            *ApprovalsCache          // in-memory cache of approvals that weren't verified
+	atomicLastSealedHeight    uint64                   // atomic variable for last sealed block height
+	atomicLastFinalizedHeight uint64                   // atomic variable for last finalized block height
+	emergencySealingActive    bool                     // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	headers                   storage.Headers          // used to access block headers in storage
+	state                     protocol.State           // used to access protocol state
+	seals                     storage.Seals            // used to get last sealed block
+	requestTracker            *sealing.RequestTracker  // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
-func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, assigner module.ChunkAssigner,
-	verifier module.Verifier, seals mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint, emergencySealingActive bool) (*approvalProcessingCore, error) {
+func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, sealsDB storage.Seals, assigner module.ChunkAssigner,
+	verifier module.Verifier, sealsMempool mempool.IncorporatedResultSeals, approvalConduit network.Conduit, requiredApprovalsForSealConstruction uint, emergencySealingActive bool) (*approvalProcessingCore, error) {
 
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -65,21 +61,17 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, as
 	}
 
 	core := &approvalProcessingCore{
-		approvalsCache:                       NewApprovalsCache(1000),
-		assigner:                             assigner,
-		headers:                              headers,
-		state:                                state,
-		verifier:                             verifier,
-		seals:                                seals,
-		approvalConduit:                      approvalConduit,
-		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		emergencySealingActive:               emergencySealingActive,
-		requestTracker:                       sealing.NewRequestTracker(10, 30),
+		approvalsCache:         NewApprovalsCache(1000),
+		headers:                headers,
+		state:                  state,
+		seals:                  sealsDB,
+		emergencySealingActive: emergencySealingActive,
+		requestTracker:         sealing.NewRequestTracker(10, 30),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*AssignmentCollector, error) {
-		return NewAssignmentCollector(result, core.state, core.headers, core.assigner, core.seals, core.verifier,
-			core.approvalConduit, core.requestTracker, core.requiredApprovalsForSealConstruction)
+		return NewAssignmentCollector(result, core.state, core.headers, assigner, sealsMempool, verifier,
+			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)
 	}
 
 	collectors := NewAssignmentCollectorTree(factoryMethod)
@@ -112,9 +104,13 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.atomicLastFinalizedHeight, finalized.Height)
 
-	lastSealed, err := c.state.Sealed().Head()
+	seal, err := c.seals.ByBlockID(finalizedBlockID)
 	if err != nil {
-		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block")
+		c.log.Fatal().Err(err).Msgf("could not retrieve seal for finalized block %s", finalizedBlockID)
+	}
+	lastSealed, err := c.headers.ByBlockID(seal.BlockID)
+	if err != nil {
+		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering

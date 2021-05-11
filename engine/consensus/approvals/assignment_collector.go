@@ -84,14 +84,14 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 }
 
 // BlockID returns the ID of the executed block
-func (rsr *AssignmentCollector) BlockID() flow.Identifier {
-	return rsr.result.BlockID
+func (ac *AssignmentCollector) BlockID() flow.Identifier {
+	return ac.result.BlockID
 }
 
-func (rsr *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
-	rsr.lock.RLock()
-	defer rsr.lock.RUnlock()
-	return rsr.collectors[incorporatedBlockID]
+func (ac *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
+	ac.lock.RLock()
+	defer ac.lock.RUnlock()
+	return ac.collectors[incorporatedBlockID]
 }
 
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
@@ -100,8 +100,8 @@ func (rsr *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Iden
 //   * have the Verification role and
 //   * have _positive_ weight and
 //   * are not ejected
-func (rsr *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
-	authorizedVerifierList, err := rsr.state.AtBlockID(blockID).Identities(
+func (ac *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
+	authorizedVerifierList, err := ac.state.AtBlockID(blockID).Identities(
 		filter.And(
 			filter.HasRole(flow.RoleVerification),
 			filter.HasStake(true),
@@ -124,25 +124,21 @@ func (rsr *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifi
 // ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of seal & verification is finished.
-func (rsr *AssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) (bool, error) {
+func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
 	// the block that _incorporates_ result and the latest finalized block
-	return collector.IncorporatedBlock().Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight, nil
+	return collector.IncorporatedBlock().Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
 
-func (rsr *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
-	for _, collector := range rsr.allCollectors() {
-		sealable, err := rsr.emergencySealable(collector, finalizedBlockHeight)
-		if err != nil {
-			return fmt.Errorf("could not determnine if result %x incorporated at %x is emergency sealable: %w",
-				rsr.ResultID, collector.IncorporatedBlockID(), err)
-		}
+func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
+	for _, collector := range ac.allCollectors() {
+		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
 		if sealable {
-			err = collector.SealResult()
+			err := collector.SealResult()
 			if err != nil {
 				return fmt.Errorf("could not create emergency seal for result %x incorporated at %x: %w",
-					rsr.ResultID, collector.IncorporatedBlockID(), err)
+					ac.ResultID, collector.IncorporatedBlockID(), err)
 			}
 		}
 	}
@@ -150,14 +146,14 @@ func (rsr *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint6
 	return nil
 }
 
-func (rsr *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
+func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	// check that result is the one that this AssignmentCollector manages
-	if irID := incorporatedResult.Result.ID(); irID != rsr.ResultID {
-		return fmt.Errorf("this AssignmentCollector manages result %x but got %x", rsr.ResultID, irID)
+	if irID := incorporatedResult.Result.ID(); irID != ac.ResultID {
+		return fmt.Errorf("this AssignmentCollector manages result %x but got %x", ac.ResultID, irID)
 	}
 
 	incorporatedBlockID := incorporatedResult.IncorporatedBlockID
-	if collector := rsr.collectorByBlockID(incorporatedBlockID); collector != nil {
+	if collector := ac.collectorByBlockID(incorporatedBlockID); collector != nil {
 		return nil
 	}
 
@@ -167,27 +163,27 @@ func (rsr *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *fl
 	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously
 
 	// chunk assigment is based on the first block in the fork that incorporates the result
-	assignment, err := rsr.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
+	assignment, err := ac.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
 
-	incorporatedBlock, err := rsr.headers.ByBlockID(incorporatedBlockID)
+	incorporatedBlock, err := ac.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve header of incorporated block %s: %w",
 			incorporatedBlockID, err)
 	}
 
-	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, rsr.seals, rsr.requiredApprovalsForSealConstruction)
+	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
 
-	isDuplicate := rsr.putCollector(incorporatedBlockID, collector)
+	isDuplicate := ac.putCollector(incorporatedBlockID, collector)
 	if isDuplicate {
 		return nil
 	}
 
 	// process approvals that have passed needed checks and are ready to be processed
-	for _, approvalID := range rsr.verifiedApprovalsCache.ByResultID(rsr.ResultID) {
-		if approval := rsr.verifiedApprovalsCache.Peek(approvalID); approval != nil {
+	for _, approvalID := range ac.verifiedApprovalsCache.ByResultID(ac.ResultID) {
+		if approval := ac.verifiedApprovalsCache.Peek(approvalID); approval != nil {
 			// those approvals are verified already and shouldn't yield any errors
 			_ = collector.ProcessApproval(approval)
 		}
@@ -196,25 +192,29 @@ func (rsr *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *fl
 	return nil
 }
 
-func (rsr *AssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) {
-	rsr.lock.Lock()
-	defer rsr.lock.Unlock()
-	rsr.collectors[incorporatedBlockID] = collector
+func (ac *AssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) bool {
+	ac.lock.Lock()
+	defer ac.lock.Unlock()
+	if _, ok := ac.collectors[incorporatedBlockID]; ok {
+		return true
+	}
+	ac.collectors[incorporatedBlockID] = collector
+	return false
 }
 
-func (rsr *AssignmentCollector) allCollectors() []*ApprovalCollector {
-	rsr.lock.RLock()
-	defer rsr.lock.RUnlock()
-	collectors := make([]*ApprovalCollector, 0, len(rsr.collectors))
-	for _, collector := range rsr.collectors {
+func (ac *AssignmentCollector) allCollectors() []*ApprovalCollector {
+	ac.lock.RLock()
+	defer ac.lock.RUnlock()
+	collectors := make([]*ApprovalCollector, 0, len(ac.collectors))
+	for _, collector := range ac.collectors {
 		collectors = append(collectors, collector)
 	}
 	return collectors
 }
 
-func (rsr *AssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
+func (ac *AssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
 	id := approval.Attestation.ID()
-	valid, err := rsr.verifier.Verify(id[:], approval.AttestationSignature, nodeIdentity.StakingPubKey)
+	valid, err := ac.verifier.Verify(id[:], approval.AttestationSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
 		return fmt.Errorf("failed to verify attestation signature: %w", err)
 	}
@@ -226,9 +226,9 @@ func (rsr *AssignmentCollector) verifyAttestationSignature(approval *flow.Result
 	return nil
 }
 
-func (rsr *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
+func (ac *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
 	id := approval.Body.ID()
-	valid, err := rsr.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
+	valid, err := ac.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
 		return fmt.Errorf("failed to verify signature: %w", err)
 	}
@@ -251,34 +251,34 @@ func (rsr *AssignmentCollector) verifySignature(approval *flow.ResultApproval, n
 // - engine.InvalidInputError - result approval is invalid
 // - exception in case of any other error, usually this is not expected
 // - nil on successful check
-func (rsr *AssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
+func (ac *AssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
 	// check that approval is for the expected result to reject incompatible inputs
-	if approval.Body.ExecutionResultID != rsr.ResultID {
-		return fmt.Errorf("this AssignmentCollector processes only approvals for result (%x) but got an approval for (%x)", rsr.ResultID, approval.Body.ExecutionResultID)
+	if approval.Body.ExecutionResultID != ac.ResultID {
+		return fmt.Errorf("this AssignmentCollector processes only approvals for result (%x) but got an approval for (%x)", ac.ResultID, approval.Body.ExecutionResultID)
 	}
 
 	// approval has to refer same block as execution result
-	if approval.Body.BlockID != rsr.BlockID() {
+	if approval.Body.BlockID != ac.BlockID() {
 		return engine.NewInvalidInputErrorf("result approval for invalid block, expected (%x) vs (%x)",
-			rsr.BlockID(), approval.Body.BlockID)
+			ac.BlockID(), approval.Body.BlockID)
 	}
 
 	chunkIndex := approval.Body.ChunkIndex
-	if chunkIndex >= uint64(rsr.result.Chunks.Len()) {
+	if chunkIndex >= uint64(ac.result.Chunks.Len()) {
 		return engine.NewInvalidInputErrorf("chunk index out of range: %v", chunkIndex)
 	}
 
-	identity, found := rsr.authorizedApprovers[approval.Body.ApproverID]
+	identity, found := ac.authorizedApprovers[approval.Body.ApproverID]
 	if !found {
 		return engine.NewInvalidInputErrorf("approval not from authorized verifier")
 	}
 
-	err := rsr.verifyAttestationSignature(&approval.Body, identity)
+	err := ac.verifyAttestationSignature(&approval.Body, identity)
 	if err != nil {
 		return fmt.Errorf("validating attestation signature failed: %w", err)
 	}
 
-	err = rsr.verifySignature(approval, identity)
+	err = ac.verifySignature(approval, identity)
 	if err != nil {
 		return fmt.Errorf("validating approval signature failed: %w", err)
 	}
@@ -286,15 +286,20 @@ func (rsr *AssignmentCollector) validateApproval(approval *flow.ResultApproval) 
 	return nil
 }
 
-func (rsr *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
-	err := rsr.validateApproval(approval)
+func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
+	err := ac.validateApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not validate approval: %w", err)
 	}
 
-	rsr.verifiedApprovalsCache.Put(approval)
+	if cached := ac.verifiedApprovalsCache.Peek(approval.Body.ID()); cached != nil {
+		// we have this approval cached already, no need to process it again
+		return nil
+	}
 
-	for _, collector := range rsr.allCollectors() {
+	ac.verifiedApprovalsCache.Put(approval)
+
+	for _, collector := range ac.allCollectors() {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
 			return fmt.Errorf("could not process approval: %w", err)
@@ -304,8 +309,8 @@ func (rsr *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) e
 	return nil
 }
 
-func (rsr *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64) error {
-	for _, collector := range rsr.allCollectors() {
+func (ac *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64) error {
+	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
 			continue
 		}
@@ -314,18 +319,18 @@ func (rsr *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting u
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := rsr.requestTracker.Get(rsr.ResultID, collector.IncorporatedBlockID(), chunkIndex)
+			requestTrackerItem := ac.requestTracker.Get(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex)
 			if requestTrackerItem.IsBlackout() {
 				continue
 			}
 			requestTrackerItem.Update()
-			rsr.requestTracker.Set(rsr.ResultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
+			ac.requestTracker.Set(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
 			if requestTrackerItem.Requests >= 10 {
 				log.Debug().Msgf("requesting approvals for result %v, incorporatedBlockID %v chunk %d: %d requests",
-					rsr.ResultID,
+					ac.ResultID,
 					collector.IncorporatedBlockID(),
 					chunkIndex,
 					requestTrackerItem.Requests,
@@ -335,11 +340,11 @@ func (rsr *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting u
 			// prepare the request
 			req := &messages.ApprovalRequest{
 				Nonce:      rand.Uint64(),
-				ResultID:   rsr.ResultID,
+				ResultID:   ac.ResultID,
 				ChunkIndex: chunkIndex,
 			}
 
-			err := rsr.approvalConduit.Publish(req, verifiers...)
+			err := ac.approvalConduit.Publish(req, verifiers...)
 			if err != nil {
 				log.Error().Err(err).
 					Msgf("could not publish approval request for chunk %d", chunkIndex)

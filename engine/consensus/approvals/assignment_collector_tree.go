@@ -17,14 +17,14 @@ type AssignmentCollectorVertex struct {
 
 /* Methods implementing LevelledForest's Vertex interface */
 
-func (rsr *AssignmentCollectorVertex) VertexID() flow.Identifier { return rsr.Collector.ResultID }
-func (rsr *AssignmentCollectorVertex) Level() uint64             { return rsr.Collector.BlockHeight }
-func (rsr *AssignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
-	return rsr.Collector.result.PreviousResultID, rsr.Collector.BlockHeight - 1
+func (v *AssignmentCollectorVertex) VertexID() flow.Identifier { return v.Collector.ResultID }
+func (v *AssignmentCollectorVertex) Level() uint64             { return v.Collector.BlockHeight }
+func (v *AssignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
+	return v.Collector.result.PreviousResultID, v.Collector.BlockHeight - 1
 }
 
 // NewCollector is a factory method to generate an AssignmentCollector for an execution result
-type NewCollector = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
+type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
 // formed by the execution results. The mempool supports pruning by height: only collectors
@@ -74,6 +74,12 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(level uint64, finalizedBlo
 
 // markOrphanFork takes starting vertex of some fork and marks it as orphan in recursive manner
 func (t *AssignmentCollectorTree) markOrphanFork(vertex *AssignmentCollectorVertex) {
+	// if parent is orphan then all children should be orphan as well
+	// we can skip marking the child nodes.
+	if vertex.Orphan {
+		return
+	}
+
 	vertex.Orphan = true
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
@@ -153,12 +159,14 @@ func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifi
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	// collect IDs of vertices that were pruned
-	for l := t.forest.LowestLevel; l < limit; l++ {
-		iterator := t.forest.GetVerticesAtLevel(l)
-		for iterator.HasNext() {
-			vertex := iterator.NextVertex()
-			pruned = append(pruned, vertex.VertexID())
+	if t.forest.GetSize() > 0 {
+		// collect IDs of vertices that were pruned
+		for l := t.forest.LowestLevel; l < limit; l++ {
+			iterator := t.forest.GetVerticesAtLevel(l)
+			for iterator.HasNext() {
+				vertex := iterator.NextVertex()
+				pruned = append(pruned, vertex.VertexID())
+			}
 		}
 	}
 

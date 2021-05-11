@@ -10,7 +10,7 @@ import (
 // well as accumulating signatures of already checked approvals.
 type ChunkApprovalCollector struct {
 	assignment                           map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
-	chunkApprovals                       *flow.SignatureCollector     // accumulator of signatures for current collector
+	chunkApprovals                       flow.SignatureCollector      // accumulator of signatures for current collector
 	lock                                 sync.Mutex                   // lock to protect `chunkApprovals`
 	requiredApprovalsForSealConstruction uint                         // number of approvals that are required for each chunk to be sealed
 }
@@ -45,7 +45,7 @@ func (c *ChunkApprovalCollector) GetMissingSigners() flow.IdentifierList {
 	result := make(flow.IdentifierList, 0, len(c.assignment))
 	c.lock.Lock()
 	for id := range c.assignment {
-		if _, hasSigned := c.chunkApprovals.BySigner(id); !hasSigned {
+		if hasSigned := c.chunkApprovals.HasSigned(id); !hasSigned {
 			result = append(result, id)
 		}
 	}

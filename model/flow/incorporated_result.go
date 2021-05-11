@@ -25,7 +25,7 @@ type IncorporatedResult struct {
 	// This field is not exported (name doesn't start with a capital letter), so
 	// it is not used in calculating the ID and Checksum of the Incorporated
 	// Result (RLP encoding ignores private fields).
-	chunkApprovals     map[uint64]*SignatureCollector
+	chunkApprovals     map[uint64]SignatureCollector
 	chunkApprovalsLock sync.Mutex
 }
 
@@ -33,7 +33,7 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 	return &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,
 		Result:              result,
-		chunkApprovals:      make(map[uint64]*SignatureCollector),
+		chunkApprovals:      make(map[uint64]SignatureCollector),
 	}
 }
 
@@ -137,8 +137,8 @@ type SignatureCollector struct {
 }
 
 // NewSignatureCollector instantiates a new SignatureCollector
-func NewSignatureCollector() *SignatureCollector {
-	return &SignatureCollector{
+func NewSignatureCollector() SignatureCollector {
+	return SignatureCollector{
 		verifierSignatures: nil,
 		signerIDs:          nil,
 		signerIDSet:        make(map[Identifier]int),
@@ -167,6 +167,12 @@ func (c *SignatureCollector) BySigner(signerID Identifier) (*crypto.Signature, b
 		return nil, false
 	}
 	return &c.verifierSignatures[idx], true
+}
+
+// HasSigned checks if signer has already provided a signature
+func (c *SignatureCollector) HasSigned(signerID Identifier) bool {
+	_, found := c.signerIDSet[signerID]
+	return found
 }
 
 // Add appends a signature. Only the _first_ signature is retained for each signerID.
