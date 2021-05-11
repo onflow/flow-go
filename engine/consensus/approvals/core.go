@@ -26,7 +26,7 @@ import (
 type approvalProcessingCore struct {
 	log                       zerolog.Logger           // used to log relevant actions with context
 	collectorTree             *AssignmentCollectorTree // levelled forest for assignment collectors
-	approvalsCache            *ApprovalsCache          // in-memory cache of approvals that weren't verified
+	approvalsCache            *LruCache                // in-memory cache of approvals that weren't verified
 	atomicLastSealedHeight    uint64                   // atomic variable for last sealed block height
 	atomicLastFinalizedHeight uint64                   // atomic variable for last finalized block height
 	emergencySealingActive    bool                     // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
@@ -45,7 +45,7 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, se
 	}
 
 	core := &approvalProcessingCore{
-		approvalsCache:         NewApprovalsCache(1000),
+		approvalsCache:         NewApprovalsLRUCache(1000),
 		headers:                headers,
 		state:                  state,
 		seals:                  sealsDB,

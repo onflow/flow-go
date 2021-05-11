@@ -38,7 +38,7 @@ type AssignmentCollector struct {
 	collectors                           map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	authorizedApprovers                  map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
 	lock                                 sync.RWMutex                           // lock for protecting collectors map
-	verifiedApprovalsCache               *ApprovalsCache                        // in-memory cache of approvals (already verified)
+	verifiedApprovalsCache               *Cache                                 // in-memory cache of approvals (already verified)
 	requiredApprovalsForSealConstruction uint                                   // number of approvals that are required for each chunk to be sealed
 	assigner                             module.ChunkAssigner                   // used to build assignment
 	headers                              storage.Headers                        // used to query headers from storage
@@ -182,11 +182,10 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	}
 
 	// process approvals that have passed needed checks and are ready to be processed
-	for _, approvalID := range ac.verifiedApprovalsCache.ByResultID(ac.ResultID) {
-		if approval := ac.verifiedApprovalsCache.Peek(approvalID); approval != nil {
-			// those approvals are verified already and shouldn't yield any errors
-			_ = collector.ProcessApproval(approval)
-		}
+	for _, approval := range ac.verifiedApprovalsCache.All() {
+		// those approvals are verified already and shouldn't yield any errors
+		_ = collector.ProcessApproval(approval)
+
 	}
 
 	return nil
@@ -292,7 +291,7 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 		return fmt.Errorf("could not validate approval: %w", err)
 	}
 
-	if cached := ac.verifiedApprovalsCache.Peek(approval.Body.ID()); cached != nil {
+	if cached := ac.verifiedApprovalsCache.Get(approval.Body.PartialID()); cached != nil {
 		// we have this approval cached already, no need to process it again
 		return nil
 	}
