@@ -61,10 +61,11 @@ func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*Assig
 
 // FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
 // can mark other forks as orphan and stop processing approvals for it. Eventually all forks will be cleaned up by height
-func (t *AssignmentCollectorTree) FinalizeForkAtLevel(level uint64, finalizedBlockID flow.Identifier) {
+func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header) {
+	finalizedBlockID := finalized.ID()
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	iter := t.forest.GetVerticesAtLevel(level)
+	iter := t.forest.GetVerticesAtLevel(finalized.Height)
 	for iter.HasNext() {
 		vertex := iter.NextVertex().(*assignmentCollectorVertex)
 		if finalizedBlockID != vertex.collector.BlockID() {

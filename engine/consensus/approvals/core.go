@@ -95,6 +95,11 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 		c.log.Fatal().Err(err).Msgf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
 
+	// no need to process already finalized blocks
+	if finalized.Height <= c.lastFinalizedHeight() {
+		return
+	}
+
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.atomicLastFinalizedHeight, finalized.Height)
 
@@ -117,7 +122,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	}
 
 	// finalize forks to stop collecting approvals for orphan collectors
-	c.collectorTree.FinalizeForkAtLevel(finalized.Height, finalizedBlockID)
+	c.collectorTree.FinalizeForkAtLevel(finalized)
 
 	// as soon as we discover new sealed height, proceed with pruning collectors
 	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
