@@ -354,10 +354,10 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 		return
 	}
 
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
-
 	removed := e.pendingChunks.Rem(chunkID)
-	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")
+
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
 }
 
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.
