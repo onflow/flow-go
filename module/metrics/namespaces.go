@@ -59,7 +59,7 @@ const (
 	subsystemFinderEngine    = "finder" // TODO: should be removed once new architecture is in place.
 	subsystemMatchEngine     = "match"  // TODO: should be removed once new architecture is in place.
 	subsystemFetcherEngine   = "fetcher"
-	subsystemRequesterEngine = "verifier"
+	subsystemRequesterEngine = "requester"
 	subsystemVerifierEngine  = "verifier"
 )
 
