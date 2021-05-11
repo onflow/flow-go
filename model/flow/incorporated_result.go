@@ -25,7 +25,7 @@ type IncorporatedResult struct {
 	// This field is not exported (name doesn't start with a capital letter), so
 	// it is not used in calculating the ID and Checksum of the Incorporated
 	// Result (RLP encoding ignores private fields).
-	chunkApprovals     map[uint64]SignatureCollector
+	chunkApprovals     map[uint64]*SignatureCollector
 	chunkApprovalsLock sync.Mutex
 }
 
@@ -33,7 +33,7 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 	return &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,
 		Result:              result,
-		chunkApprovals:      make(map[uint64]SignatureCollector),
+		chunkApprovals:      make(map[uint64]*SignatureCollector),
 	}
 }
 
@@ -80,7 +80,8 @@ func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifie
 
 	as, ok := ir.chunkApprovals[chunkIndex]
 	if !ok {
-		as = NewSignatureCollector()
+		c := NewSignatureCollector()
+		as = &c
 		ir.chunkApprovals[chunkIndex] = as
 	}
 
