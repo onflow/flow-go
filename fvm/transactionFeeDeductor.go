@@ -13,6 +13,11 @@ import (
 
 type TransactionFeeDeductor struct{}
 
+const (
+	flowServiceAccountContract = "FlowServiceAccount"
+	deductFeesContractFunction = "deductTransactionFee"
+)
+
 func NewTransactionFeeDeductor() *TransactionFeeDeductor {
 	return &TransactionFeeDeductor{}
 }
@@ -47,9 +52,9 @@ func (d *TransactionFeeDeductor) deductFees(
 	txErr, fatalErr := vm.invokeContractFunction(
 		common.AddressLocation{
 			Address: common.BytesToAddress(ctx.Chain.ServiceAddress().Bytes()),
-			Name:    "FlowServiceAccount",
+			Name:    flowServiceAccountContract,
 		},
-		"deductTransactionFee",
+		deductFeesContractFunction,
 		[]interpreter.Value{
 			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
 		},
