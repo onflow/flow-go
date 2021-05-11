@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -22,8 +23,10 @@ import (
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
-	ListenAddr string
-	MaxMsgSize int // In bytes
+	ListenAddr        string
+	MaxMsgSize        int  // In bytes
+	RpcMetricsEnabled bool // enable GRPC metrics reporting
+
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -51,6 +54,18 @@ func New(
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
+	serverOptions := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	}
+
+	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
+	if config.RpcMetricsEnabled {
+		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+	}
+
+	server := grpc.NewServer(serverOptions...)
+
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
@@ -62,11 +77,13 @@ func New(
 			exeResults:         exeResults,
 			transactionResults: txResults,
 		},
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
+		server: server,
 		config: config,
+	}
+
+	if config.RpcMetricsEnabled {
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(server)
 	}
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
