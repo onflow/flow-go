@@ -221,13 +221,13 @@ func (vc *VerificationCollector) OnChunkDataPackRequested() {
 	vc.requestedChunkDataPackTotal.Inc()
 }
 
-// OnVerifiableChunkReceived is called whenever a verifiable chunk is received by Verifier engine
+// OnVerifiableChunkReceivedAtVerifierEngine is called whenever a verifiable chunk is received by Verifier engine
 // from Match engine.It increments the total number of sent verifiable chunks.
 func (vc *VerificationCollector) OnVerifiableChunkReceivedAtVerifierEngine() {
 	vc.receivedVerifiableChunksTotal.Inc()
 }
 
-// OnResultApproval is called whenever a result approval for is emitted to consensus nodes.
+// OnResultApprovalDispatchedInNetwork is called whenever a result approval for is emitted to consensus nodes.
 // It increases the total number of result approvals.
 func (vc *VerificationCollector) OnResultApprovalDispatchedInNetwork() {
 	// increases the counter of disseminated result approvals
