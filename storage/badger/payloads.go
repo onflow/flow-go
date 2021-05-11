@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
@@ -42,15 +43,15 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 	// which is not included in current payload but was incorporated in one of previous blocks.
 	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
 	// and execution result is decoupled.
-	resultsById := payload.Results.Lookup()
+	resultsByID := payload.Results.Lookup()
 	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 	var err error
 	for _, meta := range payload.Receipts {
-		result, ok := resultsById[meta.ResultID]
+		result, ok := resultsByID[meta.ResultID]
 		if !ok {
 			result, err = p.results.ByID(meta.ResultID)
 			if err != nil {
-				if errors.Is(err, badger.ErrKeyNotFound) {
+				if errors.Is(err, storage.ErrNotFound) {
 					err = fmt.Errorf("invalid payload referencing unknown execution result %v", meta.ResultID)
 				}
 				return func(*badger.Txn) error {
@@ -104,16 +105,16 @@ func (p *Payloads) storeTxn(blockID flow.Identifier, payload *flow.Payload) func
 	// which is not included in current payload but was incorporated in one of previous blocks.
 	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
 	// and execution result is decoupled.
-	resultsById := payload.Results.Lookup()
+	resultsByID := payload.Results.Lookup()
 	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
 	var err error
 	for _, meta := range payload.Receipts {
-		result, ok := resultsById[meta.ResultID]
+		result, ok := resultsByID[meta.ResultID]
 		if !ok {
 			result, err = p.results.ByID(meta.ResultID)
 			if err != nil {
-				if errors.Is(err, badger.ErrKeyNotFound) {
-					err = fmt.Errorf("invalid payload referencing unknown execution result %v", meta.ResultID)
+				if errors.Is(err, storage.ErrNotFound) {
+					err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
 				}
 				return func(*transaction.Tx) error {
 					return err
