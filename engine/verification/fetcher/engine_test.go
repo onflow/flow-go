@@ -376,9 +376,11 @@ func testInvalidChunkDataResponse(t *testing.T,
 	// alters chunk data pack so that it become invalid.
 	alterChunkDataPack(chunkDataPacks[chunkID])
 	mockStateFunc(*agrees[0], s.state, block.ID())
+
+	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
 
-	mock.AssertExpectationsForObjects(t, s.pendingChunks)
+	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
 	s.chunkConsumerNotifier.AssertNotCalled(t, "Notify")
@@ -409,9 +411,10 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	// mocks there is no pending status for this chunk at fetcher engine.
 	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
 
+	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), chunkDataPacks[chunkID], collections[chunkID])
 
-	mock.AssertExpectationsForObjects(t, s.pendingChunks)
+	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
