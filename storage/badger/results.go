@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ExecutionResults implements persistent storage for execution results.
@@ -71,9 +72,9 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) 
 	}
 }
 
-func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		err := operation.IndexExecutionResult(blockID, resultID)(tx)
+func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		err := operation.IndexExecutionResult(blockID, resultID)(tx.DBTxn)
 		if err == nil {
 			return nil
 		}
@@ -120,7 +121,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := operation.RetryOnConflict(r.db.Update, r.index(blockID, resultID))
+	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID))
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}

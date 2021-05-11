@@ -36,68 +36,6 @@ func NewPayloads(db *badger.DB, index *Index, guarantees *Guarantees, seals *Sea
 	return p
 }
 
-func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(*badger.Txn) error {
-	// For correct payloads, the execution result is part of the payload or it's already stored
-	// in storage. If execution result is not present in either of those places, we error.
-	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
-	// which is not included in current payload but was incorporated in one of previous blocks.
-	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
-	// and execution result is decoupled.
-	resultsByID := payload.Results.Lookup()
-	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
-	var err error
-	for _, meta := range payload.Receipts {
-		result, ok := resultsByID[meta.ResultID]
-		if !ok {
-			result, err = p.results.ByID(meta.ResultID)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					err = fmt.Errorf("invalid payload referencing unknown execution result %v", meta.ResultID)
-				}
-				return func(*badger.Txn) error {
-					return err
-				}
-			}
-		}
-		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
-	}
-
-	return func(tx *badger.Txn) error {
-
-		// make sure all payload guarantees are stored
-		for _, guarantee := range payload.Guarantees {
-			err := p.guarantees.storeTx(guarantee)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store guarantee: %w", err)
-			}
-		}
-
-		// make sure all payload seals are stored
-		for _, seal := range payload.Seals {
-			err := p.seals.storeTx(seal)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store seal: %w", err)
-			}
-		}
-
-		// store all payload receipts
-		for _, receipt := range fullReceipts {
-			err := p.receipts.store(receipt)(tx)
-			if err != nil {
-				return fmt.Errorf("could not store receipt: %w", err)
-			}
-		}
-
-		// store the index
-		err := p.index.storeTx(blockID, payload.Index())(tx)
-		if err != nil {
-			return fmt.Errorf("could not store index: %w", err)
-		}
-
-		return nil
-	}
-}
-
 func (p *Payloads) storeTxn(blockID flow.Identifier, payload *flow.Payload) func(*transaction.Tx) error {
 	// For correct payloads, the execution result is part of the payload or it's already stored
 	// in storage. If execution result is not present in either of those places, we error.
@@ -220,7 +158,7 @@ func (p *Payloads) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*fl
 }
 
 func (p *Payloads) Store(blockID flow.Identifier, payload *flow.Payload) error {
-	return operation.RetryOnConflict(p.db.Update, p.storeTx(blockID, payload))
+	return operation.RetryOnConflictTx(p.db, transaction.Update, p.storeTxn(blockID, payload))
 }
 
 func (p *Payloads) ByBlockID(blockID flow.Identifier) (*flow.Payload, error) {

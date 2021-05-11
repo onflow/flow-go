@@ -81,10 +81,6 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 }
 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
-func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
-	return r.cache.Put(receipt.ID(), receipt)
-}
-
 func (r *ExecutionReceipts) storeTxn(receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
 	return r.cache.PutTxn(receipt.ID(), receipt)
 }
@@ -100,7 +96,7 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*
 	}
 }
 
-func (r *ExecutionReceipts) byBlockId(blockID flow.Identifier) func(*badger.Txn) ([]*flow.ExecutionReceipt, error) {
+func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) func(*badger.Txn) ([]*flow.ExecutionReceipt, error) {
 	return func(tx *badger.Txn) ([]*flow.ExecutionReceipt, error) {
 		var receiptIDs []flow.Identifier
 		err := operation.LookupExecutionReceipts(blockID, &receiptIDs)(tx)
@@ -121,7 +117,7 @@ func (r *ExecutionReceipts) byBlockId(blockID flow.Identifier) func(*badger.Txn)
 }
 
 func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
-	return operation.RetryOnConflict(r.db.Update, r.store(receipt))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.storeTxn(receipt))
 }
 
 func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
@@ -154,5 +150,5 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
-	return r.byBlockId(blockID)(tx)
+	return r.byBlockID(blockID)(tx)
 }

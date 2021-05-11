@@ -44,10 +44,6 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 	return g
 }
 
-func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
-	return g.cache.Put(guarantee.ID(), guarantee)
-}
-
 func (g *Guarantees) storeTxn(guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
 	return g.cache.PutTxn(guarantee.ID(), guarantee)
 }
@@ -63,7 +59,7 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return operation.RetryOnConflict(g.db.Update, g.storeTx(guarantee))
+	return operation.RetryOnConflictTx(g.db, transaction.Update, g.storeTxn(guarantee))
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
