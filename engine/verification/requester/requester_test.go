@@ -35,7 +35,7 @@ type RequesterEngineTestSuite struct {
 	state           *protocol.State                   // used to check the last sealed height
 	con             *mocknetwork.Conduit              // used to send chunk data request, and receive the response
 	tracer          module.Tracer
-	metrics         module.VerificationMetrics
+	metrics         *mock.VerificationMetrics
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -105,11 +105,13 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &response.ChunkDataPack, &response.Collection).Return().Once()
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Once()
+	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
 	err := e.Process(originID, response)
 	require.Nil(t, err)
 
-	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests)
+	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
 }
 
 // TestHandleChunkDataPack_HappyPath_Multiple evaluates the happy path of receiving several requested chunk data packs.
