@@ -3,6 +3,7 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -106,7 +107,7 @@ func (vm *VirtualMachine) invokeContractFunction(
 	arguments []interpreter.Value,
 	argumentTypes []sema.Type,
 	ctx *Context,
-	proc *TransactionProcedure,
+	parentSpan opentracing.Span,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (fvmErr errors.Error, processErr error) {
@@ -118,7 +119,7 @@ func (vm *VirtualMachine) invokeContractFunction(
 		argumentTypes,
 		zerolog.Nop(),
 	)
-	_, err := invocator.Invoke(vm, ctx, proc, sth, programs)
+	_, err := invocator.Invoke(vm, ctx, parentSpan, sth, programs)
 
 	return errors.SplitErrorTypes(err)
 }

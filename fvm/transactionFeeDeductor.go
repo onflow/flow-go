@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
@@ -29,12 +31,13 @@ func (d *TransactionFeeDeductor) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
+	var span opentracing.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMDeductTransactionFees)
 		defer span.Finish()
 	}
 
-	txErr, fatalErr := d.deductFees(vm, ctx, proc, sth, programs)
+	txErr, fatalErr := d.deductFees(vm, ctx, proc, span, sth, programs)
 	// TODO handle deduct fee failures, for now just return as error
 	if txErr != nil {
 		return txErr
@@ -46,6 +49,7 @@ func (d *TransactionFeeDeductor) deductFees(
 	vm *VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
+	parentSpan opentracing.Span,
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) (errors.Error, error) {
@@ -62,7 +66,7 @@ func (d *TransactionFeeDeductor) deductFees(
 			sema.AuthAccountType,
 		},
 		ctx,
-		proc,
+		parentSpan,
 		sth,
 		programs,
 	)

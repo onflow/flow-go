@@ -41,10 +41,10 @@ func NewTransactionContractFunctionInvocator(
 	}
 }
 
-func (i *TransactionContractFunctionInvocator) Invoke(vm *VirtualMachine, ctx *Context, proc *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (cadence.Value, error) {
+func (i *TransactionContractFunctionInvocator) Invoke(vm *VirtualMachine, ctx *Context, parentSpan opentracing.Span, sth *state.StateHolder, programs *programs.Programs) (cadence.Value, error) {
 	var span opentracing.Span
-	if ctx.Tracer != nil && proc.TraceSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
+	if ctx.Tracer != nil && parentSpan != nil {
+		span = ctx.Tracer.StartSpanFromParent(parentSpan, trace.FVMInvokeContractFunction)
 		span.LogFields(
 			traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", i.contractLocation.String(), i.functionName)),
 		)
@@ -54,7 +54,6 @@ func (i *TransactionContractFunctionInvocator) Invoke(vm *VirtualMachine, ctx *C
 	env := newEnvironment(*ctx, vm, sth, programs)
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	env.setTransaction(proc.Transaction, proc.TxIndex)
 	env.setTraceSpan(span)
 	location := common.StringLocation("ContractFunctionInvocation")
 
@@ -72,7 +71,6 @@ func (i *TransactionContractFunctionInvocator) Invoke(vm *VirtualMachine, ctx *C
 
 	if err != nil {
 		i.logger.Info().
-			Str("txHash", proc.ID.String()).
 			Msg("Contract function call executed with error")
 	}
 	return value, err
