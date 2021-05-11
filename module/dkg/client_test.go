@@ -190,7 +190,6 @@ func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
 	// set up the admin account
 	s.setUpAdmin()
 
-	// create single dkg participant
 	nodeIDs := make([]flow.Identifier, len(participants))
 	accountKeys := make([]*sdk.AccountKey, len(participants))
 	signers := make([]sdkcrypto.Signer, len(participants))
