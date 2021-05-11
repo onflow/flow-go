@@ -8,9 +8,8 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -201,7 +200,6 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 			finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
 		}
 	}
-
 
 	err = tx.AddArgument(cadence.NewArray(finalSubmission))
 	if err != nil {
