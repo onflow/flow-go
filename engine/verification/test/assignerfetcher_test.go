@@ -141,7 +141,7 @@ func TestVerificationHappyPath(t *testing.T) {
 // ready to read.
 func withConsumers(t *testing.T, staked bool, blockCount int,
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup),
-	ops ...vertestutils.CompleteExecutionReceiptBuilderOpt) {
+	opts ...vertestutils.CompleteExecutionReceiptBuilderOpt) {
 
 	collector := &metrics.NoopCollector{}
 	tracer := &trace.NoopTracer{}
