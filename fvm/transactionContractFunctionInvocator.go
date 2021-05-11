@@ -54,7 +54,9 @@ func (i *TransactionContractFunctionInvocator) Invoke(vm *VirtualMachine, ctx *C
 	env := newEnvironment(*ctx, vm, sth, programs)
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	env.setTraceSpan(span)
+	if span != nil {
+		env.setTraceSpan(span)
+	}
 	location := common.StringLocation("ContractFunctionInvocation")
 
 	value, err := vm.Runtime.InvokeContractFunction(
