@@ -112,6 +112,11 @@ func (e *blockComputer) executeBlock(
 	programs *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
+	// check the start state is set
+	if !block.HasStartState() {
+		return nil, fmt.Errorf("executable block start state is not set")
+	}
+
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 	res := &execution.ComputationResult{
@@ -135,7 +140,7 @@ func (e *blockComputer) executeBlock(
 		committer: e.committer,
 		blockSpan: blockSpan,
 		tracer:    e.tracer,
-		state:     block.StartState,
+		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
 		callBack: func(state flow.StateCommitment, proof []byte, err error) {
 			if err != nil {
@@ -322,12 +327,11 @@ func (e *blockComputer) executeTransaction(
 	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
 	defer mergeSpan.Finish()
 
-	if tx.Err == nil {
-		err := collectionView.MergeView(txView)
-		if err != nil {
-			return err
-		}
-
+	// always merge the view, fvm take cares of reverting changes
+	// of failed transaction invocation
+	err = collectionView.MergeView(txView)
+	if err != nil {
+		return fmt.Errorf("merging tx view to collection view failed: %w", err)
 	}
 
 	res.AddEvents(tx.Events)

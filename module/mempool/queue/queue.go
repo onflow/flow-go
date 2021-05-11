@@ -117,25 +117,27 @@ func dequeue(queue *Queue) *Queue {
 // TryAdd(elmt) is an idempotent operation for the same elmt, i.e.
 // after the first, subsequent additions of the same elements are NoOps.
 // Returns:
-// True if and only if _after_ the operation, the element is stored in the
+// stored = True if and only if _after_ the operation, the element is stored in the
 // queue. This is the case if (a) element was newly added to the queue or
 // (b) element was already stored in the queue _before_ the call.
-// Adding an element fails with return value `false` in the following cases:
+// new = Indicates if element was new to the queue, when `stored` was true. It lets
+// distinguish (a) and (b) cases.
+// Adding an element fails with return value `false` for `stored` in the following cases:
 //   * element.ParentID() is _not_ stored in the queue
 //   * element's height is _unequal to_ its parent's height + 1
-func (q *Queue) TryAdd(element Blockify) bool {
+func (q *Queue) TryAdd(element Blockify) (stored bool, new bool) {
 	if _, found := q.Nodes[element.ID()]; found {
 		// (b) element was already stored in the queue _before_ the call.
-		return true
+		return true, false
 	}
 	// at this point, we are sure that the element is _not_ in the queue and therefore,
 	// the element cannot be referenced as a child by any other element in the queue
 	n, ok := q.Nodes[element.ParentID()]
 	if !ok {
-		return false
+		return false, false
 	}
 	if n.Item.Height() != element.Height()-1 {
-		return false
+		return false, false
 	}
 	newNode := &Node{
 		Item:     element,
@@ -150,7 +152,7 @@ func (q *Queue) TryAdd(element Blockify) bool {
 	if element.Height() > q.Highest.Item.Height() {
 		q.Highest = newNode
 	}
-	return true
+	return true, true
 }
 
 // Attach joins the other queue to this one, modifying this queue in-place.

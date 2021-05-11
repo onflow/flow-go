@@ -331,8 +331,8 @@ func (a *PublicAssignmentTestSuite) CreateChunks(num int, t *testing.T) flow.Chu
 	for i := 0; i < num; i++ {
 		// creates random state for each chunk
 		// to provide random ordering after sorting
-		state := make([]byte, 64)
-		_, err := rand.Read(state)
+		var state flow.StateCommitment
+		_, err := rand.Read(state[:])
 		require.NoError(t, err)
 
 		blockID := unittest.IdentifierFixture()

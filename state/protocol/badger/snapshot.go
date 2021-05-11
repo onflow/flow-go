@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/mapfunc"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -222,7 +223,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 	// apply the filter to the participants
 	identities = identities.Filter(selector)
 	// apply a deterministic sort to the participants
-	identities = identities.Order(order.ByNodeIDAsc)
+	identities = identities.Sort(order.ByNodeIDAsc)
 
 	return identities, nil
 }
@@ -247,7 +248,7 @@ func (s *Snapshot) Commit() (flow.StateCommitment, error) {
 	// get the ID of the sealed block
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get look up sealed commit: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("could not retrieve sealed state commit: %w", err)
 	}
 	return seal.FinalState, nil
 }
@@ -265,7 +266,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 }
 
 func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
-	_, seal, err := s.SealedResult()
+	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
@@ -273,26 +274,20 @@ func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
 	var segment []*flow.Block
-	err = state.TraverseBackward(s.state.headers, s.blockID, func(header *flow.Header) error {
+	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get block: %w", err)
 		}
 		segment = append(segment, block)
-
 		return nil
-	}, func(header *flow.Header) bool {
-		return header.ID() != seal.BlockID
-	})
+	}
+	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
 	}
 
-	// reverse the segment so it is in ascending order by height
-	for i, j := 0, len(segment)-1; i < j; i, j = i+1, j-1 {
-		segment[i], segment[j] = segment[j], segment[i]
-	}
 	return segment, nil
 }
 

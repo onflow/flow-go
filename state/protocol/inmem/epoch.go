@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -107,9 +106,6 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 
 func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 	identities := es.setupEvent.Participants.Filter(filter.Any)
-	// apply a deterministic sort to the participants
-	identities = identities.Order(order.ByNodeIDAsc)
-
 	return identities, nil
 }
 
@@ -175,11 +171,18 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
+	// filter initial participants to valid DKG participants
+	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
+	lookup, err := flow.ToDKGParticipantLookup(participants, es.commitEvent.DKGParticipantKeys)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct dkg lookup: %w", err)
+	}
+
 	dkg, err := DKGFromEncodable(EncodableDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
 			PublicKey: es.commitEvent.DKGGroupKey,
 		},
-		Participants: es.commitEvent.DKGParticipants,
+		Participants: lookup,
 	})
 	return dkg, err
 }

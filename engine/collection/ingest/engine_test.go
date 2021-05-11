@@ -139,7 +139,7 @@ func (suite *Suite) TestInvalidTransaction() {
 		tx := unittest.TransactionBodyFixture()
 		tx.Payer = unittest.RandomAddressFixture()
 		tx.ReferenceBlockID = suite.root.ID()
-		tx.GasLimit = flow.DefaultMaxGasLimit + 1
+		tx.GasLimit = flow.DefaultMaxTransactionGasLimit + 1
 
 		err := suite.engine.ProcessLocal(&tx)
 		suite.Assert().Error(err)
