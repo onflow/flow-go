@@ -168,12 +168,16 @@ func (c *approvalProcessingCore) processIncorporatedResult(result *flow.Incorpor
 	// no checks for orphans can be made at this point
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
 
-	collector, newIncorporatedResult, err := c.collectorTree.GetOrCreateCollector(result.Result)
+	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
 	}
 
-	err = collector.ProcessIncorporatedResult(result)
+	if lazyCollector.Orphan {
+		return engine.NewOutdatedInputErrorf("collector for %s is marked as orphan", result.ID())
+	}
+
+	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result: %w", err)
 	}
@@ -184,8 +188,8 @@ func (c *approvalProcessingCore) processIncorporatedResult(result *flow.Incorpor
 	// approvals for this result, and process them
 	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
 	// time, ensuring that processing of pending approvals happens once for particular assignment
-	if newIncorporatedResult {
-		err = c.processPendingApprovals(collector)
+	if lazyCollector.Created {
+		err = c.processPendingApprovals(lazyCollector.Collector)
 		if err != nil {
 			return fmt.Errorf("could not process cached approvals:  %w", err)
 		}
@@ -256,14 +260,14 @@ func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) 
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
 	}
 
-	if collector := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
-		if collector.Orphan {
+	if collector, orphan := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
+		if orphan {
 			return engine.NewOutdatedInputErrorf("collector for %s is marked as orphan", approval.Body.ExecutionResultID)
 		}
 
 		// if there is a collector it means that we have received execution result and we are ready
 		// to process approvals
-		err = collector.Collector.ProcessApproval(approval)
+		err = collector.ProcessApproval(approval)
 		if err != nil {
 			return fmt.Errorf("could not process assignment: %w", err)
 		}
@@ -294,7 +298,7 @@ func (c *approvalProcessingCore) checkEmergencySealing(lastSealedHeight, lastFin
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
-		err := collector.Collector.CheckEmergencySealing(lastFinalizedHeight)
+		err := collector.CheckEmergencySealing(lastFinalizedHeight)
 		if err != nil {
 			return err
 		}
