@@ -65,7 +65,7 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 			return storage.ErrAlreadyExists
 		}
 		if err != badger.ErrKeyNotFound {
-			return fmt.Errorf("could not check key: %w", err)
+			return storage.ErrNotFound
 		}
 
 		// serialize the entity data
