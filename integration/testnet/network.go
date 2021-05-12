@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -23,6 +24,7 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/fvm"
@@ -31,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/epochs"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -628,21 +631,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 	}
 
-	// generate the initial execution state
-	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(
-		trieDir,
-		unittest.ServiceAccountPublicKey,
-		chain,
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-	)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
 	// define root block parameters
 	parentID := flow.ZeroID
 	height := uint64(0)
@@ -689,6 +677,39 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		ClusterQCs:         clusterQCs,
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
+	}
+
+	// TODO: choose sensible values
+	epochConfig := epochs.EpochConfig{
+		EpochTokenPayout:             cadence.UFix64(0),
+		RewardCut:                    cadence.UFix64(0),
+		CurrentEpochCounter:          cadence.UInt64(epochCounter),
+		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView - 1),
+		NumViewsInStakingAuction:     cadence.UInt64(100),
+		NumViewsInDKGPhase:           cadence.UInt64(100),
+		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
+		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
+		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
+		CollectorClusters:            clusterAssignments,
+		ClusterQCs:                   clusterQCs,
+		DKGPubKeys:                   dkg.PubKeyShares,
+	}
+
+	// generate the initial execution state
+	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(
+		trieDir,
+		unittest.ServiceAccountPublicKey,
+		chain,
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithRootBlock(root.Header),
+		fvm.WithEpochConfig(epochConfig),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	// generate execution result and block seal

@@ -13,16 +13,18 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 )
 
 // A BootstrapProcedure is an invokable that can be used to bootstrap the ledger state
 // with the default accounts and contracts required by the Flow virtual machine.
 type BootstrapProcedure struct {
-	vm       *VirtualMachine
-	ctx      Context
-	sth      *state.StateHolder
-	programs *programs.Programs
-	accounts *state.Accounts
+	vm        *VirtualMachine
+	ctx       Context
+	sth       *state.StateHolder
+	programs  *programs.Programs
+	accounts  *state.Accounts
+	rootBlock *flow.Header
 
 	// genesis parameters
 	serviceAccountPublicKey flow.AccountPublicKey
@@ -33,6 +35,8 @@ type BootstrapProcedure struct {
 	transactionFee            cadence.UFix64
 	minimumStorageReservation cadence.UFix64
 	storagePerFlow            cadence.UFix64
+
+	epochConfig epochs.EpochConfig
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -99,6 +103,20 @@ func WithMinimumStorageReservation(reservation cadence.UFix64) BootstrapProcedur
 	}
 }
 
+func WithEpochConfig(epochConfig epochs.EpochConfig) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.epochConfig = epochConfig
+		return bp
+	}
+}
+
+func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.rootBlock = rootBlock
+		return bp
+	}
+}
+
 func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.storagePerFlow = ratio
@@ -115,6 +133,7 @@ func Bootstrap(
 	bootstrapProcedure := &BootstrapProcedure{
 		serviceAccountPublicKey: serviceAccountPublicKey,
 		transactionFee:          0,
+		epochConfig:             epochs.DefaultEpochConfig(),
 	}
 
 	for _, applyOption := range opts {
@@ -126,6 +145,7 @@ func Bootstrap(
 func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
 	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
+	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
 
@@ -149,6 +169,17 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation, b.storagePerFlow)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
+
+	b.deployDKG(service)
+
+	b.deployQC(service)
+
+	b.deployIDTableStaking(service,
+		fungibleToken,
+		flowToken)
+
+	b.deployEpoch(service, fungibleToken, flowToken)
+
 	return nil
 }
 
@@ -242,6 +273,73 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
 }
 
+func (b *BootstrapProcedure) deployDKG(service flow.Address) {
+	contract := contracts.FlowDKG()
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployContractTransaction(service, contract, "FlowDKG"),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy DKG contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) deployQC(service flow.Address) {
+	contract := contracts.FlowQC()
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployContractTransaction(service, contract, "FlowEpochClusterQC"),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy QC contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) deployIDTableStaking(
+	service, fungibleToken,
+	flowToken flow.Address) {
+
+	contract := contracts.FlowIDTableStaking(
+		fungibleToken.HexWithPrefix(),
+		flowToken.HexWithPrefix(),
+		true)
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployIDTableStakingTransaction(service,
+			contract,
+			b.epochConfig.EpochTokenPayout,
+			b.epochConfig.RewardCut),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy IDTableStaking contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) deployEpoch(service, fungibleToken, flowToken flow.Address) {
+
+	contract := contracts.FlowEpoch(
+		fungibleToken.HexWithPrefix(),
+		flowToken.HexWithPrefix(),
+		service.HexWithPrefix(),
+		service.HexWithPrefix(),
+		service.HexWithPrefix(),
+	)
+
+	context := NewContextFromParent(b.ctx,
+		WithBlockHeader(b.rootBlock),
+		WithBlocks(&NoopBlockFinder{}),
+	)
+
+	txError, err := b.vm.invokeMetaTransaction(
+		context,
+		deployEpochTransaction(service, contract, b.epochConfig),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy Epoch contract: %s", txError, err)
+}
+
 func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowToken, feeContract flow.Address) {
 	contract := contracts.FlowServiceAccount(
 		fungibleToken.HexWithPrefix(),
@@ -330,6 +428,40 @@ const deployStorageFeesTransactionTemplate = `
 transaction {
   prepare(serviceAccount: AuthAccount) {
     serviceAccount.contracts.add(name: "FlowStorageFees", code: "%s".decodeHex())
+  }
+}
+`
+
+const deployIDTableStakingTransactionTemplate = `
+transaction {
+  prepare(serviceAccount: AuthAccount) {
+	serviceAccount.contracts.add(name: "FlowIDTableStaking", code: "%s".decodeHex(), epochTokenPayout: UFix64(%d), rewardCut: UFix64(%d))
+  }
+}
+`
+
+const deployEpochTransactionTemplate = `
+import FlowEpochClusterQC from 0x%s
+
+transaction(collectorClusters: [FlowEpochClusterQC.Cluster],
+			clusterQCs: [FlowEpochClusterQC.ClusterQC],
+			dkgPubKeys: [String], 
+	) {
+  prepare(serviceAccount: AuthAccount)	{
+	serviceAccount.contracts.add(
+		name: "FlowEpoch",
+		code: "%s".decodeHex(),
+		currentEpochCounter: UInt64(%d),
+		numViewsInEpoch: UInt64(%d),
+		numViewsInStakingAuction: UInt64(%d),
+		numViewsInDKGPhase: UInt64(%d),
+		numCollectorClusters: UInt16(%d),
+		FLOWsupplyIncreasePercentage: UFix64(%d),
+		randomSource: %s,
+		collectorClusters: collectorClusters,
+		clusterQCs: clusterQCs,
+		dkgPubKeys: dkgPubKeys,
+	)
   }
 }
 `
@@ -451,6 +583,43 @@ func deployStorageFeesTransaction(service flow.Address, contract []byte) *Transa
 			AddAuthorizer(service),
 		0,
 	)
+}
+
+func deployIDTableStakingTransaction(service flow.Address, contract []byte, epochTokenPayout cadence.UFix64, rewardCut cadence.UFix64) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(
+				deployIDTableStakingTransactionTemplate,
+				hex.EncodeToString(contract),
+				epochTokenPayout,
+				rewardCut))).
+			AddAuthorizer(service),
+		0,
+	)
+}
+
+func deployEpochTransaction(service flow.Address, contract []byte, epochConfig epochs.EpochConfig) *TransactionProcedure {
+	tx := Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(
+				deployEpochTransactionTemplate,
+				service,
+				hex.EncodeToString(contract),
+				epochConfig.CurrentEpochCounter,
+				epochConfig.NumViewsInEpoch,
+				epochConfig.NumViewsInStakingAuction,
+				epochConfig.NumViewsInDKGPhase,
+				epochConfig.NumCollectorClusters,
+				epochConfig.FLOWsupplyIncreasePercentage,
+				epochConfig.RandomSource,
+			))).
+			AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters, service)).
+			AddArgument(epochs.EncodeClusterQCs(epochConfig.ClusterQCs, service)).
+			AddArgument(epochs.EncodePubKeys(epochConfig.DKGPubKeys, service)).
+			AddAuthorizer(service),
+		0,
+	)
+	return tx
 }
 
 func mintFlowTokenTransaction(
