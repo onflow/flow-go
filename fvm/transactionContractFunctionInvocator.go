@@ -13,8 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/module/trace"
 )
 
@@ -41,25 +39,22 @@ func NewTransactionContractFunctionInvocator(
 	}
 }
 
-func (i *TransactionContractFunctionInvocator) Invoke(vm *VirtualMachine, ctx *Context, parentSpan opentracing.Span, sth *state.StateHolder, programs *programs.Programs) (cadence.Value, error) {
+func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *TransactionProcedure, ) (cadence.Value, error) {
 	var span opentracing.Span
-	if ctx.Tracer != nil && parentSpan != nil {
-		span = ctx.Tracer.StartSpanFromParent(parentSpan, trace.FVMInvokeContractFunction)
+
+	if env.ctx.Tracer != nil && proc.TraceSpan != nil {
+		span = env.ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMInvokeContractFunction)
 		span.LogFields(
 			traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", i.contractLocation.String(), i.functionName)),
 		)
 		defer span.Finish()
 	}
 
-	env := newEnvironment(*ctx, vm, sth, programs)
-	predeclaredValues := valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(&env.ctx, env)
 
-	if span != nil {
-		env.setTraceSpan(span)
-	}
 	location := common.StringLocation("ContractFunctionInvocation")
 
-	value, err := vm.Runtime.InvokeContractFunction(
+	value, err := env.vm.Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
 		i.arguments,
