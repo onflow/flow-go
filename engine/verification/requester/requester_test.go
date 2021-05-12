@@ -273,6 +273,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// makes all (unsealed) chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(unsealedRequests))
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -286,6 +287,8 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
