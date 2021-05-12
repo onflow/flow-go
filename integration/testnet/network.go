@@ -514,8 +514,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
 			nodeContainer.addFlag("collection-ingress-port", "9000")
-			// should always have at least 1 execution node
-			nodeContainer.addFlag("script-addr", "execution_1:9000")
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
 			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
