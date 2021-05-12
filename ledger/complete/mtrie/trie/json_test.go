@@ -16,24 +16,21 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
-func Test_DumpJSON_Empty(t *testing.T) {
+func Test_DumpJSONEmpty(t *testing.T) {
 
-	trie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
-	require.NoError(t, err)
+	trie := trie.NewEmptyMTrie()
 
 	var buffer bytes.Buffer
-
-	err = trie.DumpAsJSON(&buffer)
+	err := trie.DumpAsJSON(&buffer)
 	require.NoError(t, err)
 
 	json := buffer.String()
-
 	assert.Empty(t, json)
 }
 
-func Test_DumpJSON(t *testing.T) {
+func Test_DumpJSONNonEmpty(t *testing.T) {
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
+	forest, err := mtrie.NewForest(complete.DefaultCacheSize, &metrics.NoopCollector{}, nil)
 	require.NoError(t, err)
 
 	emptyRootHash := forest.GetEmptyRootHash()
@@ -56,7 +53,7 @@ func Test_DumpJSON(t *testing.T) {
 		ledger.NewKeyPart(5, []byte("dolor")),
 	})
 
-	update, err := ledger.NewUpdate(emptyRootHash, []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
+	update, err := ledger.NewUpdate(ledger.State(emptyRootHash), []ledger.Key{key1, key2, key3}, []ledger.Value{{1}, {2}, {3}})
 	require.NoError(t, err)
 
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
@@ -94,5 +91,4 @@ func Test_DumpJSON(t *testing.T) {
 
 	// key 3
 	require.Contains(t, jsons, "{\"Key\":{\"KeyParts\":[{\"Type\":9,\"Value\":\"6c6f72656d\"},{\"Type\":0,\"Value\":\"697073756d\"},{\"Type\":5,\"Value\":\"646f6c6f72\"}]},\"Value\":\"03\"}")
-
 }

@@ -52,7 +52,7 @@ func NewConsumer(
 	maxProcessing int64,
 ) *Consumer {
 	return &Consumer{
-		log: log.With().Str("module", "jobqueue").Logger(),
+		log: log.With().Str("sub_module", "job_queue").Logger(),
 
 		// store dependency
 		jobs:     jobs,

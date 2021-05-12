@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -99,6 +98,7 @@ func main() {
 			datadir := filepath.Join(homedir, ".flow", "execution")
 
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
+			flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 40, "number of WAL segments between checkpoints")
@@ -190,7 +190,7 @@ func main() {
 			} else {
 				// if execution database has been bootstrapped, then the root statecommit must equal to the one
 				// in the bootstrap folder
-				if !bytes.Equal(commit, node.RootSeal.FinalState) {
+				if commit != node.RootSeal.FinalState {
 					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
 						"bootstap has statecommitment: %x",
 						commit, node.RootSeal.FinalState)
