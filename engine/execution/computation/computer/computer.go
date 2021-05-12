@@ -327,11 +327,11 @@ func (e *blockComputer) executeTransaction(
 	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
 	defer mergeSpan.Finish()
 
-	// always merge the view, fvm take cares of reverting changes
-	// of failed transaction invocation
-	err = collectionView.MergeView(txView)
-	if err != nil {
-		return fmt.Errorf("merging tx view to collection view failed: %w", err)
+	if tx.Err == nil {
+		err := collectionView.MergeView(txView)
+		if err != nil {
+			return err
+		}
 	}
 
 	res.AddEvents(tx.Events)
