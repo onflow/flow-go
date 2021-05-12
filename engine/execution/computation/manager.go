@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strings"
+	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
@@ -36,15 +37,18 @@ type ComputationManager interface {
 	GetAccount(addr flow.Address, header *flow.Header, view state.View) (*flow.Account, error)
 }
 
+var DefaultScriptLogThreshold = 1 * time.Second
+
 // Manager manages computation and execution
 type Manager struct {
-	log           zerolog.Logger
-	me            module.Local
-	protoState    protocol.State
-	vm            VirtualMachine
-	vmCtx         fvm.Context
-	blockComputer computer.BlockComputer
-	programsCache *ProgramsCache
+	log                zerolog.Logger
+	me                 module.Local
+	protoState         protocol.State
+	vm                 VirtualMachine
+	vmCtx              fvm.Context
+	blockComputer      computer.BlockComputer
+	programsCache      *ProgramsCache
+	scriptLogThreshold time.Duration
 }
 
 func New(
@@ -57,6 +61,7 @@ func New(
 	vmCtx fvm.Context,
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
+	scriptLogThreshold time.Duration,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -79,13 +84,14 @@ func New(
 	}
 
 	e := Manager{
-		log:           log,
-		me:            me,
-		protoState:    protoState,
-		vm:            vm,
-		vmCtx:         vmCtx,
-		blockComputer: blockComputer,
-		programsCache: programsCache,
+		log:                log,
+		me:                 me,
+		protoState:         protoState,
+		vm:                 vm,
+		vmCtx:              vmCtx,
+		blockComputer:      blockComputer,
+		programsCache:      programsCache,
+		scriptLogThreshold: scriptLogThreshold,
 	}
 
 	return &e, nil
@@ -108,19 +114,35 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	err := func() (err error) {
 
+		start := time.Now()
+
 		defer func() {
-			if r := recover(); r != nil {
-				err = fmt.Errorf("cadence runtime error: %s", r)
+
+			prepareLog := func() *zerolog.Event {
 
 				args := make([]string, 0)
 				for _, a := range arguments {
 					args = append(args, hex.EncodeToString(a))
 				}
-				e.log.Error().
+				return e.log.Error().
 					Hex("script_hex", code).
-					Str("args", strings.Join(args[:], ",")).
-					Interface("r", r).
+					Str("args", strings.Join(args[:], ","))
+			}
+
+			elapsed := time.Since(start)
+
+			if r := recover(); r != nil {
+				prepareLog().
+					Interface("recovered", r).
 					Msg("script execution caused runtime panic")
+
+				err = fmt.Errorf("cadence runtime error: %s", r)
+				return
+			}
+			if elapsed >= e.scriptLogThreshold {
+				prepareLog().
+					Dur("duration", elapsed).
+					Msg("script execution exceeded threshold")
 			}
 		}()
 
