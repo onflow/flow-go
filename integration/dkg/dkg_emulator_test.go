@@ -16,7 +16,6 @@ import (
 )
 
 func TestWithEmulator(t *testing.T) {
-	t.Skip() // un-skip once https://github.com/onflow/flow-go/pull/692 is merged
 	suite.Run(t, new(DKGSuite))
 }
 
