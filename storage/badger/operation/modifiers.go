@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
@@ -23,6 +24,17 @@ func SkipDuplicates(op func(*badger.Txn) error) func(tx *badger.Txn) error {
 func RetryOnConflict(action func(func(*badger.Txn) error) error, op func(tx *badger.Txn) error) error {
 	for {
 		err := action(op)
+		if errors.Is(err, badger.ErrConflict) {
+			metrics.GetStorageCollector().RetryOnConflict()
+			continue
+		}
+		return err
+	}
+}
+
+func RetryOnConflictTx(db *badger.DB, action func(*badger.DB, func(*transaction.Tx) error) error, op func(*transaction.Tx) error) error {
+	for {
+		err := action(db, op)
 		if errors.Is(err, badger.ErrConflict) {
 			metrics.GetStorageCollector().RetryOnConflict()
 			continue

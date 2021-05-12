@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
@@ -78,7 +78,6 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.tracer,
 		s.metrics,
 		s.pendingRequests,
-		s.handler,
 		s.retryInterval,
 		// requests are only qualified if their retryAfter is elapsed.
 		requester.RetryAfterQualifier,
@@ -88,6 +87,8 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 		s.requestTargets)
 	require.NoError(t, err)
 	testifymock.AssertExpectationsForObjects(t, net)
+
+	e.WithChunkDataPackHandler(s.handler)
 
 	return e
 }
@@ -176,7 +177,7 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithHeight(5),
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
-	test.MockLastSealedHeight(s.state, 10)
+	vertestutils.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
@@ -212,7 +213,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	chunkCollectionIdMap := chunkToCollectionIdMap(t, []*messages.ChunkDataResponse{response})
 
 	// mocks the requester pipeline
-	test.MockLastSealedHeight(s.state, sealedHeight)
+	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
 	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
@@ -258,7 +259,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	requests := append(sealedRequests, unsealedRequests...)
 
-	test.MockLastSealedHeight(s.state, sealedHeight)
+	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests)
 
 	// makes all (unsealed) chunk requests being qualified for dispatch instantly
@@ -305,7 +306,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		unittest.WithHeightGreaterThan(5),
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
-	test.MockLastSealedHeight(s.state, 5)
+	vertestutils.MockLastSealedHeight(s.state, 5)
 	s.pendingRequests.On("All").Return(requests)
 
 	// makes all chunk requests being qualified for dispatch instantly
@@ -338,7 +339,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	// the chunk request should be dispatched.
 	agrees := unittest.IdentifierListFixture(2)
 	disagrees := unittest.IdentifierListFixture(3)
-	test.MockLastSealedHeight(s.state, 5)
+	vertestutils.MockLastSealedHeight(s.state, 5)
 	// models requests that are just added to the mempool and are ready to dispatch.
 	instantQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
 		unittest.WithHeightGreaterThan(5),

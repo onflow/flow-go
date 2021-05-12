@@ -26,7 +26,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/build"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -53,7 +52,7 @@ type LibP2PFactoryFunc func() (*Node, error)
 // DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
 // proper parameters.
 func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
-	maxPubSubMsgSize int, metrics module.NetworkMetrics) (LibP2PFactoryFunc, error) {
+	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider) (LibP2PFactoryFunc, error) {
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
 		// skip message signing
@@ -65,7 +64,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 	}
 
 	return func() (*Node, error) {
-		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
+		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, pingInfoProvider, psOptions...)
 	}, nil
 }
 
@@ -91,6 +90,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	key fcrypto.PrivateKey,
 	allowList bool,
 	rootBlockID string,
+	pingInfoProvider PingInfoProvider,
 	psOption ...pubsub.Option) (*Node, error) {
 
 	libp2pKey, err := privKey(key)
@@ -116,7 +116,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	}
 
 	pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
-	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, build.Semver(), logger)
+	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, pingInfoProvider, logger)
 
 	n := &Node{
 		connGater:            connGater,

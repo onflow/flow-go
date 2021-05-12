@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type Seals struct {
@@ -48,6 +49,10 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
 func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
 	return s.cache.Put(seal.ID(), seal)
+}
+
+func (s *Seals) storeTxn(seal *flow.Seal) func(*transaction.Tx) error {
+	return s.cache.PutTxn(seal.ID(), seal)
 }
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {

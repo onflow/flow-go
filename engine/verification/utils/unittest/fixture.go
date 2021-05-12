@@ -1,7 +1,8 @@
-package utils
+package vertestutils
 
 import (
 	"context"
+	"math/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/messages"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,12 +50,92 @@ type CompleteExecutionReceipt struct {
 	ReceiptsData []*ExecutionReceiptData  // execution receipts data of the container block
 }
 
+type CompleteExecutionReceiptList []*CompleteExecutionReceipt
+
+// ChunkDataResponseOf is a test helper method that returns a chunk data pack response message for the specified chunk ID that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
+func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
+	result, chunkIndex := c.resultOf(t, chunkID)
+	receiptData := c.ReceiptDataOf(t, chunkID)
+
+	// publishes the chunk data pack response to the network
+	res := &messages.ChunkDataResponse{
+		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
+		Nonce:         rand.Uint64(),
+	}
+
+	// only non-system chunks have a collection
+	if !isSystemChunk(chunkIndex, len(result.Chunks)) {
+		res.Collection = *receiptData.Collections[chunkIndex]
+	}
+
+	return res
+}
+
+// ChunkOf is a test helper method that returns the chunk of the specified index from the specified result that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no execution result with the specified identifier is found in this complete execution receipt list.
+func (c CompleteExecutionReceiptList) ChunkOf(t *testing.T, resultID flow.Identifier, chunkIndex uint64) *flow.Chunk {
+	for _, completeER := range c {
+		for _, result := range completeER.ContainerBlock.Payload.Results {
+			if result.ID() == resultID {
+				return result.Chunks[chunkIndex]
+			}
+		}
+	}
+
+	require.Fail(t, "could not find specified chunk in the complete execution result list")
+	return nil
+}
+
+// ReceiptDataOf is a test helper method that returns the receipt data of the specified chunk ID that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
+func (c CompleteExecutionReceiptList) ReceiptDataOf(t *testing.T, chunkID flow.Identifier) *ExecutionReceiptData {
+	for _, completeER := range c {
+		for _, receiptData := range completeER.ReceiptsData {
+			for _, cdp := range receiptData.ChunkDataPacks {
+				if cdp.ChunkID == chunkID {
+					return receiptData
+				}
+			}
+		}
+	}
+
+	require.Fail(t, "could not find receipt data of specified chunk in the complete execution result list")
+	return nil
+}
+
+// resultOf is a test helper method that returns the execution result and chunk index of the specified chunk ID that
+// should belong to this complete execution receipt list.
+//
+// It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
+func (c CompleteExecutionReceiptList) resultOf(t *testing.T, chunkID flow.Identifier) (*flow.ExecutionResult, uint64) {
+	for _, completeER := range c {
+		for _, result := range completeER.ContainerBlock.Payload.Results {
+			for _, chunk := range result.Chunks {
+				if chunk.ID() == chunkID {
+					return result, chunk.Index
+				}
+			}
+		}
+	}
+
+	require.Fail(t, "could not find specified chunk in the complete execution result list")
+	return nil, uint64(0)
+}
+
 // CompleteExecutionReceiptBuilder is a test helper struct that specifies the parameters to build a CompleteExecutionReceipt.
 type CompleteExecutionReceiptBuilder struct {
 	resultsCount int // number of execution results in the container block.
 	copyCount    int // number of times each execution result is copied in a block (by different receipts).
 	chunksCount  int // number of chunks in each execution result.
 	chain        flow.Chain
+	executorIDs  flow.IdentifierList // identifier of execution nodes in the test.
 }
 
 type CompleteExecutionReceiptBuilderOpt func(builder *CompleteExecutionReceiptBuilder)
@@ -64,7 +146,7 @@ func WithResults(count int) CompleteExecutionReceiptBuilderOpt {
 	}
 }
 
-func WithChunks(count int) CompleteExecutionReceiptBuilderOpt {
+func WithChunksCount(count int) CompleteExecutionReceiptBuilderOpt {
 	return func(builder *CompleteExecutionReceiptBuilder) {
 		builder.chunksCount = count
 	}
@@ -82,6 +164,12 @@ func WithChain(chain flow.Chain) CompleteExecutionReceiptBuilderOpt {
 	}
 }
 
+func WithExecutorIDs(executorIDs flow.IdentifierList) CompleteExecutionReceiptBuilderOpt {
+	return func(builder *CompleteExecutionReceiptBuilder) {
+		builder.executorIDs = executorIDs
+	}
+}
+
 // CompleteExecutionReceiptFixture returns complete execution receipt with an
 // execution receipt referencing the block collections.
 //
@@ -90,7 +178,7 @@ func WithChain(chain flow.Chain) CompleteExecutionReceiptBuilderOpt {
 // for the system chunk.
 // TODO: remove this function once new verification architecture is in place.
 func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain, root *flow.Header) *CompleteExecutionReceipt {
-	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunks(chunks), WithChain(chain))[0]
+	return CompleteExecutionReceiptChainFixture(t, root, 1, WithChunksCount(chunks), WithChain(chain))[0]
 }
 
 // ExecutionResultFixture is a test helper that returns an execution result for the reference block header as well as the execution receipt data
@@ -256,7 +344,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				ChunkID:      chunk.ID(),
 				StartState:   chunk.StartState,
 				Proof:        proof,
-				CollectionID: collection.ID(),
+				CollectionID: collectionID,
 			}
 
 			chunks = append(chunks, chunk)
@@ -389,11 +477,18 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 		apply(builder)
 	}
 
+	if len(builder.executorIDs) == 0 {
+		builder.executorIDs = unittest.IdentifierListFixture(builder.copyCount)
+	}
+
+	require.GreaterOrEqual(t, len(builder.executorIDs), builder.copyCount,
+		"number of executors in the tests should be greater than or equal to the number of receipts per block")
+
 	for i := 0; i < count; i++ {
 		// Generates two blocks as parent <- R <- C where R is a reference block containing guarantees,
 		// and C is a container block containing execution receipt for R.
-		allResults, allData, head := ExecutionResultsFromParentBlockFixture(t, parent, builder)
-		containerBlock, receipts := ContainerBlockFixture(head, allResults)
+		receipts, allData, head := ExecutionReceiptsFromParentBlockFixture(t, parent, builder)
+		containerBlock := ContainerBlockFixture(head, receipts)
 		completeERs = append(completeERs, &CompleteExecutionReceipt{
 			ContainerBlock: containerBlock,
 			Receipts:       receipts,
@@ -405,29 +500,35 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 	return completeERs
 }
 
-// ExecutionResultsFromParentBlockFixture creates a chain of results from a parent block.
+// ExecutionReceiptsFromParentBlockFixture creates a chain of receipts from a parent block.
 //
 // By default each result refers to a distinct reference block, and it extends the block chain after generating each
 // result (i.e., for the next result).
 //
 // Each result may appear in more than one receipt depending on the builder parameters.
-func ExecutionResultsFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) ([]*flow.ExecutionResult,
+func ExecutionReceiptsFromParentBlockFixture(t *testing.T, parent *flow.Header, builder *CompleteExecutionReceiptBuilder) (
+	[]*flow.ExecutionReceipt,
 	[]*ExecutionReceiptData, *flow.Header) {
-	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount)
-	allResults := make([]*flow.ExecutionResult, 0, builder.resultsCount)
+
+	allData := make([]*ExecutionReceiptData, 0, builder.resultsCount*builder.copyCount)
+	allReceipts := make([]*flow.ExecutionReceipt, 0, builder.resultsCount*builder.copyCount)
 
 	for i := 0; i < builder.resultsCount; i++ {
 		result, data := ExecutionResultFromParentBlockFixture(t, parent, builder)
 
 		// makes several copies of the same result
 		for cp := 0; cp < builder.copyCount; cp++ {
+			allReceipts = append(allReceipts, &flow.ExecutionReceipt{
+				ExecutorID:      builder.executorIDs[cp],
+				ExecutionResult: *result,
+			})
+
 			allData = append(allData, data)
-			allResults = append(allResults, result)
 		}
 		parent = data.ReferenceBlock.Header
 	}
 
-	return allResults, allData, parent
+	return allReceipts, allData, parent
 }
 
 // ExecutionResultFromParentBlockFixture is a test helper that creates a child (reference) block from the parent, as well as an execution for it.
@@ -437,21 +538,11 @@ func ExecutionResultFromParentBlockFixture(t *testing.T, parent *flow.Header, bu
 	return ExecutionResultFixture(t, builder.chunksCount, builder.chain, &refBlkHeader)
 }
 
-// ContainerBlockFixture builds and returns a block that contains an execution receipt for the
-// input result.
-func ContainerBlockFixture(parent *flow.Header, results []*flow.ExecutionResult) (*flow.Block, []*flow.ExecutionReceipt) {
-	receipts := make([]*flow.ExecutionReceipt, 0, len(results))
-
-	for _, result := range results {
-		receipts = append(receipts, &flow.ExecutionReceipt{
-			ExecutorID:      unittest.IdentifierFixture(),
-			ExecutionResult: *result,
-		})
-	}
-
+// ContainerBlockFixture builds and returns a block that contains input execution receipts.
+func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceipt) *flow.Block {
 	// container block is the block that contains the execution receipt of reference block
 	containerBlock := unittest.BlockWithParentFixture(parent)
 	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
-	return &containerBlock, receipts
+	return &containerBlock
 }
