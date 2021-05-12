@@ -335,7 +335,7 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--access-address=%s", accessAddress),
-		fmt.Sprintf("--qc-contract-address=%s", unittest.ServiceAccountPublicKey.PublicKey.String()),
+		fmt.Sprintf("--qc-contract-address=%s",flow.Testnet.Chain().ServiceAddress().String()),
 	)
 
 	return service
