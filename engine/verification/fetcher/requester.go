@@ -9,6 +9,9 @@ import (
 type ChunkDataPackRequester interface {
 	// Request makes the request of chunk data pack for the specified chunk ID with the specified targets.
 	Request(request *verification.ChunkDataPackRequest)
+	// WithChunkDataPackHandler registers the handler component of requester engine. The handler implements the logic of handling
+	// a requested chunk data pack upon its arrival.
+	WithChunkDataPackHandler(handler ChunkDataPackHandler)
 }
 
 // ChunkDataPackHandler encapsulates the logic of handling a requested chunk data pack upon its arrival.

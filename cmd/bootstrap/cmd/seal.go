@@ -28,12 +28,6 @@ func constructRootResultAndSeal(
 	}
 	stateCommit, err := flow.ToStateCommitment(stateCommitBytes)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not convert state commitment")
-	}
-
-	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err = rand.Read(randomSource)
-	if err != nil {
 		log.Fatal().
 			Int("expected_state_commitment_length", len(stateCommit)).
 			Int("received_state_commitment_length", len(stateCommitBytes)).
