@@ -779,7 +779,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				}
 
 				// update `committed_epoch_final_view` metric with new final view
-				m.complianceMetrics.CommittedEpochFinalView(setup.FinalView)
+				m.metrics.CommittedEpochFinalView(setup.FinalView)
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.CommitID = ev.ID()
