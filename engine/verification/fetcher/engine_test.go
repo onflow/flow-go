@@ -28,7 +28,6 @@ import (
 
 // FetcherEngineTestSuite encapsulates data structures for running unittests on fetcher engine.
 type FetcherEngineTestSuite struct {
-	// modules
 	log                   zerolog.Logger
 	metrics               *module.VerificationMetrics
 	tracer                *trace.NoopTracer

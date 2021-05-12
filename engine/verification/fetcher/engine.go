@@ -1,8 +1,10 @@
 package fetcher
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -12,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -113,7 +116,6 @@ func (e *Engine) Done() <-chan struct{} {
 // Once a chunk has been processed, it will call the processing notifier callback to notify
 // the chunk consumer in order to process the next chunk.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
-	// TODO: add tracing and metrics.
 	locatorID := locator.ID()
 	lg := e.log.With().
 		Hex("locator_id", logging.ID(locatorID)).
@@ -138,33 +140,57 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Logger()
 	lg.Debug().Msg("result and chunk for locator retrieved")
 
+	span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
+	if !ok {
+		span = e.tracer.StartSpan(chunkID, trace.VERProcessAssignedChunk)
+		span.SetTag("chunk_id", chunkID)
+		defer span.Finish()
+	}
+
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleAssignedChunk, func() {
+		requested, err := e.processAssignedChunk(ctx, chunk, result)
+		if err != nil {
+			lg.Fatal().Err(err).Msg("could not process assigned chunk")
+		}
+
+		lg.Info().Bool("requested", requested).Msg("assigned chunk processed successfully")
+
+		if requested {
+			e.metrics.OnChunkDataPackRequestSentByFetcher()
+		}
+	})
+}
+
+// processAssignedChunk receives an assigned chunk and its result and requests its chunk data pack from requester.
+// Boolean return value determines whether chunk data pack was requested or not.
+func (e *Engine) processAssignedChunk(ctx context.Context, chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
 	// skips processing a chunk if it belongs to a sealed block.
+	chunkID := chunk.ID()
 	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+		return false, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
 		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		lg.Info().Msg("drops requesting chunk of a sealed block")
-		return
+		return false, nil
 	}
 
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{
-		ChunkIndex:      locator.Index,
+		ChunkIndex:      chunk.Index,
 		ExecutionResult: result,
+		Ctx:             ctx,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
 		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
-		lg.Fatal().Msg("received a duplicate chunk locator, possible data race")
-		return
+		return false, fmt.Errorf("data race detected, received a duplicate chunk locator")
 	}
 
-	err = e.requestChunkDataPack(chunkID, locator.ResultID, chunk.BlockID)
+	err = e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not request chunk data pack")
-		return
+		return false, fmt.Errorf("could not request chunk data pack: %w", err)
 	}
 
 	// requesting a chunk data pack is async, i.e., once engine reaches this point
@@ -174,7 +200,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	//
 	// both these events happen through requester module calling fetchers callbacks.
 	// it is during those callbacks that we notify the consumer that we are done with this job.
-	lg.Info().Msg("chunk data pack requested from requester engine")
+	return true, nil
 }
 
 // HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
@@ -197,48 +223,60 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 
-	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	resultID := status.ExecutionResult.ID()
-
 	lg = lg.With().
 		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).
 		Hex("result_id", logging.ID(resultID)).
 		Uint64("chunk_index", status.ChunkIndex).
 		Logger()
 
-	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection, status.ExecutionResult)
-	if err != nil {
-		// TODO: this can be due to a byzantine behavior
-		lg.Error().Err(err).Msg("could not validate chunk data pack")
-		return
-	}
+	e.tracer.WithSpanFromContext(status.Ctx, trace.VERFetcherHandleChunkDataPack, func() {
+		// make sure the chunk data pack is valid
+		err := e.validateChunkDataPack(status.ChunkIndex, originID, chunkDataPack, collection, status.ExecutionResult)
+		if err != nil {
+			// TODO: this can be due to a byzantine behavior
+			lg.Error().Err(err).Msg("could not validate chunk data pack")
+			return
+		}
 
-	lg = lg.With().
-		Hex("result_id", logging.ID(resultID)).
-		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).Logger()
+		processed, err := e.handleValidatedChunkDataPack(status, chunkDataPack, collection)
+		if err != nil {
+			lg.Fatal().Err(err).Msg("could not handle validated chunk data pack")
+			return
+		}
 
+		if processed {
+			e.metrics.OnVerifiableChunkSentToVerifier()
+
+			// we need to report that the job has been finished eventually
+			e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+			lg.Info().Msg("verifiable chunk pushed to verifier engine")
+		}
+	})
+}
+
+// handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
+// verifier engine.
+// Boolean return value determines whether verifiable chunk pushed to verifier or not.
+func (e *Engine) handleValidatedChunkDataPack(status *verification.ChunkStatus, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) (bool, error) {
+
+	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
-	lg.Debug().Bool("removed", removed).Msg("removed chunk status")
+
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
 		// on processing current one.
-		return
+		return false, nil
 	}
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
-	err = e.pushToVerifier(chunk, status.ExecutionResult, chunkDataPack, collection)
+	err := e.pushToVerifier(chunk, status.ExecutionResult, chunkDataPack, collection)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
-		return
+		return false, fmt.Errorf("could not push the chunk to verifier engine")
 	}
 
-	e.metrics.OnVerifiableChunkSentToVerifier()
-
-	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
-	lg.Info().Msg("chunk verification is done")
+	return true, nil
 }
 
 // validateChunkDataPack validates the integrity of a received chunk data pack as well as the authenticity of its sender.
@@ -246,11 +284,14 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // given collection.
 //
 // Regarding the authenticity: the chunk data pack should be coming from a sender that is an staked execution node at the block of the chunk.
-func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
+func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	senderID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
 	collection *flow.Collection,
 	result *flow.ExecutionResult) error {
+
+	chunk := result.Chunks[chunkIndex]
+
 	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
@@ -450,7 +491,6 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 
 	e.requester.Request(request)
 
-	e.metrics.OnChunkDataPackRequestSentByFetcher()
 	return nil
 }
 
