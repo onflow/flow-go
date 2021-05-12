@@ -232,7 +232,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 	e.tracer.WithSpanFromContext(status.Ctx, trace.VERFetcherHandleChunkDataPack, func() {
 		// make sure the chunk data pack is valid
-		err := e.validateChunkDataPack(status.ChunkIndex, originID, chunkDataPack, collection, status.ExecutionResult)
+		err := e.validateChunkDataPackWithTracing(status.Ctx, status.ChunkIndex, originID, chunkDataPack, collection, status.ExecutionResult)
 		if err != nil {
 			// TODO: this can be due to a byzantine behavior
 			lg.Error().Err(err).Msg("could not validate chunk data pack")
@@ -258,7 +258,10 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
 // verifier engine.
 // Boolean return value determines whether verifiable chunk pushed to verifier or not.
-func (e *Engine) handleValidatedChunkDataPack(status *verification.ChunkStatus, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) (bool, error) {
+func (e *Engine) handleValidatedChunkDataPack(
+	status *verification.ChunkStatus,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) (bool, error) {
 
 	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
@@ -271,12 +274,28 @@ func (e *Engine) handleValidatedChunkDataPack(status *verification.ChunkStatus, 
 	}
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
-	err := e.pushToVerifier(chunk, status.ExecutionResult, chunkDataPack, collection)
+	err := e.pushToVerifierWithTracing(status.Ctx, chunk, status.ExecutionResult, chunkDataPack, collection)
 	if err != nil {
 		return false, fmt.Errorf("could not push the chunk to verifier engine")
 	}
 
 	return true, nil
+}
+
+// validateChunkDataPackWithTracing validates chunk data pack with tracing enabled. It provides a tracing wrapper around validateChunkDataPack.
+func (e *Engine) validateChunkDataPackWithTracing(ctx context.Context,
+	chunkIndex uint64,
+	senderID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+	result *flow.ExecutionResult) error {
+
+	var err error
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherValidateChunkDataPack, func() {
+		err = e.validateChunkDataPack(chunkIndex, senderID, chunkDataPack, collection, result)
+	})
+
+	return err
 }
 
 // validateChunkDataPack validates the integrity of a received chunk data pack as well as the authenticity of its sender.
@@ -406,6 +425,22 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 
 	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
+}
+
+// pushToVerifierWithTracing provides a wrapper around pushing a verifiable chunk to verifier engine with tracing enabled.
+func (e *Engine) pushToVerifierWithTracing(
+	ctx context.Context,
+	chunk *flow.Chunk,
+	result *flow.ExecutionResult,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) error {
+
+	var err error
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherPushToVerifier, func() {
+		err = e.pushToVerifier(chunk, result, chunkDataPack, collection)
+	})
+
+	return err
 }
 
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.

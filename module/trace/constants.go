@@ -127,8 +127,10 @@ const (
 	// fetcher engine
 	VERProcessAssignedChunk SpanName = "ver.processAssignedChunk"
 	// children of VERProcessAssignedChunk
-	VERFetcherHandleAssignedChunk SpanName = "ver.fetcher.handleAssignedChunk"
-	VERFetcherHandleChunkDataPack SpanName = "ver.fetcher.handleChunkDataPack"
+	VERFetcherHandleAssignedChunk   SpanName = "ver.fetcher.handleAssignedChunk"
+	VERFetcherHandleChunkDataPack   SpanName = "ver.fetcher.handleChunkDataPack"
+	VERFetcherPushToVerifier        SpanName = "ver.fetcher.pushToVerifier"
+	VERFetcherValidateChunkDataPack SpanName = "ver.fetcher.pushToVerifier"
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
