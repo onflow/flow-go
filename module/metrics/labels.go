@@ -67,6 +67,7 @@ const (
 	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
 	ResourceChunkStatus              = "chunk_status"                 // verification node, fetcher engine
+	ResourceChunkRequest             = "chunk_request"                // verification node, requester engine
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
