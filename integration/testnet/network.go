@@ -620,7 +620,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write private key files for each node
-	for _, nodeConfig := range confs {
+	for i, nodeConfig := range confs {
 		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
 
 		// retrieve private representation of the node
@@ -636,8 +636,23 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 		// We use the network key for the machine account. Normally it would be
 		// a separate key.
+
+		// Accounts are generated in a known order during bootstrapping, and
+		// account addresses are deterministic based on order for a given chain
+		// configuration. During the bootstrapping. We create accounts for the
+		// FungibleToken, FlowToken, and FlowFees smart contracts besides the
+		// service account. The service account has index 0, then these 3
+		// accounts would occupy account indices [1-3], so the node machine
+		// accounts would occupy account indices [4,n+4]. They will be created
+		// in the order defined by the identity list provided to the
+		// BootstrapProcedure, which is the same order as the container configs.
+		accountAddress, err := chainID.Chain().AddressAtIndex(uint64(4 + i))
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
 		info := bootstrap.NodeMachineAccountInfo{
-			Address:           nodeConfig.Address,
+			Address:           accountAddress.HexWithPrefix(),
 			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
 			KeyIndex:          0,
 			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
