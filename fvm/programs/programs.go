@@ -56,6 +56,9 @@ func (p *Programs) ChildPrograms() *Programs {
 	return &Programs{
 		programs: map[common.LocationID]ProgramEntry{},
 		parentFunc: func(location common.Location) (*ProgramEntry, bool) {
+			//p.lock.RLock()
+			//defer p.lock.RUnlock()
+
 			return p.get(location)
 		},
 	}

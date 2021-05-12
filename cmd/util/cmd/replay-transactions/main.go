@@ -210,6 +210,7 @@ func mainnet7() int {
 	loader := newLoader("/mnt/data/protocol", "/mnt/data/execution-root", "devnet12", "devnet/block-ids", "devnet/blocks", vm, true, flow.Mainnet, true)
 
 	first := 13_404_174
+	//first := 13_411_835
 	last := 13_804_274
 
 	totalTx := 0

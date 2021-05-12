@@ -1,6 +1,7 @@
 package computer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -382,6 +383,8 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 
 	workingCollectionView := collectionView.NewChild()
 
+	debugOutput := false
+
 	for _, txBody := range collection.Transactions {
 
 		wg := sync.WaitGroup{}
@@ -405,7 +408,14 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 
 		go func() {
 			defer wg.Done()
+
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("about to execute #1 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+			}
 			txEvents, txServiceEvents, txResult, txGasUsed, err = e.executeTransaction(txBody, colSpan, txMetrics, workingCollectionView, programs, txCtx, txIndex)
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("executed #1 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+			}
 			if err != nil {
 				wrong = true
 			}
@@ -415,10 +425,17 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 			defer wg.Done()
 			alternativeCollectionView = baseCollectionView.NewChild()
 
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("about to execute #2 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+			}
+
 			_, _, _, _, err =
 				e.executeTransaction(txBody, colSpan, txMetrics, alternativeCollectionView, collectionPrograms, txCtx, txIndex)
 			if err != nil {
 				wrong = true
+			}
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("executed #2 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
 			}
 		}()
 
@@ -426,16 +443,24 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 			defer wg.Done()
 			blockView = alternativeBlockView.NewChild()
 
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("about to execute #3 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+			}
 			_, _, _, _, err =
 				e.executeTransaction(txBody, colSpan, txMetrics, blockView, blockPrograms, txCtx, txIndex)
 			if err != nil {
 				wrong = true
+			}
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("executed #3 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
 			}
 		}()
 
 		wg.Wait()
 
 		if wrong {
+			fmt.Printf("WRONG WRONG WRONG block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+
 			return nil, nil, nil, 0, 0, nil, nil, 0, 0, 0, err
 		}
 
@@ -445,22 +470,55 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 		txResults = append(txResults, txResult)
 		gasUsed += txGasUsed
 
-		interactions := workingCollectionView.(*delta.View).Interactions().Delta
-		collectionInteractions := alternativeCollectionView.(*delta.View).Interactions().Delta
-		blockInteractionsInteractions := blockView.(*delta.View).Interactions().Delta
+		interactions := workingCollectionView.(*delta.View).Interactions().Delta.Data
+		collectionInteractions := alternativeCollectionView.(*delta.View).Interactions().Delta.Data
+		blockInteractionsInteractions := blockView.(*delta.View).Interactions().Delta.Data
 
-		collectionD, err := diff.Diff(interactions, collectionInteractions)
+		blockC := make(chan []string, 0)
+		collectionC := make(chan []string, 0)
+
+		go func() {
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("about to diff #1 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+				fmt.Printf("interactions delta size: %d collection delta size: %d\n", len(interactions), len(collectionInteractions))
+			}
+			//d, err := diff.Diff(interactions, collectionInteractions)
+			collectionC <- diffData(interactions, collectionInteractions)
+
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("done diff #1 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+			}
+		}()
+
+		go func() {
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("about to diff #2 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+				fmt.Printf("interactions delta size: %d block delta size: %d\n", len(interactions), len(blockInteractionsInteractions))
+			}
+			//d, err := diff.Diff(interactions, blockInteractionsInteractions)
+			blockC <- diffData(interactions, blockInteractionsInteractions)
+			//blockC <- d
+			if header.Height > 13_411_835 && debugOutput {
+				fmt.Printf("done diff #2 for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+			}
+		}()
+
+		collectionD := <-collectionC
+		blockD := <-blockC
 
 		if len(collectionD) > 0 {
 			conflictingCollectionTxs++
 		}
 
-		blockD, err := diff.Diff(interactions, blockInteractionsInteractions)
 		if len(blockD) > 0 {
 			conflictingBlockTxs++
 		}
 
-		writeTxRegisters(txIndex, txBody, header, workingCollectionView, collectionIndex, collection.Collection(), collectionD, blockD)
+		go writeTxRegisters(txIndex, txBody, header, workingCollectionView, collectionIndex, collection.Collection(), collectionD, blockD)
+
+		if header.Height > 13_411_835 && debugOutput {
+			fmt.Printf("written data for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
+		}
 
 		totalTx++
 	}
@@ -474,9 +532,40 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
 
-	collectionView.MergeView(workingCollectionView)
+	err := collectionView.MergeView(workingCollectionView)
+	if err != nil {
+		return nil, nil, nil, 0, 0, nil, nil, 0, 0, 0, fmt.Errorf("cannot merge viee: %w", err)
+	}
 
 	return events, serviceEvents, txResults, txIndex, gasUsed, cumulativeBlockConflicts, cumulativeCollectionConflicts, totalTx, conflictingBlockTxs, conflictingCollectionTxs, nil
+}
+
+func diffData(a map[string]flow.RegisterEntry, b map[string]flow.RegisterEntry) []string {
+	allkeys := make(map[string]struct{})
+
+	diffs := make([]string, 0)
+
+	for k := range a {
+		allkeys[k] = struct{}{}
+	}
+	for k := range b {
+		allkeys[k] = struct{}{}
+	}
+
+	for key := range allkeys {
+		entryA, hasA := a[key]
+		entryB, hasB := b[key]
+
+		if hasA && hasB {
+			if !bytes.Equal(entryA.Value, entryB.Value) {
+				diffs = append(diffs, key)
+			}
+		} else {
+			diffs = append(diffs, key)
+		}
+	}
+
+	return diffs
 }
 
 type TransactionBody struct {
@@ -497,7 +586,7 @@ type TxJson struct {
 	BlockConflicts      []string
 }
 
-func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow.Header, view state.View, collectionIndex int, collection flow.Collection, collectionD diff.Changelog, blockD diff.Changelog) {
+func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow.Header, view state.View, collectionIndex int, collection flow.Collection, collectionD []string, blockD []string) {
 
 	basedir := "/mnt/data-out/blocks"
 
@@ -532,17 +621,17 @@ func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow
 		},
 		Reads:               reads,
 		Writes:              writes,
-		CollectionConflicts: make([]string, len(collectionD)),
-		BlockConflicts:      make([]string, len(blockD)),
+		CollectionConflicts: collectionD,
+		BlockConflicts:      blockD,
 	}
 
-	for i, change := range collectionD {
-		s.CollectionConflicts[i] = strings.Join(change.Path, "/")
-	}
-
-	for i, change := range blockD {
-		s.BlockConflicts[i] = strings.Join(change.Path, "/")
-	}
+	//for i, change := range collectionD {
+	//	s.CollectionConflicts[i] = strings.Join(change.Path, "/")
+	//}
+	//
+	//for i, change := range blockD {
+	//	s.BlockConflicts[i] = strings.Join(change.Path, "/")
+	//}
 
 	data, err := json.MarshalIndent(s, "", "    ")
 	if err != nil {
