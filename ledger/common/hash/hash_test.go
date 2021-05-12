@@ -5,8 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/stretchr/testify/assert"
 
 	cryhash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/ledger"
