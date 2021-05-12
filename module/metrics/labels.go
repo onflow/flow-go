@@ -55,7 +55,7 @@ const (
 	ResourceTransaction              = "transaction"
 	ResourceClusterPayload           = "cluster_payload"
 	ResourceClusterProposal          = "cluster_proposal"
-	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine
+	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine // TODO: remove finder engine labels
 	ResourceDiscardedResultID        = "discarded_result_id"          // verification node, finder engine
 	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
 	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
@@ -66,6 +66,7 @@ const (
 	ResourcePendingBlock             = "pending_block"                // verification node, match engine
 	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
+	ResourceChunkStatus              = "chunk_status"                 // verification node, fetcher engine
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"

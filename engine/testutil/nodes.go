@@ -828,6 +828,7 @@ func NewVerificationNode(t testing.TB,
 
 	if node.ChunkStatuses == nil {
 		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
+		err = mempoolCollector.Register(metrics.ResourceChunkStatus, node.ChunkStatuses.Size)
 	}
 
 	if node.ChunkRequests == nil {
