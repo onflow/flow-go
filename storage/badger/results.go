@@ -74,7 +74,7 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) 
 
 func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		err := operation.IndexExecutionResult(blockID, resultID)(tx.DBTxn)
+		err := transaction.WithTx(operation.IndexExecutionResult(blockID, resultID))(tx)
 		if err == nil {
 			return nil
 		}
@@ -86,7 +86,7 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transa
 		// when trying to index a result for a block, and there is already a result indexed for this block,
 		// double check if the indexed result is the same
 		var storedResultID flow.Identifier
-		err = operation.LookupExecutionResult(blockID, &storedResultID)(tx.DBTxn)
+		err = transaction.WithTx(operation.LookupExecutionResult(blockID, &storedResultID))(tx)
 		if err != nil {
 			return fmt.Errorf("there is a result stored already, but cannot retrieve it: %w", err)
 		}

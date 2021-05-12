@@ -427,13 +427,13 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 		}
 
 		// index the latest sealed block in this fork
-		err = operation.IndexBlockSeal(blockID, last.ID())(tx.DBTxn)
+		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
 
 		// index the child block for recovery
-		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx.DBTxn)
+		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}

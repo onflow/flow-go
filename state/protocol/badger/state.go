@@ -136,18 +136,18 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transa
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
 			}
-			err = operation.InsertBlockValidity(blockID, true)(tx.DBTxn)
+			err = transaction.WithTx(operation.InsertBlockValidity(blockID, true))(tx)
 			if err != nil {
 				return fmt.Errorf("could not mark root block as valid: %w", err)
 			}
-			err = operation.IndexBlockHeight(height, blockID)(tx.DBTxn)
+			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(tx.DBTxn)
+				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -155,7 +155,7 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transa
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = operation.InsertBlockChildren(head.ID(), nil)(tx.DBTxn)
+		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
