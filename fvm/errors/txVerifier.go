@@ -172,6 +172,11 @@ func (e InvalidProposalSeqNumberError) CurrentSeqNumber() uint64 {
 	return e.currentSeqNumber
 }
 
+// ProvidedSeqNumber returns the provided sequence number
+func (e InvalidProposalSeqNumberError) ProvidedSeqNumber() uint64 {
+	return e.providedSeqNumber
+}
+
 func (e InvalidProposalSeqNumberError) Error() string {
 	return fmt.Sprintf(
 		"%s invalid proposal key: public key %d on account %s has sequence number %d, but given %d",

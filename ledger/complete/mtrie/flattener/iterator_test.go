@@ -13,13 +13,12 @@ import (
 )
 
 func TestEmptyTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(1)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	itr := flattener.NewNodeIterator(emptyTrie)
 	require.True(t, nil == itr.Value()) // initial iterator should return nil
 
-	require.True(t, itr.Next())
+	require.False(t, itr.Next())
 	require.Equal(t, emptyTrie.RootNode(), itr.Value())
 	require.Equal(t, emptyTrie.RootNode(), itr.Value()) // test that recalling twice has no problem
 	require.False(t, itr.Next())
@@ -27,8 +26,7 @@ func TestEmptyTrie(t *testing.T) {
 }
 
 func TestPopulatedTrie(t *testing.T) {
-	emptyTrie, err := trie.NewEmptyMTrie(1)
-	require.NoError(t, err)
+	emptyTrie := trie.NewEmptyMTrie()
 
 	// key: 0000...
 	p1 := utils.PathByUint8(1)
@@ -53,12 +51,12 @@ func TestPopulatedTrie(t *testing.T) {
 
 	require.True(t, itr.Next())
 	p1_leaf := itr.Value()
-	require.Equal(t, p1, p1_leaf.Path())
+	require.Equal(t, p1, *p1_leaf.Path())
 	require.Equal(t, v1, p1_leaf.Payload())
 
 	require.True(t, itr.Next())
 	p2_leaf := itr.Value()
-	require.Equal(t, p2, p2_leaf.Path())
+	require.Equal(t, p2, *p2_leaf.Path())
 	require.Equal(t, v2, p2_leaf.Payload())
 
 	require.True(t, itr.Next())

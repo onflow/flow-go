@@ -476,7 +476,7 @@ func (m *MockCommits) EXPECT() *MockCommitsMockRecorder {
 }
 
 // BatchStore mocks base method
-func (m *MockCommits) BatchStore(arg0 flow.Identifier, arg1 []byte, arg2 storage.BatchStorage) error {
+func (m *MockCommits) BatchStore(arg0 flow.Identifier, arg1 flow.StateCommitment, arg2 storage.BatchStorage) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -490,10 +490,10 @@ func (mr *MockCommitsMockRecorder) BatchStore(arg0, arg1, arg2 interface{}) *gom
 }
 
 // ByBlockID mocks base method
-func (m *MockCommits) ByBlockID(arg0 flow.Identifier) ([]byte, error) {
+func (m *MockCommits) ByBlockID(arg0 flow.Identifier) (flow.StateCommitment, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ByBlockID", arg0)
-	ret0, _ := ret[0].([]byte)
+	ret0, _ := ret[0].(flow.StateCommitment)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -505,7 +505,7 @@ func (mr *MockCommitsMockRecorder) ByBlockID(arg0 interface{}) *gomock.Call {
 }
 
 // Store mocks base method
-func (m *MockCommits) Store(arg0 flow.Identifier, arg1 []byte) error {
+func (m *MockCommits) Store(arg0 flow.Identifier, arg1 flow.StateCommitment) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Store", arg0, arg1)
 	ret0, _ := ret[0].(error)

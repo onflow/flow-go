@@ -84,7 +84,10 @@ func (s *DKGSuite) SetupTest() {
 func (s *DKGSuite) initEmulator() {
 	s.chainID = flow.Emulator
 
-	blockchain, err := emulator.NewBlockchain(emulator.WithTransactionExpiry(flow.DefaultTransactionExpiry))
+	blockchain, err := emulator.NewBlockchain(
+		emulator.WithTransactionExpiry(flow.DefaultTransactionExpiry),
+		emulator.WithStorageLimitEnabled(false),
+	)
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain

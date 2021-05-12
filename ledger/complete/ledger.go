@@ -2,7 +2,6 @@ package complete
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
@@ -51,7 +51,7 @@ func NewLedger(
 	log zerolog.Logger,
 	pathFinderVer uint8) (*Ledger, error) {
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, capacity, metrics, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) error {
 		return wal.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
@@ -149,7 +149,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return nil, err
+		return ledger.State(hash.DummyHash), err
 	}
 
 	l.metrics.UpdateCount()
@@ -165,10 +165,10 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 	walError := <-walChan
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot update state: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
 	}
 	if walError != nil {
-		return nil, fmt.Errorf("error while writing LedgerWAL: %w", walError)
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -182,7 +182,8 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
-	l.logger.Info().Hex("from", update.State()).
+	state := update.State()
+	l.logger.Info().Hex("from", state[:]).
 		Hex("to", newRootHash[:]).
 		Int("update_size", update.Size()).
 		Msg("ledger updated")
@@ -244,13 +245,13 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
-		return nil, fmt.Errorf("cannot get try at the given state commitment: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
 	err = l.keepOnlyOneTrie(state)
 	if err != nil {
-		return nil, fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
 	// TODO enable validity check of trie
@@ -271,19 +272,28 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 
 		payloads, err = migrate(payloads)
 		if err != nil {
-			return nil, fmt.Errorf("error applying migration (%d): %w", i, err)
+			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
-		if payloadSize != len(payloads) {
-			l.logger.Warn().Int("migration_step", i).Int("expected_size", payloadSize).Int("outcome_size", len(payloads)).Msg("payload counts has changed during migration, make sure this is expected.")
+
+		newPayloadSize := len(payloads)
+
+		if payloadSize != newPayloadSize {
+			l.logger.Warn().
+				Int("migration_step", i).
+				Int("expected_size", payloadSize).
+				Int("outcome_size", newPayloadSize).
+				Msg("payload counts has changed during migration, make sure this is expected.")
 		}
 		l.logger.Info().Msgf("migration %d is done", i)
+
+		payloadSize = newPayloadSize
 	}
 
 	// run reporters
 	for i, reporter := range reporters {
 		err = reporter.Report(payloads)
 		if err != nil {
-			return nil, fmt.Errorf("error running reporter (%d): %w", i, err)
+			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
 		}
 	}
 
@@ -292,40 +302,43 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	// get paths
 	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
 	if err != nil {
-		return nil, fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
 	}
 
-	emptyTrie, err := trie.NewEmptyMTrie(pathfinder.PathByteSize)
-	if err != nil {
-		return nil, fmt.Errorf("constructing empty trie failed: %w", err)
-	}
+	emptyTrie := trie.NewEmptyMTrie()
 
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
 	if err != nil {
-		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}
 
 	l.logger.Info().Msg("creating a checkpoint for the new trie")
 
 	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create a checkpoint writer: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
 	}
 
 	flatTrie, err := flattener.FlattenTrie(newTrie)
 	if err != nil {
-		return nil, fmt.Errorf("failed to flatten the trie: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to flatten the trie: %w", err)
 	}
 
 	l.logger.Info().Msg("storing the checkpoint to the file")
 
 	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to store the checkpoint: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
 	}
 	writer.Close()
 
-	return newTrie.RootHash(), nil
+	return ledger.State(newTrie.RootHash()), nil
+}
+
+// MostRecentTouchedState returns a state which is most recently touched.
+func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
+	root, err := l.forest.MostRecentTouchedRootHash()
+	return ledger.State(root), err
 }
 
 // DumpTrieAsJSON export trie at specific state as a jsonl file, each line is json encode of a payload
@@ -336,7 +349,7 @@ func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error
 		return fmt.Errorf("cannot find the target trie: %w", err)
 	}
 
-	path := filepath.Join(outputFilePath, hex.EncodeToString(ledger.RootHash(state))+".trie.jsonl")
+	path := filepath.Join(outputFilePath, hex.EncodeToString(state[:])+".trie.jsonl")
 
 	fi, err := os.Create(path)
 	if err != nil {
@@ -364,7 +377,7 @@ func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
 	targetRootHash := ledger.RootHash(state)
 	for _, trie := range allTries {
 		trieRootHash := trie.RootHash()
-		if !bytes.Equal(trieRootHash, targetRootHash) {
+		if trieRootHash != targetRootHash {
 			l.forest.RemoveTrie(trieRootHash)
 		}
 	}

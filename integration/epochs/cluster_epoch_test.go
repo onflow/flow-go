@@ -41,7 +41,7 @@ type Suite struct {
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
 func (s *Suite) SetupTest() {
 	// create a new instance of the emulated blockchain
-	blockchain, err := emulator.NewBlockchain()
+	blockchain, err := emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
 	require.NoError(s.T(), err)
 	s.blockchain = blockchain
 	s.emulatorClient = emulatormod.NewEmulatorClient(blockchain)

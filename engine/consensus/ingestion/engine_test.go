@@ -181,6 +181,28 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	suite.conduit.AssertExpectations(suite.T())
 }
 
+func (suite *IngestionSuite) TestOnGuaranteeUnstaked() {
+
+	guarantee := suite.validGuarantee()
+
+	// the guarantee is not part of the memory pool yet
+	suite.pool.On("Has", guarantee.ID()).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
+
+	// we are not staked
+	suite.finalIdentities = suite.finalIdentities.Filter(filter.Not(filter.HasNodeID(suite.con1ID)))
+
+	// submit the guarantee
+	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	suite.Assert().NoError(err, "should not error on guarantee when unstaked")
+
+	// the guarantee should be added to the mempool
+	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
+
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything, mock.Anything, mock.Anything)
+}
+
 func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 
 	guarantee := suite.validGuarantee()

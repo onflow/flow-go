@@ -72,11 +72,10 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 	return &ExecutionReceipts{
 		db:      db,
 		results: results,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceReceipt,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceReceipt)),
+			withRetrieve(retrieve)),
 	}
 }
 
