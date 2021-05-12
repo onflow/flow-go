@@ -19,7 +19,7 @@ import (
 const ServiceAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "69d9e87deaec0e7ff64a2c4044cdc530068e5f7ced47913f2f8d6992ff3a97a0"
+const GenesisStateCommitmentHex = "b8c93314fcec6d5d7084324217b74a95703a0e06284a302c01e3f0f661d4c938"
 
 var GenesisStateCommitment flow.StateCommitment
 
@@ -36,9 +36,13 @@ var ServiceAccountPublicKey flow.AccountPublicKey
 
 func init() {
 	var err error
-	GenesisStateCommitment, err = hex.DecodeString(GenesisStateCommitmentHex)
+	GenesisStateCommitmentBytes, err := hex.DecodeString(GenesisStateCommitmentHex)
 	if err != nil {
 		panic("error while hex decoding hardcoded state commitment")
+	}
+	GenesisStateCommitment, err = flow.ToStateCommitment(GenesisStateCommitmentBytes)
+	if err != nil {
+		panic("genesis state commitment size is invalid")
 	}
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(ServiceAccountPrivateKeyHex)

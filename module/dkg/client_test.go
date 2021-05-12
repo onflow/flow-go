@@ -47,7 +47,7 @@ func TestDKGClient(t *testing.T) {
 // Setup Test creates the blockchain client, the emulated blockchain and deploys
 // the DKG contract to the emulator
 func (s *ClientSuite) SetupTest() {
-	blockchain, err := emulator.NewBlockchain()
+	blockchain, err := emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
 	require.NoError(s.T(), err)
 
 	s.blockchain = blockchain
@@ -57,8 +57,6 @@ func (s *ClientSuite) SetupTest() {
 	s.deployDKGContract()
 
 	s.contractClient = NewClient(zerolog.Nop(), s.emulatorClient, s.dkgSigner, s.dkgAddress.String(), s.dkgAddress.String(), 0)
-
-	s.setUpAdmin()
 }
 
 func (s *ClientSuite) deployDKGContract() {
@@ -90,22 +88,17 @@ func (s *ClientSuite) deployDKGContract() {
 // Note: Contract functionality tested by `flow-core-contracts`
 func (s *ClientSuite) TestBroadcast() {
 
-	// dkg node ids and paricipant node id
-	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]flow.Identifier, 1)
-	dkgNodeIDStrings[0] = nodeID
+	// create single dkg participant
+	participants := unittest.IdentifierListFixture(1)
 
-	// start dkf with 1 participant
-	s.startDKGWithParticipants(dkgNodeIDStrings)
-
-	// create participant resource
-	s.createParticipant(nodeID)
+	// set up DKG with Participants
+	clients := s.prepareDKG(participants)
 
 	// create DKG message fixture
 	msg := unittest.DKGBroadcastMessageFixture()
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
-	err := s.contractClient.Broadcast(*msg)
+	err := clients[0].Broadcast(*msg)
 	assert.NoError(s.T(), err)
 }
 
@@ -113,22 +106,17 @@ func (s *ClientSuite) TestBroadcast() {
 // to verify what we broadcasted was what was received
 func (s *ClientSuite) TestBroadcastReadSingle() {
 
-	// dkg partcipant node ID and participants
-	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]flow.Identifier, 1)
-	dkgNodeIDStrings[0] = nodeID
+	// create single dkg participant
+	participants := unittest.IdentifierListFixture(1)
 
-	// start dkf with 1 participant
-	s.startDKGWithParticipants(dkgNodeIDStrings)
-
-	// create participant resource
-	s.createParticipant(nodeID)
+	// set up DKG with Participants
+	clients := s.prepareDKG(participants)
 
 	// create DKG message fixture
 	msg := unittest.DKGBroadcastMessageFixture()
 
 	// broadcast messsage a random broadcast message and verify that there were no errors
-	err := s.contractClient.Broadcast(*msg)
+	err := clients[0].Broadcast(*msg)
 	assert.NoError(s.T(), err)
 
 	// read latest broadcast messages
@@ -136,7 +124,7 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	require.NoError(s.T(), err)
 
 	// verify the data recieved with data sent
-	messages, err := s.contractClient.ReadBroadcast(0, block.ID())
+	messages, err := clients[0].ReadBroadcast(0, block.ID())
 	require.NoError(s.T(), err)
 	assert.Len(s.T(), messages, 1)
 
@@ -147,19 +135,44 @@ func (s *ClientSuite) TestBroadcastReadSingle() {
 	assert.Equal(s.T(), msg.Signature, broadcastedMsg.Signature)
 }
 
-func (s *ClientSuite) TestSubmitResult() {
-	nodeID := unittest.IdentifierFixture()
-	dkgNodeIDStrings := make([]flow.Identifier, 1)
-	dkgNodeIDStrings[0] = nodeID
+// TestNilDKGSubmission tests that even with `nil` DKG public keys the `SubmitResult`
+// still proceeds with no errors
+func (s *ClientSuite) TestNilDKGSubmission() {
 
-	// start dkf with 1 participant
-	s.startDKGWithParticipants(dkgNodeIDStrings)
+	// create two participants
+	participants := unittest.IdentifierListFixture(2)
 
-	// create participant resource
-	s.createParticipant(nodeID)
+	// prepare DKG
+	clients := s.prepareDKG(participants)
 
 	// generate list of public keys
-	numberOfNodes := len(dkgNodeIDStrings)
+	numberOfNodes := len(participants)
+	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes+1)
+	for i := 0; i < numberOfNodes; i++ {
+		publicKeys = append(publicKeys, nil)
+	}
+
+	// create a nil group public key
+	var groupPublicKey crypto.PublicKey
+
+	// submit empty nil keys for each participant
+	for _, client := range clients {
+		err := client.SubmitResult(groupPublicKey, publicKeys)
+		require.NoError(s.T(), err)
+	}
+}
+
+// TestSubmitResult creates random DKG public key submission and verifys that transaction was
+// submitted with no errors
+func (s *ClientSuite) TestSubmitResult() {
+	// create single dkg participant
+	participants := unittest.IdentifierListFixture(1)
+
+	// set up DKG with Participants
+	clients := s.prepareDKG(participants)
+
+	// generate list of public keys
+	numberOfNodes := len(participants)
 	publicKeys := make([]crypto.PublicKey, 0, numberOfNodes)
 	for i := 0; i < numberOfNodes; i++ {
 		privateKey := unittest.KeyFixture(crypto.BLSBLS12381)
@@ -168,8 +181,47 @@ func (s *ClientSuite) TestSubmitResult() {
 	// create a group public key
 	groupPublicKey := unittest.KeyFixture(crypto.BLSBLS12381).PublicKey()
 
-	err := s.contractClient.SubmitResult(groupPublicKey, publicKeys)
+	err := clients[0].SubmitResult(groupPublicKey, publicKeys)
 	require.NoError(s.T(), err)
+}
+
+func (s *ClientSuite) prepareDKG(participants []flow.Identifier) []*Client {
+
+	// set up the admin account
+	s.setUpAdmin()
+
+	nodeIDs := make([]flow.Identifier, len(participants))
+	accountKeys := make([]*sdk.AccountKey, len(participants))
+	signers := make([]sdkcrypto.Signer, len(participants))
+	addresses := make([]sdk.Address, len(participants))
+
+	for index, participant := range participants {
+
+		nodeIDs[index] = participant
+
+		// create account key, address and signer for participant
+		accountKey, signer := test.AccountKeyGenerator().NewWithSigner()
+		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{accountKey}, nil)
+		require.NoError(s.T(), err)
+
+		accountKeys[index], addresses[index], signers[index] = accountKey, address, signer
+	}
+
+	// start DKG with participants
+	s.startDKGWithParticipants(nodeIDs)
+
+	for index := range participants {
+		// create participant resource
+		s.createParticipant(nodeIDs[index], addresses[index], signers[index])
+	}
+
+	// create clients for each participant
+	clients := make([]*Client, len(participants))
+	for index := range participants {
+		clients[index] = NewClient(zerolog.Nop(), s.emulatorClient, signers[index], s.dkgAddress.String(), addresses[index].String(), 0)
+	}
+
+	return clients
 }
 
 func (s *ClientSuite) setUpAdmin() {
@@ -218,7 +270,7 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	assert.Equal(s.T(), cadence.NewArray(valueNodeIDs), result)
 }
 
-func (s *ClientSuite) createParticipant(nodeID flow.Identifier) {
+func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.Address, signer sdkcrypto.Signer) {
 
 	// create DKG partcipant
 	createParticipantTx := sdk.NewTransaction().
@@ -227,7 +279,7 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier) {
 		SetProposalKey(s.blockchain.ServiceKey().Address, s.blockchain.ServiceKey().Index,
 			s.blockchain.ServiceKey().SequenceNumber).
 		SetPayer(s.blockchain.ServiceKey().Address).
-		AddAuthorizer(s.dkgAddress)
+		AddAuthorizer(authoriser)
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
@@ -235,8 +287,8 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier) {
 	require.NoError(s.T(), err)
 
 	s.signAndSubmit(createParticipantTx,
-		[]sdk.Address{s.blockchain.ServiceKey().Address, s.dkgAddress},
-		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), s.dkgSigner},
+		[]sdk.Address{s.blockchain.ServiceKey().Address, authoriser},
+		[]sdkcrypto.Signer{s.blockchain.ServiceKey().Signer(), signer},
 	)
 
 	// verify that nodeID was registered

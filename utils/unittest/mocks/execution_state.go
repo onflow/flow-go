@@ -42,7 +42,7 @@ func (es *ExecutionState) StateCommitmentByBlockID(ctx context.Context, blockID 
 	defer es.Unlock()
 	commit, ok := es.commits[blockID]
 	if !ok {
-		return nil, storage.ErrNotFound
+		return flow.DummyStateCommitment, storage.ErrNotFound
 	}
 
 	return commit, nil

@@ -11,6 +11,7 @@ const (
 	LabelNodeAddress = "nodeaddress"
 	LabelNodeRole    = "noderole"
 	LabelNodeInfo    = "nodeinfo"
+	LabelNodeVersion = "nodeversion"
 	LabelPriority    = "priority"
 )
 
@@ -44,6 +45,7 @@ const (
 	ResourceIdentity                 = "identity"
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
+	ResourceResultApprovals          = "result_approvals"
 	ResourceReceipt                  = "receipt"
 	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
@@ -68,12 +70,16 @@ const (
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
 
-	ResourceDKGKey                = "dkg-key"
+	ResourceDKGKey                = "dkg-key"                         // consensus node, DKG engine
 	ResourceApprovalQueue         = "sealing_approval_queue"          // consensus node, sealing engine
 	ResourceReceiptQueue          = "sealing_receipt_queue"           // consensus node, sealing engine
 	ResourceApprovalResponseQueue = "sealing_approval_response_queue" // consensus node, sealing engine
 	ResourceBlockProposalQueue    = "compliance_proposal_queue"       // consensus node, compliance engine
 	ResourceBlockVoteQueue        = "compliance_vote_queue"           // consensus node, compliance engine
+	ResourceChunkDataPack         = "chunk_data_pack"                 // execution node
+	ResourceEvents                = "events"                          // execution node
+	ResourceServiceEvents         = "service_events"                  // execution node
+	ResourceTransactionResults    = "transaction_results"             // execution node
 )
 
 const (

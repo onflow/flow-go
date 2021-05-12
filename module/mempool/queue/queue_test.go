@@ -35,58 +35,72 @@ func TestQueue(t *testing.T) {
 	queue := NewQueue(a)
 
 	t.Run("Adding", func(t *testing.T) {
-		added := queue.TryAdd(b) //parent not added yet
+		stored, _ := queue.TryAdd(b) //parent not stored yet
 		size := queue.Size()
 		height := queue.Height()
-		assert.False(t, added)
+		assert.False(t, stored)
 		assert.Equal(t, 1, size)
 		assert.Equal(t, uint64(0), height)
 
-		added = queue.TryAdd(c)
+		stored, new := queue.TryAdd(c)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 2, size)
 		assert.Equal(t, uint64(1), height)
 
-		added = queue.TryAdd(b)
+		stored, new = queue.TryAdd(b)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 3, size)
 		assert.Equal(t, uint64(2), height)
 
-		added = queue.TryAdd(f) //parent not added yet
-		assert.False(t, added)
-
-		added = queue.TryAdd(d)
+		stored, new = queue.TryAdd(b) //repeat
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.False(t, new)
+		assert.Equal(t, 3, size)
+		assert.Equal(t, uint64(2), height)
+
+		stored, _ = queue.TryAdd(f) //parent not stored yet
+		assert.False(t, stored)
+
+		stored, new = queue.TryAdd(d)
+		size = queue.Size()
+		height = queue.Height()
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 4, size)
 		assert.Equal(t, uint64(2), height)
 
-		added = queue.TryAdd(dBroken) // wrong height
-		assert.False(t, added)
+		stored, _ = queue.TryAdd(dBroken) // wrong height
+		assert.False(t, stored)
 
-		added = queue.TryAdd(e)
+		stored, new = queue.TryAdd(e)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 5, size)
 		assert.Equal(t, uint64(3), height)
 
-		added = queue.TryAdd(f)
+		stored, new = queue.TryAdd(f)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 6, size)
 		assert.Equal(t, uint64(3), height)
 
-		added = queue.TryAdd(g)
+		stored, new = queue.TryAdd(g)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 7, size)
 		assert.Equal(t, uint64(3), height)
 	})
@@ -173,14 +187,16 @@ func TestQueue(t *testing.T) {
 	t.Run("Attaching", func(t *testing.T) {
 		queue := NewQueue(a)
 
-		added := queue.TryAdd(c)
+		added, new := queue.TryAdd(c)
 		assert.True(t, added)
+		assert.True(t, new)
 		assert.Equal(t, 2, queue.Size())
 		assert.Equal(t, uint64(1), queue.Height())
 
 		queueB := NewQueue(b)
-		added = queueB.TryAdd(g)
+		added, new = queueB.TryAdd(g)
 		assert.True(t, added)
+		assert.True(t, new)
 
 		assert.Equal(t, 2, queueB.Size())
 		assert.Equal(t, uint64(1), queueB.Height())
@@ -195,8 +211,9 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, 4, queue.Size())
 		assert.Equal(t, uint64(3), queue.Height())
 
-		added = queue.TryAdd(d)
+		added, new = queue.TryAdd(d)
 		assert.True(t, added)
+		assert.True(t, new)
 		assert.Equal(t, 5, queue.Size())
 		assert.Equal(t, uint64(3), queue.Height())
 
@@ -214,15 +231,25 @@ func TestQueue(t *testing.T) {
 	//     we should only get one child queue f--d--c
 	t.Run("Adding_Idempotent", func(t *testing.T) {
 		queue := NewQueue(a)
-		assert.True(t, queue.TryAdd(c))
-		assert.True(t, queue.TryAdd(d))
-		assert.True(t, queue.TryAdd(f))
+		add, new := queue.TryAdd(c)
+		assert.True(t, add)
+		assert.True(t, new)
+
+		add, new = queue.TryAdd(d)
+		assert.True(t, add)
+		assert.True(t, new)
+
+		add, new = queue.TryAdd(f)
+		assert.True(t, add)
+		assert.True(t, new)
 
 		assert.Equal(t, 4, queue.Size())
 		assert.Equal(t, uint64(3), queue.Height())
 
 		// adding c a second time
-		assert.True(t, queue.TryAdd(c))
+		add, new = queue.TryAdd(c)
+		assert.True(t, add)
+		assert.False(t, new)
 
 		// Dequeueing a
 		head, childQueues := queue.Dismount()
@@ -241,12 +268,22 @@ func TestQueue(t *testing.T) {
 	// attach queueA to queueB: we expect an error as the queues have nodes in common
 	t.Run("Attaching_partially_overlapped_queue", func(t *testing.T) {
 		queueA := NewQueue(c)
-		assert.True(t, queueA.TryAdd(b))
-		assert.True(t, queueA.TryAdd(g))
+		add, new := queueA.TryAdd(b)
+		assert.True(t, add)
+		assert.True(t, new)
+
+		add, new = queueA.TryAdd(g)
+		assert.True(t, add)
+		assert.True(t, new)
 
 		queueB := NewQueue(a)
-		assert.True(t, queueB.TryAdd(c))
-		assert.True(t, queueB.TryAdd(d))
+		add, new = queueB.TryAdd(c)
+		assert.True(t, add)
+		assert.True(t, new)
+
+		add, new = queueB.TryAdd(d)
+		assert.True(t, add)
+		assert.True(t, new)
 
 		err := queueB.Attach(queueA)
 		assert.Error(t, err)

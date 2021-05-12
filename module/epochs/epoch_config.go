@@ -51,14 +51,20 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 		for _, id := range cluster {
 			kvp := cadence.KeyValuePair{
 				Key:   cadence.NewString(id.String()),
-				Value: cadence.NewUInt64(0),
+				Value: cadence.NewUInt64(1),
 			}
 			weightsByNodeID = append(weightsByNodeID, kvp)
 		}
 
+		totalWeight := cadence.NewUInt64(uint64(len(cluster)))
+
+		votes := cadence.NewArray([]cadence.Value{})
+
 		fields := []cadence.Value{
 			clusterIndex,
 			cadence.NewDictionary(weightsByNodeID),
+			totalWeight,
+			votes,
 		}
 
 		clusterStruct := cadence.NewStruct(fields).
@@ -80,6 +86,16 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 							ElementType: cadence.UInt64Type{},
 						},
 					},
+					{
+						Identifier: "totalWeight",
+						Type:       cadence.UInt64Type{},
+					},
+					{
+						Identifier: "votes",
+						Type: cadence.ConstantSizedArrayType{
+							ElementType: cadence.AnyStructType{},
+						},
+					},
 				},
 			})
 
@@ -99,6 +115,8 @@ func EncodeClusterQCs(qcs []*flow.QuorumCertificate, service flow.Address) []byt
 	for i, qc := range qcs {
 		qcIndex := cadence.UInt16(i)
 
+		// Here we are adding signer IDs rather than votes. It doesn't matter
+		// because these initial values aren't used by the contract.
 		qcVotes := []cadence.Value{}
 		for _, v := range qc.SignerIDs {
 			qcVotes = append(qcVotes, cadence.NewString(v.String()))

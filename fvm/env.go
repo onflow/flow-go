@@ -259,6 +259,34 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 
 	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
+	if script.Err == nil {
+		balance = script.Value.ToGoValue().(uint64)
+	}
+
+	return balance, nil
+}
+
+func (e *hostEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvGetAccountBalance)
+		defer sp.Finish()
+	}
+
+	script := getFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+
+	// TODO similar to the one above
+	err = e.vm.Run(
+		e.ctx,
+		script,
+		e.sth.State().View(),
+		e.programs.Programs,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	var balance uint64
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if script.Err == nil {
@@ -999,7 +1027,7 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		err := e.vm.invokeMetaTransaction(
+		txErr, err := e.vm.invokeMetaTransaction(
 			e.ctx,
 			initAccountTransaction(
 				flow.Address(payer),
@@ -1010,7 +1038,10 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 			e.programs.Programs,
 		)
 		if err != nil {
-			return address, fmt.Errorf("creating account failed: %w", err)
+			return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
+		}
+		if txErr != nil {
+			return address, fmt.Errorf("meta-transaction for creating account failed: %w", txErr)
 		}
 	}
 
