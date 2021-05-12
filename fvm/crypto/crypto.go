@@ -14,22 +14,6 @@ import (
 
 const runtimeUserDomainTag = "user"
 
-const (
-	UnknownHashingAlgorithm = hash.UnknownHashingAlgorithm
-	SHA2_256                = hash.SHA2_256
-	SHA2_384                = hash.SHA2_384
-	SHA3_256                = hash.SHA3_256
-	SHA3_384                = hash.SHA3_384
-	KMAC128                 = hash.KMAC128
-)
-
-const (
-	UnknownSigningAlgorithm = crypto.UnknownSigningAlgorithm
-	BLSBLS12381             = crypto.BLSBLS12381
-	ECDSAP256               = crypto.ECDSAP256
-	ECDSASecp256k1          = crypto.ECDSASecp256k1
-)
-
 type SignatureVerifier interface {
 	Verify(
 		signature []byte,
@@ -193,13 +177,13 @@ func ConstructNewPublicKey(publicKey *runtime.PublicKey,
 
 	var err error
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgorithm == UnknownSigningAlgorithm {
+	if signAlgorithm == crypto.UnknownSigningAlgorithm {
 		err = errors.NewValueErrorf(publicKey.SignAlgo.Name(), "signature algorithm type not found")
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
 	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
-	if hashAlgorithm == UnknownHashingAlgorithm {
+	if hashAlgorithm == hash.UnknownHashingAlgorithm {
 		err = errors.NewValueErrorf(hashAlgo.Name(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}

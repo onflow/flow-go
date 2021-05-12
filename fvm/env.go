@@ -16,6 +16,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -544,7 +545,7 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 	}
 
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	if hashAlgo == crypto.UnknownHashingAlgorithm {
+	if hashAlgo == hash.UnknownHashingAlgorithm {
 		err := errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
