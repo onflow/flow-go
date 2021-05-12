@@ -1,9 +1,11 @@
 package requester
 
 import (
+	"context"
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/rand"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
@@ -148,6 +151,21 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // handleChunkDataPack sends the received chunk data pack and its collection to the registered handler, and cleans up its request status.
+func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
+	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
+	if !ok {
+		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
+		span.SetTag("chunk_id", chunkDataPack.ChunkID)
+		defer span.Finish()
+	}
+
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataResponse, func() {
+		e.handleChunkDataPack(originID, chunkDataPack, collection)
+	})
+}
+
+// handleChunkDataPack sends the received chunk data pack and its collection to the registered handler, and cleans up its request status.
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
 	chunkID := chunkDataPack.ChunkID
 	collectionID := collection.ID()
@@ -174,16 +192,27 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
-	added := e.pendingRequests.Add(request)
-	e.metrics.OnChunkDataPackRequestReceivedByRequester()
+	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+	if !ok {
+		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+		span.SetTag("chunk_id", request.ChunkID)
+		defer span.Finish()
+	}
 
-	e.log.Info().
-		Hex("chunk_id", logging.ID(request.ChunkID)).
-		Uint64("block_height", request.Height).
-		Int("agree_executors", len(request.Agrees)).
-		Int("disagree_executors", len(request.Disagrees)).
-		Bool("added_to_pending_requests", added).
-		Msg("chunk data pack request arrived")
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
+		added := e.pendingRequests.Add(request)
+
+		e.metrics.OnChunkDataPackRequestReceivedByRequester()
+
+		e.log.Info().
+			Hex("chunk_id", logging.ID(request.ChunkID)).
+			Uint64("block_height", request.Height).
+			Int("agree_executors", len(request.Agrees)).
+			Int("disagree_executors", len(request.Disagrees)).
+			Bool("added_to_pending_requests", added).
+			Msg("chunk data pack request arrived")
+	})
 }
 
 // onTimer should run periodically, it goes through all pending requests, and requests their chunk data pack.
@@ -203,41 +232,70 @@ func (e *Engine) onTimer() {
 	}
 
 	for _, request := range pendingReqs {
-		lg := e.log.With().
-			Hex("chunk_id", logging.ID(request.ID())).
-			Uint64("block_height", request.Height).
-			Logger()
-
-		// if block has been sealed, then we can finish
-		if request.Height <= lastSealed.Height {
-			removed := e.pendingRequests.Rem(request.ID())
-			e.handler.NotifyChunkDataPackSealed(request.ID())
-			lg.Info().
-				Bool("removed", removed).
-				Msg("drops requesting chunk of a sealed block")
-			continue
-		}
-
-		qualified := e.canDispatchRequest(request.ChunkID)
-		if !qualified {
-			lg.Debug().Msg("chunk data pack request is not qualified for dispatching at this round")
-			continue
-		}
-
-		err = e.requestChunkDataPack(request)
-		if err != nil {
-			lg.Error().Err(err).Msg("could not request chunk data pack")
-			continue
-		}
-
-		attempts, lastAttempt, retryAfter, updated := e.onRequestDispatched(request.ChunkID)
-		lg.Info().
-			Bool("pending_request_updated", updated).
-			Uint64("attempts_made", attempts).
-			Time("last_attempt", lastAttempt).
-			Dur("retry_after", retryAfter).
-			Msg("chunk data pack requested")
+		e.handleChunkDataPackRequestWithTracing(request, lastSealed.Height)
 	}
+}
+
+// handleChunkDataPackRequestWithTracing encapsulates the logic of dispatching chunk data request in network with tracing enabled.
+func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.ChunkDataPackRequest, lastSealedHeight uint64) {
+	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+	if !ok {
+		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+		span.SetTag("chunk_id", request.ChunkID)
+		defer span.Finish()
+	}
+
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
+		e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
+	})
+}
+
+// handleChunkDataPackRequest encapsulates the logic of dispatching the chunk data pack request to the network.
+func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verification.ChunkDataPackRequest, lastSealedHeight uint64) {
+	lg := e.log.With().
+		Hex("chunk_id", logging.ID(request.ID())).
+		Uint64("block_height", request.Height).
+		Logger()
+
+	// if block has been sealed, then we can finish
+	if request.Height <= lastSealedHeight {
+		removed := e.pendingRequests.Rem(request.ID())
+		e.handler.NotifyChunkDataPackSealed(request.ID())
+		lg.Info().
+			Bool("removed", removed).
+			Msg("drops requesting chunk of a sealed block")
+		return
+	}
+
+	qualified := e.canDispatchRequest(request.ChunkID)
+	if !qualified {
+		lg.Debug().Msg("chunk data pack request is not qualified for dispatching at this round")
+		return
+	}
+
+	err := e.requestChunkDataPackWithTracing(ctx, request)
+	if err != nil {
+		lg.Error().Err(err).Msg("could not request chunk data pack")
+		return
+	}
+
+	attempts, lastAttempt, retryAfter, updated := e.onRequestDispatched(request.ChunkID)
+	lg.Info().
+		Bool("pending_request_updated", updated).
+		Uint64("attempts_made", attempts).
+		Time("last_attempt", lastAttempt).
+		Dur("retry_after", retryAfter).
+		Msg("chunk data pack requested")
+}
+
+// requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
+func (e *Engine) requestChunkDataPackWithTracing(ctx context.Context, request *verification.ChunkDataPackRequest) error {
+	var err error
+	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterDispatchChunkDataRequest, func() {
+		err = e.requestChunkDataPack(request)
+	})
+	return err
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
