@@ -9,6 +9,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	flow "github.com/onflow/flow-go/model/flow"
 	storage "github.com/onflow/flow-go/storage"
+	transaction "github.com/onflow/flow-go/storage/badger/transaction"
 	reflect "reflect"
 )
 
@@ -135,6 +136,20 @@ func (m *MockBlocks) StoreTx(arg0 *flow.Block) func(*v2.Txn) error {
 func (mr *MockBlocksMockRecorder) StoreTx(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreTx", reflect.TypeOf((*MockBlocks)(nil).StoreTx), arg0)
+}
+
+// StoreTxn mocks base method
+func (m *MockBlocks) StoreTxn(arg0 *flow.Block) func(*transaction.Tx) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StoreTxn", arg0)
+	ret0, _ := ret[0].(func(*transaction.Tx) error)
+	return ret0
+}
+
+// StoreTxn indicates an expected call of StoreTxn
+func (mr *MockBlocksMockRecorder) StoreTxn(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StoreTxn", reflect.TypeOf((*MockBlocks)(nil).StoreTxn), arg0)
 }
 
 // UpdateLastFullBlockHeight mocks base method

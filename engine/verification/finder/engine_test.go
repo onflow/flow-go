@@ -13,7 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/finder"
-	"github.com/onflow/flow-go/engine/verification/utils"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	realModule "github.com/onflow/flow-go/module"
@@ -99,7 +99,7 @@ func (suite *FinderEngineTestSuite) SetupTest() {
 	suite.matchEng = &mocknetwork.Engine{}
 
 	// generates an execution result with a single collection, chunk, and transaction.
-	completeER := utils.LightExecutionResultFixture(1)
+	completeER := vertestutils.LightExecutionResultFixture(1)
 	suite.collection = completeER.ReceiptsData[0].Collections[0]
 	suite.block = completeER.ReceiptsData[0].ReferenceBlock
 	suite.receipt = completeER.Receipts[0]

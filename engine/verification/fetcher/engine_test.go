@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -64,6 +64,8 @@ func setupTest() *FetcherEngineTestSuite {
 
 // newFetcherEngine returns a fetcher engine for testing.
 func newFetcherEngine(s *FetcherEngineTestSuite) *fetcher.Engine {
+	s.requester.On("WithChunkDataPackHandler", mock.AnythingOfType("*fetcher.Engine")).Return()
+
 	e := fetcher.New(s.log,
 		s.metrics,
 		s.tracer,
@@ -151,7 +153,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	// fetcher engine should create and pass a verifiable chunk to verifier engine upon receiving each
 	// chunk data responses, and notify the consumer that it is done with processing chunk.
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses.Chunks()))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -225,6 +227,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
+	mockPendingChunksByID(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
@@ -241,7 +244,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	})
 
 	// fetcher engine should notify
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses.Chunks()))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -628,8 +631,14 @@ func mockVerifierEngine(t *testing.T,
 		expected, ok := verifiableChunks[vc.Chunk.ID()]
 		require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
+		if vc.IsSystemChunk {
+			// system chunk has an empty collection
+			require.Equal(t, vc.Collection.Len(), 0)
+		} else {
+			require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
+		}
+
 		require.Equal(t, *expected.ChunkDataPack, *vc.ChunkDataPack)
-		require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
 		require.Equal(t, expected.Result.ID(), vc.Result.ID())
 		require.Equal(t, expected.Header.ID(), vc.Header.ID())
 
@@ -648,7 +657,7 @@ func mockVerifierEngine(t *testing.T,
 
 // mockChunkConsumerNotifier mocks the notify method of processing notifier to be notified exactly once per
 // given chunk IDs.
-func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier, chunkIDs flow.IdentifierList) {
+func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier, locatorIDs flow.IdentifierList) {
 	mu := &sync.Mutex{}
 	seen := make(map[flow.Identifier]struct{})
 	notifier.On("Notify", mock.Anything).Run(func(args mock.Arguments) {
@@ -656,25 +665,25 @@ func mockChunkConsumerNotifier(t *testing.T, notifier *module.ProcessingNotifier
 		mu.Lock()
 		defer mu.Unlock()
 
-		chunkID, ok := args[0].(flow.Identifier)
+		locatorID, ok := args[0].(flow.Identifier)
 		require.True(t, ok)
-		require.Contains(t, chunkIDs, chunkID, "tried calling notifier on an unexpected chunk ID")
+		require.Contains(t, locatorIDs, locatorID, "tried calling notifier on an unexpected locator ID")
 
 		// each chunk should be notified once
-		_, ok = seen[chunkID]
+		_, ok = seen[locatorID]
 		require.False(t, ok)
-		seen[chunkID] = struct{}{}
+		seen[locatorID] = struct{}{}
 
-	}).Return().Times(len(chunkIDs))
+	}).Return().Times(len(locatorIDs))
 }
 
 // mockBlockSealingStatus mocks protocol state sealing status at height of given block header.
 func mockBlockSealingStatus(state *protocol.State, headers *storage.Headers, header *flow.Header, sealed bool) {
 	headers.On("ByBlockID", header.ID()).Return(header, nil)
 	if sealed {
-		test.MockLastSealedHeight(state, header.Height+1)
+		vertestutils.MockLastSealedHeight(state, header.Height+1)
 	} else {
-		test.MockLastSealedHeight(state, header.Height-1)
+		vertestutils.MockLastSealedHeight(state, header.Height-1)
 	}
 }
 
@@ -747,12 +756,20 @@ func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *fl
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, chunk := range chunks {
 		chunkID := chunk.ID()
+
+		chunkDataPack := chunkDataPacks[chunkID]
+
+		if fetcher.IsSystemChunk(chunk.Index, result) {
+			chunkDataPack.CollectionID = flow.ZeroID
+			collections[chunkID] = &flow.Collection{Transactions: nil}
+		}
+
 		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
 			Chunk:         chunk,
 			Header:        block.Header,
 			Result:        result,
 			Collection:    collections[chunkID],
-			ChunkDataPack: chunkDataPacks[chunkID],
+			ChunkDataPack: chunkDataPack,
 		}
 	}
 
