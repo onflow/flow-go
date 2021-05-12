@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Headers implements a simple read-only header storage around a badger DB.
@@ -74,22 +75,19 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
 	h := &Headers{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceHeader,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceHeader)),
+			withRetrieve(retrieve)),
 
-		heightCache: newCache(collector,
+		heightCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeHeight),
-			withRetrieve(retrieveHeight),
-			withResource(metrics.ResourceFinalizedHeight)),
-		chunkIDCache: newCache(collector,
+			withRetrieve(retrieveHeight)),
+		chunkIDCache: newCache(collector, metrics.ResourceFinalizedHeight,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(storeChunkID),
-			withRetrieve(retrieveChunkID),
-			withResource(metrics.ResourceFinalizedHeight)),
+			withRetrieve(retrieveChunkID)),
 	}
 
 	return h
@@ -97,6 +95,10 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
 func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
 	return h.cache.Put(header.ID(), header)
+}
+
+func (h *Headers) storeTxn(header *flow.Header) func(*transaction.Tx) error {
+	return h.cache.PutTxn(header.ID(), header)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {

@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -175,7 +175,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithTransactionProcessors(
+		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(zerolog.Nop()), //we don't need to check signatures or sequence numbers
 		))
 
@@ -194,7 +194,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := event.GetServiceEventWhitelist()
+		eventWhitelist := handler.GetServiceEventWhitelist()
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
@@ -385,6 +385,8 @@ type testRuntime struct {
 	executeTransaction func(runtime.Script, runtime.Context) error
 }
 
+var _ runtime.Runtime = &testRuntime{}
+
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)
 }
@@ -403,6 +405,14 @@ func (*testRuntime) SetCoverageReport(_ *runtime.CoverageReport) {
 
 func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
+}
+
+func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadStored not expected")
+}
+
+func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
+	panic("ReadLinked not expected")
 }
 
 type RandomAddressGenerator struct{}
@@ -483,8 +493,42 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 	require.Contains(t, registerTouches, id.String())
 	require.Equal(t, id, registerTouches[id.String()])
-
 }
+
+func Test_ExecutingSystemCollection(t *testing.T) {
+
+	execCtx := fvm.NewContext(zerolog.Nop())
+
+	runtime := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(runtime)
+
+	rag := &RandomAddressGenerator{}
+
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+
+	committer := new(computermock.ViewCommitter)
+	committer.On("CommitView", mock.Anything, mock.Anything).
+		Return(nil, nil, nil).
+		Times(1) // only system chunk
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	require.NoError(t, err)
+
+	// create empty block, it will have system collection attached while executing
+	block := generateBlock(0, 0, rag)
+
+	view := delta.NewView(ledger.Get)
+
+	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+	assert.NoError(t, err)
+	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
+	assert.Len(t, result.TransactionResults, 1)
+
+	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+
+	committer.AssertExpectations(t)
+}
+
 func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
 	return generateBlockWithVisitor(collectionCount, transactionCount, addressGenerator, nil)
 }
@@ -513,6 +557,7 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 	return &entity.ExecutableBlock{
 		Block:               &block,
 		CompleteCollections: completeCollections,
+		StartState:          unittest.StateCommitmentPointerFixture(),
 	}
 }
 

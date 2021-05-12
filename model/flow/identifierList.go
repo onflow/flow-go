@@ -45,3 +45,14 @@ func (il IdentifierList) Strings() []string {
 
 	return list
 }
+
+// Contains returns whether this identifier list contains the target identifier.
+func (il IdentifierList) Contains(target Identifier) bool {
+	for _, id := range il {
+		if target == id {
+			return true
+		}
+	}
+
+	return false
+}

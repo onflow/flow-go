@@ -11,11 +11,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	vermodel "github.com/onflow/flow-go/model/verification"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
@@ -249,7 +248,7 @@ func (e *Engine) handleExecutionResult(originID flow.Identifier, result *flow.Ex
 
 	// stores the result as a result data pack in the mempool
 	// and only store it if there is at least one chunk assigned to me
-	rdp := &vermodel.ResultDataPack{
+	rdp := &verification.ResultDataPack{
 		ExecutorID:      originID,
 		ExecutionResult: result,
 	}
@@ -509,13 +508,11 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier,
 	var endState flow.StateCommitment
 	if int(status.Chunk.Index) == len(result.ExecutionResult.Chunks)-1 {
 		// last chunk in a result is the system chunk and takes final state commitment
-		finalState, ok := result.ExecutionResult.FinalStateCommitment()
-		if !ok {
-			return fmt.Errorf("could not get final state: no chunks found")
-		}
-
 		isSystemChunk = true
-		endState = finalState
+		endState, err = result.ExecutionResult.FinalStateCommitment()
+		if err != nil {
+			return fmt.Errorf("could not get final state: %w", err)
+		}
 	} else {
 		// any chunk except last takes the subsequent chunk's start state
 		isSystemChunk = false

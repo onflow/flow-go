@@ -87,11 +87,10 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 	return &MyExecutionReceipts{
 		genericReceipts: receipts,
 		db:              db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceMyReceipt,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceMyReceipt)),
+			withRetrieve(retrieve)),
 	}
 }
 
@@ -138,7 +137,7 @@ func (m *MyExecutionReceipts) BatchStoreMyReceipt(receipt *flow.ExecutionReceipt
 }
 
 // MyReceipt retrieves my receipt for the given block.
-// Returns badger.ErrKeyNotFound if no receipt was persisted for the block.
+// Returns storage.ErrNotFound if no receipt was persisted for the block.
 func (m *MyExecutionReceipts) MyReceipt(blockID flow.Identifier) (*flow.ExecutionReceipt, error) {
 	tx := m.db.NewTransaction(false)
 	defer tx.Discard()

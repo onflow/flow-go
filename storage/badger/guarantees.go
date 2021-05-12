@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Guarantees implements persistent storage for collection guarantees.
@@ -34,11 +35,10 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 
 	g := &Guarantees{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceGuarantee,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceGuarantee)),
+			withRetrieve(retrieve)),
 	}
 
 	return g
@@ -46,6 +46,10 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 
 func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
 	return g.cache.Put(guarantee.ID(), guarantee)
+}
+
+func (g *Guarantees) storeTxn(guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
+	return g.cache.PutTxn(guarantee.ID(), guarantee)
 }
 
 func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
