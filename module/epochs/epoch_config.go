@@ -56,9 +56,15 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 			weightsByNodeID = append(weightsByNodeID, kvp)
 		}
 
+		totalWeight := cadence.NewUInt64(uint64(len(cluster)))
+
+		votes := cadence.NewArray([]cadence.Value{})
+
 		fields := []cadence.Value{
 			clusterIndex,
 			cadence.NewDictionary(weightsByNodeID),
+			totalWeight,
+			votes,
 		}
 
 		clusterStruct := cadence.NewStruct(fields).
@@ -78,6 +84,16 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 						Type: cadence.DictionaryType{
 							KeyType:     cadence.StringType{},
 							ElementType: cadence.UInt64Type{},
+						},
+					},
+					{
+						Identifier: "totalWeight",
+						Type:       cadence.UInt64Type{},
+					},
+					{
+						Identifier: "votes",
+						Type: cadence.ConstantSizedArrayType{
+							ElementType: cadence.AnyStructType{},
 						},
 					},
 				},
