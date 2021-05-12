@@ -76,6 +76,7 @@ func (h *AccountKeyHandler) AddAccountKey(address runtime.Address,
 // This function returns a nil key with no errors, if a key doesn't exist at the given index.
 // An error is returned if the specified account does not exist, the provided index is not valid,
 // or if the key revoking fails.
+// TODO (ramtin) do we have to return runtime.AccountKey for this method or can be separated into another method
 func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex int) (*runtime.AccountKey, error) {
 	accountAddress := flow.Address(address)
 
@@ -114,8 +115,7 @@ func (h *AccountKeyHandler) RevokeAccountKey(address runtime.Address, keyIndex i
 		return nil, fmt.Errorf("revoking account key failed: %w", err)
 	}
 
-	// Prepare the account key to return
-
+	// Prepare account key to return
 	signAlgo := crypto.CryptoToRuntimeSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgo == runtime.SignatureAlgorithmUnknown {
 		err = errors.NewValueErrorf(publicKey.SignAlgo.String(), "signature algorithm type not found")
