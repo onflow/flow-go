@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -34,8 +35,12 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("failed to decode hex code of state: %w", err)
 	}
+	state, err := ledger.ToState(stateBytes)
+	if err != nil {
+		return fmt.Errorf("cannot use the input state: %w", err)
+	}
 
-	path := filepath.Join(outputPath, hex.EncodeToString(state)+".trie.jsonl")
+	path := filepath.Join(outputPath, state.String()+".trie.jsonl")
 
 	fi, err := os.Create(path)
 	if err != nil {
@@ -46,10 +51,6 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	writer := bufio.NewWriter(fi)
 	defer writer.Flush()
 
-	state, err := ledger.ToState(stateBytes)
-	if err != nil {
-		return fmt.Errorf("cannot use the input state: %w", err)
-	}
 	err = led.DumpTrieAsJSON(state, writer)
 	if err != nil {
 		return fmt.Errorf("cannot dump trie as json: %w", err)

@@ -13,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -92,12 +93,12 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 		if err != nil {
 			return fmt.Errorf("failed to decode hex code of state: %w", err)
 		}
-     state, err = ledger.ToState(st)
-      if err != nil {
-        return fmt.Errorf("failed to convert bytes to state: %w", err)
-      }
-  }
-	filename := hex.EncodeToString(state) + ".trie.jsonl"
+		state, err = ledger.ToState(st)
+		if err != nil {
+			return fmt.Errorf("failed to convert bytes to state: %w", err)
+		}
+	}
+	filename := state.String() + ".trie.jsonl"
 	if flagGzip {
 		filename += ".gz"
 	}
@@ -118,7 +119,7 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 		defer gzipWriter.Close()
 		writer = gzipWriter
 	}
-    
+
 	err = led.DumpTrieAsJSON(state, writer)
 	if err != nil {
 		return fmt.Errorf("cannot dump trie as json: %w", err)

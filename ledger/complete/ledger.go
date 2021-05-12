@@ -1,9 +1,6 @@
 package complete
 
 import (
-	"bytes"
-	"bufio"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
