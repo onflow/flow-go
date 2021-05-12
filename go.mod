@@ -42,7 +42,6 @@ require (
 	github.com/onflow/flow-emulator v0.19.0
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.12.0
-	github.com/onflow/flow-go/integration v0.0.0-20210512181424-8adc6ae45eaa // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.7.0 // indirect
