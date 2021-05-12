@@ -44,7 +44,7 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 }
 
 func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) error {
-	return ec.cache.PutTxn(commit.ID(), commit)
+	return ec.cache.PutTx(commit.ID(), commit)
 }
 
 func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn) (*flow.EpochCommit, error) {

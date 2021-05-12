@@ -97,7 +97,7 @@ func NewMyExecutionReceipts(collector module.CacheMetrics, db *badger.DB, receip
 
 // storeMyReceipt assembles the operations to store the receipt and marks it as mine (trusted).
 func (m *MyExecutionReceipts) storeMyReceipt(receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
-	return m.cache.PutTxn(receipt.ExecutionResult.BlockID, receipt)
+	return m.cache.PutTx(receipt.ExecutionResult.BlockID, receipt)
 }
 
 // storeMyReceipt assembles the operations to retrieve my receipt for the given block ID.

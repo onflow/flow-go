@@ -82,7 +82,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
 func (r *ExecutionReceipts) storeTx(receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
-	return r.cache.PutTxn(receipt.ID(), receipt)
+	return r.cache.PutTx(receipt.ID(), receipt)
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*flow.ExecutionReceipt, error) {

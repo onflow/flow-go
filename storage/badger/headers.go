@@ -94,7 +94,7 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 }
 
 func (h *Headers) storeTx(header *flow.Header) func(*transaction.Tx) error {
-	return h.cache.PutTxn(header.ID(), header)
+	return h.cache.PutTx(header.ID(), header)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
@@ -163,7 +163,7 @@ func (h *Headers) IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) 
 }
 
 func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
-	return operation.RetryOnConflictTx(h.db, transaction.Update, h.chunkIDCache.PutTxn(chunkID, headerID))
+	return operation.RetryOnConflictTx(h.db, transaction.Update, h.chunkIDCache.PutTx(chunkID, headerID))
 }
 
 func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {

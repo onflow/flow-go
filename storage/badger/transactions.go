@@ -57,7 +57,7 @@ func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error)
 }
 
 func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*transaction.Tx) error {
-	return t.cache.PutTxn(flowTx.ID(), flowTx)
+	return t.cache.PutTx(flowTx.ID(), flowTx)
 }
 
 func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {

@@ -48,7 +48,7 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 }
 
 func (s *Seals) storeTx(seal *flow.Seal) func(*transaction.Tx) error {
-	return s.cache.PutTxn(seal.ID(), seal)
+	return s.cache.PutTx(seal.ID(), seal)
 }
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {

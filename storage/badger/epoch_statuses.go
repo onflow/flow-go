@@ -45,7 +45,7 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 }
 
 func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *transaction.Tx) error {
-	return es.cache.PutTxn(blockID, status)
+	return es.cache.PutTx(blockID, status)
 }
 
 func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*flow.EpochStatus, error) {

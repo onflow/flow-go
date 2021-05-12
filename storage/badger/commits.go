@@ -46,7 +46,7 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 }
 
 func (c *Commits) storeTx(blockID flow.Identifier, commit flow.StateCommitment) func(*transaction.Tx) error {
-	return c.cache.PutTxn(blockID, commit)
+	return c.cache.PutTx(blockID, commit)
 }
 
 func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow.StateCommitment, error) {

@@ -48,7 +48,7 @@ func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApp
 }
 
 func (r *ResultApprovals) store(approval *flow.ResultApproval) func(*transaction.Tx) error {
-	return r.cache.PutTxn(approval.ID(), approval)
+	return r.cache.PutTx(approval.ID(), approval)
 }
 
 func (r *ResultApprovals) byID(approvalID flow.Identifier) func(*badger.Txn) (*flow.ResultApproval, error) {

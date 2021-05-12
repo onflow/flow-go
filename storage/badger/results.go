@@ -48,7 +48,7 @@ func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *Executio
 }
 
 func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*transaction.Tx) error {
-	return r.cache.PutTxn(result.ID(), result)
+	return r.cache.PutTx(result.ID(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*flow.ExecutionResult, error) {

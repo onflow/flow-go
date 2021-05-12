@@ -49,7 +49,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCa
 }
 
 func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
-	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTxn(c.ChunkID, c))
+	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(c.ChunkID, c))
 	if err != nil {
 		return fmt.Errorf("could not store chunk datapack: %w", err)
 	}

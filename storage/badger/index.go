@@ -48,7 +48,7 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 }
 
 func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(*transaction.Tx) error {
-	return i.cache.PutTxn(blockID, index)
+	return i.cache.PutTx(blockID, index)
 }
 
 func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Index, error) {
