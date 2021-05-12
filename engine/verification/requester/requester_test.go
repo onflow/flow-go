@@ -324,6 +324,8 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(count * attempts)
+
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
@@ -332,6 +334,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 }
 
 // TestDispatchingRequests_Hybrid evaluates the behavior of requester when it has different request dispatch timelines, i.e.,
@@ -384,6 +387,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	// mocks only instantly qualified requests are dispatched in the network.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(instantQualifiedRequests) * attempts)
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not check chunk requests qualification on time")
