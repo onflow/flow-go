@@ -36,6 +36,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
 	}

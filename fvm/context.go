@@ -27,6 +27,8 @@ type Context struct {
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
+	EventCollectionEnabled           bool
+	ServiceEventCollectionEnabled    bool
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
 	SetValueHandler                  SetValueHandler
@@ -82,6 +84,8 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
+		EventCollectionEnabled:           true,
+		ServiceEventCollectionEnabled:    false,
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
 		SetValueHandler:                  nil,
@@ -170,6 +174,14 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
 	return func(ctx Context) Context {
 		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		return ctx
+	}
+}
+
+// WithServiceEventCollectionEnabled enables service event collection
+func WithServiceEventCollectionEnabled() Option {
+	return func(ctx Context) Context {
+		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }
