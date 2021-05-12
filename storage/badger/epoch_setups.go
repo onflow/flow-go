@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type EpochSetups struct {
@@ -51,6 +52,10 @@ func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) erro
 		}
 		return nil
 	}
+}
+
+func (es *EpochSetups) StoreTxn(setup *flow.EpochSetup) func(tx *transaction.Tx) error {
+	return es.cache.PutTxn(setup.ID(), setup)
 }
 
 func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {

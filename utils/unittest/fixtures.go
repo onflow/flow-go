@@ -1583,11 +1583,7 @@ func DKGMessageFixture() *messages.DKGMessage {
 // DKGBroadcastMessageFixture creates a single DKG broadcast message with random fields
 func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	return &messages.BroadcastDKGMessage{
-		DKGMessage: messages.DKGMessage{
-			Orig:          uint64(rand.Int()),
-			Data:          RandomBytes(10),
-			DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
-		},
-		Signature: SignatureFixture(),
+		DKGMessage: *DKGMessageFixture(),
+		Signature:  SignatureFixture(),
 	}
 }
