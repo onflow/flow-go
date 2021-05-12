@@ -371,7 +371,11 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 //
 // When this method returns without any error, it means that the verification of the chunk at the verifier engine is done (either successfully,
 // or unsuccessfully)
-func (e *Engine) pushToVerifier(chunk *flow.Chunk, result *flow.ExecutionResult, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+func (e *Engine) pushToVerifier(chunk *flow.Chunk,
+	result *flow.ExecutionResult,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) error {
+
 	header, err := e.headers.ByBlockID(chunk.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get block header: %w", err)
