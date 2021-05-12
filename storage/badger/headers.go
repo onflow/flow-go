@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Headers implements a simple read-only header storage around a badger DB.
@@ -94,6 +95,10 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
 func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
 	return h.cache.Put(header.ID(), header)
+}
+
+func (h *Headers) storeTxn(header *flow.Header) func(*transaction.Tx) error {
+	return h.cache.PutTxn(header.ID(), header)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
