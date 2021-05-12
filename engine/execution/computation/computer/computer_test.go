@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/event"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -175,7 +175,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 
 	t.Run("service events are emitted", func(t *testing.T) {
-		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithTransactionProcessors(
+		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
 			fvm.NewTransactionInvocator(zerolog.Nop()), //we don't need to check signatures or sequence numbers
 		))
 
@@ -194,7 +194,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := event.GetServiceEventWhitelist()
+		eventWhitelist := handler.GetServiceEventWhitelist()
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
@@ -493,8 +493,42 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 	require.Contains(t, registerTouches, id.String())
 	require.Equal(t, id, registerTouches[id.String()])
-
 }
+
+func Test_ExecutingSystemCollection(t *testing.T) {
+
+	execCtx := fvm.NewContext(zerolog.Nop())
+
+	runtime := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(runtime)
+
+	rag := &RandomAddressGenerator{}
+
+	ledger := testutil.RootBootstrappedLedger(vm, execCtx)
+
+	committer := new(computermock.ViewCommitter)
+	committer.On("CommitView", mock.Anything, mock.Anything).
+		Return(nil, nil, nil).
+		Times(1) // only system chunk
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	require.NoError(t, err)
+
+	// create empty block, it will have system collection attached while executing
+	block := generateBlock(0, 0, rag)
+
+	view := delta.NewView(ledger.Get)
+
+	result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
+	assert.NoError(t, err)
+	assert.Len(t, result.StateSnapshots, 1) // +1 system chunk
+	assert.Len(t, result.TransactionResults, 1)
+
+	assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+
+	committer.AssertExpectations(t)
+}
+
 func generateBlock(collectionCount, transactionCount int, addressGenerator flow.AddressGenerator) *entity.ExecutableBlock {
 	return generateBlockWithVisitor(collectionCount, transactionCount, addressGenerator, nil)
 }

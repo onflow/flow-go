@@ -11,7 +11,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/network/message"
@@ -26,14 +25,38 @@ const pingTimeout = time.Second * 60
 
 // PingService handles the outbound and inbound ping requests and response
 type PingService struct {
-	host           host.Host
-	pingProtocolID protocol.ID
-	version        string
-	logger         zerolog.Logger
+	host             host.Host
+	pingProtocolID   protocol.ID
+	pingInfoProvider PingInfoProvider
+	logger           zerolog.Logger
 }
 
-func NewPingService(h host.Host, pingProtocolID protocol.ID, version string, logger zerolog.Logger) *PingService {
-	ps := &PingService{host: h, pingProtocolID: pingProtocolID, version: version, logger: logger}
+// PingInfoProvider is the interface used by the PingService to respond to incoming PingRequest with a PingResponse
+// populated with the necessary details
+type PingInfoProvider interface {
+	SoftwareVersion() string
+	LatestFinalizedBlockHeight() uint64
+}
+
+type PingInfoProviderImpl struct {
+	SoftwareVersionFun            func() string
+	LatestFinalizedBlockHeightFun func() (uint64, error)
+}
+
+func (p PingInfoProviderImpl) SoftwareVersion() string {
+	return p.SoftwareVersionFun()
+}
+func (p PingInfoProviderImpl) LatestFinalizedBlockHeight() uint64 {
+	height, err := p.LatestFinalizedBlockHeightFun()
+	// if the node is unable to report the latest finalized block height, then report 0 instead of failing the ping
+	if err != nil {
+		return uint64(0)
+	}
+	return height
+}
+
+func NewPingService(h host.Host, pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider, logger zerolog.Logger) *PingService {
+	ps := &PingService{host: h, pingProtocolID: pingProtocolID, pingInfoProvider: pingInfoProvider, logger: logger}
 	h.SetStreamHandler(pingProtocolID, ps.PingHandler)
 	return ps
 }
@@ -89,10 +112,16 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	bufw := bufio.NewWriter(s)
 	writer := ggio.NewDelimitedWriter(bufw)
 
+	// query for the semantic version of the build this node is running
+	version := ps.pingInfoProvider.SoftwareVersion()
+
+	// query for the lastest finalized block height
+	blockHeight := ps.pingInfoProvider.LatestFinalizedBlockHeight()
+
 	// create a PingResponse
 	pingResponse := &message.PingResponse{
-		Version: ps.version, // the semantic version of the build
-		// TODO populate BlockHeight:
+		Version:     version,
+		BlockHeight: blockHeight,
 	}
 
 	// send the PingResponse
