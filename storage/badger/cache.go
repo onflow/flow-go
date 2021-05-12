@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -133,6 +134,24 @@ func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) err
 		}
 
 		c.Insert(key, resource)
+		return nil
+	}
+}
+
+// PutTxn will return Badger tx which adds an resource to the cache with the given ID.
+func (c *Cache) PutTxn(key interface{}, resource interface{}) func(*transaction.Tx) error {
+	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
+
+	return func(tx *transaction.Tx) error {
+		err := storeOps(tx.DBTxn) // execute operations to store recourse
+		if err != nil {
+			return fmt.Errorf("could not store resource: %w", err)
+		}
+
+		tx.OnSucceed(func() {
+			c.Insert(key, resource)
+		})
+
 		return nil
 	}
 }

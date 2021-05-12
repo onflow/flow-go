@@ -77,6 +77,8 @@ func New(
 		requester:     requester,
 	}
 
+	e.requester.WithChunkDataPackHandler(e)
+
 	return e
 }
 
@@ -112,7 +114,9 @@ func (e *Engine) Done() <-chan struct{} {
 // the chunk consumer in order to process the next chunk.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	// TODO: add tracing and metrics.
+	locatorID := locator.ID()
 	lg := e.log.With().
+		Hex("locator_id", logging.ID(locatorID)).
 		Hex("result_id", logging.ID(locator.ResultID)).
 		Uint64("chunk_index", locator.Index).
 		Logger()
@@ -199,7 +203,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 
 	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection)
+	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection, status.ExecutionResult)
 	if err != nil {
 		// TODO: this can be due to a byzantine behavior
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
@@ -226,7 +230,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(chunkDataPack.ChunkID)
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 	lg.Info().Msg("chunk verification is done")
 }
 
@@ -235,21 +239,82 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // given collection.
 //
 // Regarding the authenticity: the chunk data pack should be coming from a sender that is an staked execution node at the block of the chunk.
-func (e *Engine) validateChunkDataPack(chunk *flow.Chunk, senderID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
+	senderID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+	result *flow.ExecutionResult) error {
 	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
-		return fmt.Errorf("unstaked execution node sender at block ID")
+		return fmt.Errorf("unstaked execution node sender at block ID: %x, resultID: %x, chunk ID: %x",
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	// 2. start state must match
 	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
-		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x", chunk.ChunkBody.StartState, chunkDataPack.StartState)
+		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x, block ID: %x, resultID: %x, chunk ID: %x",
+			chunk.ChunkBody.StartState,
+			chunkDataPack.StartState,
+			blockID,
+			result.ID(),
+			chunk.ID())
 	}
 
 	// 3. collection id must match
+	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result)
+	if err != nil {
+		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
+			collection.ID(),
+			senderID,
+			blockID,
+			result.ID(),
+			chunk.ID())
+	}
+
+	return nil
+}
+
+// validateCollectionID returns error for an invalid collection against a chunk data pack,
+// and returns nil otherwise.
+func (e Engine) validateCollectionID(collection *flow.Collection,
+	chunkDataPack *flow.ChunkDataPack,
+	chunkIndex uint64,
+	result *flow.ExecutionResult) error {
+
+	if IsSystemChunk(chunkIndex, result) {
+		return e.validateSystemChunkCollection(collection, chunkDataPack)
+	}
+
+	return e.validateNonSystemChunkCollection(collection, chunkDataPack)
+}
+
+// validateSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
+// A collection is valid against a system chunk if collection is empty of transactions, and chunk data pack has a zero ID collection.
+func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
+	collID := flow.ZeroID // for system chunk, the collection ID should be always zero ID.
+	if collection.Len() != 0 {
+		return engine.NewInvalidInputErrorf("non-empty collection for system chunk, found on chunk data pack: %v, actual collection: %v, len: %d",
+			chunkDataPack.CollectionID, collection.ID(), collection.Len())
+	}
+
+	if chunkDataPack.CollectionID != collID {
+		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
+	}
+
+	return nil
+}
+
+// validateNonSystemChunkCollection returns nil if the collection is matching the non-system chunk data pack.
+// A collection is valid against a non-system chunk if it has a matching collection ID with system chunk's collection ID field.
+//
+// TODO: collection ID should also be checked against its block.
+func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
 	collID := collection.ID()
+
 	if chunkDataPack.CollectionID != collID {
 		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
 	}
@@ -281,9 +346,18 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 // through HandleChunkDataPack).
 func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 	// we need to report that the job has been finished eventually
-	defer e.chunkConsumerNotifier.Notify(chunkID)
+	status, exists := e.pendingChunks.ByID(chunkID)
+	if !exists {
+		e.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
+		return
+	}
+
 	removed := e.pendingChunks.Rem(chunkID)
-	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block")
+
+	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
 }
 
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.
