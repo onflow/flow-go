@@ -497,7 +497,11 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 func Test_ExecutingSystemCollection(t *testing.T) {
 
-	execCtx := fvm.NewContext(zerolog.Nop())
+	execCtx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+		fvm.WithBlockHeader(unittest.GenesisFixture(nil).Header),
+	)
 
 	runtime := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(runtime)
