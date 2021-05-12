@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -34,12 +33,11 @@ import (
 type FollowerState struct {
 	*State
 
-	index             storage.Index
-	payloads          storage.Payloads
-	tracer            module.Tracer
-	consumer          protocol.Consumer
-	cfg               Config
-	complianceMetrics module.ComplianceMetrics
+	index    storage.Index
+	payloads storage.Payloads
+	tracer   module.Tracer
+	consumer protocol.Consumer
+	cfg      Config
 }
 
 // MutableState implements a mutable protocol state. When extending the
@@ -60,13 +58,12 @@ func NewFollowerState(
 	consumer protocol.Consumer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:             state,
-		index:             index,
-		payloads:          payloads,
-		tracer:            tracer,
-		consumer:          consumer,
-		cfg:               DefaultConfig(),
-		complianceMetrics: metrics.NewComplianceCollector(),
+		State:    state,
+		index:    index,
+		payloads: payloads,
+		tracer:   tracer,
+		consumer: consumer,
+		cfg:      DefaultConfig(),
 	}
 	return followerState, nil
 }
