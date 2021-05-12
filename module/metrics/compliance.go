@@ -136,3 +136,7 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
 	cc.blockProposalDuration.Add(duration.Seconds())
 }
+
+func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
+	cc.committedEpochFinalView.Set(float64(view))
+}

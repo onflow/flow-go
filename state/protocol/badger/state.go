@@ -51,6 +51,32 @@ func Bootstrap(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	phase, err := state.Final().Phase()
+	if err != nil {
+		return nil, fmt.Errorf("could not get epoch phase from state: %w", err)
+	}
+
+	// update metric based of epoch phase
+	switch phase {
+	case flow.EpochPhaseStaking:
+	case flow.EpochPhaseSetup:
+
+		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
+		finalView, err := state.Final().Epochs().Current().FinalView()
+		if err != nil {
+			return nil, fmt.Errorf("could not get current epoch final view from state: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	case flow.EpochPhaseCommitted:
+
+		// if we are in Committed phase, then set the metric value to the next epoch's final view
+		finalView, err := state.Final().Epochs().Next().FinalView()
+		if err != nil {
+			return nil, fmt.Errorf("could not get next epoch final view from state: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	}
+
 	if err := isValidRootSnapshot(root); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}

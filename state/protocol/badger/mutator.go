@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -32,11 +33,13 @@ import (
 // the non-consensus nodes have to perform.
 type FollowerState struct {
 	*State
-	index    storage.Index
-	payloads storage.Payloads
-	tracer   module.Tracer
-	consumer protocol.Consumer
-	cfg      Config
+
+	index             storage.Index
+	payloads          storage.Payloads
+	tracer            module.Tracer
+	consumer          protocol.Consumer
+	cfg               Config
+	complianceMetrics module.ComplianceMetrics
 }
 
 // MutableState implements a mutable protocol state. When extending the
@@ -57,12 +60,13 @@ func NewFollowerState(
 	consumer protocol.Consumer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:    state,
-		index:    index,
-		payloads: payloads,
-		tracer:   tracer,
-		consumer: consumer,
-		cfg:      DefaultConfig(),
+		State:             state,
+		index:             index,
+		payloads:          payloads,
+		tracer:            tracer,
+		consumer:          consumer,
+		cfg:               DefaultConfig(),
+		complianceMetrics: metrics.NewComplianceCollector(),
 	}
 	return followerState, nil
 }
@@ -773,6 +777,9 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
 				}
+
+				// update `committed_epoch_final_view` metric with new final view
+				m.complianceMetrics.CommittedEpochFinalView(setup.FinalView)
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.CommitID = ev.ID()
