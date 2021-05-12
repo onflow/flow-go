@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ExecutionReceipts implements storage for execution receipts.
@@ -82,6 +83,10 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
 func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
 	return r.cache.Put(receipt.ID(), receipt)
+}
+
+func (r *ExecutionReceipts) storeTxn(receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
+	return r.cache.PutTxn(receipt.ID(), receipt)
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*flow.ExecutionReceipt, error) {
