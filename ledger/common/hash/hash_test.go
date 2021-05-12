@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/stretchr/testify/assert"
 
 	cryhash "github.com/onflow/flow-go/crypto/hash"
@@ -30,10 +32,10 @@ func TestHash(t *testing.T) {
 			rand.Read(value)
 			h := hash.HashLeaf(path, value)
 
-			hasher := cryhash.NewSHA3_256()
+			hasher := sha3.New256()
 			_, _ = hasher.Write(path[:])
 			_, _ = hasher.Write(value)
-			expected := hasher.SumHash()
+			expected := hasher.Sum(nil)
 			assert.Equal(t, []byte(expected), []byte(h[:]))
 		}
 	})
@@ -46,10 +48,10 @@ func TestHash(t *testing.T) {
 			rand.Read(h2[:])
 			h := hash.HashInterNode(h1, h2)
 
-			hasher := cryhash.NewSHA3_256()
+			hasher := sha3.New256()
 			_, _ = hasher.Write(h1[:])
 			_, _ = hasher.Write(h2[:])
-			expected := hasher.SumHash()
+			expected := hasher.Sum(nil)
 			assert.Equal(t, []byte(expected), []byte(h[:]))
 		}
 	})

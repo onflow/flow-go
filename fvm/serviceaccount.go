@@ -9,6 +9,10 @@ import (
 const systemChunkTransactionTemplate = `
 import FlowServiceAccount from 0x%s
 transaction {
+  prepare(serviceAccount: AuthAccount) { 
+
+  }
+
   execute {
     // TODO: replace with call to service account heartbeat
  	log("pulse")
@@ -20,5 +24,6 @@ transaction {
 // at the specified service address.
 func SystemChunkTransaction(serviceAddress flow.Address) *flow.TransactionBody {
 	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(systemChunkTransactionTemplate, serviceAddress)))
+		SetScript([]byte(fmt.Sprintf(systemChunkTransactionTemplate, serviceAddress))).
+		AddAuthorizer(serviceAddress)
 }

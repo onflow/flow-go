@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Blocks implements a simple block storage around a badger DB.
@@ -38,6 +39,21 @@ func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
 			return fmt.Errorf("could not store header: %w", err)
 		}
 		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store payload: %w", err)
+		}
+		return nil
+	}
+}
+
+// StoreTxn ...
+func (b *Blocks) StoreTxn(block *flow.Block) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		err := b.headers.storeTxn(block.Header)(tx)
+		if err != nil {
+			return fmt.Errorf("could not store header: %w", err)
+		}
+		err = b.payloads.storeTxn(block.ID(), block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}

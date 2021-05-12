@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/messages"
 	vermodel "github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/buffer"
@@ -51,7 +51,7 @@ func happyPathExample() {
 		// starts happy path
 		t := &testing.T{}
 		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
-		test.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
+		vertestutils.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
 		<-mempoolCollector.Done()
 	})
 }
