@@ -17,7 +17,6 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 
 	"github.com/onflow/flow-go/fvm/errors"
-	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -32,22 +31,20 @@ var _ runtime.Interface = &hostEnv{}
 var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx                Context
-	sth                *state.StateHolder
-	vm                 *VirtualMachine
-	accounts           *state.Accounts
-	contracts          *handler.ContractHandler
-	programs           *handler.ProgramsHandler
-	addressGenerator   flow.AddressGenerator
-	uuidGenerator      *state.UUIDGenerator
-	metrics            runtime.Metrics
-	events             []flow.Event
-	serviceEvents      []flow.Event
-	totalEventByteSize uint64
-	logs               []string
-	totalGasUsed       uint64
-	transactionEnv     *transactionEnv
-	rng                *rand.Rand
+	ctx              Context
+	sth              *state.StateHolder
+	vm               *VirtualMachine
+	accounts         *state.Accounts
+	contracts        *handler.ContractHandler
+	programs         *handler.ProgramsHandler
+	addressGenerator flow.AddressGenerator
+	uuidGenerator    *state.UUIDGenerator
+	metrics          runtime.Metrics
+	eventHandler     *handler.EventHandler
+	logs             []string
+	totalGasUsed     uint64
+	transactionEnv   *transactionEnv
+	rng              *rand.Rand
 }
 
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
@@ -63,17 +60,24 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		programs, sth,
 	)
 
+	// TODO set the flags on context
+	eventHandler := handler.NewEventHandler(ctx.Chain,
+		ctx.EventCollectionEnabled,
+		ctx.ServiceEventCollectionEnabled,
+		ctx.EventCollectionByteSizeLimit,
+	)
+
 	env := &hostEnv{
-		ctx:                ctx,
-		sth:                sth,
-		vm:                 vm,
-		metrics:            &noopMetricsCollector{},
-		accounts:           accounts,
-		contracts:          contracts,
-		addressGenerator:   generator,
-		uuidGenerator:      uuidGenerator,
-		totalEventByteSize: uint64(0),
-		programs:           programsHandler,
+		ctx:              ctx,
+		sth:              sth,
+		vm:               vm,
+		metrics:          &noopMetricsCollector{},
+		accounts:         accounts,
+		contracts:        contracts,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
+		eventHandler:     eventHandler,
+		programs:         programsHandler,
 	}
 
 	if ctx.BlockHeader != nil {
@@ -114,11 +118,11 @@ func (e *hostEnv) setTraceSpan(span opentracing.Span) {
 }
 
 func (e *hostEnv) getEvents() []flow.Event {
-	return e.events
+	return e.eventHandler.Events()
 }
 
 func (e *hostEnv) getServiceEvents() []flow.Event {
-	return e.serviceEvents
+	return e.eventHandler.ServiceEvents()
 }
 
 func (e *hostEnv) getLogs() []string {
@@ -450,34 +454,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 		return errors.NewOperationNotSupportedError("EmitEvent")
 	}
 
-	payload, err := jsoncdc.Encode(event)
-	if err != nil {
-		return errors.NewEncodingFailuref("failed to json encode a cadence event: %w", err)
-	}
-
-	e.totalEventByteSize += uint64(len(payload))
-
-	// skip limit if payer is service account
-	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
-		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-			return errors.NewEventLimitExceededError(e.totalEventByteSize, e.ctx.EventCollectionByteSizeLimit)
-		}
-	}
-
-	flowEvent := flow.Event{
-		Type:             flow.EventType(event.EventType.ID()),
-		TransactionID:    e.transactionEnv.TxID(),
-		TransactionIndex: e.transactionEnv.TxIndex(),
-		EventIndex:       uint32(len(e.events)),
-		Payload:          payload,
-	}
-
-	if fvmEvent.IsServiceEvent(event, e.ctx.Chain) {
-		e.serviceEvents = append(e.serviceEvents, flowEvent)
-	}
-
-	e.events = append(e.events, flowEvent)
-	return nil
+	return e.eventHandler.EmitEvent(event, e.transactionEnv.txID, e.transactionEnv.txIndex, e.transactionEnv.tx.Payer)
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
@@ -551,7 +528,7 @@ func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error
 }
 
 func (e *hostEnv) Events() []flow.Event {
-	return e.events
+	return e.eventHandler.Events()
 }
 
 func (e *hostEnv) Logs() []string {
