@@ -3,11 +3,7 @@
 package mockfetcher
 
 import (
-<<<<<<< HEAD
-	verification "github.com/onflow/flow-go/model/verification"
-=======
 	fetcher "github.com/onflow/flow-go/engine/verification/fetcher"
->>>>>>> master
 	mock "github.com/stretchr/testify/mock"
 
 	verification "github.com/onflow/flow-go/model/verification"
@@ -21,12 +17,9 @@ type ChunkDataPackRequester struct {
 // Request provides a mock function with given fields: request
 func (_m *ChunkDataPackRequester) Request(request *verification.ChunkDataPackRequest) {
 	_m.Called(request)
-<<<<<<< HEAD
-=======
 }
 
 // WithChunkDataPackHandler provides a mock function with given fields: handler
 func (_m *ChunkDataPackRequester) WithChunkDataPackHandler(handler fetcher.ChunkDataPackHandler) {
 	_m.Called(handler)
->>>>>>> master
 }
