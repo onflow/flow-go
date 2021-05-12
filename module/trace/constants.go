@@ -132,6 +132,13 @@ const (
 	VERFetcherPushToVerifier        SpanName = "ver.fetcher.pushToVerifier"
 	VERFetcherValidateChunkDataPack SpanName = "ver.fetcher.pushToVerifier"
 
+	// requester engine
+	VERProcessChunkDataPackRequest SpanName = "ver.processChunkDataPackRequest"
+	// children of VERProcessChunkDataPackRequest
+	VERRequesterHandleChunkDataRequest   SpanName = "ver.requester.handleChunkDataRequest"
+	VERRequesterHandleChunkDataResponse  SpanName = "ver.requester.handleChunkDataResponse"
+	VERRequesterDispatchChunkDataRequest SpanName = "ver.requester.dispatchChunkDataRequest"
+
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
 	VERFindHandleExecutionReceipt SpanName = "ver.find.handleExecutionReceipt"
