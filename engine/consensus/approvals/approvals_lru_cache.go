@@ -15,30 +15,20 @@ type LruCache struct {
 	lock sync.RWMutex
 	// secondary index by result id, since multiple approvals could
 	// reference same result
-	byResultID map[flow.Identifier]flow.IdentifierList
+	byResultID map[flow.Identifier]map[flow.Identifier]struct{}
 }
 
 func NewApprovalsLRUCache(limit uint) *LruCache {
-	byResultID := make(map[flow.Identifier]flow.IdentifierList)
+	byResultID := make(map[flow.Identifier]map[flow.Identifier]struct{})
 	// callback has to be called while we are holding lock
 	lru, _ := simplelru.NewLRU(int(limit), func(key interface{}, value interface{}) {
 		approval := value.(*flow.ResultApproval)
-		delete(byResultID, approval.Body.ExecutionResultID)
+		delete(byResultID[approval.Body.ExecutionResultID], approval.Body.PartialID())
 	})
 	return &LruCache{
 		lru:        lru,
 		byResultID: byResultID,
 	}
-}
-
-func (c *LruCache) ByResultID(resultID flow.Identifier) flow.IdentifierList {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	ids, ok := c.byResultID[resultID]
-	if ok {
-		return ids.Copy()
-	}
-	return nil
 }
 
 func (c *LruCache) Peek(approvalID flow.Identifier) *flow.ResultApproval {
@@ -65,21 +55,27 @@ func (c *LruCache) Get(approvalID flow.Identifier) *flow.ResultApproval {
 	return nil
 }
 
-func (c *LruCache) Take(approvalID flow.Identifier) *flow.ResultApproval {
+func (c *LruCache) TakeByResultID(resultID flow.Identifier) []*flow.ResultApproval {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// check if we have it in the cache
-	if resource, ok := c.lru.Peek(approvalID); ok {
-
-		// no need to cleanup secondary index since it will be
-		// cleaned up in evict callback
-
-		_ = c.lru.Remove(approvalID)
-		return resource.(*flow.ResultApproval)
+	ids, ok := c.byResultID[resultID]
+	if !ok {
+		return nil
 	}
 
-	return nil
+	approvals := make([]*flow.ResultApproval, 0, len(ids))
+	for approvalID := range ids {
+		// check if we have it in the cache
+		if resource, ok := c.lru.Peek(approvalID); ok {
+			// no need to cleanup secondary index since it will be
+			// cleaned up in evict callback
+			_ = c.lru.Remove(approvalID)
+			approvals = append(approvals, resource.(*flow.ResultApproval))
+		}
+	}
+
+	return approvals
 }
 
 func (c *LruCache) Put(approval *flow.ResultApproval) {
@@ -89,10 +85,10 @@ func (c *LruCache) Put(approval *flow.ResultApproval) {
 	defer c.lock.Unlock()
 	// cache the resource and eject least recently used one if we reached limit
 	_ = c.lru.Add(approvalID, approval)
-	ids, ok := c.byResultID[resultID]
+	_, ok := c.byResultID[resultID]
 	if !ok {
-		c.byResultID[resultID] = []flow.Identifier{approvalID}
+		c.byResultID[resultID] = map[flow.Identifier]struct{}{approvalID: {}}
 	} else {
-		c.byResultID[resultID] = append(ids, approvalID)
+		c.byResultID[resultID][approvalID] = struct{}{}
 	}
 }

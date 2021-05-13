@@ -297,18 +297,16 @@ func (c *approvalProcessingCore) checkEmergencySealing(lastSealedHeight, lastFin
 
 func (c *approvalProcessingCore) processPendingApprovals(collector *AssignmentCollector) error {
 	// filter cached approvals for concrete execution result
-	for _, approvalID := range c.approvalsCache.ByResultID(collector.ResultID) {
-		if approval := c.approvalsCache.Take(approvalID); approval != nil {
-			err := collector.ProcessApproval(approval)
-			if err != nil {
-				if engine.IsInvalidInputError(err) {
-					c.log.Debug().
-						Hex("result_id", collector.ResultID[:]).
-						Err(err).
-						Msgf("invalid approval with id %s", approval.ID())
-				} else {
-					return fmt.Errorf("could not process assignment: %w", err)
-				}
+	for _, approval := range c.approvalsCache.TakeByResultID(collector.ResultID) {
+		err := collector.ProcessApproval(approval)
+		if err != nil {
+			if engine.IsInvalidInputError(err) {
+				c.log.Debug().
+					Hex("result_id", collector.ResultID[:]).
+					Err(err).
+					Msgf("invalid approval with id %s", approval.ID())
+			} else {
+				return fmt.Errorf("could not process assignment: %w", err)
 			}
 		}
 	}
