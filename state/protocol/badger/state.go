@@ -58,8 +58,7 @@ func Bootstrap(
 
 	// update metric based of epoch phase
 	switch phase {
-	case flow.EpochPhaseStaking:
-	case flow.EpochPhaseSetup:
+	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
 
 		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
 		finalView, err := state.Final().Epochs().Current().FinalView()
