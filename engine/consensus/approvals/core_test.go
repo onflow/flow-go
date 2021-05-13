@@ -336,8 +336,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanApprovals() {
 	forks := make([][]*flow.Block, 3)
 	forkResults := make([][]*flow.ExecutionResult, len(forks))
+
 	for forkIndex := range forks {
-		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+2, &s.Block)
+		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+2, &s.ParentBlock)
 		fork := forks[forkIndex]
 
 		previousResult := s.IncorporatedResult.Result
@@ -345,7 +346,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 			s.blocks[block.ID()] = block.Header
 			s.identitiesCache[block.ID()] = s.AuthorizedVerifiers
 
-			// create and incorporate result for every block in fork except last one
+			// create and incorporate result for every block in fork except first one
 			if blockIndex > 0 {
 				// create a result
 				result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
@@ -391,6 +392,57 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 			// for first fork all results should be valid, since it's a finalized fork
 			// all others forks are orphans and approvals for those should be outdated
 			if forkIndex == 0 {
+				require.NoError(s.T(), err)
+			} else {
+				require.Error(s.T(), err)
+				require.True(s.T(), engine.IsOutdatedInputError(err))
+			}
+		}
+	}
+}
+
+// TestOnBlockFinalized_ExtendingUnprocessableFork tests that extending orphan fork results in non processable collectors
+//       - X <- Y <- Z
+//    /
+// <- A <- B <- C <- D <- E
+//		   |
+//       finalized
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnprocessableFork() {
+	forks := make([][]*flow.Block, 2)
+
+	for forkIndex := range forks {
+		forks[forkIndex] = unittest.ChainFixtureFrom(forkIndex+3, &s.Block)
+		fork := forks[forkIndex]
+		for _, block := range fork {
+			s.blocks[block.ID()] = block.Header
+			s.identitiesCache[block.ID()] = s.AuthorizedVerifiers
+		}
+	}
+
+	finalized := forks[1][0].Header
+
+	s.headers.On("ByHeight", finalized.Height).Return(finalized, nil)
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
+	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+
+	// finalize block B
+	s.core.OnFinalizedBlock(finalized.ID())
+
+	// create incorporated result for each block in main fork
+	for forkIndex, fork := range forks {
+		previousResult := s.IncorporatedResult.Result
+		for _, block := range fork {
+			result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
+			result.BlockID = block.Header.ParentID
+			result.Chunks = s.Chunks
+			previousResult = result
+
+			// incorporate in fork
+			IR := unittest.IncorporatedResult.Fixture(
+				unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+				unittest.IncorporatedResult.WithResult(result))
+			err := s.core.processIncorporatedResult(IR)
+			if forkIndex > 0 {
 				require.NoError(s.T(), err)
 			} else {
 				require.Error(s.T(), err)

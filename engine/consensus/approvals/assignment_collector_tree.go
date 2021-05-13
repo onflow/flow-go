@@ -6,13 +6,14 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
+	"github.com/onflow/flow-go/storage"
 )
 
 // assignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
-// AssignmentCollector and if it's orphan or not
+// AssignmentCollector and information if collector is processable or not
 type assignmentCollectorVertex struct {
-	collector *AssignmentCollector
-	orphan    bool
+	collector   *AssignmentCollector
+	processable bool
 }
 
 /* Methods implementing LevelledForest's Vertex interface */
@@ -35,18 +36,22 @@ type AssignmentCollectorTree struct {
 	lock              sync.RWMutex
 	onCreateCollector NewCollectorFactoryMethod
 	size              uint64
+	lastSealedID      flow.Identifier
+	headers           storage.Headers
 }
 
-func NewAssignmentCollectorTree(lowestLevel uint64, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
+func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
 	return &AssignmentCollectorTree{
-		forest:            forest.NewLevelledForest(lowestLevel),
+		forest:            forest.NewLevelledForest(lastSealed.Height),
 		lock:              sync.RWMutex{},
 		onCreateCollector: onCreateCollector,
 		size:              0,
+		lastSealedID:      lastSealed.ID(),
+		headers:           headers,
 	}
 }
 
-// GetCollector returns collector by ID and whether it is orphan or not
+// GetCollector returns collector by ID and whether it is processable or not
 func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*AssignmentCollector, bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -56,7 +61,7 @@ func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*Assig
 	}
 
 	v := vertex.(*assignmentCollectorVertex)
-	return v.collector, v.orphan
+	return v.collector, v.processable
 }
 
 // FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
@@ -69,27 +74,21 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header) {
 	for iter.HasNext() {
 		vertex := iter.NextVertex().(*assignmentCollectorVertex)
 		if finalizedBlockID != vertex.collector.BlockID() {
-			t.markOrphanFork(vertex)
+			t.markForkProcessable(vertex, false)
 		}
 	}
 }
 
-// markOrphanFork takes starting vertex of some fork and marks it as orphan in recursive manner
-func (t *AssignmentCollectorTree) markOrphanFork(vertex *assignmentCollectorVertex) {
-	// if parent is orphan then all children should be orphan as well
-	// we can skip marking the child nodes.
-	if vertex.orphan {
-		return
-	}
-
-	vertex.orphan = true
+// markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
+func (t *AssignmentCollectorTree) markForkProcessable(vertex *assignmentCollectorVertex, processable bool) {
+	vertex.processable = processable
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
-		t.markOrphanFork(iter.NextVertex().(*assignmentCollectorVertex))
+		t.markForkProcessable(iter.NextVertex().(*assignmentCollectorVertex), processable)
 	}
 }
 
-// GetCollectorsByInterval returns non-orphan collectors that satisfy interval [from; to)
+// GetCollectorsByInterval returns processable collectors that satisfy interval [from; to)
 func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollector {
 	var vertices []*AssignmentCollector
 	t.lock.RLock()
@@ -103,7 +102,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 		iter := t.forest.GetVerticesAtLevel(l)
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
-			if !vertex.orphan {
+			if vertex.processable {
 				vertices = append(vertices, vertex.collector)
 			}
 		}
@@ -113,9 +112,9 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 }
 
 type LazyInitCollector struct {
-	Collector *AssignmentCollector
-	Orphan    bool
-	Created   bool
+	Collector   *AssignmentCollector
+	Processable bool
+	Created     bool
 }
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double checked locking
@@ -123,12 +122,12 @@ type LazyInitCollector struct {
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*LazyInitCollector, error) {
 	resultID := result.ID()
 	// first let's check if we have a collector already
-	cachedCollector, orphan := t.GetCollector(resultID)
+	cachedCollector, processable := t.GetCollector(resultID)
 	if cachedCollector != nil {
 		return &LazyInitCollector{
-			Collector: cachedCollector,
-			Orphan:    orphan,
-			Created:   false,
+			Collector:   cachedCollector,
+			Processable: processable,
+			Created:     false,
 		}, nil
 	}
 
@@ -137,8 +136,13 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 	vertex := &assignmentCollectorVertex{
-		collector: collector,
-		orphan:    false,
+		collector:   collector,
+		processable: false,
+	}
+
+	executedBlock, err := t.headers.ByBlockID(result.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch executed block %v: %w", result.BlockID, err)
 	}
 
 	// fast check shows that there is no collector, need to create one
@@ -150,14 +154,16 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
-			Collector: v.(*assignmentCollectorVertex).collector,
-			Orphan:    v.(*assignmentCollectorVertex).orphan,
-			Created:   false,
+			Collector:   v.(*assignmentCollectorVertex).collector,
+			Processable: v.(*assignmentCollectorVertex).processable,
+			Created:     false,
 		}, nil
 	}
 	parent, parentFound := t.forest.GetVertex(result.PreviousResultID)
 	if parentFound {
-		vertex.orphan = parent.(*assignmentCollectorVertex).orphan
+		vertex.processable = parent.(*assignmentCollectorVertex).processable
+	} else if executedBlock.ParentID == t.lastSealedID {
+		vertex.processable = true
 	}
 
 	err = t.forest.VerifyVertex(vertex)
@@ -167,10 +173,11 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 
 	t.forest.AddVertex(vertex)
 	t.size += 1
+	t.markForkProcessable(vertex, vertex.processable)
 	return &LazyInitCollector{
-		Collector: vertex.collector,
-		Orphan:    vertex.orphan,
-		Created:   true,
+		Collector:   vertex.collector,
+		Processable: vertex.processable,
+		Created:     true,
 	}, nil
 }
 

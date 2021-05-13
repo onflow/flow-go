@@ -58,7 +58,7 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, se
 			approvalConduit, core.requestTracker, requiredApprovalsForSealConstruction)
 	}
 
-	core.collectorTree = NewAssignmentCollectorTree(lastSealed.Height, factoryMethod)
+	core.collectorTree = NewAssignmentCollectorTree(lastSealed, headers, factoryMethod)
 
 	return core, nil
 }
@@ -162,8 +162,8 @@ func (c *approvalProcessingCore) processIncorporatedResult(result *flow.Incorpor
 		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
 	}
 
-	if lazyCollector.Orphan {
-		return engine.NewOutdatedInputErrorf("collector for %s is marked as orphan", result.ID())
+	if !lazyCollector.Processable {
+		return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", result.ID())
 	}
 
 	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
@@ -249,9 +249,9 @@ func (c *approvalProcessingCore) processApproval(approval *flow.ResultApproval) 
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
 	}
 
-	if collector, orphan := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
-		if orphan {
-			return engine.NewOutdatedInputErrorf("collector for %s is marked as orphan", approval.Body.ExecutionResultID)
+	if collector, processable := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
+		if !processable {
+			return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", approval.Body.ExecutionResultID)
 		}
 
 		// if there is a collector it means that we have received execution result and we are ready
