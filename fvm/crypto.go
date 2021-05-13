@@ -70,7 +70,7 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 	switch s {
 	case runtime.SignatureAlgorithmECDSA_P256:
 		return crypto.ECDSAP256
-	case runtime.SignatureAlgorithmECDSA_Secp256k1:
+	case runtime.SignatureAlgorithmECDSA_secp256k1:
 		return crypto.ECDSASecp256k1
 	default:
 		return crypto.UnknownSigningAlgorithm
@@ -83,7 +83,7 @@ func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) runtime.Signatur
 	case crypto.ECDSAP256:
 		return runtime.SignatureAlgorithmECDSA_P256
 	case crypto.ECDSASecp256k1:
-		return runtime.SignatureAlgorithmECDSA_Secp256k1
+		return runtime.SignatureAlgorithmECDSA_secp256k1
 	default:
 		return runtime.SignatureAlgorithmUnknown
 	}

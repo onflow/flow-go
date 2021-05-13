@@ -28,7 +28,6 @@ import (
 )
 
 var _ runtime.Interface = &hostEnv{}
-var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx              Context
@@ -45,6 +44,11 @@ type hostEnv struct {
 	totalGasUsed     uint64
 	transactionEnv   *transactionEnv
 	rng              *rand.Rand
+}
+
+func (e *hostEnv) ValidatePublicKey(key *runtime.PublicKey) (bool, error) {
+	// TODO: this is a stub for now
+	return true, nil
 }
 
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
@@ -535,7 +539,7 @@ func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
+func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
 		defer sp.Finish()
@@ -552,7 +556,9 @@ func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte
 		return nil, errors.NewHasherFailuref("failed to create a hasher for env.Hash: %w", err)
 	}
 
-	return hasher.ComputeHash(data), nil
+	message := append([]byte(tag), data...)
+
+	return hasher.ComputeHash(message), nil
 }
 
 func (e *hostEnv) VerifySignature(
@@ -583,18 +589,6 @@ func (e *hostEnv) VerifySignature(
 	}
 
 	return valid, nil
-}
-
-func (e *hostEnv) HighLevelStorageEnabled() bool {
-	return e.ctx.SetValueHandler != nil
-}
-
-func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
-	err := e.ctx.SetValueHandler(flow.Address(owner), key, value)
-	if err != nil {
-		return fmt.Errorf("setting cadence value failed: %w", err)
-	}
-	return err
 }
 
 // Block Environment Functions
