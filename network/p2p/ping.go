@@ -35,20 +35,20 @@ type PingService struct {
 // populated with the necessary details
 type PingInfoProvider interface {
 	SoftwareVersion() string
-	LatestFinalizedBlockHeight() uint64
+	SealedBlockHeight() uint64
 }
 
 type PingInfoProviderImpl struct {
-	SoftwareVersionFun            func() string
-	LatestFinalizedBlockHeightFun func() (uint64, error)
+	SoftwareVersionFun   func() string
+	SealedBlockHeightFun func() (uint64, error)
 }
 
 func (p PingInfoProviderImpl) SoftwareVersion() string {
 	return p.SoftwareVersionFun()
 }
-func (p PingInfoProviderImpl) LatestFinalizedBlockHeight() uint64 {
-	height, err := p.LatestFinalizedBlockHeightFun()
-	// if the node is unable to report the latest finalized block height, then report 0 instead of failing the ping
+func (p PingInfoProviderImpl) SealedBlockHeight() uint64 {
+	height, err := p.SealedBlockHeightFun()
+	// if the node is unable to report the latest sealed block height, then report 0 instead of failing the ping
 	if err != nil {
 		return uint64(0)
 	}
@@ -116,7 +116,7 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	version := ps.pingInfoProvider.SoftwareVersion()
 
 	// query for the lastest finalized block height
-	blockHeight := ps.pingInfoProvider.LatestFinalizedBlockHeight()
+	blockHeight := ps.pingInfoProvider.SealedBlockHeight()
 
 	// create a PingResponse
 	pingResponse := &message.PingResponse{

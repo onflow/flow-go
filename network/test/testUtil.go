@@ -193,7 +193,7 @@ func generateLibP2PNode(t *testing.T,
 
 	pingInfoProvider := new(mocknetwork.PingInfoProvider)
 	pingInfoProvider.On("SoftwareVersion").Return("test")
-	pingInfoProvider.On("LatestFinalizedBlockHeight").Return(uint64(1000))
+	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
 	libP2PNode, err := p2p.NewLibP2PNode(logger,
 		id.NodeID,
