@@ -1,6 +1,7 @@
 package fvm
 
 import (
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -41,7 +42,11 @@ func (d *TransactionFeeDeductor) deductFees(
 	programs *programs.Programs,
 ) (errors.Error, error) {
 
-	feeTx := deductTransactionFeeTransaction(proc.Transaction.Payer, ctx.Chain.ServiceAddress())
+	feeTx := Transaction(
+		blueprints.DeductTransactionFeeTransaction(
+			proc.Transaction.Payer,
+			ctx.Chain.ServiceAddress()),
+		0)
 	txErr, fatalErr := vm.invokeMetaTransaction(
 		*ctx,
 		feeTx,
