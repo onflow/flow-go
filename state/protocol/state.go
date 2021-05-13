@@ -3,8 +3,6 @@
 package protocol
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -61,18 +59,4 @@ type MutableState interface {
 	// has to be already valid.
 	// It modifies the persistent immutable protocol state accordingly.
 	MarkValid(blockID flow.Identifier) error
-}
-
-// IsNodeStakedAtBlockID returns true if the `identifier` is staked at `blockID` according to `state`.
-func IsNodeStakedAtBlockID(state State, blockID flow.Identifier, identifier flow.Identifier) (bool, error) {
-	identity, err := state.AtBlockID(blockID).Identity(identifier)
-	if IsIdentityNotFound(err) {
-		return false, nil
-	}
-	if err != nil {
-		return false, fmt.Errorf("could not retrieve identity for identifier %v at block id snapshot %v: %w)", identifier, blockID, err)
-	}
-
-	staked := identity.Stake > 0
-	return staked, nil
 }

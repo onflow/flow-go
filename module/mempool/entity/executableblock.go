@@ -25,10 +25,11 @@ type ExecutableBlock struct {
 	id                  flow.Identifier
 	Block               *flow.Block
 	CompleteCollections map[flow.Identifier]*CompleteCollection // key is the collection ID.
-	StartState          flow.StateCommitment
+	StartState          *flow.StateCommitment
+	Executing           bool // flag used to indicate if block is being executed, to avoid re-execution
 }
 
-// BlocksByCollection represents a collection that the execution node
+// BlocksByCollection represents a collection that the execution node.
 // has not received its transactions yet.
 // it also holds references to the blocks that contains this collection
 // and are waiting to be executed.
@@ -102,7 +103,7 @@ func (b *ExecutableBlock) HasAllTransactions() bool {
 // HasStartState returns whether the block has StartState, which
 // indicates whether its parent has been executed.
 func (b *ExecutableBlock) HasStartState() bool {
-	return len(b.StartState) > 0
+	return b.StartState != nil
 }
 
 // IsComplete returns whether all the data needed to executed the block are

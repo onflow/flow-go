@@ -38,8 +38,10 @@ func (st *SystemChunkTestSuite) TestSystemChunkIDsShouldBeDifferent() {
 
 	// Todo: drop this part once system chunk changes the state
 	// requires that execution state is not changed between block A and B
-	stateA, _ := receiptA.ExecutionResult.FinalStateCommitment()
-	stateB, _ := receiptB.ExecutionResult.FinalStateCommitment()
+	stateA, err := receiptA.ExecutionResult.FinalStateCommitment()
+	require.NoError(st.T(), err)
+	stateB, err := receiptB.ExecutionResult.FinalStateCommitment()
+	require.NoError(st.T(), err)
 	require.Equal(st.T(), stateA, stateB)
 
 	// computes ids of system chunk for result A and B

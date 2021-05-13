@@ -23,6 +23,7 @@ require (
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
+	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-addr-util v0.0.2
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-core v0.8.0
@@ -32,15 +33,18 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.0
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
+	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.14.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210426174523-55f21dc81054
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210426174523-55f21dc81054
-	github.com/onflow/flow-emulator v0.17.2
-	github.com/onflow/flow-go-sdk v0.17.0
+	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
+	github.com/onflow/cadence v0.15.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210507220547-a2ecda1df019
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210507220547-a2ecda1df019
+	github.com/onflow/flow-emulator v0.19.0
+	github.com/onflow/flow-go-sdk v0.19.0
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/zerolog v1.19.0
@@ -53,11 +57,12 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.6.0
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
+	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.31.1
+	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gotest.tools v2.2.0+incompatible
 )
 

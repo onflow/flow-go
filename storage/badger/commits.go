@@ -34,11 +34,10 @@ func NewCommits(collector module.CacheMetrics, db *badger.DB) *Commits {
 
 	c := &Commits{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceCommit,
 			withLimit(100),
 			withStore(store),
 			withRetrieve(retrieve),
-			withResource(metrics.ResourceCommit),
 		),
 	}
 
@@ -53,7 +52,7 @@ func (c *Commits) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (flow
 	return func(tx *badger.Txn) (flow.StateCommitment, error) {
 		val, err := c.cache.Get(blockID)(tx)
 		if err != nil {
-			return nil, err
+			return flow.DummyStateCommitment, err
 		}
 		return val.(flow.StateCommitment), nil
 	}

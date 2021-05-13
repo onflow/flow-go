@@ -18,18 +18,17 @@ require (
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.14.4
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210426174523-55f21dc81054
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210426174523-55f21dc81054
-	github.com/onflow/flow-emulator v0.17.2
-	github.com/onflow/flow-go v0.15.4 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.17.0
+	github.com/onflow/cadence v0.15.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210507220547-a2ecda1df019
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210507220547-a2ecda1df019
+	github.com/onflow/flow-emulator v0.19.0
+	github.com/onflow/flow-go v0.16.3-0.20210427194927-6050c2a3ae42
+	github.com/onflow/flow-go-sdk v0.19.0
 	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.10.0 // indirect
 	github.com/prometheus/common v0.20.0 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/rs/zerolog v1.21.0
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/stretchr/testify v1.7.0

@@ -3,6 +3,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"sort"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -30,19 +31,37 @@ var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a
 // particular to run the DKG and generate root cluster quorum certificates when preparing
 // for an epoch.
 type NodeMachineAccountInfo struct {
-	Address           string
+	// Address is the flow address of the machine account, not to be confused
+	// with the network address of the node.
+	Address string
+
+	// EncodedPrivateKey is the private key of the machine account
 	EncodedPrivateKey []byte
-	KeyIndex          uint
-	SigningAlgorithm  sdkcrypto.SignatureAlgorithm
-	HashAlgorithm     sdkcrypto.HashAlgorithm
+
+	// KeyIndex is the index of the key in the associated machine account
+	KeyIndex uint
+
+	// SigningAlgorithm is the algorithm used by the machine account along with
+	// the above private key to create cryptographic signatures
+	SigningAlgorithm sdkcrypto.SignatureAlgorithm
+
+	// HashAlgorithm is the algorithm used for hashing
+	HashAlgorithm sdkcrypto.HashAlgorithm
 }
 
 // NodeConfig contains configuration information used as input to the
 // bootstrap process.
 type NodeConfig struct {
-	Role    flow.Role
+	// Role is the flow role of the node (ex Collection, Consensus, ...)
+	Role flow.Role
+
+	// Address is the networking address of the node (IP:PORT), not to be
+	// confused with the address of the flow account associated with the node's
+	// machine account.
 	Address string
-	Stake   uint64
+
+	// Stake is the stake of the node
+	Stake uint64
 }
 
 // Defines the canonical structure for encoding private node info.
@@ -79,10 +98,20 @@ type NodePrivateKeys struct {
 // This can be ensured by using only using the provided constructors and NOT
 // manually constructing an instance.
 type NodeInfo struct {
-	NodeID  flow.Identifier
-	Role    flow.Role
+
+	// NodeID is the unique identifier of the node in the network
+	NodeID flow.Identifier
+
+	// Role is the flow role of the node (collection, consensus, etc...)
+	Role flow.Role
+
+	// Address is the networking address of the node (IP:PORT), not to be
+	// confused with the address of the flow account associated with the node's
+	// machine account.
 	Address string
-	Stake   uint64
+
+	// Stake is the stake of the node
+	Stake uint64
 
 	// key information is private
 	networkPubKey  crypto.PublicKey
@@ -213,6 +242,17 @@ func (node NodeInfo) Identity() *flow.Identity {
 	return identity
 }
 
+// NodeInfoFromIdentity converts an identity to a public NodeInfo
+func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
+	return NewPublicNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.Stake,
+		identity.NetworkPubKey,
+		identity.StakingPubKey)
+}
+
 func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	var filtered []NodeInfo
 	for _, node := range nodes {
@@ -222,6 +262,14 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 		filtered = append(filtered, node)
 	}
 	return filtered
+}
+
+// Sort sorts the NodeInfo list in place using the given ordering.
+func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
+	sort.Slice(nodes, func(i, j int) bool {
+		return order(nodes[i].Identity(), nodes[j].Identity())
+	})
+	return nodes
 }
 
 func ToIdentityList(nodes []NodeInfo) flow.IdentityList {

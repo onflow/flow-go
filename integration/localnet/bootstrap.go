@@ -11,6 +11,7 @@ import (
 	"github.com/plus3it/gorecurcopy"
 	"gopkg.in/yaml.v2"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -264,9 +265,9 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"--profiler-interval=2m",
 		},
 		Volumes: []string{
-			fmt.Sprintf("%s:/bootstrap", BootstrapDir),
-			fmt.Sprintf("%s:/profiler", profilerDir),
-			fmt.Sprintf("%s:/data", dataDir),
+			fmt.Sprintf("%s:/bootstrap:z", BootstrapDir),
+			fmt.Sprintf("%s:/profiler:z", profilerDir),
+			fmt.Sprintf("%s:/data:z", dataDir),
 		},
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
@@ -280,7 +281,9 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET": container.Role.String(),
+				"TARGET":  container.Role.String(),
+				"VERSION": build.Semver(),
+				"COMMIT":  build.Commit(),
 			},
 			Target: "production",
 		}
@@ -332,7 +335,7 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--access-address=%s", accessAddress),
-		fmt.Sprintf("--qc-contract-address=%s", unittest.ServiceAccountPublicKey.PublicKey.String()),
+		fmt.Sprintf("--qc-contract-address=%s",flow.Testnet.Chain().ServiceAddress().String()),
 	)
 
 	return service
@@ -363,7 +366,7 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 
 	service.Volumes = append(
 		service.Volumes,
-		fmt.Sprintf("%s:/trie", trieDir),
+		fmt.Sprintf("%s:/trie:z", trieDir),
 	)
 
 	return service
@@ -375,7 +378,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
-		fmt.Sprintf("--script-addr=execution_1:%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",
