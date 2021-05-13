@@ -178,24 +178,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	validWithoutTag, err := v.SignatureVerifier.Verify(
-		txSig.Signature,
-		nil,
-		message,
-		accountKey.PublicKey,
-		accountKey.HashAlgo,
-	)
-	if err != nil {
-		if sType == envelopeSignature {
-			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-		}
-		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
-	}
-	if validWithoutTag {
-		return &accountKey, nil
-	}
-
-	validWithTag, err := v.SignatureVerifier.Verify(
+	valid, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
 		flow.TransactionDomainTag[:],
 		message,
@@ -209,7 +192,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	if validWithTag {
+	if valid {
 		return &accountKey, nil
 	}
 

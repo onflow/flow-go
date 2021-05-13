@@ -82,7 +82,7 @@ func ToEpochCommit(epoch Epoch) (*flow.EpochCommit, error) {
 
 	commit := &flow.EpochCommit{
 		Counter:            counter,
-		ClusterQCs:         qcs,
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(qcs),
 		DKGGroupKey:        dkg.GroupKey(),
 		DKGParticipantKeys: dkgParticipantKeys,
 	}
