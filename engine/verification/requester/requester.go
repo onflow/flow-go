@@ -142,7 +142,7 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *messages.ChunkDataResponse:
-		e.handleChunkDataPack(originID, &resource.ChunkDataPack, &resource.Collection)
+		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack, &resource.Collection)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -150,7 +150,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	return nil
 }
 
-// handleChunkDataPack sends the received chunk data pack and its collection to the registered handler, and cleans up its request status.
+// handleChunkDataPackWithTracing encapsulates the logic of handling a chunk data pack with tracing enabled.
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
 	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
 	if !ok {
