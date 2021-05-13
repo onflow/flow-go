@@ -54,7 +54,7 @@ func init() {
 }
 
 func run(*cobra.Command, []string) {
-	var stateCommitment []byte
+	var stateCommitment flow.StateCommitment
 
 	if len(flagBlockHash) > 0 && len(flagStateCommitment) > 0 {
 		log.Fatal().Msg("cannot run the command with both block hash and state commitment as inputs, only one of them should be provided")
@@ -81,13 +81,17 @@ func run(*cobra.Command, []string) {
 
 	if len(flagStateCommitment) > 0 {
 		var err error
-		stateCommitment, err = hex.DecodeString(flagStateCommitment)
+		stateCommitmentBytes, err := hex.DecodeString(flagStateCommitment)
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot get decode the state commitment")
 		}
+		stateCommitment, err = flow.ToStateCommitment(stateCommitmentBytes)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid state commitment length")
+		}
 	}
 
-	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment))
+	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
 
 	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, !flagNoMigration, !flagNoReport)
 	if err != nil {

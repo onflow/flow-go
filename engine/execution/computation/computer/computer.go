@@ -63,6 +63,7 @@ func NewBlockComputer(
 		vmCtx,
 		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
+		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
 	)
 
@@ -112,6 +113,11 @@ func (e *blockComputer) executeBlock(
 	programs *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
+	// check the start state is set
+	if !block.HasStartState() {
+		return nil, fmt.Errorf("executable block start state is not set")
+	}
+
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 	res := &execution.ComputationResult{
@@ -135,7 +141,7 @@ func (e *blockComputer) executeBlock(
 		committer: e.committer,
 		blockSpan: blockSpan,
 		tracer:    e.tracer,
-		state:     block.StartState,
+		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
 		callBack: func(state flow.StateCommitment, proof []byte, err error) {
 			if err != nil {

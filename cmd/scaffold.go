@@ -179,13 +179,28 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
+		// setup the Ping provider to return the software version and the finalized block height
+		pingProvider := p2p.PingInfoProviderImpl{
+			SoftwareVersionFun: func() string {
+				return build.Semver()
+			},
+			LatestFinalizedBlockHeightFun: func() (uint64, error) {
+				head, err := fnb.State.Final().Head()
+				if err != nil {
+					return 0, err
+				}
+				return head.Height, nil
+			},
+		}
+
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.networkKey,
 			fnb.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
-			fnb.Metrics.Network)
+			fnb.Metrics.Network,
+			pingProvider)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
@@ -498,7 +513,7 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		fnb.Logger.Info().
 			Hex("root_result_id", logging.Entity(fnb.RootResult)).
-			Hex("root_state_commitment", fnb.RootSeal.FinalState).
+			Hex("root_state_commitment", fnb.RootSeal.FinalState[:]).
 			Hex("root_block_id", logging.Entity(fnb.RootBlock)).
 			Uint64("root_block_height", fnb.RootBlock.Header.Height).
 			Msg("genesis state bootstrapped")

@@ -99,7 +99,7 @@ func (_m *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 	return r0
 }
 
-// RequestInfo provides a mock function with given fields: chunkID
+// RequestHistory provides a mock function with given fields: chunkID
 func (_m *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
 	ret := _m.Called(chunkID)
 

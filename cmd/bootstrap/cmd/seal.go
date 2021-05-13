@@ -21,9 +21,16 @@ func constructRootResultAndSeal(
 	dkgData model.DKGData,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
-	stateCommit, err := hex.DecodeString(rootCommit)
+	stateCommitBytes, err := hex.DecodeString(rootCommit)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not decode state commitment")
+	}
+	stateCommit, err := flow.ToStateCommitment(stateCommitBytes)
+	if err != nil {
+		log.Fatal().
+			Int("expected_state_commitment_length", len(stateCommit)).
+			Int("received_state_commitment_length", len(stateCommitBytes)).
+			Msg("root state commitment has incompatible length")
 	}
 
 	participants := model.ToIdentityList(participantNodes)
@@ -39,13 +46,16 @@ func constructRootResultAndSeal(
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
-		ClusterQCs:         clusterQCs,
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
 	}
 
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
-	seal := run.GenerateRootSeal(result)
+	seal, err := run.GenerateRootSeal(result)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not generate root seal")
+	}
 
 	if seal.ResultID != result.ID() {
 		log.Fatal().Msgf("root block seal (%v) mismatch with result id: (%v)", seal.ResultID, result.ID())

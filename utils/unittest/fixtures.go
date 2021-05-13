@@ -529,11 +529,20 @@ func ReceiptForBlockExecutorFixture(block *flow.Block, executor flow.Identifier)
 	return receipt
 }
 
+func ReceiptsForBlockFixture(block *flow.Block, ids []flow.Identifier) []*flow.ExecutionReceipt {
+	result := ExecutionResultFixture(WithBlock(block))
+	var ers []*flow.ExecutionReceipt
+	for _, id := range ids {
+		ers = append(ers, ExecutionReceiptFixture(WithResult(result), WithExecutorID(id)))
+	}
+	return ers
+}
+
 func WithPreviousResult(prevResult flow.ExecutionResult) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.PreviousResultID = prevResult.ID()
-		finalState, ok := prevResult.FinalStateCommitment()
-		if !ok {
+		finalState, err := prevResult.FinalStateCommitment()
+		if err != nil {
 			panic("missing final state commitment")
 		}
 		result.Chunks[0].StartState = finalState
@@ -657,9 +666,14 @@ func ResultApprovalFixture(opts ...func(*flow.ResultApproval)) *flow.ResultAppro
 }
 
 func StateCommitmentFixture() flow.StateCommitment {
-	var state = make([]byte, 20)
-	_, _ = crand.Read(state[0:20])
+	var state flow.StateCommitment
+	_, _ = crand.Read(state[:])
 	return state
+}
+
+func StateCommitmentPointerFixture() *flow.StateCommitment {
+	state := StateCommitmentFixture()
+	return &state
 }
 
 func HashFixture(size int) hash.Hash {
@@ -1319,6 +1333,14 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 	return &qc
 }
 
+func QuorumCertificatesFixtures(n uint, opts ...func(*flow.QuorumCertificate)) []*flow.QuorumCertificate {
+	qcs := make([]*flow.QuorumCertificate, 0, n)
+	for i := 0; i < int(n); i++ {
+		qcs = append(qcs, QuorumCertificateFixture(opts...))
+	}
+	return qcs
+}
+
 func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
 	return func(qc *flow.QuorumCertificate) {
 		qc.BlockID = blockID
@@ -1426,7 +1448,7 @@ func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
 func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	commit := &flow.EpochCommit{
 		Counter:            uint64(rand.Uint32()),
-		ClusterQCs:         []*flow.QuorumCertificate{QuorumCertificateFixture()},
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesFixtures(1)),
 		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
 		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
 	}
