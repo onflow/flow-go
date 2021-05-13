@@ -514,7 +514,17 @@ func (e *blockComputer) executeCollection(ctx context.Context, txIndex uint32, b
 			conflictingBlockTxs++
 		}
 
-		go writeTxRegisters(txIndex, txBody, header, workingCollectionView, collectionIndex, collection.Collection(), collectionD, blockD)
+		reads := make(map[string]flow.RegisterID)
+		writes := make(map[string]flow.RegisterID)
+
+		for k, v := range workingCollectionView.(*delta.View).Reads {
+			reads[k] = v
+		}
+
+		for k, v := range workingCollectionView.(*delta.View).Writes {
+			writes[k] = v
+		}
+		go writeTxRegisters(txIndex, txBody, header, reads, writes, collectionIndex, collection.Collection(), collectionD, blockD)
 
 		if header.Height > 13_411_835 && debugOutput {
 			fmt.Printf("written data for block %d tx %d (%s)\n", header.Height, txIndex, time.Now())
@@ -586,7 +596,7 @@ type TxJson struct {
 	BlockConflicts      []string
 }
 
-func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow.Header, view state.View, collectionIndex int, collection flow.Collection, collectionD []string, blockD []string) {
+func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow.Header, reads map[string]flow.RegisterID, writes map[string]flow.RegisterID, collectionIndex int, collection flow.Collection, collectionD []string, blockD []string) {
 
 	basedir := "/mnt/data-out/blocks"
 
@@ -605,9 +615,6 @@ func writeTxRegisters(txIndex uint32, txBody *flow.TransactionBody, header *flow
 	dir := filepath.Join(basedir, block_path, collection_path)
 
 	path := filepath.Join(dir, tx_path)
-
-	reads := view.(*delta.View).Reads
-	writes := view.(*delta.View).Writes
 
 	s := TxJson{
 		Transaction: TransactionBody{
