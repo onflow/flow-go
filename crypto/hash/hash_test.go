@@ -124,6 +124,10 @@ func TestHashersAPI(t *testing.T) {
 		emptyHash := h.SumHash()
 		assert.Equal(t, expectedEmptyHash, emptyHash)
 
+		// SumHash on an empty state is equal to compute hash with empty data
+		emptyHash = h.ComputeHash(nil)
+		assert.Equal(t, expectedEmptyHash, emptyHash)
+
 		// successive writes of data are equivalent to compute hash
 		// of the concatenated data
 		h = newFunction()
