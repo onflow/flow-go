@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/verification"
 	realModule "github.com/onflow/flow-go/module"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -162,7 +162,7 @@ func (suite *MatchEngineTestSuite) RespondChunkDataPack(engine *match.Engine,
 	en flow.Identifier) func(*messages.ChunkDataRequest) {
 	return func(req *messages.ChunkDataRequest) {
 		resp := &messages.ChunkDataResponse{
-			ChunkDataPack: test.FromChunkID(req.ChunkID),
+			ChunkDataPack: vertestutils.FromChunkID(req.ChunkID),
 			Nonce:         req.Nonce,
 		}
 
@@ -221,10 +221,10 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -261,7 +261,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 
 	// create chunk data pack
 	myChunk := result.Chunks[0]
-	chunkDataPack := test.FromChunkID(myChunk.ID())
+	chunkDataPack := vertestutils.FromChunkID(myChunk.ID())
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
@@ -304,10 +304,10 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(flow.Identifier{}),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(flow.Identifier{}),
 		),
 	)
 
@@ -346,12 +346,12 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(flow.Identifier{}), // some other node
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(flow.Identifier{}), // some other node
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -420,10 +420,10 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -500,10 +500,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -577,10 +577,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	e := suite.NewTestMatchEngine(3)
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -650,10 +650,10 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 			View:   uint64(i),
 		}
 		// create a execution result that assigns to me
-		result, assignment := test.CreateExecutionResult(
+		result, assignment := vertestutils.CreateExecutionResult(
 			header.ID(),
-			test.WithChunks(
-				test.WithAssignee(suite.myID),
+			vertestutils.WithChunks(
+				vertestutils.WithAssignee(suite.myID),
 			),
 		)
 
@@ -715,15 +715,15 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type Seals struct {
@@ -37,11 +38,10 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
 	s := &Seals{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceSeal,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceSeal)),
+			withRetrieve(retrieve)),
 	}
 
 	return s
@@ -49,6 +49,10 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
 func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
 	return s.cache.Put(seal.ID(), seal)
+}
+
+func (s *Seals) storeTxn(seal *flow.Seal) func(*transaction.Tx) error {
+	return s.cache.PutTxn(seal.ID(), seal)
 }
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {
@@ -75,7 +79,7 @@ func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
 	err := s.db.View(operation.LookupBlockSeal(blockID, &sealID))
 	if err != nil {
-		return nil, fmt.Errorf("could not look up seal for sealed: %w", err)
+		return nil, fmt.Errorf("failed to retrieve seal for fork with head %x: %w", blockID, err)
 	}
 	return s.ByID(sealID)
 }

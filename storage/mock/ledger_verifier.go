@@ -13,18 +13,18 @@ type LedgerVerifier struct {
 }
 
 // VerifyRegistersProof provides a mock function with given fields: registerIDs, stateCommitment, values, proof
-func (_m *LedgerVerifier) VerifyRegistersProof(registerIDs []flow.RegisterID, stateCommitment []byte, values [][]byte, proof [][]byte) (bool, error) {
+func (_m *LedgerVerifier) VerifyRegistersProof(registerIDs []flow.RegisterID, stateCommitment flow.StateCommitment, values [][]byte, proof [][]byte) (bool, error) {
 	ret := _m.Called(registerIDs, stateCommitment, values, proof)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func([]flow.RegisterID, []byte, [][]byte, [][]byte) bool); ok {
+	if rf, ok := ret.Get(0).(func([]flow.RegisterID, flow.StateCommitment, [][]byte, [][]byte) bool); ok {
 		r0 = rf(registerIDs, stateCommitment, values, proof)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func([]flow.RegisterID, []byte, [][]byte, [][]byte) error); ok {
+	if rf, ok := ret.Get(1).(func([]flow.RegisterID, flow.StateCommitment, [][]byte, [][]byte) error); ok {
 		r1 = rf(registerIDs, stateCommitment, values, proof)
 	} else {
 		r1 = ret.Error(1)

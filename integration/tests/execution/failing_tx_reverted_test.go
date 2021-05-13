@@ -41,8 +41,8 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// final states
-	finalStateBlockB, ok := erBlockB.ExecutionResult.FinalStateCommitment()
-	require.True(s.T(), ok)
+	finalStateBlockB, err := erBlockB.ExecutionResult.FinalStateCommitment()
+	require.NoError(s.T(), err)
 
 	// send transaction that panics and should revert
 	tx := common.SDKTransactionFixture(
@@ -68,8 +68,8 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	// wait for execution receipt for blockC from execution node 1
 	erBlockC := s.ReceiptState.WaitForReceiptFrom(s.T(), blockC.Header.ID(), s.exe1ID)
-	finalStateBlockC, ok := erBlockC.ExecutionResult.FinalStateCommitment()
-	require.True(s.T(), ok)
+	finalStateBlockC, err := erBlockC.ExecutionResult.FinalStateCommitment()
+	require.NoError(s.T(), err)
 
 	s.T().Logf("got erBlockC with SC %x", finalStateBlockC)
 

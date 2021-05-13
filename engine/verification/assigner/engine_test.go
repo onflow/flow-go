@@ -1,4 +1,4 @@
-package assigner
+package assigner_test
 
 import (
 	"testing"
@@ -7,7 +7,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/verification/test"
+	"github.com/onflow/flow-go/engine/verification/assigner"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
@@ -85,7 +86,7 @@ func SetupTest(options ...func(suite *AssignerEngineTestSuite)) *AssignerEngineT
 // createContainerBlock creates and returns a block that contains an execution receipt, with its corresponding chunks assignment based
 // on the input options.
 func createContainerBlock(options ...func(result *flow.ExecutionResult, assignments *chunks.Assignment)) (*flow.Block, *chunks.Assignment) {
-	result, assignment := test.CreateExecutionResult(unittest.IdentifierFixture(), options...)
+	result, assignment := vertestutils.CreateExecutionResult(unittest.IdentifierFixture(), options...)
 	receipt := &flow.ExecutionReceipt{
 		ExecutorID:      unittest.IdentifierFixture(),
 		ExecutionResult: *result,
@@ -103,9 +104,9 @@ func createContainerBlock(options ...func(result *flow.ExecutionResult, assignme
 }
 
 // NewAssignerEngine returns an assigner engine for testing.
-func NewAssignerEngine(s *AssignerEngineTestSuite) *Engine {
+func NewAssignerEngine(s *AssignerEngineTestSuite) *assigner.Engine {
 
-	e := New(zerolog.Logger{},
+	e := assigner.New(zerolog.Logger{},
 		s.metrics,
 		s.tracer,
 		s.me,
@@ -155,8 +156,8 @@ func newBlockHappyPath(t *testing.T) {
 	// creates a container block, with a single receipt, that contains
 	// one assigned chunk to verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(s.myID())))
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(s.myID())))
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
@@ -199,10 +200,10 @@ func newBlockUnstaked(t *testing.T) {
 	// creates a container block, with a single receipt, that contains
 	// no assigned chunk to verification node.
 	containerBlock, _ := createContainerBlock(
-		test.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture()),
-			test.WithAssignee(unittest.IdentifierFixture())))
+		vertestutils.WithChunks( // all chunks assigned to some (random) identifiers, but not this verification node
+			vertestutils.WithAssignee(unittest.IdentifierFixture()),
+			vertestutils.WithAssignee(unittest.IdentifierFixture()),
+			vertestutils.WithAssignee(unittest.IdentifierFixture())))
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 
@@ -270,12 +271,12 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// none of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
-			test.WithAssignee(unittest.IdentifierFixture()))) // assigned to others
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			vertestutils.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			vertestutils.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			vertestutils.WithAssignee(unittest.IdentifierFixture()),  // assigned to others
+			vertestutils.WithAssignee(unittest.IdentifierFixture()))) // assigned to others
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
@@ -310,12 +311,12 @@ func newBlockMultipleAssignment(t *testing.T) {
 	// creates a container block, with a single receipt, that contains 5 chunks, but
 	// only 3 of them is assigned to this verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(
-			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
-			test.WithAssignee(s.myID()),                     // assigned to me
-			test.WithAssignee(s.myID()),                     // assigned to me
-			test.WithAssignee(unittest.IdentifierFixture()), // assigned to others
-			test.WithAssignee(s.myID())))                    // assigned to me
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(unittest.IdentifierFixture()), // assigned to others
+			vertestutils.WithAssignee(s.myID()),                     // assigned to me
+			vertestutils.WithAssignee(s.myID()),                     // assigned to me
+			vertestutils.WithAssignee(unittest.IdentifierFixture()), // assigned to others
+			vertestutils.WithAssignee(s.myID())))                    // assigned to me
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)
@@ -353,7 +354,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	// creates a container block, with a single receipt, that contains a single chunk assigned
 	// to verification node.
 	containerBlock, assignment := createContainerBlock(
-		test.WithChunks(test.WithAssignee(s.myID())))
+		vertestutils.WithChunks(vertestutils.WithAssignee(s.myID())))
 	result := containerBlock.Payload.Results[0]
 	s.mockStateAtBlockID(result.BlockID)
 	chunksNum := s.mockChunkAssigner(result, assignment)

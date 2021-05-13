@@ -41,29 +41,6 @@ func (_m *ExecutionState) ChunkDataPackByChunkID(_a0 context.Context, _a1 flow.I
 	return r0, r1
 }
 
-// CommitDelta provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) CommitDelta(_a0 context.Context, _a1 delta.Delta, _a2 []byte) ([]byte, error) {
-	ret := _m.Called(_a0, _a1, _a2)
-
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, delta.Delta, []byte) []byte); ok {
-		r0 = rf(_a0, _a1, _a2)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, delta.Delta, []byte) error); ok {
-		r1 = rf(_a0, _a1, _a2)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
 // GetBlockIDByChunkID provides a mock function with given fields: chunkID
 func (_m *ExecutionState) GetBlockIDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) {
 	ret := _m.Called(chunkID)
@@ -164,11 +141,11 @@ func (_m *ExecutionState) GetHighestExecutedBlockID(_a0 context.Context) (uint64
 }
 
 // GetProof provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) GetProof(_a0 context.Context, _a1 []byte, _a2 []flow.RegisterID) ([]byte, error) {
+func (_m *ExecutionState) GetProof(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, []flow.RegisterID) []byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) []byte); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
@@ -177,7 +154,7 @@ func (_m *ExecutionState) GetProof(_a0 context.Context, _a1 []byte, _a2 []flow.R
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, []flow.RegisterID) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -187,11 +164,11 @@ func (_m *ExecutionState) GetProof(_a0 context.Context, _a1 []byte, _a2 []flow.R
 }
 
 // GetRegisters provides a mock function with given fields: _a0, _a1, _a2
-func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 []flow.RegisterID) ([][]byte, error) {
+func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 flow.StateCommitment, _a2 []flow.RegisterID) ([][]byte, error) {
 	ret := _m.Called(_a0, _a1, _a2)
 
 	var r0 [][]byte
-	if rf, ok := ret.Get(0).(func(context.Context, []byte, []flow.RegisterID) [][]byte); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, flow.StateCommitment, []flow.RegisterID) [][]byte); ok {
 		r0 = rf(_a0, _a1, _a2)
 	} else {
 		if ret.Get(0) != nil {
@@ -200,7 +177,7 @@ func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 []fl
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(context.Context, []byte, []flow.RegisterID) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, flow.StateCommitment, []flow.RegisterID) error); ok {
 		r1 = rf(_a0, _a1, _a2)
 	} else {
 		r1 = ret.Error(1)
@@ -210,11 +187,11 @@ func (_m *ExecutionState) GetRegisters(_a0 context.Context, _a1 []byte, _a2 []fl
 }
 
 // NewView provides a mock function with given fields: _a0
-func (_m *ExecutionState) NewView(_a0 []byte) *delta.View {
+func (_m *ExecutionState) NewView(_a0 flow.StateCommitment) *delta.View {
 	ret := _m.Called(_a0)
 
 	var r0 *delta.View
-	if rf, ok := ret.Get(0).(func([]byte) *delta.View); ok {
+	if rf, ok := ret.Get(0).(func(flow.StateCommitment) *delta.View); ok {
 		r0 = rf(_a0)
 	} else {
 		if ret.Get(0) != nil {
@@ -226,11 +203,11 @@ func (_m *ExecutionState) NewView(_a0 []byte) *delta.View {
 }
 
 // PersistExecutionState provides a mock function with given fields: ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results
-func (_m *ExecutionState) PersistExecutionState(ctx context.Context, header *flow.Header, endState []byte, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+func (_m *ExecutionState) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
 	ret := _m.Called(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, []byte, []*flow.ChunkDataPack, *flow.ExecutionReceipt, []flow.Event, []flow.Event, []flow.TransactionResult) error); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Header, flow.StateCommitment, []*flow.ChunkDataPack, *flow.ExecutionReceipt, []flow.Event, []flow.Event, []flow.TransactionResult) error); ok {
 		r0 = rf(ctx, header, endState, chunkDataPacks, executionReceipt, events, serviceEvents, results)
 	} else {
 		r0 = ret.Error(0)
@@ -263,15 +240,15 @@ func (_m *ExecutionState) RetrieveStateDelta(_a0 context.Context, _a1 flow.Ident
 }
 
 // StateCommitmentByBlockID provides a mock function with given fields: _a0, _a1
-func (_m *ExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) ([]byte, error) {
+func (_m *ExecutionState) StateCommitmentByBlockID(_a0 context.Context, _a1 flow.Identifier) (flow.StateCommitment, error) {
 	ret := _m.Called(_a0, _a1)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) flow.StateCommitment); ok {
 		r0 = rf(_a0, _a1)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 

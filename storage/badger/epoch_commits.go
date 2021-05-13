@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type EpochCommits struct {
@@ -33,11 +34,10 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 
 	ec := &EpochCommits{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEpochCommit,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochCommit)),
+			withRetrieve(retrieve)),
 	}
 
 	return ec
@@ -45,6 +45,10 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 
 func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(tx *badger.Txn) error {
 	return ec.cache.Put(commit.ID(), commit)
+}
+
+func (ec *EpochCommits) StoreTxn(commit *flow.EpochCommit) func(tx *transaction.Tx) error {
+	return ec.cache.PutTxn(commit.ID(), commit)
 }
 
 func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn) (*flow.EpochCommit, error) {
