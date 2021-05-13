@@ -1,8 +1,13 @@
 package exporter
 
 import (
+	"bufio"
+	"compress/gzip"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -19,6 +24,7 @@ var (
 	flagExecutionStateDir string
 	flagOutputDir         string
 	flagStateCommitment   string
+	flagGzip              bool
 )
 
 var Cmd = &cobra.Command{
@@ -37,7 +43,10 @@ func init() {
 	_ = Cmd.MarkFlagRequired("output-dir")
 
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
-		"state commitment (hex-encoded, 64 characters)")
+		"State commitment (hex-encoded, 64 characters)")
+
+	Cmd.Flags().BoolVar(&flagGzip, "gzip", true,
+		"Write GZip-encoded")
 }
 
 func run(*cobra.Command, []string) {
@@ -51,17 +60,27 @@ func run(*cobra.Command, []string) {
 // ExportLedger exports ledger key value pairs at the given blockID
 func ExportLedger(ledgerPath string, targetstate string, outputPath string) error {
 
-	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(
+		zerolog.Nop(),
+		nil,
+		&metrics.NoopCollector{},
+		ledgerPath,
+		complete.DefaultCacheSize,
+		pathfinder.PathByteSize,
+		wal.SegmentSize,
+	)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
 	defer func() {
 		<-diskWal.Done()
 	}()
+
 	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0)
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
+
 	var state ledger.State
 	// if no target state provided export the most recent state
 	if len(targetstate) == 0 {
@@ -79,7 +98,29 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 			return fmt.Errorf("failed to convert bytes to state: %w", err)
 		}
 	}
-	err = led.DumpTrieAsJSON(ledger.State(state), outputPath)
+	filename := state.String() + ".trie.jsonl"
+	if flagGzip {
+		filename += ".gz"
+	}
+	path := filepath.Join(outputPath, filename)
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	fileWriter := bufio.NewWriter(fi)
+	defer fileWriter.Flush()
+	var writer io.Writer = fileWriter
+
+	if flagGzip {
+		gzipWriter := gzip.NewWriter(fileWriter)
+		defer gzipWriter.Close()
+		writer = gzipWriter
+	}
+
+	err = led.DumpTrieAsJSON(state, writer)
 	if err != nil {
 		return fmt.Errorf("cannot dump trie as json: %w", err)
 	}
