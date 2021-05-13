@@ -16,7 +16,7 @@ IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
 # Name of the cover profile
-COVER_PROFILE := cover.out
+COVER_PROFILE := coverage.txt
 # Disable go sum database lookup for private repos
 GOPRIVATE=github.com/dapperlabs/*
 # OS
@@ -60,7 +60,7 @@ install-tools: crypto/relic/build check-go-version
 .PHONY: unittest
 unittest:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
