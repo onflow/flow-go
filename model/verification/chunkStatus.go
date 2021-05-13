@@ -1,8 +1,6 @@
 package verification
 
 import (
-	"context"
-
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -11,7 +9,6 @@ import (
 type ChunkStatus struct {
 	ChunkIndex      uint64
 	ExecutionResult *flow.ExecutionResult
-	Ctx             context.Context
 }
 
 func (s ChunkStatus) ID() flow.Identifier {
