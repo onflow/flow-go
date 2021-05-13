@@ -7,7 +7,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
-	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 )
@@ -15,10 +16,10 @@ import (
 func constructRootResultAndSeal(
 	rootCommit string,
 	block *flow.Block,
-	participantNodes []model.NodeInfo,
+	participantNodes []bootstrap.NodeInfo,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData model.DKGData,
+	dkgData dkg.DKGData,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
@@ -33,8 +34,7 @@ func constructRootResultAndSeal(
 			Msg("root state commitment has incompatible length")
 	}
 
-	participants := model.ToIdentityList(participantNodes)
-
+	participants := bootstrap.ToIdentityList(participantNodes)
 	epochSetup := &flow.EpochSetup{
 		Counter:      flagEpochCounter,
 		FirstView:    block.Header.View,
@@ -46,7 +46,7 @@ func constructRootResultAndSeal(
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
-		ClusterQCs:         clusterQCs,
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
 		DKGGroupKey:        dkgData.PubGroupKey,
 		DKGParticipantKeys: dkgData.PubKeyShares,
 	}

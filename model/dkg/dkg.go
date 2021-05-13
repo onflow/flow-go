@@ -1,4 +1,4 @@
-package bootstrap
+package dkg
 
 import (
 	"github.com/onflow/flow-go/crypto"

@@ -1,11 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"time"
+
+	"google.golang.org/grpc"
 
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go-sdk/client"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -21,6 +27,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,6 +48,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 func main() {
@@ -73,6 +81,10 @@ func main() {
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
+
+		// epoch qc contract client
+		accessAddress     string
+		qcContractAddress string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -124,6 +136,10 @@ func main() {
 				"additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
+
+			// epoch qc contract flags
+			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&qcContractAddress, "qc-contract-address", "", "the address of the Epoch QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -366,12 +382,43 @@ func main() {
 
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+
+			// check if required fields are left empty
+			if accessAddress == "" {
+				return nil, fmt.Errorf("flag `access-address` required")
+			}
+			if qcContractAddress == "" {
+				return nil, fmt.Errorf("flag `qc-contract-address` required")
+			}
+
+			// loads the private account info for this node from disk for use in the QCContractClient.
+			accountInfo, err := loadEpochQCPrivateData(node)
+			if err != nil {
+				return nil, err
+			}
+
+			// construct signer from private key
+			sk, err := sdkcrypto.DecodePrivateKey(accountInfo.SigningAlgorithm, accountInfo.EncodedPrivateKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
+			}
+			txSigner := sdkcrypto.NewInMemorySigner(sk, accountInfo.HashAlgorithm)
+
+			// create QC vote client
+			flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+			if err != nil {
+				return nil, err
+			}
+
+			qcContractClient := epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
+				accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
+
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
 				node.Me,
 				signer,
 				node.State,
-				nil, // TODO
+				qcContractClient,
 			)
 
 			factory := factories.NewEpochComponentsFactory(
@@ -406,4 +453,14 @@ func main() {
 			return manager, err
 		}).
 		Run()
+}
+
+func loadEpochQCPrivateData(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
+	data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+	if err != nil {
+		return nil, err
+	}
+	var info bootstrap.NodeMachineAccountInfo
+	err = json.Unmarshal(data, &info)
+	return &info, err
 }

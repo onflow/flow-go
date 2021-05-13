@@ -144,7 +144,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		// check previous timeouts were called
 		if !s.fvss[i].sharesTimeout || !s.fvss[i].complaintsTimeout {
 			return nil, nil, nil,
-				errors.New("two timeouts should be set before ending dkg")
+				fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
 		}
 
 		// check if a complaint has remained without an answer

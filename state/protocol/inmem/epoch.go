@@ -17,9 +17,12 @@ type Epoch struct {
 	enc EncodableEpoch
 }
 
-func (e Epoch) Counter() (uint64, error)   { return e.enc.Counter, nil }
-func (e Epoch) FirstView() (uint64, error) { return e.enc.FirstView, nil }
-func (e Epoch) FinalView() (uint64, error) { return e.enc.FinalView, nil }
+func (e Epoch) Counter() (uint64, error)            { return e.enc.Counter, nil }
+func (e Epoch) FirstView() (uint64, error)          { return e.enc.FirstView, nil }
+func (e Epoch) DKGPhase1FinalView() (uint64, error) { return e.enc.DKGPhase1FinalView, nil }
+func (e Epoch) DKGPhase2FinalView() (uint64, error) { return e.enc.DKGPhase2FinalView, nil }
+func (e Epoch) DKGPhase3FinalView() (uint64, error) { return e.enc.DKGPhase3FinalView, nil }
+func (e Epoch) FinalView() (uint64, error)          { return e.enc.FinalView, nil }
 func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return e.enc.InitialIdentities, nil
 }
@@ -85,6 +88,18 @@ func (es *setupEpoch) FirstView() (uint64, error) {
 	return es.setupEvent.FirstView, nil
 }
 
+func (es *setupEpoch) DKGPhase1FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase1FinalView, nil
+}
+
+func (es *setupEpoch) DKGPhase2FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase2FinalView, nil
+}
+
+func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase3FinalView, nil
+}
+
 func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
@@ -128,11 +143,8 @@ type committedEpoch struct {
 }
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
-	qcs := es.commitEvent.ClusterQCs
-	if uint(len(qcs)) <= index {
-		return nil, fmt.Errorf("no cluster with index %d", index)
-	}
-	rootQC := qcs[index]
+
+	epochCounter := es.setupEvent.Counter
 
 	clustering, err := es.Clustering()
 	if err != nil {
@@ -143,13 +155,26 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	if !ok {
 		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
 	}
-	epochCounter := es.setupEvent.Counter
+
+	qcs := es.commitEvent.ClusterQCs
+	if uint(len(qcs)) <= index {
+		return nil, fmt.Errorf("no cluster with index %d", index)
+	}
+	rootQCVoteData := qcs[index]
+
+	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
+	rootQC := &flow.QuorumCertificate{
+		View:      rootBlock.Header.View,
+		BlockID:   rootBlock.ID(),
+		SignerIDs: rootQCVoteData.VoterIDs,
+		SigData:   rootQCVoteData.SigData,
+	}
 
 	cluster, err := ClusterFromEncodable(EncodableCluster{
 		Index:     index,
 		Counter:   epochCounter,
 		Members:   members,
-		RootBlock: cluster.CanonicalRootBlock(epochCounter, members),
+		RootBlock: rootBlock,
 		RootQC:    rootQC,
 	})
 	return cluster, err
