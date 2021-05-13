@@ -106,7 +106,7 @@ func (c *approvalProcessingCore) OnFinalizedBlock(finalizedBlockID flow.Identifi
 	}
 
 	// finalize forks to stop collecting approvals for orphan collectors
-	c.collectorTree.FinalizeForkAtLevel(finalized)
+	c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
 
 	// as soon as we discover new sealed height, proceed with pruning collectors
 	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)

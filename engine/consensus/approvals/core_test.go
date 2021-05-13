@@ -451,3 +451,29 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 		}
 	}
 }
+
+// TestOnBlockFinalized_ExtendingSealedResult tests if assignment collector tree accepts collector which extends sealed result
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedResult() {
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
+	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+
+	unsealedBlock := unittest.BlockHeaderWithParentFixture(&s.Block)
+	s.blocks[unsealedBlock.ID()] = &unsealedBlock
+	s.identitiesCache[unsealedBlock.ID()] = s.AuthorizedVerifiers
+	result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*s.IncorporatedResult.Result))
+	result.BlockID = unsealedBlock.ID()
+
+	s.headers.On("ByHeight", unsealedBlock.Height).Return(unsealedBlock, nil)
+	s.core.OnFinalizedBlock(unsealedBlock.ID())
+
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&unsealedBlock)
+	s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+	s.identitiesCache[incorporatedBlock.ID()] = s.AuthorizedVerifiers
+	IR := unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithIncorporatedBlockID(incorporatedBlock.ID()),
+		unittest.IncorporatedResult.WithResult(result))
+	err := s.core.processIncorporatedResult(IR)
+	require.NoError(s.T(), err)
+
+	s.sealsDB.AssertExpectations(s.T())
+}

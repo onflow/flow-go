@@ -32,12 +32,13 @@ type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*Assignment
 // descending from the latest finalized block are relevant.
 // Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
 type AssignmentCollectorTree struct {
-	forest            *forest.LevelledForest
-	lock              sync.RWMutex
-	onCreateCollector NewCollectorFactoryMethod
-	size              uint64
-	lastSealedID      flow.Identifier
-	headers           storage.Headers
+	forest              *forest.LevelledForest
+	lock                sync.RWMutex
+	onCreateCollector   NewCollectorFactoryMethod
+	size                uint64
+	lastSealedID        flow.Identifier
+	lastFinalizedHeight uint64
+	headers             storage.Headers
 }
 
 func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
@@ -66,10 +67,17 @@ func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*Assig
 
 // FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
 // can mark other forks as orphan and stop processing approvals for it. Eventually all forks will be cleaned up by height
-func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header) {
+func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, sealed *flow.Header) {
 	finalizedBlockID := finalized.ID()
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	if t.lastFinalizedHeight >= finalized.Height {
+		return
+	}
+
+	t.lastFinalizedHeight = finalized.Height
+	t.lastSealedID = sealed.ID()
 	iter := t.forest.GetVerticesAtLevel(finalized.Height)
 	for iter.HasNext() {
 		vertex := iter.NextVertex().(*assignmentCollectorVertex)
@@ -111,10 +119,11 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 	return vertices
 }
 
+// LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
 	Collector   *AssignmentCollector
-	Processable bool
-	Created     bool
+	Processable bool // whether collector is processable
+	Created     bool // whether collector was created or retrieved from cache
 }
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double checked locking
