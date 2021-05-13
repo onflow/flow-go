@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/verification"
 
@@ -72,7 +73,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	}
 
 	// transaction body of system chunk
-	txBody := fvm.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
+	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
 	tx := fvm.Transaction(txBody, uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
