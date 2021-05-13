@@ -34,8 +34,7 @@ func main() {
 	}
 }
 
-// happyPathExample captures the metrics on running VerificationHappyPath with
-// a single execution receipt of 10 chunks
+// happyPathExample captures the metrics on running VerificationHappyPath with 10 blocks, each with 10 execution receipts of 10 chunks.
 func happyPathExample() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
 		tracer, err := trace.NewTracer(logger, "verification")
@@ -51,7 +50,13 @@ func happyPathExample() {
 		// starts happy path
 		t := &testing.T{}
 		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
-		vertestutils.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
+
+		ops := []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			vertestutils.WithResults(10),
+			vertestutils.WithChunksCount(10),
+			vertestutils.WithCopies(1),
+		}
+		vertestutils.NewVerificationHappyPathTest(t, true, 10, 1, verificationCollector, mempoolCollector, ops...)
 		<-mempoolCollector.Done()
 	})
 }
