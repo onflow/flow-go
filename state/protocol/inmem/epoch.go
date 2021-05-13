@@ -128,11 +128,8 @@ type committedEpoch struct {
 }
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
-	qcs := es.commitEvent.ClusterQCs
-	if uint(len(qcs)) <= index {
-		return nil, fmt.Errorf("no cluster with index %d", index)
-	}
-	rootQC := qcs[index]
+
+	epochCounter := es.setupEvent.Counter
 
 	clustering, err := es.Clustering()
 	if err != nil {
@@ -143,13 +140,26 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	if !ok {
 		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
 	}
-	epochCounter := es.setupEvent.Counter
+
+	qcs := es.commitEvent.ClusterQCs
+	if uint(len(qcs)) <= index {
+		return nil, fmt.Errorf("no cluster with index %d", index)
+	}
+	rootQCVoteData := qcs[index]
+
+	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
+	rootQC := &flow.QuorumCertificate{
+		View:      rootBlock.Header.View,
+		BlockID:   rootBlock.ID(),
+		SignerIDs: rootQCVoteData.VoterIDs,
+		SigData:   rootQCVoteData.SigData,
+	}
 
 	cluster, err := ClusterFromEncodable(EncodableCluster{
 		Index:     index,
 		Counter:   epochCounter,
 		Members:   members,
-		RootBlock: cluster.CanonicalRootBlock(epochCounter, members),
+		RootBlock: rootBlock,
 		RootQC:    rootQC,
 	})
 	return cluster, err
