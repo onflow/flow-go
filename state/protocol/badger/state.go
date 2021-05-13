@@ -74,6 +74,8 @@ func Bootstrap(
 			return nil, fmt.Errorf("could not get next epoch final view from state: %w", err)
 		}
 		state.metrics.CommittedEpochFinalView(finalView)
+	default:
+		return nil, fmt.Errorf("invalid phase: %s", phase)
 	}
 
 	if err := isValidRootSnapshot(root); err != nil {
