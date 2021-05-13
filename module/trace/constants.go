@@ -129,8 +129,8 @@ const (
 	// children of VERProcessAssignedChunk
 	VERFetcherHandleAssignedChunk   SpanName = "ver.fetcher.handleAssignedChunk"
 	VERFetcherHandleChunkDataPack   SpanName = "ver.fetcher.handleChunkDataPack"
+	VERFetcherValidateChunkDataPack SpanName = "ver.fetcher.validateChunkDataPack"
 	VERFetcherPushToVerifier        SpanName = "ver.fetcher.pushToVerifier"
-	VERFetcherValidateChunkDataPack SpanName = "ver.fetcher.pushToVerifier"
 
 	// requester engine
 	VERProcessChunkDataPackRequest SpanName = "ver.processChunkDataPackRequest"

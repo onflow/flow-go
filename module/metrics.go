@@ -189,9 +189,9 @@ type VerificationMetrics interface {
 	// by verifier engine.
 	OnResultApprovalDispatchedInNetwork()
 
-	// OnFinalizedBlockArrivesAtAssigner sets a gauge that keeps track of number of the latest block height arrives
+	// OnFinalizedBlockArrivedAtAssigner sets a gauge that keeps track of number of the latest block height arrives
 	// at assigner engine. Note that it assumes blocks are coming to assigner engine in strictly increasing order of their height.
-	OnFinalizedBlockArrivesAtAssigner(height uint64)
+	OnFinalizedBlockArrivedAtAssigner(height uint64)
 
 	// OnChunksAssignmentDoneAtAssigner increments a counter that keeps track of the total number of assigned chunks to
 	// the verification node.
@@ -208,7 +208,7 @@ type VerificationMetrics interface {
 	// sends to requester engine.
 	OnChunkDataPackRequestSentByFetcher()
 
-	// OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests arrive at
+	// OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests
 	// arrive at the requester engine from the fetcher engine.
 	OnChunkDataPackRequestReceivedByRequester()
 

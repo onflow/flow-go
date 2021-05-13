@@ -10,27 +10,27 @@ type VerificationCollector struct {
 	tracer module.Tracer
 
 	// Assigner Engine
-	receivedFinalizedHeight prometheus.Gauge   // the last finalized height received by assigner engine
-	assignedChunksTotal     prometheus.Counter // total chunks assigned to this verification node
-	sentChunksTotal         prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
+	receivedFinalizedHeightAssigner prometheus.Gauge   // the last finalized height received by assigner engine
+	assignedChunkTotalAssigner      prometheus.Counter // total chunks assigned to this verification node
+	processedChunkTotalAssigner     prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
 
 	// Fetcher Engine
 	//
 	// total assigned chunks received by fetcher engine from assigner engine (through chunk consumer),
-	receivedAssignedChunksTotal prometheus.Counter
+	receivedAssignedChunkTotalFetcher prometheus.Counter
 
 	// Requester Engine
 	//
 	// total number of chunk data pack requests received by requester engine from fetcher engine.
-	receivedChunkDataPackRequestsTotal prometheus.Counter
+	receivedChunkDataPackRequestTotalRequester prometheus.Counter
 	// total number of chunk data request messages dispatched in the network by requester engine.
-	sentChunkDataRequestMessagesTotal prometheus.Counter
+	sentChunkDataRequestMessageTotalRequester prometheus.Counter
 	// total number of chunk data response messages received by requester from network.
-	receivedChunkDataResponseMessagesTotal prometheus.Counter
+	receivedChunkDataResponseMessageTotalRequester prometheus.Counter
 	// total number of chunk data pack sent by requester to fetcher engine.
-	sentChunkDataPackTotal prometheus.Counter
+	sentChunkDataPackTotalRequester prometheus.Counter
 
-	// Finder Engine
+	// Finder Engine // TODO: remove finder engine metrics
 	receivedReceiptsTotal     prometheus.Counter // total execution receipts arrived at finder engine
 	sentExecutionResultsTotal prometheus.Counter // total execution results processed by finder engine
 
@@ -41,8 +41,8 @@ type VerificationCollector struct {
 	requestedChunkDataPackTotal   prometheus.Counter // total number of chunk data packs requested by match engine
 
 	// Verifier Engine
-	receivedVerifiableChunksTotal prometheus.Counter // total verifiable chunks received by verifier engine
-	resultApprovalsTotal          prometheus.Counter // total result approvals sent by verifier engine
+	receivedVerifiableChunkTotalVerifier prometheus.Counter // total verifiable chunks received by verifier engine
+	sentResultApprovalTotalVerifier      prometheus.Counter // total result approvals sent by verifier engine
 
 }
 
@@ -201,29 +201,29 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		sentResultApprovalTotal)
 
 	vc := &VerificationCollector{
-		tracer:                        tracer,
-		receivedReceiptsTotal:         receivedReceiptsTotals,
-		sentExecutionResultsTotal:     sentExecutionResultsTotal,
-		receivedExecutionResultsTotal: receivedExecutionResultsTotal,
-		sentVerifiableChunksTotal:     sentVerifiableChunksTotal,
-		receivedVerifiableChunksTotal: receivedVerifiableChunksTotal,
-		resultApprovalsTotal:          sentResultApprovalTotal,
-		receivedChunkDataPackTotal:    receivedChunkDataPackTotal,
-		requestedChunkDataPackTotal:   requestedChunkDataPackTotal,
+		tracer:                               tracer,
+		receivedReceiptsTotal:                receivedReceiptsTotals,
+		sentExecutionResultsTotal:            sentExecutionResultsTotal,
+		receivedExecutionResultsTotal:        receivedExecutionResultsTotal,
+		sentVerifiableChunksTotal:            sentVerifiableChunksTotal,
+		receivedVerifiableChunkTotalVerifier: receivedVerifiableChunksTotal,
+		sentResultApprovalTotalVerifier:      sentResultApprovalTotal,
+		receivedChunkDataPackTotal:           receivedChunkDataPackTotal,
+		requestedChunkDataPackTotal:          requestedChunkDataPackTotal,
 
 		// assigner
-		receivedFinalizedHeight: receivedFinalizedHeight,
-		assignedChunksTotal:     assignedChunksTotal,
-		sentChunksTotal:         sentChunksTotal,
+		receivedFinalizedHeightAssigner: receivedFinalizedHeight,
+		assignedChunkTotalAssigner:      assignedChunksTotal,
+		processedChunkTotalAssigner:     sentChunksTotal,
 
 		// fetcher
-		receivedAssignedChunksTotal: receivedAssignedChunksTotal,
+		receivedAssignedChunkTotalFetcher: receivedAssignedChunksTotal,
 
 		// requester
-		receivedChunkDataPackRequestsTotal:     receivedChunkDataPackRequestsTotal,
-		sentChunkDataRequestMessagesTotal:      sentChunkDataRequestMessagesTotal,
-		receivedChunkDataResponseMessagesTotal: receivedChunkDataResponseMessagesTotal,
-		sentChunkDataPackTotal:                 sentChunkDataPackTotal,
+		receivedChunkDataPackRequestTotalRequester:     receivedChunkDataPackRequestsTotal,
+		sentChunkDataRequestMessageTotalRequester:      sentChunkDataRequestMessagesTotal,
+		receivedChunkDataResponseMessageTotalRequester: receivedChunkDataResponseMessagesTotal,
+		sentChunkDataPackTotalRequester:                sentChunkDataPackTotal,
 	}
 
 	return vc
@@ -273,7 +273,7 @@ func (vc *VerificationCollector) OnChunkDataPackRequested() {
 // OnVerifiableChunkReceivedAtVerifierEngine is called whenever a verifiable chunk is received by Verifier engine
 // from Match engine.It increments the total number of sent verifiable chunks.
 func (vc *VerificationCollector) OnVerifiableChunkReceivedAtVerifierEngine() {
-	vc.receivedVerifiableChunksTotal.Inc()
+	vc.receivedVerifiableChunkTotalVerifier.Inc()
 }
 
 // OnResultApprovalDispatchedInNetwork is called whenever a result approval for is emitted to consensus nodes.
@@ -282,30 +282,30 @@ func (vc *VerificationCollector) OnResultApprovalDispatchedInNetwork() {
 	// increases the counter of disseminated result approvals
 	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine
-	vc.resultApprovalsTotal.Inc()
+	vc.sentResultApprovalTotalVerifier.Inc()
 }
 
-// OnFinalizedBlockArrivesAtAssigner sets a gauge that keeps track of number of the latest block height arrives
+// OnFinalizedBlockArrivedAtAssigner sets a gauge that keeps track of number of the latest block height arrives
 // at assigner engine. Note that it assumes blocks are coming to assigner engine in strictly increasing order of their height.
-func (vc *VerificationCollector) OnFinalizedBlockArrivesAtAssigner(height uint64) {
-	vc.receivedFinalizedHeight.Set(float64(height))
+func (vc *VerificationCollector) OnFinalizedBlockArrivedAtAssigner(height uint64) {
+	vc.receivedFinalizedHeightAssigner.Set(float64(height))
 }
 
 // OnChunksAssignmentDoneAtAssigner increments a counter that keeps track of the total number of assigned chunks to
 // the verification node.
 func (vc *VerificationCollector) OnChunksAssignmentDoneAtAssigner(chunks int) {
-	vc.assignedChunksTotal.Add(float64(chunks))
+	vc.assignedChunkTotalAssigner.Add(float64(chunks))
 }
 
 // OnAssignedChunkProcessedAtAssigner increments a counter that keeps track of the total number of assigned chunks pushed by
 // assigner engine to the fetcher engine.
 func (vc *VerificationCollector) OnAssignedChunkProcessedAtAssigner() {
-	vc.sentChunksTotal.Inc()
+	vc.processedChunkTotalAssigner.Inc()
 }
 
 // OnAssignedChunkReceivedAtFetcher increments a counter that keeps track of number of assigned chunks arrive at fetcher engine.
 func (vc *VerificationCollector) OnAssignedChunkReceivedAtFetcher() {
-	vc.receivedAssignedChunksTotal.Inc()
+	vc.receivedAssignedChunkTotalFetcher.Inc()
 }
 
 // OnChunkDataPackRequestSentByFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
@@ -314,28 +314,28 @@ func (vc *VerificationCollector) OnChunkDataPackRequestSentByFetcher() {
 	vc.requestedChunkDataPackTotal.Inc()
 }
 
-// OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests arrive at
+// OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests
 // arrive at the requester engine from the fetcher engine.
 func (vc *VerificationCollector) OnChunkDataPackRequestReceivedByRequester() {
-	vc.receivedChunkDataPackRequestsTotal.Inc()
+	vc.receivedChunkDataPackRequestTotalRequester.Inc()
 }
 
 // OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
 func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetwork() {
-	vc.sentChunkDataRequestMessagesTotal.Inc()
+	vc.sentChunkDataRequestMessageTotalRequester.Inc()
 }
 
 // OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
 func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetwork() {
-	vc.receivedChunkDataResponseMessagesTotal.Inc()
+	vc.receivedChunkDataResponseMessageTotalRequester.Inc()
 }
 
 // OnChunkDataPackSentToFetcher increases a counter that keeps track of number of chunk data packs sent to the fetcher engine from
 // requester engine.
 func (vc *VerificationCollector) OnChunkDataPackSentToFetcher() {
-	vc.sentChunkDataPackTotal.Inc()
+	vc.sentChunkDataPackTotalRequester.Inc()
 }
 
 // OnChunkDataPackArrivedAtFetcher increments a counter that keeps track of number of chunk data packs arrived at fetcher engine from

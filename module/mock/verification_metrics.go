@@ -79,8 +79,8 @@ func (_m *VerificationMetrics) OnExecutionResultSent() {
 	_m.Called()
 }
 
-// OnFinalizedBlockArrivesAtAssigner provides a mock function with given fields: height
-func (_m *VerificationMetrics) OnFinalizedBlockArrivesAtAssigner(height uint64) {
+// OnFinalizedBlockArrivedAtAssigner provides a mock function with given fields: height
+func (_m *VerificationMetrics) OnFinalizedBlockArrivedAtAssigner(height uint64) {
 	_m.Called(height)
 }
 

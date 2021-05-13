@@ -174,7 +174,7 @@ func newBlockHappyPath(t *testing.T) {
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivesAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -211,7 +211,7 @@ func newBlockUnstaked(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivesAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -246,7 +246,7 @@ func newBlockNoChunk(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivesAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -286,7 +286,7 @@ func newBlockNoAssignedChunk(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivesAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -333,7 +333,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends containerBlock containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivesAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
@@ -370,7 +370,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 
 	// sends block containing receipt to assigner engine
-	s.metrics.On("OnFinalizedBlockArrivesAtAssigner", containerBlock.Header.Height).Return().Once()
+	s.metrics.On("OnFinalizedBlockArrivedAtAssigner", containerBlock.Header.Height).Return().Once()
 	s.metrics.On("OnExecutionReceiptReceived").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 

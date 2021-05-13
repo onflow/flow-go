@@ -81,7 +81,7 @@ func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()            
 func (nc *NoopCollector) OnChunkDataPackReceived()                                               {}
 func (nc *NoopCollector) OnChunkDataPackRequested()                                              {}
 func (nc *NoopCollector) OnResultApprovalDispatchedInNetwork()                                   {}
-func (nc *NoopCollector) OnFinalizedBlockArrivesAtAssigner(height uint64)                        {}
+func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                        {}
 func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
 func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
 func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}

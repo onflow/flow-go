@@ -219,7 +219,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		}
 	}
 
-	e.metrics.OnFinalizedBlockArrivesAtAssigner(block.Header.Height)
+	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Header.Height)
 	lg.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
