@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // approvalProcessingCore is an implementation of ResultApprovalProcessor interface
@@ -45,6 +47,7 @@ func NewApprovalProcessingCore(headers storage.Headers, state protocol.State, se
 	}
 
 	core := &approvalProcessingCore{
+		log:                    log.With().Str("engine", "approvals.Core").Logger(),
 		approvalsCache:         NewApprovalsLRUCache(1000),
 		headers:                headers,
 		state:                  state,
@@ -193,6 +196,12 @@ func (c *approvalProcessingCore) ProcessIncorporatedResult(result *flow.Incorpor
 	// we expect that only engine.UnverifiableInputError,
 	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
 	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
+		logger := c.log.Info()
+		if engine.IsInvalidInputError(err) {
+			logger = c.log.Error()
+		}
+
+		logger.Err(err).Msgf("could not process incorporated result %v", result.ID())
 		return nil
 	}
 
@@ -230,6 +239,15 @@ func (c *approvalProcessingCore) ProcessApproval(approval *flow.ResultApproval) 
 	// we expect that only engine.UnverifiableInputError,
 	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
 	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
+		logger := c.log.Info()
+		if engine.IsInvalidInputError(err) {
+			logger = c.log.Error()
+		}
+
+		logger.Err(err).
+			Hex("approval_id", logging.Entity(approval)).
+			Msgf("could not process result approval")
+
 		return nil
 	}
 
