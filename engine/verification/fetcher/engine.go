@@ -249,7 +249,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	}
 
 	if nonFatalErr != nil {
-		lg.Debug().Err(nonFatalErr).Msg("could not handle chunk data pack")
+		lg.Error().Err(nonFatalErr).Msg("could not handle chunk data pack")
 		return
 	}
 
@@ -264,6 +264,11 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 }
 
 // handleChunkDataPackWithTracing encapsulates the logic of handling chunk data pack with tracing enabled.
+//
+// Boolean returned value determines whether the chunk data pack passed validation and its verifiable chunk
+// submitted to verifier.
+// The first returned value determines non-critical errors (i.e., expected ones).
+// The last returned value determines the critical errors that are unexpected, and should lead program to halt.
 func (e *Engine) handleChunkDataPackWithTracing(
 	originID flow.Identifier,
 	status *verification.ChunkStatus,
@@ -326,7 +331,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	return true, nil
 }
 
-// validateChunkDataPackWithTracing validates chunk data pack with tracing enabled. It provides a tracing wrapper around validateChunkDataPack.
+// validateChunkDataPackWithTracing encapsulates the logic of validating a chunk data pack with tracing enabled.
 func (e *Engine) validateChunkDataPackWithTracing(ctx context.Context,
 	chunkIndex uint64,
 	senderID flow.Identifier,
@@ -471,7 +476,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
 }
 
-// pushToVerifierWithTracing provides a wrapper around pushing a verifiable chunk to verifier engine with tracing enabled.
+// pushToVerifierWithTracing encapsulates the logic of pushing a verifiable chunk to verifier engine with tracing enabled.
 func (e *Engine) pushToVerifierWithTracing(
 	ctx context.Context,
 	chunk *flow.Chunk,
