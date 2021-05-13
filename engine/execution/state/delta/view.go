@@ -22,6 +22,7 @@ type View struct {
 	// SpocksSecret keeps the secret used for SPoCKs
 	// TODO we can add a flag to disable capturing SpocksSecret
 	// for views other than collection views to improve performance
+	spocksSecret      []byte
 	spockSecretHasher hash.Hasher
 	readFunc          GetRegisterFunc
 }
@@ -68,16 +69,12 @@ func (v *View) Interactions() *SpockSnapshot {
 		reads[i] = id
 	}
 
-	spockSecHashSum := v.spockSecretHasher.SumHash()
-	var spockSecret = make([]byte, len(spockSecHashSum))
-	copy(spockSecret, spockSecHashSum)
-
 	return &SpockSnapshot{
 		Snapshot: Snapshot{
 			Delta: delta,
 			Reads: reads,
 		},
-		SpockSecret: spockSecret,
+		SpockSecret: v.SpockSecret(),
 	}
 }
 
@@ -253,8 +250,15 @@ func (v *View) ReadsCount() uint64 {
 }
 
 // SpockSecret returns the secret value for SPoCK
+//
+// This function modifies the internal state of the SPoCK secret hasher.
+// Once called, it doesn't allow writing more data into the SPoCK secret.
 func (v *View) SpockSecret() []byte {
-	return v.spockSecretHasher.SumHash()
+	// check if spocksSecret has been already computed
+	if v.spocksSecret == nil {
+		v.spocksSecret = v.spockSecretHasher.SumHash()
+	}
+	return v.spocksSecret
 }
 
 // Detach detaches view from parent, by setting readFunc to

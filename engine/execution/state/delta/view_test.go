@@ -102,6 +102,10 @@ func TestView_Set(t *testing.T) {
 			assert.Equal(t, v.SpockSecret(), v.Interactions().SpockSecret)
 		})
 
+		v = delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
 		registerID1 := "reg1"
 
 		registerID2 := "reg2"
@@ -352,7 +356,6 @@ func TestView_MergeView(t *testing.T) {
 		assert.NoError(t, err)
 		err = hashIt(expSpock1, []byte("apple"))
 		assert.NoError(t, err)
-		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
 
 		expSpock2 := hash.NewSHA3_256()
 		chView := v.NewChild()
@@ -361,15 +364,15 @@ func TestView_MergeView(t *testing.T) {
 		err = hashIt(expSpock2, []byte("carrot"))
 		assert.NoError(t, err)
 
-		assert.Equal(t, chView.(*delta.View).SpockSecret(), []uint8(expSpock2.SumHash()))
+		hash2 := expSpock2.SumHash()
+		assert.Equal(t, chView.(*delta.View).SpockSecret(), []uint8(hash2))
 
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
-		err = hashIt(expSpock1, expSpock2.SumHash())
-		assert.NoError(t, err)
 
-		s := v.SpockSecret()
-		assert.Equal(t, s, []uint8(expSpock1.SumHash()))
+		err = hashIt(expSpock1, hash2)
+		assert.NoError(t, err)
+		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
 	})
 
 	t.Run("RegisterTouchesDataMerge", func(t *testing.T) {
