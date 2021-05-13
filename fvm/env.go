@@ -17,6 +17,7 @@ import (
 	traceLog "github.com/opentracing/opentracing-go/log"
 
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -216,7 +217,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 		defer sp.Finish()
 	}
 
-	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	script := Script(blueprints.GetStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
 	// and we handle the errors and still compute the state interactions
@@ -251,7 +252,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 		defer sp.Finish()
 	}
 
-	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	script := Script(blueprints.GetFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -279,7 +280,7 @@ func (e *hostEnv) GetAccountAvailableBalance(address common.Address) (value uint
 		defer sp.Finish()
 	}
 
-	script := getFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -1008,11 +1009,13 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		txErr, err := e.vm.invokeMetaTransaction(
 			e.ctx,
-			initAccountTransaction(
-				flow.Address(payer),
-				flowAddress,
-				e.ctx.Chain.ServiceAddress(),
-				e.ctx.RestrictedAccountCreationEnabled),
+			Transaction(
+				blueprints.InitAccountTransaction(
+					flow.Address(payer),
+					flowAddress,
+					e.ctx.Chain.ServiceAddress(),
+					e.ctx.RestrictedAccountCreationEnabled),
+				0),
 			e.sth,
 			e.programs.Programs,
 		)
