@@ -163,6 +163,18 @@ func demo() {
 				vc.OnFinalizedBlockArrivesAtAssigner(uint64(i))
 			})
 
+			// fetcher
+			tryRandomCall(vc.OnAssignedChunkReceivedAtFetcher)
+			tryRandomCall(vc.OnChunkDataPackRequestSentByFetcher)
+			tryRandomCall(vc.OnChunkDataPackArrivedAtFetcher)
+			tryRandomCall(vc.OnVerifiableChunkSentToVerifier)
+
+			// requester
+			tryRandomCall(vc.OnChunkDataPackRequestReceivedByRequester)
+			tryRandomCall(vc.OnChunkDataPackRequestDispatchedInNetwork)
+			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetwork)
+			tryRandomCall(vc.OnChunkDataPackSentToFetcher)
+
 			// finder
 			tryRandomCall(vc.OnExecutionReceiptReceived)
 			tryRandomCall(vc.OnExecutionResultSent)
