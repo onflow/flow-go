@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -335,7 +334,7 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--access-address=%s", accessAddress),
-		fmt.Sprintf("--qc-contract-address=%s",flow.Testnet.Chain().ServiceAddress().String()),
+		fmt.Sprintf("--qc-contract-address=%s", flow.Testnet.Chain().ServiceAddress().String()),
 	)
 
 	return service
