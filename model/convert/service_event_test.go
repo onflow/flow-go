@@ -1,7 +1,6 @@
 package convert
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,9 +40,6 @@ func TestEventConversion(t *testing.T) {
 		// cast event type to epoch commit
 		actual, ok := event.Event.(*flow.EpochCommit)
 		require.True(t, ok)
-
-		fmt.Println(actual.ClusterQCs[0].SigData.String())
-		fmt.Println(actual.ClusterQCs[1].SigData.String())
 
 		assert.Equal(t, expected, actual)
 	})
