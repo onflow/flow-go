@@ -21,6 +21,26 @@ var (
 	flagStakingSeed []byte
 )
 
+// keyCmd represents the key command
+var keyCmd = &cobra.Command{
+	Use:   "key",
+	Short: "Generate networking and staking keys for a partner node and write them to files",
+	Run:   keyCmdRun,
+}
+
+func init() {
+	rootCmd.AddCommand(keyCmd)
+
+	// required flags
+	keyCmd.Flags().StringVar(&flagRole, "role", "", "node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
+	_ = keyCmd.MarkFlagRequired("role")
+	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
+	_ = keyCmd.MarkFlagRequired("address")
+
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
+}
+
 // keyCmdRun generate the node staking key, networking key and node information
 func keyCmdRun(_ *cobra.Command, _ []string) {
 	// validate inputs
@@ -60,27 +80,8 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
-}
 
-// keyCmd represents the key command
-var keyCmd = &cobra.Command{
-	Use:   "key",
-	Short: "Generate networking and staking keys for a partner node and write them to files",
-	Run:   keyCmdRun,
-}
-
-func init() {
-	rootCmd.AddCommand(keyCmd)
-
-	keyCmd.Flags().StringVar(&flagRole, "role", "",
-		"node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
-	_ = keyCmd.MarkFlagRequired("role")
-	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
-	_ = keyCmd.MarkFlagRequired("address")
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(),
-		fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(),
-		fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
+	// TODO: needs to generate another set of ECDSA keys to be used for the NodeMachineAccountInfo
 }
 
 func validateRole(role string) flow.Role {
