@@ -55,7 +55,7 @@ RequestTracker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 // RequestTracker is an index of RequestTrackerItems indexed by execution result
-// ID, incorporated block ID and chunk index.
+// Index on result ID, incorporated block ID and chunk index.
 // Is concurrency-safe.
 type RequestTracker struct {
 	index             map[flow.Identifier]map[flow.Identifier]map[uint64]RequestTrackerItem
