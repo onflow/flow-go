@@ -412,6 +412,8 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
 
+	e.metrics.OnChunkDataPackRequested()
+
 	return nil
 }
 
