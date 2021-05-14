@@ -179,7 +179,9 @@ func convertParticipants(cdcParticipants []cadence.Value) (flow.IdentityList, er
 		identity := new(flow.Identity)
 		identity.Role = flow.Role(nodeInfo[1].(cadence.UInt8))
 		identity.Address = string(nodeInfo[2].(cadence.String))
-		identity.Stake = uint64(nodeInfo[5].(cadence.UFix64))
+		// CAUTION: Identity.Stake refers to weight - this is an outdated name -
+		// see note in flow.Identity
+		identity.Stake = uint64(nodeInfo[13].(cadence.UInt64))
 
 		// convert nodeID string into identifier
 		identity.NodeID, err = flow.HexStringToIdentifier(string(nodeInfo[0].(cadence.String)))

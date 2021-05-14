@@ -24,8 +24,6 @@ func TestEventConversion(t *testing.T) {
 		actual, ok := event.Event.(*flow.EpochSetup)
 		require.True(t, ok)
 
-		// TODO ignoring participants in this comparison
-		actual.Participants = nil
 		assert.Equal(t, expected, actual)
 
 	})
@@ -33,7 +31,6 @@ func TestEventConversion(t *testing.T) {
 	t.Run("epoch commit", func(t *testing.T) {
 
 		fixture, expected := epochCommitFixture()
-		_ = expected
 
 		// convert Cadence types to Go types
 		event, err := ServiceEvent(fixture)
