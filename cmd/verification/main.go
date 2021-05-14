@@ -53,30 +53,29 @@ const (
 
 func main() {
 	var (
-		followerState       protocol.MutableState
-		err                 error
-		receiptLimit        uint                       // size of execution-receipt/result related mempools
-		chunkAlpha          uint                       // number of verifiers assigned per chunk
-		chunkLimit          uint                       // size of chunk-related mempools
-		cachedReceipts      *stdmap.ReceiptDataPacks   // used in finder engine
-		pendingReceipts     *stdmap.ReceiptDataPacks   // used in finder engine
-		readyReceipts       *stdmap.ReceiptDataPacks   // used in finder engine
-		blockIDsCache       *stdmap.Identifiers        // used in finder engine
-		processedResultsIDs *stdmap.Identifiers        // used in finder engine
-		discardedResultIDs  *stdmap.Identifiers        // used in finder engine
-		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
-		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
-		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
-		pendingResults      *stdmap.ResultDataPacks    // used in match engine
-		pendingChunks       *match.Chunks              // used in match engine
-		headerStorage       *storage.Headers           // used in match and finder engines
-		syncCore            *synchronization.Core      // used in follower engine
-		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
-		finderEng           *finder.Engine             // the finder engine
-		verifierEng         *verifier.Engine           // the verifier engine
-		matchEng            *match.Engine              // the match engine
-		followerEng         *followereng.Engine        // the follower engine
-		collector           module.VerificationMetrics // used to collect metrics of all engines
+		followerState        protocol.MutableState
+		err                  error
+		receiptLimit         uint                      // size of execution-receipt/result related mempools
+		chunkAlpha           uint                      // number of verifiers assigned per chunk
+		chunkLimit           uint                      // size of chunk-related mempools
+		chunkStatuses        *stdmap.ChunkStatuses     // used in fetcher engine
+		chunkRequests        *stdmap.ChunkRequests     // used in requester engine
+		executionResults     *storage.ExecutionResults // used in fetcher engine
+		processedChunkIndex  *storage.ConsumerProgress // used in chunk consumer
+		processedBlockHeight *storage.ConsumerProgress // used in block consumer
+		chunkQueue           *storage.ChunksQueue      // used in chunk consumer
+
+		chunkIDsByResult *stdmap.IdentifierMap      // used in match engine
+		pendingResults   *stdmap.ResultDataPacks    // used in match engine
+		pendingChunks    *match.Chunks              // used in match engine
+		headerStorage    *storage.Headers           // used in match and finder engines
+		syncCore         *synchronization.Core      // used in follower engine
+		pendingBlocks    *buffer.PendingBlocks      // used in follower engine
+		finderEng        *finder.Engine             // the finder engine
+		verifierEng      *verifier.Engine           // the verifier engine
+		matchEng         *match.Engine              // the match engine
+		followerEng      *followereng.Engine        // the follower engine
+		collector        module.VerificationMetrics // used to collect metrics of all engines
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
@@ -105,14 +104,9 @@ func main() {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			cachedReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceCachedReceipt, cachedReceipts.Size)
+		Module("chunk status memory pool", func(node *cmd.FlowNodeBuilder) error {
+			chunkStatuses = stdmap.NewChunkStatuses(chunkLimit)
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
