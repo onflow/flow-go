@@ -7,5 +7,5 @@ message PingRequest {
 
 message PingResponse {
     string version = 1;     // node software version
-    uint64 blockHeight = 2; // latest finalized block height
+    uint64 blockHeight = 2; // latest sealed block height
 }
