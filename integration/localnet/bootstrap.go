@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -219,7 +220,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 			services[container.ContainerName] = prepareConsensusService(container, numConsensus)
 			numConsensus++
 		case flow.RoleCollection:
-			services[container.ContainerName] = prepareCollectionService(container, numCollection)
+			services[container.ContainerName] = prepareCollectionService(container, numCollection, "localnet_access_1_1:9000")
 			numCollection++
 		case flow.RoleExecution:
 			services[container.ContainerName] = prepareExecutionService(container, numExecution)
@@ -323,7 +324,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
+func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -333,6 +334,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--access-address=%s", accessAddress),
+		fmt.Sprintf("--qc-contract-address=%s",flow.Testnet.Chain().ServiceAddress().String()),
 	)
 
 	return service
