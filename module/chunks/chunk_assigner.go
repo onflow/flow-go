@@ -70,15 +70,16 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 		return a, nil
 	}
 
-	// Get a list of verifiers
-	snapshot := p.protocolState.AtBlockID(blockID)
-	verifiers, err := snapshot.Identities(filter.And(filter.HasRole(flow.RoleVerification), filter.HasStake(true)))
+	// Get a list of verifiers at block that is being sealed
+	verifiers, err := p.protocolState.AtBlockID(result.BlockID).Identities(filter.And(filter.HasRole(flow.RoleVerification),
+		filter.HasStake(true),
+		filter.Not(filter.Ejected)))
 	if err != nil {
 		return nil, fmt.Errorf("could not get verifiers: %w", err)
 	}
 
 	// create RNG for assignment
-	rng, err := p.rngByBlockID(snapshot)
+	rng, err := p.rngByBlockID(p.protocolState.AtBlockID(blockID))
 	if err != nil {
 		return nil, err
 	}
