@@ -1,11 +1,8 @@
 package complete
 
 import (
-	"bufio"
-	"encoding/hex"
 	"fmt"
-	"os"
-	"path/filepath"
+	"io"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -341,25 +338,13 @@ func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
 	return ledger.State(root), err
 }
 
-// DumpTrieAsJSON export trie at specific state as a jsonl file, each line is json encode of a payload
-func (l *Ledger) DumpTrieAsJSON(state ledger.State, outputFilePath string) error {
+// DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)
+func (l *Ledger) DumpTrieAsJSON(state ledger.State, writer io.Writer) error {
 	fmt.Println(ledger.RootHash(state))
 	trie, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
 		return fmt.Errorf("cannot find the target trie: %w", err)
 	}
-
-	path := filepath.Join(outputFilePath, hex.EncodeToString(state[:])+".trie.jsonl")
-
-	fi, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
-
-	writer := bufio.NewWriter(fi)
-	defer writer.Flush()
-
 	return trie.DumpAsJSON(writer)
 }
 
