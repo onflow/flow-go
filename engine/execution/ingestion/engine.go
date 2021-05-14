@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -1183,7 +1184,7 @@ func (e *Engine) generateExecutionResultForBlock(
 	// convert Cadence service event representation to flow-go representation
 	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
 	for _, event := range serviceEvents {
-		converted, err := flow.ConvertServiceEvent(event)
+		converted, err := convert.ServiceEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
