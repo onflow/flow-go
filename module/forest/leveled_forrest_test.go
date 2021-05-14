@@ -74,7 +74,7 @@ func TestVertexIteratorOnEmpty(t *testing.T) {
 
 // TestLevelledForest_AddVertex tests that Vertex can be added twice without problems
 func TestLevelledForest_AddVertex(t *testing.T) {
-	F := NewLevelledForest()
+	F := NewLevelledForest(0)
 	v := NewVertexMock("A", 3, "Genesis", 0)
 	if err := F.VerifyVertex(v); err != nil {
 		assert.Fail(t, err.Error())
@@ -308,7 +308,7 @@ func TestLevelledForest_PruneAtLevel(t *testing.T) {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~ Helper Functions ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 
 func populateNewForest(t *testing.T) *LevelledForest {
-	F := NewLevelledForest()
+	F := NewLevelledForest(0)
 	for _, v := range TestVertices {
 		if err := F.VerifyVertex(v); err != nil {
 			assert.Fail(t, err.Error())
