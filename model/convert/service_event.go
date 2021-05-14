@@ -12,10 +12,9 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// ServiceEvent converts a service event encoded as the generic
-// flow.Event type to a ServiceEvent type for use within protocol software
-// and protocol state. This acts as the conversion from the Cadence type to
-// the flow-go type.
+// ServiceEvent converts a service event encoded as the generic flow.Event
+// type to a ServiceEvent type for use within protocol software and protocol
+// state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(event flow.Event) (*flow.ServiceEvent, error) {
 
 	// depending on type of Epoch event construct Go type
@@ -54,6 +53,9 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode random source hex: %w", err)
 	}
+	setup.DKGPhase1FinalView = uint64(cdcEvent.Fields[6].(cadence.UInt64))
+	setup.DKGPhase2FinalView = uint64(cdcEvent.Fields[7].(cadence.UInt64))
+	setup.DKGPhase3FinalView = uint64(cdcEvent.Fields[8].(cadence.UInt64))
 
 	// parse cluster assignments
 	cdcClusters := cdcEvent.Fields[4].(cadence.Array).Values
