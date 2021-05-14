@@ -20,8 +20,8 @@ type ComputationResult struct {
 	StateSnapshots     []*delta.SpockSnapshot
 	StateCommitments   []flow.StateCommitment
 	Proofs             [][]byte
-	Events             []flow.Event
-	ServiceEvents      []flow.Event
+	Events             []flow.EventsList
+	ServiceEvents      []flow.EventsList
 	TransactionResults []flow.TransactionResult
 	GasUsed            uint64
 	StateReads         uint64

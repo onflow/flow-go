@@ -61,7 +61,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
 		eventMessages := make([]*entities.Event, eventsPerBlock)
 		for j := range eventsForBlock {
-			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
+			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
 			eventsForBlock[j] = e
 			eventMessages[j] = convert.EventToMessage(e)
 		}
@@ -245,7 +245,7 @@ func (suite *Suite) TestGetTransactionResult() {
 	eventsForTx := make([]flow.Event, totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
+		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
 		eventsForTx[j] = e
 		eventMessages[j] = convert.EventToMessage(e)
 	}

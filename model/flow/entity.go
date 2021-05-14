@@ -1,5 +1,7 @@
 package flow
 
+import "github.com/onflow/flow-go/model/fingerprint"
+
 // Entity defines how flow entities should be defined
 // Entities are flat data structures holding multiple data fields.
 // Entities don't includes nested entities, they only include pointers to
@@ -15,6 +17,11 @@ type Entity interface {
 	// Checksum returns a unique checksum for the entity, including the mutable
 	// data such as signatures.
 	Checksum() Identifier
+}
+
+type IDWithFingerprint interface {
+	ID() Identifier
+	fingerprint.Fingerprinter
 }
 
 // Proof contains proof that an entity is part of a EntityList

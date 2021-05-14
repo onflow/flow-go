@@ -1232,7 +1232,7 @@ func TestChunkifyEvents(t *testing.T) {
 	// generate events
 	var events []flow.Event
 	for j := 0; j < 10; j++ {
-		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture()))
+		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0))
 	}
 
 	// chunk size be 0

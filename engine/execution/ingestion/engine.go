@@ -1078,7 +1078,7 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID, blockID)
+		chunk := generateChunk(i, startState, endState, collectionID, blockID, result.Events[i])
 
 		// chunkDataPack
 		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
@@ -1144,15 +1144,12 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 // generateChunk creates a chunk from the provided computation data.
 func generateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	colID, blockID flow.Identifier) *flow.Chunk {
+	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
 			StartState:      startState,
-			// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
-			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
-			// startState stays the same if blocks are empty
-			EventCollection: colID,
+			EventCollection: eventsCollection,
 			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,

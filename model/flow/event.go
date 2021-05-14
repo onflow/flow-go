@@ -42,17 +42,17 @@ func (e Event) String() string {
 
 // ID returns a canonical identifier that is guaranteed to be unique.
 func (e Event) ID() Identifier {
-	return MakeID(e.Body())
+	return MakeID(wrapEventID(e))
 }
 
 // Body returns the body of the execution receipt.
-func (e *Event) Body() interface{} {
-	return wrapEvent(*e)
-}
+//func (e *Event) Body() interface{} {
+//	return wrapEventID(*e)
+//}
 
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
-	w := wrapEvent(e)
+	w := wrapEventID(e)
 	return encoding.DefaultEncoder.MustEncode(w)
 }
 
@@ -61,15 +61,33 @@ func (e Event) Fingerprint() []byte {
 }
 
 // Defines only the fields needed to uniquely identify an event.
-type eventWrapper struct {
+type eventIDWrapper struct {
 	TxID  []byte
 	Index uint32
 }
 
-func wrapEvent(e Event) eventWrapper {
-	return eventWrapper{
+type eventWrapper struct {
+	TxID             []byte
+	Index            uint32
+	Type             string
+	TransactionIndex uint32
+	Payload          []byte
+}
+
+func wrapEventID(e Event) eventIDWrapper {
+	return eventIDWrapper{
 		TxID:  e.TransactionID[:],
 		Index: e.EventIndex,
+	}
+}
+
+func wrapEvent(e Event) eventWrapper {
+	return eventWrapper{
+		TxID:             e.TransactionID[:],
+		Index:            e.EventIndex,
+		Type:             string(e.Type),
+		TransactionIndex: e.TransactionIndex,
+		Payload:          e.Payload[:],
 	}
 }
 
@@ -79,4 +97,22 @@ type BlockEvents struct {
 	BlockHeight    uint64
 	BlockTimestamp time.Time
 	Events         []Event
+}
+
+type EventsList []Event
+
+// Hash calculates a hash of merkle trie build of events inside a list
+// based on their IDs and Fingerprint
+// The order of items does *NOT* matter, however every Event inside has
+// internal index inside transaction so any discrepancies there would result
+// in different hashes and list inequality anyway.
+func (e EventsList) Hash() Identifier {
+
+	ids := make([]IDWithFingerprint, len(e))
+
+	for i, event := range e {
+		ids[i] = event
+	}
+
+	return MerkleRootOfList(ids)
 }

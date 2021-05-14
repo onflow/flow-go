@@ -121,6 +121,18 @@ func MerkleRoot(ids ...Identifier) Identifier {
 	return root
 }
 
+func MerkleRootOfList(entities []IDWithFingerprint) Identifier {
+	var root Identifier
+	tree := merkle.NewTree()
+	for _, e := range entities {
+		id := e.ID()
+		tree.Put(id[:], e.Fingerprint())
+	}
+	hash := tree.Hash()
+	copy(root[:], hash)
+	return root
+}
+
 func CheckMerkleRoot(root Identifier, ids ...Identifier) bool {
 	computed := MerkleRoot(ids...)
 	return root == computed
