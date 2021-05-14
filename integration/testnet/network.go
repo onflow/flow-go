@@ -531,6 +531,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
+			nodeContainer.addFlag("access-address", "access_1:9000")
 
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration

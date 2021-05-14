@@ -216,7 +216,7 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	for _, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
-			services[container.ContainerName] = prepareConsensusService(container, numConsensus)
+			services[container.ContainerName] = prepareConsensusService(container, numConsensus, "localnet_access_1_1:9000")
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(container, numCollection, "localnet_access_1_1:9000")
@@ -296,7 +296,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
+func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -307,6 +307,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
+		fmt.Sprintf("--access-address=%s", accessAddress),
 	)
 
 	return service
