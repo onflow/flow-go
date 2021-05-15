@@ -288,12 +288,11 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		require.NoError(t, err)
 
 		startState := startStateCommitment
-		endState := startStateCommitment
 
 		for i := range computationResult.StateCommitments {
 			// TODO: deltas should be applied to a particular state
 
-			endState = computationResult.StateCommitments[i]
+			endState := computationResult.StateCommitments[i]
 			var collectionID flow.Identifier
 
 			// account for system chunk being last
