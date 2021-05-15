@@ -30,13 +30,13 @@ type EpochConfig struct {
 // testing.
 func DefaultEpochConfig() EpochConfig {
 	return EpochConfig{
-		CurrentEpochCounter:      cadence.UInt64(0),
-		NumViewsInEpoch:          cadence.UInt64(10_000),
-		NumViewsInStakingAuction: cadence.UInt64(1000),
-		NumViewsInDKGPhase:       cadence.UInt64(1000),
-		//NumViewsInEpoch:              cadence.UInt64(100),
-		//NumViewsInStakingAuction:     cadence.UInt64(10),
-		//NumViewsInDKGPhase:           cadence.UInt64(10),
+		CurrentEpochCounter: cadence.UInt64(0),
+		//NumViewsInEpoch:          cadence.UInt64(10_000),
+		//NumViewsInStakingAuction: cadence.UInt64(1000),
+		//NumViewsInDKGPhase:       cadence.UInt64(1000),
+		NumViewsInEpoch:              cadence.UInt64(100),
+		NumViewsInStakingAuction:     cadence.UInt64(10),
+		NumViewsInDKGPhase:           cadence.UInt64(10),
 		NumCollectorClusters:         cadence.UInt16(3),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(5),
 	}
