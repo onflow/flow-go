@@ -27,7 +27,7 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "the last sealed height of a node",
-		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo, LabelNodeVersion}),
 	}
 
 	return pc
@@ -53,6 +53,7 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt
 		LabelNodeID:      node.NodeID.String(),
 		LabelNodeAddress: node.Address,
 		LabelNodeRole:    node.Role.String(),
-		LabelNodeInfo:    nodeInfo}).
+		LabelNodeInfo:    nodeInfo,
+		LabelNodeVersion: version}).
 		Set(float64(sealedHeight))
 }
