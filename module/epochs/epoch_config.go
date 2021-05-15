@@ -39,7 +39,7 @@ func DefaultEpochConfig() EpochConfig {
 	}
 }
 
-// EncodeClusterAssignment encodes an AssigmentList into a byte array that can
+// EncodeClusterAssignments encodes an AssigmentList into a byte array that can
 // be used as a transaction argument when deploying the epochs contract.
 func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service flow.Address) []byte {
 	collectorClusterValues := []cadence.Value{}
@@ -118,13 +118,19 @@ func EncodeClusterQCs(qcs []*flow.QuorumCertificate, service flow.Address) []byt
 		// Here we are adding signer IDs rather than votes. It doesn't matter
 		// because these initial values aren't used by the contract.
 		qcVotes := []cadence.Value{}
-		for _, v := range qc.SignerIDs {
-			qcVotes = append(qcVotes, cadence.NewString(v.String()))
+		for _, voterID := range qc.SignerIDs {
+			qcVotes = append(qcVotes, cadence.NewString(voterID.String()))
+		}
+
+		qcVoterIDs := []cadence.Value{}
+		for _, voterID := range qc.SignerIDs {
+			qcVoterIDs = append(qcVoterIDs, cadence.NewString(voterID.String()))
 		}
 
 		fields := []cadence.Value{
 			qcIndex,
 			cadence.NewArray(qcVotes),
+			cadence.NewArray(qcVoterIDs),
 		}
 
 		qcStruct := cadence.NewStruct(fields).
