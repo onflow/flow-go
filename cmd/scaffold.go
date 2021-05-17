@@ -180,8 +180,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
-			LatestFinalizedBlockHeightFun: func() (uint64, error) {
-				head, err := fnb.State.Final().Head()
+			SealedBlockHeightFun: func() (uint64, error) {
+				head, err := fnb.State.Sealed().Head()
 				if err != nil {
 					return 0, err
 				}
