@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	flowmempool "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -36,7 +35,7 @@ type RequesterEngineTestSuite struct {
 	state           *protocol.State                   // used to check the last sealed height
 	con             *mocknetwork.Conduit              // used to send chunk data request, and receive the response
 	tracer          module.Tracer
-	metrics         module.VerificationMetrics
+	metrics         *mock.VerificationMetrics
 
 	// identities
 	verIdentity *flow.Identity // verification node
@@ -51,7 +50,7 @@ func setupTest() *RequesterEngineTestSuite {
 	r := &RequesterEngineTestSuite{
 		log:             unittest.Logger(),
 		tracer:          &trace.NoopTracer{},
-		metrics:         &metrics.NoopCollector{},
+		metrics:         &mock.VerificationMetrics{},
 		handler:         &mockfetcher.ChunkDataPackHandler{},
 		retryInterval:   100 * time.Millisecond,
 		requestTargets:  2,
@@ -106,11 +105,13 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &response.ChunkDataPack, &response.Collection).Return().Once()
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Once()
+	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
 	err := e.Process(originID, response)
 	require.Nil(t, err)
 
-	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests)
+	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
 }
 
 // TestHandleChunkDataPack_HappyPath_Multiple evaluates the happy path of receiving several requested chunk data packs.
@@ -131,12 +132,14 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	mockPendingRequestsRem(t, s.pendingRequests, chunkIDs)
 	// we pass each chunk data pack and its collection to chunk data pack handler
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Times(len(responses))
+	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
 	for _, response := range responses {
 		err := e.Process(originID, response)
 		require.Nil(t, err)
 	}
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler)
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler, s.metrics)
 }
 
 // TestHandleChunkDataPack_NonExistingRequest evaluates that failing to remove a received chunk data pack's request
@@ -155,11 +158,12 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Once()
 
 	err := e.Process(originID, response)
 	require.Nil(t, err)
 
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con)
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 	s.handler.AssertNotCalled(t, "HandleChunkDataPack")
 }
 
@@ -221,6 +225,9 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	// makes all chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Times(len(requests))
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(requests))
+	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(requests))
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -233,6 +240,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 }
 
 // TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
@@ -265,6 +273,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// makes all (unsealed) chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(unsealedRequests))
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -278,6 +287,8 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
@@ -313,6 +324,8 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(count * attempts)
+
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
@@ -321,6 +334,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 }
 
 // TestDispatchingRequests_Hybrid evaluates the behavior of requester when it has different request dispatch timelines, i.e.,
@@ -373,6 +387,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	// mocks only instantly qualified requests are dispatched in the network.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(instantQualifiedRequests) * attempts)
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not check chunk requests qualification on time")
