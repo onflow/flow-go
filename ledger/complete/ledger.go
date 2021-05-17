@@ -340,7 +340,6 @@ func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
 
 // DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)
 func (l *Ledger) DumpTrieAsJSON(state ledger.State, writer io.Writer) error {
-	fmt.Println(ledger.RootHash(state))
 	trie, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
 		return fmt.Errorf("cannot find the target trie: %w", err)

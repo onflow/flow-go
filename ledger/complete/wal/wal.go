@@ -111,17 +111,24 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
 			}
 			err = forest.AddTries(rebuiltTries)
+			for _, t := range rebuiltTries {
+
+				fmt.Println("A- ", t.RootHash().String())
+			}
+
 			if err != nil {
 				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
 			}
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
-			_, err := forest.Update(update)
+			u, err := forest.Update(update)
+			fmt.Println("U- ", update.RootHash.String(), " >>>> ", u.String())
 			return err
 		},
 		func(rootHash ledger.RootHash) error {
 			forest.RemoveTrie(rootHash)
+			fmt.Println("D- ", rootHash.String())
 			return nil
 		},
 	)
