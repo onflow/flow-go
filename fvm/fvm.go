@@ -3,7 +3,6 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -12,9 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 )
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
@@ -96,30 +93,4 @@ func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProc
 	err := invocator.Process(vm, &ctx, tx, sth, programs)
 	txErr, fatalErr := errors.SplitErrorTypes(err)
 	return txErr, fatalErr
-}
-
-// invokeContractFunction invokes a contract function inside the context of an outer transaction.
-//
-// AuthAccounts can be passed by passing an address as the argument instead.
-func (vm *VirtualMachine) invokeContractFunction(
-	contractLocation common.AddressLocation,
-	functionName string,
-	arguments []interpreter.Value,
-	argumentTypes []sema.Type,
-	ctx *Context,
-	parentSpan opentracing.Span,
-	sth *state.StateHolder,
-	programs *programs.Programs,
-) (fvmErr errors.Error, processErr error) {
-
-	invocator := NewTransactionContractFunctionInvocator(
-		contractLocation,
-		functionName,
-		arguments,
-		argumentTypes,
-		zerolog.Nop(),
-	)
-	_, err := invocator.Invoke(vm, ctx, parentSpan, sth, programs)
-
-	return errors.SplitErrorTypes(err)
 }

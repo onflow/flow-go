@@ -23,6 +23,11 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	flowServiceAccountContract = "FlowServiceAccount"
+	deductFeesContractFunction = "deductTransactionFee"
+)
+
 type TransactionInvocator struct {
 	logger zerolog.Logger
 }
@@ -158,9 +163,29 @@ func (i *TransactionInvocator) Process(
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
-	// check the storage limits
-	if ctx.LimitAccountStorage && txError == nil {
-		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+	if txError == nil && ctx.LimitAccountStorage {
+		// check the storage limits
+		if ctx.LimitAccountStorage {
+			txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+		}
+	}
+
+	if txError == nil && ctx.TransactionFeesEnabled  {
+		invocator := NewTransactionContractFunctionInvocator(
+			common.AddressLocation{
+				Address: common.BytesToAddress(ctx.Chain.ServiceAddress().Bytes()),
+				Name:    flowServiceAccountContract,
+			},
+			deductFeesContractFunction,
+			[]interpreter.Value{
+				interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
+			},
+			[]sema.Type{
+				sema.AuthAccountType,
+			},
+			i.logger,
+		)
+		_, txError = invocator.Invoke(env, proc)
 	}
 
 	if txError != nil {
