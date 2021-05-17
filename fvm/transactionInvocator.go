@@ -168,7 +168,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	if txError == nil {
-		txError = i.funcName(env, proc)
+		txError = i.deductTransactionFees(env, proc)
 	}
 
 	if txError != nil {
@@ -204,7 +204,7 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-func (i *TransactionInvocator) funcName(env *hostEnv, proc *TransactionProcedure) error {
+func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *TransactionProcedure) error {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
