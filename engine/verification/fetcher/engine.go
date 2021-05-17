@@ -241,15 +241,14 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Uint64("chunk_index", status.ChunkIndex).
 		Logger()
 
-	processed, nonFatalErr, fatalErr := e.handleChunkDataPackWithTracing(originID, status, chunkDataPack, collection)
-
-	if fatalErr != nil {
-		lg.Fatal().Err(fatalErr).Msg("could not handle chunk data pack")
+	processed, err := e.handleChunkDataPackWithTracing(originID, status, chunkDataPack, collection)
+	if IsChunkDataPackValidationError(err) {
+		lg.Error().Err(err).Msg("could not validate chunk data pack")
 		return
 	}
 
-	if nonFatalErr != nil {
-		lg.Error().Err(nonFatalErr).Msg("could not handle chunk data pack")
+	if err != nil {
+		lg.Fatal().Err(err).Msg("could not handle chunk data pack")
 		return
 	}
 
@@ -273,7 +272,7 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	originID flow.Identifier,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack,
-	collection *flow.Collection) (bool, error, error) {
+	collection *flow.Collection) (bool, error) {
 
 	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
 	if !ok {
@@ -283,25 +282,24 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	}
 
 	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	var fatalErr, nonFatalErr error
-	var processed bool
+
+	var ferr error
+	processed := false
 	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleChunkDataPack, func() {
 		// make sure the chunk data pack is valid
 		err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, collection, status.ExecutionResult)
 		if err != nil {
 			// TODO: this can be due to a byzantine behavio
-			nonFatalErr = fmt.Errorf("could not validate chunk data pack: %w", err)
-			return
+			ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.CollectionID, err)
 		}
 
 		processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack, collection)
 		if err != nil {
-			fatalErr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
-			return
+			ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
 		}
 	})
 
-	return processed, nonFatalErr, fatalErr
+	return processed, ferr
 }
 
 // handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
