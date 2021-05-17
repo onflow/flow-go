@@ -120,5 +120,5 @@ func (e *Engine) pingNode(peer *flow.Identity) {
 	info := e.nodeInfo[id]
 
 	// update metric
-	e.metrics.NodeReachable(peer, info, rtt, resp.Version)
+	e.metrics.NodeReachable(peer, info, rtt, resp.Version, resp.BlockHeight)
 }
