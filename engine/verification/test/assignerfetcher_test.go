@@ -29,7 +29,7 @@ import (
 func TestVerificationHappyPath(t *testing.T) {
 	testcases := []struct {
 		blockCount      int
-		ops             []vertestutils.CompleteExecutionReceiptBuilderOpt
+		opts             []vertestutils.CompleteExecutionReceiptBuilderOpt
 		msg             string
 		staked          bool
 		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
