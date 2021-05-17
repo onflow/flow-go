@@ -500,7 +500,6 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 	execCtx := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
-		fvm.WithBlockHeader(unittest.GenesisFixture(nil).Header),
 	)
 
 	runtime := fvm.NewInterpreterRuntime()
@@ -551,7 +550,9 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 
 	block := flow.Block{
 		Header: &flow.Header{
-			View: 42,
+			Timestamp: flow.GenesisTime,
+			Height:    42,
+			View:      42,
 		},
 		Payload: &flow.Payload{
 			Guarantees: guarantees,
