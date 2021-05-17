@@ -715,7 +715,7 @@ func (ms *SealingSuite) TestRequestPendingApprovals() {
 	ms.sealing.requiredApprovalsForSealConstruction = 2
 
 	// expectedRequests collects the set of ApprovalRequests that should be sent
-	expectedRequests := []*messages.ApprovalRequest{}
+	expectedRequests := make(map[flow.Identifier]*messages.ApprovalRequest)
 
 	// populate the incorporated-results mempool with:
 	// - 50 that have collected two signatures per chunk
@@ -768,11 +768,10 @@ func (ms *SealingSuite) TestRequestPendingApprovals() {
 				// expect requests to be sent out if the result's block is below
 				// the threshold
 				if i < n-int(ms.sealing.approvalRequestsThreshold) {
-					expectedRequests = append(expectedRequests,
-						&messages.ApprovalRequest{
-							ResultID:   ir.Result.ID(),
-							ChunkIndex: chunk.Index,
-						})
+					expectedRequests[ir.IncorporatedBlockID] = &messages.ApprovalRequest{
+						ResultID:   ir.Result.ID(),
+						ChunkIndex: chunk.Index,
+					}
 				}
 			}
 		}
@@ -853,9 +852,10 @@ func (ms *SealingSuite) TestRequestPendingApprovals() {
 
 	// Check the request tracker
 	ms.Assert().Equal(exp, len(ms.sealing.requestTracker.index))
-	for _, expectedRequest := range expectedRequests {
+	for incorporatedBlockID, expectedRequest := range expectedRequests {
 		requestItem := ms.sealing.requestTracker.Get(
 			expectedRequest.ResultID,
+			incorporatedBlockID,
 			expectedRequest.ChunkIndex,
 		)
 		ms.Assert().Equal(uint(0), requestItem.Requests)
@@ -872,9 +872,10 @@ func (ms *SealingSuite) TestRequestPendingApprovals() {
 
 	// Check the request tracker
 	ms.Assert().Equal(exp, len(ms.sealing.requestTracker.index))
-	for _, expectedRequest := range expectedRequests {
+	for incorporatedBlockID, expectedRequest := range expectedRequests {
 		requestItem := ms.sealing.requestTracker.Get(
 			expectedRequest.ResultID,
+			incorporatedBlockID,
 			expectedRequest.ChunkIndex,
 		)
 		ms.Assert().Equal(uint(1), requestItem.Requests)
