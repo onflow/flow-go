@@ -29,7 +29,7 @@ import (
 func TestVerificationHappyPath(t *testing.T) {
 	testcases := []struct {
 		blockCount      int
-		opts             []vertestutils.CompleteExecutionReceiptBuilderOpt
+		opts            []vertestutils.CompleteExecutionReceiptBuilderOpt
 		msg             string
 		staked          bool
 		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
@@ -41,7 +41,7 @@ func TestVerificationHappyPath(t *testing.T) {
 			// The result has only one chunk.
 			// The verification node is staked
 			blockCount: 1,
-			ops: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(1),
 				vertestutils.WithChunksCount(1),
 				vertestutils.WithCopies(1),
@@ -52,7 +52,7 @@ func TestVerificationHappyPath(t *testing.T) {
 		},
 		{
 			blockCount: 1,
-			ops: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(1),
 				vertestutils.WithChunksCount(1),
 				vertestutils.WithCopies(1),
@@ -63,7 +63,7 @@ func TestVerificationHappyPath(t *testing.T) {
 		},
 		{
 			blockCount: 1,
-			ops: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(5),
 				vertestutils.WithChunksCount(5),
 				vertestutils.WithCopies(1),
@@ -74,7 +74,7 @@ func TestVerificationHappyPath(t *testing.T) {
 		},
 		{
 			blockCount: 10,
-			ops: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(2),
 				vertestutils.WithChunksCount(2),
 				vertestutils.WithCopies(2),
@@ -85,7 +85,7 @@ func TestVerificationHappyPath(t *testing.T) {
 		},
 		{
 			blockCount: 10,
-			ops: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(2),
 				vertestutils.WithChunksCount(2),
 				vertestutils.WithCopies(2),
@@ -106,7 +106,7 @@ func TestVerificationHappyPath(t *testing.T) {
 				tc.eventRepetition,
 				collector,
 				collector,
-				tc.ops...)
+				tc.opts...)
 		})
 	}
 }
