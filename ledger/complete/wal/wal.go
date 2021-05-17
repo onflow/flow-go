@@ -121,6 +121,9 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
+			for i := range update.Paths {
+				fmt.Printf("UD - %v - %x:%x\n", update.RootHash.String(), update.Paths[i], update.Payloads[i])
+			}
 			u, err := forest.Update(update)
 			fmt.Println("U- ", update.RootHash.String(), " >>>> ", u.String())
 			return err
