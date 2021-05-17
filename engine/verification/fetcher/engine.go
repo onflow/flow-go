@@ -291,11 +291,13 @@ func (e *Engine) handleChunkDataPackWithTracing(
 		if err != nil {
 			// TODO: this can be due to a byzantine behavio
 			ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.CollectionID, err)
+			return
 		}
 
 		processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack, collection)
 		if err != nil {
 			ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
+			return
 		}
 	})
 
