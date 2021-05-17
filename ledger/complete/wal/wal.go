@@ -112,7 +112,6 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			}
 			err = forest.AddTries(rebuiltTries)
 			for _, t := range rebuiltTries {
-
 				fmt.Println("A- ", t.RootHash().String())
 			}
 

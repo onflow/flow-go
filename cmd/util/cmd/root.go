@@ -13,6 +13,7 @@ import (
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
 	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
+	printer "github.com/onflow/flow-go/cmd/util/cmd/print-ledger-tree"
 	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
 	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
 	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
@@ -56,6 +57,7 @@ func addCommands() {
 	rootCmd.AddCommand(read_badger.RootCmd)
 	rootCmd.AddCommand(read_protocol_state.RootCmd)
 	rootCmd.AddCommand(ledger_json_exporter.Cmd)
+	rootCmd.AddCommand(printer.Cmd)
 }
 
 func initConfig() {

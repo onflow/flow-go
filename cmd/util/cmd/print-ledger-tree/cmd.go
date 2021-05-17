@@ -1,4 +1,4 @@
-package exporter
+package printer
 
 import (
 	"fmt"
@@ -15,9 +15,6 @@ import (
 
 var (
 	flagExecutionStateDir string
-	flagOutputDir         string
-	flagStateCommitment   string
-	flagGzip              bool
 )
 
 var Cmd = &cobra.Command{
@@ -34,14 +31,14 @@ func init() {
 
 func run(*cobra.Command, []string) {
 	log.Info().Msg("start printing ledger")
-	err := PrintLedger(flagExecutionStateDir, flagOutputDir)
+	err := PrintLedger(flagExecutionStateDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot get export ledger")
 	}
 }
 
 // PrintLedger
-func PrintLedger(ledgerPath string, outputPath string) error {
+func PrintLedger(ledgerPath string) error {
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
