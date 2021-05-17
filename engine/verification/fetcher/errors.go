@@ -21,7 +21,7 @@ func NewChunkDataPackValidationError(originID flow.Identifier,
 	collectionID flow.Identifier,
 	err error) error {
 
-	return &ChunkDataPackValidationError{
+	return ChunkDataPackValidationError{
 		originID:        originID,
 		chunkDataPackID: chunkDataPackID,
 		chunkID:         chunkID,
@@ -37,6 +37,5 @@ func (c ChunkDataPackValidationError) Error() string {
 }
 
 func IsChunkDataPackValidationError(err error) bool {
-	var chunkDataPackValidationError ChunkDataPackValidationError
-	return errors.Is(err, &chunkDataPackValidationError)
+	return errors.As(err, &ChunkDataPackValidationError{})
 }
