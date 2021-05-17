@@ -1987,7 +1987,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			tryToTransfer: 0,
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
 				require.IsType(t, tx.Err, &errors.TransactionFeeDeductionFailedError{})
-				require.Equal(t, txFees - 1, balanceAfter)
+				require.Equal(t, txFees-1, balanceAfter)
 			},
 		},
 		{

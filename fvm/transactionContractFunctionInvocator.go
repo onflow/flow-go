@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const contractFunctionInvocationLocation = common.StringLocation("ContractFunctionInvocation")
+
 type TransactionContractFunctionInvocator struct {
 	contractLocation common.AddressLocation
 	functionName     string
@@ -50,7 +52,6 @@ func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *Transa
 	}
 
 	predeclaredValues := valueDeclarations(&env.ctx, env)
-	location := common.StringLocation("ContractFunctionInvocation")
 
 	value, err := env.vm.Runtime.InvokeContractFunction(
 		i.contractLocation,
@@ -59,13 +60,13 @@ func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *Transa
 		i.argumentTypes,
 		runtime.Context{
 			Interface:         env,
-			Location:          location,
+			Location:          contractFunctionInvocationLocation,
 			PredeclaredValues: predeclaredValues,
 		},
 	)
 
 	if err != nil {
-		i.logger.Info().
+		i.logger.Warn().
 			Msg("Contract function call executed with error")
 	}
 	return value, err

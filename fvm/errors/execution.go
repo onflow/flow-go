@@ -73,7 +73,7 @@ func NewTransactionFeeDeductionFailedError(payer flow.Address, txFees uint64, er
 }
 
 func (e TransactionFeeDeductionFailedError) Error() string {
-	return fmt.Sprintf("%s failed to deduct %d transaction fees from %s: %s", e.Code().String(), e.TxFees, e.Payer, e.err )
+	return fmt.Sprintf("%s failed to deduct %d transaction fees from %s: %s", e.Code().String(), e.TxFees, e.Payer, e.err)
 }
 
 // Code returns the error code for this error

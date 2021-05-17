@@ -163,34 +163,12 @@ func (i *TransactionInvocator) Process(
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
-	if txError == nil && ctx.LimitAccountStorage {
-		// check the storage limits
-		if ctx.LimitAccountStorage {
-			txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
-		}
+	if txError == nil {
+		txError = i.checkAccountStorageLimit(vm, ctx, proc, sth, programs)
 	}
 
-	if txError == nil && ctx.TransactionFeesEnabled {
-		invocator := NewTransactionContractFunctionInvocator(
-			common.AddressLocation{
-				Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
-				Name:    flowServiceAccountContract,
-			},
-			deductFeesContractFunction,
-			[]interpreter.Value{
-				interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
-			},
-			[]sema.Type{
-				sema.AuthAccountType,
-			},
-			zerolog.Nop(),
-		)
-		_, err := invocator.Invoke(env, proc)
-
-		if err != nil {
-			// TODO: Fee value is currently a constant. this should be changed when it is not
-			txError = errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, DefaultTransactionFees.ToGoValue().(uint64), err)
-		}
+	if txError == nil {
+		txError = i.funcName(env, proc)
 	}
 
 	if txError != nil {
@@ -224,6 +202,43 @@ func (i *TransactionInvocator) Process(
 		Msg("transaction executed successfully")
 
 	return nil
+}
+
+func (i *TransactionInvocator) funcName(env *hostEnv, proc *TransactionProcedure) error {
+	if !env.ctx.TransactionFeesEnabled {
+		return nil
+	}
+
+	invocator := NewTransactionContractFunctionInvocator(
+		common.AddressLocation{
+			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
+			Name:    flowServiceAccountContract,
+		},
+		deductFeesContractFunction,
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
+		},
+		[]sema.Type{
+			sema.AuthAccountType,
+		},
+		zerolog.Nop(),
+	)
+	_, err := invocator.Invoke(env, proc)
+
+	if err != nil {
+		// TODO: Fee value is currently a constant. this should be changed when it is not
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, DefaultTransactionFees.ToGoValue().(uint64), err)
+	}
+	return nil
+}
+
+func (i *TransactionInvocator) checkAccountStorageLimit(vm *VirtualMachine, ctx *Context, proc *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
+	if !ctx.LimitAccountStorage {
+		return nil
+	}
+
+	// check the storage limits
+	return NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
 }
 
 func valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {

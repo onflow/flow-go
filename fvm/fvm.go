@@ -3,15 +3,14 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 )
 
 // An Procedure is an operation (or set of operations) that reads or writes ledger state.
