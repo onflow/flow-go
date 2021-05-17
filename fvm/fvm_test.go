@@ -1287,6 +1287,7 @@ func TestSignatureVerification(t *testing.T) {
 			)
 
 			t.Run(fmt.Sprintf("%s %s", signatureAlgorithm.name, hashAlgorithm.name), func(t *testing.T) {
+				t.Skip("temporarily disabled")
 
 				createKey := func() (privateKey crypto.PrivateKey, publicKey cadence.Array) {
 					seed := make([]byte, signatureAlgorithm.seedLength)
@@ -1432,6 +1433,7 @@ func TestSignatureVerification(t *testing.T) {
 						view state.View,
 						programs *programs.Programs,
 					) {
+						t.Skip("temporarily disabled")
 						privateKeyA, publicKeyA := createKey()
 						privateKeyB, publicKeyB := createKey()
 						privateKeyC, publicKeyC := createKey()

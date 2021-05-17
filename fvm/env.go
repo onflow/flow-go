@@ -46,7 +46,6 @@ type hostEnv struct {
 	rng              *rand.Rand
 }
 
-
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
@@ -542,7 +541,7 @@ func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgori
 	}
 
 	if len(tag) > 0 {
-		return nil, fmt.Errorf("specifying the tag when computing a hash is not yet suported")
+		return nil, fmt.Errorf("specifying the tag when computing a hash is not yet supported")
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
@@ -572,7 +571,7 @@ func (e *hostEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
-	valid, err := verifySignatureFromRuntime(
+	_, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
@@ -586,7 +585,8 @@ func (e *hostEnv) VerifySignature(
 		return false, fmt.Errorf("verifying signature failed: %w", err)
 	}
 
-	return valid, nil
+	// TODO: this function temporarily returns false until it is properly implemented
+	return false, nil
 }
 
 func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
