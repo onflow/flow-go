@@ -1091,7 +1091,7 @@ func TestGetAccountKey(t *testing.T) {
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1143,7 +1143,7 @@ func TestGetAccountKey(t *testing.T) {
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1195,7 +1195,7 @@ func TestGetAccountKey(t *testing.T) {
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()),
+						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(interpreter.StringResults{}),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
