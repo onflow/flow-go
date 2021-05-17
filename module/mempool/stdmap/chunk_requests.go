@@ -146,6 +146,11 @@ func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 	return requests
 }
 
+// Size returns total number of chunk requests in the memory pool.
+func (cs ChunkRequests) Size() uint {
+	return cs.Backend.Size()
+}
+
 // chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining
 // some auxiliary attributes that are internal to ChunkRequests.
 type chunkRequestStatus struct {

@@ -12,17 +12,21 @@ import (
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
+	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
@@ -544,4 +548,186 @@ func MockLastSealedHeight(state *mockprotocol.State, height uint64) {
 	header.Height = height
 	state.On("Sealed").Return(snapshot)
 	snapshot.On("Head").Return(&header, nil)
+}
+
+func NewVerificationHappyPathTest(t *testing.T,
+	staked bool,
+	blockCount int,
+	eventRepetition int,
+	verCollector module.VerificationMetrics,
+	mempoolCollector module.MempoolMetrics,
+	ops ...CompleteExecutionReceiptBuilderOpt) {
+
+	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, func(
+		blockConsumer *blockconsumer.BlockConsumer,
+		blocks []*flow.Block,
+		resultApprovalsWG *sync.WaitGroup) {
+
+		for i := 0; i < len(blocks)*eventRepetition; i++ {
+			// consumer is only required to be "notified" that a new finalized block available.
+			// It keeps track of the last finalized block it has read, and read the next height upon
+			// getting notified as follows:
+			blockConsumer.OnFinalizedBlock(&model.Block{})
+		}
+
+		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*blockCount)*time.Second,
+			"could not receive result approvals on time")
+
+	}, ops...)
+}
+
+// withConsumers is a test helper that sets up the following pipeline:
+// block reader -> block consumer (3 workers) -> assigner engine -> chunks queue -> chunks consumer (3 workers) -> mock chunk processor
+//
+// The block consumer operates on a block reader with a chain of specified number of finalized blocks
+// ready to read.
+func withConsumers(t *testing.T,
+	staked bool,
+	blockCount int,
+	verCollector module.VerificationMetrics, // verification metrics collector
+	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup),
+	ops ...CompleteExecutionReceiptBuilderOpt) {
+
+	tracer := &trace.NoopTracer{}
+	chainID := flow.Testnet
+
+	// bootstraps system with one node of each role.
+	s, verID, participants := bootstrapSystem(t, tracer, staked)
+	exeID := participants.Filter(filter.HasRole(flow.RoleExecution))[0]
+	conID := participants.Filter(filter.HasRole(flow.RoleConsensus))[0]
+	ops = append(ops, WithExecutorIDs(
+		participants.Filter(filter.HasRole(flow.RoleExecution)).NodeIDs()))
+
+	// generates a chain of blocks in the form of root <- R1 <- C1 <- R2 <- C2 <- ... where Rs are distinct reference
+	// blocks (i.e., containing guarantees), and Cs are container blocks for their preceding reference block,
+	// Container blocks only contain receipts of their preceding reference blocks. But they do not
+	// hold any guarantees.
+	root, err := s.State.Final().Head()
+	require.NoError(t, err)
+	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
+	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
+
+	// chunk assignment
+	chunkAssigner := &mock.ChunkAssigner{}
+	assignedChunkIDs := flow.IdentifierList{}
+	if staked {
+		// only staked verification node has some chunks assigned to it.
+		_, assignedChunkIDs = MockChunkAssignmentFixture(chunkAssigner,
+			flow.IdentityList{verID},
+			completeERs,
+			EvenChunkIndexAssigner)
+	}
+
+	hub := stub.NewNetworkHub()
+	collector := &metrics.NoopCollector{}
+	chunksLimit := 100
+	genericNode := testutil.GenericNodeWithStateFixture(t,
+		s,
+		hub,
+		verID,
+		unittest.Logger().With().Str("role", "verification").Logger(),
+		collector,
+		tracer,
+		chainID)
+
+	// execution node
+	exeNode, exeEngine := SetupChunkDataPackProvider(t,
+		hub,
+		exeID,
+		participants,
+		chainID,
+		completeERs,
+		assignedChunkIDs,
+		RespondChunkDataPackRequest)
+
+	// consensus node
+	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+		unittest.Logger(),
+		hub,
+		conID,
+		flow.IdentityList{verID},
+		participants,
+		completeERs,
+		chainID,
+		assignedChunkIDs)
+
+	verNode := testutil.NewVerificationNode(t,
+		hub,
+		verID,
+		participants,
+		chunkAssigner,
+		uint(chunksLimit),
+		chainID,
+		verCollector,
+		mempoolCollector,
+		testutil.WithGenericNode(&genericNode))
+
+	// turns on components and network
+	verNet, ok := hub.GetNetwork(verID.NodeID)
+	require.True(t, ok)
+	unittest.RequireReturnsBefore(t, func() {
+		verNet.StartConDev(100*time.Millisecond, true)
+	}, 100*time.Millisecond, "failed to start verification network")
+
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second,
+		verNode.BlockConsumer,
+		verNode.ChunkConsumer,
+		verNode.AssignerEngine,
+		verNode.FetcherEngine,
+		verNode.RequesterEngine,
+		verNode.VerifierEngine)
+
+	// plays test scenario
+	withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
+
+	// tears down engines and nodes
+	unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
+	unittest.RequireComponentsDoneBefore(t, 100*time.Millisecond,
+		verNode.BlockConsumer,
+		verNode.ChunkConsumer,
+		verNode.AssignerEngine,
+		verNode.FetcherEngine,
+		verNode.RequesterEngine,
+		verNode.VerifierEngine)
+
+	enginemock.RequireGenericNodesDoneBefore(t, 1*time.Second,
+		conNode,
+		exeNode)
+
+	if !staked {
+		// in unstaked mode, no message should be received by consensus and execution node.
+		conEngine.AssertNotCalled(t, "Process")
+		exeEngine.AssertNotCalled(t, "Process")
+	}
+}
+
+// bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).
+// If staked set to true, it bootstraps verification node as an staked one.
+// Otherwise, it bootstraps the verification node as unstaked in current epoch.
+//
+// As the return values, it returns the state, local module, and list of identities in system.
+func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemock.StateFixture, *flow.Identity,
+	flow.IdentityList) {
+	// creates identities to bootstrap system with
+	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	identities := unittest.CompleteIdentitySet(verID)
+	identities = append(identities, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))) // adds extra execution node
+
+	// bootstraps the system
+	collector := &metrics.NoopCollector{}
+	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
+
+	if !staked {
+		// creates a new verification node identity that is unstaked for this epoch
+		verID = unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+		identities = identities.Union(flow.IdentityList{verID})
+
+		epochBuilder := unittest.NewEpochBuilder(t, stateFixture.State)
+		epochBuilder.
+			UsingSetupOpts(unittest.WithParticipants(identities)).
+			BuildEpoch()
+	}
+
+	return stateFixture, verID, identities
 }
