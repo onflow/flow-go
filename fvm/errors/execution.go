@@ -56,6 +56,36 @@ func (e CadenceRuntimeError) Unwrap() error {
 	return e.err
 }
 
+// An TransactionFeeDeductionFailedError indicates that a there was an error deducting transaction fees from the transaction Payer
+type TransactionFeeDeductionFailedError struct {
+	Payer  flow.Address
+	TxFees uint64
+	err    error
+}
+
+// NewTransactionFeeDeductionFailedError constructs a new TransactionFeeDeductionFailedError
+func NewTransactionFeeDeductionFailedError(payer flow.Address, txFees uint64, err error) *TransactionFeeDeductionFailedError {
+	return &TransactionFeeDeductionFailedError{
+		Payer:  payer,
+		TxFees: txFees,
+		err:    err,
+	}
+}
+
+func (e TransactionFeeDeductionFailedError) Error() string {
+	return fmt.Sprintf("%s failed to deduct %d transaction fees from %s: %s", e.Code().String(), e.TxFees, e.Payer, e.err )
+}
+
+// Code returns the error code for this error
+func (e TransactionFeeDeductionFailedError) Code() ErrorCode {
+	return ErrCodeTransactionFeeDeductionFailedError
+}
+
+// Unwrap returns the wrapped err
+func (e TransactionFeeDeductionFailedError) Unwrap() error {
+	return e.err
+}
+
 // An StorageCapacityExceededError indicates that an account used more storage than it has storage capacity.
 type StorageCapacityExceededError struct {
 	address         flow.Address

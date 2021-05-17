@@ -170,10 +170,10 @@ func (i *TransactionInvocator) Process(
 		}
 	}
 
-	if txError == nil && ctx.TransactionFeesEnabled  {
+	if txError == nil && ctx.TransactionFeesEnabled {
 		invocator := NewTransactionContractFunctionInvocator(
 			common.AddressLocation{
-				Address: common.BytesToAddress(ctx.Chain.ServiceAddress().Bytes()),
+				Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
 				Name:    flowServiceAccountContract,
 			},
 			deductFeesContractFunction,
@@ -183,9 +183,14 @@ func (i *TransactionInvocator) Process(
 			[]sema.Type{
 				sema.AuthAccountType,
 			},
-			i.logger,
+			zerolog.Nop(),
 		)
-		_, txError = invocator.Invoke(env, proc)
+		_, err := invocator.Invoke(env, proc)
+
+		if err != nil {
+			// TODO: Fee value is currently a constant. this should be changed when it is not
+			txError = errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, DefaultTransactionFees.ToGoValue().(uint64), err)
+		}
 	}
 
 	if txError != nil {

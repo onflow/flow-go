@@ -274,8 +274,7 @@ func WithAccountStorageLimit(enabled bool) Option {
 	}
 }
 
-// WithTransactionFeesEnabled enables or disables checking if account storage used is
-// over its storage capacity
+// WithTransactionFeesEnabled enables or disables deduction of transaction fees
 func WithTransactionFeesEnabled(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.TransactionFeesEnabled = enabled

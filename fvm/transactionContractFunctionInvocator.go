@@ -39,9 +39,8 @@ func NewTransactionContractFunctionInvocator(
 	}
 }
 
-func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *TransactionProcedure, ) (cadence.Value, error) {
+func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *TransactionProcedure) (cadence.Value, error) {
 	var span opentracing.Span
-
 	if env.ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = env.ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMInvokeContractFunction)
 		span.LogFields(
@@ -51,7 +50,6 @@ func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *Transa
 	}
 
 	predeclaredValues := valueDeclarations(&env.ctx, env)
-
 	location := common.StringLocation("ContractFunctionInvocation")
 
 	value, err := env.vm.Runtime.InvokeContractFunction(
