@@ -5,12 +5,15 @@ import (
 	"sync"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type AuthorizedAccountsForContractDeploymentFunc func() []common.Address
 
 // ContractHandler handles all interaction
 // with smart contracts such as get/set/update
@@ -21,14 +24,14 @@ type ContractHandler struct {
 	accounts                    *state.Accounts
 	draftUpdates                map[programs.ContractUpdateKey]programs.ContractUpdate
 	restrictedDeploymentEnabled bool
-	authorizedAccounts          []runtime.Address
+	authorizedAccounts          AuthorizedAccountsForContractDeploymentFunc
 	// handler doesn't have to be thread safe and right now
 	// is only used in a single thread but a mutex has been added
 	// here to prevent accidental multi-thread use in the future
 	lock sync.Mutex
 }
 
-func NewContractHandler(accounts *state.Accounts, restrictedDeploymentEnabled bool, authorizedAccounts []runtime.Address) *ContractHandler {
+func NewContractHandler(accounts *state.Accounts, restrictedDeploymentEnabled bool, authorizedAccounts AuthorizedAccountsForContractDeploymentFunc) *ContractHandler {
 	return &ContractHandler{
 		accounts:                    accounts,
 		draftUpdates:                make(map[programs.ContractUpdateKey]programs.ContractUpdate),
@@ -132,7 +135,8 @@ func (h *ContractHandler) UpdateKeys() []programs.ContractUpdateKey {
 
 func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
 	if h.restrictedDeploymentEnabled {
-		for _, authorized := range h.authorizedAccounts {
+		accs := h.authorizedAccounts()
+		for _, authorized := range accs {
 			for _, signer := range signingAccounts {
 				if signer == authorized {
 					// a single authorized singer is enough

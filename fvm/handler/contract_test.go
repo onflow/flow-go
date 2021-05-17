@@ -78,7 +78,7 @@ func TestContract_AuthorizationFunctionality(t *testing.T) {
 	err = accounts.Create(nil, unAuthAdd)
 	require.NoError(t, err)
 
-	contractHandler := handler.NewContractHandler(accounts, true, []common.Address{rAdd})
+	contractHandler := handler.NewContractHandler(accounts, true, func() []common.Address { return []common.Address{rAdd} })
 
 	// try to set contract by an unAuthRAdd
 	err = contractHandler.SetContract(rAdd, "testContract1", []byte("ABC"), []common.Address{unAuthRAdd})

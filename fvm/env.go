@@ -52,8 +52,8 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	contracts := handler.NewContractHandler(accounts,
 		ctx.RestrictedDeploymentEnabled,
-		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
-
+		getAuthorizedAccountsForContractUpdatesFunc(ctx),
+	)
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	programsHandler := handler.NewProgramsHandler(
@@ -111,6 +111,12 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		tx,
 		txIndex,
 	)
+}
+
+func getAuthorizedAccountsForContractUpdatesFunc(ctx Context) func() []common.Address {
+	defaultValue := []runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())}
+	// TODO call vm to read values from
+	return func() []common.Address { return defaultValue }
 }
 
 func (e *hostEnv) setTraceSpan(span opentracing.Span) {
