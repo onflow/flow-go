@@ -9,11 +9,11 @@ import (
 
 func InitAll(metrics module.CacheMetrics, db *badger.DB) *storage.All {
 	headers := NewHeaders(metrics, db)
-	guarantees := NewGuarantees(metrics, db)
+	guarantees := NewGuarantees(metrics, db, DefaultCacheSize)
 	seals := NewSeals(metrics, db)
 	index := NewIndex(metrics, db)
 	results := NewExecutionResults(metrics, db)
-	receipts := NewExecutionReceipts(metrics, db, results)
+	receipts := NewExecutionReceipts(metrics, db, results, DefaultCacheSize)
 	payloads := NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := NewBlocks(db, headers, payloads)
 	setups := NewEpochSetups(metrics, db)
