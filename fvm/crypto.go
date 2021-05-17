@@ -135,12 +135,17 @@ func verifySignatureFromRuntime(
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
-
+	}
+	if sigAlgo == crypto.BLSBLS12381 {
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported", crypto.BLSBLS12381.String())
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
 		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
+	}
+	if hashAlgo == hash.KMAC128 {
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "hashing algorithm %s not supported", hash.KMAC128.String())
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)

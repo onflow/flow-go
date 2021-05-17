@@ -46,11 +46,6 @@ type hostEnv struct {
 	rng              *rand.Rand
 }
 
-func (e *hostEnv) ValidatePublicKey(key *runtime.PublicKey) (bool, error) {
-	// TODO: this is a stub for now
-	return true, nil
-}
-
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
@@ -545,6 +540,10 @@ func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgori
 		defer sp.Finish()
 	}
 
+	if len(tag) > 0 {
+		return nil, fmt.Errorf("specifying the tag when computing a hash is not yet supported")
+	}
+
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == crypto.UnknownHashAlgorithm {
 		err := errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
@@ -556,9 +555,7 @@ func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgori
 		return nil, errors.NewHasherFailuref("failed to create a hasher for env.Hash: %w", err)
 	}
 
-	message := append([]byte(tag), data...)
-
-	return hasher.ComputeHash(message), nil
+	return hasher.ComputeHash(data), nil
 }
 
 func (e *hostEnv) VerifySignature(
@@ -574,7 +571,7 @@ func (e *hostEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
-	valid, err := verifySignatureFromRuntime(
+	_, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
@@ -588,7 +585,13 @@ func (e *hostEnv) VerifySignature(
 		return false, fmt.Errorf("verifying signature failed: %w", err)
 	}
 
-	return valid, nil
+	// TODO: this function temporarily returns false until it is properly implemented
+	return false, nil
+}
+
+func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
+	// TODO: this is a stub for now
+	return false, nil
 }
 
 // Block Environment Functions

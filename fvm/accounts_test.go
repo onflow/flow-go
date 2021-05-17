@@ -1086,12 +1086,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1138,12 +1138,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1190,12 +1190,12 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()),
+						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(interpreter.StringResults{}),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])

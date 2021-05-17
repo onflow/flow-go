@@ -169,7 +169,7 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	if !ok {
 		return 0, false, fmt.Errorf("could not decode composite at %s: %w", address, err)
 	}
-	balanceField, ok := composite.Fields.Get("balance")
+	balanceField, ok := composite.Fields().Get("balance")
 	if !ok {
 		return 0, false, fmt.Errorf("could get balance field at %s: %w", address, err)
 	}

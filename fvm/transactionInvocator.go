@@ -252,13 +252,13 @@ func valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
 				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+						panic(errors.NewValueErrorf(invocation.Arguments[0].String(interpreter.StringResults{}),
 							"first argument of setAccountFrozen must be an address"))
 					}
 
 					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
 					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+						panic(errors.NewValueErrorf(invocation.Arguments[0].String(interpreter.StringResults{}),
 							"second argument of setAccountFrozen must be a boolean"))
 					}
 					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
