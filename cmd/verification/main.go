@@ -112,14 +112,9 @@ func main() {
 			}
 			return nil
 		}).
-		Module("pending execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
+		Module("chunk requests memory pool", func(node *cmd.FlowNodeBuilder) error {
+			chunkRequests = stdmap.NewChunkRequests(chunkLimit)
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
