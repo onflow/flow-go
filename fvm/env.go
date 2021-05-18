@@ -30,7 +30,6 @@ import (
 )
 
 var _ runtime.Interface = &hostEnv{}
-var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
 	ctx              Context
@@ -569,10 +568,14 @@ func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
+func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
 		defer sp.Finish()
+	}
+
+	if len(tag) > 0 {
+		return nil, fmt.Errorf("specifying the tag when computing a hash is not yet supported")
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
@@ -619,16 +622,9 @@ func (e *hostEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *hostEnv) HighLevelStorageEnabled() bool {
-	return e.ctx.SetValueHandler != nil
-}
-
-func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
-	err := e.ctx.SetValueHandler(flow.Address(owner), key, value)
-	if err != nil {
-		return fmt.Errorf("setting cadence value failed: %w", err)
-	}
-	return err
+func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
+	// TODO: this is a stub for now
+	return false, nil
 }
 
 // Block Environment Functions

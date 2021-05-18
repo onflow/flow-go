@@ -10,7 +10,9 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -386,6 +388,10 @@ type testRuntime struct {
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+	panic("InvokeContractFunction not expected")
+}
 
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)
