@@ -134,12 +134,12 @@ func (e *hostEnv) GetAuthorizedAccountsForContractUpdatesFunc() func() []common.
 			},
 		)
 		if err != nil {
-			// TODO log warning
+			e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
 			return defaultAccounts
 		}
 		adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
 		if !ok {
-			// TODO log warning
+			e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
 			return defaultAccounts
 		}
 		return adresses
