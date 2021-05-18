@@ -27,10 +27,6 @@ import (
 // for subsequent inclusion in block.
 const DefaultRequiredApprovalsForSealConstruction = 0
 
-// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
-// sealing.
-const DefaultEmergencySealingThreshold = 400
-
 // DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
@@ -64,7 +60,7 @@ type Core struct {
 	headers                   storage.Headers                    // used to access block headers in storage
 	state                     protocol.State                     // used to access protocol state
 	seals                     storage.Seals                      // used to get last sealed block
-	requestTracker            *RequestTracker                    // used to keep track of number of approval requests, and blackout periods, by chunk
+	requestTracker            *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
 	pendingReceipts           mempool.PendingReceipts            // buffer for receipts where an ancestor result is missing, so they can't be connected to the sealed results
 	metrics                   module.ConsensusMetrics            // used to track consensus metrics
 	tracer                    module.Tracer                      // used to trace execution
@@ -110,7 +106,7 @@ func NewCore(
 		receiptsDB:       receiptsDB,
 		receipts:         receipts,
 		receiptValidator: receiptValidator,
-		requestTracker:   NewRequestTracker(10, 30),
+		requestTracker:   approvals.NewRequestTracker(10, 30),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
@@ -318,7 +314,7 @@ func (c *Core) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint6
 		return nil
 	}
 
-	emergencySealingHeight := lastSealedHeight + DefaultEmergencySealingThreshold
+	emergencySealingHeight := lastSealedHeight + approvals.DefaultEmergencySealingThreshold
 
 	// we are interested in all collectors that match condition:
 	// lastSealedBlock + sealing.DefaultEmergencySealingThreshold < lastFinalizedHeight
@@ -655,7 +651,7 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 	// Hence, the following operation cannot underflow
 	maxHeightForRequesting := lastFinalizedHeight - c.options.approvalRequestsThreshold
 
-	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+maxHeightForRequesting) {
+	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting) {
 		err := collector.RequestMissingApprovals(maxHeightForRequesting)
 		if err != nil {
 			return err

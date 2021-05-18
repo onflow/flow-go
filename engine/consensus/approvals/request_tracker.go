@@ -1,4 +1,4 @@
-package sealing
+package approvals
 
 import (
 	"math/rand"

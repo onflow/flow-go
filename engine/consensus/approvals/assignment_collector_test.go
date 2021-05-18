@@ -47,7 +47,7 @@ type AssignmentCollectorTestSuite struct {
 	sigVerifier     *module.Verifier
 	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	requestTracker  *sealing.RequestTracker
+	requestTracker  *RequestTracker
 
 	collector *AssignmentCollector
 }
@@ -62,7 +62,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.conduit = &mocknetwork.Conduit{}
 	s.headers = &storage.Headers{}
 
-	s.requestTracker = sealing.NewRequestTracker(1, 3)
+	s.requestTracker = NewRequestTracker(1, 3)
 
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)

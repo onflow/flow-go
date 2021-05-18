@@ -52,6 +52,12 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 	}
 }
 
+func (t *AssignmentCollectorTree) GetSize() uint64 {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	return t.size
+}
+
 // GetCollector returns collector by ID and whether it is processable or not
 func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*AssignmentCollector, bool) {
 	t.lock.RLock()

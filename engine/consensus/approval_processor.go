@@ -17,7 +17,14 @@ type ResultApprovalProcessor interface {
 	// * nil - successfully processed incorporated result
 	ProcessIncorporatedResult(result *flow.IncorporatedResult) error
 
+	// ProcessReceipt processes receipt which was submitted from p2p network.
+	// This function is needed only for phase 2 sealing and verification where receipts can
+	// be broadcast through p2p network. Will be removed in phase 3.
 	ProcessReceipt(receipt *flow.ExecutionReceipt) error
 
+	// ProcessFinalizedBlock processes finalization events in blocking way. Concurrency safe.
+	// Returns:
+	// * exception in case of unexpected error
+	// * nil - successfully processed finalized block
 	ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error
 }

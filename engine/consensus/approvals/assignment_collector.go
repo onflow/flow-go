@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -18,6 +17,10 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
+
+// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
+// sealing.
+const DefaultEmergencySealingThreshold = 400
 
 // helper functor that can be used to retrieve cached block height
 type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
@@ -46,11 +49,11 @@ type AssignmentCollector struct {
 	verifier                             module.Verifier                        // used to validate result approvals
 	seals                                mempool.IncorporatedResultSeals        // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
 	approvalConduit                      network.Conduit                        // used to request missing approvals from verification nodes
-	requestTracker                       *sealing.RequestTracker                // used to keep track of number of approval requests, and blackout periods, by chunk
+	requestTracker                       *RequestTracker                        // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
 func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint,
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *RequestTracker, requiredApprovalsForSealConstruction uint,
 ) (*AssignmentCollector, error) {
 	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
@@ -128,7 +131,7 @@ func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, f
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
 	// the block that _incorporates_ result and the latest finalized block
-	return collector.IncorporatedBlock().Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight
+	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
 
 func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
