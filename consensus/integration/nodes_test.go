@@ -188,7 +188,7 @@ func createNode(
 	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
 		guarantees, seals, receipts, tracer)
 
-	signer := &verification.Signer{identity.ID()}
+	signer := &verification.MockSigner{identity.ID()}
 
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()

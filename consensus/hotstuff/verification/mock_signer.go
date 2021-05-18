@@ -5,27 +5,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Signer struct {
-	localID flow.Identifier
+type MockSigner struct {
+	LocalID flow.Identifier
 }
 
-func (*Signer) CreateProposal(block *model.Block) (*model.Proposal, error) {
+func (*MockSigner) CreateProposal(block *model.Block) (*model.Proposal, error) {
 	proposal := &model.Proposal{
 		Block:   block,
 		SigData: nil,
 	}
 	return proposal, nil
 }
-func (s *Signer) CreateVote(block *model.Block) (*model.Vote, error) {
+func (s *MockSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 	vote := &model.Vote{
 		View:     block.View,
 		BlockID:  block.BlockID,
-		SignerID: s.localID,
+		SignerID: s.LocalID,
 		SigData:  nil,
 	}
 	return vote, nil
 }
-func (*Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
+func (*MockSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	voterIDs := make([]flow.Identifier, 0, len(votes))
 	for _, vote := range votes {
 		voterIDs = append(voterIDs, vote.SignerID)
@@ -39,10 +39,10 @@ func (*Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	return qc, nil
 }
 
-func (*Signer) VerifyVote(voterID *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+func (*MockSigner) VerifyVote(voterID *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 	return true, nil
 }
 
-func (*Signer) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+func (*MockSigner) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 	return true, nil
 }
