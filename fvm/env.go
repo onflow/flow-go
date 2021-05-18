@@ -133,10 +133,7 @@ func (e *hostEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
 			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
 			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
 		},
-		runtime.Context{
-			Interface: e,
-			Location:  common.ScriptLocation("temp for now until this becomes optional"),
-		},
+		runtime.Context{Interface: e},
 	)
 	if err != nil {
 		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")

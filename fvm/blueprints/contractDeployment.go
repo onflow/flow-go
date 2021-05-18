@@ -27,8 +27,10 @@ func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, au
 		return nil, err
 	}
 
-	arg2, err := jsoncdc.Encode(cadence.Path{Domain: ContractDeploymentAuthorizedAddressesPathDomain,
-		Identifier: ContractDeploymentAuthorizedAddressesPathIdentifier})
+	arg2, err := jsoncdc.Encode(cadence.Path{
+		Domain:     ContractDeploymentAuthorizedAddressesPathDomain,
+		Identifier: ContractDeploymentAuthorizedAddressesPathIdentifier,
+	})
 	if err != nil {
 		return nil, err
 	}
