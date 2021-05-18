@@ -18,10 +18,10 @@ type EpochSetups struct {
 // NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		id := key.(flow.Identifier)
 		setup := val.(*flow.EpochSetup)
-		return operation.SkipDuplicates(operation.InsertEpochSetup(id, setup))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochSetup(id, setup)))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -44,18 +44,8 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 	return es
 }
 
-func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		err := es.cache.Put(setup.ID(), setup)(tx)
-		if err != nil {
-			return err
-		}
-		return nil
-	}
-}
-
-func (es *EpochSetups) StoreTxn(setup *flow.EpochSetup) func(tx *transaction.Tx) error {
-	return es.cache.PutTxn(setup.ID(), setup)
+func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *transaction.Tx) error {
+	return es.cache.PutTx(setup.ID(), setup)
 }
 
 func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {

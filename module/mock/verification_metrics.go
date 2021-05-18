@@ -9,13 +9,38 @@ type VerificationMetrics struct {
 	mock.Mock
 }
 
-// OnAssignerProcessFinalizedBlock provides a mock function with given fields: height
-func (_m *VerificationMetrics) OnAssignerProcessFinalizedBlock(height uint64) {
-	_m.Called(height)
+// OnAssignedChunkProcessedAtAssigner provides a mock function with given fields:
+func (_m *VerificationMetrics) OnAssignedChunkProcessedAtAssigner() {
+	_m.Called()
+}
+
+// OnAssignedChunkReceivedAtFetcher provides a mock function with given fields:
+func (_m *VerificationMetrics) OnAssignedChunkReceivedAtFetcher() {
+	_m.Called()
+}
+
+// OnChunkDataPackArrivedAtFetcher provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackArrivedAtFetcher() {
+	_m.Called()
 }
 
 // OnChunkDataPackReceived provides a mock function with given fields:
 func (_m *VerificationMetrics) OnChunkDataPackReceived() {
+	_m.Called()
+}
+
+// OnChunkDataPackRequestDispatchedInNetwork provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackRequestDispatchedInNetwork() {
+	_m.Called()
+}
+
+// OnChunkDataPackRequestReceivedByRequester provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackRequestReceivedByRequester() {
+	_m.Called()
+}
+
+// OnChunkDataPackRequestSentByFetcher provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackRequestSentByFetcher() {
 	_m.Called()
 }
 
@@ -24,13 +49,18 @@ func (_m *VerificationMetrics) OnChunkDataPackRequested() {
 	_m.Called()
 }
 
-// OnChunkProcessed provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunkProcessed() {
+// OnChunkDataPackResponseReceivedFromNetwork provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackResponseReceivedFromNetwork() {
 	_m.Called()
 }
 
-// OnChunksAssigned provides a mock function with given fields: chunks
-func (_m *VerificationMetrics) OnChunksAssigned(chunks int) {
+// OnChunkDataPackSentToFetcher provides a mock function with given fields:
+func (_m *VerificationMetrics) OnChunkDataPackSentToFetcher() {
+	_m.Called()
+}
+
+// OnChunksAssignmentDoneAtAssigner provides a mock function with given fields: chunks
+func (_m *VerificationMetrics) OnChunksAssignmentDoneAtAssigner(chunks int) {
 	_m.Called(chunks)
 }
 
@@ -49,17 +79,27 @@ func (_m *VerificationMetrics) OnExecutionResultSent() {
 	_m.Called()
 }
 
-// OnResultApproval provides a mock function with given fields:
-func (_m *VerificationMetrics) OnResultApproval() {
+// OnFinalizedBlockArrivedAtAssigner provides a mock function with given fields: height
+func (_m *VerificationMetrics) OnFinalizedBlockArrivedAtAssigner(height uint64) {
+	_m.Called(height)
+}
+
+// OnResultApprovalDispatchedInNetwork provides a mock function with given fields:
+func (_m *VerificationMetrics) OnResultApprovalDispatchedInNetwork() {
 	_m.Called()
 }
 
-// OnVerifiableChunkReceived provides a mock function with given fields:
-func (_m *VerificationMetrics) OnVerifiableChunkReceived() {
+// OnVerifiableChunkReceivedAtVerifierEngine provides a mock function with given fields:
+func (_m *VerificationMetrics) OnVerifiableChunkReceivedAtVerifierEngine() {
 	_m.Called()
 }
 
 // OnVerifiableChunkSent provides a mock function with given fields:
 func (_m *VerificationMetrics) OnVerifiableChunkSent() {
+	_m.Called()
+}
+
+// OnVerifiableChunkSentToVerifier provides a mock function with given fields:
+func (_m *VerificationMetrics) OnVerifiableChunkSentToVerifier() {
 	_m.Called()
 }

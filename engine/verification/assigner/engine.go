@@ -100,7 +100,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
-	e.metrics.OnChunksAssigned(len(chunkList))
+	e.metrics.OnChunksAssignmentDoneAtAssigner(len(chunkList))
 
 	// TODO: de-escalate to debug level on stable version.
 	log.Info().
@@ -138,7 +138,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 		return false, nil
 	}
 
-	e.metrics.OnChunkProcessed()
+	e.metrics.OnAssignedChunkProcessedAtAssigner()
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
@@ -219,7 +219,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		}
 	}
 
-	e.metrics.OnAssignerProcessFinalizedBlock(block.Header.Height)
+	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Header.Height)
 	lg.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
