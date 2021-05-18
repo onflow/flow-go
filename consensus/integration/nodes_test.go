@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -187,7 +188,7 @@ func createNode(
 	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
 		guarantees, seals, receipts, tracer)
 
-	signer := &Signer{identity.ID()}
+	signer := &verification.Signer{identity.ID()}
 
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()
