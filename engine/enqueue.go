@@ -26,11 +26,11 @@ type Pattern struct {
 	Map MapFunc
 	// Store is an abstract message store where we will store the message upon receipt.
 	Store MessageStore
-	// BeforeStore is a hook for functions to be called when a message is stored.
-	BeforeStore []OnMessageFunc
+	// Filter takes a predict function to determine whether to store the message. Return true to store, return false to drop.
+	Filter FilterFunc
 }
 
-type OnMessageFunc func(*Message)
+type FilterFunc func(*Message) bool
 
 type MatchFunc func(*Message) bool
 
@@ -81,8 +81,11 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 				msg = pattern.Map(msg)
 			}
 
-			for _, apply := range pattern.BeforeStore {
-				apply(msg)
+			if pattern.Filter != nil {
+				keep := pattern.Filter(msg)
+				if !keep {
+					continue
+				}
 			}
 
 			ok := pattern.Store.Put(msg)

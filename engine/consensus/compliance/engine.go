@@ -80,10 +80,9 @@ func NewEngine(
 				_, ok := msg.Payload.(*messages.BlockProposal)
 				return ok
 			},
-			BeforeStore: []engine.OnMessageFunc{
-				func(_ *engine.Message) {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-				},
+			Filter: func(_ *engine.Message) bool {
+				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+				return true
 			},
 			Store: pendingBlocks,
 		},
@@ -102,10 +101,9 @@ func NewEngine(
 					},
 				}
 			},
-			BeforeStore: []engine.OnMessageFunc{
-				func(_ *engine.Message) {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-				},
+			Filter: func(_ *engine.Message) bool {
+				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+				return true
 			},
 			Store: pendingBlocks,
 		},
@@ -114,10 +112,9 @@ func NewEngine(
 				_, ok := msg.Payload.(*messages.BlockVote)
 				return ok
 			},
-			BeforeStore: []engine.OnMessageFunc{
-				func(_ *engine.Message) {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
-				},
+			Filter: func(_ *engine.Message) bool {
+				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+				return true
 			},
 			Store: pendingVotes,
 		},
