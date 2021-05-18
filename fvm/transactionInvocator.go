@@ -227,7 +227,12 @@ func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *Transac
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not
-		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, DefaultTransactionFees.ToGoValue().(uint64), err)
+		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
+		if !ok {
+			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
+		}
+
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
 	}
 	return nil
 }
