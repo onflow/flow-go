@@ -585,7 +585,6 @@ func (e *hostEnv) VerifySignature(
 		return false, fmt.Errorf("verifying signature failed: %w", err)
 	}
 
-	// TODO: this function temporarily returns false until it is properly implemented
 	return valid, nil
 }
 
