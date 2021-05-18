@@ -16,10 +16,12 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
@@ -49,10 +51,6 @@ type hostEnv struct {
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	contracts := handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
-		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
-
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	programsHandler := handler.NewProgramsHandler(
@@ -72,12 +70,17 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		vm:               vm,
 		metrics:          &noopMetricsCollector{},
 		accounts:         accounts,
-		contracts:        contracts,
 		addressGenerator: generator,
 		uuidGenerator:    uuidGenerator,
 		eventHandler:     eventHandler,
 		programs:         programsHandler,
 	}
+
+	contracts := handler.NewContractHandler(accounts,
+		ctx.RestrictedDeploymentEnabled,
+		env.GetAuthorizedAccountsForContractUpdates,
+	)
+	env.contracts = contracts
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
@@ -110,6 +113,37 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 		tx,
 		txIndex,
 	)
+}
+
+// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
+// are authorized to update/deploy contracts
+//
+// It reads a storage path from service account and parse the addresses.
+// if any issue occurs on the process (missing registers, stored value properly not set)
+// it gracefully handle it and falls back to default behaviour (only service account be authorized)
+func (e *hostEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
+	// set default to service account only
+	service := runtime.Address(e.ctx.Chain.ServiceAddress())
+	defaultAccounts := []runtime.Address{service}
+
+	value, err := e.vm.Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
+		},
+		runtime.Context{Interface: e},
+	)
+	if err != nil {
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
+		return defaultAccounts
+	}
+	adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	if !ok {
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
+		return defaultAccounts
+	}
+	return adresses
 }
 
 func (e *hostEnv) setTraceSpan(span opentracing.Span) {
@@ -861,10 +895,15 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 
 func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
-			},
+			[]opentracing.LogRecord{
+				{Timestamp: time.Now(),
+					Fields: []traceLog.Field{traceLog.String("location", locStr)},
+				},
 			},
 		)
 	}
@@ -873,9 +912,13 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 
 func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", locStr)},
 			},
 			},
 		)
@@ -885,9 +928,13 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 
 func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", locStr)},
 			},
 			},
 		)
