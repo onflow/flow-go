@@ -78,7 +78,7 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 		for _, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
-			tr.cache.Put(key, result)
+			tr.cache.Insert(key, result)
 		}
 	})
 	return nil

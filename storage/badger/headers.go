@@ -26,24 +26,24 @@ type Headers struct {
 
 func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		blockID := key.(flow.Identifier)
 		header := val.(*flow.Header)
-		return operation.InsertHeader(blockID, header)
+		return transaction.WithTx(operation.InsertHeader(blockID, header))
 	}
 
 	// CAUTION: should only be used to index FINALIZED blocks by their
 	// respective height
-	storeHeight := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	storeHeight := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		height := key.(uint64)
 		id := val.(flow.Identifier)
-		return operation.IndexBlockHeight(height, id)
+		return transaction.WithTx(operation.IndexBlockHeight(height, id))
 	}
 
-	storeChunkID := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	storeChunkID := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		chunkID := key.(flow.Identifier)
 		blockID := val.(flow.Identifier)
-		return operation.IndexBlockIDByChunkID(chunkID, blockID)
+		return transaction.WithTx(operation.IndexBlockIDByChunkID(chunkID, blockID))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -93,12 +93,8 @@ func NewHeaders(collector module.CacheMetrics, db *badger.DB) *Headers {
 	return h
 }
 
-func (h *Headers) storeTx(header *flow.Header) func(*badger.Txn) error {
-	return h.cache.Put(header.ID(), header)
-}
-
-func (h *Headers) storeTxn(header *flow.Header) func(*transaction.Tx) error {
-	return h.cache.PutTxn(header.ID(), header)
+func (h *Headers) storeTx(header *flow.Header) func(*transaction.Tx) error {
+	return h.cache.PutTx(header.ID(), header)
 }
 
 func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Header, error) {
@@ -112,7 +108,7 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 }
 
 func (h *Headers) Store(header *flow.Header) error {
-	return operation.RetryOnConflict(h.db.Update, h.storeTx(header))
+	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header))
 }
 
 func (h *Headers) ByBlockID(blockID flow.Identifier) (*flow.Header, error) {
@@ -167,7 +163,7 @@ func (h *Headers) IDByChunkID(chunkID flow.Identifier) (flow.Identifier, error) 
 }
 
 func (h *Headers) IndexByChunkID(headerID, chunkID flow.Identifier) error {
-	return operation.RetryOnConflict(h.db.Update, h.chunkIDCache.Put(chunkID, headerID))
+	return operation.RetryOnConflictTx(h.db, transaction.Update, h.chunkIDCache.PutTx(chunkID, headerID))
 }
 
 func (h *Headers) BatchIndexByChunkID(headerID, chunkID flow.Identifier, batch storage.BatchStorage) error {
