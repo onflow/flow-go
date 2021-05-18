@@ -470,7 +470,9 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		require.NoError(t, err)
 
 		// setup a new authorizer account
-		authTxBody := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		require.NoError(t, err)
+
 		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
 		authTxBody.SetPayer(chain.ServiceAddress())
 		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
