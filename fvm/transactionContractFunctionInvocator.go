@@ -16,14 +16,13 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-const contractFunctionInvocationLocation = common.StringLocation("ContractFunctionInvocation")
-
 type TransactionContractFunctionInvocator struct {
 	contractLocation common.AddressLocation
 	functionName     string
 	arguments        []interpreter.Value
 	argumentTypes    []sema.Type
 	logger           zerolog.Logger
+	logSpanFields    []traceLog.Field
 }
 
 func NewTransactionContractFunctionInvocator(
@@ -38,6 +37,7 @@ func NewTransactionContractFunctionInvocator(
 		arguments:        arguments,
 		argumentTypes:    argumentTypes,
 		logger:           logger,
+		logSpanFields:    []traceLog.Field{traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", contractLocation.String(), functionName))},
 	}
 }
 
@@ -46,7 +46,7 @@ func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *Transa
 	if env.ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = env.ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMInvokeContractFunction)
 		span.LogFields(
-			traceLog.String("transaction.ContractFunctionCall", fmt.Sprintf("%s.%s", i.contractLocation.String(), i.functionName)),
+			i.logSpanFields...,
 		)
 		defer span.Finish()
 	}
@@ -60,7 +60,6 @@ func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *Transa
 		i.argumentTypes,
 		runtime.Context{
 			Interface:         env,
-			Location:          contractFunctionInvocationLocation,
 			PredeclaredValues: predeclaredValues,
 		},
 	)
