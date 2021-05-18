@@ -148,6 +148,12 @@ func (tb *TransactionBody) AddAuthorizer(address Address) *TransactionBody {
 	return tb
 }
 
+// ResetAuthorizers resets authorizers of this account.
+func (tb *TransactionBody) ResetAuthorizers() *TransactionBody {
+	tb.Authorizers = make([]Address, 0)
+	return tb
+}
+
 // Transaction is the smallest unit of task.
 type Transaction struct {
 	TransactionBody

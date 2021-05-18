@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -456,6 +457,44 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
+
+	t.Run("account update with set code succeeds when account is added as authorized account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// set a new authorizer account
+		authTxBody := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
+		// test deploying a new contract
+		fmt.Println(accounts[0])
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
+		// by default this transaction has service account as authorizer
+		// so we need to reset
+		txBody.ResetAuthorizers()
+		txBody.AddAuthorizer(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {

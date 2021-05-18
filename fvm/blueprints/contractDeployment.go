@@ -13,6 +13,8 @@ const ContractDeploymentAuthorizedAddressesPathIdentifier = "authorizedAddresses
 const setContractDeploymentAuthorizersTransactionTemplate = `
 transaction {
 		prepare(signer: AuthAccount) {
+			// this drops previous list
+			signer.load<[Address]>(from: /%s/%s)
 			signer.save([%s], to: /%s/%s)
 		}
 }
@@ -27,6 +29,8 @@ func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, au
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(setContractDeploymentAuthorizersTransactionTemplate,
+			ContractDeploymentAuthorizedAddressesPathDomain,
+			ContractDeploymentAuthorizedAddressesPathIdentifier,
 			strings.Join(addStrs, ", "),
 			ContractDeploymentAuthorizedAddressesPathDomain,
 			ContractDeploymentAuthorizedAddressesPathIdentifier))).
