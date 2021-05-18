@@ -14,6 +14,7 @@ import (
 
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // TestEpochSetupStoreAndRetrieve tests that a setup can be stored, retrieved and attempted to be stored again without an error
@@ -28,7 +29,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 
 		// store a setup in db
 		expected := unittest.EpochSetupFixture()
-		err = operation.RetryOnConflict(db.Update, store.StoreTx(expected))
+		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(expected))
 		require.NoError(t, err)
 
 		// retrieve the setup by ID
@@ -37,7 +38,7 @@ func TestEpochSetupStoreAndRetrieve(t *testing.T) {
 		assert.Equal(t, expected, actual)
 
 		// test storing same epoch setup
-		err = operation.RetryOnConflict(db.Update, store.StoreTx(expected))
+		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(expected))
 		require.NoError(t, err)
 	})
 }
