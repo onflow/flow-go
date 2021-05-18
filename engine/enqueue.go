@@ -98,7 +98,7 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 		}
 	}
 
-	return fmt.Errorf("no matching processor pattern for message")
+	return fmt.Errorf("no matching processor pattern for message, type: %T, origin: %x", payload, originID[:])
 }
 
 // notify the handler to pick new message from the queue
