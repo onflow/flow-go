@@ -215,7 +215,8 @@ func main() {
 			return fetcherEngine, nil
 		}).
 		Component("assigner engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			chunkAssigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
+			var chunkAssigner module.ChunkAssigner
+			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize chunk assigner: %w", err)
 			}
@@ -239,6 +240,10 @@ func main() {
 				node.State,
 				assignerEngine,
 				blockWorkers)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
+			}
 
 			node.Logger.Info().
 				Str("component", "node-builder").
