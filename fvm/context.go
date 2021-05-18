@@ -27,6 +27,7 @@ type Context struct {
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
+	TransactionFeesEnabled           bool
 	CadenceLoggingEnabled            bool
 	EventCollectionEnabled           bool
 	ServiceEventCollectionEnabled    bool
@@ -90,7 +91,6 @@ func defaultContext(logger zerolog.Logger) Context {
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionFeeDeductor(),
 			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
 		},
@@ -270,6 +270,14 @@ func WithRestrictedAccountCreation(enabled bool) Option {
 func WithAccountStorageLimit(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.LimitAccountStorage = enabled
+		return ctx
+	}
+}
+
+// WithTransactionFeesEnabled enables or disables deduction of transaction fees
+func WithTransactionFeesEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionFeesEnabled = enabled
 		return ctx
 	}
 }
