@@ -1212,7 +1212,7 @@ func TestSignatureVerification(t *testing.T) {
 
 	signatureAlgorithms := []signatureAlgorithm{
 		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_Secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
