@@ -469,26 +469,26 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
 		require.NoError(t, err)
 
-		// set a new authorizer account
+		// setup a new authorizer account
 		authTxBody := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
 		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
 		authTx := fvm.Transaction(authTxBody, 0)
+
 		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
 
-		// test deploying a new contract
-		fmt.Println(accounts[0])
-		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
-		// by default this transaction has service account as authorizer
-		// so we need to reset
-		txBody.ResetAuthorizers()
-		txBody.AddAuthorizer(accounts[0])
+		// test deploying a new contract (not authorized by service account)
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
 		txBody.SetProposalKey(accounts[0], 0, 0)
 		txBody.SetPayer(accounts[0])
 
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
+
 		tx := fvm.Transaction(txBody, 0)
 		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
 		require.NoError(t, err)
