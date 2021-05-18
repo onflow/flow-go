@@ -210,7 +210,7 @@ func (e *Engine) loop() {
 		case <-e.messageHandler.GetNotifier():
 			err := e.processAvailableMessages()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing message from the fifo queue")
+				e.log.Fatal().Err(err).Msg("internal error processing queued message")
 			}
 		}
 	}

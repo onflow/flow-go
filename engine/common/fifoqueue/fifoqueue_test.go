@@ -45,7 +45,7 @@ func TestConcurrentPushPull(t *testing.T) {
 
 	require.Equal(t, count, queue.Len())
 
-	// verify that concurrent get will alway get one, and in the end, the queue
+	// verify that concurrent Pop will always get one, and in the end, the queue
 	// is empty
 	for i := 0; i < count; i++ {
 		sent.Add(1)

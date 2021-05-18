@@ -24,7 +24,7 @@ type MessageStore interface {
 type Pattern struct {
 	// Match is a function to match a message to this pattern, typically by payload type.
 	Match MatchFunc
-	// Map is a function to apply to messages before storing them. if not provided, then the message won't get mapped.
+	// Map is a function to apply to messages before storing them. If not provided, then the message is stored in its original form.
 	Map MapFunc
 	// Store is an abstract message store where we will store the message upon receipt.
 	Store MessageStore

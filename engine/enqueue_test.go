@@ -44,7 +44,6 @@ type messageC struct {
 func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 	queueA, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(capacity),
-		fifoqueue.WithLengthObserver(func(len int) {}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue A: %w", err)
@@ -52,7 +51,6 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 
 	queueB, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(capacity),
-		fifoqueue.WithLengthObserver(func(len int) {}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue B: %w", err)
