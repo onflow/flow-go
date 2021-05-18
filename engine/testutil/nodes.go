@@ -89,7 +89,8 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 	metrics := metrics.NewNoopCollector()
 
 	// creates state fixture and bootstrap it.
-	stateFixture := CompleteStateFixture(t, metrics, tracer, participants)
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	stateFixture := CompleteStateFixture(t, metrics, tracer, rootSnapshot)
 
 	require.NoError(t, err)
 	for _, option := range options {

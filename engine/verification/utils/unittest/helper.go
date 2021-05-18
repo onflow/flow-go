@@ -716,7 +716,8 @@ func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemo
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch
