@@ -882,11 +882,13 @@ func (c *Core) clearPools(sealedIDs []flow.Identifier) error {
 
 	// clear the request tracker of all items corresponding to results that are
 	// no longer in the incorporated-results mempool
-	for resultID := range c.requestTracker.GetAll() {
+	var removedResultIDs []flow.Identifier
+	for _, resultID := range c.requestTracker.GetAllIds() {
 		if _, _, ok := c.incorporatedResults.ByResultID(resultID); !ok {
-			c.requestTracker.Remove(resultID)
+			removedResultIDs = append(removedResultIDs, resultID)
 		}
 	}
+	c.requestTracker.Remove(removedResultIDs...)
 
 	// for each missing block that we are tracking, remove it from tracking if
 	// we now know that block or if we have just cleared related resources; then
@@ -1067,10 +1069,11 @@ func (c *Core) requestPendingApprovals() (int, error) {
 	requestCount := 0
 	for _, r := range c.incorporatedResults.All() {
 		resultID := r.Result.ID()
+		incorporatedBlockID := r.IncorporatedBlockID
 
 		// not finding the block that the result was incorporated in is a fatal
 		// error at this stage
-		block, err := c.headersDB.ByBlockID(r.IncorporatedBlockID)
+		block, err := c.headersDB.ByBlockID(incorporatedBlockID)
 		if err != nil {
 			return 0, fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -1088,7 +1091,7 @@ func (c *Core) requestPendingApprovals() (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
 		}
-		if finalizedBlockAtHeight.ID() != r.IncorporatedBlockID {
+		if finalizedBlockAtHeight.ID() != incorporatedBlockID {
 			// block is in an orphaned fork
 			continue
 		}
@@ -1109,7 +1112,7 @@ func (c *Core) requestPendingApprovals() (int, error) {
 		// from verifiers that were assigned to the chunk. Note that the
 		// assigner keeps a cache of computed assignments, so this is not
 		// necessarily an expensive operation.
-		assignment, err := c.assigner.Assign(r.Result, r.IncorporatedBlockID)
+		assignment, err := c.assigner.Assign(r.Result, incorporatedBlockID)
 		if err != nil {
 			// at this point, we know the block and a valid child block exists.
 			// Not being able to compute the assignment constitutes a fatal
@@ -1130,11 +1133,12 @@ func (c *Core) requestPendingApprovals() (int, error) {
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := c.requestTracker.Get(resultID, chunk.Index)
+			requestTrackerItem := c.requestTracker.Get(resultID, incorporatedBlockID, chunk.Index)
 			if requestTrackerItem.IsBlackout() {
 				continue
 			}
 			requestTrackerItem.Update()
+			c.requestTracker.Set(resultID, incorporatedBlockID, chunk.Index, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10

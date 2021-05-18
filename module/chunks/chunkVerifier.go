@@ -135,7 +135,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			if errors.Is(err, ledger.ErrMissingKeys{}) {
 
 				unknownRegTouch[registerID.String()] = &registerKey
-				return nil, fmt.Errorf("missing register")
+
+				// don't send error just return empty byte slice
+				// we always assume empty value for missing registers (which might cause the transaction to fail)
+				// but after execution we check unknownRegTouch and if any
+				// register is inside it, code won't generate approvals and
+				// it activates a challenge
+
+				return []byte{}, nil
 			}
 			// append to missing keys if error is ErrMissingKeys
 

@@ -1,7 +1,6 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -28,20 +27,17 @@ type Context struct {
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
+	TransactionFeesEnabled           bool
 	CadenceLoggingEnabled            bool
 	EventCollectionEnabled           bool
 	ServiceEventCollectionEnabled    bool
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
-	SetValueHandler                  SetValueHandler
 	SignatureVerifier                crypto.SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
 	Logger                           zerolog.Logger
 }
-
-// SetValueHandler receives a value written by the Cadence runtime.
-type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
 func NewContext(logger zerolog.Logger, opts ...Option) Context {
@@ -90,13 +86,11 @@ func defaultContext(logger zerolog.Logger) Context {
 		ServiceEventCollectionEnabled:    false,
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
-		SetValueHandler:                  nil,
 		SignatureVerifier:                crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionFeeDeductor(),
 			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
 		},
@@ -271,20 +265,19 @@ func WithRestrictedAccountCreation(enabled bool) Option {
 	}
 }
 
-// WithSetValueHandler sets a handler that is called when a value is written
-// by the Cadence runtime.
-func WithSetValueHandler(handler SetValueHandler) Option {
-	return func(ctx Context) Context {
-		ctx.SetValueHandler = handler
-		return ctx
-	}
-}
-
 // WithAccountStorageLimit enables or disables checking if account storage used is
 // over its storage capacity
 func WithAccountStorageLimit(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.LimitAccountStorage = enabled
+		return ctx
+	}
+}
+
+// WithTransactionFeesEnabled enables or disables deduction of transaction fees
+func WithTransactionFeesEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionFeesEnabled = enabled
 		return ctx
 	}
 }

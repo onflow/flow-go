@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type Collections struct {
@@ -34,15 +35,15 @@ func (c *Collections) StoreLight(collection *flow.LightCollection) error {
 }
 
 func (c *Collections) Store(collection *flow.Collection) error {
-	return operation.RetryOnConflict(c.db.Update, func(btx *badger.Txn) error {
+	return operation.RetryOnConflictTx(c.db, transaction.Update, func(ttx *transaction.Tx) error {
 		light := collection.Light()
-		err := operation.SkipDuplicates(operation.InsertCollection(&light))(btx)
+		err := transaction.WithTx(operation.SkipDuplicates(operation.InsertCollection(&light)))(ttx)
 		if err != nil {
 			return fmt.Errorf("could not insert collection: %w", err)
 		}
 
 		for _, tx := range collection.Transactions {
-			err = c.transactions.storeTx(tx)(btx)
+			err = c.transactions.storeTx(tx)(ttx)
 			if err != nil {
 				return fmt.Errorf("could not insert transaction: %w", err)
 			}

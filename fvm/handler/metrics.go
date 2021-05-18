@@ -37,6 +37,9 @@ func (m *MetricsHandler) ProgramParsed(location common.Location, duration time.D
 	// The three functions (parsing, checking, interpretation) are not called in sequence, but in some cases as part of each other.
 	// We basically only measure the durations reported for the entry-point (the transaction), and not for child locations,
 	// because they might be already part of the duration for the entry-point.
+	if location == nil {
+		return
+	}
 	if _, ok := location.(common.TransactionLocation); ok {
 		m.TimeSpentOnParsing = duration
 		m.Reporter.TransactionParsed(duration)
@@ -46,6 +49,9 @@ func (m *MetricsHandler) ProgramParsed(location common.Location, duration time.D
 // ProgramChecked captures time spent on checking a code at specific location
 func (m *MetricsHandler) ProgramChecked(location common.Location, duration time.Duration) {
 	// see the comment for ProgramParsed
+	if location == nil {
+		return
+	}
 	if _, ok := location.(common.TransactionLocation); ok {
 		m.TimeSpentOnChecking = duration
 		m.Reporter.TransactionChecked(duration)
@@ -55,6 +61,9 @@ func (m *MetricsHandler) ProgramChecked(location common.Location, duration time.
 // ProgramInterpreted captures time spent on interpreting a code at specific location
 func (m *MetricsHandler) ProgramInterpreted(location common.Location, duration time.Duration) {
 	// see the comment for ProgramInterpreted
+	if location == nil {
+		return
+	}
 	if _, ok := location.(common.TransactionLocation); ok {
 		m.TimeSpentOnInterpreting = duration
 		m.Reporter.TransactionInterpreted(duration)

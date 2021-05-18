@@ -238,6 +238,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving a chunk data pack
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return().Once()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -365,6 +366,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Twice()
 	// receiving two chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Twice()
+	suite.metrics.On("OnChunkDataPackRequested").Return().Twice()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -437,6 +439,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving one chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
@@ -517,6 +520,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving one chunk data pack
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -590,6 +594,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -643,6 +648,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Times(count)
 	// receiving `count`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(count)
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	for i := 0; i < count; i++ {
 		header := &flow.Header{
@@ -737,6 +743,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	sentMetricsC := suite.OnVerifiableChunkSentMetricCalledNTimes(len(result.Chunks))
 	// receiving `len(result.Chunk)`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
+	suite.metrics.On("OnChunkDataPackRequested").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()

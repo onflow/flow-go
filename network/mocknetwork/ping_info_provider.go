@@ -9,8 +9,8 @@ type PingInfoProvider struct {
 	mock.Mock
 }
 
-// LatestFinalizedBlockHeight provides a mock function with given fields:
-func (_m *PingInfoProvider) LatestFinalizedBlockHeight() uint64 {
+// SealedBlockHeight provides a mock function with given fields:
+func (_m *PingInfoProvider) SealedBlockHeight() uint64 {
 	ret := _m.Called()
 
 	var r0 uint64
