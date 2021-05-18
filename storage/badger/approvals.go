@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ResultApprovals implements persistent storage for result approvals.
@@ -21,9 +22,9 @@ type ResultApprovals struct {
 
 func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApprovals {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		approval := val.(*flow.ResultApproval)
-		return operation.SkipDuplicates(operation.InsertResultApproval(approval))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertResultApproval(approval)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -46,8 +47,8 @@ func NewResultApprovals(collector module.CacheMetrics, db *badger.DB) *ResultApp
 	return res
 }
 
-func (r *ResultApprovals) store(approval *flow.ResultApproval) func(*badger.Txn) error {
-	return r.cache.Put(approval.ID(), approval)
+func (r *ResultApprovals) store(approval *flow.ResultApproval) func(*transaction.Tx) error {
+	return r.cache.PutTx(approval.ID(), approval)
 }
 
 func (r *ResultApprovals) byID(approvalID flow.Identifier) func(*badger.Txn) (*flow.ResultApproval, error) {
@@ -106,7 +107,7 @@ func (r *ResultApprovals) index(resultID flow.Identifier, chunkIndex uint64, app
 
 // Store stores a ResultApproval
 func (r *ResultApprovals) Store(approval *flow.ResultApproval) error {
-	return operation.RetryOnConflict(r.db.Update, r.store(approval))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.store(approval))
 }
 
 // Index indexes a ResultApproval by chunk (ResultID + chunk index).

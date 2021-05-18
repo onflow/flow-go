@@ -3,9 +3,7 @@
 package mock
 
 import (
-	badger "github.com/dgraph-io/badger/v2"
 	flow "github.com/onflow/flow-go/model/flow"
-
 	mock "github.com/stretchr/testify/mock"
 
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
@@ -135,23 +133,7 @@ func (_m *Blocks) Store(block *flow.Block) error {
 }
 
 // StoreTx provides a mock function with given fields: block
-func (_m *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
-	ret := _m.Called(block)
-
-	var r0 func(*badger.Txn) error
-	if rf, ok := ret.Get(0).(func(*flow.Block) func(*badger.Txn) error); ok {
-		r0 = rf(block)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func(*badger.Txn) error)
-		}
-	}
-
-	return r0
-}
-
-// StoreTxn provides a mock function with given fields: block
-func (_m *Blocks) StoreTxn(block *flow.Block) func(*transaction.Tx) error {
+func (_m *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
 	ret := _m.Called(block)
 
 	var r0 func(*transaction.Tx) error
