@@ -62,7 +62,9 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
-	pendingBlocks := &engine.FifoMessageStore{blocksQueue}
+	pendingBlocks := &engine.FifoMessageStore{
+		FifoQueue: blocksQueue,
+	}
 
 	// FIFO queue for block votes
 	votesQueue, err := fifoqueue.NewFifoQueue(
@@ -72,7 +74,7 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
 	}
-	pendingVotes := &engine.FifoMessageStore{votesQueue}
+	pendingVotes := &engine.FifoMessageStore{FifoQueue: votesQueue}
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(

@@ -22,8 +22,8 @@ type TestEngine struct {
 	log            zerolog.Logger
 	ready          sync.WaitGroup
 	messageHandler *engine.MessageHandler
-	queueA         *fifoqueue.FifoQueue
-	queueB         *fifoqueue.FifoQueue
+	queueA         *engine.FifoMessageStore
+	queueB         *engine.FifoMessageStore
 
 	mu       sync.RWMutex
 	messages []interface{}
@@ -42,18 +42,26 @@ type messageC struct {
 }
 
 func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
-	queueA, err := fifoqueue.NewFifoQueue(
+	fifoQueueA, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(capacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue A: %w", err)
 	}
 
-	queueB, err := fifoqueue.NewFifoQueue(
+	fifoQueueB, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(capacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue B: %w", err)
+	}
+
+	queueA := &engine.FifoMessageStore{
+		FifoQueue: fifoQueueA,
+	}
+
+	queueB := &engine.FifoMessageStore{
+		FifoQueue: fifoQueueB,
 	}
 
 	// define message queueing behaviour

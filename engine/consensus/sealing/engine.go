@@ -50,7 +50,7 @@ type Engine struct {
 	receiptSink                          EventSink
 	approvalSink                         EventSink
 	requestedApprovalSink                EventSink
-	pendingReceipts                      *fifoqueue.FifoQueue
+	pendingReceipts                      *fifoqueue.FifoQueue // TODO replace with engine.FifoMessageStore
 	pendingApprovals                     *fifoqueue.FifoQueue
 	pendingRequestedApprovals            *fifoqueue.FifoQueue
 	pendingEventSink                     EventSink
@@ -166,13 +166,13 @@ func (e *Engine) processEvents() {
 	// takes pending event from one of the queues
 	// nil sink means nothing to send, this prevents blocking on select
 	fetchEvent := func() (*Event, EventSink, *fifoqueue.FifoQueue) {
-		if val, ok := e.pendingReceipts.Front(); ok {
+		if val, ok := e.pendingReceipts.Head(); ok {
 			return val.(*Event), e.receiptSink, e.pendingReceipts
 		}
-		if val, ok := e.pendingRequestedApprovals.Front(); ok {
+		if val, ok := e.pendingRequestedApprovals.Head(); ok {
 			return val.(*Event), e.requestedApprovalSink, e.pendingRequestedApprovals
 		}
-		if val, ok := e.pendingApprovals.Front(); ok {
+		if val, ok := e.pendingApprovals.Head(); ok {
 			return val.(*Event), e.approvalSink, e.pendingApprovals
 		}
 		return nil, nil, nil

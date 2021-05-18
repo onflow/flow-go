@@ -77,7 +77,7 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 	for _, pattern := range e.patterns {
 		if pattern.Match(msg) {
 
-			keep := true
+			var keep bool
 			if pattern.Map != nil {
 				msg, keep = pattern.Map(msg)
 				if !keep {
