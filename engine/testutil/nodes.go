@@ -153,14 +153,18 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 }
 
 // CompleteStateFixture is a test helper that creates, bootstraps, and returns a StateFixture for sake of unit testing.
-func CompleteStateFixture(t testing.TB, metric *metrics.NoopCollector, tracer module.Tracer,
-	participants flow.IdentityList) *testmock.StateFixture {
+func CompleteStateFixture(
+	t testing.TB,
+	metric *metrics.NoopCollector,
+	tracer module.Tracer,
+	rootSnapshot protocol.Snapshot,
+) *testmock.StateFixture {
+
 	dbDir := unittest.TempDir(t)
 	db := unittest.BadgerDB(t, dbDir)
 	s := storage.InitAll(metric, db)
-	consumer := events.NewNoop()
+	consumer := events.NewDistributor()
 
-	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
@@ -171,7 +175,7 @@ func CompleteStateFixture(t testing.TB, metric *metrics.NoopCollector, tracer mo
 		DB:             db,
 		Storage:        s,
 		DBDir:          dbDir,
-		ProtocolEvents: events.NewDistributor(),
+		ProtocolEvents: consumer,
 		State:          mutableState,
 	}
 }
