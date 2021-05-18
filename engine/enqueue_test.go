@@ -81,14 +81,15 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 					return false
 				}
 			},
-			Map: func(msg *engine.Message) *engine.Message {
+			Map: func(msg *engine.Message) (*engine.Message, bool) {
 				b := msg.Payload.(*messageB)
-				return &engine.Message{
+				msg = &engine.Message{
 					OriginID: msg.OriginID,
 					Payload: &messageC{
 						s: fmt.Sprintf("c-%v", b.n),
 					},
 				}
+				return msg, true
 			},
 			Store: queueB,
 		},

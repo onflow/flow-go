@@ -6,8 +6,6 @@ import (
 	"sync"
 
 	"github.com/ef-ds/deque"
-
-	"github.com/onflow/flow-go/engine"
 )
 
 // FifoQueue implements a FIFO queue with max capacity and length observer.
@@ -21,7 +19,6 @@ import (
 // option `WithLengthObserver`.
 //
 // Caution:
-// * The queue is NOT concurrency safe.
 // * the QueueLengthObserver must be non-blocking
 type FifoQueue struct {
 	mu             sync.RWMutex
@@ -30,12 +27,12 @@ type FifoQueue struct {
 	lengthObserver QueueLengthObserver
 }
 
-// ConstructorOptions can are optional arguments for the `NewFifoQueue`
+// ConstructorOptions are optional arguments for the `NewFifoQueue`
 // constructor to specify properties of the FifoQueue.
 type ConstructorOption func(*FifoQueue) error
 
-// QueueLengthObserver is a callback that can optionally provided
-// to the `NewFifoQueue` constructor (via `WithLengthObserver` option).
+// QueueLengthObserver is a optional callback that can be provided to
+// the `NewFifoQueue` constructor (via `WithLengthObserver` option).
 type QueueLengthObserver func(int)
 
 // WithCapacity is a constructor option for NewFifoQueue. It specifies the
@@ -56,7 +53,12 @@ func WithCapacity(capacity int) ConstructorOption {
 // WithLengthObserver is a constructor option for NewFifoQueue. Each time the
 // queue's length changes, the queue calls the provided callback with the new
 // length. By default, the QueueLengthObserver is a NoOp.
-// Caution: the QueueLengthObserver callback must be non-blocking
+// CAUTION:
+//  * QueueLengthObserver implementations must be non-blocking
+//  * The values published to queue length observer might be in different order
+//    than the actual length values at the time of insertion. This is a
+//    performance optimization, which allows to reduce the duration during
+//    which the queue is internally locked when inserting elements.
 func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	return func(queue *FifoQueue) error {
 		if callback == nil {
@@ -67,7 +69,7 @@ func WithLengthObserver(callback QueueLengthObserver) ConstructorOption {
 	}
 }
 
-// Constructor for FifoQueue
+// NewFifoQueue is the Constructor for FifoQueue
 func NewFifoQueue(options ...ConstructorOption) (*FifoQueue, error) {
 	// maximum value for platform-specific int: https://yourbasic.org/golang/max-min-int-uint/
 	maxInt := 1<<(mathbits.UintSize-1) - 1
@@ -142,16 +144,4 @@ func (q *FifoQueue) Len() int {
 	defer q.mu.RUnlock()
 
 	return q.queue.Len()
-}
-
-func (q *FifoQueue) Put(msg *engine.Message) bool {
-	return q.Push(msg)
-}
-
-func (q *FifoQueue) Get() (*engine.Message, bool) {
-	msgint, ok := q.Pop()
-	if !ok {
-		return nil, false
-	}
-	return msgint.(*engine.Message), true
 }
