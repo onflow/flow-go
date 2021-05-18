@@ -22,10 +22,10 @@ import (
 )
 
 // TestApprovalProcessingCore performs testing of approval processing core
-// approvalProcessingCore is responsible for delegating processing to assignment collectorTree for each separate execution result
-// approvalProcessingCore performs height based checks and decides if approval or incorporated result has to be processed at all
+// Core is responsible for delegating processing to assignment collectorTree for each separate execution result
+// Core performs height based checks and decides if approval or incorporated result has to be processed at all
 // or rejected as outdated or unverifiable.
-// approvalProcessingCore maintains a LRU cache of known approvals that cannot be verified at the moment/
+// Core maintains a LRU cache of known approvals that cannot be verified at the moment/
 func TestApprovalProcessingCore(t *testing.T) {
 	suite.Run(t, new(ApprovalProcessingCoreTestSuite))
 }
@@ -42,7 +42,7 @@ type ApprovalProcessingCoreTestSuite struct {
 	sigVerifier     *module.Verifier
 	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	core            *approvalProcessingCore
+	core            *Core
 }
 
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {

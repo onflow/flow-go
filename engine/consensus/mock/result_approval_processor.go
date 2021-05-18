@@ -26,6 +26,20 @@ func (_m *ResultApprovalProcessor) ProcessApproval(approval *flow.ResultApproval
 	return r0
 }
 
+// ProcessFinalizedBlock provides a mock function with given fields: finalizedBlockID
+func (_m *ResultApprovalProcessor) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
+	ret := _m.Called(finalizedBlockID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
+		r0 = rf(finalizedBlockID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // ProcessIncorporatedResult provides a mock function with given fields: result
 func (_m *ResultApprovalProcessor) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 	ret := _m.Called(result)
@@ -33,6 +47,20 @@ func (_m *ResultApprovalProcessor) ProcessIncorporatedResult(result *flow.Incorp
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.IncorporatedResult) error); ok {
 		r0 = rf(result)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// ProcessReceipt provides a mock function with given fields: receipt
+func (_m *ResultApprovalProcessor) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
+	ret := _m.Called(receipt)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.ExecutionReceipt) error); ok {
+		r0 = rf(receipt)
 	} else {
 		r0 = ret.Error(0)
 	}

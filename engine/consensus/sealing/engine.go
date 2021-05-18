@@ -2,18 +2,18 @@ package sealing
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
-	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/fifoqueue"
 )
@@ -36,15 +36,17 @@ type (
 	EventSink chan *Event // Channel to push pending events
 )
 
-// Engine is a wrapper for sealing `Core` which implements logic for
+// Engine is a wrapper for approval processing `Core` which implements logic for
 // queuing and filtering network messages which later will be processed by sealing engine.
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	unit                                 *engine.Unit
+	core                                 sealing.ResultApprovalProcessor
+	workerPool                           *workerpool.WorkerPool
 	log                                  zerolog.Logger
 	me                                   module.Local
-	core                                 *Core
+	payloads                             storage.Payloads
 	cacheMetrics                         module.MempoolMetrics
 	engineMetrics                        module.EngineMetrics
 	receiptSink                          EventSink
@@ -57,40 +59,30 @@ type Engine struct {
 	requiredApprovalsForSealConstruction uint
 }
 
-// NewEngine constructs new `EngineEngine` which runs on it's own unit.
+// NewEngine constructs new `Engine` which runs on it's own unit.
 func NewEngine(log zerolog.Logger,
 	engineMetrics module.EngineMetrics,
-	tracer module.Tracer,
+	core sealing.ResultApprovalProcessor,
 	mempool module.MempoolMetrics,
-	conMetrics module.ConsensusMetrics,
 	net module.Network,
-	state protocol.State,
 	me module.Local,
-	receiptRequester module.Requester,
-	receiptsDB storage.ExecutionReceipts,
-	headersDB storage.Headers,
-	indexDB storage.Index,
-	incorporatedResults mempool.IncorporatedResults,
-	receipts mempool.ExecutionTree,
-	approvals mempool.Approvals,
-	seals mempool.IncorporatedResultSeals,
-	pendingReceipts mempool.PendingReceipts,
-	assigner module.ChunkAssigner,
-	receiptValidator module.ReceiptValidator,
-	approvalValidator module.ApprovalValidator,
 	requiredApprovalsForSealConstruction uint,
-	emergencySealingActive bool) (*Engine, error) {
+) (*Engine, error) {
+
+	hardwareConcurrency := runtime.NumCPU()
+
 	e := &Engine{
 		unit:                                 engine.NewUnit(),
 		log:                                  log,
 		me:                                   me,
-		core:                                 nil,
+		core:                                 core,
 		engineMetrics:                        engineMetrics,
 		cacheMetrics:                         mempool,
 		receiptSink:                          make(EventSink),
 		approvalSink:                         make(EventSink),
 		requestedApprovalSink:                make(EventSink),
 		pendingEventSink:                     make(EventSink),
+		workerPool:                           workerpool.New(hardwareConcurrency),
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
 
@@ -132,19 +124,6 @@ func NewEngine(log zerolog.Logger,
 	_, err = net.Register(engine.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
-	}
-
-	// register engine to the channel for requesting missing approvals
-	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
-	}
-
-	e.core, err = NewCore(log, engineMetrics, tracer, mempool, conMetrics, state, me, receiptRequester, receiptsDB, headersDB,
-		indexDB, incorporatedResults, receipts, approvals, seals, pendingReceipts, assigner, receiptValidator, approvalValidator,
-		requiredApprovalsForSealConstruction, emergencySealingActive, approvalConduit)
-	if err != nil {
-		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
 
 	return e, nil
@@ -218,45 +197,61 @@ func (e *Engine) processPendingEvent(event *Event) {
 
 // consumeEvents consumes events that are ready to be processed.
 func (e *Engine) consumeEvents() {
-	// Context:
-	// We expect a lot more Approvals compared to blocks or receipts. However, the level of
-	// information only changes significantly with new blocks or new receipts.
-	// We used to kick off the sealing check after every approval and receipt. In cases where
-	// the sealing check takes a lot more time than processing the actual messages (which we
-	// assume for the current implementation), we incur a large overhead as we check a lot
-	// of conditions, which only change with new blocks or new receipts.
-	// TEMPORARY FIX: to avoid sealing checks to monopolize the engine and delay processing
-	// of receipts and approvals. Specifically, we schedule sealing checks every 2 seconds.
-	checkSealingTicker := make(chan struct{})
-	defer close(checkSealingTicker)
-	e.unit.LaunchPeriodically(func() {
-		checkSealingTicker <- struct{}{}
-	}, 2*time.Second, 10*time.Second)
-
 	for {
-		var err error
 		select {
 		case event := <-e.receiptSink:
-			err = e.core.OnReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
-			e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
+			e.onReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
 		case event := <-e.approvalSink:
-			err = e.core.OnApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
-			e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
+			e.onApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
 		case event := <-e.requestedApprovalSink:
-			err = e.core.OnApproval(event.OriginID, &event.Msg.(*messages.ApprovalResponse).Approval)
-			e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
-		case <-checkSealingTicker:
-			err = e.core.CheckSealing()
+			e.onApproval(event.OriginID, &event.Msg.(*messages.ApprovalResponse).Approval)
 		case <-e.unit.Quit():
 			return
 		}
+	}
+}
+
+// processIncorporatedResult is a function that creates incorporated result and submits it for processing
+// to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
+// This will be changed in phase 3.
+func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) {
+	e.workerPool.Submit(func() {
+		incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+		err := e.core.ProcessIncorporatedResult(incorporatedResult)
+		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
+
 		if err != nil {
-			// Public methods of `Core` are supposed to handle all errors internally.
-			// Here if error happens it means that internal state is corrupted or we have caught
-			// exception while processing. In such case best just to abort the node.
 			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
 		}
+	})
+}
+
+// onReceipt submits new execution receipt for processing.
+// Any error indicates an unexpected problem in the protocol logic. The node's
+// internal state might be corrupted. Hence, returned errors should be treated as fatal.
+func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
+	e.workerPool.Submit(func() {
+		err := e.core.ProcessReceipt(receipt)
+		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
+		}
+	})
+}
+
+func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) {
+	// don't process approval if originID is mismatched
+	if originID != approval.Body.ApproverID {
+		return
 	}
+
+	e.workerPool.Submit(func() {
+		err := e.core.ProcessApproval(approval)
+		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
+		}
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -312,4 +307,21 @@ func (e *Engine) Ready() <-chan struct{} {
 
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
+}
+
+// OnFinalizedBlock process finalization event from hotstuff. Processes all results that were submitted in payload.
+func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
+	payload, err := e.payloads.ByBlockID(finalizedBlockID)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
+	}
+
+	err = e.core.ProcessFinalizedBlock(finalizedBlockID)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("critical sealing error when processing finalized block %v", finalizedBlockID)
+	}
+
+	for _, result := range payload.Results {
+		e.processIncorporatedResult(result)
+	}
 }

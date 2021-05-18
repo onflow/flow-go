@@ -14,7 +14,7 @@ import (
 // ATTENTION: this is a temporary wrapper for `mempool.IncorporatedResultSeals` to support
 // a condition that there must be at least 2 receipts from _different_ ENs
 // committing to the same incorporated result.
-// This wrapper should only be used with `approvalProcessingCore`.
+// This wrapper should only be used with `Core`.
 type IncorporatedResultSeals struct {
 	seals      mempool.IncorporatedResultSeals // seals mempool that wrapped
 	receiptsDB storage.ExecutionReceipts       // receipts DB to decide if we have multiple receipts for same result

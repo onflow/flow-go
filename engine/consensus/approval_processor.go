@@ -1,4 +1,4 @@
-package consensus
+package sealing
 
 import "github.com/onflow/flow-go/model/flow"
 
@@ -16,4 +16,8 @@ type ResultApprovalProcessor interface {
 	// * exception in case of unexpected error
 	// * nil - successfully processed incorporated result
 	ProcessIncorporatedResult(result *flow.IncorporatedResult) error
+
+	ProcessReceipt(receipt *flow.ExecutionReceipt) error
+
+	ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error
 }
