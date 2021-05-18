@@ -70,7 +70,7 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 	switch s {
 	case runtime.SignatureAlgorithmECDSA_P256:
 		return crypto.ECDSAP256
-	case runtime.SignatureAlgorithmECDSA_Secp256k1:
+	case runtime.SignatureAlgorithmECDSA_secp256k1:
 		return crypto.ECDSASecp256k1
 	default:
 		return crypto.UnknownSigningAlgorithm
@@ -83,7 +83,7 @@ func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) runtime.Signatur
 	case crypto.ECDSAP256:
 		return runtime.SignatureAlgorithmECDSA_P256
 	case crypto.ECDSASecp256k1:
-		return runtime.SignatureAlgorithmECDSA_Secp256k1
+		return runtime.SignatureAlgorithmECDSA_secp256k1
 	default:
 		return runtime.SignatureAlgorithmUnknown
 	}
@@ -135,12 +135,17 @@ func verifySignatureFromRuntime(
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
-
+	}
+	if sigAlgo == crypto.BLSBLS12381 {
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported", crypto.BLSBLS12381.String())
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
 		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
+	}
+	if hashAlgo == hash.KMAC128 {
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "hashing algorithm %s not supported", hash.KMAC128.String())
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
