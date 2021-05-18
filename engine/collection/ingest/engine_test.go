@@ -86,7 +86,7 @@ func (suite *Suite) SetupTest() {
 	suite.clusters, err = flow.NewClusterList(assignments, collectors)
 	suite.Require().NoError(err)
 
-	suite.root = unittest.GenesisFixture(suite.identities)
+	suite.root = unittest.GenesisFixture()
 	suite.final = suite.root
 	suite.blocks = make(map[flow.Identifier]*flow.Block)
 	suite.blocks[suite.root.ID()] = suite.root
