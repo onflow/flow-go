@@ -9,18 +9,19 @@ This package provides two ledger implementations:
 - **Partial Ledger** implements the ledger functionality for a limited subset of keys. Partial ledgers are designed to be constructed and verified by a collection of proofs from a complete ledger. The partial ledger uses a partial binary Merkle trie which holds intermediate hash value for the pruned branched and prevents updates to keys that were not part of proofs.
 
 ## Definitions
+In this section we provide an overview of some of the concepts. Hence it is highly recommended to checkout [this doc](https://github.com/onflow/flow-go/blob/master/ledger/complete/mtrie/README.md) for the formal and technical definitions in more details.
 
 ### binary Merkle tree
 
 ![binary Merkle tree image](/ledger/docs/binary_merkle_tree.png?raw=true "binary Merkle tree" )
 
-In this context a *binary Merkle tree* is defined as a full binary tree with an specific height including three type of nodes:
+In this context a *binary Merkle tree* is defined as [perfect binary tree](https://xlinux.nist.gov/dads/HTML/perfectBinaryTree.html) with a specific height including three type of nodes:
 
 - leaf nodes: holds a payload (data), a path (where the node is located), and a hash value (hash of path and payload content)
 
 - empty leaf nodes: doesn't hold any data and only stores a path, and a default hash value based on the height of tree
 
-- intermediate nodes: holds a path and a hash value which is defined as hash of hash value of left and right children.
+- interior nodes: holds a hash value which is defined as hash of hash value of left and right children.
 
 ![node types image](/ledger/docs/node_types.png)
 
@@ -41,14 +42,14 @@ A *path* is a unique address of a node storing a payload. Paths are derived from
 ![proof image](/ledger/docs/proof.png?raw=true "proof")
 
 ### binary Merkle trie
-A **binary Merkle trie** in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but don’t store unnecessary nodes.
+A **binary Merkle trie** in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but doesn't explicitly store empty nodes. Formally, a node is empty: 
+* the node is an empty leaf node (see definition above)
+* an interior node is defined to be empty, if its two children are empty. 
 
 ![binary partial trie image](/ledger/docs/trie_update.gif?raw=true "binary partial trie")
 
 ### forest 
-A **forest** holds a set of binary Merkle tries, given a parent trie and a batch of updates it creates a new binary merkle trie and adds it to the forest.
-
-![forest image](/ledger/docs/forest.png?raw=true "forest")
+Formally, a **forest** is any acyclic graph. Any set of disjoint trees forms a forest. In the context of Flow, we take an existing state, represented by a Merkle tree. Updating the payload of some of the leafs creates a new Merkle tree, which we add to the forest. In other words, the forest holds a set of state snapshots
 
 ### compact forest 
 A **compact forest** constructs a new trie after each update (copy on change) and reuses unchanged sub-tries from the parent.
