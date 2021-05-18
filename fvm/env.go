@@ -116,6 +116,12 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	)
 }
 
+// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
+// are authorized to update/deploy contracts
+//
+// It reads a storage path from service account and parse the addresses.
+// if any issue occurs on the process (missing registers, stored value properly not set)
+// it gracefully handle it and falls back to default behaviour (only service account be authorized)
 func (e *hostEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
 	// set default to service account only
 	service := runtime.Address(e.ctx.Chain.ServiceAddress())

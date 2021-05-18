@@ -249,6 +249,7 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		feeContract.HexWithPrefix(),
 		service.HexWithPrefix(),
 	)
+
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
