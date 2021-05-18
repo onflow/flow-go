@@ -20,8 +20,8 @@ func OptionalCadenceValueToAddressSlice(value cadence.Value) (addresses []common
 	}
 
 	// parse addresses
-	for _, i := range v.Values {
-		a, ok := i.(cadence.Address)
+	for _, value := range v.Values {
+		a, ok := value.(cadence.Address)
 		if !ok {
 			return nil, false
 		}
