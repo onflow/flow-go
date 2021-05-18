@@ -328,6 +328,7 @@ func assembleInternalNodes() []model.NodeInfo {
 			stake,
 			internal.NetworkPrivKey,
 			internal.StakingPrivKey,
+			nil,
 		)
 
 		nodes = append(nodes, node)

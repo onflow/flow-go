@@ -9,14 +9,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
 var (
-	flagRole        string
-	flagAddress     string
+	flagRole    string
+	flagAddress string
+
+	// bools
+	flagNetworkKey bool
+	flagStakingKey bool
+	flagMachineKey bool
+
+	// seed flags
 	flagNetworkSeed []byte
 	flagStakingSeed []byte
 	flagMachineSeed []byte
@@ -38,6 +46,10 @@ func init() {
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 
+	keyCmd.Flags().BoolVar(&flagNetworkKey, "networking", false, "generate networking key only")
+	keyCmd.Flags().BoolVar(&flagNetworkKey, "staking", false, "generate staking key only")
+	keyCmd.Flags().BoolVar(&flagNetworkKey, "machine", false, "generate machine key only")
+
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
@@ -48,30 +60,49 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	// validate inputs
 	role := validateRole(flagRole)
 	validateAddressFormat(flagAddress)
-	networkSeed := validateSeed(flagNetworkSeed)
-	stakingSeed := validateSeed(flagStakingSeed)
-	machineSeed := validateSeed(flagMachineSeed)
 
-	log.Debug().Msg("will generate networking key")
-	networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot generate networking key")
-	}
-	log.Info().Msg("generated networking key")
+	var networkKey crypto.PrivateKey
+	var stakingKey crypto.PrivateKey
+	var machineKey crypto.PrivateKey
 
-	log.Debug().Msg("will generate staking key")
-	stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot generate staking key")
+	if !flagNetworkKey && !flagStakingKey && !flagMachineKey {
+		flagNetworkKey = true
+		flagStakingKey = true
+		flagMachineKey = true
 	}
-	log.Info().Msg("generated staking key")
 
-	log.Debug().Msg("will generate machine account key")
-	machineKeys, err := run.GenerateNetworkingKeys(1, [][]byte{machineSeed})
-	if err != nil {
-		log.Fatal().Err(err).Msg("cannot generate machine account key")
+	if flagNetworkKey {
+		log.Debug().Msg("will generate networking key")
+		networkSeed := validateSeed(flagNetworkSeed)
+		networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot generate networking key")
+		}
+		networkKey = networkKeys[0]
+		log.Info().Msg("generated networking key")
 	}
-	log.Info().Msg("generated machine account key")
+
+	if flagStakingKey {
+		log.Debug().Msg("will generate staking key")
+		stakingSeed := validateSeed(flagStakingSeed)
+		stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot generate staking key")
+		}
+		stakingKey = stakingKeys[0]
+		log.Info().Msg("generated staking key")
+	}
+
+	if flagMachineKey {
+		log.Debug().Msg("will generate machine account key")
+		machineSeed := validateSeed(flagMachineSeed)
+		machineKeys, err := run.GenerateNetworkingKeys(1, [][]byte{machineSeed})
+		if err != nil {
+			log.Fatal().Err(err).Msg("cannot generate machine account key")
+		}
+		machineKey = machineKeys[0]
+		log.Info().Msg("generated machine account key")
+	}
 
 	log.Debug().Str("address", flagAddress).Msg("assembling node information")
 	conf := model.NodeConfig{
@@ -79,7 +110,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		Address: flagAddress,
 		Stake:   0,
 	}
-	nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0], machineKeys[0])
+	nodeInfo := assembleNodeInfo(conf, networkKey, stakingKey, machineKey)
 
 	// retrieve private representation of the node
 	private, err := nodeInfo.Private()

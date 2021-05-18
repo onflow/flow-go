@@ -226,6 +226,7 @@ func assembleInternalNodesWithoutStake() []model.NodeInfo {
 			1000,
 			internal.NetworkPrivKey,
 			internal.StakingPrivKey,
+			nil,
 		)
 
 		nodes = append(nodes, node)
