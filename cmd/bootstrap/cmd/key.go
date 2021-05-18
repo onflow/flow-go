@@ -19,6 +19,7 @@ var (
 	flagAddress     string
 	flagNetworkSeed []byte
 	flagStakingSeed []byte
+	flagMachineSeed []byte
 )
 
 // keyCmd represents the key command
@@ -39,6 +40,7 @@ func init() {
 
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -48,6 +50,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	validateAddressFormat(flagAddress)
 	networkSeed := validateSeed(flagNetworkSeed)
 	stakingSeed := validateSeed(flagStakingSeed)
+	machineSeed := validateSeed(flagMachineSeed)
 
 	log.Debug().Msg("will generate networking key")
 	networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
@@ -63,13 +66,20 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 	log.Info().Msg("generated staking key")
 
+	log.Debug().Msg("will generate machine account key")
+	machineKeys, err := run.GenerateNetworkingKeys(1, [][]byte{machineSeed})
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot generate machine account key")
+	}
+	log.Info().Msg("generated machine account key")
+
 	log.Debug().Str("address", flagAddress).Msg("assembling node information")
 	conf := model.NodeConfig{
 		Role:    role,
 		Address: flagAddress,
 		Stake:   0,
 	}
-	nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0])
+	nodeInfo := assembleNodeInfo(conf, networkKeys[0], stakingKeys[0], machineKeys[0])
 
 	// retrieve private representation of the node
 	private, err := nodeInfo.Private()
@@ -80,8 +90,6 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
-
-	// TODO: needs to generate another set of ECDSA keys to be used for the NodeMachineAccountInfo
 }
 
 func validateRole(role string) flow.Role {
