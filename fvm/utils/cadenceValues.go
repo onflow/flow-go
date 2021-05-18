@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
