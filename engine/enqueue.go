@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -26,15 +28,13 @@ type Pattern struct {
 	Map MapFunc
 	// Store is an abstract message store where we will store the message upon receipt.
 	Store MessageStore
-	// Filter takes a predict function to determine whether to store the message. Return true to store, return false to drop.
-	Filter FilterFunc
 }
 
 type FilterFunc func(*Message) bool
 
 type MatchFunc func(*Message) bool
 
-type MapFunc func(*Message) *Message
+type MapFunc func(*Message) (*Message, bool)
 
 type MessageHandler struct {
 	log      zerolog.Logger
@@ -50,7 +50,7 @@ func NewMessageHandler(log zerolog.Logger, patterns ...Pattern) *MessageHandler 
 	// again. During this blind period, if the notifier had no buffer, then `doNotify` call will not
 	// able to push message to the notifier channel, therefore has to drop the message and cause the
 	// consumer waiting forever with unconsumed message in the message store.
-	// having 1 message buffer covers the "blind period", so that during the blind priod if there is
+	// having 1 message buffer covers the "blind period", so that during the blind period if there is
 	// a new message arrived, it will be buffered, and once the blind period is over, the consumer
 	// will empty the buffer and start draining the message store again.
 	notifier := make(chan struct{}, 1)
@@ -77,14 +77,11 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 	for _, pattern := range e.patterns {
 		if pattern.Match(msg) {
 
+			keep := true
 			if pattern.Map != nil {
-				msg = pattern.Map(msg)
-			}
-
-			if pattern.Filter != nil {
-				keep := pattern.Filter(msg)
+				msg, keep = pattern.Map(msg)
 				if !keep {
-					continue
+					return
 				}
 			}
 
@@ -101,8 +98,7 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 		}
 	}
 
-	log.Msg("discarding unknown message type")
-	return
+	return fmt.Errorf("no matching processor pattern for message")
 }
 
 // notify the handler to pick new message from the queue

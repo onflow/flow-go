@@ -41,8 +41,8 @@ type Engine struct {
 	state          protocol.State
 	prov           network.Engine
 	core           *Core
-	pendingBlocks  *fifoqueue.FifoQueue
-	pendingVotes   *fifoqueue.FifoQueue
+	pendingBlocks  *engine.FifoMessageStore
+	pendingVotes   *engine.FifoMessageStore
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
 }
@@ -55,22 +55,24 @@ func NewEngine(
 	core *Core) (*Engine, error) {
 
 	// FIFO queue for block proposals
-	pendingBlocks, err := fifoqueue.NewFifoQueue(
+	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
+	pendingBlocks := &engine.FifoMessageStore{blocksQueue}
 
 	// FIFO queue for block votes
-	pendingVotes, err := fifoqueue.NewFifoQueue(
+	votesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
 		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
 	}
+	pendingVotes := &engine.FifoMessageStore{votesQueue}
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
@@ -78,43 +80,41 @@ func NewEngine(
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+				}
 				return ok
-			},
-			Filter: func(_ *engine.Message) bool {
-				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-				return true
 			},
 			Store: pendingBlocks,
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedBlock)
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+				}
 				return ok
 			},
-			Map: func(msg *engine.Message) *engine.Message {
+			Map: func(msg *engine.Message) (*engine.Message, bool) {
 				syncedBlock := msg.Payload.(*events.SyncedBlock)
-				return &engine.Message{
+				msg = &engine.Message{
 					OriginID: msg.OriginID,
 					Payload: &messages.BlockProposal{
 						Payload: syncedBlock.Block.Payload,
 						Header:  syncedBlock.Block.Header,
 					},
 				}
-			},
-			Filter: func(_ *engine.Message) bool {
-				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
-				return true
+				return msg, true
 			},
 			Store: pendingBlocks,
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockVote)
+				if ok {
+					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+				}
 				return ok
-			},
-			Filter: func(_ *engine.Message) bool {
-				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
-				return true
 			},
 			Store: pendingVotes,
 		},
