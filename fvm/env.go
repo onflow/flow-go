@@ -895,10 +895,15 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 
 func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
-			},
+			[]opentracing.LogRecord{
+				{Timestamp: time.Now(),
+					Fields: []traceLog.Field{traceLog.String("location", locStr)},
+				},
 			},
 		)
 	}
@@ -907,9 +912,13 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 
 func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", locStr)},
 			},
 			},
 		)
@@ -919,9 +928,13 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 
 func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", locStr)},
 			},
 			},
 		)
