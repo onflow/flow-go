@@ -1086,12 +1086,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1138,12 +1138,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1190,16 +1190,131 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1)), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()),
+						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(interpreter.StringResults{}),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
 				}
+			}),
+	)
+}
+
+func TestAccountBalanceFields(t *testing.T) {
+	t.Run("Get balance works",
+		newVMTest().withContextOptions(
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.balance
+					}
+				`, account.Hex())))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				assert.NoError(t, err)
+
+				assert.Equal(t, cadence.UFix64(1_0000_0000), script.Value)
+			}),
+	)
+
+	t.Run("Get available balance works",
+		newVMTest().withContextOptions(
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(10_0000_0000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.availableBalance
+					}
+				`, account.Hex())))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				assert.Equal(t, cadence.UFix64(9999_5030), script.Value)
+			}),
+	)
+
+	t.Run("Get available balance works with minimum balance",
+		newVMTest().withContextOptions(
+			fvm.WithRestrictedAccountCreation(false),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithCadenceLogging(true),
+			fvm.WithAccountStorageLimit(false),
+		).withBootstrapProcedureOptions(
+			fvm.WithStorageMBPerFLOW(10_0000_0000),
+			fvm.WithAccountCreationFee(10_0000),
+			fvm.WithMinimumStorageReservation(10_0000),
+		).
+			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				account := createAccount(t, vm, chain, ctx, view, programs)
+
+				txBody := transferTokensTx(chain).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddAuthorizer(chain.ServiceAddress())
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err := vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				script := fvm.Script([]byte(fmt.Sprintf(`
+					pub fun main(): UFix64 {
+						let acc = getAccount(0x%s)
+						return acc.availableBalance
+					}
+				`, account.Hex())))
+
+				err = vm.Run(ctx, script, view, programs)
+
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+
+				// Should be 1_0000_0000 because 10_0000 was given to it during account creation and is now locked up
+				assert.Equal(t, cadence.UFix64(1_0000_0000), script.Value)
 			}),
 	)
 }

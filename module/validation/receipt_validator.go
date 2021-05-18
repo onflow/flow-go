@@ -1,14 +1,13 @@
 package validation
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
@@ -125,15 +124,15 @@ func (v *receiptValidator) subgraphCheck(result *flow.ExecutionResult, prevResul
 // resultChainCheck enforces that the end state of the parent result
 // matches the current result's start state
 func (v *receiptValidator) resultChainCheck(result *flow.ExecutionResult, prevResult *flow.ExecutionResult) error {
-	finalState, isOk := prevResult.FinalStateCommitment()
-	if !isOk {
-		return fmt.Errorf("missing final state commitment in execution result %v", prevResult.ID())
+	finalState, err := prevResult.FinalStateCommitment()
+	if err != nil {
+		return fmt.Errorf("missing final state commitment in parent result %v", prevResult.ID())
 	}
-	initialState, isOK := result.InitialStateCommit()
-	if !isOK {
-		return fmt.Errorf("missing initial state commitment in execution result %v", result.ID())
+	initialState, err := result.InitialStateCommit()
+	if err != nil {
+		return engine.NewInvalidInputErrorf("missing initial state commitment in execution result %v", result.ID())
 	}
-	if !bytes.Equal(initialState, finalState) {
+	if initialState != finalState {
 		return engine.NewInvalidInputErrorf("execution results do not form chain: expecting init state %x, but got %x",
 			finalState, initialState)
 	}
@@ -212,11 +211,6 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest sealed result %x: %w", lastSeal.ResultID, err)
 	}
-	sealedBlock, err := v.headers.ByBlockID(lastSeal.BlockID)
-	if err != nil {
-		return fmt.Errorf("could not retrieve sealed block (%x): %w", lastSeal.BlockID, err)
-	}
-	sealedHeight := sealedBlock.Height
 
 	// forkBlocks is the set of all _unsealed_ blocks on the fork. We
 	// use it to identify receipts that are for blocks not in the fork.
@@ -263,11 +257,7 @@ func (v *receiptValidator) ValidatePayload(candidate *flow.Block) error {
 		}
 		return nil
 	}
-	visitParent := func(header *flow.Header) bool {
-		parentHeight := header.Height - 1
-		return parentHeight > sealedHeight
-	}
-	err = state.TraverseForward(v.headers, header.ParentID, bookKeeper, visitParent)
+	err = fork.TraverseForward(v.headers, header.ParentID, bookKeeper, fork.ExcludingBlock(lastSeal.BlockID))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing the ancestor fork of unsealed blocks: %w", err)
 	}
@@ -372,19 +362,4 @@ func (v *receiptValidator) validateReceipt(receipt *flow.ExecutionReceiptMeta, b
 	}
 
 	return nil
-}
-
-// check the receipt's data integrity by checking its result has
-// both final statecommitment and initial statecommitment
-func IntegrityCheck(receipt *flow.ExecutionReceipt) (flow.StateCommitment, flow.StateCommitment, error) {
-	final, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok {
-		return nil, nil, fmt.Errorf("execution receipt without FinalStateCommit: %x", receipt.ID())
-	}
-
-	init, ok := receipt.ExecutionResult.InitialStateCommit()
-	if !ok {
-		return nil, nil, fmt.Errorf("execution receipt without InitialStateCommit: %x", receipt.ID())
-	}
-	return init, final, nil
 }

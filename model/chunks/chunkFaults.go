@@ -51,8 +51,8 @@ func NewCFMissingRegisterTouch(regsterIDs []string, chInx uint64, execResID flow
 // CFNonMatchingFinalState is returned when the computed final state commitment
 // (applying chunk register updates to the partial trie) doesn't match the one provided by the chunk
 type CFNonMatchingFinalState struct {
-	expected   []byte
-	computed   []byte
+	expected   flow.StateCommitment
+	computed   flow.StateCommitment
 	chunkIndex uint64
 	execResID  flow.Identifier
 }
@@ -72,7 +72,7 @@ func (cf CFNonMatchingFinalState) ExecutionResultID() flow.Identifier {
 }
 
 // NewCFNonMatchingFinalState creates a new instance of Chunk Fault (NonMatchingFinalState)
-func NewCFNonMatchingFinalState(expected []byte, computed []byte, chInx uint64, execResID flow.Identifier) *CFNonMatchingFinalState {
+func NewCFNonMatchingFinalState(expected flow.StateCommitment, computed flow.StateCommitment, chInx uint64, execResID flow.Identifier) *CFNonMatchingFinalState {
 	return &CFNonMatchingFinalState{expected: expected,
 		computed:   computed,
 		chunkIndex: chInx,

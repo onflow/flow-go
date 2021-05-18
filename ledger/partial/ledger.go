@@ -34,7 +34,7 @@ func NewLedger(proof ledger.Proof, s ledger.State, pathFinderVer uint8) (*Ledger
 	}
 
 	// decode proof
-	psmt, err := ptrie.NewPSMT(s, pathfinder.PathByteSize, batchProof)
+	psmt, err := ptrie.NewPSMT(ledger.RootHash(s), batchProof)
 
 	if err != nil {
 		// TODO provide more details based on the error type
@@ -75,16 +75,16 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	if err != nil {
 		if pErr, ok := err.(*ptrie.ErrMissingPath); ok {
 			//store mappings and restore keys from missing paths
-			pathToKey := make(map[string]ledger.Key)
+			pathToKey := make(map[ledger.Path]ledger.Key)
 
 			for i, key := range query.Keys() {
 				path := paths[i]
-				pathToKey[string(path)] = key
+				pathToKey[path] = key
 			}
 
 			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[string(path)])
+				keys = append(keys, pathToKey[path])
 			}
 			return nil, &ledger.ErrMissingKeys{Keys: keys}
 		}
@@ -108,7 +108,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return nil, err
+		return ledger.DummyState, err
 	}
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
@@ -117,24 +117,24 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 			paths, err := pathfinder.KeysToPaths(update.Keys(), l.pathFinderVersion)
 			if err != nil {
-				return nil, err
+				return ledger.DummyState, err
 			}
 
 			//store mappings and restore keys from missing paths
-			pathToKey := make(map[string]ledger.Key)
+			pathToKey := make(map[ledger.Path]ledger.Key)
 
 			for i, key := range update.Keys() {
 				path := paths[i]
-				pathToKey[string(path)] = key
+				pathToKey[path] = key
 			}
 
 			keys := make([]ledger.Key, 0, len(pErr.Paths))
 			for _, path := range pErr.Paths {
-				keys = append(keys, pathToKey[string(path)])
+				keys = append(keys, pathToKey[path])
 			}
-			return nil, &ledger.ErrMissingKeys{Keys: keys}
+			return ledger.DummyState, &ledger.ErrMissingKeys{Keys: keys}
 		}
-		return nil, err
+		return ledger.DummyState, err
 	}
 
 	// TODO log info state

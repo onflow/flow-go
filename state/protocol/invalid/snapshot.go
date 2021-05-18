@@ -35,7 +35,7 @@ func (u *Snapshot) Identity(_ flow.Identifier) (*flow.Identity, error) {
 }
 
 func (u *Snapshot) Commit() (flow.StateCommitment, error) {
-	return nil, u.err
+	return flow.DummyStateCommitment, u.err
 }
 
 func (u *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {

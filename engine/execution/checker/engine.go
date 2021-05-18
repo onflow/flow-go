@@ -1,7 +1,6 @@
 package checker
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
@@ -95,7 +94,7 @@ func (e *Engine) checkLastSealed(finalizedID flow.Identifier) error {
 		return fmt.Errorf("could not get my state commitment OnFinalizedBlock, blockID: %v", blockID)
 	}
 
-	if !bytes.Equal(mycommit, sealedCommit) {
+	if mycommit != sealedCommit {
 		sealed, err := e.state.AtBlockID(blockID).Head()
 		if err != nil {
 			return fmt.Errorf("could not get sealed block when checkLastSealed: %v, err: %w", blockID, err)

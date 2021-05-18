@@ -11,6 +11,7 @@ const (
 	LabelNodeAddress = "nodeaddress"
 	LabelNodeRole    = "noderole"
 	LabelNodeInfo    = "nodeinfo"
+	LabelNodeVersion = "nodeversion"
 	LabelPriority    = "priority"
 )
 
@@ -44,6 +45,7 @@ const (
 	ResourceIdentity                 = "identity"
 	ResourceGuarantee                = "guarantee"
 	ResourceResult                   = "result"
+	ResourceResultApprovals          = "result_approvals"
 	ResourceReceipt                  = "receipt"
 	ResourceMyReceipt                = "my_receipt"
 	ResourceCollection               = "collection"
@@ -53,7 +55,7 @@ const (
 	ResourceTransaction              = "transaction"
 	ResourceClusterPayload           = "cluster_payload"
 	ResourceClusterProposal          = "cluster_proposal"
-	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine
+	ResourceProcessedResultID        = "processed_result_id"          // verification node, finder engine // TODO: remove finder engine labels
 	ResourceDiscardedResultID        = "discarded_result_id"          // verification node, finder engine
 	ResourcePendingReceipt           = "pending_receipt"              // verification node, finder engine
 	ResourceReceiptIDsByResult       = "receipt_ids_by_result"        // verification node, finder engine
@@ -64,6 +66,8 @@ const (
 	ResourcePendingBlock             = "pending_block"                // verification node, match engine
 	ResourceCachedReceipt            = "cached_receipt"               // verification node, finder engine
 	ResourceCachedBlockID            = "cached_block_id"              // verification node, finder engine
+	ResourceChunkStatus              = "chunk_status"                 // verification node, fetcher engine
+	ResourceChunkRequest             = "chunk_request"                // verification node, requester engine
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
@@ -72,6 +76,10 @@ const (
 	ResourceApprovalResponseQueue    = "sealing_approval_response_queue" // consensus node, sealing engine
 	ResourceBlockProposalQueue       = "compliance_proposal_queue"       // consensus node, compliance engine
 	ResourceBlockVoteQueue           = "compliance_vote_queue"           // consensus node, compliance engine
+	ResourceChunkDataPack            = "chunk_data_pack"                 // execution node
+	ResourceEvents                   = "events"                          // execution node
+	ResourceServiceEvents            = "service_events"                  // execution node
+	ResourceTransactionResults       = "transaction_results"             // execution node
 )
 
 const (

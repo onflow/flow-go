@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
-	"github.com/onflow/flow-go/ledger/complete/wal"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -97,7 +96,7 @@ func pull(cmd *cobra.Command, args []string) {
 	// move root checkpoint file if node role is execution
 	if role == flow.RoleExecution {
 		// root.checkpoint is downloaded to <bootstrap folder>/public-root-information after a pull
-		rootCheckpointSrc := filepath.Join(flagBootDir, model.DirnamePublicBootstrap, wal.RootCheckpointFilename)
+		rootCheckpointSrc := filepath.Join(flagBootDir, model.DirnamePublicBootstrap, model.FilenameWALRootCheckpoint)
 		rootCheckpointDst := filepath.Join(flagBootDir, model.PathRootCheckpoint)
 
 		log.Info().Str("src", rootCheckpointSrc).Str("destination", rootCheckpointDst).Msgf("moving file")

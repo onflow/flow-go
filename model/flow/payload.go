@@ -8,8 +8,8 @@ import (
 type Payload struct {
 	Guarantees []*CollectionGuarantee
 	Seals      []*Seal
-	Receipts   []*ExecutionReceiptMeta
-	Results    []*ExecutionResult
+	Receipts   ExecutionReceiptMetaList
+	Results    ExecutionResultList
 }
 
 // EmptyPayload returns an empty block payload.
@@ -56,13 +56,4 @@ func (p Payload) Index() *Index {
 		ResultIDs:     GetIDs(p.Results),
 	}
 	return idx
-}
-
-// ResultsById generates a lookup map for accessing execution results by ID.
-func (p Payload) ResultsById() map[Identifier]*ExecutionResult {
-	resultsByID := make(map[Identifier]*ExecutionResult)
-	for _, result := range p.Results {
-		resultsByID[result.ID()] = result
-	}
-	return resultsByID
 }

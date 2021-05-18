@@ -80,7 +80,8 @@ func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifie
 
 	as, ok := ir.chunkApprovals[chunkIndex]
 	if !ok {
-		as = NewSignatureCollector()
+		c := NewSignatureCollector()
+		as = &c
 		ir.chunkApprovals[chunkIndex] = as
 	}
 
@@ -137,8 +138,8 @@ type SignatureCollector struct {
 }
 
 // NewSignatureCollector instantiates a new SignatureCollector
-func NewSignatureCollector() *SignatureCollector {
-	return &SignatureCollector{
+func NewSignatureCollector() SignatureCollector {
+	return SignatureCollector{
 		verifierSignatures: nil,
 		signerIDs:          nil,
 		signerIDSet:        make(map[Identifier]int),
@@ -169,6 +170,12 @@ func (c *SignatureCollector) BySigner(signerID Identifier) (*crypto.Signature, b
 	return &c.verifierSignatures[idx], true
 }
 
+// HasSigned checks if signer has already provided a signature
+func (c *SignatureCollector) HasSigned(signerID Identifier) bool {
+	_, found := c.signerIDSet[signerID]
+	return found
+}
+
 // Add appends a signature. Only the _first_ signature is retained for each signerID.
 func (c *SignatureCollector) Add(signerID Identifier, signature crypto.Signature) {
 	if _, found := c.signerIDSet[signerID]; found {
@@ -184,7 +191,9 @@ func (c *SignatureCollector) NumberSignatures() uint {
 	return uint(len(c.signerIDs))
 }
 
-/* GROUPING allows to split a list or map of incorporated results by some property */
+/*******************************************************************************
+GROUPING allows to split a list incorporated results by some property
+*******************************************************************************/
 
 // IncorporatedResultList is a slice of IncorporatedResults with the additional
 // functionality to group them by various properties
@@ -208,7 +217,7 @@ func (l IncorporatedResultList) GroupBy(grouper IncorporatedResultGroupingFuncti
 	return groups
 }
 
-// GroupByExecutorID partitions the IncorporatedResultList by the ID of the block that
+// GroupByIncorporatedBlockID partitions the IncorporatedResultList by the ID of the block that
 // incorporates the result. Within each group, the order and multiplicity of the
 // IncorporatedResults is preserved.
 func (l IncorporatedResultList) GroupByIncorporatedBlockID() IncorporatedResultGroupedList {
@@ -223,7 +232,7 @@ func (l IncorporatedResultList) GroupByResultID() IncorporatedResultGroupedList 
 	return l.GroupBy(grouper)
 }
 
-// GroupByResultID partitions the IncorporatedResultList by the IDs of the executed blocks.
+// GroupByExecutedBlockID partitions the IncorporatedResultList by the IDs of the executed blocks.
 // Within each group, the order and multiplicity of the IncorporatedResults is preserved.
 func (l IncorporatedResultList) GroupByExecutedBlockID() IncorporatedResultGroupedList {
 	grouper := func(ir *IncorporatedResult) Identifier { return ir.Result.BlockID }

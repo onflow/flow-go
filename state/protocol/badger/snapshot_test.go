@@ -99,10 +99,8 @@ func TestClusters(t *testing.T) {
 	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 	setup.Assignments = unittest.ClusterAssignment(uint(nClusters), collectors)
-	commit.ClusterQCs = make([]*flow.QuorumCertificate, nClusters)
-	for i := 0; i < nClusters; i++ {
-		commit.ClusterQCs[i] = unittest.QuorumCertificateFixture()
-	}
+	clusterQCs := unittest.QuorumCertificatesFixtures(uint(nClusters))
+	commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(clusterQCs)
 	seal.ResultID = result.ID()
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)

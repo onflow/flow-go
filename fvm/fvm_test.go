@@ -19,7 +19,9 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -81,6 +83,51 @@ func (vmt vmTest) run(
 
 		f(t, vm, chain, ctx, view, programs)
 	}
+}
+
+func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
+	return flow.NewTransactionBody().
+		SetScript([]byte(fmt.Sprintf(`
+							// This transaction is a template for a transaction that
+							// could be used by anyone to send tokens to another account
+							// that has been set up to receive tokens.
+							//
+							// The withdraw amount and the account from getAccount
+							// would be the parameters to the transaction
+							
+							import FungibleToken from 0x%s
+							import FlowToken from 0x%s
+							
+							transaction(amount: UFix64, to: Address) {
+							
+								// The Vault resource that holds the tokens that are being transferred
+								let sentVault: @FungibleToken.Vault
+							
+								prepare(signer: AuthAccount) {
+							
+									// Get a reference to the signer's stored vault
+									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+										?? panic("Could not borrow reference to the owner's Vault!")
+							
+									// Withdraw tokens from the signer's stored vault
+									self.sentVault <- vaultRef.withdraw(amount: amount)
+								}
+							
+								execute {
+							
+									// Get the recipient's public account object
+									let recipient = getAccount(to)
+							
+									// Get a reference to the recipient's Receiver
+									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
+										.borrow<&{FungibleToken.Receiver}>()
+										?? panic("Could not borrow receiver reference to the recipient's Vault")
+							
+									// Deposit the withdrawn tokens in the recipient's receiver
+									receiverRef.deposit(from: <-self.sentVault)
+								}
+							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+		)
 }
 
 func TestPrograms(t *testing.T) {
@@ -410,6 +457,46 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
+
+	t.Run("account update with set code succeeds when account is added as authorized account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// setup a new authorizer account
+		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		require.NoError(t, err)
+
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
+
+		// test deploying a new contract (not authorized by service account)
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
@@ -615,6 +702,7 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 	bootstrapOptions := []fvm.BootstrapProcedureOption{
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	}
 
 	t.Run("Storing too much data fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -1165,7 +1253,7 @@ func TestSignatureVerification(t *testing.T) {
 
 	signatureAlgorithms := []signatureAlgorithm{
 		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_Secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
@@ -1614,51 +1702,6 @@ func TestEventLimits(t *testing.T) {
 }
 
 func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
-	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
-		return flow.NewTransactionBody().
-			SetScript([]byte(fmt.Sprintf(`
-							// This transaction is a template for a transaction that
-							// could be used by anyone to send tokens to another account
-							// that has been set up to receive tokens.
-							//
-							// The withdraw amount and the account from getAccount
-							// would be the parameters to the transaction
-							
-							import FungibleToken from 0x%s
-							import FlowToken from 0x%s
-							
-							transaction(amount: UFix64, to: Address) {
-							
-								// The Vault resource that holds the tokens that are being transferred
-								let sentVault: @FungibleToken.Vault
-							
-								prepare(signer: AuthAccount) {
-							
-									// Get a reference to the signer's stored vault
-									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-										?? panic("Could not borrow reference to the owner's Vault!")
-							
-									// Withdraw tokens from the signer's stored vault
-									self.sentVault <- vaultRef.withdraw(amount: amount)
-								}
-							
-								execute {
-							
-									// Get the recipient's public account object
-									let recipient = getAccount(to)
-							
-									// Get a reference to the recipient's Receiver
-									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
-										.borrow<&{FungibleToken.Receiver}>()
-										?? panic("Could not borrow receiver reference to the recipient's Vault")
-							
-									// Deposit the withdrawn tokens in the recipient's receiver
-									receiverRef.deposit(from: <-self.sentVault)
-								}
-							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
-			)
-	}
-
 	getBalance := func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
 
 		code := []byte(fmt.Sprintf(`
@@ -1686,6 +1729,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 	t.Run("Transaction fails because of storage", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).run(
 		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
@@ -1727,9 +1771,50 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		}),
 	)
 
-	t.Run("Transaction fails but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
+	t.Run("Transaction sequence number check fails and sequence number is not incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+	).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				txBody := transferTokensTx(chain).
+					AddAuthorizer(accounts[0]).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000_0000))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+				// set wrong sequence number
+				txBody.SetProposalKey(accounts[0], 0, 10)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				require.Equal(t, (&errors.InvalidProposalSeqNumberError{}).Code(), tx.Err.Code())
+				require.Equal(t, uint64(0), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
+			}),
+	)
+
+	t.Run("Transaction invocation fails but sequence number is incremented", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	).
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
@@ -1774,4 +1859,76 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 				require.Equal(t, uint64(1), tx.Err.(*errors.InvalidProposalSeqNumberError).CurrentSeqNumber())
 			}),
 	)
+}
+func TestSigningWithTags(t *testing.T) {
+
+	checkWithTag := func(tag []byte, shouldWork bool) func(t *testing.T) {
+		return newVMTest().
+			run(
+				func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+					// Create an account private key.
+					privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+					require.NoError(t, err)
+
+					// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+					accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+					require.NoError(t, err)
+
+					txBody := flow.NewTransactionBody().
+						SetScript([]byte(`transaction(){}`))
+
+					txBody.SetProposalKey(accounts[0], 0, 0)
+					txBody.SetPayer(accounts[0])
+
+					hasher, err := exeUtils.NewHasher(privateKeys[0].HashAlgo)
+					require.NoError(t, err)
+
+					sig, err := txBody.SignMessageWithTag(txBody.EnvelopeMessage(), tag, privateKeys[0].PrivateKey, hasher)
+					require.NoError(t, err)
+					txBody.AddEnvelopeSignature(accounts[0], 0, sig)
+
+					tx := fvm.Transaction(txBody, 0)
+
+					err = vm.Run(ctx, tx, view, programs)
+					require.NoError(t, err)
+					if shouldWork {
+						require.NoError(t, tx.Err)
+					} else {
+						require.Error(t, tx.Err)
+						require.IsType(t, tx.Err, &errors.InvalidProposalSignatureError{})
+					}
+				},
+			)
+	}
+
+	cases := []struct {
+		name      string
+		tag       []byte
+		shouldWok bool
+	}{
+		{
+			name:      "no tag",
+			tag:       nil,
+			shouldWok: false,
+		},
+		{
+			name:      "transaction tag",
+			tag:       flow.TransactionDomainTag[:],
+			shouldWok: true,
+		},
+		{
+			name:      "user tag",
+			tag:       flow.UserDomainTag[:],
+			shouldWok: false,
+		},
+	}
+
+	for i, c := range cases {
+		works := "works"
+		if !c.shouldWok {
+			works = "doesn't work"
+		}
+		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWok))
+	}
+
 }

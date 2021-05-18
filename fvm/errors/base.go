@@ -83,10 +83,15 @@ func (e InvalidLocationError) Error() string {
 		errMsg = e.err.Error()
 	}
 
+	locationStr := ""
+	if e.location != nil {
+		locationStr = e.location.String()
+	}
+
 	return fmt.Sprintf(
 		"%s location (%s) is not a valid location: %s",
 		e.Code().String(),
-		e.location.String(),
+		locationStr,
 		errMsg,
 	)
 }

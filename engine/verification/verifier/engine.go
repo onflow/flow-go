@@ -10,13 +10,13 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -248,7 +248,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 	log.Info().Msg("result approval submitted")
 	// increases number of sent result approvals for sake of metrics
-	e.metrics.OnResultApproval()
+	e.metrics.OnResultApprovalDispatchedInNetwork()
 
 	return nil
 }
@@ -313,7 +313,7 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 
 	// increments number of received verifiable chunks
 	// for sake of metrics
-	e.metrics.OnVerifiableChunkReceived()
+	e.metrics.OnVerifiableChunkReceivedAtVerifierEngine()
 
 	log := e.log.With().
 		Hex("result_id", logging.ID(ch.Result.ID())).

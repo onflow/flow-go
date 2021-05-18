@@ -40,7 +40,8 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	}
 
 	// check collection committee Byzantine threshold for each cluster
-	_, clusters := constructClusterAssignment(partnerNodes, internalNodes)
+	// for checking Byzantine constraints, the seed doesn't matter
+	_, clusters := constructClusterAssignment(partnerNodes, internalNodes, 0)
 	partnerCOLCount := uint(0)
 	internalCOLCount := uint(0)
 	for _, cluster := range clusters {

@@ -8,8 +8,8 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -18,7 +18,7 @@ func withLimit(limit uint) func(*Cache) {
 	}
 }
 
-type storeFunc func(key interface{}, val interface{}) func(*badger.Txn) error
+type storeFunc func(key interface{}, val interface{}) func(*transaction.Tx) error
 
 func withStore(store storeFunc) func(*Cache) {
 	return func(c *Cache) {
@@ -26,14 +26,14 @@ func withStore(store storeFunc) func(*Cache) {
 	}
 }
 
-func noStore(key interface{}, val interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func noStore(key interface{}, val interface{}) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-func noopStore(key interface{}, val interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func noopStore(key interface{}, val interface{}) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		return nil
 	}
 }
@@ -52,12 +52,6 @@ func noRetrieve(key interface{}) func(*badger.Txn) (interface{}, error) {
 	}
 }
 
-func withResource(resource string) func(*Cache) {
-	return func(c *Cache) {
-		c.resource = resource
-	}
-}
-
 type Cache struct {
 	metrics  module.CacheMetrics
 	limit    uint
@@ -67,13 +61,13 @@ type Cache struct {
 	cache    *lru.Cache
 }
 
-func newCache(collector module.CacheMetrics, options ...func(*Cache)) *Cache {
+func newCache(collector module.CacheMetrics, resourceName string, options ...func(*Cache)) *Cache {
 	c := Cache{
 		metrics:  collector,
 		limit:    1000,
 		store:    noStore,
 		retrieve: noRetrieve,
-		resource: metrics.ResourceUndefined,
+		resource: resourceName,
 	}
 	for _, option := range options {
 		option(&c)
@@ -116,21 +110,32 @@ func (c *Cache) Get(key interface{}) func(*badger.Txn) (interface{}, error) {
 	}
 }
 
-// Put will add an resource to the cache with the given ID.
-func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) error {
+func (c *Cache) Remove(key interface{}) {
+	c.cache.Remove(key)
+}
+
+// Insert will add an resource directly to the cache with the given ID
+func (c *Cache) Insert(key interface{}, resource interface{}) {
+	// cache the resource and eject least recently used one if we reached limit
+	evicted := c.cache.Add(key, resource)
+	if !evicted {
+		c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
+	}
+}
+
+// PutTx will return tx which adds an resource to the cache with the given ID.
+func (c *Cache) PutTx(key interface{}, resource interface{}) func(*transaction.Tx) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
-	return func(tx *badger.Txn) error {
+	return func(tx *transaction.Tx) error {
 		err := storeOps(tx) // execute operations to store recourse
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}
 
-		// cache the resource and eject least recently used one if we reached limit
-		evicted := c.cache.Add(key, resource)
-		if !evicted {
-			c.metrics.CacheEntries(c.resource, uint(c.cache.Len()))
-		}
+		tx.OnSucceed(func() {
+			c.Insert(key, resource)
+		})
 
 		return nil
 	}

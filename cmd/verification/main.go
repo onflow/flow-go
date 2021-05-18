@@ -37,7 +37,7 @@ const (
 	// requestInterval represents the time interval in milliseconds that the
 	// match engine retries sending resource requests to the network
 	// this value is set following this issue (3443)
-	requestInterval = 1000 * time.Millisecond
+	requestInterval = 5000 * time.Millisecond
 
 	// processInterval represents the time interval in milliseconds that the
 	// finder engine iterates over the execution receipts ready to process
@@ -47,9 +47,8 @@ const (
 	// failureThreshold represents the number of retries match engine sends
 	// at `requestInterval` milliseconds for each of the missing resources.
 	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// Currently setting the threshold to a very large value (corresponding to 100 days),
-	// which for all practical purposes is equivalent to the Verifier trying indefinitely.
-	failureThreshold = 10000000
+	// This value is currently set to account for a single 24-hour failure of an Execution node.
+	failureThreshold = 17500
 )
 
 func main() {

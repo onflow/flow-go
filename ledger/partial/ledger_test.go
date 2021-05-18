@@ -76,7 +76,7 @@ func TestProofsForEmptyRegisters(t *testing.T) {
 	// create empty update
 	emptyState := l.InitialState()
 
-	view := delta.NewView(executionState.LedgerGetRegister(l, emptyState))
+	view := delta.NewView(executionState.LedgerGetRegister(l, flow.StateCommitment(emptyState)))
 
 	registerID := flow.NewRegisterID("b", "o", "nk")
 

@@ -1,18 +1,17 @@
 package flow_test
 
 import (
-	//"encoding/json"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	//"github.com/stretchr/testify/require"
-	//"github.com/vmihailenco/msgpack/v4"
-
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/unittest"
-	//"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestHexStringToIdentifier(t *testing.T) {
@@ -133,4 +132,42 @@ func TestSample(t *testing.T) {
 		il := unittest.IdentityListFixture(10)
 		require.Equal(t, uint(10), il.Sample(11).Count())
 	})
+}
+
+func TestShuffle(t *testing.T) {
+	t.Run("should be shuffled", func(t *testing.T) {
+		il := unittest.IdentityListFixture(15) // ~1/billion chance of shuffling to input state
+		shuffled := il.DeterministicShuffle(rand.Int63())
+		assert.Equal(t, len(il), len(shuffled))
+		assert.ElementsMatch(t, il, shuffled)
+	})
+	t.Run("should be deterministic", func(t *testing.T) {
+		il := unittest.IdentityListFixture(10)
+		seed := rand.Int63()
+		shuffled1 := il.DeterministicShuffle(seed)
+		shuffled2 := il.DeterministicShuffle(seed)
+		assert.Equal(t, shuffled1, shuffled2)
+	})
+}
+
+// check that identities consistently hash to the same ID, even with different
+// public key implementations
+func TestIdentity_ID(t *testing.T) {
+	identity1 := unittest.IdentityFixture(unittest.WithKeys)
+	var identity2 = new(flow.Identity)
+	*identity2 = *identity1
+	identity2.StakingPubKey = encodable.StakingPubKey{PublicKey: identity1.StakingPubKey}
+
+	id1 := flow.MakeID(identity1)
+	id2 := flow.MakeID(identity2)
+	assert.Equal(t, id1, id2)
+}
+
+func TestIdentity_Sort(t *testing.T) {
+	il := unittest.IdentityListFixture(20)
+	random := il.DeterministicShuffle(time.Now().UnixNano())
+	assert.False(t, random.Sorted(order.Canonical))
+
+	canonical := il.Sort(order.Canonical)
+	assert.True(t, canonical.Sorted(order.Canonical))
 }

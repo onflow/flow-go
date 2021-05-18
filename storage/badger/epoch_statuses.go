@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type EpochStatuses struct {
@@ -17,10 +18,10 @@ type EpochStatuses struct {
 // NewEpochStatuses ...
 func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatuses {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		blockID := key.(flow.Identifier)
 		status := val.(*flow.EpochStatus)
-		return operation.InsertEpochStatus(blockID, status)
+		return transaction.WithTx(operation.InsertEpochStatus(blockID, status))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -34,18 +35,17 @@ func NewEpochStatuses(collector module.CacheMetrics, db *badger.DB) *EpochStatus
 
 	es := &EpochStatuses{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEpochStatus,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochStatus)),
+			withRetrieve(retrieve)),
 	}
 
 	return es
 }
 
-func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *badger.Txn) error {
-	return es.cache.Put(blockID, status)
+func (es *EpochStatuses) StoreTx(blockID flow.Identifier, status *flow.EpochStatus) func(tx *transaction.Tx) error {
+	return es.cache.PutTx(blockID, status)
 }
 
 func (es *EpochStatuses) retrieveTx(blockID flow.Identifier) func(tx *badger.Txn) (*flow.EpochStatus, error) {

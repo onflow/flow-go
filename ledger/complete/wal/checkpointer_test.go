@@ -75,7 +75,7 @@ func Test_WAL(t *testing.T) {
 				data[string(encoding.EncodeKey(&key))] = values[j]
 			}
 
-			savedData[string(state)] = data
+			savedData[string(state[:])] = data
 		}
 
 		<-diskWal.Done()
@@ -98,7 +98,9 @@ func Test_WAL(t *testing.T) {
 
 			fmt.Printf("Querying with %x\n", state)
 
-			query, err := ledger.NewQuery([]byte(state), keys)
+			var ledgerState ledger.State
+			copy(ledgerState[:], state)
+			query, err := ledger.NewQuery(ledgerState, keys)
 			require.NoError(t, err)
 			values, err := led2.Get(query)
 			require.NoError(t, err)
@@ -117,13 +119,13 @@ func Test_Checkpointing(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
-		f, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		var rootHash = f.GetEmptyRootHash()
 
 		//saved data after updates
-		savedData := make(map[string]map[string]*ledger.Payload)
+		savedData := make(map[ledger.RootHash]map[ledger.Path]*ledger.Payload)
 
 		t.Run("create WAL and initial trie", func(t *testing.T) {
 
@@ -138,7 +140,7 @@ func Test_Checkpointing(t *testing.T) {
 
 				keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, 1600, 1600)
 				values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
-				update, err := ledger.NewUpdate(rootHash, keys, values)
+				update, err := ledger.NewUpdate(ledger.State(rootHash), keys, values)
 				require.NoError(t, err)
 
 				trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
@@ -152,12 +154,12 @@ func Test_Checkpointing(t *testing.T) {
 
 				fmt.Printf("Updated with %x\n", rootHash)
 
-				data := make(map[string]*ledger.Payload, len(trieUpdate.Paths))
+				data := make(map[ledger.Path]*ledger.Payload, len(trieUpdate.Paths))
 				for j, path := range trieUpdate.Paths {
-					data[string(path)] = trieUpdate.Payloads[j]
+					data[path] = trieUpdate.Payloads[j]
 				}
 
-				savedData[string(rootHash)] = data
+				savedData[rootHash] = data
 			}
 			// some buffer time of the checkpointer to run
 			time.Sleep(1 * time.Second)
@@ -167,7 +169,7 @@ func Test_Checkpointing(t *testing.T) {
 		})
 
 		// create a new forest and reply WAL
-		f2, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay WAL and create checkpoint", func(t *testing.T) {
@@ -204,7 +206,7 @@ func Test_Checkpointing(t *testing.T) {
 			<-wal2.Done()
 		})
 
-		f3, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f3, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("read checkpoint", func(t *testing.T) {
@@ -234,24 +236,23 @@ func Test_Checkpointing(t *testing.T) {
 			for rootHash, data := range savedData {
 
 				paths := make([]ledger.Path, 0, len(data))
-				for pathString := range data {
-					path := []byte(pathString)
+				for path := range data {
 					paths = append(paths, path)
 				}
 
-				payloads1, err := f.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
+				payloads1, err := f.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
+				payloads2, err := f2.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
-				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: ledger.RootHash([]byte(rootHash)), Paths: paths})
+				payloads3, err := f3.Read(&ledger.TrieRead{RootHash: rootHash, Paths: paths})
 				require.NoError(t, err)
 
 				for i, path := range paths {
-					require.True(t, data[string(path)].Equals(payloads1[i]))
-					require.True(t, data[string(path)].Equals(payloads2[i]))
-					require.True(t, data[string(path)].Equals(payloads3[i]))
+					require.True(t, data[path].Equals(payloads1[i]))
+					require.True(t, data[path].Equals(payloads2[i]))
+					require.True(t, data[path].Equals(payloads3[i]))
 				}
 			}
 		})
@@ -268,7 +269,7 @@ func Test_Checkpointing(t *testing.T) {
 			wal4, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
 			require.NoError(t, err)
 
-			update, err := ledger.NewUpdate(rootHash, keys2, values2)
+			update, err := ledger.NewUpdate(ledger.State(rootHash), keys2, values2)
 			require.NoError(t, err)
 
 			trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, pathFinderVersion)
@@ -285,7 +286,7 @@ func Test_Checkpointing(t *testing.T) {
 			require.FileExists(t, path.Join(dir, "00000011")) //make sure we have extra segment
 		})
 
-		f5, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+		f5, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
 		t.Run("replay both checkpoint and updates after checkpoint", func(t *testing.T) {
@@ -317,7 +318,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("extra updates were applied correctly", func(t *testing.T) {
 
-			query, err := ledger.NewQuery(rootHash, keys2)
+			query, err := ledger.NewQuery(ledger.State(rootHash), keys2)
 			require.NoError(t, err)
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)
@@ -336,7 +337,7 @@ func Test_Checkpointing(t *testing.T) {
 
 		t.Run("corrupted checkpoints are skipped", func(t *testing.T) {
 
-			f6, err := mtrie.NewForest(pathByteSize, size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
+			f6, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 			require.NoError(t, err)
 
 			wal6, err := realWAL.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, segmentSize)
@@ -399,7 +400,7 @@ func Test_Checkpointing(t *testing.T) {
 			<-wal6.Done()
 
 			// check if the latest data is still there
-			query, err := ledger.NewQuery(rootHash, keys2)
+			query, err := ledger.NewQuery(ledger.State(rootHash), keys2)
 			require.NoError(t, err)
 			trieRead, err := pathfinder.QueryToTrieRead(query, pathFinderVersion)
 			require.NoError(t, err)

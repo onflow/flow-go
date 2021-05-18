@@ -62,6 +62,14 @@ pub fun main(): UFix64 {
 }
 `
 
+const getFlowTokenAvailableBalanceScriptTemplate = `
+import FlowStorageFees from 0x%s
+
+pub fun main(): UFix64 {
+  return FlowStorageFees.defaultTokenAvailableBalance(0x%s)
+}
+`
+
 const getStorageCapacityScriptTemplate = `
 import FlowStorageFees from 0x%s
 
@@ -94,6 +102,10 @@ func initAccountTransaction(
 
 func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
 	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
+}
+
+func getFlowTokenAvailableBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
+	return Script([]byte(fmt.Sprintf(getFlowTokenAvailableBalanceScriptTemplate, serviceAddress, accountAddress)))
 }
 
 func getStorageCapacityScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
