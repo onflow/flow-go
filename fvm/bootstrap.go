@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -146,6 +147,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	}
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
+	b.setupContractDeploymentAuthorizers(service)
+
 	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation, b.storagePerFlow)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
@@ -249,7 +252,6 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		feeContract.HexWithPrefix(),
 		service.HexWithPrefix(),
 	)
-
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
 		deployContractTransaction(service, contract, "FlowServiceAccount"),
@@ -257,6 +259,20 @@ func (b *BootstrapProcedure) deployServiceAccount(service, fungibleToken, flowTo
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy service account contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setupContractDeploymentAuthorizers(service flow.Address) {
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.SetContractDeploymentAuthorizersTransaction(
+				service,
+				[]flow.Address{service}),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to setup contract deployment authorizers: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) mintInitialTokens(

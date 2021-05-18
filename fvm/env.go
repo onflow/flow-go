@@ -16,10 +16,12 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
@@ -50,10 +52,6 @@ type hostEnv struct {
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	contracts := handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
-		getAuthorizedAccountsForContractUpdatesFunc(ctx),
-	)
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	programsHandler := handler.NewProgramsHandler(
@@ -73,12 +71,17 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 		vm:               vm,
 		metrics:          &noopMetricsCollector{},
 		accounts:         accounts,
-		contracts:        contracts,
 		addressGenerator: generator,
 		uuidGenerator:    uuidGenerator,
 		eventHandler:     eventHandler,
 		programs:         programsHandler,
 	}
+
+	contracts := handler.NewContractHandler(accounts,
+		ctx.RestrictedDeploymentEnabled,
+		env.GetAuthorizedAccountsForContractUpdatesFunc(),
+	)
+	env.contracts = contracts
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
@@ -113,10 +116,34 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	)
 }
 
-func getAuthorizedAccountsForContractUpdatesFunc(ctx Context) func() []common.Address {
-	defaultValue := []runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())}
-	// TODO call vm to read values from
-	return func() []common.Address { return defaultValue }
+func (e *hostEnv) GetAuthorizedAccountsForContractUpdatesFunc() func() []common.Address {
+	return func() []common.Address {
+		// set default to service account only
+		service := runtime.Address(e.ctx.Chain.ServiceAddress())
+		defaultAccounts := []runtime.Address{service}
+
+		value, err := e.vm.Runtime.ReadStored(
+			service,
+			cadence.Path{
+				Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+				Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
+			},
+			runtime.Context{
+				Interface: e,
+				Location:  common.ScriptLocation("temp for now until this becomes optional"),
+			},
+		)
+		if err != nil {
+			// TODO log warning
+			return defaultAccounts
+		}
+		adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+		if !ok {
+			// TODO log warning
+			return defaultAccounts
+		}
+		return adresses
+	}
 }
 
 func (e *hostEnv) setTraceSpan(span opentracing.Span) {
