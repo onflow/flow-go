@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type DKGKeys struct {
@@ -17,10 +18,10 @@ type DKGKeys struct {
 
 func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) *DKGKeys {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		epochCounter := key.(uint64)
 		info := val.(*dkg.DKGParticipantPriv)
-		return operation.InsertMyDKGPrivateInfo(epochCounter, info)
+		return transaction.WithTx(operation.InsertMyDKGPrivateInfo(epochCounter, info))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -44,8 +45,8 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) *DKGKeys {
 	return k
 }
 
-func (k *DKGKeys) storeTx(epochCounter uint64, info *dkg.DKGParticipantPriv) func(tx *badger.Txn) error {
-	return k.cache.Put(epochCounter, info)
+func (k *DKGKeys) storeTx(epochCounter uint64, info *dkg.DKGParticipantPriv) func(tx *transaction.Tx) error {
+	return k.cache.PutTx(epochCounter, info)
 }
 
 func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*dkg.DKGParticipantPriv, error) {
@@ -59,7 +60,7 @@ func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*dkg.DKG
 }
 
 func (k *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) error {
-	return operation.RetryOnConflict(k.db.Update, k.storeTx(epochCounter, info))
+	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, info))
 }
 
 func (k *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, error) {
