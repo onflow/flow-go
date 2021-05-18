@@ -64,6 +64,7 @@ func createSignerData(t *testing.T, n int) *ParticipantData {
 			identity.Stake,
 			networkingKeys[i],
 			stakingKeys[i],
+			nil,
 		)
 		participants[i] = Participant{
 			NodeInfo:            nodeInfo,

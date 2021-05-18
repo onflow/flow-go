@@ -92,7 +92,7 @@ type NodeInfo struct {
 	stakingPrivKey crypto.PrivateKey
 
 	// node machine account keys
-	machinePubKey  crypto.PublicKey
+	// machinePubKey  crypto.PublicKey
 	machinePrivKey crypto.PrivateKey
 }
 
@@ -130,6 +130,7 @@ func NewPrivateNodeInfo(
 		Stake:          stake,
 		networkPrivKey: networkKey,
 		stakingPrivKey: stakingKey,
+		machinePrivKey: machineKey,
 	}
 }
 
