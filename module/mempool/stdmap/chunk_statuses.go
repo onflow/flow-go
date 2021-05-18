@@ -62,3 +62,8 @@ func (cs ChunkStatuses) All() []*verification.ChunkStatus {
 	}
 	return statuses
 }
+
+// Size returns total number of chunk statuses in the memory pool.
+func (cs ChunkStatuses) Size() uint {
+	return cs.Backend.Size()
+}

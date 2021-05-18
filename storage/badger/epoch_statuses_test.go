@@ -14,6 +14,7 @@ import (
 
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 func TestEpochStatusesStoreAndRetrieve(t *testing.T) {
@@ -28,7 +29,7 @@ func TestEpochStatusesStoreAndRetrieve(t *testing.T) {
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store epoch status
-		err = operation.RetryOnConflict(db.Update, store.StoreTx(blockID, expected))
+		err = operation.RetryOnConflictTx(db, transaction.Update, store.StoreTx(blockID, expected))
 		require.NoError(t, err)
 
 		// retreive status

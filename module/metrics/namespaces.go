@@ -55,10 +55,12 @@ const (
 
 // Verification Subsystems
 const (
-	subsystemAssignerEngine = "assigner"
-	subsystemFinderEngine   = "finder"
-	subsystemMatchEngine    = "match"
-	subsystemVerifierEngine = "verifier"
+	subsystemAssignerEngine  = "assigner"
+	subsystemFinderEngine    = "finder" // TODO: should be removed once new architecture is in place.
+	subsystemMatchEngine     = "match"  // TODO: should be removed once new architecture is in place.
+	subsystemFetcherEngine   = "fetcher"
+	subsystemRequesterEngine = "requester"
+	subsystemVerifierEngine  = "verifier"
 )
 
 // METRIC NAMING GUIDELINES
