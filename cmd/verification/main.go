@@ -192,7 +192,7 @@ func main() {
 
 			return requesterEngine, err
 		}).
-		Component("fetcher engine and chunk consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("fetcher engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			fetcherEngine = fetcher.New(
 				node.Logger,
 				collector,
@@ -205,6 +205,10 @@ func main() {
 				node.Storage.Receipts,
 				requesterEngine)
 
+			return fetcherEngine, nil
+		}).
+		Component("chunk consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
 				node.Logger,
 				processedChunkIndex,
@@ -212,7 +216,7 @@ func main() {
 				fetcherEngine,
 				chunkWorkers)
 
-			return fetcherEngine, nil
+			return chunkConsumer, nil
 		}).
 		Component("assigner engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
@@ -231,6 +235,9 @@ func main() {
 				chunkQueue,
 				chunkConsumer)
 
+			return assignerEngine, nil
+		}).
+		Component("block consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			var initBlockHeight uint64
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
@@ -250,7 +257,7 @@ func main() {
 				Uint64("init_height", initBlockHeight).
 				Msg("block consumer initialized")
 
-			return assignerEngine, nil
+			return blockConsumer, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
