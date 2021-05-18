@@ -111,7 +111,7 @@ func (q *FifoQueue) push(element interface{}) (int, bool) {
 }
 
 // Front peeks message at the head of the queue (without removing the head).
-func (q *FifoQueue) Front() (interface{}, bool) {
+func (q *FifoQueue) Head() (interface{}, bool) {
 	q.mu.RLock()
 	defer q.mu.RUnlock()
 

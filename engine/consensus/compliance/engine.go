@@ -76,7 +76,7 @@ func NewEngine(
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
-		log,
+		log.With().Str("compliance", "engine").Logger(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)
