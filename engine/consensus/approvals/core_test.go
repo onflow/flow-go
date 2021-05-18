@@ -309,7 +309,13 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 // TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
 	s.core.emergencySealingActive = true
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+		},
+	).Return(true, nil).Once()
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Times(sealing.DefaultEmergencySealingThreshold)

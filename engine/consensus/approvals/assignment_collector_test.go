@@ -111,7 +111,13 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+		},
+	).Return(true, nil).Once()
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	blockID := s.Block.ID()
@@ -127,7 +133,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 		}
 	}
 
-	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	s.sealsPL.AssertExpectations(s.T())
 }
 
 // TestProcessIncorporatedResult_ReusingCachedApprovals tests a scenario where we successfully processed approvals for one incorporated result
@@ -164,7 +170,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 
 	err = s.collector.ProcessIncorporatedResult(incorporatedResult)
 	require.NoError(s.T(), err)
-	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	s.sealsPL.AssertExpectations(s.T())
 
 }
 
@@ -418,7 +424,13 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 	err = s.collector.CheckEmergencySealing(s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+		},
+	).Return(true, nil).Once()
 
 	err = s.collector.CheckEmergencySealing(sealing.DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)

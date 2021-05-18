@@ -48,7 +48,13 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_ValidApproval() {
 // met for each chunk.
 func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 	expectedSignatures := make([]flow.AggregatedSignature, s.IncorporatedResult.Result.Chunks.Len())
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+		},
+	).Return(true, nil).Once()
 
 	for i, chunk := range s.Chunks {
 		var err error
