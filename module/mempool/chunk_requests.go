@@ -91,4 +91,7 @@ type ChunkRequests interface {
 
 	// All returns all chunk requests stored in this memory pool.
 	All() []*verification.ChunkDataPackRequest
+
+	// Size returns total number of chunk requests in the memory pool.
+	Size() uint
 }

@@ -412,6 +412,8 @@ func (e *Engine) requestChunkDataPack(c *ChunkStatus) error {
 		return fmt.Errorf("could not publish chunk data pack request for chunk (id=%s): %w", chunkID, err)
 	}
 
+	e.metrics.OnChunkDataPackRequested()
+
 	return nil
 }
 
@@ -620,16 +622,4 @@ func (e *Engine) matchChunk(
 // can be tried again.
 func CanTry(maxAttempt int, chunk *ChunkStatus) bool {
 	return chunk.Attempt < maxAttempt
-}
-
-// IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
-// Otherwise, it returns false.
-// In the current version, a chunk is a system chunk if it is the last chunk of the
-// execution result.
-func IsSystemChunk(chunkIndex uint64, result *flow.ExecutionResult) bool {
-	if chunkIndex == uint64(len(result.Chunks)-1) {
-		return true
-	} else {
-		return false
-	}
 }

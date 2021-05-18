@@ -571,7 +571,7 @@ func (e *hostEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
-	_, err := verifySignatureFromRuntime(
+	valid, err := verifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
@@ -586,7 +586,7 @@ func (e *hostEnv) VerifySignature(
 	}
 
 	// TODO: this function temporarily returns false until it is properly implemented
-	return false, nil
+	return valid, nil
 }
 
 func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
