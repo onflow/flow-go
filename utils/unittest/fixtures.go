@@ -298,7 +298,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	}
 }
 
-func GenesisFixture(identities flow.IdentityList) *flow.Block {
+func GenesisFixture() *flow.Block {
 	genesis := flow.Genesis(flow.Emulator)
 	return genesis
 }
@@ -1462,7 +1462,7 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 // protocol state.
 func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block)) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 
-	root := GenesisFixture(participants)
+	root := GenesisFixture()
 	for _, apply := range opts {
 		apply(root)
 	}

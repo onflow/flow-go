@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -456,6 +457,46 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
+
+	t.Run("account update with set code succeeds when account is added as authorized account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// setup a new authorizer account
+		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		require.NoError(t, err)
+
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
+
+		// test deploying a new contract (not authorized by service account)
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
@@ -1212,7 +1253,7 @@ func TestSignatureVerification(t *testing.T) {
 
 	signatureAlgorithms := []signatureAlgorithm{
 		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_Secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
