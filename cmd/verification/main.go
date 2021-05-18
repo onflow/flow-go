@@ -177,21 +177,6 @@ func main() {
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			requesterEngine, err = verificationrequester.New(
-				node.Logger,
-				node.State,
-				node.Network,
-				node.Tracer,
-				collector,
-				chunkRequests,
-				requestInterval,
-				verificationrequester.RetryAfterQualifier,
-				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
-				requestTargets)
-
-			return requesterEngine, err
-		}).
 		Component("fetcher engine and chunk consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			fetcherEngine = fetcher.New(
 				node.Logger,
@@ -213,6 +198,21 @@ func main() {
 				chunkWorkers)
 
 			return fetcherEngine, nil
+		}).
+		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			requesterEngine, err = verificationrequester.New(
+				node.Logger,
+				node.State,
+				node.Network,
+				node.Tracer,
+				collector,
+				chunkRequests,
+				requestInterval,
+				verificationrequester.RetryAfterQualifier,
+				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
+				requestTargets)
+
+			return requesterEngine, err
 		}).
 		Component("assigner engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			chunkAssigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
