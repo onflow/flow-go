@@ -79,7 +79,7 @@ func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, pro
 
 	contracts := handler.NewContractHandler(accounts,
 		ctx.RestrictedDeploymentEnabled,
-		env.GetAuthorizedAccountsForContractUpdatesFunc(),
+		env.GetAuthorizedAccountsForContractUpdates,
 	)
 	env.contracts = contracts
 
@@ -116,34 +116,32 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	)
 }
 
-func (e *hostEnv) GetAuthorizedAccountsForContractUpdatesFunc() func() []common.Address {
-	return func() []common.Address {
-		// set default to service account only
-		service := runtime.Address(e.ctx.Chain.ServiceAddress())
-		defaultAccounts := []runtime.Address{service}
+func (e *hostEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
+	// set default to service account only
+	service := runtime.Address(e.ctx.Chain.ServiceAddress())
+	defaultAccounts := []runtime.Address{service}
 
-		value, err := e.vm.Runtime.ReadStored(
-			service,
-			cadence.Path{
-				Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-				Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-			},
-			runtime.Context{
-				Interface: e,
-				Location:  common.ScriptLocation("temp for now until this becomes optional"),
-			},
-		)
-		if err != nil {
-			e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
-			return defaultAccounts
-		}
-		adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
-		if !ok {
-			e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
-			return defaultAccounts
-		}
-		return adresses
+	value, err := e.vm.Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
+		},
+		runtime.Context{
+			Interface: e,
+			Location:  common.ScriptLocation("temp for now until this becomes optional"),
+		},
+	)
+	if err != nil {
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
+		return defaultAccounts
 	}
+	adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	if !ok {
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
+		return defaultAccounts
+	}
+	return adresses
 }
 
 func (e *hostEnv) setTraceSpan(span opentracing.Span) {
