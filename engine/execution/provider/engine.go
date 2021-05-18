@@ -230,9 +230,9 @@ func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier)
 }
 
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
-	finalState, ok := receipt.ExecutionResult.FinalStateCommitment()
-	if !ok {
-		return fmt.Errorf("could not get final state: no chunks found")
+	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		return fmt.Errorf("could not get final state: %w", err)
 	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
@@ -241,7 +241,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("final_state", finalState).
+		Hex("final_state", finalState[:]).
 		Msg("broadcasting execution receipt")
 
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,

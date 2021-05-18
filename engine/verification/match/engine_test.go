@@ -14,7 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -162,7 +162,7 @@ func (suite *MatchEngineTestSuite) RespondChunkDataPack(engine *match.Engine,
 	en flow.Identifier) func(*messages.ChunkDataRequest) {
 	return func(req *messages.ChunkDataRequest) {
 		resp := &messages.ChunkDataResponse{
-			ChunkDataPack: test.FromChunkID(req.ChunkID),
+			ChunkDataPack: vertestutils.FromChunkID(req.ChunkID),
 			Nonce:         req.Nonce,
 		}
 
@@ -221,10 +221,10 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -238,6 +238,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving a chunk data pack
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return().Once()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -261,7 +262,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 
 	// create chunk data pack
 	myChunk := result.Chunks[0]
-	chunkDataPack := test.FromChunkID(myChunk.ID())
+	chunkDataPack := vertestutils.FromChunkID(myChunk.ID())
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
@@ -304,10 +305,10 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(flow.Identifier{}),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(flow.Identifier{}),
 		),
 	)
 
@@ -346,12 +347,12 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(flow.Identifier{}), // some other node
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(flow.Identifier{}), // some other node
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -365,6 +366,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Twice()
 	// receiving two chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Twice()
+	suite.metrics.On("OnChunkDataPackRequested").Return().Twice()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -420,10 +422,10 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -437,6 +439,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving one chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
@@ -500,10 +503,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -517,6 +520,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving one chunk data pack
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -577,10 +581,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	e := suite.NewTestMatchEngine(3)
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -590,6 +594,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -643,6 +648,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Times(count)
 	// receiving `count`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(count)
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	for i := 0; i < count; i++ {
 		header := &flow.Header{
@@ -650,10 +656,10 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 			View:   uint64(i),
 		}
 		// create a execution result that assigns to me
-		result, assignment := test.CreateExecutionResult(
+		result, assignment := vertestutils.CreateExecutionResult(
 			header.ID(),
-			test.WithChunks(
-				test.WithAssignee(suite.myID),
+			vertestutils.WithChunks(
+				vertestutils.WithAssignee(suite.myID),
 			),
 		)
 
@@ -715,15 +721,15 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -737,6 +743,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	sentMetricsC := suite.OnVerifiableChunkSentMetricCalledNTimes(len(result.Chunks))
 	// receiving `len(result.Chunk)`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
+	suite.metrics.On("OnChunkDataPackRequested").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()

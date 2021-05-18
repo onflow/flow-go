@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -210,24 +209,25 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		receiptSpan.Finish()
 	}()
 
-	resultID := receipt.ExecutionResult.ID()
+	// setup logger to capture basic information about the receipt
 	log := c.log.With().
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("result_id", resultID[:]).
+		Hex("result_id", logging.Entity(receipt.ExecutionResult)).
 		Hex("previous_result", receipt.ExecutionResult.PreviousResultID[:]).
 		Hex("block_id", receipt.ExecutionResult.BlockID[:]).
 		Hex("executor_id", receipt.ExecutorID[:]).
 		Logger()
-
-	initialState, finalState, err := validation.IntegrityCheck(receipt)
+	initialState, finalState, err := getStartAndEndStates(receipt)
 	if err != nil {
-		log.Error().Err(err).Msg("received execution receipt that didn't pass the integrity check")
-		return false, nil
+		if errors.Is(err, flow.NoChunksError) {
+			log.Error().Err(err).Msg("discarding malformed receipt")
+			return false, nil
+		}
+		return false, fmt.Errorf("internal problem retrieving start- and end-state commitment from receipt: %w", err)
 	}
-
 	log = log.With().
-		Hex("initial_state", initialState).
-		Hex("final_state", finalState).Logger()
+		Hex("initial_state", initialState[:]).
+		Hex("final_state", finalState[:]).Logger()
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
@@ -766,10 +766,10 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	aggregatedSigs := incorporatedResult.GetAggregatedSignatures()
 
 	// get final state of execution result
-	finalState, ok := incorporatedResult.Result.FinalStateCommitment()
-	if !ok {
+	finalState, err := incorporatedResult.Result.FinalStateCommitment()
+	if err != nil {
 		// message correctness should have been checked before: failure here is an internal implementation bug
-		return fmt.Errorf("failed to get final state commitment from Execution Result")
+		return fmt.Errorf("processing malformed result, whose correctness should have been enforced before: %w", err)
 	}
 
 	// TODO: Check SPoCK proofs
@@ -783,7 +783,7 @@ func (c *Core) sealResult(incorporatedResult *flow.IncorporatedResult) error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err := c.seals.Add(&flow.IncorporatedResultSeal{
+	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: incorporatedResult,
 		Seal:               seal,
 	})
@@ -882,11 +882,13 @@ func (c *Core) clearPools(sealedIDs []flow.Identifier) error {
 
 	// clear the request tracker of all items corresponding to results that are
 	// no longer in the incorporated-results mempool
-	for resultID := range c.requestTracker.GetAll() {
+	var removedResultIDs []flow.Identifier
+	for _, resultID := range c.requestTracker.GetAllIds() {
 		if _, _, ok := c.incorporatedResults.ByResultID(resultID); !ok {
-			c.requestTracker.Remove(resultID)
+			removedResultIDs = append(removedResultIDs, resultID)
 		}
 	}
+	c.requestTracker.Remove(removedResultIDs...)
 
 	// for each missing block that we are tracking, remove it from tracking if
 	// we now know that block or if we have just cleared related resources; then
@@ -1067,10 +1069,11 @@ func (c *Core) requestPendingApprovals() (int, error) {
 	requestCount := 0
 	for _, r := range c.incorporatedResults.All() {
 		resultID := r.Result.ID()
+		incorporatedBlockID := r.IncorporatedBlockID
 
 		// not finding the block that the result was incorporated in is a fatal
 		// error at this stage
-		block, err := c.headersDB.ByBlockID(r.IncorporatedBlockID)
+		block, err := c.headersDB.ByBlockID(incorporatedBlockID)
 		if err != nil {
 			return 0, fmt.Errorf("could not retrieve block: %w", err)
 		}
@@ -1088,7 +1091,7 @@ func (c *Core) requestPendingApprovals() (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("could not retrieve finalized block for finalized height %d: %w", block.Height, err)
 		}
-		if finalizedBlockAtHeight.ID() != r.IncorporatedBlockID {
+		if finalizedBlockAtHeight.ID() != incorporatedBlockID {
 			// block is in an orphaned fork
 			continue
 		}
@@ -1109,7 +1112,7 @@ func (c *Core) requestPendingApprovals() (int, error) {
 		// from verifiers that were assigned to the chunk. Note that the
 		// assigner keeps a cache of computed assignments, so this is not
 		// necessarily an expensive operation.
-		assignment, err := c.assigner.Assign(r.Result, r.IncorporatedBlockID)
+		assignment, err := c.assigner.Assign(r.Result, incorporatedBlockID)
 		if err != nil {
 			// at this point, we know the block and a valid child block exists.
 			// Not being able to compute the assignment constitutes a fatal
@@ -1130,11 +1133,12 @@ func (c *Core) requestPendingApprovals() (int, error) {
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := c.requestTracker.Get(resultID, chunk.Index)
+			requestTrackerItem := c.requestTracker.Get(resultID, incorporatedBlockID, chunk.Index)
 			if requestTrackerItem.IsBlackout() {
 				continue
 			}
 			requestTrackerItem.Update()
+			c.requestTracker.Set(resultID, incorporatedBlockID, chunk.Index, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
@@ -1181,4 +1185,20 @@ func (c *Core) requestPendingApprovals() (int, error) {
 	}
 
 	return requestCount, nil
+}
+
+// getStartAndEndStates returns the pair: (start state commitment; final state commitment)
+// Error returns:
+//  * NoChunksError: if there are no chunks, i.e. the ExecutionResult is malformed
+//  * all other errors are unexpected and symptoms of node-internal problems
+func getStartAndEndStates(receipt *flow.ExecutionReceipt) (initialState flow.StateCommitment, finalState flow.StateCommitment, err error) {
+	initialState, err = receipt.ExecutionResult.InitialStateCommit()
+	if err != nil {
+		return initialState, finalState, fmt.Errorf("could not get commitment for initial state from receipt: %w", err)
+	}
+	finalState, err = receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		return initialState, finalState, fmt.Errorf("could not get commitment for final state from receipt: %w", err)
+	}
+	return initialState, finalState, nil
 }

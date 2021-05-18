@@ -13,12 +13,13 @@ import (
 )
 
 func TestStorableNode(t *testing.T) {
+	path := utils.PathByUint8(3)
 
 	storableNode := &flattener.StorableNode{
 		LIndex:     1,
 		RIndex:     2,
 		Height:     2137,
-		Path:       utils.PathByUint8(3),
+		Path:       path[:],
 		EncPayload: encoding.EncodePayload(utils.LightPayload8('A', 'a')),
 		HashValue:  []byte{4, 4, 4},
 		MaxDepth:   7,

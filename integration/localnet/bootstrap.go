@@ -11,6 +11,7 @@ import (
 	"github.com/plus3it/gorecurcopy"
 	"gopkg.in/yaml.v2"
 
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -279,7 +280,9 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			Context:    "../../",
 			Dockerfile: "cmd/Dockerfile",
 			Args: map[string]string{
-				"TARGET": container.Role.String(),
+				"TARGET":  container.Role.String(),
+				"VERSION": build.Semver(),
+				"COMMIT":  build.Commit(),
 			},
 			Target: "production",
 		}
@@ -372,7 +375,6 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
-		fmt.Sprintf("--script-addr=execution_1:%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
 		"--log-tx-time-to-finalized-executed",

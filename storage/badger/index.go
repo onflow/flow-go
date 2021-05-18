@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Index implements a simple read-only payload storage around a badger DB.
@@ -48,6 +49,10 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 
 func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(*badger.Txn) error {
 	return i.cache.Put(blockID, index)
+}
+
+func (i *Index) storeTxn(blockID flow.Identifier, index *flow.Index) func(*transaction.Tx) error {
+	return i.cache.PutTxn(blockID, index)
 }
 
 func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Index, error) {

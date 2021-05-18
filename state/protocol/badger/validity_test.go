@@ -2,6 +2,7 @@ package badger
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -11,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var participants = unittest.IdentityListFixture(5, unittest.WithAllRoles())
+var participants = unittest.IdentityListFixture(20, unittest.WithAllRoles())
 
 func TestEpochSetupValidity(t *testing.T) {
 	t.Run("invalid first/final view", func(t *testing.T) {
@@ -19,6 +20,16 @@ func TestEpochSetupValidity(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		// set an invalid final view for the first epoch
 		setup.FinalView = setup.FirstView
+
+		err := isValidEpochSetup(setup)
+		require.Error(t, err)
+	})
+
+	t.Run("non-canonically ordered identities", func(t *testing.T) {
+		_, result, _ := unittest.BootstrapFixture(participants)
+		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+		// randomly shuffle the identities so they are not canonically ordered
+		setup.Participants = setup.Participants.DeterministicShuffle(time.Now().UnixNano())
 
 		err := isValidEpochSetup(setup)
 		require.Error(t, err)
@@ -62,7 +73,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
 		// add an extra QC to commit
-		commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
+		extraQC := unittest.QuorumCertificateFixture()
+		commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(extraQC))
 
 		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)
@@ -82,12 +94,8 @@ func TestBootstrapInvalidEpochCommit(t *testing.T) {
 		_, result, _ := unittest.BootstrapFixture(participants)
 		setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 		commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
-		// add an invalid DKG participant
-		collector := participants.Filter(filter.HasRole(flow.RoleCollection))[0]
-		commit.DKGParticipants[collector.NodeID] = flow.DKGParticipant{
-			KeyShare: unittest.KeyFixture(crypto.BLSBLS12381).PublicKey(),
-			Index:    1,
-		}
+		// add an extra DKG participant key
+		commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
 
 		err := isValidEpochCommit(commit, setup)
 		require.Error(t, err)

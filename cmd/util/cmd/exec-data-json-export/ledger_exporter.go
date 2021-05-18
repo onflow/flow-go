@@ -1,8 +1,11 @@
 package jsonexporter
 
 import (
+	"bufio"
 	"encoding/hex"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -28,11 +31,27 @@ func ExportLedger(ledgerPath string, targetstate string, outputPath string) erro
 	if err != nil {
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
-	state, err := hex.DecodeString(targetstate)
+	stateBytes, err := hex.DecodeString(targetstate)
 	if err != nil {
 		return fmt.Errorf("failed to decode hex code of state: %w", err)
 	}
-	err = led.DumpTrieAsJSON(ledger.State(state), outputPath)
+	state, err := ledger.ToState(stateBytes)
+	if err != nil {
+		return fmt.Errorf("cannot use the input state: %w", err)
+	}
+
+	path := filepath.Join(outputPath, state.String()+".trie.jsonl")
+
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer fi.Close()
+
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	err = led.DumpTrieAsJSON(state, writer)
 	if err != nil {
 		return fmt.Errorf("cannot dump trie as json: %w", err)
 	}
