@@ -23,6 +23,11 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	flowServiceAccountContract = "FlowServiceAccount"
+	deductFeesContractFunction = "deductTransactionFee"
+)
+
 type TransactionInvocator struct {
 	logger zerolog.Logger
 }
@@ -63,7 +68,7 @@ func (i *TransactionInvocator) Process(
 	parentState := sth.State()
 	childState := sth.NewChild()
 	env = newEnvironment(*ctx, vm, sth, programs)
-	predeclaredValues := i.valueDeclarations(ctx, env)
+	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
 		// an extra check for state holder health, this should never happen
@@ -158,9 +163,12 @@ func (i *TransactionInvocator) Process(
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
-	// check the storage limits
-	if ctx.LimitAccountStorage && txError == nil {
-		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+	if txError == nil {
+		txError = i.checkAccountStorageLimit(vm, ctx, proc, sth, programs)
+	}
+
+	if txError == nil {
+		txError = i.deductTransactionFees(env, proc)
 	}
 
 	if txError != nil {
@@ -197,7 +205,49 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
+func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *TransactionProcedure) error {
+	if !env.ctx.TransactionFeesEnabled {
+		return nil
+	}
+
+	invocator := NewTransactionContractFunctionInvocator(
+		common.AddressLocation{
+			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
+			Name:    flowServiceAccountContract,
+		},
+		deductFeesContractFunction,
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
+		},
+		[]sema.Type{
+			sema.AuthAccountType,
+		},
+		zerolog.Nop(),
+	)
+	_, err := invocator.Invoke(env, proc)
+
+	if err != nil {
+		// TODO: Fee value is currently a constant. this should be changed when it is not
+		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
+		if !ok {
+			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
+		}
+
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
+	}
+	return nil
+}
+
+func (i *TransactionInvocator) checkAccountStorageLimit(vm *VirtualMachine, ctx *Context, proc *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
+	if !ctx.LimitAccountStorage {
+		return nil
+	}
+
+	// check the storage limits
+	return NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+}
+
+func valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
@@ -228,13 +278,13 @@ func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []r
 				func(invocation interpreter.Invocation) interpreter.Value {
 					address, ok := invocation.Arguments[0].(interpreter.AddressValue)
 					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+						panic(errors.NewValueErrorf(invocation.Arguments[0].String(interpreter.StringResults{}),
 							"first argument of setAccountFrozen must be an address"))
 					}
 
 					frozen, ok := invocation.Arguments[1].(interpreter.BoolValue)
 					if !ok {
-						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
+						panic(errors.NewValueErrorf(invocation.Arguments[0].String(interpreter.StringResults{}),
 							"second argument of setAccountFrozen must be a boolean"))
 					}
 					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
