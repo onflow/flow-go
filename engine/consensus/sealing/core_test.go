@@ -37,19 +37,16 @@ func TestApprovalProcessingCore(t *testing.T) {
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseApprovalsTestSuite
 
-	blocks           map[flow.Identifier]*flow.Header
-	headers          *storage.Headers
-	state            *protocol.State
-	assigner         *module.ChunkAssigner
-	sealsPL          *mempool.IncorporatedResultSeals
-	sealsDB          *storage.Seals
-	receiptsDB       *storage.ExecutionReceipts
-	receipts         *mempool.ExecutionTree
-	sigVerifier      *module.Verifier
-	conduit          *mocknetwork.Conduit
-	receiptValidator *module.ReceiptValidator
-	identitiesCache  map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	core             *Core
+	blocks          map[flow.Identifier]*flow.Header
+	headers         *storage.Headers
+	state           *protocol.State
+	assigner        *module.ChunkAssigner
+	sealsPL         *mempool.IncorporatedResultSeals
+	sealsDB         *storage.Seals
+	sigVerifier     *module.Verifier
+	conduit         *mocknetwork.Conduit
+	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	core            *Core
 }
 
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
@@ -62,9 +59,6 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.conduit = &mocknetwork.Conduit{}
 	s.headers = &storage.Headers{}
 	s.sealsDB = &storage.Seals{}
-	s.receiptsDB = &storage.ExecutionReceipts{}
-	s.receiptValidator = &module.ReceiptValidator{}
-	s.receipts = &mempool.ExecutionTree{}
 
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)
@@ -102,8 +96,6 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	)
 	var err error
 
-	s.receipts.On("Size").Return(uint(0)).Once()
-
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -114,8 +106,8 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		approvalRequestsThreshold:            2,
 	}
 
-	s.core, err = NewCore(log, tracer, metrics, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
-		s.sealsPL, s.conduit, s.receipts, s.receiptsDB, s.receiptValidator, options)
+	s.core, err = NewCore(log, tracer, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
+		s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -131,7 +123,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedApp
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 	err = s.core.ProcessFinalizedBlock(s.Block.ID())
 	require.NoError(s.T(), err)
 
@@ -146,7 +137,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOutdatedExe
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 	err := s.core.ProcessFinalizedBlock(s.Block.ID())
 	require.NoError(s.T(), err)
 
@@ -196,7 +186,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
 	// blockB1 becomes finalized
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 	err := s.core.ProcessFinalizedBlock(blockB1.ID())
 	require.NoError(s.T(), err)
 
@@ -236,7 +225,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 	// we will need to cleanup our tree till new height, removing all outdated collectors
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&candidate))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 
 	err := s.core.ProcessFinalizedBlock(candidate.ID())
 	require.NoError(s.T(), err)
@@ -355,7 +343,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	require.NoError(s.T(), err)
 
 	lastFinalizedBlock := &s.IncorporatedBlock
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Times(approvals.DefaultEmergencySealingThreshold)
 	for i := 0; i < approvals.DefaultEmergencySealingThreshold; i++ {
 		finalizedBlock := unittest.BlockHeaderWithParentFixture(lastFinalizedBlock)
 		s.blocks[finalizedBlock.ID()] = &finalizedBlock
@@ -409,7 +396,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 	// block B_1 becomes finalized
 	err := s.core.ProcessFinalizedBlock(forks[0][0].ID())
 	require.NoError(s.T(), err)
@@ -467,7 +453,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
 	// finalize block B
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 	err := s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
 
@@ -506,7 +491,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 	result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*s.IncorporatedResult.Result))
 	result.BlockID = unsealedBlock.ID()
 
-	s.receipts.On("PruneUpToHeight", mock.Anything).Return(nil).Once()
 	s.headers.On("ByHeight", unsealedBlock.Height).Return(unsealedBlock, nil)
 	err := s.core.ProcessFinalizedBlock(unsealedBlock.ID())
 	require.NoError(s.T(), err)

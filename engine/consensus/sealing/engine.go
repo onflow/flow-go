@@ -200,7 +200,7 @@ func (e *Engine) consumeEvents() {
 	for {
 		select {
 		case event := <-e.receiptSink:
-			e.onReceipt(event.OriginID, event.Msg.(*flow.ExecutionReceipt))
+			e.processIncorporatedResult(&event.Msg.(*flow.ExecutionReceipt).ExecutionResult)
 		case event := <-e.approvalSink:
 			e.onApproval(event.OriginID, event.Msg.(*flow.ResultApproval))
 		case event := <-e.requestedApprovalSink:
@@ -220,19 +220,6 @@ func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) {
 		err := e.core.ProcessIncorporatedResult(incorporatedResult)
 		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 
-		if err != nil {
-			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
-		}
-	})
-}
-
-// onReceipt submits new execution receipt for processing.
-// Any error indicates an unexpected problem in the protocol logic. The node's
-// internal state might be corrupted. Hence, returned errors should be treated as fatal.
-func (e *Engine) onReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) {
-	e.workerPool.Submit(func() {
-		err := e.core.ProcessReceipt(receipt)
-		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 		if err != nil {
 			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
 		}
