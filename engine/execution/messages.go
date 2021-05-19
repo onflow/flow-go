@@ -21,14 +21,14 @@ type ComputationResult struct {
 	StateCommitments   []flow.StateCommitment
 	Proofs             [][]byte
 	Events             []flow.EventsList
-	ServiceEvents      []flow.EventsList
+	ServiceEvents      flow.EventsList
 	TransactionResults []flow.TransactionResult
 	GasUsed            uint64
 	StateReads         uint64
 }
 
-func (cr *ComputationResult) AddEvents(inp []flow.Event) {
-	cr.Events = append(cr.Events, inp...)
+func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
+	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], inp...)
 }
 
 func (cr *ComputationResult) AddServiceEvents(inp []flow.Event) {

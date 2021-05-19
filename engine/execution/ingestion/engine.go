@@ -1078,7 +1078,7 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID, blockID, result.Events[i])
+		chunk := generateChunk(i, startState, endState, collectionID, blockID, result.Events[i].Hash())
 
 		// chunkDataPack
 		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
