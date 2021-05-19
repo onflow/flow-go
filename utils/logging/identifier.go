@@ -4,6 +4,7 @@ package logging
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,6 +16,10 @@ func Entity(entity flow.Entity) []byte {
 
 func ID(id flow.Identifier) []byte {
 	return id[:]
+}
+
+func Type(obj interface{}) string {
+	return fmt.Sprintf("%T", obj)
 }
 
 func IDs(ids []flow.Identifier) []string {

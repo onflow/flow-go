@@ -629,6 +629,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// wait for the max blackout period to elapse
 	time.Sleep(3 * time.Second)
 
+	// our setup is for 5 verification nodes
 	s.conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).Times(chunkCount)
 

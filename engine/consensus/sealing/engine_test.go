@@ -4,7 +4,6 @@ package sealing
 
 import (
 	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/utils/fifoqueue"
 	"os"
 	"sync"
 	"testing"
@@ -14,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
