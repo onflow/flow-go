@@ -424,9 +424,8 @@ func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunk
 }
 
 // validateNonSystemChunkCollection returns nil if the collection is matching the non-system chunk data pack.
-// A collection is valid against a non-system chunk if it has a matching collection ID with system chunk's collection ID field.
-//
-// TODO: collection ID should also be checked against its block.
+// A collection is valid against a non-system chunk if it has a matching ID with system chunk's collection ID field, as well as the
+// collection ID of corresponding guarantee of the chunk in the referenced block payload.
 func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack, chunk *flow.Chunk) error {
 	collID := collection.ID()
 
