@@ -9,14 +9,18 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var LogVerbose = flag.Bool("vv", false, "print debugging logs")
+var verbose = flag.Bool("vv", false, "print debugging logs")
+
+func LogVerbose() {
+	*verbose = true
+}
 
 // Logger returns a zerolog
 // use -vv flag to print debugging logs for tests
 func Logger() zerolog.Logger {
 	writer := ioutil.Discard
 
-	if *LogVerbose {
+	if *verbose {
 		writer = os.Stderr
 	}
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
