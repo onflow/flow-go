@@ -1,6 +1,7 @@
 package matching
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,9 @@ type Config struct {
 	MaxResultsToRequest uint // maximum number of receipts to request
 }
 
+// Core represents the matching business logic, used to process receipts received from
+// p2p network. Performs processing of pending receipts, storing of receipts and re-requesting
+// missing execution receipts. During Sealing and Verification phase 2 submits events to sealing engine
 type Core struct {
 	log              zerolog.Logger                  // used to log relevant actions with context
 	tracer           module.Tracer                   // used to trace execution
@@ -71,6 +75,7 @@ func NewCore(log zerolog.Logger,
 		seals:            seals,
 		receiptValidator: receiptValidator,
 		receiptRequester: receiptRequester,
+		sealingEngine:    sealingEngine,
 		config:           config,
 	}
 }
@@ -374,6 +379,29 @@ HEIGHT_LOOP:
 	}
 
 	return len(missingBlocksOrderedByHeight), firstMissingHeight, nil
+}
+
+func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
+	startTime := time.Now()
+	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealingRequestPendingReceipts)
+	// request execution receipts for unsealed finalized blocks
+	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
+	requestReceiptsSpan.Finish()
+
+	if err != nil {
+		return fmt.Errorf("could not request pending block results: %w", err)
+	}
+
+	c.log.Info().
+		Hex("finalized_block_id", finalizedBlockID[:]).
+		Uint64("first_height_missing_result", firstMissingHeight).
+		Uint("seals_size", c.seals.Size()).
+		Uint("receipts_size", c.receipts.Size()).
+		Int("pending_receipt_requests", pendingReceiptRequests).
+		Int64("duration_ms", time.Since(startTime).Milliseconds()).
+		Msg("checking sealing finished successfully")
+
+	return nil
 }
 
 // getStartAndEndStates returns the pair: (start state commitment; final state commitment)
