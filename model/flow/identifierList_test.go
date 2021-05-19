@@ -1,4 +1,4 @@
-package flow
+package flow_test
 
 import (
 	"bytes"
@@ -8,24 +8,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestIdentifierListSort tests the IdentityList against its implemented sort interface
 // it generates and sorts a list of ids, and then evaluates sorting in ascending order
 func TestIdentifierListSort(t *testing.T) {
 	count := 10
-	// creates an identity list of 10 ids
-	var identityList IdentityList
-	for i := 0; i < count; i++ {
-		// defining id of node
-		var nodeID [32]byte
-		nodeID[0] = byte(i + 1)
-		identity := &Identity{
-			NodeID: nodeID,
-		}
-		identityList = append(identityList, identity)
-	}
-	var ids IdentifierList = identityList.NodeIDs()
+	// creates an identifier list of 10 ids
+	var ids flow.IdentifierList = unittest.IdentifierListFixture(count)
 
 	// shuffles array before sorting to enforce some pseudo-randomness
 	rand.Seed(time.Now().UnixNano())
@@ -44,4 +37,20 @@ func TestIdentifierListSort(t *testing.T) {
 		}
 		before = id
 	}
+}
+
+// TestIdentifierListContains tests the IdentifierList against its Contains method implementation.
+func TestIdentifierListContains(t *testing.T) {
+	count := 10
+	// creates an identifier list of 10 ids
+	var ids flow.IdentifierList = unittest.IdentifierListFixture(count)
+
+	// all identifiers in the list should have a valid Contains result.
+	for _, id := range ids {
+		require.True(t, ids.Contains(id))
+	}
+
+	// non-existent identifier should have a negative Contains result.
+	nonExistent := unittest.IdentifierFixture()
+	require.False(t, ids.Contains(nonExistent))
 }

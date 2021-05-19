@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
 	utilsio "github.com/onflow/flow-go/utils/io"
 )
@@ -28,8 +29,6 @@ const VersionV1 uint16 = 0x01
 // Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
 // Version 3 contains a file checksum for detecting corrupted checkpoint files.
 const VersionV3 uint16 = 0x03
-
-const RootCheckpointFilename = "root.checkpoint"
 
 type Checkpointer struct {
 	dir            string
@@ -154,7 +153,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	forest, err := mtrie.NewForest(c.keyByteSize, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {
@@ -294,12 +293,12 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedFores
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() (*flattener.FlattenedForest, error) {
-	filepath := path.Join(c.dir, RootCheckpointFilename)
+	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
 	return LoadCheckpoint(filepath)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
-	if _, err := os.Stat(path.Join(c.dir, RootCheckpointFilename)); err == nil {
+	if _, err := os.Stat(path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil

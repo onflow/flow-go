@@ -56,7 +56,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 	}
 
 	// Do not produce a vote for blocks where we are not a valid committee
-	// member. HotStuff will ask for a vote for the first block of the next epoch, even if we are unstaked in 
+	// member. HotStuff will ask for a vote for the first block of the next epoch, even if we are unstaked in
 	// the next epoch.
 	// These votes can't be used to produce valid QCs.
 	_, err := v.committee.Identity(block.BlockID, v.committee.Self())

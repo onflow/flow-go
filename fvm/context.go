@@ -27,9 +27,10 @@ type Context struct {
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
 	CadenceLoggingEnabled            bool
+	EventCollectionEnabled           bool
+	ServiceEventCollectionEnabled    bool
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
-	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
@@ -82,9 +83,10 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
+		EventCollectionEnabled:           true,
+		ServiceEventCollectionEnabled:    false,
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
-		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
@@ -174,6 +176,14 @@ func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
 	}
 }
 
+// WithServiceEventCollectionEnabled enables service event collection
+func WithServiceEventCollectionEnabled() Option {
+	return func(ctx Context) Context {
+		ctx.ServiceEventCollectionEnabled = true
+		return ctx
+	}
+}
+
 // WithExtensiveTracing sets the extensive tracing
 func WithExtensiveTracing() Option {
 	return func(ctx Context) Context {
@@ -251,15 +261,6 @@ func WithCadenceLogging(enabled bool) Option {
 func WithRestrictedAccountCreation(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.RestrictedAccountCreationEnabled = enabled
-		return ctx
-	}
-}
-
-// WithSetValueHandler sets a handler that is called when a value is written
-// by the Cadence runtime.
-func WithSetValueHandler(handler SetValueHandler) Option {
-	return func(ctx Context) Context {
-		ctx.SetValueHandler = handler
 		return ctx
 	}
 }

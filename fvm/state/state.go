@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -232,4 +233,55 @@ func addressFromOwner(owner string) (flow.Address, bool) {
 	}
 	address := flow.BytesToAddress(ownerBytes)
 	return address, true
+}
+
+// IsFVMStateKey returns true if the
+// key is controlled by the fvm env and
+// return false otherwise (key controlled by the cadence env)
+func IsFVMStateKey(owner, controller, key string) bool {
+
+	// check if is a service level key (owner and controller is empty)
+	// cases:
+	// 		- "", "", "uuid"
+	// 		- "", "", "account_address_state"
+	if len(owner) == 0 && len(controller) == 0 {
+		return true
+	}
+	// check account level keys
+	// cases:
+	// 		- address, address, "public_key_count"
+	// 		- address, address, "public_key_%d" (index)
+	// 		- address, address, "contract_names"
+	// 		- address, address, "code.%s" (contract name)
+	// 		- address, "", exists
+	// 		- address, "", "storage_used"
+	// 		- address, "", "frozen"
+	if owner == controller {
+		if key == KeyPublicKeyCount {
+			return true
+		}
+		if bytes.HasPrefix([]byte(key), []byte("public_key_")) {
+			return true
+		}
+		if key == KeyContractNames {
+			return true
+		}
+		if bytes.HasPrefix([]byte(key), []byte(KeyCode)) {
+			return true
+		}
+	}
+
+	if len(controller) == 0 {
+		if key == KeyExists {
+			return true
+		}
+		if key == KeyStorageUsed {
+			return true
+		}
+		if key == KeyAccountFrozen {
+			return true
+		}
+	}
+
+	return false
 }

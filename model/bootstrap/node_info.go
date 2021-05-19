@@ -3,6 +3,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -198,6 +199,17 @@ func (node NodeInfo) Identity() *flow.Identity {
 	return identity
 }
 
+// NodeInfoFromIdentity converts an identity to a public NodeInfo
+func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
+	return NewPublicNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.Stake,
+		identity.NetworkPubKey,
+		identity.StakingPubKey)
+}
+
 func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	var filtered []NodeInfo
 	for _, node := range nodes {
@@ -207,6 +219,14 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 		filtered = append(filtered, node)
 	}
 	return filtered
+}
+
+// Sort sorts the NodeInfo list in place using the given ordering.
+func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
+	sort.Slice(nodes, func(i, j int) bool {
+		return order(nodes[i].Identity(), nodes[j].Identity())
+	})
+	return nodes
 }
 
 func ToIdentityList(nodes []NodeInfo) flow.IdentityList {

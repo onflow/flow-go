@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
@@ -282,13 +284,9 @@ func EncodePath(p ledger.Path) []byte {
 	buffer = utils.AppendUint8(buffer, TypePath)
 
 	// encode path
-	buffer = append(buffer, encodePath(p)...)
+	buffer = append(buffer, p[:]...)
 
 	return buffer
-}
-
-func encodePath(p ledger.Path) []byte {
-	return p
 }
 
 // DecodePath constructs a path value using an encoded byte slice
@@ -296,20 +294,24 @@ func DecodePath(encodedPath []byte) (ledger.Path, error) {
 	// check enc dec version
 	rest, _, err := CheckVersion(encodedPath)
 	if err != nil {
-		return nil, err
+		return ledger.DummyPath, err
 	}
 
 	// check the encoding type
 	rest, err = CheckType(rest, TypePath)
 	if err != nil {
-		return nil, err
+		return ledger.DummyPath, err
 	}
 
 	return decodePath(rest)
 }
 
 func decodePath(inp []byte) (ledger.Path, error) {
-	return ledger.Path(inp), nil
+	path, err := ledger.ToPath(inp)
+	if err != nil {
+		return path, fmt.Errorf("decode path failed: %w", err)
+	}
+	return path, nil
 }
 
 // EncodePayload encodes a ledger payload
@@ -435,7 +437,7 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 
 	// encode root hash (size and data)
 	buffer = utils.AppendUint16(buffer, uint16(len(t.RootHash)))
-	buffer = append(buffer, t.RootHash...)
+	buffer = append(buffer, t.RootHash[:]...)
 
 	// encode number of paths
 	buffer = utils.AppendUint32(buffer, uint32(t.Size()))
@@ -446,9 +448,9 @@ func encodeTrieUpdate(t *ledger.TrieUpdate) []byte {
 
 	// encode paths
 	// encode path size (assuming all paths are the same size)
-	buffer = utils.AppendUint16(buffer, uint16(t.Paths[0].Size()))
+	buffer = utils.AppendUint16(buffer, uint16(ledger.PathLen))
 	for _, path := range t.Paths {
-		buffer = append(buffer, encodePath(path)...)
+		buffer = append(buffer, path[:]...)
 	}
 
 	// we assume same number of payloads
@@ -492,9 +494,13 @@ func decodeTrieUpdate(inp []byte) (*ledger.TrieUpdate, error) {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
 	}
 
-	rh, rest, err := utils.ReadSlice(rest, int(rhSize))
+	rhBytes, rest, err := utils.ReadSlice(rest, int(rhSize))
 	if err != nil {
 		return nil, fmt.Errorf("error decoding trie update: %w", err)
+	}
+	rh, err := ledger.ToRootHash(rhBytes)
+	if err != nil {
+		return nil, fmt.Errorf("decode trie update failed: %w", err)
 	}
 
 	// decode number of paths
@@ -557,7 +563,8 @@ func EncodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = utils.AppendUint8(buffer, TypeProof)
 
 	// append encoded proof content
-	buffer = append(buffer, encodeTrieProof(p)...)
+	proof := encodeTrieProof(p)
+	buffer = append(buffer, proof[:]...)
 
 	return buffer
 }
@@ -578,8 +585,8 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = append(buffer, p.Flags...)
 
 	// include path size and content
-	buffer = utils.AppendUint16(buffer, uint16(p.Path.Size()))
-	buffer = append(buffer, p.Path...)
+	buffer = utils.AppendUint16(buffer, uint16(ledger.PathLen))
+	buffer = append(buffer, p.Path[:]...)
 
 	// include encoded payload size and content
 	encPayload := encodePayload(p.Payload)
@@ -591,7 +598,7 @@ func encodeTrieProof(p *ledger.TrieProof) []byte {
 	buffer = utils.AppendUint8(buffer, uint8(len(p.Interims)))
 	for _, inter := range p.Interims {
 		buffer = utils.AppendUint16(buffer, uint16(len(inter)))
-		buffer = append(buffer, inter...)
+		buffer = append(buffer, inter[:]...)
 	}
 
 	return buffer
@@ -620,7 +627,7 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Inclusion = utils.Bit(byteInclusion, 0) == 1
+	pInst.Inclusion = bitutils.Bit(byteInclusion, 0) == 1
 
 	// read steps
 	steps, rest, err := utils.ReadUint8(rest)
@@ -649,7 +656,10 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	pInst.Path = path
+	pInst.Path, err = ledger.ToPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding proof: %w", err)
+	}
 
 	// read payload
 	encPayloadSize, rest, err := utils.ReadUint64(rest)
@@ -671,10 +681,11 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decoding proof: %w", err)
 	}
-	interims := make([][]byte, 0)
+	interims := make([]hash.Hash, 0)
 
 	var interimSize uint16
-	var interim []byte
+	var interim hash.Hash
+	var interimBytes []byte
 
 	for i := 0; i < int(interimsLen); i++ {
 		interimSize, rest, err = utils.ReadUint16(rest)
@@ -682,10 +693,15 @@ func decodeTrieProof(inp []byte) (*ledger.TrieProof, error) {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
 
-		interim, rest, err = utils.ReadSlice(rest, int(interimSize))
+		interimBytes, rest, err = utils.ReadSlice(rest, int(interimSize))
 		if err != nil {
 			return nil, fmt.Errorf("error decoding proof: %w", err)
 		}
+		interim, err = hash.ToHash(interimBytes)
+		if err != nil {
+			return nil, fmt.Errorf("error decoding proof: %w", err)
+		}
+
 		interims = append(interims, interim)
 	}
 	pInst.Interims = interims

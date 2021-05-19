@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -22,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	chunksmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -104,9 +104,9 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	assert.True(s.T(), ok)
 }
 
-// TestFailedTx tests verification behaviour in case
-// of failed transaction. if a transaction fails, it shouldn't
-// change the state commitment.
+// TestFailedTx tests verification behavior in case
+// of failed transaction. if a transaction fails, it should
+// still change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
 	assert.NotNil(s.T(), vch)
@@ -232,7 +232,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: 0,
-			StartState:      startState,
+			StartState:      flow.StateCommitment(startState),
 			BlockID:         blockID,
 		},
 		Index: 0,
@@ -240,7 +240,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	chunkDataPack := flow.ChunkDataPack{
 		ChunkID:    chunk.ID(),
-		StartState: startState,
+		StartState: flow.StateCommitment(startState),
 		Proof:      proof,
 	}
 
@@ -257,7 +257,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		Result:        &result,
 		Collection:    &coll,
 		ChunkDataPack: &chunkDataPack,
-		EndState:      endState,
+		EndState:      flow.StateCommitment(endState),
 	}
 
 	return &verifiableChunkData
@@ -278,7 +278,7 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 		tx.Logs = []string{"log1", "log2"}
 	case "failedTx":
 		// add updates to the ledger
-		_ = led.Set("00", "", "", []byte{'F'})
+		_ = led.Set("05", "", "", []byte{'B'})
 		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
 	default:
 		_, _ = led.Get("00", "", "")

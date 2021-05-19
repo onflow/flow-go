@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -173,63 +174,68 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 }
 
-func TestBootstrapDuplicateID(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4}, // dupe
-	}
-	root := unittest.RootSnapshotFixture(participants)
-	bootstrap(t, root, func(state *bprotocol.State, err error) {
-		assert.Error(t, err)
-	})
-}
+func TestBootstrap_InvalidIdentities(t *testing.T) {
+	t.Run("duplicate node ID", func(t *testing.T) {
+		participants := unittest.CompleteIdentitySet()
+		dupeIDIdentity := unittest.IdentityFixture(unittest.WithNodeID(participants[0].NodeID))
+		participants = append(participants, dupeIDIdentity)
 
-func TestBootstrapZeroStake(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-	root := unittest.RootSnapshotFixture(participants)
-	bootstrap(t, root, func(state *bprotocol.State, err error) {
-		assert.Error(t, err)
-	})
-}
-
-func TestBootstrapMissingRole(t *testing.T) {
-	requiredRoles := []flow.Role{
-		flow.RoleConsensus,
-		flow.RoleCollection,
-		flow.RoleExecution,
-		flow.RoleVerification,
-	}
-
-	for _, role := range requiredRoles {
-		t.Run(fmt.Sprintf("no %s nodes", role.String()), func(t *testing.T) {
-			participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
-			root := unittest.RootSnapshotFixture(participants)
-			bootstrap(t, root, func(state *bprotocol.State, err error) {
-				assert.Error(t, err)
-			})
+		root := unittest.RootSnapshotFixture(participants)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
 		})
-	}
-}
+	})
 
-func TestBootstrapExistingAddress(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2}, // dupe address
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
+	t.Run("zero stake", func(t *testing.T) {
+		zeroStakeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithStake(0))
+		participants := unittest.CompleteIdentitySet(zeroStakeIdentity)
+		root := unittest.RootSnapshotFixture(participants)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
 
-	root := unittest.RootSnapshotFixture(participants)
-	bootstrap(t, root, func(state *bprotocol.State, err error) {
-		assert.Error(t, err)
+	t.Run("missing role", func(t *testing.T) {
+		requiredRoles := []flow.Role{
+			flow.RoleConsensus,
+			flow.RoleCollection,
+			flow.RoleExecution,
+			flow.RoleVerification,
+		}
+
+		for _, role := range requiredRoles {
+			t.Run(fmt.Sprintf("no %s nodes", role), func(t *testing.T) {
+				participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
+				root := unittest.RootSnapshotFixture(participants)
+				bootstrap(t, root, func(state *bprotocol.State, err error) {
+					assert.Error(t, err)
+				})
+			})
+		}
+	})
+
+	t.Run("duplicate address", func(t *testing.T) {
+		participants := unittest.CompleteIdentitySet()
+		dupeAddressIdentity := unittest.IdentityFixture(unittest.WithAddress(participants[0].Address))
+		participants = append(participants, dupeAddressIdentity)
+
+		root := unittest.RootSnapshotFixture(participants)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("non-canonical ordering", func(t *testing.T) {
+		participants := unittest.IdentityListFixture(20, unittest.WithAllRoles())
+
+		root := unittest.RootSnapshotFixture(participants)
+		// randomly shuffle the identities so they are not canonically ordered
+		encodable := root.Encodable()
+		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
+		root = inmem.SnapshotFromEncodable(encodable)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
 	})
 }
 

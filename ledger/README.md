@@ -19,7 +19,7 @@ In this context a *binary Merkle tree* is defined as [perfect binary tree](https
 
 - leaf nodes: holds a payload (data), a path (where the node is located), and a hash value (hash of path and payload content)
 
-- interior nodes: holds a hash value which is defined as hash of hash value of left and right children.
+- interim nodes: holds a hash value which is defined as hash of hash value of left and right children.
 
 ![node types image](/ledger/docs/node_types.png)
 
@@ -40,9 +40,9 @@ A *path* is a unique address of a node storing a payload. Paths are derived from
 ![proof image](/ledger/docs/proof.png?raw=true "proof")
 
 ### Memory-trie (Mtrie)
-An **Mtrie** in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but doesn't explicitly store empty nodes. Formally, a node is empty: 
+An **Mtrie** in this context is defined as a compact version of binary Merkle tree, providing the exact same functionality but doesn't explicitly store empty nodes. Formally, a node is empty: 
 * the node is an empty leaf node: it doesn't hold any data and only stores a path. Its hash value is defined as a default hash based on the height of tree.
-* an interior node is defined to be empty, if its two children are empty. 
+* an interim node is defined to be empty, if its two children are empty. 
 
 ![binary partial trie image](/ledger/docs/trie_update.gif?raw=true "binary partial trie")
 

@@ -31,8 +31,8 @@ const (
 )
 
 const (
-	_ = iota
-	_ = 1 << (10 * iota)
+	_  = iota
+	kb = 1 << (10 * iota)
 	mb
 	gb
 )
@@ -130,7 +130,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
 	m.libP2PNode = libP2PNode
-	m.libP2PNode.SetStreamHandler(m.handleIncomingStream)
+	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
@@ -428,10 +428,10 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 }
 
 // Ping pings the target node and returns the ping RTT or an error
-func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
 	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return -1, fmt.Errorf("could not find identity for target id: %w", err)
+		return message.PingResponse{}, -1, fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
 	return m.libP2PNode.Ping(m.ctx, targetIdentity)

@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/build"
+	"github.com/onflow/flow-go/cmd/build"
 )
 
 var ()

@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -43,6 +44,11 @@ func isValidEpochSetup(setup *flow.EpochSetup) error {
 		if participant.Stake == 0 {
 			return fmt.Errorf("node with zero stake (%x)", participant.NodeID)
 		}
+	}
+
+	// the participants must be ordered by canonical order
+	if !setup.Participants.Sorted(order.Canonical) {
+		return fmt.Errorf("participants are not canonically ordered")
 	}
 
 	// STEP 3: sanity checks for individual roles
@@ -102,19 +108,9 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 		return fmt.Errorf("missing DKG public group key")
 	}
 
-	participants := setup.Participants.Filter(filter.HasRole(flow.RoleConsensus))
-
-	// make sure each participant of the epoch has a DKG entry
-	for _, participant := range participants {
-		_, exists := commit.DKGParticipants[participant.NodeID]
-		if !exists {
-			return fmt.Errorf("missing DKG participant data (%x)", participant.NodeID)
-		}
-	}
-
-	// make sure that there is no extra data
-	if len(participants) != len(commit.DKGParticipants) {
-		return fmt.Errorf("DKG data contains extra entries")
+	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
+	if len(participants) != len(commit.DKGParticipantKeys) {
+		return fmt.Errorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}
 
 	return nil
@@ -151,6 +147,15 @@ func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	if seal.ResultID != result.ID() {
 		return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+	}
+
+	// identities must be canonically ordered
+	identities, err := snap.Identities(filter.Any)
+	if err != nil {
+		return fmt.Errorf("could not get identities for root snapshot: %w", err)
+	}
+	if !identities.Sorted(order.Canonical) {
+		return fmt.Errorf("identities are not canonically ordered")
 	}
 
 	// root qc must be for reference block of snapshot

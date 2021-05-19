@@ -98,3 +98,8 @@ var IsVotingConsensusCommitteeMember = And(
 	HasRole(flow.RoleConsensus),
 	IsValidCurrentEpochParticipant,
 )
+
+// IsValidDKGParticipant is an identity filter for all DKG participants. It is
+// equivalent to the filter for consensus committee members, as these are
+// the same group for now.
+var IsValidDKGParticipant = IsVotingConsensusCommitteeMember

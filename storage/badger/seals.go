@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type Seals struct {
@@ -20,10 +21,10 @@ type Seals struct {
 
 func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		sealID := key.(flow.Identifier)
 		seal := val.(*flow.Seal)
-		return operation.SkipDuplicates(operation.InsertSeal(sealID, seal))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertSeal(sealID, seal)))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -37,18 +38,17 @@ func NewSeals(collector module.CacheMetrics, db *badger.DB) *Seals {
 
 	s := &Seals{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceSeal,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceSeal)),
+			withRetrieve(retrieve)),
 	}
 
 	return s
 }
 
-func (s *Seals) storeTx(seal *flow.Seal) func(*badger.Txn) error {
-	return s.cache.Put(seal.ID(), seal)
+func (s *Seals) storeTx(seal *flow.Seal) func(*transaction.Tx) error {
+	return s.cache.PutTx(seal.ID(), seal)
 }
 
 func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal, error) {
@@ -62,7 +62,7 @@ func (s *Seals) retrieveTx(sealID flow.Identifier) func(*badger.Txn) (*flow.Seal
 }
 
 func (s *Seals) Store(seal *flow.Seal) error {
-	return operation.RetryOnConflict(s.db.Update, s.storeTx(seal))
+	return operation.RetryOnConflictTx(s.db, transaction.Update, s.storeTx(seal))
 }
 
 func (s *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
@@ -75,7 +75,7 @@ func (s *Seals) ByBlockID(blockID flow.Identifier) (*flow.Seal, error) {
 	var sealID flow.Identifier
 	err := s.db.View(operation.LookupBlockSeal(blockID, &sealID))
 	if err != nil {
-		return nil, fmt.Errorf("could not look up seal for sealed: %w", err)
+		return nil, fmt.Errorf("failed to retrieve seal for fork with head %x: %w", blockID, err)
 	}
 	return s.ByID(sealID)
 }

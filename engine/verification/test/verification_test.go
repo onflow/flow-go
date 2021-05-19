@@ -10,7 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/engine/verification/utils"
+	enginemock "github.com/onflow/flow-go/engine/testutil/mock"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -52,7 +53,7 @@ func TestHappyPath(t *testing.T) {
 			defer mu.Unlock()
 
 			collector := metrics.NewNoopCollector()
-			VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount, collector, collector)
+			vertestutils.VerificationHappyPath(t, tc.verNodeCount, tc.chunkCount, collector, collector)
 		})
 	}
 }
@@ -102,18 +103,20 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	root, err := verNode.State.Params().Root()
 	require.NoError(t, err)
 
-	completeER := utils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
+	completeER := vertestutils.CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
 	// stores block of execution result in state and mutate state accordingly
 	err = verNode.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
 	require.NoError(t, err)
 
 	// mocks chunk assignment
-	MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity}, []*utils.CompleteExecutionReceipt{completeER}, evenChunkIndexAssigner)
+	_, expectedChunkIDs := vertestutils.MockChunkAssignmentFixture(assigner, flow.IdentityList{verIdentity},
+		[]*vertestutils.CompleteExecutionReceipt{completeER}, vertestutils.EvenChunkIndexAssigner)
 
 	// starts all the engines
-	<-verNode.FinderEngine.Ready()
-	<-verNode.MatchEngine.(module.ReadyDoneAware).Ready()
-	<-verNode.VerifierEngine.(module.ReadyDoneAware).Ready()
+	unittest.RequireComponentsReadyBefore(t, 1*time.Second,
+		verNode.FinderEngine,
+		verNode.MatchEngine.(module.ReadyDoneAware),
+		verNode.VerifierEngine)
 
 	// starts verification node's network in continuous mode
 	verNet, ok := hub.GetNetwork(verIdentity.NodeID)
@@ -121,23 +124,26 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode, exeEngine := SetupMockExeNode(t,
+	exeNode, exeEngine := vertestutils.SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
-		flow.IdentityList{verIdentity},
 		identities,
 		chainID,
-		completeER)
+		[]*vertestutils.CompleteExecutionReceipt{completeER},
+		expectedChunkIDs,
+		vertestutils.RespondChunkDataPackRequest) // always responds to chunk data pack requests.
 
 	// consensus node
 	// mock consensus node
-	conNode, conEngine, conWG := SetupMockConsensusNode(t,
+	conNode, conEngine, conWG := vertestutils.SetupMockConsensusNode(t,
+		unittest.Logger(),
 		hub,
 		conIdentity,
 		flow.IdentityList{verIdentity},
 		identities,
-		completeER,
-		chainID)
+		vertestutils.CompleteExecutionReceiptList{completeER},
+		chainID,
+		expectedChunkIDs)
 
 	// send the ER from execution to verification node
 	err = verNode.FinderEngine.Process(exeIdentity.NodeID, completeER.Receipts[0])
@@ -157,14 +163,16 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	// stops verification node
 	// Note: this should be done prior to any evaluation to make sure that
 	// the process method of Ingest engines is done working.
-	<-verNode.FinderEngine.Done()
-	<-verNode.MatchEngine.(module.ReadyDoneAware).Done()
-	<-verNode.VerifierEngine.(module.ReadyDoneAware).Done()
+	unittest.RequireComponentsDoneBefore(t, 1*time.Second,
+		verNode.FinderEngine,
+		verNode.MatchEngine.(module.ReadyDoneAware),
+		verNode.VerifierEngine)
 
 	// receipt ID should be added to the ingested results mempool
 	assert.True(t, verNode.ProcessedResultIDs.Has(completeER.Receipts[0].ExecutionResult.ID()))
 
-	verNode.Done()
-	conNode.Done()
-	exeNode.Done()
+	enginemock.RequireGenericNodesDoneBefore(t, 1*time.Second,
+		conNode,
+		exeNode,
+		verNode.GenericNode)
 }

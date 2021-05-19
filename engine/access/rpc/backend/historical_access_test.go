@@ -39,7 +39,6 @@ func (suite *Suite) TestHistoricalTransactionResult() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
 		nil,
 		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
 		suite.blocks,
@@ -96,7 +95,6 @@ func (suite *Suite) TestHistoricalTransaction() {
 
 	backend := New(
 		suite.state,
-		suite.execClient,
 		nil,
 		[]accessproto.AccessAPIClient{suite.historicalAccessClient},
 		suite.blocks,

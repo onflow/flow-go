@@ -4,7 +4,87 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
+	cryptoHash "github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/hash"
 )
+
+// Path captures storage path of a payload;
+// where we store a payload in the ledger
+type Path hash.Hash
+
+// DummyPath is an arbitrary path value, used in function error returns.
+var DummyPath = Path(hash.DummyHash)
+
+// PathLen is the size of paths in bytes.
+const PathLen = 32
+
+// The node maximum height or the tree height.
+// It corresponds to the path size in bits.
+const NodeMaxHeight = PathLen * 8
+
+// we are currently supporting paths of a size equal to 32 bytes.
+// I.e. path length from the rootNode of a fully expanded tree to the leaf node is 256.
+// A path of length k is comprised of k+1 vertices. Hence, we need 257 default hashes.
+const defaultHashesNum = NodeMaxHeight + 1
+
+// array to store all default hashes
+var defaultHashes [defaultHashesNum]hash.Hash
+
+func init() {
+	hasher := cryptoHash.NewSHA3_256()
+
+	// default value and default hash value for a default node
+	var defaultLeafHash hash.Hash
+	copy(defaultLeafHash[:], hasher.ComputeHash([]byte("default:")))
+
+	// Creates the Default hashes from base to level height
+	defaultHashes[0] = defaultLeafHash
+	for i := 1; i < defaultHashesNum; i++ {
+		defaultHashes[i] = hash.HashInterNode(defaultHashes[i-1], defaultHashes[i-1])
+	}
+}
+
+// GetDefaultHashes returns the default hashes of the SMT.
+//
+// For each tree level N, there is a default hash equal to the chained
+// hashing of the default value N times.
+func GetDefaultHashes() [defaultHashesNum]hash.Hash {
+	return defaultHashes
+}
+
+// GetDefaultHashForHeight returns the default hashes of the SMT at a specified height.
+//
+// For each tree level N, there is a default hash equal to the chained
+// hashing of the default value N times.
+func GetDefaultHashForHeight(height int) hash.Hash {
+	return defaultHashes[height]
+}
+
+// ComputeCompactValue computes the value for the node considering the sub tree
+// to only include this value and default values. It writes the hash result to the result input.
+// UNCHECKED: payload!= nil
+func ComputeCompactValue(path hash.Hash, value []byte, nodeHeight int) hash.Hash {
+	// if register is unallocated: return default hash
+	if len(value) == 0 {
+		return GetDefaultHashForHeight(nodeHeight)
+	}
+
+	var out hash.Hash
+	out = hash.HashLeaf(path, value)   // we first compute the hash of the fully-expanded leaf
+	for h := 1; h <= nodeHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+		// h is the height of the node, whose hash we are computing in this iteration.
+		// The hash is computed from the node's children at height h-1.
+		bit := bitutils.Bit(path[:], NodeMaxHeight-h)
+		if bit == 1 { // right branching
+			out = hash.HashInterNode(GetDefaultHashForHeight(h-1), out)
+		} else { // left branching
+			out = hash.HashInterNode(out, GetDefaultHashForHeight(h-1))
+		}
+	}
+	return out
+}
 
 // TrieRead captures a trie read query
 type TrieRead struct {
@@ -32,13 +112,11 @@ func (u *TrieUpdate) IsEmpty() bool {
 func (u *TrieUpdate) String() string {
 	str := "Trie Update:\n "
 	str += "\t triehash : " + u.RootHash.String() + "\n"
-	tp := 0
 	for i, p := range u.Paths {
-		tp += p.Size()
 		str += fmt.Sprintf("\t\t path %d : %s\n", i, p)
 	}
-	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), tp)
-	tp = 0
+	str += fmt.Sprintf("\t paths len: %d , bytesize: %d\n", len(u.Paths), len(u.Paths)*PathLen)
+	tp := 0
 	for _, p := range u.Payloads {
 		tp += p.Size()
 	}
@@ -75,53 +153,51 @@ func (u *TrieUpdate) Equals(other *TrieUpdate) bool {
 }
 
 // RootHash captures the root hash of a trie
-type RootHash []byte
+type RootHash hash.Hash
 
 func (rh RootHash) String() string {
-	return hex.EncodeToString(rh)
+	return hex.EncodeToString(rh[:])
 }
 
 // Equals compares the root hash to another one
 func (rh RootHash) Equals(o RootHash) bool {
-	if o == nil {
-		return false
-	}
-	return bytes.Equal(rh, o)
+	return rh == o
 }
 
-// Path captures storage path of a payload;
-// where we store a payload in the ledger
-type Path []byte
+// ToRootHash converts a byte slice into a root hash.
+// It returns an error if the slice has an invalid length.
+func ToRootHash(rootHashBytes []byte) (RootHash, error) {
+	var rootHash RootHash
+	if len(rootHashBytes) != len(rootHash) {
+		return RootHash(hash.DummyHash), fmt.Errorf("expecting %d bytes but got %d bytes", len(rootHash), len(rootHashBytes))
+	}
+	copy(rootHash[:], rootHashBytes)
+	return rootHash, nil
+}
 
 func (p Path) String() string {
 	str := ""
 	for _, i := range p {
 		str += fmt.Sprintf("%08b", i)
 	}
-	if len(str) > 16 {
-		str = str[0:8] + "..." + str[len(str)-8:]
-	}
+	str = str[0:8] + "..." + str[len(str)-8:]
 	return str
-}
-
-// Size returns the size of the path
-func (p *Path) Size() int {
-	return len(*p)
 }
 
 // Equals compares this path to another path
 func (p Path) Equals(o Path) bool {
-	if o == nil {
-		return false
-	}
-	return bytes.Equal([]byte(p), []byte(o))
+	return p == o
 }
 
-// DeepCopy returns a deep copy of the payload
-func (p *Path) DeepCopy() Path {
-	newP := make([]byte, 0, len(*p))
-	path := []byte(*p)
-	return Path(append(newP, path...))
+// ToPath converts a byte slice into a path.
+// It returns an error if the slice has an invalid length.
+func ToPath(pathBytes []byte) (Path, error) {
+	var path Path
+	if len(pathBytes) != len(path) {
+		return DummyPath, fmt.Errorf("expecting %d bytes but got %d bytes", len(path), len(pathBytes))
+	}
+	copy(path[:], pathBytes)
+	return path, nil
 }
 
 // Payload is the smallest immutable storable unit in ledger
@@ -178,20 +254,19 @@ func EmptyPayload() *Payload {
 // through a trie branch from an specific leaf node (key)
 // up to the root of the trie.
 type TrieProof struct {
-	Path      Path     // path
-	Payload   *Payload // payload
-	Interims  [][]byte // the non-default intermediate nodes in the proof
-	Inclusion bool     // flag indicating if this is an inclusion or exclusion proof
-	Flags     []byte   // The flags of the proofs (is set if an intermediate node has a non-default)
-	Steps     uint8    // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
+	Path      Path        // path
+	Payload   *Payload    // payload
+	Interims  []hash.Hash // the non-default intermediate nodes in the proof
+	Inclusion bool        // flag indicating if this is an inclusion or exclusion proof
+	Flags     []byte      // The flags of the proofs (is set if an intermediate node has a non-default)
+	Steps     uint8       // number of steps for the proof (path len) // TODO: should this be a type allowing for larger values?
 }
 
 // NewTrieProof creates a new instance of Trie Proof
 func NewTrieProof() *TrieProof {
 	return &TrieProof{
-		Path:      make([]byte, 0),
 		Payload:   EmptyPayload(),
-		Interims:  make([][]byte, 0),
+		Interims:  make([]hash.Hash, 0),
 		Inclusion: false,
 		Flags:     make([]byte, 0),
 		Steps:     0,
@@ -237,7 +312,7 @@ func (p *TrieProof) Equals(o *TrieProof) bool {
 		return false
 	}
 	for i, inter := range p.Interims {
-		if !bytes.Equal(inter, o.Interims[i]) {
+		if inter != o.Interims[i] {
 			return false
 		}
 	}
