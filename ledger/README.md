@@ -19,13 +19,11 @@ In this context a *binary Merkle tree* is defined as [perfect binary tree](https
 
 - leaf nodes: holds a payload (data), a path (where the node is located), and a hash value (hash of path and payload content)
 
-- empty leaf nodes: doesn't hold any data and only stores a path, and a default hash value based on the height of tree
-
 - interior nodes: holds a hash value which is defined as hash of hash value of left and right children.
 
 ![node types image](/ledger/docs/node_types.png)
 
-A *path* is a unique address of a node storing a payload. Paths are derived from the content of payloads (see common/pathfinder).
+A *path* is a unique address of a node storing a payload. Paths are derived from the content of payloads (see common/pathfinder). A path is explicitly a hash of 256 bits.  
 
 ![paths image](/ledger/docs/paths.png?raw=true "paths")
 
@@ -41,9 +39,9 @@ A *path* is a unique address of a node storing a payload. Paths are derived from
 
 ![proof image](/ledger/docs/proof.png?raw=true "proof")
 
-### binary Merkle trie
-A **binary Merkle trie** in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but doesn't explicitly store empty nodes. Formally, a node is empty: 
-* the node is an empty leaf node (see definition above)
+### Memory-trie (Mtrie)
+An **Mtrie** in this context is defined as a compact version of binary Merkle tree, providing exact same functionality but doesn't explicitly store empty nodes. Formally, a node is empty: 
+* the node is an empty leaf node: it doesn't hold any data and only stores a path. Its hash value is defined as a default hash based on the height of tree.
 * an interior node is defined to be empty, if its two children are empty. 
 
 ![binary partial trie image](/ledger/docs/trie_update.gif?raw=true "binary partial trie")
@@ -57,7 +55,7 @@ A **compact forest** constructs a new trie after each update (copy on change) an
 ![compact forest image](/ledger/docs/reuse_sub_trees.gif?raw=true "compact forest")
 
 ### path finder 
-**Path finder** deterministically computes a path for a given payload. Path finder is responsible to make sure the trie grows in balance and relevant data are stored nearby so that the proof size can be optimized.
+**Path finder** deterministically computes a path for a given payload. Path finder is responsible for making sure the trie grows in balance.
 
 ### partial binary Merkle trie
 A **partial Merkle trie** is similar to a Merkle trie but only keeping a subset of nodes and having intermediate nodes without the full sub-trie. It can be constructed from batch of inclusion and non-inclusion proofs. It provides functionality to verify outcome of updates to a trie without the need to have the full trie.
