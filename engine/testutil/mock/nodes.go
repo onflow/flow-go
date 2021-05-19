@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -114,11 +116,19 @@ func (g *GenericNode) CloseDB() error {
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
-	Collections     storage.Collections
-	Transactions    storage.Transactions
-	IngestionEngine *collectioningest.Engine
-	PusherEngine    *pusher.Engine
-	ProviderEngine  *provider.Engine
+	Collections            storage.Collections
+	Transactions           storage.Transactions
+	IngestionEngine        *collectioningest.Engine
+	PusherEngine           *pusher.Engine
+	ProviderEngine         *provider.Engine
+	TxPools                *epochpool.TransactionPools
+	Voter                  module.ClusterRootQCVoter
+	ClusterStateFactory    *factories.ClusterStateFactory
+	BuilderFactory         *factories.BuilderFactory
+	ProposalEngineFactory  *factories.ProposalEngineFactory
+	SyncFactory            *factories.SyncEngineFactory
+	HotStuffFactory        *factories.HotStuffFactory
+	EpochComponentsFactory *factories.EpochComponentsFactory
 }
 
 // ConsensusNode implements an in-process consensus node for tests.
