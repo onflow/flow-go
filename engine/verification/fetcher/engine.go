@@ -378,7 +378,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	}
 
 	// 3. collection id must match
-	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result)
+	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result, chunk)
 	if err != nil {
 		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
 			collection.ID(),
@@ -396,19 +396,21 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 func (e Engine) validateCollectionID(collection *flow.Collection,
 	chunkDataPack *flow.ChunkDataPack,
 	chunkIndex uint64,
-	result *flow.ExecutionResult) error {
+	result *flow.ExecutionResult,
+	chunk *flow.Chunk) error {
 
 	if IsSystemChunk(chunkIndex, result) {
 		return e.validateSystemChunkCollection(collection, chunkDataPack)
 	}
 
-	return e.validateNonSystemChunkCollection(collection, chunkDataPack)
+	return e.validateNonSystemChunkCollection(collection, chunkDataPack, chunk)
 }
 
 // validateSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
 // A collection is valid against a system chunk if collection is empty of transactions, and chunk data pack has a zero ID collection.
 func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
 	collID := flow.ZeroID // for system chunk, the collection ID should be always zero ID.
+
 	if collection.Len() != 0 {
 		return engine.NewInvalidInputErrorf("non-empty collection for system chunk, found on chunk data pack: %v, actual collection: %v, len: %d",
 			chunkDataPack.CollectionID, collection.ID(), collection.Len())
@@ -425,11 +427,24 @@ func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunk
 // A collection is valid against a non-system chunk if it has a matching collection ID with system chunk's collection ID field.
 //
 // TODO: collection ID should also be checked against its block.
-func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
+func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack, chunk *flow.Chunk) error {
 	collID := collection.ID()
 
+	block, err := e.blocks.ByID(chunk.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get block: %w", err)
+	}
+
+	if block.Payload.Guarantees[chunk.Index].CollectionID != collID {
+		return engine.NewInvalidInputErrorf("mismatch collection id with guarantee, expected: %v, got: %v",
+			block.Payload.Guarantees[chunk.Index].CollectionID,
+			collID)
+	}
+
 	if chunkDataPack.CollectionID != collID {
-		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
+		return engine.NewInvalidInputErrorf("mismatch collection id with chunk data pack, expected %v, got: %v",
+			chunkDataPack.CollectionID,
+			collID)
 	}
 
 	return nil
