@@ -16,11 +16,12 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
-	fvmEvent "github.com/onflow/flow-go/fvm/event"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
@@ -29,52 +30,57 @@ import (
 )
 
 var _ runtime.Interface = &hostEnv{}
-var _ runtime.HighLevelStorage = &hostEnv{}
 
 type hostEnv struct {
-	ctx                Context
-	sth                *state.StateHolder
-	vm                 *VirtualMachine
-	accounts           *state.Accounts
-	contracts          *handler.ContractHandler
-	programs           *handler.ProgramsHandler
-	addressGenerator   flow.AddressGenerator
-	uuidGenerator      *state.UUIDGenerator
-	metrics            runtime.Metrics
-	events             []flow.Event
-	serviceEvents      []flow.Event
-	totalEventByteSize uint64
-	logs               []string
-	totalGasUsed       uint64
-	transactionEnv     *transactionEnv
-	rng                *rand.Rand
+	ctx              Context
+	sth              *state.StateHolder
+	vm               *VirtualMachine
+	accounts         *state.Accounts
+	contracts        *handler.ContractHandler
+	programs         *handler.ProgramsHandler
+	addressGenerator flow.AddressGenerator
+	uuidGenerator    *state.UUIDGenerator
+	metrics          runtime.Metrics
+	eventHandler     *handler.EventHandler
+	logs             []string
+	totalGasUsed     uint64
+	transactionEnv   *transactionEnv
+	rng              *rand.Rand
 }
 
 func newEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *hostEnv {
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
-	contracts := handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
-		[]runtime.Address{runtime.Address(ctx.Chain.ServiceAddress())})
-
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	programsHandler := handler.NewProgramsHandler(
 		programs, sth,
 	)
 
+	// TODO set the flags on context
+	eventHandler := handler.NewEventHandler(ctx.Chain,
+		ctx.EventCollectionEnabled,
+		ctx.ServiceEventCollectionEnabled,
+		ctx.EventCollectionByteSizeLimit,
+	)
+
 	env := &hostEnv{
-		ctx:                ctx,
-		sth:                sth,
-		vm:                 vm,
-		metrics:            &noopMetricsCollector{},
-		accounts:           accounts,
-		contracts:          contracts,
-		addressGenerator:   generator,
-		uuidGenerator:      uuidGenerator,
-		totalEventByteSize: uint64(0),
-		programs:           programsHandler,
+		ctx:              ctx,
+		sth:              sth,
+		vm:               vm,
+		metrics:          &noopMetricsCollector{},
+		accounts:         accounts,
+		addressGenerator: generator,
+		uuidGenerator:    uuidGenerator,
+		eventHandler:     eventHandler,
+		programs:         programsHandler,
 	}
+
+	contracts := handler.NewContractHandler(accounts,
+		ctx.RestrictedDeploymentEnabled,
+		env.GetAuthorizedAccountsForContractUpdates,
+	)
+	env.contracts = contracts
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
@@ -109,16 +115,47 @@ func (e *hostEnv) setTransaction(tx *flow.TransactionBody, txIndex uint32) {
 	)
 }
 
+// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
+// are authorized to update/deploy contracts
+//
+// It reads a storage path from service account and parse the addresses.
+// if any issue occurs on the process (missing registers, stored value properly not set)
+// it gracefully handle it and falls back to default behaviour (only service account be authorized)
+func (e *hostEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
+	// set default to service account only
+	service := runtime.Address(e.ctx.Chain.ServiceAddress())
+	defaultAccounts := []runtime.Address{service}
+
+	value, err := e.vm.Runtime.ReadStored(
+		service,
+		cadence.Path{
+			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
+			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
+		},
+		runtime.Context{Interface: e},
+	)
+	if err != nil {
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
+		return defaultAccounts
+	}
+	adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	if !ok {
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
+		return defaultAccounts
+	}
+	return adresses
+}
+
 func (e *hostEnv) setTraceSpan(span opentracing.Span) {
 	e.transactionEnv.traceSpan = span
 }
 
 func (e *hostEnv) getEvents() []flow.Event {
-	return e.events
+	return e.eventHandler.Events()
 }
 
 func (e *hostEnv) getServiceEvents() []flow.Event {
-	return e.serviceEvents
+	return e.eventHandler.ServiceEvents()
 }
 
 func (e *hostEnv) getLogs() []string {
@@ -450,34 +487,7 @@ func (e *hostEnv) EmitEvent(event cadence.Event) error {
 		return errors.NewOperationNotSupportedError("EmitEvent")
 	}
 
-	payload, err := jsoncdc.Encode(event)
-	if err != nil {
-		return errors.NewEncodingFailuref("failed to json encode a cadence event: %w", err)
-	}
-
-	e.totalEventByteSize += uint64(len(payload))
-
-	// skip limit if payer is service account
-	if e.transactionEnv.tx.Payer != e.ctx.Chain.ServiceAddress() {
-		if e.totalEventByteSize > e.ctx.EventCollectionByteSizeLimit {
-			return errors.NewEventLimitExceededError(e.totalEventByteSize, e.ctx.EventCollectionByteSizeLimit)
-		}
-	}
-
-	flowEvent := flow.Event{
-		Type:             flow.EventType(event.EventType.ID()),
-		TransactionID:    e.transactionEnv.TxID(),
-		TransactionIndex: e.transactionEnv.TxIndex(),
-		EventIndex:       uint32(len(e.events)),
-		Payload:          payload,
-	}
-
-	if fvmEvent.IsServiceEvent(event, e.ctx.Chain) {
-		e.serviceEvents = append(e.serviceEvents, flowEvent)
-	}
-
-	e.events = append(e.events, flowEvent)
-	return nil
+	return e.eventHandler.EmitEvent(event, e.transactionEnv.txID, e.transactionEnv.txIndex, e.transactionEnv.tx.Payer)
 }
 
 func (e *hostEnv) GenerateUUID() (uint64, error) {
@@ -551,17 +561,21 @@ func (e *hostEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error
 }
 
 func (e *hostEnv) Events() []flow.Event {
-	return e.events
+	return e.eventHandler.Events()
 }
 
 func (e *hostEnv) Logs() []string {
 	return e.logs
 }
 
-func (e *hostEnv) Hash(data []byte, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
+func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.transactionEnv.traceSpan, trace.FVMEnvHash)
 		defer sp.Finish()
+	}
+
+	if len(tag) > 0 {
+		return nil, fmt.Errorf("specifying the tag when computing a hash is not yet supported")
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
@@ -608,16 +622,9 @@ func (e *hostEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *hostEnv) HighLevelStorageEnabled() bool {
-	return e.ctx.SetValueHandler != nil
-}
-
-func (e *hostEnv) SetCadenceValue(owner common.Address, key string, value cadence.Value) error {
-	err := e.ctx.SetValueHandler(flow.Address(owner), key, value)
-	if err != nil {
-		return fmt.Errorf("setting cadence value failed: %w", err)
-	}
-	return err
+func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
+	// TODO: this is a stub for now
+	return false, nil
 }
 
 // Block Environment Functions
@@ -888,10 +895,15 @@ func (e *hostEnv) ImplementationDebugLog(message string) error {
 
 func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
-			},
+			[]opentracing.LogRecord{
+				{Timestamp: time.Now(),
+					Fields: []traceLog.Field{traceLog.String("location", locStr)},
+				},
 			},
 		)
 	}
@@ -900,9 +912,13 @@ func (e *hostEnv) ProgramParsed(location common.Location, duration time.Duration
 
 func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceCheckProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", locStr)},
 			},
 			},
 		)
@@ -912,9 +928,13 @@ func (e *hostEnv) ProgramChecked(location common.Location, duration time.Duratio
 
 func (e *hostEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
 	if e.isTraceable() {
+		locStr := ""
+		if location != nil {
+			locStr = location.String()
+		}
 		e.ctx.Tracer.RecordSpanFromParent(e.transactionEnv.traceSpan, trace.FVMCadenceInterpretProgram, duration,
 			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
+				Fields: []traceLog.Field{traceLog.String("location", locStr)},
 			},
 			},
 		)

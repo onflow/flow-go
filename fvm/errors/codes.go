@@ -57,6 +57,7 @@ const (
 	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
 	ErrCodeStateKeySizeLimitError             ErrorCode = 1107
 	ErrCodeStateValueSizeLimitError           ErrorCode = 1108
+	ErrCodeTransactionFeeDeductionFailedError ErrorCode = 1109
 
 	// accounts errors 1200 - 1250
 	// ErrCodeAccountError              ErrorCode = 1200 - reserved

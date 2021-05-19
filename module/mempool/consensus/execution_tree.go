@@ -29,7 +29,7 @@ type ExecutionTree struct {
 func NewExecutionTree() *ExecutionTree {
 	return &ExecutionTree{
 		RWMutex: sync.RWMutex{},
-		forest:  *forest.NewLevelledForest(),
+		forest:  *forest.NewLevelledForest(0),
 		size:    0,
 	}
 }

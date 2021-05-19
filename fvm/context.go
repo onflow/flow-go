@@ -26,10 +26,12 @@ type Context struct {
 	RestrictedAccountCreationEnabled bool
 	RestrictedDeploymentEnabled      bool
 	LimitAccountStorage              bool
+	TransactionFeesEnabled           bool
 	CadenceLoggingEnabled            bool
+	EventCollectionEnabled           bool
+	ServiceEventCollectionEnabled    bool
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
-	SetValueHandler                  SetValueHandler
 	SignatureVerifier                SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
@@ -82,15 +84,15 @@ func defaultContext(logger zerolog.Logger) Context {
 		RestrictedAccountCreationEnabled: true,
 		RestrictedDeploymentEnabled:      true,
 		CadenceLoggingEnabled:            false,
+		EventCollectionEnabled:           true,
+		ServiceEventCollectionEnabled:    false,
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
-		SetValueHandler:                  nil,
 		SignatureVerifier:                NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
 			NewTransactionSequenceNumberChecker(),
-			NewTransactionFeeDeductor(),
 			NewTransactionAccountFrozenEnabler(),
 			NewTransactionInvocator(logger),
 		},
@@ -170,6 +172,14 @@ func WithBlockHeader(header *flow.Header) Option {
 func WithAccountFreezeAvailable(accountFreezeAvailable bool) Option {
 	return func(ctx Context) Context {
 		ctx.AccountFreezeAvailable = accountFreezeAvailable
+		return ctx
+	}
+}
+
+// WithServiceEventCollectionEnabled enables service event collection
+func WithServiceEventCollectionEnabled() Option {
+	return func(ctx Context) Context {
+		ctx.ServiceEventCollectionEnabled = true
 		return ctx
 	}
 }
@@ -255,20 +265,19 @@ func WithRestrictedAccountCreation(enabled bool) Option {
 	}
 }
 
-// WithSetValueHandler sets a handler that is called when a value is written
-// by the Cadence runtime.
-func WithSetValueHandler(handler SetValueHandler) Option {
-	return func(ctx Context) Context {
-		ctx.SetValueHandler = handler
-		return ctx
-	}
-}
-
 // WithAccountStorageLimit enables or disables checking if account storage used is
 // over its storage capacity
 func WithAccountStorageLimit(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.LimitAccountStorage = enabled
+		return ctx
+	}
+}
+
+// WithTransactionFeesEnabled enables or disables deduction of transaction fees
+func WithTransactionFeesEnabled(enabled bool) Option {
+	return func(ctx Context) Context {
+		ctx.TransactionFeesEnabled = enabled
 		return ctx
 	}
 }

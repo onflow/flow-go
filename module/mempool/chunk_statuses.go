@@ -24,4 +24,7 @@ type ChunkStatuses interface {
 
 	// All returns all chunk statuses stored in this memory pool.
 	All() []*verification.ChunkStatus
+
+	// Size returns total number of chunk statuses in the memory pool.
+	Size() uint
 }

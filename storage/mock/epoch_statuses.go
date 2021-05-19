@@ -3,9 +3,7 @@
 package mock
 
 import (
-	badger "github.com/dgraph-io/badger/v2"
 	flow "github.com/onflow/flow-go/model/flow"
-
 	mock "github.com/stretchr/testify/mock"
 
 	transaction "github.com/onflow/flow-go/storage/badger/transaction"
@@ -40,23 +38,7 @@ func (_m *EpochStatuses) ByBlockID(_a0 flow.Identifier) (*flow.EpochStatus, erro
 }
 
 // StoreTx provides a mock function with given fields: blockID, state
-func (_m *EpochStatuses) StoreTx(blockID flow.Identifier, state *flow.EpochStatus) func(*badger.Txn) error {
-	ret := _m.Called(blockID, state)
-
-	var r0 func(*badger.Txn) error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, *flow.EpochStatus) func(*badger.Txn) error); ok {
-		r0 = rf(blockID, state)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(func(*badger.Txn) error)
-		}
-	}
-
-	return r0
-}
-
-// StoreTxn provides a mock function with given fields: blockID, state
-func (_m *EpochStatuses) StoreTxn(blockID flow.Identifier, state *flow.EpochStatus) func(*transaction.Tx) error {
+func (_m *EpochStatuses) StoreTx(blockID flow.Identifier, state *flow.EpochStatus) func(*transaction.Tx) error {
 	ret := _m.Called(blockID, state)
 
 	var r0 func(*transaction.Tx) error
