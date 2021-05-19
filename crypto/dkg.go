@@ -64,17 +64,25 @@ type index byte
 func newDKGCommon(size int, threshold int, currentIndex int,
 	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
-		return nil, fmt.Errorf("size should be between %d and %d", DKGMinSize, DKGMaxSize)
+		return nil, newInvalidInputs(fmt.Sprintf(
+			"size should be between %d and %d",
+			DKGMinSize,
+			DKGMaxSize))
 	}
 
 	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
-		return nil, fmt.Errorf("indices of current and leader nodes must be between 0 and %d, got %d",
-			size-1, currentIndex)
+		return nil, newInvalidInputs(fmt.Sprintf(
+			"indices of current and leader nodes must be between 0 and %d, got %d",
+			size-1,
+			currentIndex))
 	}
 
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, fmt.Errorf("The threshold must be between %d and %d, got %d",
-			MinimumThreshold, size-1, threshold)
+		return nil, newInvalidInputs(fmt.Sprintf(
+			"The threshold must be between %d and %d, got %d",
+			MinimumThreshold,
+			size-1,
+			threshold))
 	}
 
 	return &dkgCommon{
