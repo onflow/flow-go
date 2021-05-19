@@ -34,6 +34,11 @@ func TestApprovalProcessingCore(t *testing.T) {
 	suite.Run(t, new(ApprovalProcessingCoreTestSuite))
 }
 
+// RequiredApprovalsForSealConstructionTestingValue defines the number of approvals that are
+// required to construct a seal for testing purposes. Thereby, the default production value
+// can be set independently without changing test behaviour.
+const RequiredApprovalsForSealConstructionTestingValue = 1
+
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseApprovalsTestSuite
 
