@@ -201,7 +201,7 @@ func main() {
 				verifierEng,
 				node.State,
 				chunkStatuses,
-				node.Storage.Headers,
+				node.Storage.Blocks,
 				node.Storage.Results,
 				node.Storage.Receipts,
 				requesterEngine)
