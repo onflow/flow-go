@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ExecutionResults implements persistent storage for execution results.
@@ -21,9 +22,9 @@ type ExecutionResults struct {
 
 func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *ExecutionResults {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		result := val.(*flow.ExecutionResult)
-		return operation.SkipDuplicates(operation.InsertExecutionResult(result))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -46,8 +47,8 @@ func NewExecutionResults(collector module.CacheMetrics, db *badger.DB) *Executio
 	return res
 }
 
-func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*badger.Txn) error {
-	return r.cache.Put(result.ID(), result)
+func (r *ExecutionResults) store(result *flow.ExecutionResult) func(*transaction.Tx) error {
+	return r.cache.PutTx(result.ID(), result)
 }
 
 func (r *ExecutionResults) byID(resultID flow.Identifier) func(*badger.Txn) (*flow.ExecutionResult, error) {
@@ -71,9 +72,9 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) 
 	}
 }
 
-func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		err := operation.IndexExecutionResult(blockID, resultID)(tx)
+func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+		err := transaction.WithTx(operation.IndexExecutionResult(blockID, resultID))(tx)
 		if err == nil {
 			return nil
 		}
@@ -85,7 +86,7 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger
 		// when trying to index a result for a block, and there is already a result indexed for this block,
 		// double check if the indexed result is the same
 		var storedResultID flow.Identifier
-		err = operation.LookupExecutionResult(blockID, &storedResultID)(tx)
+		err = transaction.WithTx(operation.LookupExecutionResult(blockID, &storedResultID))(tx)
 		if err != nil {
 			return fmt.Errorf("there is a result stored already, but cannot retrieve it: %w", err)
 		}
@@ -100,7 +101,7 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*badger
 }
 
 func (r *ExecutionResults) Store(result *flow.ExecutionResult) error {
-	return operation.RetryOnConflict(r.db.Update, r.store(result))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.store(result))
 }
 
 func (r *ExecutionResults) BatchStore(result *flow.ExecutionResult, batch storage.BatchStorage) error {
@@ -120,7 +121,7 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := operation.RetryOnConflict(r.db.Update, r.index(blockID, resultID))
+	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID))
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}

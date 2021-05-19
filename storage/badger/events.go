@@ -45,7 +45,7 @@ func (e *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch 
 	}
 
 	callback := func() {
-		e.cache.Put(blockID, events)
+		e.cache.Insert(blockID, events)
 	}
 	batch.OnSucceed(callback)
 	return nil
@@ -127,7 +127,7 @@ func (e *ServiceEvents) BatchStore(blockID flow.Identifier, events []flow.Event,
 	}
 
 	callback := func() {
-		e.cache.Put(blockID, events)
+		e.cache.Insert(blockID, events)
 	}
 	batch.OnSucceed(callback)
 	return nil
