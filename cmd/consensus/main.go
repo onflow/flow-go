@@ -233,7 +233,7 @@ func main() {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
-			options := sealing.DefaultOptions()
+			options := sealing.DefaultConfig()
 			options.EmergencySealingActive = emergencySealing
 			options.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
 

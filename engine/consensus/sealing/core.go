@@ -31,14 +31,15 @@ const DefaultRequiredApprovalsForSealConstruction = 0
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
 
-type Options struct {
+// Config is a structure of values that configure behavior of sealing engine
+type Config struct {
 	EmergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
 	RequiredApprovalsForSealConstruction uint   // min number of approvals required for constructing a candidate seal
 	ApprovalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
 }
 
-func DefaultOptions() Options {
-	return Options{
+func DefaultConfig() Config {
+	return Config{
 		EmergencySealingActive:               DefaultEmergencySealingActive,
 		RequiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
 		ApprovalRequestsThreshold:            10,
@@ -64,7 +65,7 @@ type Core struct {
 	pendingReceipts           mempool.PendingReceipts            // buffer for receipts where an ancestor result is missing, so they can't be connected to the sealed results
 	metrics                   module.ConsensusMetrics            // used to track consensus metrics
 	tracer                    module.Tracer                      // used to trace execution
-	options                   Options
+	config                    Config
 }
 
 func NewCore(
@@ -78,7 +79,7 @@ func NewCore(
 	verifier module.Verifier,
 	sealsMempool mempool.IncorporatedResultSeals,
 	approvalConduit network.Conduit,
-	options Options,
+	config Config,
 ) (*Core, error) {
 	lastSealed, err := state.Sealed().Head()
 	if err != nil {
@@ -93,13 +94,13 @@ func NewCore(
 		headers:        headers,
 		state:          state,
 		seals:          sealsDB,
-		options:        options,
+		config:         config,
 		requestTracker: approvals.NewRequestTracker(10, 30),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
 		return approvals.NewAssignmentCollector(result, core.state, core.headers, assigner, sealsMempool, verifier,
-			approvalConduit, core.requestTracker, options.RequiredApprovalsForSealConstruction)
+			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
 	}
 
 	core.collectorTree = approvals.NewAssignmentCollectorTree(lastSealed, headers, factoryMethod)
@@ -296,7 +297,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 }
 
 func (c *Core) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint64) error {
-	if !c.options.EmergencySealingActive {
+	if !c.config.EmergencySealingActive {
 		return nil
 	}
 
@@ -406,18 +407,18 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uint64) error {
 	// skip requesting approvals if they are not required for sealing
-	if c.options.RequiredApprovalsForSealConstruction == 0 {
+	if c.config.RequiredApprovalsForSealConstruction == 0 {
 		return nil
 	}
 
-	if lastSealedHeight+c.options.ApprovalRequestsThreshold >= lastFinalizedHeight {
+	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
 		return nil
 	}
 
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold
 	// Hence, the following operation cannot underflow
-	maxHeightForRequesting := lastFinalizedHeight - c.options.ApprovalRequestsThreshold
+	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
 
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting) {
 		err := collector.RequestMissingApprovals(maxHeightForRequesting)

@@ -75,7 +75,7 @@ func NewEngine(log zerolog.Logger,
 	assigner module.ChunkAssigner,
 	verifier module.Verifier,
 	sealsMempool mempool.IncorporatedResultSeals,
-	options Options,
+	options Config,
 ) (*Engine, error) {
 
 	hardwareConcurrency := runtime.NumCPU()

@@ -16,7 +16,6 @@ type ResultApprovalProcessor interface {
 	// * exception in case of unexpected error
 	// * nil - successfully processed incorporated result
 	ProcessIncorporatedResult(result *flow.IncorporatedResult) error
-
 	// ProcessFinalizedBlock processes finalization events in blocking way. Concurrency safe.
 	// Returns:
 	// * exception in case of unexpected error

@@ -107,7 +107,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
-	options := Options{
+	options := Config{
 		EmergencySealingActive:               false,
 		RequiredApprovalsForSealConstruction: uint(len(s.AuthorizedVerifiers)),
 		ApprovalRequestsThreshold:            2,
@@ -334,7 +334,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 
 // TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
-	s.core.options.EmergencySealingActive = true
+	s.core.config.EmergencySealingActive = true
 	s.sealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
@@ -555,7 +555,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	}
 
 	// the sealing Core requires approvals from both verifiers for each chunk
-	s.core.options.RequiredApprovalsForSealConstruction = 2
+	s.core.config.RequiredApprovalsForSealConstruction = 2
 
 	// populate the incorporated-results tree with:
 	// - 50 that have collected two signatures per chunk
@@ -609,7 +609,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	// start delivering finalization events
 	lastProcessedIndex := 0
-	for ; lastProcessedIndex < int(s.core.options.ApprovalRequestsThreshold); lastProcessedIndex++ {
+	for ; lastProcessedIndex < int(s.core.config.ApprovalRequestsThreshold); lastProcessedIndex++ {
 		err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
 		require.NoError(s.T(), err)
 	}
