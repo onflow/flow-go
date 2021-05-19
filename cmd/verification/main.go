@@ -38,9 +38,6 @@ import (
 )
 
 const (
-	// requestInterval represents the time interval in milliseconds that the
-	// match engine retries sending resource requests to the network
-	// this value is set following this issue (3443)
 	requestInterval = 1000 * time.Millisecond
 
 	backoffMultiplier  = float64(2)
@@ -50,17 +47,26 @@ const (
 	blockWorkers = int64(5)
 	chunkWorkers = int64(20)
 
-	// requestTargets determine the maximum number of execution nodes a chunk data pack request is dispatched to
 	requestTargets = 2
 )
 
 func main() {
 	var (
-		followerState        protocol.MutableState
-		err                  error
-		receiptLimit         uint                      // size of execution-receipt/result related mempools
-		chunkAlpha           uint                      // number of verifiers assigned per chunk
-		chunkLimit           uint                      // size of chunk-related mempools
+		followerState protocol.MutableState
+		err           error
+		receiptLimit  uint // size of execution-receipt/result related memory pools.
+		chunkAlpha    uint // number of verifiers assigned per chunk.
+		chunkLimit    uint // size of chunk-related memory pools.
+
+		requestInterval    time.Duration // time interval that requester engine tries requesting chunk data packs.
+		backoffMinInterval time.Duration // minimum time interval a chunk data pack request waits before dispatching.
+		backoffMaxInterval time.Duration // maximum time interval a chunk data pack request waits before dispatching.
+		backoffMultiplier  float64       // base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
+		requestTargets     uint64 // maximum number of execution nodes a chunk data pack request is dispatched to.
+
+		blockWorkers int64 // number of blocks processed in parallel
+		chunkWorkers int64 // number of chunks processed in parallel
+
 		chunkStatuses        *stdmap.ChunkStatuses     // used in fetcher engine
 		chunkRequests        *stdmap.ChunkRequests     // used in requester engine
 		processedChunkIndex  *storage.ConsumerProgress // used in chunk consumer
@@ -84,7 +90,8 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
+			flags.
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
