@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -116,19 +116,33 @@ func (g *GenericNode) CloseDB() error {
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
-	Collections            storage.Collections
-	Transactions           storage.Transactions
-	IngestionEngine        *collectioningest.Engine
-	PusherEngine           *pusher.Engine
-	ProviderEngine         *provider.Engine
-	TxPools                *epochpool.TransactionPools
-	Voter                  module.ClusterRootQCVoter
-	ClusterStateFactory    *factories.ClusterStateFactory
-	BuilderFactory         *factories.BuilderFactory
-	ProposalEngineFactory  *factories.ProposalEngineFactory
-	SyncFactory            *factories.SyncEngineFactory
-	HotStuffFactory        *factories.HotStuffFactory
-	EpochComponentsFactory *factories.EpochComponentsFactory
+	Collections        storage.Collections
+	Transactions       storage.Transactions
+	TxPools            *epochpool.TransactionPools
+	Voter              module.ClusterRootQCVoter
+	IngestionEngine    *collectioningest.Engine
+	PusherEngine       *pusher.Engine
+	ProviderEngine     *provider.Engine
+	EpochManagerEngine *epochmgr.Engine
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
+	return lifecycle.AllReady(
+		n.PusherEngine,
+		n.ProviderEngine,
+		n.IngestionEngine,
+		n.EpochManagerEngine,
+	)
+}
+
+func (n CollectionNode) Done() <-chan struct{} {
+	n.GenericNode.Done()
+	return lifecycle.AllDone(
+		n.PusherEngine,
+		n.ProviderEngine,
+		n.IngestionEngine,
+		n.EpochManagerEngine,
+	)
 }
 
 // ConsensusNode implements an in-process consensus node for tests.
