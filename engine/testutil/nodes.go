@@ -77,6 +77,9 @@ import (
 // GenericNodeFromParticipants is a test helper that creates and returns a generic node.
 // The generic node's state is generated from the given participants, resulting in a
 // root state snapshot.
+//
+// CAUTION: Please use GenericNode instead for most use-cases so that multiple nodes
+// may share the same root state snapshot.
 func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID,
 	options ...func(protocol.State)) testmock.GenericNode {
 	var i int
@@ -105,7 +108,30 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 	return GenericNodeWithStateFixture(t, stateFixture, hub, identity, log, metrics, tracer, chainID)
 }
 
-// The generic node is used as the core data structure to create other types of flow nodes.
+// GenericNode returns a generic test node, containing components shared across
+// all node roles. The generic node is used as the core data structure to create
+// other types of flow nodes.
+func GenericNode(
+	t testing.TB,
+	hub *stub.Hub,
+	identity *flow.Identity,
+	root protocol.Snapshot,
+) testmock.GenericNode {
+
+	log := unittest.Logger().With().
+		Hex("node_id", identity.NodeID[:]).
+		Str("role", identity.Role.String()).
+		Logger()
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+	stateFixture := CompleteStateFixture(t, metrics, tracer, root)
+
+	head, err := root.Head()
+	require.NoError(t, err)
+	chainID := head.ChainID
+
+	return GenericNodeWithStateFixture(t, stateFixture, hub, identity, log, metrics, tracer, chainID)
+}
 
 // GenericNodeWithStateFixture is a test helper that creates a generic node with specified state fixture.
 func GenericNodeWithStateFixture(t testing.TB,
@@ -191,14 +217,13 @@ func CompleteStateFixture(
 // CollectionNode returns a mock collection node.
 func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
-	// TODO instantiate
-	var node testmock.GenericNode
+	node := GenericNode(t, hub, identity, rootSnapshot)
 
 	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
 	collections := storage.NewCollections(node.DB, transactions)
 
-	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, chainID.Chain(), pools, collectioningest.DefaultConfig())
+	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
 
 	selector := filter.HasRole(flow.RoleAccess, flow.RoleVerification)
@@ -302,17 +327,18 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 }
 
 // CollectionNodes returns n collection nodes connected to the given hub.
-func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.ChainID, options ...func(protocol.State)) []testmock.CollectionNode {
-	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
+func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int) []testmock.CollectionNode {
 
+	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
 	// add some extra dummy identities so we have one of each role
 	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleCollection))
 
 	identities := append(colIdentities, others...)
+	root := unittest.RootSnapshotFixture(identities)
 
 	nodes := make([]testmock.CollectionNode, 0, len(colIdentities))
 	for _, identity := range colIdentities {
-		nodes = append(nodes, CollectionNode(t, hub, identity, identities, chainID, options...))
+		nodes = append(nodes, CollectionNode(t, hub, identity, root))
 	}
 
 	return nodes
