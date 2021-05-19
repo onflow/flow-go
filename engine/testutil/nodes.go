@@ -74,9 +74,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// GenericNode is a test helper that creates and returns a generic node.
-// The generic node is used as the core data structure to create other types of flow nodes.
-func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID,
+// GenericNodeFromParticipants is a test helper that creates and returns a generic node.
+// The generic node's state is generated from the given participants, resulting in a
+// root state snapshot.
+func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Identity, participants []*flow.Identity, chainID flow.ChainID,
 	options ...func(protocol.State)) testmock.GenericNode {
 	var i int
 	var participant *flow.Identity
@@ -103,6 +104,8 @@ func GenericNode(t testing.TB, hub *stub.Hub, identity *flow.Identity, participa
 
 	return GenericNodeWithStateFixture(t, stateFixture, hub, identity, log, metrics, tracer, chainID)
 }
+
+// The generic node is used as the core data structure to create other types of flow nodes.
 
 // GenericNodeWithStateFixture is a test helper that creates a generic node with specified state fixture.
 func GenericNodeWithStateFixture(t testing.TB,
@@ -317,7 +320,7 @@ func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int, chainID flow.Chain
 
 func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) testmock.ConsensusNode {
 
-	node := GenericNode(t, hub, identity, identities, chainID)
+	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
 	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB)
@@ -412,7 +415,7 @@ type CheckerMock struct {
 }
 
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
-	node := GenericNode(t, hub, identity, identities, chainID)
+	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
@@ -719,7 +722,7 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.GenericNode == nil {
-		gn := GenericNode(t, hub, identity, identities, chainID)
+		gn := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 		node.GenericNode = &gn
 	}
 
@@ -912,7 +915,7 @@ func NewVerificationNode(t testing.TB,
 	}
 
 	if node.GenericNode == nil {
-		gn := GenericNode(t, hub, verIdentity, participants, chainID)
+		gn := GenericNodeFromParticipants(t, hub, verIdentity, participants, chainID)
 		node.GenericNode = &gn
 	}
 
