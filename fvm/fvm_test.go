@@ -2056,22 +2056,53 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		).run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				ctx.TransactionFeesEnabled = true
-				// Create an account private key.
-				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				// ==== Create an account ====
+				privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
+
+				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
 				require.NoError(t, err)
 
-				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				rootHasher := hash.NewSHA2_256()
+
+				err = txBody.SignEnvelope(
+					chain.ServiceAddress(),
+					0,
+					unittest.ServiceAccountPrivateKey.PrivateKey,
+					rootHasher,
+				)
 				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				assert.NoError(t, tx.Err)
+
+				assert.Len(t, tx.Events, 5)
+
+				var accountCreatedEvent *flow.Event
+				for _, event := range tx.Events {
+					if event.Type != flow.EventAccountCreated {
+						continue
+					}
+					accountCreatedEvent = &event
+					break
+				}
+				assert.NotNil(t, accountCreatedEvent)
+
+				// read the address of the account created (e.g. "0x01" and convert it to flow.address)
+				data, err := jsoncdc.Decode(accountCreatedEvent.Payload)
+				require.NoError(t, err)
+				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
 				// ==== Transfer tokens to new account ====
-
-				txBody := transferTokensTx(chain).
+				txBody = transferTokensTx(chain).
 					AddAuthorizer(chain.ServiceAddress()).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.fundWith))).
-					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(accounts[0])))
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
 
-				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
 				txBody.SetPayer(chain.ServiceAddress())
 
 				err = testutil.SignPayload(
@@ -2088,35 +2119,35 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				)
 				require.NoError(t, err)
 
-				tx := fvm.Transaction(txBody, 0)
+				tx = fvm.Transaction(txBody, 0)
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
-				balanceBefore := getBalance(vm, chain, ctx, view, accounts[0])
+				balanceBefore := getBalance(vm, chain, ctx, view, address)
 
 				// ==== Transfer tokens from new account ====
 
 				txBody = transferTokensTx(chain).
-					AddAuthorizer(accounts[0]).
+					AddAuthorizer(address).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
 					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
 
-				txBody.SetProposalKey(accounts[0], 0, 0)
-				txBody.SetPayer(accounts[0])
+				txBody.SetProposalKey(address, 0, 0)
+				txBody.SetPayer(address)
 
 				err = testutil.SignPayload(
 					txBody,
-					accounts[0],
-					privateKeys[0],
+					address,
+					privateKey,
 				)
 				require.NoError(t, err)
 
 				err = testutil.SignEnvelope(
 					txBody,
-					accounts[0],
-					privateKeys[0],
+					address,
+					privateKey,
 				)
 				require.NoError(t, err)
 
@@ -2125,7 +2156,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 
-				balanceAfter := getBalance(vm, chain, ctx, view, accounts[0])
+				balanceAfter := getBalance(vm, chain, ctx, view, address)
 
 				tc.checkResult(
 					t,
