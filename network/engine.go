@@ -8,6 +8,7 @@ import (
 // Engine represents an isolated process running across the peer-to-peer network
 // as part of the node business logic. It provides the network layer with
 // the necessary interface to forward events to engines for processing.
+// TODO: DEPRECATED replace with MessageProcessor
 type Engine interface {
 
 	// SubmitLocal submits an event originating on the local node.
@@ -25,4 +26,8 @@ type Engine interface {
 	// in a blocking manner. It returns the potential processing error when
 	// done.
 	Process(originID flow.Identifier, event interface{}) error
+}
+
+type MessageProcessor interface {
+	Process(originID flow.Identifier, message interface{}) error
 }
