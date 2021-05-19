@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
-	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
+	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/encodable"
@@ -37,19 +37,6 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
-const (
-	requestInterval = 1000 * time.Millisecond
-
-	backoffMultiplier  = float64(2)
-	backoffMinInterval = 1 * time.Millisecond
-	backoffMaxInterval = 1 * time.Minute
-
-	blockWorkers = int64(5)
-	chunkWorkers = int64(20)
-
-	requestTargets = 2
-)
-
 func main() {
 	var (
 		followerState protocol.MutableState
@@ -62,10 +49,10 @@ func main() {
 		backoffMinInterval time.Duration // minimum time interval a chunk data pack request waits before dispatching.
 		backoffMaxInterval time.Duration // maximum time interval a chunk data pack request waits before dispatching.
 		backoffMultiplier  float64       // base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
-		requestTargets     uint64 // maximum number of execution nodes a chunk data pack request is dispatched to.
+		requestTargets     uint64        // maximum number of execution nodes a chunk data pack request is dispatched to.
 
-		blockWorkers int64 // number of blocks processed in parallel
-		chunkWorkers int64 // number of chunks processed in parallel
+		blockWorkers uint64 // number of blocks processed in parallel.
+		chunkWorkers uint64 // number of chunks processed in parallel.
 
 		chunkStatuses        *stdmap.ChunkStatuses     // used in fetcher engine
 		chunkRequests        *stdmap.ChunkRequests     // used in requester engine
@@ -73,12 +60,12 @@ func main() {
 		processedBlockHeight *storage.ConsumerProgress // used in block consumer
 		chunkQueue           *storage.ChunksQueue      // used in chunk consumer
 
-		syncCore        *synchronization.Core         // used in follower engine
-		pendingBlocks   *buffer.PendingBlocks         // used in follower engine
-		assignerEngine  *assigner.Engine              // the assigner engine
-		fetcherEngine   *fetcher.Engine               // the fetcher engine
-		requesterEngine *verificationrequester.Engine // the requester engine
-		verifierEng     *verifier.Engine              // the verifier engine
+		syncCore        *synchronization.Core // used in follower engine
+		pendingBlocks   *buffer.PendingBlocks // used in follower engine
+		assignerEngine  *assigner.Engine      // the assigner engine
+		fetcherEngine   *fetcher.Engine       // the fetcher engine
+		requesterEngine *vereq.Engine         // the requester engine
+		verifierEng     *verifier.Engine      // the verifier engine
 		chunkConsumer   *chunkconsumer.ChunkConsumer
 		blockConsumer   *blockconsumer.BlockConsumer
 
@@ -91,7 +78,14 @@ func main() {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
 			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
-			flags.
+			flags.DurationVar(&requestInterval, "chunk-request-interval", vereq.DefaultRequestInterval, "time interval chunk data pack request is processed")
+			flags.DurationVar(&backoffMinInterval, "backoff-min-interval", vereq.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
+			flags.DurationVar(&backoffMaxInterval, "backoff-max-interval", vereq.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
+			flags.Float64Var(&backoffMultiplier, "backoff-multiplier", vereq.DefaultBackoffMultiplier, "base of exponent in exponential backoff requesting mechanism")
+			flags.Uint64Var(&requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
+			flags.Uint64Var(&blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
+			flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
+
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -185,7 +179,7 @@ func main() {
 			return verifierEng, err
 		}).
 		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			requesterEngine, err = verificationrequester.New(
+			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
 				node.Network,
@@ -193,7 +187,7 @@ func main() {
 				collector,
 				chunkRequests,
 				requestInterval,
-				verificationrequester.RetryAfterQualifier,
+				vereq.RetryAfterQualifier,
 				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
 				requestTargets)
 

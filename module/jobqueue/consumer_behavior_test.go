@@ -450,7 +450,7 @@ func assertProcessed(t testing.TB, cp storage.ConsumerProgress, expectProcessed 
 
 func newTestConsumer(cp storage.ConsumerProgress, jobs module.Jobs, worker jobqueue.Worker) module.JobConsumer {
 	log := unittest.Logger().With().Str("module", "consumer").Logger()
-	maxProcessing := int64(3)
+	maxProcessing := uint64(3)
 	c := jobqueue.NewConsumer(log, jobs, cp, worker, maxProcessing)
 	return c
 }

@@ -22,6 +22,23 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	// DefaultRequestInterval is the time interval that requester engine tries requesting chunk data packs.
+	DefaultRequestInterval = 1000 * time.Millisecond
+
+	// DefaultBackoffMultiplier is the base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
+	DefaultBackoffMultiplier = float64(2)
+
+	// DefaultBackoffMinInterval is the minimum time interval a chunk data pack request waits before dispatching.
+	DefaultBackoffMinInterval = 1 * time.Millisecond
+
+	// DefaultBackoffMaxInterval is the maximum time interval a chunk data pack request waits before dispatching.
+	DefaultBackoffMaxInterval = 1 * time.Minute
+
+	// DefaultRequestTargets is the  maximum number of execution nodes a chunk data pack request is dispatched to.
+	DefaultRequestTargets = 2
+)
+
 // Engine implements a ChunkDataPackRequester that is responsible of receiving chunk data pack requests,
 // dispatching it to the execution nodes, receiving the requested chunk data pack from execution nodes,
 // and passing it to the registered handler.
@@ -41,7 +58,7 @@ type Engine struct {
 
 	// internal logic
 	retryInterval    time.Duration                          // determines time in milliseconds for retrying chunk data requests.
-	requestTargets   uint                                   // maximum number of execution nodes being asked for a chunk data pack.
+	requestTargets   uint64                                 // maximum number of execution nodes being asked for a chunk data pack.
 	pendingRequests  mempool.ChunkRequests                  // used to track requested chunks.
 	reqQualifierFunc RequestQualifierFunc                   // used to decide whether to dispatch a request at a certain cycle.
 	reqUpdaterFunc   mempool.ChunkRequestHistoryUpdaterFunc // used to atomically update chunk request info on mempool.
@@ -56,7 +73,7 @@ func New(log zerolog.Logger,
 	retryInterval time.Duration,
 	reqQualifierFunc RequestQualifierFunc,
 	reqUpdaterFunc mempool.ChunkRequestHistoryUpdaterFunc,
-	requestTargets uint) (*Engine, error) {
+	requestTargets uint64) (*Engine, error) {
 
 	e := &Engine{
 		log:              log.With().Str("engine", "requester").Logger(),

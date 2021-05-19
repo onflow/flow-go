@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	DefaultJobIndex = uint64(0)
+	DefaultJobIndex     = uint64(0)
+	DefaultChunkWorkers = uint64(20)
 )
 
 // ChunkConsumer consumes the jobs from the job queue, and pass it to the
@@ -28,7 +29,7 @@ func NewChunkConsumer(
 	processedIndex storage.ConsumerProgress, // to persist the processed index
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
 	engine fetcher.AssignedChunkProcessor, // to process jobs (chunks)
-	maxProcessing int64, // max number of jobs to be processed in parallel
+	maxProcessing uint64, // max number of jobs to be processed in parallel
 ) *ChunkConsumer {
 	worker := NewWorker(engine)
 	engine.WithChunkConsumerNotifier(worker)
