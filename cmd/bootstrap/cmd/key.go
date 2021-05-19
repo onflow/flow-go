@@ -61,6 +61,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	role := validateRole(flagRole)
 	validateAddressFormat(flagAddress)
 
+	var err error
 	var networkKey crypto.PrivateKey
 	var stakingKey crypto.PrivateKey
 	var machineKey crypto.PrivateKey
@@ -76,33 +77,30 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	if flagNetworkKey {
 		log.Debug().Msg("will generate networking key")
 		networkSeed := validateSeed(flagNetworkSeed)
-		networkKeys, err := run.GenerateNetworkingKeys(1, [][]byte{networkSeed})
+		networkKey, err = run.GenerateNetworkingKey(networkSeed)
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot generate networking key")
 		}
-		networkKey = networkKeys[0]
 		log.Info().Msg("generated networking key")
 	}
 
 	if flagStakingKey {
 		log.Debug().Msg("will generate staking key")
 		stakingSeed := validateSeed(flagStakingSeed)
-		stakingKeys, err := run.GenerateStakingKeys(1, [][]byte{stakingSeed})
+		stakingKey, err = run.GenerateStakingKey(stakingSeed)
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot generate staking key")
 		}
-		stakingKey = stakingKeys[0]
 		log.Info().Msg("generated staking key")
 	}
 
 	if flagMachineKey {
 		log.Debug().Msg("will generate machine account key")
 		machineSeed := validateSeed(flagMachineSeed)
-		machineKeys, err := run.GenerateNetworkingKeys(1, [][]byte{machineSeed})
+		machineKey, err = run.GenerateMachineAccountKey(machineSeed)
 		if err != nil {
 			log.Fatal().Err(err).Msg("cannot generate machine account key")
 		}
-		machineKey = machineKeys[0]
 		log.Info().Msg("generated machine account key")
 	}
 

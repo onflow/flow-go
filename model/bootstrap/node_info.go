@@ -91,8 +91,7 @@ type NodeInfo struct {
 	stakingPubKey  crypto.PublicKey
 	stakingPrivKey crypto.PrivateKey
 
-	// node machine account keys
-	// machinePubKey  crypto.PublicKey
+	// node machine account key
 	machinePrivKey crypto.PrivateKey
 }
 
