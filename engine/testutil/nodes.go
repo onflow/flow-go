@@ -6,6 +6,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
+	"github.com/onflow/flow-go/engine/collection/epochmgr/factories"
+	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -182,9 +186,10 @@ func CompleteStateFixture(
 }
 
 // CollectionNode returns a mock collection node.
-func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID, options ...func(protocol.State)) testmock.CollectionNode {
+func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSnapshot protocol.Snapshot) testmock.CollectionNode {
 
-	node := GenericNode(t, hub, identity, identities, chainID, options...)
+	// TODO instantiate
+	var node testmock.GenericNode
 
 	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
@@ -204,13 +209,92 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identi
 	pusherEngine, err := pusher.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, collections, transactions)
 	require.NoError(t, err)
 
+	clusterStateFactory, err := factories.NewClusterStateFactory(
+		node.DB,
+		node.Metrics,
+		node.Tracer,
+	)
+	require.NoError(t, err)
+
+	builderFactory, err := factories.NewBuilderFactory(
+		node.DB,
+		node.Headers,
+		node.Tracer,
+		node.Metrics,
+		pusherEngine,
+	)
+	require.NoError(t, err)
+
+	proposalFactory, err := factories.NewProposalEngineFactory(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.Metrics, node.Metrics, node.Metrics,
+		node.State,
+		transactions,
+	)
+	require.NoError(t, err)
+
+	syncFactory, err := factories.NewSyncEngineFactory(
+		node.Log,
+		node.Metrics,
+		node.Net,
+		node.Me,
+		chainsync.DefaultConfig(),
+	)
+	require.NoError(t, err)
+
+	// create an aggregated signature provider which produces fake signatures and
+	// considers all verification inputs as valid
+	aggregator := new(mockmodule.AggregatingSigner)
+	aggregator.On("Sign", mock.Anything).Return(unittest.SignatureFixture(), nil)
+	aggregator.On("Aggregate", mock.Anything).Return(unittest.SignatureFixture(), nil)
+	aggregator.On("VerifyMany", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	aggregator.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+
+	hotstuffFactory, err := factories.NewHotStuffFactory(
+		node.Log,
+		node.Me,
+		aggregator,
+		node.DB,
+		node.State,
+	)
+
+	factory := factories.NewEpochComponentsFactory(
+		node.Me,
+		pools,
+		builderFactory,
+		clusterStateFactory,
+		hotstuffFactory,
+		proposalFactory,
+		syncFactory,
+	)
+
+	rootQCVoter := new(mockmodule.ClusterRootQCVoter)
+	rootQCVoter.On("Vote", mock.Anything, mock.Anything).Return(nil)
+
+	heights := gadgets.NewHeights()
+	node.ProtocolEvents.AddConsumer(heights)
+
+	epochManager, err := epochmgr.New(
+		node.Log,
+		node.Me,
+		node.State,
+		pools,
+		rootQCVoter,
+		factory,
+		heights,
+	)
+	require.NoError(t, err)
+
 	return testmock.CollectionNode{
-		GenericNode:     node,
-		Collections:     collections,
-		Transactions:    transactions,
-		IngestionEngine: ingestionEngine,
-		PusherEngine:    pusherEngine,
-		ProviderEngine:  providerEngine,
+		GenericNode:        node,
+		Collections:        collections,
+		Transactions:       transactions,
+		IngestionEngine:    ingestionEngine,
+		PusherEngine:       pusherEngine,
+		ProviderEngine:     providerEngine,
+		EpochManagerEngine: epochManager,
 	}
 }
 
