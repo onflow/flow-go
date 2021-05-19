@@ -369,5 +369,5 @@ type PingMetrics interface {
 	// NodeReachable tracks the round trip time in milliseconds taken to ping a node
 	// The nodeInfo provides additional information about the node such as the name of the node operator
 	// version is the software version the target node is running
-	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration, version string)
+	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration, version string, sealedHeight uint64)
 }

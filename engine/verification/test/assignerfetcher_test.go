@@ -106,7 +106,7 @@ func TestVerificationHappyPath(t *testing.T) {
 				tc.eventRepetition,
 				collector,
 				collector,
-				tc.ops...)
+				tc.opts...)
 		})
 	}
 }
