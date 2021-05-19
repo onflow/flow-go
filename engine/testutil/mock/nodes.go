@@ -136,13 +136,18 @@ func (n CollectionNode) Ready() <-chan struct{} {
 }
 
 func (n CollectionNode) Done() <-chan struct{} {
-	n.GenericNode.Done()
-	return lifecycle.AllDone(
-		n.PusherEngine,
-		n.ProviderEngine,
-		n.IngestionEngine,
-		n.EpochManagerEngine,
-	)
+	done := make(chan struct{})
+	go func() {
+		<-lifecycle.AllDone(
+			n.PusherEngine,
+			n.ProviderEngine,
+			n.IngestionEngine,
+			n.EpochManagerEngine,
+		)
+		n.GenericNode.Done()
+		close(done)
+	}()
+	return done
 }
 
 // ConsensusNode implements an in-process consensus node for tests.
