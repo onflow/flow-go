@@ -65,6 +65,8 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	var stakingKey crypto.PrivateKey
 	var machineKey crypto.PrivateKey
 
+	// if no key type flags are specified, we generate all keys
+	// if any specific key type flags are specified, we only generate the specified keys
 	if !flagNetworkKey && !flagStakingKey && !flagMachineKey {
 		flagNetworkKey = true
 		flagStakingKey = true
