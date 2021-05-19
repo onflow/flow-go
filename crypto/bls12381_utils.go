@@ -47,12 +47,14 @@ func (ct *ctx) initContext() error {
 // relic context must be initialized before seeding.
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
-		return fmt.Errorf("seed length needs to be larger than %d",
-			securityBits/8)
+		return newInvalidInputs(fmt.Sprintf(
+			"seed length needs to be larger than %d",
+			securityBits/8))
 	}
 	if len(seed) > maxRelicPrgSeed {
-		return fmt.Errorf("seed length needs to be less than %x",
-			maxRelicPrgSeed)
+		return newInvalidInputs(
+			fmt.Sprintf("seed length needs to be less than %x",
+				maxRelicPrgSeed))
 	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
@@ -106,7 +108,9 @@ func randZrStar(x *scalar) {
 // the resulting scalar is in the range 0 < k < r
 func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
-		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
+		return newInvalidInputs(fmt.Sprintf(
+			"input slice length must be less than %d",
+			maxScalarSize))
 	}
 	C.bn_map_to_Zr_star((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
@@ -144,6 +148,7 @@ func readPointG2(a *pointG2, src []byte) error {
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)),
 	) != valid {
+		// TODO: update error
 		return errors.New("reading a G2 point has failed")
 	}
 	return nil
