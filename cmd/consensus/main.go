@@ -241,34 +241,32 @@ func main() {
 				return nil, err
 			}
 
-			match, err := sealing.NewEngine(
+			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+			options := sealing.DefaultOptions()
+			options.EmergencySealingActive = emergencySealing
+			options.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
+
+			engine, err := sealing.NewEngine(
 				node.Logger,
-				node.Metrics.Engine,
 				node.Tracer,
-				node.Metrics.Mempool,
 				conMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
 				node.Network,
-				node.State,
 				node.Me,
-				receiptRequester,
-				node.Storage.Receipts,
 				node.Storage.Headers,
-				node.Storage.Index,
-				results,
-				receipts,
-				approvals,
-				seals,
-				pendingReceipts,
+				node.State,
+				node.Storage.Seals,
 				chunkAssigner,
-				receiptValidator,
-				approvalValidator,
-				requiredApprovalsForSealConstruction,
-				emergencySealing,
+				resultApprovalSigVerifier,
+				seals,
+				options,
 			)
 
-			receiptRequester.WithHandle(match.HandleReceipt)
+			receiptRequester.WithHandle(engine.HandleReceipt)
 
-			return match, err
+			return engine, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(

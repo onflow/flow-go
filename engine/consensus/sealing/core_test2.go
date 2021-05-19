@@ -110,9 +110,9 @@ package sealing
 //		assigner:                             ms.Assigner,
 //		receiptValidator:                     ms.receiptValidator,
 //		requestTracker:                       approvals.NewRequestTracker(1, 3),
-//		approvalRequestsThreshold:            10,
-//		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
-//		emergencySealingActive:               false,
+//		ApprovalRequestsThreshold:            10,
+//		RequiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
+//		EmergencySealingActive:               false,
 //		approvalValidator:                    ms.approvalValidator,
 //	}
 //}
@@ -412,7 +412,7 @@ package sealing
 //
 //// TestOutlierReceiptNotSealed verifies temporary safety guard:
 //// Situation:
-////  * we don't require any approvals for seals, i.e. requiredApprovalsForSealConstruction = 0
+////  * we don't require any approvals for seals, i.e. RequiredApprovalsForSealConstruction = 0
 ////  * there are two conflicting results: resultA and resultB:
 ////    - resultA has two receipts from the _same_ EN committing to it
 ////    - resultB has two receipts from different ENs committing to it
@@ -420,7 +420,7 @@ package sealing
 //// Method Core.sealableResults() should only return resultB as sealable
 //// TODO: remove this test, once temporary safety guard is replaced by full verification
 //func (ms *SealingSuite) TestOutlierReceiptNotSealed() {
-//	ms.sealing.requiredApprovalsForSealConstruction = 0
+//	ms.sealing.RequiredApprovalsForSealConstruction = 0
 //
 //	// dummy assigner: as we don't require (and don't have) any approvals, the assignment doesn't matter
 //	ms.Assigner.On("Assign", mock.Anything, mock.Anything).Return(chunks.NewAssignment(), nil).Maybe()
@@ -549,7 +549,7 @@ package sealing
 //// that are deep enough but still without verifications.
 //func (ms *SealingSuite) TestSealableResultsEmergencySealingMultipleCandidates() {
 //	// make sure that emergency sealing is enabled
-//	ms.sealing.emergencySealingActive = true
+//	ms.sealing.EmergencySealingActive = true
 //	emergencySealingCandidates := make([]flow.Identifier, 10)
 //
 //	for i := range emergencySealingCandidates {
@@ -714,7 +714,7 @@ package sealing
 //	verifiers := unittest.IdentifierListFixture(2)
 //
 //	// the sealing Core requires approvals from both verifiers for each chunk
-//	ms.sealing.requiredApprovalsForSealConstruction = 2
+//	ms.sealing.RequiredApprovalsForSealConstruction = 2
 //
 //	// expectedRequests collects the set of ApprovalRequests that should be sent
 //	expectedRequests := make(map[flow.Identifier]*messages.ApprovalRequest)
@@ -769,7 +769,7 @@ package sealing
 //				// all these chunks are missing at least one signature so we
 //				// expect requests to be sent out if the result's block is below
 //				// the threshold
-//				if i < n-int(ms.sealing.approvalRequestsThreshold) {
+//				if i < n-int(ms.sealing.ApprovalRequestsThreshold) {
 //					expectedRequests[ir.IncorporatedBlockID] = &messages.ApprovalRequest{
 //						ResultID:   ir.Result.ID(),
 //						ChunkIndex: chunk.Index,
@@ -782,7 +782,7 @@ package sealing
 //	}
 //
 //	// exp is the number of requests that we expect
-//	exp := n - s - int(ms.sealing.approvalRequestsThreshold)
+//	exp := n - s - int(ms.sealing.ApprovalRequestsThreshold)
 //
 //	// add an incorporated-result for a block that was already sealed. We
 //	// expect that no approval requests will be sent for this result, even if it

@@ -101,9 +101,9 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	tracer := trace.NewNoopTracer()
 
 	options := Options{
-		emergencySealingActive:               false,
-		requiredApprovalsForSealConstruction: uint(len(s.AuthorizedVerifiers)),
-		approvalRequestsThreshold:            2,
+		EmergencySealingActive:               false,
+		RequiredApprovalsForSealConstruction: uint(len(s.AuthorizedVerifiers)),
+		ApprovalRequestsThreshold:            2,
 	}
 
 	s.core, err = NewCore(log, tracer, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
@@ -258,7 +258,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 
 // TestProcessIncorporated_ApprovalsAfterResult tests a scenario when first we have discovered execution result
 //// and after that we started receiving approvals. In this scenario we should be able to create a seal right
-//// after processing last needed approval to meet `requiredApprovalsForSealConstruction` threshold.
+//// after processing last needed approval to meet `RequiredApprovalsForSealConstruction` threshold.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
@@ -327,7 +327,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 
 // TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
-	s.core.options.emergencySealingActive = true
+	s.core.options.EmergencySealingActive = true
 	s.sealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)

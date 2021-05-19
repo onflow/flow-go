@@ -32,16 +32,16 @@ const DefaultRequiredApprovalsForSealConstruction = 0
 const DefaultEmergencySealingActive = false
 
 type Options struct {
-	emergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
-	requiredApprovalsForSealConstruction uint   // min number of approvals required for constructing a candidate seal
-	approvalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
+	EmergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
+	RequiredApprovalsForSealConstruction uint   // min number of approvals required for constructing a candidate seal
+	ApprovalRequestsThreshold            uint64 // threshold for re-requesting approvals: min height difference between the latest finalized block and the block incorporating a result
 }
 
 func DefaultOptions() Options {
 	return Options{
-		emergencySealingActive:               DefaultEmergencySealingActive,
-		requiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
-		approvalRequestsThreshold:            10,
+		EmergencySealingActive:               DefaultEmergencySealingActive,
+		RequiredApprovalsForSealConstruction: DefaultRequiredApprovalsForSealConstruction,
+		ApprovalRequestsThreshold:            10,
 	}
 }
 
@@ -99,7 +99,7 @@ func NewCore(
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
 		return approvals.NewAssignmentCollector(result, core.state, core.headers, assigner, sealsMempool, verifier,
-			approvalConduit, core.requestTracker, options.requiredApprovalsForSealConstruction)
+			approvalConduit, core.requestTracker, options.RequiredApprovalsForSealConstruction)
 	}
 
 	core.collectorTree = approvals.NewAssignmentCollectorTree(lastSealed, headers, factoryMethod)
@@ -296,7 +296,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 }
 
 func (c *Core) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint64) error {
-	if !c.options.emergencySealingActive {
+	if !c.options.EmergencySealingActive {
 		return nil
 	}
 
@@ -406,18 +406,18 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uint64) error {
 	// skip requesting approvals if they are not required for sealing
-	if c.options.requiredApprovalsForSealConstruction == 0 {
+	if c.options.RequiredApprovalsForSealConstruction == 0 {
 		return nil
 	}
 
-	if lastSealedHeight+c.options.approvalRequestsThreshold >= lastFinalizedHeight {
+	if lastSealedHeight+c.options.ApprovalRequestsThreshold >= lastFinalizedHeight {
 		return nil
 	}
 
 	// Reaching the following code implies:
-	// 0 <= sealed.Height < final.Height - approvalRequestsThreshold
+	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold
 	// Hence, the following operation cannot underflow
-	maxHeightForRequesting := lastFinalizedHeight - c.options.approvalRequestsThreshold
+	maxHeightForRequesting := lastFinalizedHeight - c.options.ApprovalRequestsThreshold
 
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting) {
 		err := collector.RequestMissingApprovals(maxHeightForRequesting)

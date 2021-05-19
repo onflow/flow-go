@@ -2,6 +2,8 @@ package sealing
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/state/protocol"
 	"runtime"
 	"sync"
 
@@ -61,21 +63,26 @@ type Engine struct {
 
 // NewEngine constructs new `Engine` which runs on it's own unit.
 func NewEngine(log zerolog.Logger,
+	tracer module.Tracer,
+	conMetrics module.ConsensusMetrics,
 	engineMetrics module.EngineMetrics,
-	core sealing.ResultApprovalProcessor,
 	mempool module.MempoolMetrics,
 	net module.Network,
 	me module.Local,
-	requiredApprovalsForSealConstruction uint,
+	headers storage.Headers,
+	state protocol.State,
+	sealsDB storage.Seals,
+	assigner module.ChunkAssigner,
+	verifier module.Verifier,
+	sealsMempool mempool.IncorporatedResultSeals,
+	options Options,
 ) (*Engine, error) {
 
 	hardwareConcurrency := runtime.NumCPU()
-
 	e := &Engine{
 		unit:                                 engine.NewUnit(),
 		log:                                  log,
 		me:                                   me,
-		core:                                 core,
 		engineMetrics:                        engineMetrics,
 		cacheMetrics:                         mempool,
 		receiptSink:                          make(EventSink),
@@ -83,7 +90,7 @@ func NewEngine(log zerolog.Logger,
 		requestedApprovalSink:                make(EventSink),
 		pendingEventSink:                     make(EventSink),
 		workerPool:                           workerpool.New(hardwareConcurrency),
-		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		requiredApprovalsForSealConstruction: options.RequiredApprovalsForSealConstruction,
 	}
 
 	// FIFO queue for inbound receipts
@@ -124,6 +131,17 @@ func NewEngine(log zerolog.Logger,
 	_, err = net.Register(engine.ReceiveApprovals, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for approvals: %w", err)
+	}
+
+	// register engine to the channel for requesting missing approvals
+	approvalConduit, err := net.Register(engine.RequestApprovalsByChunk, e)
+	if err != nil {
+		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
+	}
+
+	e.core, err = NewCore(log, tracer, conMetrics, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
 
 	return e, nil
