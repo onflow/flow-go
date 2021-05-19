@@ -47,8 +47,8 @@ func init() {
 	_ = keyCmd.MarkFlagRequired("address")
 
 	keyCmd.Flags().BoolVar(&flagNetworkKey, "networking", false, "generate networking key only")
-	keyCmd.Flags().BoolVar(&flagNetworkKey, "staking", false, "generate staking key only")
-	keyCmd.Flags().BoolVar(&flagNetworkKey, "machine", false, "generate machine key only")
+	keyCmd.Flags().BoolVar(&flagStakingKey, "staking", false, "generate staking key only")
+	keyCmd.Flags().BoolVar(&flagMachineKey, "machine", false, "generate machine key only")
 
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
