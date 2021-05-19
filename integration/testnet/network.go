@@ -685,7 +685,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	epochCommit := &flow.EpochCommit{
 		Counter:            epochCounter,
-		ClusterQCs:         clusterQCs,
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}

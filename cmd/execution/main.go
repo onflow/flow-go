@@ -90,6 +90,7 @@ func main() {
 		extensiveLog                bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 		diskWAL                     *wal.DiskWAL
+		scriptLogThreshold          time.Duration
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -107,6 +108,7 @@ func main() {
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
 			flags.UintVar(&chdpCacheSize, "chdp-cache", 100, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
+			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
 			flags.UintVar(&transactionResultsCacheSize, "transaction-results-cache-size", 10000, "number of transaction results to be cached")
 			flags.BoolVar(&syncByBlocks, "sync-by-blocks", true, "deprecated, sync by blocks instead of execution state deltas")
@@ -235,6 +237,7 @@ func main() {
 				vmCtx,
 				cadenceExecutionCache,
 				committer,
+				scriptLogThreshold,
 			)
 			if err != nil {
 				return nil, err
