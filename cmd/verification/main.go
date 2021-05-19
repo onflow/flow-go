@@ -135,7 +135,7 @@ func main() {
 			chunkQueue = storage.NewChunkQueue(node.DB)
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
-				return fmt.Errorf("could not initialize default index in chunk consumer: %w", err)
+				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
 
 			node.Logger.Info().
