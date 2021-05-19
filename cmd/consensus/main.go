@@ -77,9 +77,7 @@ func main() {
 		mutableState      protocol.MutableState
 		privateDKGData    *bootstrap.DKGParticipantPriv
 		guarantees        mempool.Guarantees
-		results           mempool.IncorporatedResults
 		receipts          mempool.ExecutionTree
-		approvals         mempool.Approvals
 		seals             mempool.IncorporatedResultSeals
 		pendingReceipts   mempool.PendingReceipts
 		prov              *provider.Engine
@@ -183,10 +181,6 @@ func main() {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
 		}).
-		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results, err = stdmap.NewIncorporatedResults(resultLimit)
-			return err
-		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
@@ -195,10 +189,6 @@ func main() {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
-		}).
-		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
-			approvals, err = stdmap.NewApprovals(approvalLimit)
-			return err
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break

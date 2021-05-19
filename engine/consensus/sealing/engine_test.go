@@ -138,3 +138,19 @@ func (s *ApprovalsEngineSuite) TestMultipleProcessingItems() {
 
 	s.core.AssertExpectations(s.T())
 }
+
+// try to submit an approval where the message origin is inconsistent with the message creator
+func (s *ApprovalsEngineSuite) TestApprovalInvalidOrigin() {
+	// approval from valid origin (i.e. a verification node) but with random ApproverID
+	originID := unittest.IdentifierFixture()
+	approval := unittest.ResultApprovalFixture() // with random ApproverID
+
+	err := s.engine.Process(originID, approval)
+	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
+
+	// sealing engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	// In both cases, we expect the approval to be rejected without hitting the mempools
+	s.core.AssertNumberOfCalls(s.T(), "ProcessApproval", 0)
+}

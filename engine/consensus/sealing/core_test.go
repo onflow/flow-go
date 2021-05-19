@@ -2,21 +2,23 @@ package sealing
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/trace"
-	"github.com/rs/zerolog"
 	"os"
 	"testing"
+	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -510,4 +512,132 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 	require.NoError(s.T(), err)
 
 	s.sealsDB.AssertExpectations(s.T())
+}
+
+// TestRequestPendingApprovals checks that requests are sent only for chunks
+// that have not collected enough approvals yet, and are sent only to the
+// verifiers assigned to those chunks. It also checks that the threshold and
+// rate limiting is respected.
+func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
+
+	s.core.requestTracker = approvals.NewRequestTracker(1, 3)
+
+	// n is the total number of blocks and incorporated-results we add to the
+	// chain and mempool
+	n := 100
+
+	// create blocks
+	unsealedFinalizedBlocks := make([]flow.Block, 0, n)
+	parentBlock := &s.ParentBlock
+	for i := 0; i < n; i++ {
+		block := unittest.BlockWithParentFixture(parentBlock)
+		s.blocks[block.ID()] = block.Header
+		s.identitiesCache[block.ID()] = s.AuthorizedVerifiers
+		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, block)
+		parentBlock = block.Header
+	}
+
+	// progress latest sealed and latest finalized:
+	//s.LatestSealedBlock = unsealedFinalizedBlocks[0]
+	//s.LatestFinalizedBlock = &unsealedFinalizedBlocks[n-1]
+
+	// add an unfinalized block; it shouldn't require an approval request
+	unfinalizedBlock := unittest.BlockWithParentFixture(parentBlock)
+	s.blocks[unfinalizedBlock.ID()] = unfinalizedBlock.Header
+
+	// we will assume that all chunks are assigned to the same two verifiers.
+	verifiers := make([]flow.Identifier, 0)
+	for nodeID := range s.AuthorizedVerifiers {
+		if len(verifiers) > 2 {
+			break
+		}
+		verifiers = append(verifiers, nodeID)
+	}
+
+	// the sealing Core requires approvals from both verifiers for each chunk
+	s.core.options.RequiredApprovalsForSealConstruction = 2
+
+	// populate the incorporated-results tree with:
+	// - 50 that have collected two signatures per chunk
+	// - 25 that have collected only one signature
+	// - 25 that have collected no signatures
+	//
+	//
+	//     sealed          unsealed/finalized
+	// |              ||                        |
+	// 1 <- 2 <- .. <- s <- s+1 <- .. <- n-t <- n
+	//                 |                  |
+	//                    expected reqs
+	prevResult := s.IncorporatedResult.Result
+	resultIDs := make([]flow.Identifier, 0, n)
+	chunkCount := 2
+	for i := 0; i < n; i++ {
+
+		// Create an incorporated result for unsealedFinalizedBlocks[i].
+		// By default the result will contain 17 chunks.
+		ir := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithResult(
+				unittest.ExecutionResultFixture(
+					unittest.WithBlock(&unsealedFinalizedBlocks[i]),
+					unittest.WithPreviousResult(*prevResult),
+					unittest.WithChunks(uint(chunkCount)),
+				),
+			),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(
+				unsealedFinalizedBlocks[i].ID(),
+			),
+		)
+
+		prevResult = ir.Result
+
+		s.ChunksAssignment = chunks.NewAssignment()
+
+		for _, chunk := range ir.Result.Chunks {
+			// assign the verifier to this chunk
+			s.ChunksAssignment.Add(chunk, verifiers)
+		}
+
+		err := s.core.processIncorporatedResult(ir)
+		require.NoError(s.T(), err)
+
+		resultIDs = append(resultIDs, ir.Result.ID())
+	}
+
+	// sealed block doesn't change
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
+	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil)
+
+	// start delivering finalization events
+	lastProcessedIndex := 0
+	for ; lastProcessedIndex < int(s.core.options.ApprovalRequestsThreshold); lastProcessedIndex++ {
+		err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
+		require.NoError(s.T(), err)
+	}
+
+	require.Empty(s.T(), s.core.requestTracker.GetAllIds())
+
+	// process two more blocks, this will trigger requesting approvals for lastSealed + 1 height
+	// but they will be in blackout period
+	for i := 0; i < 2; i++ {
+		err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
+		require.NoError(s.T(), err)
+		lastProcessedIndex += 1
+	}
+
+	require.ElementsMatch(s.T(), s.core.requestTracker.GetAllIds(), resultIDs[:1])
+
+	// wait for the max blackout period to elapse
+	time.Sleep(3 * time.Second)
+
+	s.conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).Times(chunkCount)
+
+	// process next block
+	err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
+	require.NoError(s.T(), err)
+
+	// now 2 results should be pending
+	require.ElementsMatch(s.T(), s.core.requestTracker.GetAllIds(), resultIDs[:2])
+
+	s.conduit.AssertExpectations(s.T())
 }
