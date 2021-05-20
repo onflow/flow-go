@@ -28,7 +28,7 @@ var (
 // keyCmd represents the key command
 var keyCmd = &cobra.Command{
 	Use:   "key",
-	Short: "Generate networking, staking, and machine account keys for a partner node and write them to files. If no key-type ('--networking', '--staking', '--machine') flags are specified, all keys are generated. If any key-type flags are specified, only the specified key types are generated. ",
+	Short: "Generate networking, staking, and machine account keys for a partner node and write them to files.",
 	Run:   keyCmdRun,
 }
 
