@@ -426,7 +426,6 @@ func TestBatchVerify(t *testing.T) {
 	// hasher
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
-	// TODO: add a test for 1 signature
 	sigsNum := mrand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
@@ -450,6 +449,15 @@ func TestBatchVerify(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
 		assert.Equal(t, valid, expectedValid,
+			fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
+				sigs, sks, input, valid))
+	})
+
+	// one valid signature
+	t.Run("one valid signature", func(t *testing.T) {
+		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:1], sigs[:1], input, kmac)
+		require.NoError(t, err)
+		assert.Equal(t, valid, expectedValid[:1],
 			fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 				sigs, sks, input, valid))
 	})
