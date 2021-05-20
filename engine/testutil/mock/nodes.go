@@ -2,7 +2,6 @@ package mock
 
 import (
 	"context"
-	"github.com/onflow/flow-go/engine/consensus/matching"
 	"os"
 	"sync"
 	"testing"
@@ -19,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"

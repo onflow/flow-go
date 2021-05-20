@@ -2,8 +2,6 @@ package sealing
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/state/protocol"
 	"runtime"
 	"sync"
 
@@ -12,11 +10,13 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus"
+	sealing "github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -44,7 +44,7 @@ type (
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	unit                                 *engine.Unit
-	core                                 sealing.ResultApprovalProcessor
+	core                                 sealing.SealingCore
 	workerPool                           *workerpool.WorkerPool
 	log                                  zerolog.Logger
 	me                                   module.Local

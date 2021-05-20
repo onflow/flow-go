@@ -62,7 +62,6 @@ type Core struct {
 	state                     protocol.State                     // used to access protocol state
 	seals                     storage.Seals                      // used to get last sealed block
 	requestTracker            *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
-	pendingReceipts           mempool.PendingReceipts            // buffer for receipts where an ancestor result is missing, so they can't be connected to the sealed results
 	metrics                   module.ConsensusMetrics            // used to track consensus metrics
 	tracer                    module.Tracer                      // used to trace execution
 	config                    Config

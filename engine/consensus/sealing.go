@@ -2,10 +2,10 @@ package sealing
 
 import "github.com/onflow/flow-go/model/flow"
 
-// ResultApprovalProcessor performs processing of execution results and result approvals.
+// SealingCore performs processing of execution results and result approvals.
 // Accepts `flow.IncorporatedResult` to start processing approvals for particular result.
 // Whenever enough approvals are collected produces a candidate seal and adds it to the mempool.
-type ResultApprovalProcessor interface {
+type SealingCore interface {
 	// ProcessApproval processes approval in blocking way. Concurrency safe.
 	// Returns:
 	// * exception in case of unexpected error

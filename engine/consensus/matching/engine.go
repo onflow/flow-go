@@ -24,7 +24,6 @@ const defaultFinalizationQueueCapacity = 100
 type Engine struct {
 	unit                      *engine.Unit
 	log                       zerolog.Logger
-	mempool                   module.MempoolMetrics
 	me                        module.Local
 	core                      sealing.MatchingCore
 	pendingReceipts           *engine.FifoMessageStore
@@ -57,6 +56,9 @@ func NewEngine(
 	finalizationQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultFinalizationQueueCapacity),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for inbound finalization events: %w", err)
+	}
 
 	pendingFinalizationEvents := &engine.FifoMessageStore{
 		FifoQueue: finalizationQueue,

@@ -3,7 +3,6 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/engine/consensus/matching"
 	"testing"
 	"time"
 
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"

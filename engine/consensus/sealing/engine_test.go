@@ -3,13 +3,12 @@
 package sealing
 
 import (
-	"github.com/gammazero/workerpool"
-	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
