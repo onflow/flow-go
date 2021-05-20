@@ -178,8 +178,7 @@ func main() {
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Module("requester engine", func(node *cmd.FlowNodeBuilder) error {
-			// we initialize requester engine as a module, and let it be started by fetcher engine
+		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
@@ -192,10 +191,6 @@ func main() {
 				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
 				requestTargets)
 
-			return err
-		}).
-		Module("fetcher engine", func(node *cmd.FlowNodeBuilder) error {
-			// we initialize fetcher engine as a module, and let it be started by chunk consumer
 			fetcherEngine = fetcher.New(
 				node.Logger,
 				collector,
@@ -208,10 +203,7 @@ func main() {
 				node.Storage.Receipts,
 				requesterEngine)
 
-			return nil
-		}).
-		Component("chunk consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
+			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
 				node.Logger,
 				processedChunkIndex,
