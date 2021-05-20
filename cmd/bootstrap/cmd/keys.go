@@ -84,7 +84,6 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey, machi
 		nodeConfig.Stake,
 		networkKey,
 		stakingKey,
-		machineKey,
 	)
 
 	return nodeInfo

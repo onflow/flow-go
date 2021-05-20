@@ -90,9 +90,6 @@ type NodeInfo struct {
 	networkPrivKey crypto.PrivateKey
 	stakingPubKey  crypto.PublicKey
 	stakingPrivKey crypto.PrivateKey
-
-	// node machine account key
-	machinePrivKey crypto.PrivateKey
 }
 
 func NewPublicNodeInfo(
@@ -120,7 +117,6 @@ func NewPrivateNodeInfo(
 	stake uint64,
 	networkKey crypto.PrivateKey,
 	stakingKey crypto.PrivateKey,
-	machineKey crypto.PrivateKey,
 ) NodeInfo {
 	return NodeInfo{
 		NodeID:         nodeID,
@@ -129,7 +125,6 @@ func NewPrivateNodeInfo(
 		Stake:          stake,
 		networkPrivKey: networkKey,
 		stakingPrivKey: stakingKey,
-		machinePrivKey: machineKey,
 	}
 }
 
