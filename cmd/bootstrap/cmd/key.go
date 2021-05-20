@@ -19,11 +19,6 @@ var (
 	flagRole    string
 	flagAddress string
 
-	// bools
-	flagNetworkKey bool
-	flagStakingKey bool
-	flagMachineKey bool
-
 	// seed flags
 	flagNetworkSeed []byte
 	flagStakingSeed []byte
@@ -56,7 +51,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 
 	// TODO: We need NodeID of the node to continue checking if the node-info.priv.json exists
 	// TODO: Add paths to log messages for clarity
-	exists, err := pathExists(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID))
+	exists, err := pathExists(fmt.Sprintf(model.PathNodeInfoPriv, flow.Identifier{}))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-info.priv.json exists")
 	}
