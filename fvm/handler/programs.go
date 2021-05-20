@@ -38,6 +38,10 @@ type ProgramsHandler struct {
 }
 
 func (h *ProgramsHandler) Set(location common.Location, program *interpreter.Program) error {
+	// ignore empty locations
+	if location == nil {
+		return nil
+	}
 
 	// we track only for AddressLocation, so for anything other simply put a value
 	if _, is := location.(common.AddressLocation); !is {
@@ -76,6 +80,11 @@ func (h *ProgramsHandler) mergeState(state *state.State) error {
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
+	// ignore empty locations
+	if location == nil {
+		return nil, false
+	}
+
 	program, view, has := h.Programs.Get(location)
 	if has {
 		if view != nil { // handle view not set (ie. for non-address locations

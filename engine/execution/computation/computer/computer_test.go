@@ -10,7 +10,9 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -28,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -50,7 +53,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -74,7 +77,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create an empty block
@@ -107,7 +110,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		collectionCount := 2
@@ -246,7 +249,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(emittingRuntime)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
@@ -307,7 +310,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		const collectionCount = 2
@@ -376,7 +379,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		vm := fvm.NewVirtualMachine(rt)
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
 		block := generateBlock(collectionCount, transactionCount, rag)
@@ -397,6 +400,10 @@ type testRuntime struct {
 }
 
 var _ runtime.Runtime = &testRuntime{}
+
+func (e *testRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
+	panic("InvokeContractFunction not expected")
+}
 
 func (e *testRuntime) ExecuteScript(script runtime.Script, context runtime.Context) (cadence.Value, error) {
 	return e.executeScript(script, context)
@@ -482,7 +489,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	err = accounts.Create([]flow.AccountPublicKey{key.PublicKey(1000)}, address)
 	require.NoError(t, err)
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	block := generateBlockWithVisitor(1, 1, fag, func(txBody *flow.TransactionBody) {

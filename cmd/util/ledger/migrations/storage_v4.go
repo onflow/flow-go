@@ -251,15 +251,15 @@ func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) 
 	compositeValue, ok := value.(*interpreter.CompositeValue)
 	if !ok ||
 		key != flowTokenReceiverStorageKey ||
-		!isTokenForwardingLocation(compositeValue.Location) ||
-		compositeValue.QualifiedIdentifier != "TokenForwarding.Forwarder" {
+		!isTokenForwardingLocation(compositeValue.Location()) ||
+		compositeValue.QualifiedIdentifier() != "TokenForwarding.Forwarder" {
 
 		return
 	}
 
 	const recipientField = "recipient"
 
-	recipient, ok := compositeValue.Fields.Get(recipientField)
+	recipient, ok := compositeValue.Fields().Get(recipientField)
 	if !ok {
 		fmt.Printf(
 			"Warning: missing recipient field for TokenForwarding Forwarder:\n%s\n\n",
@@ -295,12 +295,12 @@ func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) 
 
 	fmt.Printf(
 		"Rewriting TokenForwarding Forwarder: %s\n\treference: %#+v\n\tcapability: %#+v\n",
-		compositeValue,
+		compositeValue.String(interpreter.StringResults{}),
 		recipientRef,
 		recipientCap,
 	)
 
-	compositeValue.Fields.Set(recipientField, recipientCap)
+	compositeValue.Fields().Set(recipientField, recipientCap)
 }
 
 func checkStorageFormatV4(payload ledger.Payload) error {

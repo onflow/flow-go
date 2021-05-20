@@ -80,7 +80,8 @@ func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifie
 
 	as, ok := ir.chunkApprovals[chunkIndex]
 	if !ok {
-		as = NewSignatureCollector()
+		c := NewSignatureCollector()
+		as = &c
 		ir.chunkApprovals[chunkIndex] = as
 	}
 
@@ -137,8 +138,8 @@ type SignatureCollector struct {
 }
 
 // NewSignatureCollector instantiates a new SignatureCollector
-func NewSignatureCollector() *SignatureCollector {
-	return &SignatureCollector{
+func NewSignatureCollector() SignatureCollector {
+	return SignatureCollector{
 		verifierSignatures: nil,
 		signerIDs:          nil,
 		signerIDSet:        make(map[Identifier]int),
@@ -167,6 +168,12 @@ func (c *SignatureCollector) BySigner(signerID Identifier) (*crypto.Signature, b
 		return nil, false
 	}
 	return &c.verifierSignatures[idx], true
+}
+
+// HasSigned checks if signer has already provided a signature
+func (c *SignatureCollector) HasSigned(signerID Identifier) bool {
+	_, found := c.signerIDSet[signerID]
+	return found
 }
 
 // Add appends a signature. Only the _first_ signature is retained for each signerID.

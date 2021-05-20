@@ -630,7 +630,7 @@ func MockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64) {
 	height := uint64(5000)
 	pingInfoProvider := new(mocknetwork.PingInfoProvider)
 	pingInfoProvider.On("SoftwareVersion").Return(version)
-	pingInfoProvider.On("LatestFinalizedBlockHeight").Return(height)
+	pingInfoProvider.On("SealedBlockHeight").Return(height)
 	return pingInfoProvider, version, height
 }
 
