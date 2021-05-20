@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	sealing "github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 )
@@ -68,13 +67,20 @@ func NewEngine(
 		log.With().Str("matching", "engine").Logger(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BlockProposal)
+				_, ok := msg.Payload.(*flow.ExecutionReceipt)
 				if ok {
-					engineMetrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+					engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 				}
 				return ok
 			},
 			Store: pendingReceipts,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(flow.Identifier)
+				return ok
+			},
+			Store: pendingFinalizationEvents,
 		},
 	)
 
@@ -146,6 +152,13 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	err := e.Process(originID, receipt)
 	if err != nil {
 		e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
+	}
+}
+
+func (e *Engine) HandleFinalizedBlock(finalizedBlockID flow.Identifier) {
+	err := e.messageHandler.Process(e.me.NodeID(), finalizedBlockID)
+	if err != nil {
+		e.log.Error().Err(err).Msg("could not process finalized block")
 	}
 }
 

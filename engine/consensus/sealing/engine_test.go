@@ -21,11 +21,11 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestApprovalsEngineContext(t *testing.T) {
-	suite.Run(t, new(ApprovalsEngineSuite))
+func TestSealingEngineContext(t *testing.T) {
+	suite.Run(t, new(SealingEngineSuite))
 }
 
-type ApprovalsEngineSuite struct {
+type SealingEngineSuite struct {
 	suite.Suite
 
 	core *mockconsensus.ResultApprovalProcessor
@@ -34,7 +34,7 @@ type ApprovalsEngineSuite struct {
 	engine *Engine
 }
 
-func (s *ApprovalsEngineSuite) SetupTest() {
+func (s *SealingEngineSuite) SetupTest() {
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
@@ -64,7 +64,7 @@ func (s *ApprovalsEngineSuite) SetupTest() {
 
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
 // Tests the whole processing pipeline.
-func (s *ApprovalsEngineSuite) TestProcessValidReceipt() {
+func (s *SealingEngineSuite) TestProcessValidReceipt() {
 	block := unittest.BlockFixture()
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
@@ -86,7 +86,7 @@ func (s *ApprovalsEngineSuite) TestProcessValidReceipt() {
 
 // TestMultipleProcessingItems tests that the engine queues multiple receipts and approvals
 // and eventually feeds them into sealing.Core for processing
-func (s *ApprovalsEngineSuite) TestMultipleProcessingItems() {
+func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	originID := unittest.IdentifierFixture()
 	block := unittest.BlockFixture()
 
@@ -140,7 +140,7 @@ func (s *ApprovalsEngineSuite) TestMultipleProcessingItems() {
 }
 
 // try to submit an approval where the message origin is inconsistent with the message creator
-func (s *ApprovalsEngineSuite) TestApprovalInvalidOrigin() {
+func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	// approval from valid origin (i.e. a verification node) but with random ApproverID
 	originID := unittest.IdentifierFixture()
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
