@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
-	module "github.com/onflow/flow-go/module/mock"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
@@ -47,10 +46,6 @@ type BaseChainSuite struct {
 	ResultsDB        *storage.ExecutionResults
 	PersistedResults map[flow.Identifier]*flow.ExecutionResult
 
-	// mock mempool.IncorporatedResults: backed by in-memory map PendingResults
-	ResultsPL      *mempool.IncorporatedResults
-	PendingResults map[flow.Identifier]*flow.IncorporatedResult
-
 	// mock mempool.IncorporatedResultSeals: backed by in-memory map PendingSeals
 	SealsPL      *mempool.IncorporatedResultSeals
 	PendingSeals map[flow.Identifier]*flow.IncorporatedResultSeal
@@ -62,16 +57,8 @@ type BaseChainSuite struct {
 	SealsDB    *storage.Seals                 // backed by map SealsIndex
 	SealsIndex map[flow.Identifier]*flow.Seal // last valid seal for block
 
-	// mock mempool.Approvals: used to test whether or not Matching Engine stores approvals
-	// mock storage backed by in-memory map PendingApprovals
-	ApprovalsPL      *mempool.Approvals
-	PendingApprovals map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval
-
 	// mock mempool.ReceiptsForest: used to test whether or not Matching Engine stores receipts
 	ReceiptsPL *mempool.ExecutionTree
-
-	Assigner    *module.ChunkAssigner
-	Assignments map[flow.Identifier]*chunks.Assignment // index for assignments for given execution result
 }
 
 func (bc *BaseChainSuite) SetupChain() {
@@ -327,30 +314,6 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 	)
 
-	// ~~~~~~~~~~~~~~~~ SETUP INCORPORATED RESULTS MEMPOOL ~~~~~~~~~~~~~~~~~ //
-	bc.PendingResults = make(map[flow.Identifier]*flow.IncorporatedResult)
-	bc.ResultsPL = &mempool.IncorporatedResults{}
-	bc.ResultsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
-	bc.ResultsPL.On("All").Return(
-		func() flow.IncorporatedResultList {
-			results := make(flow.IncorporatedResultList, 0, len(bc.PendingResults))
-			for _, result := range bc.PendingResults {
-				results = append(results, result)
-			}
-			return results
-		},
-	).Maybe()
-
-	// ~~~~~~~~~~~~~~~~~~~~~~ SETUP APPROVALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
-	bc.ApprovalsPL = &mempool.Approvals{}
-	bc.ApprovalsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
-	bc.PendingApprovals = make(map[flow.Identifier]map[uint64]map[flow.Identifier]*flow.ResultApproval)
-	bc.ApprovalsPL.On("ByChunk", mock.Anything, mock.Anything).Return(
-		func(resultID flow.Identifier, chunkIndex uint64) map[flow.Identifier]*flow.ResultApproval {
-			return bc.PendingApprovals[resultID][chunkIndex]
-		},
-	).Maybe()
-
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP RECEIPTS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
@@ -378,9 +341,6 @@ func (bc *BaseChainSuite) SetupChain() {
 			return seals
 		},
 	).Maybe()
-
-	bc.Assigner = &module.ChunkAssigner{}
-	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
 }
 
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
@@ -550,10 +510,6 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 			approvals[chunk.Index] = chunkApprovals
 		}
 
-		bc.Assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Maybe()
-		bc.PendingApprovals[incorporatedResult.Result.ID()] = approvals
-		bc.PendingResults[incorporatedResult.Result.ID()] = incorporatedResult
-		bc.Assignments[incorporatedResult.Result.ID()] = assignment
 		bc.PersistedResults[result.ID()] = result
 		// TODO: adding receipt
 	}
@@ -568,8 +524,4 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 	bc.Blocks[subgraph.Block.ID()] = subgraph.Block
 	bc.PersistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
 	bc.PersistedResults[subgraph.Result.ID()] = subgraph.Result
-	bc.PendingResults[subgraph.IncorporatedResult.ID()] = subgraph.IncorporatedResult
-
-	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
-	bc.PendingApprovals[subgraph.IncorporatedResult.Result.ID()] = subgraph.Approvals
 }

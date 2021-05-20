@@ -1,8 +1,6 @@
 package flow
 
 import (
-	"sync"
-
 	"github.com/onflow/flow-go/crypto"
 )
 
@@ -18,22 +16,12 @@ type IncorporatedResult struct {
 	// Result is the ExecutionResult contained in the ExecutionReceipt that was
 	// incorporated in the payload of IncorporatedBlockID.
 	Result *ExecutionResult
-
-	// chunkApprovals is a placeholder for attestation signatures
-	// collected for each chunk. It gets populated by the consensus matching
-	// engine when approvals are matched to execution results.
-	// This field is not exported (name doesn't start with a capital letter), so
-	// it is not used in calculating the ID and Checksum of the Incorporated
-	// Result (RLP encoding ignores private fields).
-	chunkApprovals     map[uint64]*SignatureCollector
-	chunkApprovalsLock sync.Mutex
 }
 
 func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResult) *IncorporatedResult {
 	return &IncorporatedResult{
 		IncorporatedBlockID: incorporatedBlockID,
 		Result:              result,
-		chunkApprovals:      make(map[uint64]*SignatureCollector),
 	}
 }
 
@@ -47,77 +35,6 @@ func (ir *IncorporatedResult) ID() Identifier {
 // capable of being stored directly in mempools and storage.
 func (ir *IncorporatedResult) Checksum() Identifier {
 	return MakeID(ir)
-}
-
-// GetChunkSignatures returns the AggregatedSignature for a specific chunk
-func (ir *IncorporatedResult) GetChunkSignatures(chunkIndex uint64) (*AggregatedSignature, bool) {
-	ir.chunkApprovalsLock.Lock()
-	defer ir.chunkApprovalsLock.Unlock()
-	s, ok := ir.chunkApprovals[chunkIndex]
-	if !ok {
-		return nil, false
-	}
-	as := s.ToAggregatedSignature()
-	return &as, true
-}
-
-// GetSignature returns a signature by chunk index and signer ID
-func (ir *IncorporatedResult) GetSignature(chunkIndex uint64, signerID Identifier) (*crypto.Signature, bool) {
-	ir.chunkApprovalsLock.Lock()
-	defer ir.chunkApprovalsLock.Unlock()
-
-	as, ok := ir.chunkApprovals[chunkIndex]
-	if !ok {
-		return nil, false
-	}
-	return as.BySigner(signerID)
-}
-
-// AddSignature adds a signature to the collection of AggregatedSignatures
-func (ir *IncorporatedResult) AddSignature(chunkIndex uint64, signerID Identifier, signature crypto.Signature) {
-	ir.chunkApprovalsLock.Lock()
-	defer ir.chunkApprovalsLock.Unlock()
-
-	as, ok := ir.chunkApprovals[chunkIndex]
-	if !ok {
-		c := NewSignatureCollector()
-		as = &c
-		ir.chunkApprovals[chunkIndex] = as
-	}
-
-	as.Add(signerID, signature)
-}
-
-// NumberSignatures returns the number of stored (distinct) signatures for the given chunk
-func (ir *IncorporatedResult) NumberSignatures(chunkIndex uint64) uint {
-	ir.chunkApprovalsLock.Lock()
-	defer ir.chunkApprovalsLock.Unlock()
-
-	as, ok := ir.chunkApprovals[chunkIndex]
-	if !ok {
-		return 0
-	}
-	return as.NumberSignatures()
-}
-
-// GetAggregatedSignatures returns all the aggregated signatures orderd by chunk
-// index
-func (ir *IncorporatedResult) GetAggregatedSignatures() []AggregatedSignature {
-	ir.chunkApprovalsLock.Lock()
-	defer ir.chunkApprovalsLock.Unlock()
-
-	result := make([]AggregatedSignature, 0, len(ir.Result.Chunks))
-
-	for _, chunk := range ir.Result.Chunks {
-		ca, ok := ir.chunkApprovals[chunk.Index]
-		if ok {
-			result = append(result, ca.ToAggregatedSignature())
-		} else {
-			result = append(result, AggregatedSignature{})
-		}
-	}
-
-	return result
 }
 
 /* ************************************************************************ */
