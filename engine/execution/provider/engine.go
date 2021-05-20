@@ -152,6 +152,13 @@ func (e *Engine) onChunkDataRequest(
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
+	// randomly drop half of the chunk data pack requests
+	// to confirm whether the execution hiccup of EN4 was
+	// caused by slow chunk data pack requests
+	if chunkID%2 == 0 {
+		return nil
+	}
+
 	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
