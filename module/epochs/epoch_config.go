@@ -151,6 +151,12 @@ func EncodeClusterQCs(qcs []*flow.QuorumCertificate, service flow.Address) []byt
 							ElementType: cadence.StringType{},
 						},
 					},
+					{
+						Identifier: "voterIDs",
+						Type: cadence.ConstantSizedArrayType{
+							ElementType: cadence.StringType{},
+						},
+					},
 				},
 			})
 
