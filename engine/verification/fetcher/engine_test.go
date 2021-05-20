@@ -438,6 +438,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 
 	// none of the subsequent calls on the pipeline path should happen.
 	s.results.AssertNotCalled(t, "ByID")
+	s.blocks.AssertNotCalled(t, "ByID")
 	s.pendingChunks.AssertNotCalled(t, "Rem")
 	s.state.AssertNotCalled(t, "AtBlockID")
 }
