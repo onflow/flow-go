@@ -47,7 +47,8 @@ type Core struct {
 	config           Config                          // config for matching core
 }
 
-func NewCore(log zerolog.Logger,
+func NewCore(
+	log zerolog.Logger,
 	tracer module.Tracer,
 	metrics module.ConsensusMetrics,
 	mempool module.MempoolMetrics,

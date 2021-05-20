@@ -121,12 +121,6 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("failed to create queue for requested approvals: %w", err)
 	}
 
-	// register engine with the receipt provider
-	_, err = net.Register(engine.ReceiveReceipts, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register for results: %w", err)
-	}
-
 	// register engine with the approval provider
 	_, err = net.Register(engine.ReceiveApprovals, e)
 	if err != nil {
@@ -277,18 +271,6 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.Process(e.me.NodeID(), event)
-}
-
-// HandleReceipt pipes explicitly requested receipts to the process function.
-// Receipts can come from this function or the receipt provider setup in the
-// engine constructor.
-func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
-	e.log.Debug().Msg("received receipt from requester engine")
-
-	err := e.Process(originID, receipt)
-	if err != nil {
-		e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
-	}
 }
 
 // Ready returns a ready channel that is closed once the engine has fully

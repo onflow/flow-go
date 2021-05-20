@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"path/filepath"
 	"time"
 
@@ -73,22 +74,22 @@ func main() {
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
 
-		err               error
-		mutableState      protocol.MutableState
-		privateDKGData    *bootstrap.DKGParticipantPriv
-		guarantees        mempool.Guarantees
-		receipts          mempool.ExecutionTree
-		seals             mempool.IncorporatedResultSeals
-		pendingReceipts   mempool.PendingReceipts
-		prov              *provider.Engine
-		receiptRequester  *requester.Engine
-		syncCore          *synchronization.Core
-		comp              *compliance.Engine
-		conMetrics        module.ConsensusMetrics
-		mainMetrics       module.HotstuffMetrics
-		receiptValidator  module.ReceiptValidator
-		approvalValidator module.ApprovalValidator
-		chunkAssigner     *chmodule.ChunkAssigner
+		err              error
+		mutableState     protocol.MutableState
+		privateDKGData   *bootstrap.DKGParticipantPriv
+		guarantees       mempool.Guarantees
+		receipts         mempool.ExecutionTree
+		seals            mempool.IncorporatedResultSeals
+		pendingReceipts  mempool.PendingReceipts
+		prov             *provider.Engine
+		receiptRequester *requester.Engine
+		syncCore         *synchronization.Core
+		comp             *compliance.Engine
+		sealingEngine    *sealing.Engine
+		conMetrics       module.ConsensusMetrics
+		mainMetrics      module.HotstuffMetrics
+		receiptValidator module.ReceiptValidator
+		chunkAssigner    *chmodule.ChunkAssigner
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -147,10 +148,6 @@ func main() {
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
-
-			approvalValidator = validation.NewApprovalValidator(
-				node.State,
-				resultApprovalSigVerifier)
 
 			sealValidator := validation.NewSealValidator(
 				node.State,
@@ -215,6 +212,32 @@ func main() {
 		}).
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+			config := sealing.DefaultConfig()
+			config.EmergencySealingActive = emergencySealing
+			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
+
+			e, err := sealing.NewEngine(
+				node.Logger,
+				node.Tracer,
+				conMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				node.Network,
+				node.Me,
+				node.Storage.Headers,
+				node.State,
+				node.Storage.Seals,
+				chunkAssigner,
+				resultApprovalSigVerifier,
+				seals,
+				config,
+			)
+
+			return e, err
+		}).
+		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -231,32 +254,43 @@ func main() {
 				return nil, err
 			}
 
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+			config := matching.Config{
+				SealingThreshold:    0,
+				MaxResultsToRequest: 0,
+			}
 
-			options := sealing.DefaultConfig()
-			options.EmergencySealingActive = emergencySealing
-			options.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
-
-			engine, err := sealing.NewEngine(
+			core := matching.NewCore(
 				node.Logger,
 				node.Tracer,
 				conMetrics,
-				node.Metrics.Engine,
 				node.Metrics.Mempool,
-				node.Network,
-				node.Me,
-				node.Storage.Headers,
 				node.State,
-				node.Storage.Seals,
-				chunkAssigner,
-				resultApprovalSigVerifier,
+				node.Storage.Headers,
+				node.Storage.Receipts,
+				receipts,
+				pendingReceipts,
 				seals,
-				options,
+				receiptValidator,
+				receiptRequester,
+				sealingEngine,
+				config,
 			)
 
-			receiptRequester.WithHandle(engine.HandleReceipt)
+			e, err := matching.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				core,
+			)
+			if err != nil {
+				return nil, err
+			}
 
-			return engine, err
+			receiptRequester.WithHandle(e.HandleReceipt)
+
+			return e, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
