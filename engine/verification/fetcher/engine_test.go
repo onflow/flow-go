@@ -276,72 +276,80 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 // as the necessary conditions for chunk data integrity.
 func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 	tt := []struct {
-		alterChunkDataPack func(*flow.ChunkDataPack)
-		mockStateFunc      func(flow.Identity, *protocol.State, *storage.Blocks, *flow.Block) // mocks state at block identifier for the given identity.
-		msg                string
+		alterChunkDataResponse func(*flow.ChunkDataPack, *flow.Collection)
+		mockStateFunc          func(flow.Identity, *protocol.State, flow.Identifier) // mocks state at block identifier for the given identity.
+		msg                    string
 	}{
 		{
-			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				cdp.CollectionID = unittest.IdentifierFixture()
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
-				mockBlocksStorage(blocks, block)
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
-			msg: "invalid-collection-ID",
+			msg: "conflicting-collection-ID-with-chunk-data-pack",
 		},
 		{
-			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+				// re-writes collection with a random one that is different than original collection ID
+				// in block's guarantee.
+				c := unittest.CollectionFixture(1)
+				coll = &c
+				cdp.CollectionID = c.ID()
+			},
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				// mocks a valid execution node as originID
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+			},
+			msg: "conflicting-collection-with-blocks-storage",
+		},
+		{
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				cdp.ChunkID = unittest.IdentifierFixture()
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
-				mockBlocksStorage(blocks, block)
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "invalid-chunk-ID",
 		},
 		{
-			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				cdp.StartState = unittest.StateCommitmentFixture()
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
-				mockBlocksStorage(blocks, block)
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "invalid-start-state",
 		},
 		{
-			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				// we don't alter chunk data pack content
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
-				mockStateAtBlockIDForMissingIdentities(state, block.ID(), flow.IdentityList{&identity})
-				mockBlocksStorage(blocks, block)
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+				mockStateAtBlockIDForMissingIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "invalid-origin-id",
 		},
 		{
-			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				// we don't alter chunk data pack content
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				identity.Stake = 0
-				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
-				mockBlocksStorage(blocks, block)
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "unstaked-origin-id",
 		},
 		{
-			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				// we don't alter chunk data pack content
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				identity.Role = flow.RoleVerification
-				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
-				mockBlocksStorage(blocks, block)
+				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
 			},
 			msg: "invalid-origin-role",
 		},
@@ -349,7 +357,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.msg, func(t *testing.T) {
-			testInvalidChunkDataResponse(t, tc.alterChunkDataPack, tc.mockStateFunc)
+			testInvalidChunkDataResponse(t, tc.alterChunkDataResponse, tc.mockStateFunc)
 		})
 	}
 }
@@ -361,8 +369,8 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 //
 // The input alter function alters the chunk data response to break its integrity.
 func testInvalidChunkDataResponse(t *testing.T,
-	alterChunkDataPack func(cdp *flow.ChunkDataPack),
-	mockStateFunc func(flow.Identity, *protocol.State, *storage.Blocks, *flow.Block)) {
+	alterChunkDataResponse func(*flow.ChunkDataPack, *flow.Collection),
+	mockStateFunc func(flow.Identity, *protocol.State, flow.Identifier)) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
@@ -374,14 +382,15 @@ func testInvalidChunkDataResponse(t *testing.T,
 
 	// mocks resources on fetcher engine side.
 	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockBlocksStorage(s.blocks, block)
 
 	chunk := statuses.Chunks()[0]
 	chunkID := chunk.ID()
 	chunkDataPacks, collections, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collectionList)
 
 	// alters chunk data pack so that it become invalid.
-	alterChunkDataPack(chunkDataPacks[chunkID])
-	mockStateFunc(*agrees[0], s.state, s.blocks, block)
+	alterChunkDataResponse(chunkDataPacks[chunkID], collections[chunkID])
+	mockStateFunc(*agrees[0], s.state, block.ID())
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
