@@ -104,7 +104,9 @@ func (e *Engine) Ready() <-chan struct{} {
 
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		<-e.requester.Done()
+	})
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.

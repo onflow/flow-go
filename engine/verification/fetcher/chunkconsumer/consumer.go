@@ -70,7 +70,5 @@ func (c *ChunkConsumer) Ready() <-chan struct{} {
 func (c *ChunkConsumer) Done() <-chan struct{} {
 	c.consumer.Stop()
 
-	ready := make(chan struct{})
-	close(ready)
-	return ready
+	return c.chunkProcessor.Done()
 }
