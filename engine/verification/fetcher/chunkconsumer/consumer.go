@@ -21,25 +21,29 @@ const (
 // It wraps the generic job consumer in order to be used as a ReadyDoneAware
 // on startup
 type ChunkConsumer struct {
-	consumer module.JobConsumer
+	consumer       module.JobConsumer
+	chunkProcessor fetcher.AssignedChunkProcessor
 }
 
 func NewChunkConsumer(
 	log zerolog.Logger,
 	processedIndex storage.ConsumerProgress, // to persist the processed index
 	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
-	engine fetcher.AssignedChunkProcessor, // to process jobs (chunks)
+	chunkProcessor fetcher.AssignedChunkProcessor, // to process jobs (chunks)
 	maxProcessing uint64, // max number of jobs to be processed in parallel
 ) *ChunkConsumer {
-	worker := NewWorker(engine)
-	engine.WithChunkConsumerNotifier(worker)
+	worker := NewWorker(chunkProcessor)
+	chunkProcessor.WithChunkConsumerNotifier(worker)
 
 	jobs := &ChunkJobs{locators: chunksQueue}
 
 	lg := log.With().Str("module", "chunk_consumer").Logger()
 	consumer := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing)
 
-	chunkConsumer := &ChunkConsumer{consumer}
+	chunkConsumer := &ChunkConsumer{
+		consumer:       consumer,
+		chunkProcessor: chunkProcessor,
+	}
 
 	worker.consumer = chunkConsumer
 
@@ -60,9 +64,7 @@ func (c *ChunkConsumer) Ready() <-chan struct{} {
 		panic(fmt.Errorf("could not start the chunk consumer for match engine: %w", err))
 	}
 
-	ready := make(chan struct{})
-	close(ready)
-	return ready
+	return c.chunkProcessor.Ready()
 }
 
 func (c *ChunkConsumer) Done() <-chan struct{} {
