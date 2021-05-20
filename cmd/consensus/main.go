@@ -255,8 +255,8 @@ func main() {
 			}
 
 			config := matching.Config{
-				SealingThreshold:    0,
-				MaxResultsToRequest: 0,
+				SealingThreshold:    10,
+				MaxResultsToRequest: 20,
 			}
 
 			core := matching.NewCore(
