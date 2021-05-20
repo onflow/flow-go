@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -456,6 +457,46 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.Contains(t, tx.Err.Error(), "setting contracts requires authorization from specific accounts")
 		assert.Equal(t, (&errors.CadenceRuntimeError{}).Code(), tx.Err.Code())
 	})
+
+	t.Run("account update with set code succeeds when account is added as authorized account", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// setup a new authorizer account
+		authTxBody, err := blueprints.SetContractDeploymentAuthorizersTransaction(chain.ServiceAddress(), []flow.Address{chain.ServiceAddress(), accounts[0]})
+		require.NoError(t, err)
+
+		authTxBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		authTxBody.SetPayer(chain.ServiceAddress())
+		err = testutil.SignEnvelope(authTxBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+		authTx := fvm.Transaction(authTxBody, 0)
+
+		err = vm.Run(ctx, authTx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, authTx.Err)
+
+		// test deploying a new contract (not authorized by service account)
+		txBody := testutil.DeployUnauthorizedCounterContractTransaction(accounts[0])
+		txBody.SetProposalKey(accounts[0], 0, 0)
+		txBody.SetPayer(accounts[0])
+
+		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		assert.NoError(t, tx.Err)
+	})
+
 }
 
 func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
@@ -1212,7 +1253,7 @@ func TestSignatureVerification(t *testing.T) {
 
 	signatureAlgorithms := []signatureAlgorithm{
 		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
-		{"ECDSA_Secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
 	}
 
 	type hashAlgorithm struct {
@@ -1890,4 +1931,240 @@ func TestSigningWithTags(t *testing.T) {
 		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWok))
 	}
 
+}
+
+func TestTransactionFeeDeduction(t *testing.T) {
+	getBalance := func(vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, address flow.Address) uint64 {
+
+		code := []byte(fmt.Sprintf(`
+					import FungibleToken from 0x%s
+					import FlowToken from 0x%s
+					
+					pub fun main(account: Address): UFix64 {
+						let acct = getAccount(account)
+						let vaultRef = acct.getCapability(/public/flowTokenBalance)
+							.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+							?? panic("Could not borrow Balance reference to the Vault")
+					
+						return vaultRef.balance
+					}
+				`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain)))
+		script := fvm.Script(code).WithArguments(
+			jsoncdc.MustEncode(cadence.NewAddress(address)),
+		)
+
+		err := vm.Run(ctx, script, view, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+		return script.Value.ToGoValue().(uint64)
+	}
+
+	type testCase struct {
+		name          string
+		fundWith      uint64
+		tryToTransfer uint64
+		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
+	}
+
+	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
+	fundingAmount := uint64(1_0000_0000)
+	transferAmount := uint64(123_456)
+
+	testCases := []testCase{
+		{
+			name:          "Transaction fees are deducted",
+			fundWith:      fundingAmount,
+			tryToTransfer: 0,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				require.Equal(t, txFees, balanceBefore-balanceAfter)
+			},
+		},
+		{
+			name:          "Transaction fee deduction emits events",
+			fundWith:      fundingAmount,
+			tryToTransfer: 0,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range tx.Events {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
+			},
+		},
+		{
+			name:          "Transaction fees are deducted and tx is applied",
+			fundWith:      fundingAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				require.Equal(t, txFees+transferAmount, balanceBefore-balanceAfter)
+			},
+		},
+		{
+			name:          "If just enough balance, fees are deducted",
+			fundWith:      txFees + transferAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.NoError(t, tx.Err)
+				require.Equal(t, uint64(0), balanceAfter)
+			},
+		},
+		{
+			name:          "If no balance, transaction fails",
+			fundWith:      txFees - 1,
+			tryToTransfer: 0,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.IsType(t, tx.Err, &errors.TransactionFeeDeductionFailedError{})
+				require.Equal(t, txFees-1, balanceAfter)
+			},
+		},
+		{
+			name:          "If no enough balance, transaction fails",
+			fundWith:      txFees,
+			tryToTransfer: 1,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.IsType(t, tx.Err, &errors.TransactionFeeDeductionFailedError{})
+				require.Equal(t, txFees, balanceAfter)
+			},
+		},
+		{
+			// This will change later
+			name:          "If tx fails, no fees are deducted",
+			fundWith:      fundingAmount,
+			tryToTransfer: 2 * fundingAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.Equal(t, fundingAmount, balanceAfter)
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+
+		t.Run(fmt.Sprintf("Transaction Fees %d: %s", i, tc.name), newVMTest().withBootstrapProcedureOptions(
+			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		).run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				ctx.TransactionFeesEnabled = true
+				// ==== Create an account ====
+				privateKey, txBody := testutil.CreateAccountCreationTransaction(t, chain)
+
+				err := testutil.SignTransactionAsServiceAccount(txBody, 0, chain)
+				require.NoError(t, err)
+
+				rootHasher := hash.NewSHA2_256()
+
+				err = txBody.SignEnvelope(
+					chain.ServiceAddress(),
+					0,
+					unittest.ServiceAccountPrivateKey.PrivateKey,
+					rootHasher,
+				)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				assert.NoError(t, tx.Err)
+
+				assert.Len(t, tx.Events, 5)
+
+				var accountCreatedEvent *flow.Event
+				for _, event := range tx.Events {
+					if event.Type != flow.EventAccountCreated {
+						continue
+					}
+					accountCreatedEvent = &event
+					break
+				}
+				assert.NotNil(t, accountCreatedEvent)
+
+				// read the address of the account created (e.g. "0x01" and convert it to flow.address)
+				data, err := jsoncdc.Decode(accountCreatedEvent.Payload)
+				require.NoError(t, err)
+				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+
+				// ==== Transfer tokens to new account ====
+				txBody = transferTokensTx(chain).
+					AddAuthorizer(chain.ServiceAddress()).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.fundWith))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
+				txBody.SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey,
+				)
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(
+					txBody,
+					chain.ServiceAddress(),
+					unittest.ServiceAccountPrivateKey,
+				)
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				balanceBefore := getBalance(vm, chain, ctx, view, address)
+
+				// ==== Transfer tokens from new account ====
+
+				txBody = transferTokensTx(chain).
+					AddAuthorizer(address).
+					AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
+					AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+				txBody.SetProposalKey(address, 0, 0)
+				txBody.SetPayer(address)
+
+				err = testutil.SignPayload(
+					txBody,
+					address,
+					privateKey,
+				)
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(
+					txBody,
+					address,
+					privateKey,
+				)
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 1)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				balanceAfter := getBalance(vm, chain, ctx, view, address)
+
+				tc.checkResult(
+					t,
+					balanceBefore,
+					balanceAfter,
+					tx,
+				)
+			}),
+		)
+	}
 }
