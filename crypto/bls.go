@@ -190,6 +190,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
 		return sk, nil
 	}
+	// TODO: check error
 	return nil, newInvalidInputs("the private key is not a valid BLS12-381 curve key")
 }
 

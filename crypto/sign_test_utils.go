@@ -84,9 +84,11 @@ func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int)
 	seed = make([]byte, minLen-1)
 	_, err = GeneratePrivateKey(salg, seed)
 	assert.Error(t, err)
+	assert.IsType(t, expectedError, err)
 	seed = make([]byte, maxLen+1)
 	_, err = GeneratePrivateKey(salg, seed)
 	assert.Error(t, err)
+	assert.IsType(t, expectedError, err)
 }
 
 func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
@@ -147,6 +149,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		0x5B, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x01}
 	_, err := DecodePrivateKey(salg, groupOrder[salg])
 	require.Error(t, err, "the key decoding should fail - private key value is too large")
+	assert.IsType(t, newInvalidInputs(""), err)
 }
 
 func testEquals(t *testing.T, salg SigningAlgorithm, otherSigAlgo SigningAlgorithm) {
