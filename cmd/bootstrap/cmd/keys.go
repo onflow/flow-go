@@ -37,7 +37,7 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	for i, nodeConfig := range nodeConfigs {
 		log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
 
-		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i], nil)
+		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		internalNodes = append(internalNodes, nodeInfo)
 
 		// retrieve private representation of the node
@@ -62,7 +62,7 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	return internalNodes
 }
 
-func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey, machineKey crypto.PrivateKey) model.NodeInfo {
+func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto.PrivateKey) model.NodeInfo {
 	var err error
 	nodeID, found := getNameID()
 	if !found {
@@ -87,6 +87,16 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey, machi
 	)
 
 	return nodeInfo
+}
+
+func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey) model.NodeMachineAccountInfo {
+
+	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	machineNodeInfo := model.NodeMachineAccountInfo{
+		EncodedPrivateKey: machineKey.Encode(),
+	}
+
+	return machineNodeInfo
 }
 
 func validateAddressesUnique(ns []model.NodeConfig) {

@@ -70,13 +70,16 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not generate keys")
 	}
 
+	// construct NodeMachineAccountInfo struct to write
+	machineAccountInfo := assembleNodeMachineAccountInfo(machineKey)
+
 	log.Debug().Str("address", flagAddress).Msg("assembling node information")
 	conf := model.NodeConfig{
 		Role:    role,
 		Address: flagAddress,
 		Stake:   0,
 	}
-	nodeInfo := assembleNodeInfo(conf, networkKey, stakingKey, machineKey)
+	nodeInfo := assembleNodeInfo(conf, networkKey, stakingKey)
 
 	// retrieve private representation of the node
 	private, err := nodeInfo.Private()
@@ -88,6 +91,10 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+
+	// write machine account info
+	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID), machineAccountInfo)
+
 }
 
 func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
