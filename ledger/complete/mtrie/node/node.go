@@ -16,8 +16,8 @@ import (
 //     downward path between v and a tree leaf.
 //
 // Conceptually, an MTrie is a sparse Merkle Trie, which has two node types:
-//   * INTERIOR node: has at least one child (i.e. lChild or rChild is not
-//     nil). Interior nodes do not store a path and have no payload.
+//   * INTERIM node: has at least one child (i.e. lChild or rChild is not
+//     nil). Interim nodes do not store a path and have no payload.
 //   * LEAF node: has _no_ children.
 // Per convention, we also consider nil as a leaf. Formally, nil is the generic
 // representative for any empty (sub)-trie (i.e. a trie without allocated
@@ -34,7 +34,7 @@ type Node struct {
 	lChild    *Node           // Left Child
 	rChild    *Node           // Right Child
 	height    int             // height where the Node is at
-	path      ledger.Path     // the storage path (dummy value for interior nodes)
+	path      ledger.Path     // the storage path (dummy value for interim nodes)
 	payload   *ledger.Payload // the payload this node is storing (leaf nodes only)
 	hashValue hash.Hash       // hash value of node (cached)
 	// TODO : Atm, we don't support trees with dynamic depth.
@@ -218,12 +218,12 @@ func (n *Node) Payload() *ledger.Payload {
 }
 
 // LeftChild returns the the Node's left child.
-// Only INTERIOR nodes have children.
+// Only INTERIM nodes have children.
 // Do NOT MODIFY returned Node!
 func (n *Node) LeftChild() *Node { return n.lChild }
 
 // RightChild returns the the Node's right child.
-// Only INTERIOR nodes have children.
+// Only INTERIM nodes have children.
 // Do NOT MODIFY returned Node!
 func (n *Node) RightChild() *Node { return n.rChild }
 

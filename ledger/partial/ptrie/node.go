@@ -38,7 +38,7 @@ func newNode(v hash.Hash, height int) *node {
 // Hash returns the node's pre-computed hash value
 func (n *node) Hash() hash.Hash { return n.hashValue }
 
-// forceComputeHash computes (and updates) the hashes of _all interior nodes_
+// forceComputeHash computes (and updates) the hashes of _all interim nodes_
 // of this sub-trie. Caution: this is an expensive operation!
 func (n *node) forceComputeHash() hash.Hash {
 	// leaf node

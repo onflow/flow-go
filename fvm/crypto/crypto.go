@@ -52,6 +52,7 @@ func (DefaultSignatureVerifier) Verify(
 	return valid, nil
 }
 
+// NewHasher returns a crypto hasher supported by runtime.
 func NewHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 	switch hashAlgo {
 	case hash.SHA2_256:
@@ -173,13 +174,12 @@ func VerifySignatureFromRuntime(
 	return valid, nil
 }
 
-// TODO change int to fixed size int
-func ConstructNewPublicKey(publicKey *runtime.PublicKey,
+//  NewAccountPublicKey construct an account public key given a runtime public key.
+func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	hashAlgo sema.HashAlgorithm,
 	keyIndex int,
 	weight int,
 ) (*flow.AccountPublicKey, error) {
-
 	var err error
 	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
 	if signAlgorithm == crypto.UnknownSigningAlgorithm {

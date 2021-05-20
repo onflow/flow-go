@@ -51,7 +51,7 @@ func (h *AccountKeyHandler) AddAccountKey(address runtime.Address,
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
-	accountPublicKey, err := crypto.ConstructNewPublicKey(publicKey, hashAlgo, int(keyIndex), weight)
+	accountPublicKey, err := crypto.NewAccountPublicKey(publicKey, hashAlgo, int(keyIndex), weight)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
