@@ -8,11 +8,10 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/flow-go/engine/collection/epochmgr"
-	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -44,6 +43,7 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"

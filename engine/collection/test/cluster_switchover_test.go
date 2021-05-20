@@ -9,8 +9,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// Wrap several protocol.State modules in one to enable epoch builder
-// Use Signer from hotstuff integration tests
 func TestClusterSwitchover(t *testing.T) {
 	unittest.LogVerbose()
 
@@ -21,6 +19,7 @@ func TestClusterSwitchover(t *testing.T) {
 
 	node := testutil.CollectionNode(t, hub, identity, rootSnapshot)
 
+	// for now just bring up and down the node
 	<-node.Ready()
 	<-node.Done()
 }
