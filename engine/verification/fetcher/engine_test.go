@@ -122,7 +122,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 
 	// creates a result with specified chunk number and assigned chunk numbers
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
-	block, result, statuses, locators := completeChunkStatusListFixture(t, chunkNum, assignedNum)
+	block, result, statuses, locators, collectionList := completeChunkStatusListFixture(t, chunkNum, assignedNum)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
@@ -131,6 +131,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 
 	// mocks resources on fetcher engine side.
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
+	mockBlocksStorage(s.blocks, block)
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
 	mockPendingChunksByID(s.pendingChunks, statuses)
@@ -138,7 +139,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 
 	// generates and mocks requesting chunk data pack fixture
 	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees, disagrees)
-	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(statuses.Chunks(), block, result)
+	chunkDataPacks, collections, verifiableChunks := verifiableChunkFixture(t, statuses.Chunks(), block, result, collectionList)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
@@ -186,7 +187,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	e := newFetcherEngine(s)
 
 	// creates a result with specified 2 chunks and a single assigned chunk to this fetcher engine.
-	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
+	block, result, statuses, _, collectionList := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 	mockBlockSealingStatus(s.state, s.blocks, block, false)
 
@@ -199,7 +200,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 
 	chunk := statuses.Chunks()[0]
 	chunkID := chunk.ID()
-	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+	chunkDataPacks, collections, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collectionList)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Once()
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
@@ -223,7 +224,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	// also the chunk belongs to an unsealed block.
-	block, result, statuses, locators := completeChunkStatusListFixture(t, 2, 1)
+	block, result, statuses, locators, collectionList := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 	mockBlockSealingStatus(s.state, s.blocks, block, false)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
@@ -237,7 +238,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 
 	// generates and mocks requesting chunk data pack fixture
 	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees, disagrees)
-	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+	chunkDataPacks, collections, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collectionList)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	// as the response it receives a notification that chunk belongs to a sealed block.
@@ -276,16 +277,17 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 	tt := []struct {
 		alterChunkDataPack func(*flow.ChunkDataPack)
-		mockStateFunc      func(flow.Identity, *protocol.State, flow.Identifier) // mocks state at block identifier for the given identity.
+		mockStateFunc      func(flow.Identity, *protocol.State, *storage.Blocks, *flow.Block) // mocks state at block identifier for the given identity.
 		msg                string
 	}{
 		{
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				cdp.CollectionID = unittest.IdentifierFixture()
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
 				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
+				mockBlocksStorage(blocks, block)
 			},
 			msg: "invalid-collection-ID",
 		},
@@ -293,9 +295,10 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				cdp.ChunkID = unittest.IdentifierFixture()
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
 				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
+				mockBlocksStorage(blocks, block)
 			},
 			msg: "invalid-chunk-ID",
 		},
@@ -303,9 +306,10 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				cdp.StartState = unittest.StateCommitmentFixture()
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
 				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
+				mockBlocksStorage(blocks, block)
 			},
 			msg: "invalid-start-state",
 		},
@@ -313,8 +317,9 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				// we don't alter chunk data pack content
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
-				mockStateAtBlockIDForMissingIdentities(state, blockID, flow.IdentityList{&identity})
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
+				mockStateAtBlockIDForMissingIdentities(state, block.ID(), flow.IdentityList{&identity})
+				mockBlocksStorage(blocks, block)
 			},
 			msg: "invalid-origin-id",
 		},
@@ -322,9 +327,10 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				// we don't alter chunk data pack content
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
 				identity.Stake = 0
-				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
+				mockBlocksStorage(blocks, block)
 			},
 			msg: "unstaked-origin-id",
 		},
@@ -332,9 +338,10 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			alterChunkDataPack: func(cdp *flow.ChunkDataPack) {
 				// we don't alter chunk data pack content
 			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
+			mockStateFunc: func(identity flow.Identity, state *protocol.State, blocks *storage.Blocks, block *flow.Block) {
 				identity.Role = flow.RoleVerification
-				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
+				mockStateAtBlockIDForIdentities(state, block.ID(), flow.IdentityList{&identity})
+				mockBlocksStorage(blocks, block)
 			},
 			msg: "invalid-origin-role",
 		},
@@ -355,14 +362,14 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 // The input alter function alters the chunk data response to break its integrity.
 func testInvalidChunkDataResponse(t *testing.T,
 	alterChunkDataPack func(cdp *flow.ChunkDataPack),
-	mockStateFunc func(flow.Identity, *protocol.State, flow.Identifier)) {
+	mockStateFunc func(flow.Identity, *protocol.State, *storage.Blocks, *flow.Block)) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
 	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	// also the chunk belongs to an unsealed block.
-	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
+	block, result, statuses, _, collectionList := completeChunkStatusListFixture(t, 2, 1)
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 
 	// mocks resources on fetcher engine side.
@@ -370,11 +377,11 @@ func testInvalidChunkDataResponse(t *testing.T,
 
 	chunk := statuses.Chunks()[0]
 	chunkID := chunk.ID()
-	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+	chunkDataPacks, collections, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collectionList)
 
 	// alters chunk data pack so that it become invalid.
 	alterChunkDataPack(chunkDataPacks[chunkID])
-	mockStateFunc(*agrees[0], s.state, block.ID())
+	mockStateFunc(*agrees[0], s.state, s.blocks, block)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
 	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collections[chunkID])
@@ -402,10 +409,10 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	// creates a result with 2 chunks, which one of those chunks is assigned to this fetcher engine
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	// also the chunk belongs to an unsealed block.
-	block, result, statuses, _ := completeChunkStatusListFixture(t, 2, 1)
+	block, result, statuses, _, collectionList := completeChunkStatusListFixture(t, 2, 1)
 	chunk := statuses.Chunks()[0]
 	chunkID := chunk.ID()
-	chunkDataPacks, collections, _ := verifiableChunkFixture(statuses.Chunks(), block, result)
+	chunkDataPacks, collections, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collectionList)
 
 	// mocks there is no pending status for this chunk at fetcher engine.
 	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
@@ -698,6 +705,11 @@ func mockBlockSealingStatus(state *protocol.State, blocks *storage.Blocks, block
 	}
 }
 
+// mockBlockSealingStatus mocks protocol state sealing status at height of given block.
+func mockBlocksStorage(blocks *storage.Blocks, block *flow.Block) {
+	blocks.On("ByID", block.ID()).Return(block, nil)
+}
+
 // mockRequester mocks the chunk data pack requester with the given chunk data pack requests.
 // Each chunk should be requested exactly once.
 // On reply, it invokes the handler function with the given collection and chunk data pack for the chunk ID.
@@ -737,19 +749,20 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 	return wg
 }
 
-// chunkDataPackResponseFixture creates chunk data pack and collections for given chunks.
-func chunkDataPackResponseFixture(chunks flow.ChunkList) (map[flow.Identifier]*flow.ChunkDataPack,
+// chunkDataPackResponseFixture creates chunk data packs for given chunks.
+func chunkDataPackResponseFixture(t *testing.T, chunks flow.ChunkList, allCollections []*flow.Collection) (
+	map[flow.Identifier]*flow.ChunkDataPack,
 	map[flow.Identifier]*flow.Collection) {
+
 	chunkDataPacks := make(map[flow.Identifier]*flow.ChunkDataPack)
 	collections := make(map[flow.Identifier]*flow.Collection)
 
 	for _, chunk := range chunks {
 		chunkID := chunk.ID()
-		collection := unittest.CollectionFixture(1)
-		collections[chunkID] = &collection
+		collections[chunkID] = allCollections[chunk.Index]
 		chunkDataPacks[chunkID] = unittest.ChunkDataPackFixture(chunkID,
 			unittest.WithStartState(chunk.StartState),
-			unittest.WithCollectionID(collection.ID()))
+			unittest.WithCollectionID(allCollections[chunk.Index].ID()))
 	}
 
 	return chunkDataPacks, collections
@@ -757,12 +770,12 @@ func chunkDataPackResponseFixture(chunks flow.ChunkList) (map[flow.Identifier]*f
 
 // verifiableChunkFixture is a test helper that creates verifiable chunks, chunk data packs,
 // and collection fixtures for the given chunks list.
-func verifiableChunkFixture(chunks flow.ChunkList, block *flow.Block, result *flow.ExecutionResult) (
+func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Block, result *flow.ExecutionResult, collectionList []*flow.Collection) (
 	map[flow.Identifier]*flow.ChunkDataPack,
 	map[flow.Identifier]*flow.Collection,
 	map[flow.Identifier]*verification.VerifiableChunkData) {
 
-	chunkDataPacks, collections := chunkDataPackResponseFixture(chunks)
+	chunkDataPacks, collections := chunkDataPackResponseFixture(t, chunks, collectionList)
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, chunk := range chunks {
@@ -812,16 +825,24 @@ func chunkRequestFixture(chunks flow.ChunkList, height uint64, agrees flow.Ident
 // and hence have chunk status associated with them, i.e., `statusCount` of them.
 //
 // It returns the block, result, assigned chunk statuses, and their corresponding locators.
-func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.Block, *flow.ExecutionResult, verification.ChunkStatusList,
-	chunks.LocatorList) {
+func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.Block,
+	*flow.ExecutionResult,
+	verification.ChunkStatusList,
+	chunks.LocatorList,
+	[]*flow.Collection) {
 	require.LessOrEqual(t, statusCount, chunkCount)
 
-	block := unittest.BlockFixture()
+	collections := unittest.CollectionListFixture(chunkCount)
+
+	block := unittest.BlockWithGuaranteesFixture(
+		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	)
+
 	result := unittest.ExecutionResultFixture(
-		unittest.WithBlock(&block),
+		unittest.WithBlock(block),
 		unittest.WithChunks(uint(chunkCount)))
 	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, statusCount)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 
-	return &block, result, statuses, locators
+	return block, result, statuses, locators, collections
 }
