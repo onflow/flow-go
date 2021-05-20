@@ -46,10 +46,6 @@ func init() {
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 
-	keyCmd.Flags().BoolVar(&flagNetworkKey, "networking", false, "generate networking key only")
-	keyCmd.Flags().BoolVar(&flagStakingKey, "staking", false, "generate staking key only")
-	keyCmd.Flags().BoolVar(&flagMachineKey, "machine", false, "generate machine key only")
-
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
@@ -57,19 +53,24 @@ func init() {
 
 // keyCmdRun generate the node staking key, networking key and node information
 func keyCmdRun(_ *cobra.Command, _ []string) {
+
+	// TODO: We need NodeID of the node to continue checking if the node-info.priv.json exists
+	// TODO: Add paths to log messages for clarity
+	exists, err := pathExists(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID))
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not check if node-info.priv.json exists")
+	}
+	if exists {
+		log.Warn().Msg("node-info.priv.json exists, please delete and try again if you are tying to generate new keys")
+		return
+	}
+
 	// validate inputs
 	role := validateRole(flagRole)
 	validateAddressFormat(flagAddress)
 
-	// if no key type flags are specified, we generate all keys
-	// if any specific key type flags are specified, we only generate the specified keys
-	if !flagNetworkKey && !flagStakingKey && !flagMachineKey {
-		flagNetworkKey = true
-		flagStakingKey = true
-		flagMachineKey = true
-	}
-
-	networkKey, stakingKey, machineKey, err := generateKeys(flagNetworkKey, flagStakingKey, flagMachineKey)
+	// generate all three keys
+	networkKey, stakingKey, machineKey, err := generateKeys()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate keys")
 	}
@@ -88,47 +89,37 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not access private keys")
 	}
 
+	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 }
 
-func generateKeys(network, staking, machine bool) (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
+func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
 
-	var err error
-	var networkKey crypto.PrivateKey
-	var stakingKey crypto.PrivateKey
-	var machineKey crypto.PrivateKey
-
-	if network {
-		log.Debug().Msg("will generate networking key")
-		networkSeed := validateSeed(flagNetworkSeed)
-		networkKey, err = run.GenerateNetworkingKey(networkSeed)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
-		}
-		log.Info().Msg("generated networking key")
+	log.Debug().Msg("will generate networking key")
+	networkSeed := validateSeed(flagNetworkSeed)
+	networkKey, err := run.GenerateNetworkingKey(networkSeed)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
+	log.Info().Msg("generated networking key")
 
-	if staking {
-		log.Debug().Msg("will generate staking key")
-		stakingSeed := validateSeed(flagStakingSeed)
-		stakingKey, err = run.GenerateStakingKey(stakingSeed)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
-		}
-		log.Info().Msg("generated staking key")
+	log.Debug().Msg("will generate staking key")
+	stakingSeed := validateSeed(flagStakingSeed)
+	stakingKey, err := run.GenerateStakingKey(stakingSeed)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
+	log.Info().Msg("generated staking key")
 
-	if machine {
-		log.Debug().Msg("will generate machine account key")
-		machineSeed := validateSeed(flagMachineSeed)
-		machineKey, err = run.GenerateMachineAccountKey(machineSeed)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("could not generate machine key: %w", err)
-		}
-		log.Info().Msg("generated machine account key")
+	log.Debug().Msg("will generate machine account key")
+	machineSeed := validateSeed(flagMachineSeed)
+	machineKey, err := run.GenerateMachineAccountKey(machineSeed)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not generate machine key: %w", err)
 	}
+	log.Info().Msg("generated machine account key")
 
 	return networkKey, stakingKey, machineKey, nil
 }

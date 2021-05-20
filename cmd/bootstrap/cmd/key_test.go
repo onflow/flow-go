@@ -18,34 +18,10 @@ import (
 func TestGenerateKeys(t *testing.T) {
 
 	t.Run("should generate all keys", func(t *testing.T) {
-		net, stake, machine, err := generateKeys(true, true, true)
+		net, stake, machine, err := generateKeys()
 		require.NoError(t, err)
 		assert.NotNil(t, net)
 		assert.NotNil(t, stake)
-		assert.NotNil(t, machine)
-	})
-
-	t.Run("should generate network key only", func(t *testing.T) {
-		net, stake, machine, err := generateKeys(true, false, false)
-		require.NoError(t, err)
-		assert.NotNil(t, net)
-		assert.Nil(t, stake)
-		assert.Nil(t, machine)
-	})
-
-	t.Run("should generate staking key only", func(t *testing.T) {
-		net, stake, machine, err := generateKeys(false, true, false)
-		require.NoError(t, err)
-		assert.Nil(t, net)
-		assert.NotNil(t, stake)
-		assert.Nil(t, machine)
-	})
-
-	t.Run("should generate machine key only", func(t *testing.T) {
-		net, stake, machine, err := generateKeys(false, false, true)
-		require.NoError(t, err)
-		assert.Nil(t, net)
-		assert.Nil(t, stake)
 		assert.NotNil(t, machine)
 	})
 }
