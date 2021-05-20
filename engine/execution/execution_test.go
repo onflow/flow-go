@@ -383,7 +383,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, scExe1Block1, scExe1Block2)
+	// TODO this is no longer valid because the system chunk can change the state
+	//assert.Equal(t, scExe1Block1, scExe1Block2)
+	_ = scExe1Block2
 
 	collectionEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)

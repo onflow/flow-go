@@ -134,6 +134,20 @@ func (_m *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 	return r0, r1, r2, r3
 }
 
+// Size provides a mock function with given fields:
+func (_m *ChunkRequests) Size() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
+
 // UpdateRequestHistory provides a mock function with given fields: chunkID, updater
 func (_m *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater mempool.ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool) {
 	ret := _m.Called(chunkID, updater)
