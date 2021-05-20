@@ -158,7 +158,10 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
-	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
+	b.ctx = NewContextFromParent(
+		ctx,
+		WithRestrictedDeployment(false),
+		WithRestrictedAccountCreation(false))
 	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
@@ -195,7 +198,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployEpoch(service, fungibleToken, flowToken)
 
-	b.registerNodes(service, flowToken)
+	b.registerNodes(service, fungibleToken, flowToken)
 
 	return nil
 }
@@ -415,13 +418,44 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) registerNodes(service, token flow.Address) {
+func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flow.Address) {
 	for _, id := range b.identities {
+
+		// create a machine account for the node
+		nodeAddress := b.createAccount()
+
+		// give a vault resource to the machine account
 		txError, err := b.vm.invokeMetaTransaction(
 			b.ctx,
+			setupAccountTransaction(
+				fungibleToken,
+				flowToken,
+				nodeAddress,
+			),
+			b.sth,
+			b.programs,
+		)
+		panicOnMetaInvokeErrf("failed to setup machine account: %s", txError, err)
+
+		// fund the machine account
+		txError, err = b.vm.invokeMetaTransaction(
+			b.ctx,
+			fundAccountTransaction(service,
+				fungibleToken,
+				flowToken,
+				nodeAddress),
+			b.sth,
+			b.programs,
+		)
+		panicOnMetaInvokeErrf("failed to fund machine account: %s", txError, err)
+
+		// register the node
+		txError, err = b.vm.invokeMetaTransaction(
+			b.ctx,
 			registerNodeTransaction(service,
-				id,
-				token),
+				flowToken,
+				nodeAddress,
+				id),
 			b.sth,
 			b.programs,
 		)
@@ -578,6 +612,61 @@ transaction() {
 }
 `
 
+const setupAccountTemplate = `
+// This transaction is a template for a transaction
+// to add a Vault resource to their account
+// so that they can use the flowToken
+
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction {
+
+    prepare(signer: AuthAccount) {
+
+        if signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) == nil {
+            // Create a new flowToken Vault and put it in storage
+            signer.save(<-FlowToken.createEmptyVault(), to: /storage/flowTokenVault)
+
+            // Create a public capability to the Vault that only exposes
+            // the deposit function through the Receiver interface
+            signer.link<&FlowToken.Vault{FungibleToken.Receiver}>(
+                /public/flowTokenReceiver,
+                target: /storage/flowTokenVault
+            )
+
+            // Create a public capability to the Vault that only exposes
+            // the balance field through the Balance interface
+            signer.link<&FlowToken.Vault{FungibleToken.Balance}>(
+                /public/flowTokenBalance,
+                target: /storage/flowTokenVault
+            )
+        }
+    }
+}
+`
+
+const fundAccountTemplate = `
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction(amount: UFix64, recipient: Address) {
+	let sentVault: @FungibleToken.Vault
+	prepare(signer: AuthAccount) {
+	let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+		?? panic("failed to borrow reference to sender vault")
+	self.sentVault <- vaultRef.withdraw(amount: amount)
+	}
+	execute {
+	let receiverRef =  getAccount(recipient)
+		.getCapability(/public/flowTokenReceiver)
+		.borrow<&{FungibleToken.Receiver}>()
+		?? panic("failed to borrow reference to recipient vault")
+	receiverRef.deposit(from: <-self.sentVault)
+	}
+}
+`
+
 func deployContractTransaction(address flow.Address, contract []byte, contractName string) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
@@ -721,13 +810,46 @@ func setupStorageForServiceAccountsTransaction(
 	)
 }
 
+func setupAccountTransaction(
+	fungibleToken flow.Address,
+	flowToken flow.Address,
+	accountAddress flow.Address,
+) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(setupAccountTemplate, fungibleToken, flowToken))).
+			AddAuthorizer(accountAddress),
+		0,
+	)
+}
+
+func fundAccountTransaction(
+	service flow.Address,
+	fungibleToken flow.Address,
+	flowToken flow.Address,
+	nodeAddress flow.Address,
+) *TransactionProcedure {
+
+	// register node
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(fundAccountTemplate, fungibleToken, flowToken))).
+			AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
+			AddAuthorizer(service),
+		0,
+	)
+}
+
 // registerNodeTransaction creates a new node struct object.
 // Then, if the node is a collector node, creates a new account and adds a QC object to it
 // If the node is a consensus node, it creates a new account and adds a DKG object to it
 func registerNodeTransaction(
 	service flow.Address,
+	flowTokenAddress flow.Address,
+	nodeAddress flow.Address,
 	id *flow.Identity,
-	flowTokenAddress flow.Address) *TransactionProcedure {
+) *TransactionProcedure {
 
 	env := templates.Environment{
 		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
@@ -751,6 +873,7 @@ func registerNodeTransaction(
 		},
 	)
 
+	// register node
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
@@ -761,7 +884,7 @@ func registerNodeTransaction(
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
 			AddArgument(jsoncdc.MustEncode(cadence.UFix64(id.Stake))).
 			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
-			AddAuthorizer(service),
+			AddAuthorizer(nodeAddress),
 		0,
 	)
 }
