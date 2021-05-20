@@ -94,7 +94,6 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 
 	// write machine account info
 	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID), machineAccountInfo)
-
 }
 
 func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
