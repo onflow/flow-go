@@ -263,10 +263,7 @@ func main() {
 				return nil, err
 			}
 
-			config := matching.Config{
-				SealingThreshold:    10,
-				MaxResultsToRequest: 20,
-			}
+			config := matching.DefaultConfig()
 
 			core := matching.NewCore(
 				node.Logger,

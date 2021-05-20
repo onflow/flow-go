@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -432,7 +431,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 		},
 	).Return(true, nil).Once()
 
-	err = s.collector.CheckEmergencySealing(sealing.DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.sealsPL.AssertExpectations(s.T())

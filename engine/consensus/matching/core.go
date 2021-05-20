@@ -27,6 +27,13 @@ type Config struct {
 	MaxResultsToRequest uint // maximum number of receipts to request
 }
 
+func DefaultConfig() Config {
+	return Config{
+		SealingThreshold:    10,
+		MaxResultsToRequest: 20,
+	}
+}
+
 // Core represents the matching business logic, used to process receipts received from
 // p2p network. Performs processing of pending receipts, storing of receipts and re-requesting
 // missing execution receipts. During Sealing and Verification phase 2 submits events to sealing engine

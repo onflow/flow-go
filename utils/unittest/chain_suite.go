@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"fmt"
+	module "github.com/onflow/flow-go/module/mock"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -59,6 +60,11 @@ type BaseChainSuite struct {
 
 	// mock mempool.ReceiptsForest: used to test whether or not Matching Engine stores receipts
 	ReceiptsPL *mempool.ExecutionTree
+
+	Assigner    *module.ChunkAssigner
+	Assignments map[flow.Identifier]*chunks.Assignment // index for assignments for given execution result
+
+	PendingReceipts *mempool.PendingReceipts
 }
 
 func (bc *BaseChainSuite) SetupChain() {
@@ -318,6 +324,8 @@ func (bc *BaseChainSuite) SetupChain() {
 	bc.ReceiptsPL = &mempool.ExecutionTree{}
 	bc.ReceiptsPL.On("Size").Return(uint(0)).Maybe() // only for metrics
 
+	bc.PendingReceipts = &mempool.PendingReceipts{}
+
 	// ~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SEALS MEMPOOL ~~~~~~~~~~~~~~~~~~~~~~~~ //
 	bc.PendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 	bc.SealsPL = &mempool.IncorporatedResultSeals{}
@@ -341,6 +349,9 @@ func (bc *BaseChainSuite) SetupChain() {
 			return seals
 		},
 	).Maybe()
+
+	bc.Assigner = &module.ChunkAssigner{}
+	bc.Assignments = make(map[flow.Identifier]*chunks.Assignment)
 }
 
 func StateSnapshotForUnknownBlock() *protocol.Snapshot {
@@ -509,9 +520,9 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 			}
 			approvals[chunk.Index] = chunkApprovals
 		}
-
+		bc.Assigner.On("Assign", incorporatedResult.Result, incorporatedResult.IncorporatedBlockID).Return(assignment, nil).Maybe()
+		bc.Assignments[incorporatedResult.Result.ID()] = assignment
 		bc.PersistedResults[result.ID()] = result
-		// TODO: adding receipt
 	}
 	for _, seal := range block.Payload.Seals {
 		bc.SealsIndex[block.ID()] = seal
@@ -524,4 +535,5 @@ func (bc *BaseChainSuite) AddSubgraphFixtureToMempools(subgraph subgraphFixture)
 	bc.Blocks[subgraph.Block.ID()] = subgraph.Block
 	bc.PersistedResults[subgraph.PreviousResult.ID()] = subgraph.PreviousResult
 	bc.PersistedResults[subgraph.Result.ID()] = subgraph.Result
+	bc.Assigner.On("Assign", subgraph.IncorporatedResult.Result, subgraph.IncorporatedResult.IncorporatedBlockID).Return(subgraph.Assignment, nil).Maybe()
 }

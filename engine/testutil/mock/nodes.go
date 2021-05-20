@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"os"
 	"sync"
 	"testing"
@@ -125,11 +126,11 @@ type CollectionNode struct {
 type ConsensusNode struct {
 	GenericNode
 	Guarantees      mempool.Guarantees
-	Approvals       mempool.Approvals
 	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	SealingEngine   *sealing.Engine
+	MatchingEngine  *matching.Engine
 }
 
 func (cn ConsensusNode) Ready() {
