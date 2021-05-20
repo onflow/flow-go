@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"path/filepath"
 	"time"
@@ -74,22 +75,23 @@ func main() {
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
 
-		err              error
-		mutableState     protocol.MutableState
-		privateDKGData   *bootstrap.DKGParticipantPriv
-		guarantees       mempool.Guarantees
-		receipts         mempool.ExecutionTree
-		seals            mempool.IncorporatedResultSeals
-		pendingReceipts  mempool.PendingReceipts
-		prov             *provider.Engine
-		receiptRequester *requester.Engine
-		syncCore         *synchronization.Core
-		comp             *compliance.Engine
-		sealingEngine    *sealing.Engine
-		conMetrics       module.ConsensusMetrics
-		mainMetrics      module.HotstuffMetrics
-		receiptValidator module.ReceiptValidator
-		chunkAssigner    *chmodule.ChunkAssigner
+		err                     error
+		mutableState            protocol.MutableState
+		privateDKGData          *bootstrap.DKGParticipantPriv
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		prov                    *provider.Engine
+		receiptRequester        *requester.Engine
+		syncCore                *synchronization.Core
+		comp                    *compliance.Engine
+		sealingEngine           *sealing.Engine
+		conMetrics              module.ConsensusMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		finalizationDistributor *notifications.FinalizationDistributor
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -210,6 +212,10 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
+		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
+			finalizationDistributor = notifications.NewFinalizationDistributor()
+			return nil
+		}).
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
@@ -234,6 +240,9 @@ func main() {
 				seals,
 				config,
 			)
+
+			// subscribe for finalization events from hotstuff
+			finalizationDistributor.HandleFinalization(e.HandleFinalizedBlock)
 
 			return e, err
 		}).
@@ -289,6 +298,9 @@ func main() {
 			}
 
 			receiptRequester.WithHandle(e.HandleReceipt)
+
+			// subscribe for finalization events from hotstuff
+			finalizationDistributor.HandleFinalization(e.HandleFinalizedBlock)
 
 			return e, err
 		}).
@@ -421,6 +433,9 @@ func main() {
 				node.Storage.Index,
 				node.RootChainID,
 			)
+
+			notifier.AddConsumer(finalizationDistributor)
+
 			// make compliance engine as a FinalizationConsumer
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)

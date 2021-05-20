@@ -296,8 +296,8 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// OnFinalizedBlock process finalization event from hotstuff. Processes all results that were submitted in payload.
-func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
+// HandleFinalizedBlock process finalization event from hotstuff. Processes all results that were submitted in payload.
+func (e *Engine) HandleFinalizedBlock(finalizedBlockID flow.Identifier) {
 	payload, err := e.payloads.ByBlockID(finalizedBlockID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)

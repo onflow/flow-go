@@ -4,6 +4,7 @@ package sealing
 
 import (
 	"github.com/gammazero/workerpool"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"os"
 	"sync"
 	"testing"
@@ -60,6 +61,25 @@ func (s *SealingEngineSuite) SetupTest() {
 	s.engine.pendingRequestedApprovals, _ = fifoqueue.NewFifoQueue()
 
 	<-s.engine.Ready()
+}
+
+// TestHandleFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (s *SealingEngineSuite) TestHandleFinalizedBlock() {
+	finalizedBlockID := unittest.IdentifierFixture()
+	// setup payload fixture
+	payloads := &mockstorage.Payloads{}
+	payload := unittest.PayloadFixture()
+	payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil).Once()
+	s.engine.payloads = payloads
+
+	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
+	s.engine.HandleFinalizedBlock(finalizedBlockID)
+
+	// matching engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	s.core.AssertExpectations(s.T())
 }
 
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
