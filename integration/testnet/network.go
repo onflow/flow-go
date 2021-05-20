@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	dkgmod "github.com/onflow/flow-go/model/dkg"
@@ -531,7 +532,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
-			nodeContainer.addFlag("access-address", "access_1:9000")
 
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
@@ -701,9 +701,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
-		Counter: epochCounter,
-		// FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
-		FinalView:    root.Header.View + 100, // XXX 100 views ~= 2min
+		Counter:      epochCounter,
+		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants,
 		Assignments:  clusterAssignments,
 		RandomSource: randomSource,
@@ -722,8 +721,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
 		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView - 1),
-		NumViewsInStakingAuction:     cadence.UInt64(5),
-		NumViewsInDKGPhase:           cadence.UInt64(60),
+		NumViewsInStakingAuction:     cadence.UInt64(100),
+		NumViewsInDKGPhase:           cadence.UInt64(100),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
 		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
