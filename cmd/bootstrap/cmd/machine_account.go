@@ -1,29 +1,19 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
-	"google.golang.org/grpc"
-
-	"github.com/onflow/cadence"
-
-	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/client"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
 
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
 var (
-	flagAccessAddress string
+	flagMachineAccountAddress string
 )
 
 // machineAccountCmd represents the `machine-account` command which generates required machine account file
@@ -40,9 +30,6 @@ func init() {
 
 	machineAccountCmd.Flags().StringVar(&flagMachineAccountAddress, "address", "", "the node's machine account address")
 	_ = machineAccountCmd.MarkFlagRequired("address")
-
-	machineAccountCmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "the network address of an access node")
-	_ = machineAccountCmd.MarkFlagRequired("access-address")
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -79,74 +66,11 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	machinePrivKey := readMachineAccountPriv(nodeID)
 	log.Info().Msg("read machine account private key json")
 
-
 	// create node-machine-account-info.priv.json file
-	machineAccountInfo := assembleNodeMachineAccountInfo(machineAccountAddress, 0, machinePrivKey)
+	machineAccountInfo := assembleNodeMachineAccountInfo(flagMachineAccountAddress, 0, machinePrivKey)
 
 	// write machine account info
 	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), machineAccountInfo)
-}
-
-func createAccount(privateKey crypto.PrivateKey) (sdk.Address, error) {
-	accessClient, err := client.New(flagAccessAddress, grpc.WithInsecure())
-	if err != nil {
-		return sdk.Address{}, fmt.Errorf("could not initialize client to access-address: %w", err)
-	}
-
-	ctx := context.Background()
-
-	// get latest block
-	latestBlock, err := accessClient.GetLatestBlock(ctx, true)
-	if err != nil {
-		return sdk.Address{}, fmt.Errorf("could not get latest block from access node: %w", err)
-	}
-
-	// create account for private key
-	accountKey := sdk.NewAccountKey().FromPrivateKey(privateKey).
-		SetSigAlgo(sdkcrypto.ECDSA_P256).
-		SetHashAlgo(sdkcrypto.SHA3_256).
-		SetWeight(sdk.AccountKeyWeightThreshold)
-	accountSigner := sdkcrypto.NewInMemorySigner(privateKey, accountKey.HashAlgo)
-
-	// TODO: need to define proposer and payer for tx
-	createAccountTx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, []templates.Contract{}, sdk.Address{})
-	createAccountTx.SetGasLimit(flow.DefaultMaxTransactionGasLimit).
-		SetReferenceBlockID(sdk.Identifier(latestBlock.ID)).
-		SetProposalKey(sdk.Address{}, 0, 0).
-		SetPayer(sdk.Address{})
-
-	// sign transaction
-	err = createAccountTx.SignEnvelope(sdk.Address{}, 0, accountSigner)
-	if err != nil {
-		return sdk.Address{}, fmt.Errorf("could not sign transaction: %w", err)
-	}
-
-	// submit transaction to create account
-	err = accessClient.SendTransaction(ctx, *createAccountTx)
-	if err != nil {
-		return sdk.Address{}, fmt.Errorf("could not submit create account transaction: %w", err)
-	}
-
-	// get transaction result
-	txResult, err := accessClient.GetTransactionResult(ctx, createAccountTx.ID())
-	if err != nil {
-		return sdk.Address{}, fmt.Errorf("could not get transaction result for create account tx: %w", err)
-	}
-
-	// find account created event with account address
-	var address sdk.Address
-	for _, event := range txResult.Events {
-		if event.Type == sdk.EventAccountCreated {
-			address = sdk.Address(event.Value.Fields[0].(cadence.Address))
-			break
-		}
-	}
-
-	if address == (sdk.Address{}) {
-		return sdk.Address{}, fmt.Errorf("failed to find AccountCreated event")
-	}
-
-	return address, nil
 }
 
 // readMachineAccountPriv reads the machine account private key files in the bootstrap dir
