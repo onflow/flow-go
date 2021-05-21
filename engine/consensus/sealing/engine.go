@@ -52,6 +52,7 @@ type Engine struct {
 	pendingRequestedApprovals            engine.MessageStore
 	messageHandler                       *engine.MessageHandler
 	requiredApprovalsForSealConstruction uint
+	rootHeader                           *flow.Header
 }
 
 // NewEngine constructs new `Engine` which runs on it's own unit.
@@ -73,6 +74,12 @@ func NewEngine(log zerolog.Logger,
 ) (*Engine, error) {
 
 	hardwareConcurrency := runtime.NumCPU()
+
+	rootHeader, err := state.Params().Root()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve root block: %w", err)
+	}
+
 	e := &Engine{
 		unit:                                 engine.NewUnit(),
 		log:                                  log.With().Str("engine", "sealing.Engine").Logger(),
@@ -83,9 +90,10 @@ func NewEngine(log zerolog.Logger,
 		payloads:                             payloads,
 		workerPool:                           workerpool.New(hardwareConcurrency),
 		requiredApprovalsForSealConstruction: options.RequiredApprovalsForSealConstruction,
+		rootHeader:                           rootHeader,
 	}
 
-	err := e.setupMessageHandler()
+	err = e.setupMessageHandler()
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize message handler: %w", err)
 	}
@@ -316,6 +324,11 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 		incorporatedBlock, err := e.headers.ByBlockID(incorporatedBlockID)
 		if err != nil {
 			e.log.Fatal().Err(err).Msgf("could not retrieve header for block %v", incorporatedBlockID)
+		}
+
+		// we are interested in blocks with height strictly larger than root block
+		if incorporatedBlock.Height <= e.rootHeader.Height {
+			return
 		}
 
 		payload, err := e.payloads.ByBlockID(incorporatedBlock.ParentID)

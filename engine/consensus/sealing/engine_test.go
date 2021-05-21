@@ -41,6 +41,9 @@ func (s *SealingEngineSuite) SetupTest() {
 	me := &mockmodule.Local{}
 	s.core = &mockconsensus.SealingCore{}
 
+	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
+	require.NoError(s.T(), err)
+
 	s.engine = &Engine{
 		log:                                  log,
 		unit:                                 engine.NewUnit(),
@@ -50,10 +53,11 @@ func (s *SealingEngineSuite) SetupTest() {
 		cacheMetrics:                         metrics,
 		workerPool:                           workerpool.New(8),
 		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
+		rootHeader:                           rootHeader,
 	}
 
 	// setups message handler
-	err := s.engine.setupMessageHandler()
+	err = s.engine.setupMessageHandler()
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
