@@ -61,7 +61,7 @@ func createNode(
 	epochSetup flow.EpochSetup,
 	firstBlock flow.Identifier) *node {
 
-	core := testutil.GenericNode(t, hub, id, ids, chainID)
+	core := testutil.GenericNodeFromParticipants(t, hub, id, ids, chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to when

@@ -372,7 +372,7 @@ func (s *DKGSuite) getResult() []string {
 }
 
 func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
-	core := testutil.GenericNode(s.T(), s.hub, node.account.netID, ids, s.chainID)
+	core := testutil.GenericNodeFromParticipants(s.T(), s.hub, node.account.netID, ids, s.chainID)
 	core.Log = zerolog.New(os.Stdout).Level(zerolog.DebugLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to new views
