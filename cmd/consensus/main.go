@@ -242,7 +242,7 @@ func main() {
 			)
 
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.HandleFinalization(e.HandleFinalizedBlock)
+			finalizationDistributor.HandleFinalization(e.OnFinalizedBlock)
 
 			return e, err
 		}).

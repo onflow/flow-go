@@ -184,6 +184,10 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	return nil
 }
 
+// ProcessIncorporatedResult processes incorporated result in blocking way. Concurrency safe.
+// Returns:
+// * exception in case of unexpected error
+// * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 	err := c.processIncorporatedResult(result)
 
@@ -227,6 +231,10 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 	return nil
 }
 
+// ProcessApproval processes approval in blocking way. Concurrency safe.
+// Returns:
+// * exception in case of unexpected error
+// * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	startTime := time.Now()
 	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
@@ -341,6 +349,10 @@ func (c *Core) processPendingApprovals(collector *approvals.AssignmentCollector)
 	return nil
 }
 
+// ProcessFinalizedBlock processes finalization events in blocking way. Concurrency safe.
+// Returns:
+// * exception in case of unexpected error
+// * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	finalized, err := c.headers.ByBlockID(finalizedBlockID)
 	if err != nil {
