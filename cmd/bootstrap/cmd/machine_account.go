@@ -86,7 +86,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	}
 
 	// create node-machine-account-info.priv.json file
-	machineAccountInfo := assembleNodeMachineAccountInfo(accountAddress.String(), 0, machinePrivKey)
+	machineAccountInfo := assembleNodeMachineAccountInfo(machineAccountAddress, 0, machinePrivKey)
 
 	// write machine account info
 	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), machineAccountInfo)
