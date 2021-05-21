@@ -61,7 +61,7 @@ func NewEngine(
 	}
 
 	e := &Engine{
-		log:                       log.With().Str("matching", "engine").Logger(),
+		log:                       log.With().Str("engine", "matching.Engine").Logger(),
 		unit:                      engine.NewUnit(),
 		me:                        me,
 		core:                      core,

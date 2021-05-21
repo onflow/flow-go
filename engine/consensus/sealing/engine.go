@@ -81,7 +81,7 @@ func NewEngine(log zerolog.Logger,
 	hardwareConcurrency := runtime.NumCPU()
 	e := &Engine{
 		unit:                                 engine.NewUnit(),
-		log:                                  log,
+		log:                                  log.With().Str("engine", "sealing.Engine").Logger(),
 		me:                                   me,
 		engineMetrics:                        engineMetrics,
 		cacheMetrics:                         mempool,
@@ -302,17 +302,21 @@ func (e *Engine) Done() <-chan struct{} {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	payload, err := e.payloads.ByBlockID(finalizedBlockID)
-	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
-	}
+	e.log.Info().Msgf("processing finalized block: %v", finalizedBlockID)
 
-	err = e.core.ProcessFinalizedBlock(finalizedBlockID)
-	if err != nil {
-		e.log.Fatal().Err(err).Msgf("critical sealing error when processing finalized block %v", finalizedBlockID)
-	}
+	e.workerPool.Submit(func() {
+		payload, err := e.payloads.ByBlockID(finalizedBlockID)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
+		}
 
-	for _, result := range payload.Results {
-		e.processIncorporatedResult(result)
-	}
+		err = e.core.ProcessFinalizedBlock(finalizedBlockID)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("critical sealing error when processing finalized block %v", finalizedBlockID)
+		}
+
+		for _, result := range payload.Results {
+			e.processIncorporatedResult(result)
+		}
+	})
 }

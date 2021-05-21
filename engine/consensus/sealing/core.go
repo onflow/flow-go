@@ -192,7 +192,9 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 // * exception in case of unexpected error
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
+	span := c.tracer.StartSpan(result.ID(), trace.CONSealingProcessIncorporatedResult)
 	err := c.processIncorporatedResult(result)
+	span.Finish()
 
 	// we expect that only engine.UnverifiableInputError,
 	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
@@ -240,7 +242,7 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 // * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	startTime := time.Now()
-	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
+	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONSealingProcessApproval)
 
 	err := c.processApproval(approval)
 
@@ -361,6 +363,9 @@ func (c *Core) processPendingApprovals(collector *approvals.AssignmentCollector)
 // * exception in case of unexpected error
 // * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
+	processFinalizedBlockSpan := c.tracer.StartSpan(finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
+	defer processFinalizedBlockSpan.Finish()
+
 	finalized, err := c.headers.ByBlockID(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve header for finalized block %s", finalizedBlockID)
@@ -386,17 +391,21 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	// it's important to use atomic operation to make sure that we have correct ordering
 	atomic.StoreUint64(&c.atomicLastSealedHeight, lastSealed.Height)
 
+	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
 	err = c.checkEmergencySealing(lastSealed.Height, finalized.Height)
+	checkEmergencySealingSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
+	updateCollectorTreeSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingUpdateAssignmentCollectorTree)
 	// finalize forks to stop collecting approvals for orphan collectors
 	c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
 
 	// as soon as we discover new sealed height, proceed with pruning collectors
 	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
+	updateCollectorTreeSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
 	}
@@ -404,7 +413,9 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	// remove all pending items that we might have requested
 	c.requestTracker.Remove(pruned...)
 
+	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)
+	requestPendingApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("internal error while requesting pending approvals: %w", err)
 	}

@@ -145,7 +145,7 @@ func (c *Core) ProcessReceipt(originID flow.Identifier, receipt *flow.ExecutionR
 //   internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
-	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchOnReceipt)
+	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchProcessReceipt)
 	defer func() {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
 		receiptSpan.Finish()
@@ -198,7 +198,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		return false, nil
 	}
 
-	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchOnReceiptVal)
+	childSpan := c.tracer.StartSpanFromParent(receiptSpan, trace.CONMatchProcessReceiptVal)
 	err = c.receiptValidator.Validate(receipt)
 	childSpan.Finish()
 
@@ -393,7 +393,7 @@ HEIGHT_LOOP:
 
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	startTime := time.Now()
-	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchCheckSealingRequestPendingReceipts)
+	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
 	// request execution receipts for unsealed finalized blocks
 	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
 	requestReceiptsSpan.Finish()
