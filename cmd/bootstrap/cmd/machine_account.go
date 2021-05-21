@@ -64,10 +64,6 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Msg("could not read machine account private key file: run `bootstrap machine-account-key` to create one")
 	}
 
-	// read in machine account private key
-	machinePrivKey := readMachineAccountPriv(nodeID)
-	log.Info().Msg("read machine account private key json")
-
 	// check if node-machine-account-info.priv.json file exists in boostrap dir
 	machineAccountInfoPath := fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID)
 	infoExists, err := pathExists(filepath.Join(flagOutdir, machineAccountInfoPath))
@@ -78,6 +74,10 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 		log.Info().Str("path", machineAccountInfoPath).Msg("node maching account info file already exists")
 		return
 	}
+
+	// read in machine account private key
+	machinePrivKey := readMachineAccountPriv(nodeID)
+	log.Info().Msg("read machine account private key json")
 
 	// create account on access node
 	accountAddress, err := createAccount(machinePrivKey)
