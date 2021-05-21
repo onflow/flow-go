@@ -79,11 +79,6 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	machinePrivKey := readMachineAccountPriv(nodeID)
 	log.Info().Msg("read machine account private key json")
 
-	// create account on access node
-	accountAddress, err := createAccount(machinePrivKey)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not create account for private key")
-	}
 
 	// create node-machine-account-info.priv.json file
 	machineAccountInfo := assembleNodeMachineAccountInfo(machineAccountAddress, 0, machinePrivKey)
