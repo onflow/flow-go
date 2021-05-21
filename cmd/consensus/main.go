@@ -263,8 +263,6 @@ func main() {
 				return nil, err
 			}
 
-			config := matching.DefaultConfig()
-
 			core := matching.NewCore(
 				node.Logger,
 				node.Tracer,
@@ -279,7 +277,7 @@ func main() {
 				receiptValidator,
 				receiptRequester,
 				sealingEngine,
-				config,
+				matching.DefaultConfig(),
 			)
 
 			e, err := matching.NewEngine(
@@ -294,9 +292,8 @@ func main() {
 				return nil, err
 			}
 
+			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-
-			// subscribe for finalization events from hotstuff
 			finalizationDistributor.HandleFinalization(e.OnFinalizedBlock)
 
 			return e, err
@@ -433,7 +430,6 @@ func main() {
 
 			notifier.AddConsumer(finalizationDistributor)
 
-			// make compliance engine as a FinalizationConsumer
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
