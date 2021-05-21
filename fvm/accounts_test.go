@@ -36,9 +36,11 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
-	require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
+	accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 
-	data, err := jsoncdc.Decode(tx.Events[0].Payload)
+	require.Len(t, accountCreatedEvents, 1)
+
+	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -355,11 +357,10 @@ func TestCreateAccount(t *testing.T) {
 
 				assert.NoError(t, tx.Err)
 
-				require.Len(t, tx.Events, 1)
+				accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+				require.Len(t, accountCreatedEvents, 1)
 
-				require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
-
-				data, err := jsoncdc.Decode(tx.Events[0].Payload)
+				data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -387,10 +388,12 @@ func TestCreateAccount(t *testing.T) {
 
 				assert.NoError(t, tx.Err)
 
-				require.Len(t, tx.Events, count)
-
-				for i := 0; i < count; i++ {
-					require.Equal(t, flow.EventAccountCreated, tx.Events[i].Type)
+				accountCreatedEventCount := 0
+				for i := 0; i < len(tx.Events); i++ {
+					if tx.Events[i].Type != flow.EventAccountCreated {
+						continue
+					}
+					accountCreatedEventCount += 1
 
 					data, err := jsoncdc.Decode(tx.Events[i].Payload)
 					require.NoError(t, err)
@@ -400,6 +403,7 @@ func TestCreateAccount(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, account)
 				}
+				require.Equal(t, count, accountCreatedEventCount)
 			}),
 	)
 }

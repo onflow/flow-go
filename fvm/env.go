@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
@@ -705,7 +706,7 @@ func (e *hostEnv) CreateAccount(payer runtime.Address) (address runtime.Address,
 		return runtime.Address{}, errors.NewOperationNotSupportedError("CreateAccount")
 	}
 
-	add, err := e.transactionEnv.CreateAccount(payer)
+	add, err := e.transactionEnv.CreateAccount(e, payer)
 	if err != nil {
 		return add, fmt.Errorf("creating account failed: %w", err)
 	}
@@ -1038,7 +1039,7 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 	return e.tx.GasLimit
 }
 
-func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
+func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (address runtime.Address, err error) {
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
@@ -1050,16 +1051,56 @@ func (e *transactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		txErr, err := e.vm.invokeMetaTransaction(
-			e.ctx,
-			initAccountTransaction(
-				flow.Address(payer),
-				flowAddress,
-				e.ctx.Chain.ServiceAddress(),
-				e.ctx.RestrictedAccountCreationEnabled),
-			e.sth,
-			e.programs.Programs,
+
+		if e.ctx.RestrictedAccountCreationEnabled {
+			invoker := NewTransactionContractFunctionInvocator(
+				common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
+				"isAccountCreator",
+				[]interpreter.Value{
+					interpreter.NewAddressValue(common.BytesToAddress(payer.Bytes())),
+				},
+				[]sema.Type{
+					&sema.AddressType{},
+				},
+				e.ctx.Logger,
+			)
+
+			value, err := invoker.Invoke(env, e.traceSpan)
+
+			txErr, err := errors.SplitErrorTypes(err)
+
+			if err != nil {
+				return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
+			}
+			if txErr != nil {
+				return address, fmt.Errorf("meta-transaction for creating account failed: %w", txErr)
+			}
+
+			isAccountCreator := value.(cadence.Bool)
+
+			if !isAccountCreator {
+				return address, fmt.Errorf("account cannot create new accounts: %s", payer.ShortHexWithPrefix())
+			}
+		}
+
+		invoker := NewTransactionContractFunctionInvocator(
+			common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
+			"setupNewAccount",
+			[]interpreter.Value{
+				interpreter.NewAddressValue(common.BytesToAddress(flowAddress.Bytes())),
+				interpreter.NewAddressValue(common.BytesToAddress(payer.Bytes())),
+			},
+			[]sema.Type{
+				sema.AuthAccountType,
+				sema.AuthAccountType,
+			},
+			e.ctx.Logger,
 		)
+
+		_, err := invoker.Invoke(env, e.traceSpan)
+
+		txErr, err := errors.SplitErrorTypes(err)
+
 		if err != nil {
 			return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
 		}
