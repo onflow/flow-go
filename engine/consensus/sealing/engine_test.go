@@ -10,10 +10,10 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -46,19 +46,15 @@ func (s *SealingEngineSuite) SetupTest() {
 		unit:                                 engine.NewUnit(),
 		core:                                 s.core,
 		me:                                   me,
-		approvalSink:                         make(chan *Event),
-		requestedApprovalSink:                make(chan *Event),
-		receiptSink:                          make(chan *Event),
-		pendingEventSink:                     make(chan *Event),
 		engineMetrics:                        metrics,
 		cacheMetrics:                         metrics,
 		workerPool:                           workerpool.New(8),
 		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
 	}
 
-	s.engine.pendingReceipts, _ = fifoqueue.NewFifoQueue()
-	s.engine.pendingApprovals, _ = fifoqueue.NewFifoQueue()
-	s.engine.pendingRequestedApprovals, _ = fifoqueue.NewFifoQueue()
+	// setups message handler
+	err := s.engine.setupMessageHandler()
+	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
 }
@@ -113,28 +109,6 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	s.core.AssertExpectations(s.T())
 }
 
-// TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
-// Tests the whole processing pipeline.
-func (s *SealingEngineSuite) TestProcessValidReceipt() {
-	block := unittest.BlockFixture()
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
-	)
-
-	originID := unittest.IdentifierFixture()
-
-	IR := flow.NewIncorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)
-	s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
-
-	err := s.engine.Process(originID, receipt)
-	s.Require().NoError(err, "should add receipt and result to mempool if valid")
-
-	// sealing engine has at least 100ms ticks for processing events
-	time.Sleep(1 * time.Second)
-
-	s.core.AssertExpectations(s.T())
-}
-
 // TestMultipleProcessingItems tests that the engine queues multiple receipts and approvals
 // and eventually feeds them into sealing.Core for processing
 func (s *SealingEngineSuite) TestMultipleProcessingItems() {
@@ -148,8 +122,6 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
 		)
 		receipts[i] = receipt
-		IR := flow.NewIncorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)
-		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
 	}
 
 	numApprovalsPerReceipt := 1
@@ -165,14 +137,6 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for _, receipt := range receipts {
-			err := s.engine.Process(originID, receipt)
-			s.Require().NoError(err, "should add receipt and result to mempool if valid")
-		}
-	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
