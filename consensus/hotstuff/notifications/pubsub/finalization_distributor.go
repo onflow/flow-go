@@ -1,4 +1,4 @@
-package notifications
+package pubsub
 
 import (
 	"sync"
@@ -22,10 +22,10 @@ func NewFinalizationDistributor() *FinalizationDistributor {
 	}
 }
 
-func (p *FinalizationDistributor) HandleFinalization(handler FinalizationConsumer) {
+func (p *FinalizationDistributor) AddConsumer(consumer FinalizationConsumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.subscribers = append(p.subscribers, handler)
+	p.subscribers = append(p.subscribers, consumer)
 }
 
 func (p *FinalizationDistributor) OnEventProcessed() {}

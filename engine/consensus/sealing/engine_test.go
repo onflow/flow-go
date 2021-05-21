@@ -29,7 +29,7 @@ func TestSealingEngineContext(t *testing.T) {
 type SealingEngineSuite struct {
 	suite.Suite
 
-	core *mockconsensus.ResultApprovalProcessor
+	core *mockconsensus.SealingCore
 
 	// Sealing Engine
 	engine *Engine
@@ -39,7 +39,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
-	s.core = &mockconsensus.ResultApprovalProcessor{}
+	s.core = &mockconsensus.SealingCore{}
 
 	s.engine = &Engine{
 		log:                                  log,
@@ -63,9 +63,9 @@ func (s *SealingEngineSuite) SetupTest() {
 	<-s.engine.Ready()
 }
 
-// TestHandleFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
-func (s *SealingEngineSuite) TestHandleFinalizedBlock() {
+func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlockID := unittest.IdentifierFixture()
 	// setup payload fixture
 	payloads := &mockstorage.Payloads{}

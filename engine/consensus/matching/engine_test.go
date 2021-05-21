@@ -52,9 +52,9 @@ func (s *MatchingEngineSuite) SetupTest() {
 	<-s.engine.Ready()
 }
 
-// TestHandleFinalizedBlock tests if finalized block gets processed when send through `Engine`.
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
-func (s *MatchingEngineSuite) TestHandleFinalizedBlock() {
+func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 
 	finalizedBlockID := unittest.IdentifierFixture()
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()

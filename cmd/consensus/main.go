@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -91,7 +91,7 @@ func main() {
 		mainMetrics             module.HotstuffMetrics
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
-		finalizationDistributor *notifications.FinalizationDistributor
+		finalizationDistributor *pubsub.FinalizationDistributor
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -213,7 +213,7 @@ func main() {
 			return err
 		}).
 		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
-			finalizationDistributor = notifications.NewFinalizationDistributor()
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
@@ -242,7 +242,7 @@ func main() {
 			)
 
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.HandleFinalization(e.OnFinalizedBlock)
+			finalizationDistributor.AddConsumer(e.OnFinalizedBlock)
 
 			return e, err
 		}).
@@ -294,7 +294,7 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			finalizationDistributor.HandleFinalization(e.OnFinalizedBlock)
+			finalizationDistributor.AddConsumer(e.OnFinalizedBlock)
 
 			return e, err
 		}).
