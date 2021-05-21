@@ -46,7 +46,7 @@ func DefaultConfig() Config {
 	}
 }
 
-// Core is an implementation of ResultApprovalProcessor interface
+// Core is an implementation of SealingCore interface
 // This struct is responsible for:
 // 	- collecting approvals for execution results
 // 	- processing multiple incorporated results
