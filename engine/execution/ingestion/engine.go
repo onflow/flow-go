@@ -693,10 +693,6 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 // return a bool indicates whether the block was completed
 func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 
-	if eb.Executing {
-		return false
-	}
-
 	// if the eb has parent statecommitment, and we have the delta for this block
 	// then apply the delta
 	// note the block ID is the delta's ID
@@ -726,9 +722,6 @@ func (e *Engine) executeBlockIfComplete(eb *entity.ExecutableBlock) bool {
 		if e.extensiveLogging {
 			e.logExecutableBlock(eb)
 		}
-
-		// no external synchronisation is used because this method must be run in a thread-safe context
-		eb.Executing = true
 
 		e.unit.Launch(func() {
 			e.executeBlock(e.unit.Ctx(), eb)
@@ -807,8 +800,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				// Note: it's guaranteed the transactions are for this collection, because
 				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
-
-				fmt.Printf("handled collection\n")
 
 				// check if the block becomes executable
 				_ = e.executeBlockIfComplete(executableBlock)
