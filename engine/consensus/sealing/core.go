@@ -247,31 +247,35 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	c.metrics.OnApprovalProcessingDuration(time.Since(startTime))
 	approvalSpan.Finish()
 
-	// we expect that only engine.UnverifiableInputError,
-	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
-	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
-		logger := c.log.Info()
-		if engine.IsInvalidInputError(err) {
-			logger = c.log.Error()
+	if err != nil {
+		// we expect that only engine.UnverifiableInputError,
+		// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
+		if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
+			logger := c.log.Info()
+			if engine.IsInvalidInputError(err) {
+				logger = c.log.Error()
+			}
+
+			logger.Err(err).
+				Hex("approval_id", logging.Entity(approval)).
+				Msgf("could not process result approval")
+
+			return nil
 		}
 
-		logger.Err(err).
+		marshalled, err := json.Marshal(approval)
+		if err != nil {
+			marshalled = []byte("json_marshalling_failed")
+		}
+		c.log.Error().Err(err).
 			Hex("approval_id", logging.Entity(approval)).
-			Msgf("could not process result approval")
+			Str("approval", string(marshalled)).
+			Msgf("unexpected error processing result approval")
 
-		return nil
+		return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
 	}
-	marshalled, err := json.Marshal(approval)
-	if err != nil {
-		marshalled = []byte("json_marshalling_failed")
-	}
-	c.log.Error().Err(err).
-		Hex("approval_id", logging.Entity(approval)).
-		Str("approval", string(marshalled)).
-		Msgf("unexpected error processing result approval")
 
-	return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
-
+	return nil
 }
 
 // processApproval implements business logic for processing single approval
@@ -420,9 +424,6 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uint64) error {
-	startTime := time.Now()
-	sealingTracker := tracker.NewSealingTracker(c.state)
-
 	// skip requesting approvals if they are not required for sealing
 	if c.config.RequiredApprovalsForSealConstruction == 0 {
 		return nil
@@ -431,6 +432,9 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
 		return nil
 	}
+
+	startTime := time.Now()
+	sealingTracker := tracker.NewSealingTracker(c.state)
 
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold

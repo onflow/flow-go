@@ -44,16 +44,17 @@ const RequiredApprovalsForSealConstructionTestingValue = 1
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseApprovalsTestSuite
 
-	blocks          map[flow.Identifier]*flow.Header
-	headers         *storage.Headers
-	state           *protocol.State
-	assigner        *module.ChunkAssigner
-	sealsPL         *mempool.IncorporatedResultSeals
-	sealsDB         *storage.Seals
-	sigVerifier     *module.Verifier
-	conduit         *mocknetwork.Conduit
-	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	core            *Core
+	blocks            map[flow.Identifier]*flow.Header
+	headers           *storage.Headers
+	state             *protocol.State
+	assigner          *module.ChunkAssigner
+	sealsPL           *mempool.IncorporatedResultSeals
+	sealsDB           *storage.Seals
+	sigVerifier       *module.Verifier
+	conduit           *mocknetwork.Conduit
+	finalizedAtHeight map[uint64]*flow.Header
+	identitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	core              *Core
 }
 
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
@@ -77,20 +78,33 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
 	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
+	s.finalizedAtHeight = make(map[uint64]*flow.Header)
+
 	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
 
-	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.Header {
-		return s.blocks[blockID]
-	}, func(blockID flow.Identifier) error {
-		_, found := s.blocks[blockID]
-		if found {
-			return nil
-		} else {
-			return realstorage.ErrNotFound
-		}
-	})
+	s.headers.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *flow.Header {
+			return s.blocks[blockID]
+		}, func(blockID flow.Identifier) error {
+			_, found := s.blocks[blockID]
+			if found {
+				return nil
+			} else {
+				return realstorage.ErrNotFound
+			}
+		})
 
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
+
+	s.state.On("AtHeight", mock.Anything).Return(
+		func(height uint64) realproto.Snapshot {
+			if block, found := s.finalizedAtHeight[height]; found {
+				return unittest.StateSnapshotForKnownBlock(block, s.identitiesCache[block.ID()])
+			} else {
+				return unittest.StateSnapshotForUnknownBlock()
+			}
+		},
+	)
 
 	s.state.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
@@ -101,6 +115,10 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 			}
 		},
 	)
+
+	// for metrics
+	s.sealsPL.On("Size").Return(uint(0)).Maybe()
+
 	var err error
 
 	log := zerolog.New(os.Stderr)
@@ -345,6 +363,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Times(approvals.DefaultEmergencySealingThreshold)
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
 	err := s.core.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
@@ -519,7 +538,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 // verifiers assigned to those chunks. It also checks that the threshold and
 // rate limiting is respected.
 func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
-
 	s.core.requestTracker = approvals.NewRequestTracker(1, 3)
 
 	// n is the total number of blocks and incorporated-results we add to the
@@ -606,6 +624,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// sealed block doesn't change
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil)
+
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil))
 
 	// start delivering finalization events
 	lastProcessedIndex := 0
