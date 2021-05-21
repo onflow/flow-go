@@ -316,6 +316,8 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	)
 	require.NoError(t, err)
 
+	node.ProtocolEvents.AddConsumer(epochManager)
+
 	return testmock.CollectionNode{
 		GenericNode:        node,
 		Collections:        collections,
