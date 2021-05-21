@@ -18,11 +18,11 @@ var (
 )
 
 // machineAccountKeyCmd represents the `machine-account-key` command which generates required machine account key
-// file and writes it to the default path within the boostrap directory. Used by existing operators to create  the
+// and writes it to the default path within the bootstrap directory. Used by existing operators to create the
 // machine account key only
 var machineAccountKeyCmd = &cobra.Command{
 	Use:   "machine-account-key",
-	Short: "machine-account-key",
+	Short: "Generates machine account key and writes it to the default path within the bootstrap directory",
 	Run:   machineAccountKeyRun,
 }
 
