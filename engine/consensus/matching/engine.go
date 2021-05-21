@@ -26,9 +26,10 @@ type Engine struct {
 	log                       zerolog.Logger
 	me                        module.Local
 	core                      sealing.MatchingCore
-	pendingReceipts           *engine.FifoMessageStore
-	pendingFinalizationEvents *engine.FifoMessageStore
-	messageHandler            *engine.MessageHandler
+	metrics                   module.EngineMetrics
+	notifier                  engine.Notifier
+	pendingReceipts           engine.MessageStore
+	pendingFinalizationEvents *fifoqueue.FifoQueue
 }
 
 func NewEngine(
@@ -47,51 +48,25 @@ func NewEngine(
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
-
 	pendingReceipts := &engine.FifoMessageStore{
 		FifoQueue: receiptsQueue,
 	}
 
 	// FIFO queue for finalization events
-	finalizationQueue, err := fifoqueue.NewFifoQueue(
+	pendingFinalizationEvents, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultFinalizationQueueCapacity),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound finalization events: %w", err)
 	}
 
-	pendingFinalizationEvents := &engine.FifoMessageStore{
-		FifoQueue: finalizationQueue,
-	}
-
-	// define message queueing behaviour
-	handler := engine.NewMessageHandler(
-		log.With().Str("matching", "engine").Logger(),
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*flow.ExecutionReceipt)
-				if ok {
-					engineMetrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-				}
-				return ok
-			},
-			Store: pendingReceipts,
-		},
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(flow.Identifier)
-				return ok
-			},
-			Store: pendingFinalizationEvents,
-		},
-	)
-
 	e := &Engine{
 		log:                       log.With().Str("matching", "engine").Logger(),
 		unit:                      engine.NewUnit(),
 		me:                        me,
 		core:                      core,
-		messageHandler:            handler,
+		metrics:                   engineMetrics,
+		notifier:                  engine.NewNotifier(),
 		pendingReceipts:           pendingReceipts,
 		pendingFinalizationEvents: pendingFinalizationEvents,
 	}
@@ -142,35 +117,39 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(originID, event)
+	receipt, ok := event.(*flow.ExecutionReceipt)
+	if !ok {
+		return fmt.Errorf("input message of incompatible type: %T, origin: %x", event, originID[:])
+	}
+	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
+	e.pendingReceipts.Put(&engine.Message{OriginID: originID, Payload: receipt})
+	e.notifier.Notify()
+	return nil
 }
 
-// HandleReceipt pipes explicitly requested receipts to the process function.
-// Receipts can come from this function or the receipt provider setup in the
-// engine constructor.
+// HandleReceipt ingests receipts from the Requester module.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
-
-	err := e.Process(originID, receipt)
-	if err != nil {
-		e.log.Error().Err(err).Hex("origin", originID[:]).Msg("could not process receipt")
-	}
+	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
+	e.pendingReceipts.Put(&engine.Message{OriginID: originID, Payload: receipt})
+	e.notifier.Notify()
 }
 
+//
+// CAUTION: the input to this callback is trusted.
 func (e *Engine) HandleFinalizedBlock(finalizedBlockID flow.Identifier) {
-	err := e.messageHandler.Process(e.me.NodeID(), finalizedBlockID)
-	if err != nil {
-		e.log.Error().Err(err).Msg("could not process finalized block")
-	}
+	e.pendingFinalizationEvents.Push(finalizedBlockID)
+	e.notifier.Notify()
 }
 
 func (e *Engine) loop() {
+	c := e.notifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
-		case <-e.messageHandler.GetNotifier():
-			err := e.processAvailableMessages()
+		case <-c:
+			err := e.processAvailableEvents()
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing queued message")
 			}
@@ -178,19 +157,20 @@ func (e *Engine) loop() {
 	}
 }
 
-func (e *Engine) processAvailableMessages() error {
-
+// processAvailableEvents processes _all_ available events (untrusted messages
+// from other nodes as well as internally trusted
+func (e *Engine) processAvailableEvents() error {
 	for {
-		msg, ok := e.pendingFinalizationEvents.Get()
+		finalizedBlockID, ok := e.pendingFinalizationEvents.Pop()
 		if ok {
-			err := e.core.ProcessFinalizedBlock(msg.Payload.(flow.Identifier))
+			err := e.core.ProcessFinalizedBlock(finalizedBlockID.(flow.Identifier))
 			if err != nil {
 				return fmt.Errorf("could not process finalized block: %w", err)
 			}
 			continue
 		}
 
-		msg, ok = e.pendingReceipts.Get()
+		msg, ok := e.pendingReceipts.Get()
 		if ok {
 			err := e.core.ProcessReceipt(msg.OriginID, msg.Payload.(*flow.ExecutionReceipt))
 			if err != nil {
