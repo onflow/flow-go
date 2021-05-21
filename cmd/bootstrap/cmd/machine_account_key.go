@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -43,7 +44,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-key.priv.json path exists
 	machineAccountKeyPath := fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID)
-	keyExists, err := pathExists(machineAccountKeyPath)
+	keyExists, err := pathExists(path.Join(flagOutdir, machineAccountKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
