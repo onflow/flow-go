@@ -38,7 +38,7 @@ var machineAccountCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(machineAccountCmd)
 
-	machineAccountCmd.Flags().StringVar(&flagAddress, "address", "", "the node's network address")
+	machineAccountCmd.Flags().StringVar(&flagMachineAccountAddress, "address", "", "the node's machine account address")
 	_ = machineAccountCmd.MarkFlagRequired("address")
 
 	machineAccountCmd.Flags().StringVar(&flagAccessAddress, "access-address", "", "the network address of an access node")
