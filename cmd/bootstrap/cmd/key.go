@@ -49,17 +49,6 @@ func init() {
 // keyCmdRun generate the node staking key, networking key and node information
 func keyCmdRun(_ *cobra.Command, _ []string) {
 
-	// TODO: We need NodeID of the node to continue checking if the node-info.priv.json exists
-	// TODO: Add paths to log messages for clarity
-	exists, err := pathExists(fmt.Sprintf(model.PathNodeInfoPriv, flow.Identifier{}))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not check if node-info.priv.json exists")
-	}
-	if exists {
-		log.Warn().Msg("node-info.priv.json exists, please delete and try again if you are tying to generate new keys")
-		return
-	}
-
 	// validate inputs
 	role := validateRole(flagRole)
 	validateAddressFormat(flagAddress)
@@ -70,9 +59,6 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not generate keys")
 	}
 
-	// construct NodeMachineAccountInfo struct to write
-	machineAccountInfo := assembleNodeMachineAccountInfo(machineKey)
-
 	log.Debug().Str("address", flagAddress).Msg("assembling node information")
 	conf := model.NodeConfig{
 		Role:    role,
@@ -81,11 +67,13 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 	nodeInfo := assembleNodeInfo(conf, networkKey, stakingKey)
 
-	// retrieve private representation of the node
 	private, err := nodeInfo.Private()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not access private keys")
 	}
+
+	log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
+	machineAccountInfo := assembleNodeMachineAccountInfo(machineKey)
 
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
@@ -93,7 +81,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
-	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID), machineAccountInfo)
+	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountInfo)
 }
 
 func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {

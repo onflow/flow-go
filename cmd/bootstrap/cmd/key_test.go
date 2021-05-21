@@ -15,23 +15,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateKeys(t *testing.T) {
-
-	t.Run("should generate all keys", func(t *testing.T) {
-		net, stake, machine, err := generateKeys()
-		require.NoError(t, err)
-		assert.NotNil(t, net)
-		assert.NotNil(t, stake)
-		assert.NotNil(t, machine)
-	})
-}
-
 var happyPathRegex = `^will generate networking key` +
 	`generated networking key` +
 	`will generate staking key` +
 	`generated staking key` +
+	`will generate machine account key` +
+	`generated machine account key` +
 	`assembling node information` +
 	`encoded public staking and network keys` +
+	`assembling machine account information` +
+	`encoded public machine account key` +
 	`wrote file /tmp/%s/public-root-information/node-id` +
 	`wrote file /tmp/%s/private-root-information/private-node-info_\S+/node-info.priv.json` +
 	`wrote file /tmp/%s/public-root-information/node-info.pub.\S+.json`
