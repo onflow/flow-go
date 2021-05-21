@@ -18,6 +18,10 @@ int get_invalid() {
     return INVALID;
 }
 
+int get_undefined() {
+    return UNDEFINED;
+}
+
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
@@ -234,6 +238,8 @@ static int fp_get_sign(fp_t y) {
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_write_bin
+// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR is any of
+// the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
     ep_null(t);
@@ -275,6 +281,8 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
+// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR is any of
+// the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
     if (len!=G1_size) {
@@ -307,7 +315,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     byte* temp = (byte*)malloc(Fp_BYTES);
     if (!temp) {
         RLC_THROW(ERR_NO_MEMORY);
-        return RLC_ERR;
+        return UNDEFINED;
     }
     memcpy(temp, bin, Fp_BYTES);
     temp[0] &= 0x1F;
@@ -376,6 +384,8 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
+// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR is any of
+// the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     const int G2size = (G2_BYTES/(G2_SERIALIZATION+1));
@@ -408,7 +418,7 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
     byte* temp = (byte*)malloc(2*Fp_BYTES);
     if (!temp) {
         RLC_THROW(ERR_NO_MEMORY);
-        return RLC_ERR;
+        return UNDEFINED;
     }
     memcpy(temp, bin, 2*Fp_BYTES);
     // clear the header bits
@@ -556,8 +566,8 @@ void ep_sum_vector(ep_t jointx, ep_st* x, const int len) {
     }
 }
 
-// Computes the sum of the signatures (G1 elements) flattened in an single sigs array
-// and store the sum bytes in dest
+// Computes the sum of the signatures (G1 elements) flattened in a single sigs array
+// and store the sum bytes in dest.
 // The function assumes sigs is correctly allocated with regards to len.
 int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     // temp variables

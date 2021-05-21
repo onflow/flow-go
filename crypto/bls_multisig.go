@@ -86,8 +86,8 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	for i, sig := range sigs {
 		if len(sig) != signatureLengthBLSBLS12381 {
 			return nil, newInvalidInputs(fmt.Sprintf(
-				"signature at index %d is not a valid BLS signature",
-				i))
+				"signature at index %d has an invalid length, %d is expected, got %d",
+				i, signatureLengthBLSBLS12381, len(sig)))
 		}
 		flatSigs = append(flatSigs, sig...)
 	}
