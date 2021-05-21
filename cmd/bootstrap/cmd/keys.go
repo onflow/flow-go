@@ -96,7 +96,7 @@ func assembleNodeMachineAccountInfo(accountAddress string, keyIndex uint, machin
 	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
 	machineNodeInfo := model.NodeMachineAccountInfo{
 		EncodedPrivateKey: machineKey.Encode(),
-		KeyIndex:          keyIndex,
+		KeyIndex:          0,
 		SigningAlgorithm:  sdkcrypto.ECDSA_P256,
 		HashAlgorithm:     sdkcrypto.SHA3_256,
 		Address:           accountAddress,

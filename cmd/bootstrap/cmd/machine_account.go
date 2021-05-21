@@ -21,7 +21,7 @@ var (
 // before running this command.
 var machineAccountCmd = &cobra.Command{
 	Use:   "machine-account",
-	Short: "",
+	Short: "Generates machine account info file for existing and new operators.",
 	Run:   machineAccountRun,
 }
 
