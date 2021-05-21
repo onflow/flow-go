@@ -2,6 +2,7 @@ package test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
@@ -20,6 +21,6 @@ func TestClusterSwitchover(t *testing.T) {
 	node := testutil.CollectionNode(t, hub, identity, rootSnapshot)
 
 	// for now just bring up and down the node
-	<-node.Ready()
-	<-node.Done()
+	unittest.RequireCloseBefore(t, node.Ready(), time.Second, "failed to start node")
+	unittest.RequireCloseBefore(t, node.Done(), time.Second, "failed to stop node")
 }
