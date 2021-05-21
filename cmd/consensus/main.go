@@ -10,7 +10,10 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -24,11 +27,13 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
+	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
+	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -37,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
@@ -49,7 +55,9 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -76,10 +84,11 @@ func main() {
 		requiredApprovalsForSealVerification   uint
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
+		accessAddress                          string
 
 		err               error
 		mutableState      protocol.MutableState
-		privateDKGData    *dkg.DKGParticipantPriv
+		privateDKGData    *dkgmodel.DKGParticipantPriv
 		guarantees        mempool.Guarantees
 		results           mempool.IncorporatedResults
 		receipts          mempool.ExecutionTree
@@ -95,6 +104,7 @@ func main() {
 		receiptValidator  module.ReceiptValidator
 		approvalValidator module.ApprovalValidator
 		chunkAssigner     *chmodule.ChunkAssigner
+		dkgBrokerTunnel   *dkgmodule.BrokerTunnel
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -118,6 +128,7 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 		}).
 		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
@@ -550,6 +561,90 @@ func main() {
 			// created with sealing engine
 			return receiptRequester, nil
 		}).
+		Component("DKG messaging engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// brokerTunnel is used to forward messages between the DKG
+			// messaging engine and the DKG broker/controller
+			dkgBrokerTunnel = dkgmodule.NewBrokerTunnel()
+
+			// messagingEngine is a network engine that is used by nodes to
+			// exchange private DKG messages
+			messagingEngine, err := dkgeng.NewMessagingEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				dkgBrokerTunnel,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize DKG messaging engine: %w", err)
+			}
+
+			return messagingEngine, nil
+		}).
+		Component("DKG reactor engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			// the viewsObserver is used by the reactor engine to subscribe to
+			// new views being finalized
+			viewsObserver := gadgets.NewViews()
+			node.ProtocolEvents.AddConsumer(viewsObserver)
+
+			// keyDB is used to store the private key resulting from the node's
+			// participation in the DKG run
+			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
+
+			machineAccountInfo, err := loadEpochQCPrivateData(node)
+			if err != nil {
+				return nil, fmt.Errorf("could't load machine account info: %w", err)
+			}
+			decodedPrivateKey, err := crypto.DecodePrivateKey(
+				machineAccountInfo.SigningAlgorithm,
+				machineAccountInfo.EncodedPrivateKey,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not decode machine account private key: %w", err)
+			}
+			machineAccountSigner := crypto.NewInMemorySigner(
+				decodedPrivateKey,
+				machineAccountInfo.HashAlgorithm,
+			)
+
+			sdkClient, err := client.New(
+				accessAddress,
+				grpc.WithInsecure())
+			if err != nil {
+				return nil, fmt.Errorf("could not initialise sdk client: %w", err)
+			}
+
+			dkgContractClient := dkgmodule.NewClient(
+				node.Logger,
+				sdkClient,
+				machineAccountSigner,
+				node.RootChainID.Chain().ServiceAddress().HexWithPrefix(),
+				machineAccountInfo.Address,
+				machineAccountInfo.KeyIndex,
+			)
+
+			// the reactor engine reacts to new views being finalized and drives the
+			// DKG protocol
+			reactorEngine := dkgeng.NewReactorEngine(
+				node.Logger,
+				node.Me,
+				node.State,
+				keyDB,
+				dkgmodule.NewControllerFactory(
+					node.Logger,
+					node.Me,
+					dkgContractClient,
+					dkgBrokerTunnel,
+				),
+				viewsObserver,
+			)
+
+			// reactorEngine consumes the EpochSetupPhaseStarted event
+			node.ProtocolEvents.AddConsumer(reactorEngine)
+
+			return reactorEngine, nil
+		}).
 		Run()
 }
 
@@ -566,4 +661,14 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 		return nil, err
 	}
 	return &priv, nil
+}
+
+func loadEpochQCPrivateData(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
+	data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+	if err != nil {
+		return nil, err
+	}
+	var info bootstrap.NodeMachineAccountInfo
+	err = json.Unmarshal(data, &info)
+	return &info, err
 }

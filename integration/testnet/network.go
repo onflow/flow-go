@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	dkgmod "github.com/onflow/flow-go/model/dkg"
@@ -701,8 +700,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
-		Counter:      epochCounter,
-		FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
+		Counter: epochCounter,
+		// FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
+		FinalView:    root.Header.View + 100, // XXX 100 views ~= 2min
 		Participants: participants,
 		Assignments:  clusterAssignments,
 		RandomSource: randomSource,
@@ -721,8 +721,8 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
 		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView - 1),
-		NumViewsInStakingAuction:     cadence.UInt64(100),
-		NumViewsInDKGPhase:           cadence.UInt64(100),
+		NumViewsInStakingAuction:     cadence.UInt64(5),
+		NumViewsInDKGPhase:           cadence.UInt64(60),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
 		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
