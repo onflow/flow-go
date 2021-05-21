@@ -9,10 +9,11 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/onflow/flow-go/engine/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/engine/execution"
 
 	"github.com/onflow/flow-go/crypto"
 	engineCommon "github.com/onflow/flow-go/engine"
