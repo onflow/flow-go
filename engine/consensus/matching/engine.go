@@ -135,9 +135,10 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.notifier.Notify()
 }
 
-//
-// CAUTION: the input to this callback is trusted.
-func (e *Engine) HandleFinalizedBlock(finalizedBlockID flow.Identifier) {
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 	e.pendingFinalizationEvents.Push(finalizedBlockID)
 	e.notifier.Notify()
 }
