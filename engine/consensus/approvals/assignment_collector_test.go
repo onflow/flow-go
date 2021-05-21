@@ -382,24 +382,27 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 			requests = append(requests, ar)
 		})
 
-	err := s.collector.RequestMissingApprovals(lastHeight)
+	requestCount, err := s.collector.RequestMissingApprovals(nil, lastHeight)
 	require.NoError(s.T(), err)
 
 	// first time it goes through, no requests should be made because of the
 	// blackout period
 	require.Len(s.T(), requests, 0)
+	require.Zero(s.T(), requestCount)
 
 	// wait for the max blackout period to elapse and retry
 	time.Sleep(3 * time.Second)
 
 	// requesting with immature height will be ignored
-	err = s.collector.RequestMissingApprovals(lastHeight - uint64(len(incorporatedBlocks)) - 1)
+	requestCount, err = s.collector.RequestMissingApprovals(nil, lastHeight-uint64(len(incorporatedBlocks))-1)
 	s.Require().NoError(err)
 	require.Len(s.T(), requests, 0)
+	require.Zero(s.T(), requestCount)
 
-	err = s.collector.RequestMissingApprovals(lastHeight)
+	requestCount, err = s.collector.RequestMissingApprovals(nil, lastHeight)
 	s.Require().NoError(err)
 
+	require.Equal(s.T(), requestCount, s.Chunks.Len()*len(s.collector.collectors))
 	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
 
 	resultID := s.IncorporatedResult.Result.ID()

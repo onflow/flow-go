@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
@@ -61,6 +62,7 @@ type Core struct {
 	headers                   storage.Headers                    // used to access block headers in storage
 	state                     protocol.State                     // used to access protocol state
 	seals                     storage.Seals                      // used to get last sealed block
+	sealsMempool              mempool.IncorporatedResultSeals    // used by tracker.SealingTracker to log info
 	requestTracker            *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
 	metrics                   module.ConsensusMetrics            // used to track consensus metrics
 	tracer                    module.Tracer                      // used to trace execution
@@ -93,6 +95,7 @@ func NewCore(
 		headers:        headers,
 		state:          state,
 		seals:          sealsDB,
+		sealsMempool:   sealsMempool,
 		config:         config,
 		requestTracker: approvals.NewRequestTracker(10, 30),
 	}
@@ -417,6 +420,9 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uint64) error {
+	startTime := time.Now()
+	sealingTracker := tracker.NewSealingTracker(c.state)
+
 	// skip requesting approvals if they are not required for sealing
 	if c.config.RequiredApprovalsForSealConstruction == 0 {
 		return nil
@@ -431,7 +437,9 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 	// Hence, the following operation cannot underflow
 	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
 
-	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting) {
+	pendingApprovalRequests := 0
+	collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)
+	for _, collector := range collectors {
 		// Note:
 		// * The `AssignmentCollectorTree` works with the height of the _executed_ block. However,
 		//   the `maxHeightForRequesting` should use the height of the block _incorporating the result_
@@ -441,11 +449,23 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 		//   filtering based on the executed block height is a useful pre-filter, but not quite
 		//   precise enough.
 		// * The `AssignmentCollector` will apply the precise filter to avoid unnecessary overhead.
-		err := collector.RequestMissingApprovals(maxHeightForRequesting)
+		requestCount, err := collector.RequestMissingApprovals(sealingTracker, maxHeightForRequesting)
 		if err != nil {
 			return err
 		}
+		pendingApprovalRequests += requestCount
 	}
+
+	c.log.Info().
+		Str("next_unsealed_results", sealingTracker.String()).
+		Bool("mempool_has_seal_for_next_height", sealingTracker.MempoolHasNextSeal(c.sealsMempool)).
+		Uint("seals_size", c.sealsMempool.Size()).
+		Uint64("last_sealed_height", lastSealedHeight).
+		Uint64("last_finalized_height", lastFinalizedHeight).
+		Int("pending_collectors", len(collectors)).
+		Int("pending_approval_requests", pendingApprovalRequests).
+		Int64("duration_ms", time.Since(startTime).Milliseconds()).
+		Msg("checking sealing finished successfully")
 
 	return nil
 }

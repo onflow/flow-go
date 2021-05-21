@@ -2,12 +2,14 @@ package approvals
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -311,13 +313,23 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 	return nil
 }
 
-func (ac *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64) error {
+// RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
+// approvals from verifiers.
+// Returns number of requests made and error in case something goes wrong.
+func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
+	requestCount := 0
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
 			continue
 		}
 
-		for chunkIndex, verifiers := range collector.CollectMissingVerifiers() {
+		firstChunkWithMissingApproval := uint64(math.MaxUint64)
+		missingChunks := collector.CollectMissingVerifiers()
+		for chunkIndex, verifiers := range missingChunks {
+			if firstChunkWithMissingApproval < chunkIndex {
+				firstChunkWithMissingApproval = chunkIndex
+			}
+
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
@@ -346,12 +358,19 @@ func (ac *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting ui
 				ChunkIndex: chunkIndex,
 			}
 
+			requestCount++
 			err := ac.approvalConduit.Publish(req, verifiers...)
 			if err != nil {
 				log.Error().Err(err).
 					Msgf("could not publish approval request for chunk %d", chunkIndex)
 			}
 		}
+
+		if sealingTracker != nil && len(missingChunks) > 0 {
+			sealingRecord := tracker.NewRecordWithInsufficientApprovals(collector.incorporatedResult, firstChunkWithMissingApproval)
+			sealingTracker.Track(sealingRecord)
+		}
+
 	}
-	return nil
+	return requestCount, nil
 }
