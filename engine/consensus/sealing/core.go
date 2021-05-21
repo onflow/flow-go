@@ -432,6 +432,15 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
 
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting) {
+		// Note:
+		// * The `AssignmentCollectorTree` works with the height of the _executed_ block. However,
+		//   the `maxHeightForRequesting` should use the height of the block _incorporating the result_
+		//   as reference.
+		// * There might be blocks whose height is below `maxHeightForRequesting`, while their result
+		//   is incorporated into blocks with _larger_ height than `maxHeightForRequesting`. Therefore,
+		//   filtering based on the executed block height is a useful pre-filter, but not quite
+		//   precise enough.
+		// * The `AssignmentCollector` will apply the precise filter to avoid unnecessary overhead.
 		err := collector.RequestMissingApprovals(maxHeightForRequesting)
 		if err != nil {
 			return err
