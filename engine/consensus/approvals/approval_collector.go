@@ -13,13 +13,12 @@ import (
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
-	incorporatedBlock                    *flow.Header                    // block that incorporates execution result
-	incorporatedResult                   *flow.IncorporatedResult        // incorporated result that is being sealed
-	chunkCollectors                      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
-	aggregatedSignatures                 *AggregatedSignatures           // aggregated signature for each chunk
-	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	numberOfChunks                       int                             // number of chunks for execution result, remains constant
-	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
+	incorporatedBlock    *flow.Header                    // block that incorporates execution result
+	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
+	chunkCollectors      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
+	aggregatedSignatures *AggregatedSignatures           // aggregated signature for each chunk
+	seals                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	numberOfChunks       int                             // number of chunks for execution result, remains constant
 }
 
 func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
@@ -32,13 +31,12 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 
 	numberOfChunks := result.Result.Chunks.Len()
 	return &ApprovalCollector{
-		incorporatedResult:                   result,
-		incorporatedBlock:                    incorporatedBlock,
-		numberOfChunks:                       numberOfChunks,
-		chunkCollectors:                      chunkCollectors,
-		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		aggregatedSignatures:                 NewAggregatedSignatures(uint64(numberOfChunks)),
-		seals:                                seals,
+		incorporatedResult:   result,
+		incorporatedBlock:    incorporatedBlock,
+		numberOfChunks:       numberOfChunks,
+		chunkCollectors:      chunkCollectors,
+		aggregatedSignatures: NewAggregatedSignatures(uint64(numberOfChunks)),
+		seals:                seals,
 	}
 }
 

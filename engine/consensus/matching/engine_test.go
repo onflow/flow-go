@@ -58,7 +58,7 @@ func (s *MatchingEngineSuite) TestHandleFinalizedBlock() {
 
 	finalizedBlockID := unittest.IdentifierFixture()
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.HandleFinalizedBlock(finalizedBlockID)
+	s.engine.OnFinalizedBlock(finalizedBlockID)
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

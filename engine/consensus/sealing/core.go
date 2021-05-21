@@ -46,7 +46,7 @@ func DefaultConfig() Config {
 	}
 }
 
-// Core is an implementation of ResultApprovalProcessor interface
+// Core is an implementation of SealingCore interface
 // This struct is responsible for:
 // 	- collecting approvals for execution results
 // 	- processing multiple incorporated results
@@ -184,6 +184,10 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	return nil
 }
 
+// ProcessIncorporatedResult processes incorporated result in blocking way. Concurrency safe.
+// Returns:
+// * exception in case of unexpected error
+// * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 	err := c.processIncorporatedResult(result)
 
@@ -227,6 +231,10 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 	return nil
 }
 
+// ProcessApproval processes approval in blocking way. Concurrency safe.
+// Returns:
+// * exception in case of unexpected error
+// * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	startTime := time.Now()
 	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONMatchOnApproval)
@@ -341,6 +349,10 @@ func (c *Core) processPendingApprovals(collector *approvals.AssignmentCollector)
 	return nil
 }
 
+// ProcessFinalizedBlock processes finalization events in blocking way. Concurrency safe.
+// Returns:
+// * exception in case of unexpected error
+// * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	finalized, err := c.headers.ByBlockID(finalizedBlockID)
 	if err != nil {
@@ -420,6 +432,15 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
 
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting) {
+		// Note:
+		// * The `AssignmentCollectorTree` works with the height of the _executed_ block. However,
+		//   the `maxHeightForRequesting` should use the height of the block _incorporating the result_
+		//   as reference.
+		// * There might be blocks whose height is below `maxHeightForRequesting`, while their result
+		//   is incorporated into blocks with _larger_ height than `maxHeightForRequesting`. Therefore,
+		//   filtering based on the executed block height is a useful pre-filter, but not quite
+		//   precise enough.
+		// * The `AssignmentCollector` will apply the precise filter to avoid unnecessary overhead.
 		err := collector.RequestMissingApprovals(maxHeightForRequesting)
 		if err != nil {
 			return err

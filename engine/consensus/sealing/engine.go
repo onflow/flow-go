@@ -296,8 +296,12 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// HandleFinalizedBlock process finalization event from hotstuff. Processes all results that were submitted in payload.
-func (e *Engine) HandleFinalizedBlock(finalizedBlockID flow.Identifier) {
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Informs sealing.Core about finalization of respective block.
+//  (2) Processes all execution results that were incorporated in the block's payload.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 	payload, err := e.payloads.ByBlockID(finalizedBlockID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
