@@ -100,6 +100,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
 
+	events := make(flow.EventsList, 0)
+
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
 
@@ -166,6 +168,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 
+		events = append(events, tx.Events...)
+
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
 		err = chunkView.MergeView(txView)
 		if err != nil {
@@ -180,6 +184,11 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			missingRegs = append(missingRegs, key.String())
 		}
 		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+	}
+
+	eventsHash := events.Hash()
+	if chunk.EventCollection != eventsHash {
+		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
