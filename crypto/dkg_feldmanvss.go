@@ -371,14 +371,16 @@ func writeVerifVector(dest []byte, A []pointG2) {
 // readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) error {
-	if C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
+	switch C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(A)),
-	) != valid {
-		// TODO: check error
-		return errors.New("the verifcation vector does not serialize points correctly")
+		(C.int)(len(A))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputs("the verifcation vector does not serialize G2 points")
+	default:
+		return errors.New("reading the verifcation vector failed")
 	}
-	return nil
 }
 
 func (s *feldmanVSSstate) verifyShare() bool {

@@ -18,10 +18,6 @@ int get_invalid() {
     return INVALID;
 }
 
-int get_undefined() {
-    return UNDEFINED;
-}
-
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
@@ -494,8 +490,9 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
 
     // elemsG1[0] = s1
     ep_new(elemsG1[0]);
-    if (ep_read_bin_compact(elemsG1[0], sig1, SIGNATURE_LEN) != RLC_OK) 
-        return INVALID;
+    int read_ret = ep_read_bin_compact(elemsG1[0], sig1, SIGNATURE_LEN);
+    if (read_ret != RLC_OK) 
+        return read_ret;
 
     // check s1 is on curve and in G1
     if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
@@ -503,8 +500,9 @@ int bls_spock_verify(const ep2_t pk1, const byte* sig1, const ep2_t pk2, const b
 
     // elemsG1[1] = s2
     ep_new(elemsG1[1]);
-    if (ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN) != RLC_OK) 
-        return INVALID;
+    read_ret = ep_read_bin_compact(elemsG1[1], sig2, SIGNATURE_LEN);
+    if (read_ret != RLC_OK) 
+        return read_ret;
 
     // check s2 is on curve and in G1
     if (check_membership_G1(elemsG1[1]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
@@ -580,8 +578,9 @@ int ep_sum_vector_byte(byte* dest, const byte* sigs_bytes, const int len) {
     for (int i=0; i < len; i++) {
         ep_new(sigs[i]);
         // deserialize each point from the input array
-        if (ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
-            return INVALID;
+        int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if (read_ret != RLC_OK)
+            return read_ret;
     }
     // sum the points
     ep_sum_vector(acc, sigs, len);

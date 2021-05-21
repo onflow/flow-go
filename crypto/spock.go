@@ -70,5 +70,12 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 		(*C.ep2_st)(&blsPk2.point),
 		(*C.uchar)(&proof2[0]))
 
-	return (verif == valid), nil
+	switch verif {
+	case invalid:
+		return false, nil
+	case valid:
+		return true, nil
+	default:
+		return false, fmt.Errorf("SPoCK verification failed")
+	}
 }

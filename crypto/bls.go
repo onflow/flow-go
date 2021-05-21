@@ -127,7 +127,7 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 
 	if kmac == nil {
-		return false, newInvalidInputs("VerifyBytes requires a Hasher")
+		return false, newInvalidInputs("verification requires a Hasher")
 	}
 	// check hasher output size
 	if kmac.Size() < minHashSizeBLSBLS12381 {
@@ -148,7 +148,14 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 		(*C.uchar)(&h[0]),
 		(C.int)(len(h)))
 
-	return (verif == valid), nil
+	switch verif {
+	case invalid:
+		return false, nil
+	case valid:
+		return true, nil
+	default:
+		return false, fmt.Errorf("signature verification failed")
+	}
 }
 
 // generatePrivateKey generates a private key for BLS on BLS12-381 curve.
@@ -190,7 +197,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
 		return sk, nil
 	}
-	// TODO: check error
+
 	return nil, newInvalidInputs("the private key is not a valid BLS12-381 curve key")
 }
 
@@ -203,8 +210,12 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 			pubKeyLengthBLSBLS12381))
 	}
 	var pk PubKeyBLSBLS12381
-	if readPointG2(&pk.point, publicKeyBytes) != nil {
-		return nil, newInvalidInputs("the input does not encode a BLS12-381 point")
+	err := readPointG2(&pk.point, publicKeyBytes)
+	if err != nil {
+		if _, ok := err.(*InvalidInputs); ok {
+			return nil, newInvalidInputs("the input does not encode a BLS12-381 point")
+		}
+		return nil, errors.New("decode public key failed")
 	}
 	if !pk.point.checkValidPublicKeyPoint() {
 		return nil, newInvalidInputs("the input is infinity or does not encode a BLS12-381 point in the valid group")

@@ -94,15 +94,19 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	aggregatedSig := make([]byte, signatureLengthBLSBLS12381)
 
 	// add the points in the C layer
-	if C.ep_sum_vector_byte(
+	result := C.ep_sum_vector_byte(
 		(*C.uchar)(&aggregatedSig[0]),
 		(*C.uchar)(&flatSigs[0]),
-		(C.int)(len(sigs)),
-	) != valid {
-		// TODO update error
-		return nil, fmt.Errorf("decoding BLS signatures has failed")
+		(C.int)(len(sigs)))
+
+	switch result {
+	case valid:
+		return aggregatedSig, nil
+	case invalid:
+		return nil, newInvalidInputs("decoding at least one BLS signatures has failed")
+	default:
+		return nil, fmt.Errorf("aggregating signatures failed")
 	}
-	return aggregatedSig, nil
 }
 
 // AggregateBLSPrivateKeys aggregate multiple BLS private keys into one.
@@ -326,6 +330,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i])
 	}
 
+	var verif (C.int)
 	//compare the 2 maps for the shortest length
 	if len(mapPerHash) < len(mapPerPk) {
 		// aggregate keys per distinct hashes
@@ -340,7 +345,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			pkPerHash = append(pkPerHash, uint32(len(pksVal)))
 			allPks = append(allPks, pksVal...)
 		}
-		verif := C.bls_verifyPerDistinctMessage(
+		verif = C.bls_verifyPerDistinctMessage(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerHash)),
 			(*C.uchar)(&flatDistinctHashes[0]),
@@ -348,7 +353,6 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			(*C.uint32_t)(&pkPerHash[0]),
 			(*C.ep2_st)(&allPks[0]),
 		)
-		return (verif == valid), nil
 
 	} else {
 		// aggregate hashes per distinct key
@@ -366,14 +370,22 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			}
 		}
 
-		verif := C.bls_verifyPerDistinctKey(
+		verif = C.bls_verifyPerDistinctKey(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerPk)),
 			(*C.ep2_st)(&distinctPks[0]),
 			(*C.uint32_t)(&hashPerPk[0]),
 			(*C.uchar)(&flatHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]))
-		return (verif == valid), nil
+	}
+
+	switch verif {
+	case invalid:
+		return false, nil
+	case valid:
+		return true, nil
+	default:
+		return false, fmt.Errorf("signature verification failed")
 	}
 }
 
@@ -411,7 +423,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	verifBool := make([]bool, len(sigs))
 	// hasher check
 	if kmac == nil {
-		return verifBool, newInvalidInputs("VerifyBytes requires a Hasher")
+		return verifBool, newInvalidInputs("verification requires a Hasher")
 	}
 
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
@@ -459,6 +471,9 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	)
 
 	for i, v := range verifInt {
+		if (C.int)(v) != valid && (C.int)(v) != invalid {
+			return verifBool, fmt.Errorf("batch verification failed")
+		}
 		verifBool[i] = ((C.int)(v) == valid)
 	}
 

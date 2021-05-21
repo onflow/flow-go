@@ -144,14 +144,16 @@ func writePointG2(dest []byte, a *pointG2) {
 
 // readVerifVector reads a G2 point from a slice of bytes
 func readPointG2(a *pointG2, src []byte) error {
-	if C.ep2_read_bin_compact((*C.ep2_st)(a),
+	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(src)),
-	) != valid {
-		// TODO: update error
+		(C.int)(len(src))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputs("input is not a G2 point")
+	default:
 		return errors.New("reading a G2 point has failed")
 	}
-	return nil
 }
 
 // This is only a TEST function.

@@ -105,9 +105,9 @@ int ep2_vector_read_bin(ep2_st* A, const byte* src, const int len){
     const int size = (G2_BYTES/(G2_SERIALIZATION+1));
     byte* p = (byte*) src;
     for (int i=0; i<len; i++){
-        int ret = ep2_read_bin_compact(&A[i], p, size);
-        if (ret != RLC_OK)
-            return ret;
+        int read_ret = ep2_read_bin_compact(&A[i], p, size);
+        if (read_ret != RLC_OK)
+            return read_ret;
         p += size;
     }
     return RLC_OK;

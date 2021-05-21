@@ -327,12 +327,14 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	}
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
-	if C.G1_lagrangeInterpolateAtZero(
+	result := C.G1_lagrangeInterpolateAtZero(
 		(*C.uchar)(&thresholdSignature[0]),
 		(*C.uchar)(&s.shares[0]),
-		(*C.uint8_t)(&s.signers[0]), (C.int)(len(s.signers)),
-	) != valid {
-		// TODO: check error
+		(*C.uint8_t)(&s.signers[0]), (C.int)(len(s.signers)))
+	if result != valid {
+		if result == invalid { // sanity check, but shouldn't happen
+			return nil, newInvalidInputs("a signature share is not valid")
+		}
 		return nil, errors.New("reading signatures has failed")
 	}
 
@@ -422,7 +424,6 @@ func ReconstructThresholdSignature(size int, threshold int,
 		(*C.uchar)(&flatShares[0]),
 		(*C.uint8_t)(&indexSigners[0]), (C.int)(threshold+1),
 	) != valid {
-		// TODO: check error
 		return nil, errors.New("reading signatures has failed")
 	}
 	return thresholdSignature, nil
