@@ -82,6 +82,37 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 	s.core.AssertExpectations(s.T())
 }
 
+// TestOnBlockIncorporated tests if incorporated block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (s *SealingEngineSuite) TestOnBlockIncorporated() {
+	parentBlock := unittest.BlockHeaderFixture()
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	incorporatedBlockID := incorporatedBlock.ID()
+	// setup payload fixture
+	payloads := &mockstorage.Payloads{}
+	payload := unittest.PayloadFixture()
+	unittest.WithAllTheFixins(&payload)
+	payloads.On("ByBlockID", parentBlock.ID()).Return(&payload, nil).Once()
+	s.engine.payloads = payloads
+
+	// setup headers storage
+	headers := &mockstorage.Headers{}
+	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
+	s.engine.headers = headers
+
+	for _, result := range payload.Results {
+		IR := flow.NewIncorporatedResult(result.BlockID, result)
+		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
+	}
+
+	s.engine.OnBlockIncorporated(incorporatedBlockID)
+
+	// matching engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	s.core.AssertExpectations(s.T())
+}
+
 // TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestProcessValidReceipt() {

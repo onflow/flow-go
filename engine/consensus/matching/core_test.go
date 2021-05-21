@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,7 +27,6 @@ type MatchingSuite struct {
 	// misc SERVICE COMPONENTS which are injected into Sealing Core
 	requester        *mockmodule.Requester
 	receiptValidator *mockmodule.ReceiptValidator
-	sealingEngine    *mocknetwork.Engine
 
 	// MATCHING CORE
 	core *Core
@@ -45,7 +43,6 @@ func (ms *MatchingSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING CORE ~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.requester = new(mockmodule.Requester)
 	ms.receiptValidator = &mockmodule.ReceiptValidator{}
-	ms.sealingEngine = &mocknetwork.Engine{}
 
 	config := Config{
 		SealingThreshold:    10,
@@ -65,7 +62,6 @@ func (ms *MatchingSuite) SetupTest() {
 		ms.SealsPL,
 		ms.receiptValidator,
 		ms.requester,
-		ms.sealingEngine,
 		config,
 	)
 }
@@ -80,7 +76,6 @@ func (ms *MatchingSuite) TestOnReceiptUnknownBlock() {
 	ms.Require().NoError(err, "should drop receipt for unknown block without error")
 
 	ms.ReceiptsPL.AssertNumberOfCalls(ms.T(), "Add", 0)
-	ms.sealingEngine.AssertNumberOfCalls(ms.T(), "ProcessLocal", 0)
 }
 
 // sealing Core should drop Result for known block that is already sealed
@@ -107,12 +102,6 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	)
 	ms.receiptValidator.On("Validate", receipt).Return(nil)
 
-	// Receipt should be passed to sealing engine for processing. Only for phase 2 of Sealing & Verification
-	// TODO: remove for later sealing phases
-	ms.sealingEngine.
-		On("ProcessLocal", receipt).
-		Return(nil).Once()
-
 	// Expect the receipt to be added to mempool and persistent storage
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
@@ -120,7 +109,6 @@ func (ms *MatchingSuite) TestOnReceiptPendingResult() {
 	_, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "should handle different receipts for already pending result")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.sealingEngine.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertExpectations(ms.T())
 }
 
@@ -140,16 +128,9 @@ func (ms *MatchingSuite) TestOnReceipt_ReceiptInPersistentStorage() {
 	// The receipt should be added to the receipts mempool
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 
-	// Receipt should be passed to sealing engine for processing. Only for phase 2 of Sealing & Verification
-	// TODO: remove for later sealing phases
-	ms.sealingEngine.
-		On("ProcessLocal", receipt).
-		Return(nil).Once()
-
 	_, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "should process receipts, even if it is already in storage")
 	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.sealingEngine.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 1)
 }
 
@@ -167,12 +148,6 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
 	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
 
-	// Receipt should be passed to sealing engine for processing. Only for phase 2 of Sealing & Verification
-	// TODO: remove for later sealing phases
-	ms.sealingEngine.
-		On("ProcessLocal", receipt).
-		Return(nil).Once()
-
 	// onReceipt should run to completion without throwing an error
 	_, err := ms.core.processReceipt(receipt)
 	ms.Require().NoError(err, "should add receipt and result to mempools if valid")
@@ -180,7 +155,6 @@ func (ms *MatchingSuite) TestOnReceiptValid() {
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsPL.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertExpectations(ms.T())
-	ms.sealingEngine.AssertExpectations(ms.T())
 }
 
 // TestOnReceiptInvalid tests that we reject receipts that don't pass the ReceiptValidator
@@ -205,7 +179,6 @@ func (ms *MatchingSuite) TestOnReceiptInvalid() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.sealingEngine.AssertExpectations(ms.T())
 }
 
 // TestOnUnverifiableReceipt tests handling of receipts that are unverifiable
@@ -229,7 +202,6 @@ func (ms *MatchingSuite) TestOnUnverifiableReceipt() {
 
 	ms.receiptValidator.AssertExpectations(ms.T())
 	ms.ReceiptsDB.AssertNumberOfCalls(ms.T(), "Store", 0)
-	ms.sealingEngine.AssertExpectations(ms.T())
 	ms.PendingReceipts.AssertExpectations(ms.T())
 }
 

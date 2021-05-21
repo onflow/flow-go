@@ -48,6 +48,7 @@ type Engine struct {
 	workerPool                           *workerpool.WorkerPool
 	log                                  zerolog.Logger
 	me                                   module.Local
+	headers                              storage.Headers
 	payloads                             storage.Payloads
 	cacheMetrics                         module.MempoolMetrics
 	engineMetrics                        module.EngineMetrics
@@ -70,6 +71,7 @@ func NewEngine(log zerolog.Logger,
 	net module.Network,
 	me module.Local,
 	headers storage.Headers,
+	payloads storage.Payloads,
 	state protocol.State,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
@@ -85,6 +87,8 @@ func NewEngine(log zerolog.Logger,
 		me:                                   me,
 		engineMetrics:                        engineMetrics,
 		cacheMetrics:                         mempool,
+		headers:                              headers,
+		payloads:                             payloads,
 		receiptSink:                          make(EventSink),
 		approvalSink:                         make(EventSink),
 		requestedApprovalSink:                make(EventSink),
@@ -305,14 +309,28 @@ func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 	e.log.Info().Msgf("processing finalized block: %v", finalizedBlockID)
 
 	e.workerPool.Submit(func() {
-		payload, err := e.payloads.ByBlockID(finalizedBlockID)
-		if err != nil {
-			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
-		}
-
-		err = e.core.ProcessFinalizedBlock(finalizedBlockID)
+		err := e.core.ProcessFinalizedBlock(finalizedBlockID)
 		if err != nil {
 			e.log.Fatal().Err(err).Msgf("critical sealing error when processing finalized block %v", finalizedBlockID)
+		}
+	})
+}
+
+func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
+	e.log.Info().Msgf("processing incorporated block: %v", incorporatedBlockID)
+
+	e.workerPool.Submit(func() {
+		// We can't process incorporated block because of how sealing engine handles assignments we need to
+		// make sure that block has children. Instead we will process parent block
+
+		incorporatedBlock, err := e.headers.ByBlockID(incorporatedBlockID)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not retrieve header for block %v", incorporatedBlockID)
+		}
+
+		payload, err := e.payloads.ByBlockID(incorporatedBlock.ParentID)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", incorporatedBlock.ParentID)
 		}
 
 		for _, result := range payload.Results {

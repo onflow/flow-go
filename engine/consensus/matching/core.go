@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -38,7 +37,7 @@ func DefaultConfig() Config {
 
 // Core represents the matching business logic, used to process receipts received from
 // p2p network. Performs processing of pending receipts, storing of receipts and re-requesting
-// missing execution receipts. During Sealing and Verification phase 2 submits events to sealing engine
+// missing execution receipts.
 type Core struct {
 	log              zerolog.Logger                  // used to log relevant actions with context
 	tracer           module.Tracer                   // used to trace execution
@@ -52,7 +51,6 @@ type Core struct {
 	seals            mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
 	receiptValidator module.ReceiptValidator         // used to validate receipts
 	receiptRequester module.Requester                // used to request missing execution receipts by block ID
-	sealingEngine    network.Engine                  // used to submit execution receipts that were processed by core
 	config           Config                          // config for matching core
 }
 
@@ -69,7 +67,6 @@ func NewCore(
 	seals mempool.IncorporatedResultSeals,
 	receiptValidator module.ReceiptValidator,
 	receiptRequester module.Requester,
-	sealingEngine network.Engine,
 	config Config,
 ) *Core {
 	return &Core{
@@ -85,7 +82,6 @@ func NewCore(
 		seals:            seals,
 		receiptValidator: receiptValidator,
 		receiptRequester: receiptRequester,
-		sealingEngine:    sealingEngine,
 		config:           config,
 	}
 }
@@ -232,19 +228,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	_, err = c.storeReceipt(receipt, head)
 	if err != nil {
 		return false, fmt.Errorf("failed to store receipt: %w", err)
-	}
-
-	// ATTENTION:
-	//
-	// In phase 2, we need to send execution receipt to the sealing engine which was discovered by network layer
-	//
-	// In phase 3, the incorporated results mempool will be populated by the
-	// finalizer when blocks are added to the chain, and the IncorporatedBlockID
-	// will be the ID of the first block on its fork that contains a receipt
-	// committing to this result.
-	err = c.sealingEngine.ProcessLocal(receipt)
-	if err != nil {
-		return false, fmt.Errorf("failed to store incorporated result: %w", err)
 	}
 
 	log.Info().Msg("execution result processed and stored")

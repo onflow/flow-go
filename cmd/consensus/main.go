@@ -86,7 +86,6 @@ func main() {
 		receiptRequester        *requester.Engine
 		syncCore                *synchronization.Core
 		comp                    *compliance.Engine
-		sealingEngine           *sealing.Engine
 		conMetrics              module.ConsensusMetrics
 		mainMetrics             module.HotstuffMetrics
 		receiptValidator        module.ReceiptValidator
@@ -224,7 +223,7 @@ func main() {
 			config.EmergencySealingActive = emergencySealing
 			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
 
-			sealingEngine, err = sealing.NewEngine(
+			e, err := sealing.NewEngine(
 				node.Logger,
 				node.Tracer,
 				conMetrics,
@@ -233,6 +232,7 @@ func main() {
 				node.Network,
 				node.Me,
 				node.Storage.Headers,
+				node.Storage.Payloads,
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
@@ -241,10 +241,15 @@ func main() {
 				config,
 			)
 
-			// subscribe for finalization events from hotstuff
-			finalizationDistributor.AddConsumer(sealingEngine.OnFinalizedBlock)
+			finalizationConsumer := pubsub.FinalizationConsumer{
+				OnBlockFinalized:    e.OnFinalizedBlock,
+				OnBlockIncorporated: e.OnBlockIncorporated,
+			}
 
-			return sealingEngine, err
+			// subscribe for finalization events from hotstuff
+			finalizationDistributor.AddConsumer(finalizationConsumer)
+
+			return e, err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
@@ -276,7 +281,6 @@ func main() {
 				seals,
 				receiptValidator,
 				receiptRequester,
-				sealingEngine,
 				matching.DefaultConfig(),
 			)
 
@@ -294,7 +298,9 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			finalizationDistributor.AddConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddConsumer(pubsub.FinalizationConsumer{
+				OnBlockFinalized: e.OnFinalizedBlock,
+			})
 
 			return e, err
 		}).
