@@ -224,7 +224,7 @@ func main() {
 			config.EmergencySealingActive = emergencySealing
 			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
 
-			e, err := sealing.NewEngine(
+			sealingEngine, err = sealing.NewEngine(
 				node.Logger,
 				node.Tracer,
 				conMetrics,
@@ -242,9 +242,9 @@ func main() {
 			)
 
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.AddConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddConsumer(sealingEngine.OnFinalizedBlock)
 
-			return e, err
+			return sealingEngine, err
 		}).
 		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
