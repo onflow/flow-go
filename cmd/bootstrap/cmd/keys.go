@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -89,11 +90,11 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	return nodeInfo
 }
 
-func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey) model.NodeMachineAccountInfo {
+func assembleNodeMachineAccountPriv(machineKey crypto.PrivateKey) model.NodeMachineAccountPriv {
 
 	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
-	machineNodeInfo := model.NodeMachineAccountInfo{
-		EncodedPrivateKey: machineKey.Encode(),
+	machineNodeInfo := model.NodeMachineAccountPriv{
+		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
 	}
 
 	return machineNodeInfo

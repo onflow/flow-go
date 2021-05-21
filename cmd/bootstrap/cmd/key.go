@@ -73,7 +73,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 
 	log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
-	machineAccountInfo := assembleNodeMachineAccountInfo(machineKey)
+	machineAccountPriv := assembleNodeMachineAccountPriv(machineKey)
 
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
@@ -81,7 +81,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
-	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountInfo)
+	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
 }
 
 func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
