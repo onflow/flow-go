@@ -1,19 +1,25 @@
 package test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/stub"
+	"github.com/onflow/flow-go/state/cluster"
+	bcluster "github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,10 +33,11 @@ import (
 type ClusterSwitchoverSuite struct {
 	suite.Suite
 
-	identities flow.IdentityList
-	hub        *stub.Hub
-	root       protocol.Snapshot
-	nodes      []testmock.CollectionNode
+	identities flow.IdentityList         // identity table
+	hub        *stub.Hub                 // mock network hub
+	root       protocol.Snapshot         // shared root snapshot
+	nodes      []testmock.CollectionNode // collection nodes
+	sn         *mockmodule.Engine        // fake consensus node engine for receiving guarantees
 }
 
 func TestClusterSwitchoverSuite(t *testing.T) {
@@ -93,9 +100,15 @@ func (suite *ClusterSwitchoverSuite) Transaction(opts ...func(*flow.TransactionB
 	return tx
 }
 
+// ClusterState opens and returns a read-only cluster state for the given node and cluster ID.
+func (suite *ClusterSwitchoverSuite) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID) cluster.State {
+	state, err := bcluster.OpenState(node.DB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID)
+	suite.Require().NoError(err)
+	return state
+}
+
 // TestSingleNode tests cluster switchover with a single node.
 func (suite *ClusterSwitchoverSuite) TestSingleNode() {
-	unittest.LogVerbose()
 
 	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	participants := unittest.CompleteIdentitySet(identity)
@@ -105,7 +118,19 @@ func (suite *ClusterSwitchoverSuite) TestSingleNode() {
 	suite.StartNodes()
 	defer suite.StopNodes()
 
+	// create a mock consensus node to receive collection guarantees
+	consensus := testutil.GenericNode(
+		suite.T(),
+		suite.hub,
+		suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
+		suite.root,
+	)
+	guaranteeReceiver := new(mockmodule.Engine)
+	_, err := consensus.Net.Register(engine.ReceiveGuarantees, guaranteeReceiver)
+	require.NoError(suite.T(), err)
+
 	collector := suite.nodes[0]
+	collector.Net.StartConDev(10*time.Millisecond, false)
 
 	// build out the first epoch and begin the second epoch - at this point
 	// the collection node should be running consensus for both epochs 1 & 2
@@ -117,15 +142,52 @@ func (suite *ClusterSwitchoverSuite) TestSingleNode() {
 
 	// create one transaction for each epoch
 	epoch1Tx := suite.Transaction(func(tx *flow.TransactionBody) {
+		// reference a block in epoch 1, so it is routed to the epoch 1 cluster
 		tx.SetReferenceBlockID(suite.RootBlock().ID())
 	})
 	epoch2Tx := suite.Transaction(func(tx *flow.TransactionBody) {
+		// reference a block in epoch 2, so it is routed to the epoch 2 cluster
 		tx.SetReferenceBlockID(final.ID())
 	})
+
+	// expect 2 collections to be received
+	waitForGuarantees := new(sync.WaitGroup)
+	waitForGuarantees.Add(2)
+	guaranteeReceiver.On("Submit", mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(_ mock.Arguments) {
+			waitForGuarantees.Done()
+		}).
+		Twice()
 
 	// submit both transactions to the node's ingestion engine
 	err = collector.IngestionEngine.ProcessLocal(epoch1Tx)
 	require.NoError(suite.T(), err)
 	err = collector.IngestionEngine.ProcessLocal(epoch2Tx)
 	require.NoError(suite.T(), err)
+
+	// wait for 2 distinct collection guarantees to be received by the consensus node
+	unittest.RequireReturnsBefore(suite.T(), waitForGuarantees.Wait, time.Second, "did not receive 2 collections")
+
+	// open cluster states for both epoch 1 and epoch 2 clusters
+	epoch1Cluster, err := collector.State.Final().Epochs().Previous().Cluster(0)
+	suite.Require().NoError(err)
+	epoch2Cluster, err := collector.State.Final().Epochs().Current().Cluster(0)
+	suite.Require().NoError(err)
+	epoch1ClusterState := suite.ClusterState(collector, epoch1Cluster.ChainID())
+	epoch2ClusterState := suite.ClusterState(collector, epoch2Cluster.ChainID())
+
+	// the transaction referencing a block in epoch 1 should be in the epoch 1 cluster state
+	unittest.NewClusterStateChecker(epoch1ClusterState).
+		ExpectTxCount(1).
+		ExpectContainsTx(epoch1Tx.ID()).
+		ExpectOmitsTx(epoch2Tx.ID()).
+		Assert(suite.T())
+
+	// the transaction referencing a block in epoch 2 should be in the epoch 2 cluster state
+	unittest.NewClusterStateChecker(epoch2ClusterState).
+		ExpectTxCount(1).
+		ExpectContainsTx(epoch2Tx.ID()).
+		ExpectOmitsTx(epoch1Tx.ID()).
+		Assert(suite.T())
 }
