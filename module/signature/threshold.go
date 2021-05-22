@@ -95,7 +95,13 @@ func EnoughThresholdShares(size int, shares int) (bool, error) {
 // signature for the group of the given size. The indices represent the index for ech signature share
 // within the DKG algorithm.
 func (tp *ThresholdProvider) Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
+	return CombineThresholdShares(size, shares, indices)
+}
 
+// CombineThresholdShares will combine the provided signature shares to attempt
+// and reconstruct a threshold signature for the group of the given size. The
+// indices represent the index for ech signature share within the DKG algorithm.
+func CombineThresholdShares(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 	// check that we have sufficient shares to reconstruct the threshold signature
 	enoughShares, err := EnoughThresholdShares(int(size), len(shares))
 	if err != nil {

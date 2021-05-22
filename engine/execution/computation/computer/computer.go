@@ -119,6 +119,7 @@ func (e *blockComputer) executeBlock(
 	}
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
+	systemChunkCtx := fvm.NewContextFromParent(e.systemChunkCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 
 	chunksSize := len(collections) + 1 // + 1 system chunk
@@ -179,7 +180,7 @@ func (e *blockComputer) executeBlock(
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
-	_, err = e.executeSystemCollection(blockSpan, collectionIndex, txIndex, colView, programs, res)
+	_, err = e.executeSystemCollection(blockSpan, collectionIndex, txIndex, systemChunkCtx, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -203,6 +204,7 @@ func (e *blockComputer) executeSystemCollection(
 	blockSpan opentracing.Span,
 	collectionIndex int,
 	txIndex uint32,
+	systemChunkCtx fvm.Context,
 	collectionView state.View,
 	programs *programs.Programs,
 	res *execution.ComputationResult,
@@ -213,7 +215,7 @@ func (e *blockComputer) executeSystemCollection(
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 	tx := fvm.SystemChunkTransaction(serviceAddress)
-	err := e.executeTransaction(tx, colSpan, collectionView, programs, e.systemChunkCtx, collectionIndex, txIndex, res)
+	err := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
 	if err != nil {
 		return txIndex, err

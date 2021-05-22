@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -1078,10 +1079,10 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID, blockID, result.Events[i].Hash())
+		chunk := GenerateChunk(i, startState, endState, collectionID, blockID, result.Events[i].Hash())
 
 		// chunkDataPack
-		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
+		chdps[i] = GenerateChunkDataPack(chunk, collectionID, result.Proofs[i])
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
@@ -1142,7 +1143,7 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 }
 
 // generateChunk creates a chunk from the provided computation data.
-func generateChunk(colIndex int,
+func GenerateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
 	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
@@ -1180,7 +1181,7 @@ func (e *Engine) generateExecutionResultForBlock(
 	// convert Cadence service event representation to flow-go representation
 	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
 	for _, event := range serviceEvents {
-		converted, err := flow.ConvertServiceEvent(event)
+		converted, err := convert.ServiceEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
@@ -1256,7 +1257,7 @@ func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
 }
 
 // generateChunkDataPack creates a chunk data pack
-func generateChunkDataPack(
+func GenerateChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
 	proof flow.StorageProof,

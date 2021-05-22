@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"time"
@@ -27,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -35,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
+	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -46,6 +49,7 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -75,7 +79,7 @@ func main() {
 
 		err               error
 		mutableState      protocol.MutableState
-		privateDKGData    *bootstrap.DKGParticipantPriv
+		privateDKGData    *dkg.DKGParticipantPriv
 		guarantees        mempool.Guarantees
 		results           mempool.IncorporatedResults
 		receipts          mempool.ExecutionTree
@@ -176,8 +180,89 @@ func main() {
 			return err
 		}).
 		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
+			// If this node was a participant in a spork, their DKG key for the
+			// first epoch was generated during the bootstrapping process and is
+			// specified in a private bootstrapping file. We load their key and
+			// store it in the db for the initial post-spork epoch for use going
+			// forward.
+			// If this node was not a participant in a spork, they joined at an
+			// epoch boundary, so they have no DKG file (they will generate
+			// their first DKG private key through the procedure run during the
+			// current epoch setup phase), and we do not need to insert a key at
+			// startup.
+
+			// if the node is not part of the current epoch identities, we do
+			// not need to load the key
+			epoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			initialIdentities, err := epoch.InitialIdentities()
+			if err != nil {
+				return err
+			}
+			if _, ok := initialIdentities.ByNodeID(node.NodeID); !ok {
+				node.Logger.Info().Msg("node joined at epoch boundary, not reading DKG file")
+				return nil
+			}
+
+			// otherwise, load and save the key in DB for the current epoch (wrt
+			// root block)
 			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
-			return err
+			if err != nil {
+				return err
+			}
+			epochCounter, err := epoch.Counter()
+			if err != nil {
+				return err
+			}
+			err = node.Storage.DKGKeys.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return err
+			}
+
+			// Given an epoch, checkEpochKey returns an error if we are a
+			// participant in the epoch and we don't have the corresponding DKG
+			// key in the database.
+			checkEpochKey := func(protocol.Epoch) error {
+				identities, err := epoch.InitialIdentities()
+				if err != nil {
+					return err
+				}
+				if _, ok := identities.ByNodeID(node.NodeID); ok {
+					counter, err := epoch.Counter()
+					if err != nil {
+						return err
+					}
+					_, err = node.Storage.DKGKeys.RetrieveMyDKGPrivateInfo(counter)
+					if err != nil {
+						return err
+					}
+				}
+				return nil
+			}
+
+			// if we are a member of the current epoch, make sure we have the
+			// DKG key
+			currentEpoch := node.State.Final().Epochs().Current()
+			err = checkEpochKey(currentEpoch)
+			if err != nil {
+				return fmt.Errorf("a random beacon that we are a participant in is currently in use and we don't have our key share for it: %w", err)
+			}
+
+			// if we participated in the DKG protocol for the next epoch, and we
+			// are in EpochCommitted phase, make sure we have saved the
+			// resulting DKG key
+			phase, err := node.State.Final().Phase()
+			if err != nil {
+				return err
+			}
+			if phase == flow.EpochPhaseCommitted {
+				nextEpoch := node.State.Final().Epochs().Next()
+				err = checkEpochKey(nextEpoch)
+				if err != nil {
+					return fmt.Errorf("a random beacon DKG protocol that we were a participant in completed and we didn't store our key share for it: %w", err)
+				}
+			}
+
+			return nil
 		}).
 		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
@@ -366,8 +451,8 @@ func main() {
 			// initialize the aggregating signature module for staking signatures
 			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
 
-			// initialize the threshold signature module for random beacon signatures
-			beacon := signature.NewThresholdProvider(encoding.RandomBeaconTag, privateDKGData.RandomBeaconPrivKey)
+			// initialize the verifier used to verify threshold signatures
+			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
 
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
@@ -380,13 +465,18 @@ func main() {
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
+			epochLookup := epochs.NewEpochLookup(node.State)
+
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
+
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
 			signer = verification.NewCombinedSigner(
 				committee,
 				staking,
-				beacon,
+				thresholdVerifier,
 				merger,
+				thresholdSignerStore,
 				node.NodeID,
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
@@ -463,14 +553,14 @@ func main() {
 		Run()
 }
 
-func loadDKGPrivateData(dir string, myID flow.Identifier) (*bootstrap.DKGParticipantPriv, error) {
+func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {
 	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
 	data, err := io.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}
 
-	var priv bootstrap.DKGParticipantPriv
+	var priv dkg.DKGParticipantPriv
 	err = json.Unmarshal(data, &priv)
 	if err != nil {
 		return nil, err

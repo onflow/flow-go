@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sort"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,12 +25,43 @@ const (
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
+// NodeMachineAccountInfo defines the structure for a bootstrapping file containing
+// private information about the node's machine account. The machine account is used
+// by the protocol software to interact with Flow as a client autonomously as needed, in
+// particular to run the DKG and generate root cluster quorum certificates when preparing
+// for an epoch.
+type NodeMachineAccountInfo struct {
+	// Address is the flow address of the machine account, not to be confused
+	// with the network address of the node.
+	Address string
+
+	// EncodedPrivateKey is the private key of the machine account
+	EncodedPrivateKey []byte
+
+	// KeyIndex is the index of the key in the associated machine account
+	KeyIndex uint
+
+	// SigningAlgorithm is the algorithm used by the machine account along with
+	// the above private key to create cryptographic signatures
+	SigningAlgorithm sdkcrypto.SignatureAlgorithm
+
+	// HashAlgorithm is the algorithm used for hashing
+	HashAlgorithm sdkcrypto.HashAlgorithm
+}
+
 // NodeConfig contains configuration information used as input to the
 // bootstrap process.
 type NodeConfig struct {
-	Role    flow.Role
+	// Role is the flow role of the node (ex Collection, Consensus, ...)
+	Role flow.Role
+
+	// Address is the networking address of the node (IP:PORT), not to be
+	// confused with the address of the flow account associated with the node's
+	// machine account.
 	Address string
-	Stake   uint64
+
+	// Stake is the stake of the node
+	Stake uint64
 }
 
 // Defines the canonical structure for encoding private node info.
@@ -65,10 +98,20 @@ type NodePrivateKeys struct {
 // This can be ensured by using only using the provided constructors and NOT
 // manually constructing an instance.
 type NodeInfo struct {
-	NodeID  flow.Identifier
-	Role    flow.Role
+
+	// NodeID is the unique identifier of the node in the network
+	NodeID flow.Identifier
+
+	// Role is the flow role of the node (collection, consensus, etc...)
+	Role flow.Role
+
+	// Address is the networking address of the node (IP:PORT), not to be
+	// confused with the address of the flow account associated with the node's
+	// machine account.
 	Address string
-	Stake   uint64
+
+	// Stake is the stake of the node
+	Stake uint64
 
 	// key information is private
 	networkPubKey  crypto.PublicKey
