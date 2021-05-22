@@ -222,6 +222,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
 	collections := storage.NewCollections(node.DB, transactions)
+	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
@@ -322,6 +323,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 		GenericNode:        node,
 		Collections:        collections,
 		Transactions:       transactions,
+		ClusterPayloads:    clusterPayloads,
 		IngestionEngine:    ingestionEngine,
 		PusherEngine:       pusherEngine,
 		ProviderEngine:     providerEngine,

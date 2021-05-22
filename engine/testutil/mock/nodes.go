@@ -118,6 +118,7 @@ type CollectionNode struct {
 	GenericNode
 	Collections        storage.Collections
 	Transactions       storage.Transactions
+	ClusterPayloads    storage.ClusterPayloads
 	TxPools            *epochpool.TransactionPools
 	Voter              module.ClusterRootQCVoter
 	IngestionEngine    *collectioningest.Engine
