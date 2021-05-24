@@ -74,7 +74,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 }
 
 // readMachineAccountPriv reads the machine account private key files in the bootstrap dir
-func readMachineAccountPriv(nodeID string) crypto.PrivateKey {
+func readMachineAccountKey(nodeID string) crypto.PrivateKey {
 	var machineAccountPriv model.NodeMachineAccountPriv
 
 	path := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
