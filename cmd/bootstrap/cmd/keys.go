@@ -92,7 +92,7 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	return nodeInfo
 }
 
-func assembleNodeMachineAccountInfo(accountAddress string, keyIndex uint, machineKey crypto.PrivateKey) model.NodeMachineAccountInfo {
+func assembleNodeMachineAccountInfo(accountAddress string, machineKey crypto.PrivateKey) model.NodeMachineAccountInfo {
 	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
 	machineNodeInfo := model.NodeMachineAccountInfo{
 		EncodedPrivateKey: machineKey.Encode(),
