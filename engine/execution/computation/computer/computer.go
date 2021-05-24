@@ -215,6 +215,7 @@ func (e *blockComputer) executeSystemCollection(
 		return txIndex, err
 	}
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
+
 	return txIndex, err
 }
 

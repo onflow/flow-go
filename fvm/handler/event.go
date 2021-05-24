@@ -59,7 +59,8 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 	}
 
 	flowEvent := flow.Event{
-		Type:             flow.EventType(event.EventType.ID()),
+		// Type:             flow.EventType(event.EventType.ID()),
+		Type:             flow.EventType(event.EventType.QualifiedIdentifier), // XXX is this safe?
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       h.eventCollection.eventCounter,
@@ -140,7 +141,8 @@ func (e *EventCollection) TotalByteSize() uint64 {
 // TODO refactor this
 // Keep serviceEventWhitelist module-only to prevent accidental modifications
 var serviceEventWhitelist = map[string]struct{}{
-	"EpochManager.EpochSetup": {},
+	"FlowEpoch.EpochSetup":  {},
+	"FlowEpoch.EpochCommit": {},
 }
 
 var serviceEventWhitelistFlat []string

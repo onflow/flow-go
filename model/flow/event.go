@@ -12,10 +12,10 @@ import (
 
 // List of built-in event types.
 const (
-	EventAccountCreated EventType = "flow.AccountCreated"
-	EventAccountUpdated EventType = "flow.AccountUpdated"
-	EventEpochSetup     EventType = "flow.EpochSetup"
-	EventEpochCommit    EventType = "flow.EpochCommit"
+	EventAccountCreated EventType = "FlowEpoch.AccountCreated"
+	EventAccountUpdated EventType = "FlowEpoch.AccountUpdated"
+	EventEpochSetup     EventType = "FlowEpoch.EpochSetup"
+	EventEpochCommit    EventType = "FlowEpoch.EpochCommit"
 )
 
 type EventType string
