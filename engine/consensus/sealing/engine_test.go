@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -51,7 +50,6 @@ func (s *SealingEngineSuite) SetupTest() {
 		me:                                   me,
 		engineMetrics:                        metrics,
 		cacheMetrics:                         metrics,
-		workerPool:                           workerpool.New(8),
 		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
 		rootHeader:                           rootHeader,
 	}

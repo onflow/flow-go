@@ -167,8 +167,6 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	// In terms of locking time it's better to perform extra computation in edge cases than lock this logic with mutex
 	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously
 
-	// G <- A <- B[ER[A]]
-
 	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := ac.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {

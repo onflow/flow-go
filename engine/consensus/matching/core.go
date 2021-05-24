@@ -392,7 +392,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		Uint("receipts_size", c.receipts.Size()).
 		Int("pending_receipt_requests", pendingReceiptRequests).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Msg("checking sealing finished successfully")
+		Msg("finalized block processed successfully")
 
 	return nil
 }

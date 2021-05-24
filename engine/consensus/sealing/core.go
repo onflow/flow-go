@@ -480,7 +480,7 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 		Int("pending_collectors", len(collectors)).
 		Int("pending_approval_requests", pendingApprovalRequests).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Msg("checking sealing finished successfully")
+		Msg("requested pending approvals successfully")
 
 	return nil
 }

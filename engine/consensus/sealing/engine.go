@@ -2,9 +2,7 @@ package sealing
 
 import (
 	"fmt"
-	"runtime"
 
-	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -30,6 +28,15 @@ const defaultApprovalQueueCapacity = 10000
 // defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
 const defaultApprovalResponseQueueCapacity = 10000
 
+// defaultIncorporatedResultsQueueCapacity maximum capacity of incorporates results queue
+const defaultIncorporatedResultsQueueCapacity = 10000
+
+// defaultFinalizationEventsQueueCapacity maximum capacity of finalization events
+const defaultFinalizationEventsQueueCapacity = 1000
+
+// defaultSealingEngineWorkers number of workers to dispatch events for sealing core
+const defaultSealingEngineWorkers = 8
+
 type (
 	EventSink chan *Event // Channel to push pending events
 )
@@ -41,7 +48,6 @@ type (
 type Engine struct {
 	unit                                 *engine.Unit
 	core                                 sealing.SealingCore
-	workerPool                           *workerpool.WorkerPool
 	log                                  zerolog.Logger
 	me                                   module.Local
 	headers                              storage.Headers
@@ -50,6 +56,9 @@ type Engine struct {
 	engineMetrics                        module.EngineMetrics
 	pendingApprovals                     engine.MessageStore
 	pendingRequestedApprovals            engine.MessageStore
+	pendingFinalizationEvents            *fifoqueue.FifoQueue
+	pendingIncorporatedResults           *fifoqueue.FifoQueue
+	notifier                             engine.Notifier
 	messageHandler                       *engine.MessageHandler
 	requiredApprovalsForSealConstruction uint
 	rootHeader                           *flow.Header
@@ -72,9 +81,6 @@ func NewEngine(log zerolog.Logger,
 	sealsMempool mempool.IncorporatedResultSeals,
 	options Config,
 ) (*Engine, error) {
-
-	hardwareConcurrency := runtime.NumCPU()
-
 	rootHeader, err := state.Params().Root()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve root block: %w", err)
@@ -88,7 +94,6 @@ func NewEngine(log zerolog.Logger,
 		cacheMetrics:                         mempool,
 		headers:                              headers,
 		payloads:                             payloads,
-		workerPool:                           workerpool.New(hardwareConcurrency),
 		requiredApprovalsForSealConstruction: options.RequiredApprovalsForSealConstruction,
 		rootHeader:                           rootHeader,
 	}
@@ -143,10 +148,23 @@ func (e *Engine) setupMessageHandler() error {
 		FifoQueue: pendingRequestedApprovalsQueue,
 	}
 
+	e.pendingFinalizationEvents, err = fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultFinalizationEventsQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for finalization events: %w", err)
+	}
+
+	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultIncorporatedResultsQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+	}
+
+	e.notifier = engine.NewNotifier()
 	// define message queueing behaviour
 	e.messageHandler = engine.NewMessageHandler(
 		e.log,
-		engine.NewNotifier(),
+		e.notifier,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*flow.ResultApproval)
@@ -201,6 +219,25 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) processAvailableMessages() error {
 
 	for {
+		event, ok := e.pendingFinalizationEvents.Pop()
+		if ok {
+			err := e.core.ProcessFinalizedBlock(event.(flow.Identifier))
+			if err != nil {
+				return fmt.Errorf("could not process finalized block: %w", err)
+			}
+
+			continue
+		}
+
+		event, ok = e.pendingIncorporatedResults.Pop()
+		if ok {
+			err := e.processIncorporatedResult(event.(*flow.ExecutionResult))
+			if err != nil {
+				return fmt.Errorf("could not process incorporated result: %w", err)
+			}
+			continue
+		}
+
 		// TODO prioritization
 		// eg: msg := engine.SelectNextMessage()
 		msg, ok := e.pendingRequestedApprovals.Get()
@@ -209,7 +246,10 @@ func (e *Engine) processAvailableMessages() error {
 		}
 
 		if ok {
-			e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
+			err := e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
+			if err != nil {
+				return fmt.Errorf("could not process result approval: %w", err)
+			}
 			continue
 		}
 
@@ -220,11 +260,12 @@ func (e *Engine) processAvailableMessages() error {
 }
 
 func (e *Engine) loop() {
+	notifier := e.notifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
-		case <-e.messageHandler.GetNotifier():
+		case <-notifier:
 			err := e.processAvailableMessages()
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing queued message")
@@ -236,31 +277,30 @@ func (e *Engine) loop() {
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
 // to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
 // This will be changed in phase 3.
-func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) {
-	e.workerPool.Submit(func() {
-		incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
-		err := e.core.ProcessIncorporatedResult(incorporatedResult)
-		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
+func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
+	incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+	err := e.core.ProcessIncorporatedResult(incorporatedResult)
+	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 
-		if err != nil {
-			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
-		}
-	})
-}
-
-func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) {
-	// don't process approval if originID is mismatched
-	if originID != approval.Body.ApproverID {
-		return
+	if err != nil {
+		return fmt.Errorf("fatal internal error in sealing core logic: %w", err)
 	}
 
-	e.workerPool.Submit(func() {
-		err := e.core.ProcessApproval(approval)
-		e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
-		if err != nil {
-			e.log.Fatal().Err(err).Msgf("fatal internal error in sealing core logic")
-		}
-	})
+	return nil
+}
+
+func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	// don't process approval if originID is mismatched
+	if originID != approval.Body.ApproverID {
+		return nil
+	}
+
+	err := e.core.ProcessApproval(approval)
+	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
+	if err != nil {
+		return fmt.Errorf("fatal internal error in sealing core logic")
+	}
+	return nil
 }
 
 // SubmitLocal submits an event originating on the local node.
@@ -287,7 +327,10 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.loop)
+	// launch as many workers as we need
+	for i := 0; i < defaultSealingEngineWorkers; i++ {
+		e.unit.Launch(e.loop)
+	}
 	return e.unit.Ready()
 }
 
@@ -300,14 +343,8 @@ func (e *Engine) Done() <-chan struct{} {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	e.log.Info().Msgf("processing finalized block: %v", finalizedBlockID)
-
-	e.workerPool.Submit(func() {
-		err := e.core.ProcessFinalizedBlock(finalizedBlockID)
-		if err != nil {
-			e.log.Fatal().Err(err).Msgf("critical sealing error when processing finalized block %v", finalizedBlockID)
-		}
-	})
+	e.pendingFinalizationEvents.Push(finalizedBlockID)
+	e.notifier.Notify()
 }
 
 // OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`
@@ -315,9 +352,7 @@ func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	e.log.Info().Msgf("processing incorporated block: %v", incorporatedBlockID)
-
-	e.workerPool.Submit(func() {
+	go func() {
 		// We can't process incorporated block because of how sealing engine handles assignments we need to
 		// make sure that block has children. Instead we will process parent block
 
@@ -325,6 +360,8 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 		if err != nil {
 			e.log.Fatal().Err(err).Msgf("could not retrieve header for block %v", incorporatedBlockID)
 		}
+
+		e.log.Info().Msgf("processing incorporated block %v at height %d", incorporatedBlockID, incorporatedBlock.Height)
 
 		// we are interested in blocks with height strictly larger than root block
 		if incorporatedBlock.Height <= e.rootHeader.Height {
@@ -337,7 +374,8 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 		}
 
 		for _, result := range payload.Results {
-			e.processIncorporatedResult(result)
+			e.pendingIncorporatedResults.Push(result)
 		}
-	})
+		e.notifier.Notify()
+	}()
 }
