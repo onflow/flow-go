@@ -499,12 +499,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
-	sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
-	}
 	sealedBlockID := latestSeal.BlockID
-	sealedBlock, err := b.headers.ByBlockID(sealedBlockID)
 
 	// ancestors is used to keep the IDs of the ancestor blocks we iterate through.
 	// We use it to skip receipts that are not for unsealed blocks in the fork.
@@ -540,15 +535,6 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
 
-	// After recovering from a crash, the mempools are wiped and the sealed results will not
-	// be stored in the Execution Tree anymore. Adding the result to the tree allows to create
-	// a vertex in the tree without attaching any Execution Receipts to it. Thereby, we can
-	// traverse to receipts committing to derived results without having to find the receipts
-	// for the sealed result.
-	err = b.recPool.AddResult(sealedResult, sealedBlock) // no-op, if result is already in Execution Tree
-	if err != nil {
-		return nil, fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
-	}
 	isResultForUnsealedBlock := isResultForBlock(ancestors)
 	isReceiptUniqueAndUnsealed := isNoDupAndNotSealed(includedReceipts, sealedBlockID)
 	// find all receipts:

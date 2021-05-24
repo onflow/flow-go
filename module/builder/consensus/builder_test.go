@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	realproto "github.com/onflow/flow-go/state/protocol"
 	"math/rand"
 	"os"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
