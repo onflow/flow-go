@@ -141,7 +141,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 
 // repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
 // Repopulating of execution tree is split into two parts:
-// 1) traverse backwards all finalized blocks starting from last finalized block till we reach last sealed block. (lastSealedHeight, lastFinalizedHeight]
+// 1) traverse backwards all finalized blocks starting from last finalized block till we reach last sealed block. [lastSealedHeight, lastFinalizedHeight]
 // 2) traverse forward all unfinalized(pending) blocks starting from last finalized block.
 // For each block that is being traversed we will collect execution results and add them to execution tree.
 func (b *Builder) repopulateExecutionTree() error {
@@ -205,7 +205,7 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// traverse chain backwards to collect all execution results that were incorporated in this fork
 	// starting from finalized block and finishing with latest sealed block
-	err = fork.TraverseBackward(b.headers, finalizedID, traverser, fork.ExcludingHeight(latestSealed.Height))
+	err = fork.TraverseBackward(b.headers, finalizedID, traverser, fork.IncludingHeight(latestSealed.Height))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
 	}
@@ -215,7 +215,7 @@ func (b *Builder) repopulateExecutionTree() error {
 		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
 	}
 
-	// at this point execution tree is filled with all results in range (lastSealedBlock, lastFinalizedBlock].
+	// at this point execution tree is filled with all results in range [lastSealedBlock, lastFinalizedBlock].
 
 	validPending, err := finalizedSnapshot.ValidPending()
 	if err != nil {
