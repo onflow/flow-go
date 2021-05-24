@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -115,24 +116,36 @@ func NewUpdate(sc State, keys []Key, values []Value) (*Update, error) {
 }
 
 // State captures an state of the ledger
-type State []byte
+type State hash.Hash
+
+// DummyState is an arbitrary value used in function failure cases,
+// although it can represent a valid state.
+var DummyState = State(hash.DummyHash)
 
 // String returns the hex encoding of the state
 func (sc State) String() string {
-	return hex.EncodeToString(sc)
+	return hex.EncodeToString(sc[:])
 }
 
 // Base64 return the base64 encoding of the state
 func (sc State) Base64() string {
-	return base64.StdEncoding.EncodeToString(sc)
+	return base64.StdEncoding.EncodeToString(sc[:])
 }
 
 // Equals compares the state to another state
 func (sc State) Equals(o State) bool {
-	if o == nil {
-		return false
+	return sc == o
+}
+
+// ToState converts a byte slice into a State.
+// It returns an error if the slice has an invalid length.
+func ToState(stateBytes []byte) (State, error) {
+	var state State
+	if len(stateBytes) != len(state) {
+		return DummyState, fmt.Errorf("expecting %d bytes but got %d bytes", len(state), len(stateBytes))
 	}
-	return bytes.Equal(sc, o)
+	copy(state[:], stateBytes)
+	return state, nil
 }
 
 // Proof is a byte slice capturing encoded version of a batch proof

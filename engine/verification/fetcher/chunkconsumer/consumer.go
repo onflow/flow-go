@@ -35,10 +35,8 @@ func NewChunkConsumer(
 
 	jobs := &ChunkJobs{locators: chunksQueue}
 
-	// TODO: adding meta to logger
-	consumer := jobqueue.NewConsumer(
-		log, jobs, processedIndex, worker, maxProcessing,
-	)
+	lg := log.With().Str("module", "chunk_consumer").Logger()
+	consumer := jobqueue.NewConsumer(lg, jobs, processedIndex, worker, maxProcessing)
 
 	chunkConsumer := &ChunkConsumer{consumer}
 

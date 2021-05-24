@@ -36,9 +36,13 @@ var ServiceAccountPublicKey flow.AccountPublicKey
 
 func init() {
 	var err error
-	GenesisStateCommitment, err = hex.DecodeString(GenesisStateCommitmentHex)
+	GenesisStateCommitmentBytes, err := hex.DecodeString(GenesisStateCommitmentHex)
 	if err != nil {
 		panic("error while hex decoding hardcoded state commitment")
+	}
+	GenesisStateCommitment, err = flow.ToStateCommitment(GenesisStateCommitmentBytes)
+	if err != nil {
+		panic("genesis state commitment size is invalid")
 	}
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(ServiceAccountPrivateKeyHex)

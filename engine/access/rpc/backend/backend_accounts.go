@@ -17,12 +17,11 @@ import (
 )
 
 type backendAccounts struct {
-	state              protocol.State
-	staticExecutionRPC execproto.ExecutionAPIClient
-	headers            storage.Headers
-	executionReceipts  storage.ExecutionReceipts
-	connFactory        ConnectionFactory
-	log                zerolog.Logger
+	state             protocol.State
+	headers           storage.Headers
+	executionReceipts storage.ExecutionReceipts
+	connFactory       ConnectionFactory
+	log               zerolog.Logger
 }
 
 func (b *backendAccounts) GetAccount(ctx context.Context, address flow.Address) (*flow.Account, error) {
@@ -82,29 +81,17 @@ func (b *backendAccounts) getAccountAtBlockID(
 		BlockId: blockID[:],
 	}
 
-	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get account from the execution node: %v", err)
+		return nil, getAccountError(err)
 	}
 
 	var exeRes *execproto.GetAccountAtBlockIDResponse
-	if len(execNodes) == 0 {
-		if b.staticExecutionRPC == nil {
-			return nil, status.Errorf(codes.Internal, "failed to get account from the execution node")
-		}
-
-		exeRes, err = b.staticExecutionRPC.GetAccountAtBlockID(ctx, &exeReq)
-		if err != nil {
-			convertedErr := getAccountError(err)
-			return nil, convertedErr
-		}
-
-	} else {
-		exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
-		if err != nil {
-			return nil, err
-		}
+	exeRes, err = b.getAccountFromAnyExeNode(ctx, execNodes, exeReq)
+	if err != nil {
+		return nil, err
 	}
+
 	account, err := convert.MessageToAccount(exeRes.GetAccount())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to convert account message: %v", err)

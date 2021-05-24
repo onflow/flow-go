@@ -41,7 +41,7 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 
 			stateCommitment := ls.InitialState()
 
-			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
+			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(flow.StateCommitment(stateCommitment), nil)
 
 			chunkDataPacks := new(storage.ChunkDataPacks)
 

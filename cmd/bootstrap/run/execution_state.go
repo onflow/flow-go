@@ -39,7 +39,7 @@ func GenerateExecutionState(
 
 	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metricsCollector, dbDir, 100, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, err
 	}
 	defer func() {
 		<-diskWal.Done()
@@ -47,7 +47,7 @@ func GenerateExecutionState(
 
 	ledgerStorage, err := ledger.NewLedger(diskWal, 100, metricsCollector, zerolog.Nop(), ledger.DefaultPathFinderVersion)
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, err
 	}
 
 	return bootstrap.NewBootstrapper(

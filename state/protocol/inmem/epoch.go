@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/invalid"
@@ -92,9 +91,6 @@ func (es *setupEpoch) FinalView() (uint64, error) {
 
 func (es *setupEpoch) InitialIdentities() (flow.IdentityList, error) {
 	identities := es.setupEvent.Participants.Filter(filter.Any)
-	// apply a deterministic sort to the participants
-	identities = identities.Order(order.ByNodeIDAsc)
-
 	return identities, nil
 }
 
@@ -132,11 +128,8 @@ type committedEpoch struct {
 }
 
 func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
-	qcs := es.commitEvent.ClusterQCs
-	if uint(len(qcs)) <= index {
-		return nil, fmt.Errorf("no cluster with index %d", index)
-	}
-	rootQC := qcs[index]
+
+	epochCounter := es.setupEvent.Counter
 
 	clustering, err := es.Clustering()
 	if err != nil {
@@ -147,24 +140,44 @@ func (es *committedEpoch) Cluster(index uint) (protocol.Cluster, error) {
 	if !ok {
 		return nil, fmt.Errorf("failed to get members of cluster %d: %w", index, err)
 	}
-	epochCounter := es.setupEvent.Counter
+
+	qcs := es.commitEvent.ClusterQCs
+	if uint(len(qcs)) <= index {
+		return nil, fmt.Errorf("no cluster with index %d", index)
+	}
+	rootQCVoteData := qcs[index]
+
+	rootBlock := cluster.CanonicalRootBlock(epochCounter, members)
+	rootQC := &flow.QuorumCertificate{
+		View:      rootBlock.Header.View,
+		BlockID:   rootBlock.ID(),
+		SignerIDs: rootQCVoteData.VoterIDs,
+		SigData:   rootQCVoteData.SigData,
+	}
 
 	cluster, err := ClusterFromEncodable(EncodableCluster{
 		Index:     index,
 		Counter:   epochCounter,
 		Members:   members,
-		RootBlock: cluster.CanonicalRootBlock(epochCounter, members),
+		RootBlock: rootBlock,
 		RootQC:    rootQC,
 	})
 	return cluster, err
 }
 
 func (es *committedEpoch) DKG() (protocol.DKG, error) {
+	// filter initial participants to valid DKG participants
+	participants := es.setupEvent.Participants.Filter(filter.IsValidDKGParticipant)
+	lookup, err := flow.ToDKGParticipantLookup(participants, es.commitEvent.DKGParticipantKeys)
+	if err != nil {
+		return nil, fmt.Errorf("could not construct dkg lookup: %w", err)
+	}
+
 	dkg, err := DKGFromEncodable(EncodableDKG{
 		GroupKey: encodable.RandomBeaconPubKey{
 			PublicKey: es.commitEvent.DKGGroupKey,
 		},
-		Participants: es.commitEvent.DKGParticipants,
+		Participants: lookup,
 	})
 	return dkg, err
 }

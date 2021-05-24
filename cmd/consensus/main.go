@@ -157,7 +157,7 @@ func main() {
 			sealValidator := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
-				node.Storage.Payloads,
+				node.Storage.Index,
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,

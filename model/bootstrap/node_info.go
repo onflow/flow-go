@@ -3,6 +3,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -218,6 +219,14 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 		filtered = append(filtered, node)
 	}
 	return filtered
+}
+
+// Sort sorts the NodeInfo list in place using the given ordering.
+func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
+	sort.Slice(nodes, func(i, j int) bool {
+		return order(nodes[i].Identity(), nodes[j].Identity())
+	})
+	return nodes
 }
 
 func ToIdentityList(nodes []NodeInfo) flow.IdentityList {

@@ -177,9 +177,9 @@ SearchLoop:
 	// create a chunk for the execution result
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:      0,           // irrelevant for consensus node
-			StartState:           nil,         // irrelevant for consensus node
-			EventCollection:      flow.ZeroID, // irrelevant for consensus node
+			CollectionIndex:      0,                         // irrelevant for consensus node
+			StartState:           flow.DummyStateCommitment, // irrelevant for consensus node
+			EventCollection:      flow.ZeroID,               // irrelevant for consensus node
 			BlockID:              targetID,
 			TotalComputationUsed: 0, // irrelevant for consensus node
 			NumberOfTransactions: 0, // irrelevant for consensus node

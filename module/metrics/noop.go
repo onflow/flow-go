@@ -77,13 +77,21 @@ func (nc *NoopCollector) OnExecutionReceiptReceived()                           
 func (nc *NoopCollector) OnExecutionResultSent()                                                 {}
 func (nc *NoopCollector) OnExecutionResultReceived()                                             {}
 func (nc *NoopCollector) OnVerifiableChunkSent()                                                 {}
-func (nc *NoopCollector) OnVerifiableChunkReceived()                                             {}
+func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()                             {}
 func (nc *NoopCollector) OnChunkDataPackReceived()                                               {}
 func (nc *NoopCollector) OnChunkDataPackRequested()                                              {}
-func (nc *NoopCollector) OnResultApproval()                                                      {}
-func (nc *NoopCollector) OnAssignerProcessFinalizedBlock(height uint64)                          {}
-func (nc *NoopCollector) OnChunksAssigned(chunks int)                                            {}
-func (nc *NoopCollector) OnChunkProcessed()                                                      {}
+func (nc *NoopCollector) OnResultApprovalDispatchedInNetwork()                                   {}
+func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                        {}
+func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
+func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
+func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetwork()                             {}
+func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                   {}
+func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                             {}
+func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
+func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
+func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                                    {}

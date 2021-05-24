@@ -1,15 +1,14 @@
 package chunks
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/model/verification"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -37,6 +36,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
 	}
@@ -101,7 +101,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	}
 
 	// constructing a partial trie given chunk data package
-	psmt, err := partial.NewLedger(chunkDataPack.Proof, chunkDataPack.StartState, partial.DefaultPathFinderVersion)
+	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
+
 	if err != nil {
 		// TODO provide more details based on the error type
 		return nil, chmodels.NewCFInvalidVerifiableChunk("error constructing partial trie: ", err, chIndex, execResID),
@@ -122,7 +123,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 
 		registerKey := executionState.RegisterIDToKey(registerID)
 
-		query, err := ledger.NewQuery(chunkDataPack.StartState, []ledger.Key{registerKey})
+		query, err := ledger.NewQuery(ledger.State(chunkDataPack.StartState), []ledger.Key{registerKey})
 
 		if err != nil {
 			return nil, fmt.Errorf("cannot create query: %w", err)
@@ -133,7 +134,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			if errors.Is(err, ledger.ErrMissingKeys{}) {
 
 				unknownRegTouch[registerID.String()] = &registerKey
-				return nil, fmt.Errorf("missing register")
+
+				// don't send error just return empty byte slice
+				// we always assume empty value for missing registers (which might cause the transaction to fail)
+				// but after execution we check unknownRegTouch and if any
+				// register is inside it, code won't generate approvals and
+				// it activates a challenge
+
+				return []byte{}, nil
 			}
 			// append to missing keys if error is ErrMissingKeys
 
@@ -180,7 +188,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	regs, values := chunkView.Delta().RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
-		chunkDataPack.StartState,
+		ledger.State(chunkDataPack.StartState),
 		executionState.RegisterIDSToKeys(regs),
 		executionState.RegisterValuesToValues(values),
 	)
@@ -205,8 +213,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// TODO check if exec node provided register touches that was not used (no read and no update)
 	// check if the end state commitment mentioned in the chunk matches
 	// what the partial trie is providing.
-	if !bytes.Equal(expEndStateComm, endState) {
-		return nil, chmodels.NewCFNonMatchingFinalState(expEndStateComm, endState, chIndex, execResID), nil
+	if flow.StateCommitment(expEndStateComm) != endState {
+		return nil, chmodels.NewCFNonMatchingFinalState(flow.StateCommitment(expEndStateComm), endState, chIndex, execResID), nil
 	}
 	return chunkView.SpockSecret(), nil, nil
 }

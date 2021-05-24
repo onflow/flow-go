@@ -15,6 +15,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -513,8 +514,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
 			nodeContainer.addFlag("collection-ingress-port", "9000")
-			// should always have at least 1 execution node
-			nodeContainer.addFlag("script-addr", "execution_1:9000")
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
 			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
@@ -590,18 +589,23 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
+	// sort node infos to the canonical ordering
+	// IMPORTANT: we must use this ordering when writing the DKG keys as
+	// this ordering defines the DKG participant's indices
+	nodeInfos := bootstrap.Sort(toNodeInfos(confs), order.Canonical)
+
 	// write private key files for each DKG participant
-	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
+	consensusNodes := bootstrap.FilterByRole(nodeInfos, flow.RoleConsensus)
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticpant := bootstrap.DKGParticipantPriv{
+		privParticipant := bootstrap.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
 			GroupIndex:          i,
 		}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticpant)
+		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticipant)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -643,14 +647,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	height := uint64(0)
 	timestamp := time.Now().UTC()
 	epochCounter := uint64(0)
-	participants := bootstrap.ToIdentityList(toNodeInfos(confs))
+	participants := bootstrap.ToIdentityList(nodeInfos)
 
 	// generate root block
 	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
 	// generate QC
-	nodeInfos := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
-	signerData, err := run.GenerateQCParticipantData(nodeInfos, nodeInfos, dkg)
+	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -680,21 +683,23 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RandomSource: randomSource,
 	}
 
-	dkgLookup := bootstrap.ToDKGLookup(dkg, participants)
 	epochCommit := &flow.EpochCommit{
-		Counter:         epochCounter,
-		ClusterQCs:      clusterQCs,
-		DKGGroupKey:     dkg.PubGroupKey,
-		DKGParticipants: dkgLookup,
+		Counter:            epochCounter,
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
+		DKGGroupKey:        dkg.PubGroupKey,
+		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
 	// generate execution result and block seal
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
-	seal := run.GenerateRootSeal(result)
+	seal, err := run.GenerateRootSeal(result)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
+	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot")
+		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())

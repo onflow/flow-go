@@ -58,7 +58,6 @@ func extractExecutionState(dir string,
 	if migrate {
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
-			mgr.StorageFormatV4Migration,
 		}
 	}
 	if report {
@@ -68,7 +67,7 @@ func extractExecutionState(dir string,
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
-		targetHash,
+		ledger.State(targetHash),
 		migrations,
 		reporters,
 		complete.DefaultPathFinderVersion,
