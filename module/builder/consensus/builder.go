@@ -153,7 +153,7 @@ func (b *Builder) repopulateExecutionTree() error {
 	finalizedID := finalized.ID()
 
 	// Get the latest sealed block on this fork, ie the highest block for which
-	// there is a seal in this fork. This block is not necessarily finalized.
+	// there is a seal in this fork.
 	latestSeal, err := b.seals.ByBlockID(finalizedID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
@@ -164,6 +164,18 @@ func (b *Builder) repopulateExecutionTree() error {
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSeal.BlockID, err)
 	}
 
+	sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
+	}
+
+	// handle latest sealed result manually
+	// this is needed to handle a case when we are building on top of genesis block
+	err = b.recPool.AddResult(sealedResult, latestSealed)
+	if err != nil {
+		return fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
+	}
+
 	blockLookup := make(map[flow.Identifier]*flow.Header)
 
 	// usually we start with empty execution tree, prune it to minimum height before adding results
@@ -172,6 +184,7 @@ func (b *Builder) repopulateExecutionTree() error {
 		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
 	}
 
+	// traverse block and collect result IDs that were included in that block
 	traverser := func(header *flow.Header) error {
 		index, err := b.index.ByBlockID(header.ID())
 		if err != nil {
