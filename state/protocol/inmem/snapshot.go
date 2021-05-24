@@ -57,6 +57,11 @@ func (s Snapshot) Pending() ([]flow.Identifier, error) {
 	return nil, nil
 }
 
+func (s Snapshot) ValidPending() ([]flow.Identifier, error) {
+	// canonical snapshots don't have any pending blocks
+	return nil, nil
+}
+
 func (s Snapshot) Phase() (flow.EpochPhase, error) {
 	return s.enc.Phase, nil
 }

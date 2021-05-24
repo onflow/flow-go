@@ -5,7 +5,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
@@ -295,11 +294,47 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 	return s.pending(s.blockID)
 }
 
-func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
+func (s *Snapshot) ValidPending() ([]flow.Identifier, error) {
+	pendingIDs, err := s.lookupChildren(s.blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.validPending(pendingIDs)
+}
+
+func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
 	var pendingIDs []flow.Identifier
 	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending children: %w", err)
+	}
+	return pendingIDs, nil
+}
+
+func (s *Snapshot) validPending(pendingIDs []flow.Identifier) ([]flow.Identifier, error) {
+	var validPendingIds []flow.Identifier
+	for _, pendingID := range pendingIDs {
+		grandchildren, err := s.lookupChildren(pendingID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+		}
+		if len(grandchildren) > 0 {
+			validPendingIds = append(validPendingIds, pendingID)
+			ids, err := s.validPending(grandchildren)
+			if err != nil {
+				return nil, err
+			}
+			validPendingIds = append(validPendingIds, ids...)
+		}
+	}
+	return validPendingIds, nil
+}
+
+func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
+	pendingIDs, err := s.lookupChildren(blockID)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, pendingID := range pendingIDs {

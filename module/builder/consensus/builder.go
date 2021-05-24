@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -140,8 +139,14 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 	return proposal.Header, nil
 }
 
+// repopulateExecutionTree restores latest state of execution tree mempool based on local chain state information.
+// Repopulating of execution tree is split into two parts:
+// 1) traverse backwards all finalized blocks starting from last finalized block till we reach last sealed block. (lastSealedHeight, lastFinalizedHeight]
+// 2) traverse forward all unfinalized(pending) blocks starting from last finalized block.
+// For each block that is being traversed we will collect execution results and add them to execution tree.
 func (b *Builder) repopulateExecutionTree() error {
-	finalized, err := b.state.Final().Head()
+	finalizedSnapshot := b.state.Final()
+	finalized, err := finalizedSnapshot.Head()
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized block: %w", err)
 	}
@@ -200,9 +205,7 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// traverse chain backwards to collect all execution results that were incorporated in this fork
 	// starting from finalized block and finishing with latest sealed block
-	err = state.TraverseBackward(b.headers, finalizedID, traverser, func(block *flow.Header) bool {
-		return block.Height != latestSealed.Height
-	})
+	err = fork.TraverseBackward(b.headers, finalizedID, traverser, fork.ExcludingHeight(latestSealed.Height))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
 	}
@@ -210,6 +213,25 @@ func (b *Builder) repopulateExecutionTree() error {
 	err = b.recPool.PruneUpToHeight(latestSealed.Height)
 	if err != nil {
 		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
+	}
+
+	// at this point execution tree is filled with all results in range (lastSealedBlock, lastFinalizedBlock].
+
+	validPending, err := finalizedSnapshot.ValidPending()
+	if err != nil {
+		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
+	}
+
+	// valid pending has all blocks that were unfinalized excluding blocks without children
+	for _, blockID := range validPending {
+		block, err := b.headers.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header for unfinalized block %s: %w", blockID, err)
+		}
+		err = traverser(block)
+		if err != nil {
+			return fmt.Errorf("could not traverse unfinalized block %s at height %d: %w", blockID, block.Height, err)
+		}
 	}
 
 	return nil
@@ -483,10 +505,6 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	}
 	sealedBlockID := latestSeal.BlockID
 	sealedBlock, err := b.headers.ByBlockID(sealedBlockID)
-	sealed, err := b.headers.ByBlockID(latestSeal.BlockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve sealed block (%x): %w", latestSeal.BlockID, err)
-	}
 
 	// ancestors is used to keep the IDs of the ancestor blocks we iterate through.
 	// We use it to skip receipts that are not for unsealed blocks in the fork.

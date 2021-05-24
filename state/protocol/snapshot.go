@@ -71,6 +71,12 @@ type Snapshot interface {
 	// are NOT guaranteed to have been validated by HotStuff.
 	Pending() ([]flow.Identifier, error)
 
+	// Pending returns the IDs of all descendants of the Head block. The IDs
+	// are ordered such that parents are included before their children. Includes
+	// only blocks that have child blocks.
+	// These are NOT guaranteed to have been validated by HotStuff.
+	ValidPending() ([]flow.Identifier, error)
+
 	// Seed returns a deterministic seed for a pseudo random number generator.
 	// The seed is derived from the source of randomness for the Head block.
 	// In order to deterministically derive task specific seeds, indices must

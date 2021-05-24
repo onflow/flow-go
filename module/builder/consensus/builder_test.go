@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	realproto "github.com/onflow/flow-go/state/protocol"
 	"math/rand"
 	"os"
 	"testing"
@@ -51,9 +52,10 @@ type BuilderSuite struct {
 	pendingSeals      map[flow.Identifier]*flow.IncorporatedResultSeal // storage for the seal mempool
 
 	// storage for dbs
-	headers map[flow.Identifier]*flow.Header
-	index   map[flow.Identifier]*flow.Index
-	blocks  map[flow.Identifier]*flow.Block
+	headers       map[flow.Identifier]*flow.Header
+	index         map[flow.Identifier]*flow.Index
+	blocks        map[flow.Identifier]*flow.Block
+	blockChildren map[flow.Identifier][]flow.Identifier // ids of children blocks
 
 	lastSeal *flow.Seal
 
@@ -86,6 +88,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	bs.headers[block.ID()] = block.Header
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
+	bs.blockChildren[block.Header.ParentID] = append(bs.blockChildren[block.Header.ParentID], block.ID())
 }
 
 // createAndRecordBlock creates a new block chained to the previous block (if it
@@ -191,6 +194,7 @@ func (bs *BuilderSuite) SetupTest() {
 	//bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
 	bs.blocks = make(map[flow.Identifier]*flow.Block)
+	bs.blockChildren = make(map[flow.Identifier][]flow.Identifier)
 
 	// initialize behaviour tracking
 	bs.assembled = nil
@@ -260,7 +264,9 @@ func (bs *BuilderSuite) SetupTest() {
 	}).Return(nil)
 	bs.state.On("Final").Return(func() realproto.Snapshot {
 		if block, ok := bs.blocks[bs.finalID]; ok {
-			return unittest.StateSnapshotForKnownBlock(block.Header, nil)
+			snapshot := unittest.StateSnapshotForKnownBlock(block.Header, nil)
+			snapshot.On("ValidPending").Return(bs.blockChildren[bs.finalID], nil)
+			return snapshot
 		}
 		return unittest.StateSnapshotForUnknownBlock()
 	})
@@ -1204,7 +1210,9 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 // TestIntegration_RepopulateExecutionTreeAtStartup tests that the
 // builder includes receipts for candidate block after fresh start, meaning
 // it will repopulate execution tree in constructor
-// P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- X[ER{B}, ER{B}']
+// P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- C <- X[ER{B}, ER{B}', ER{C} ]
+//        |
+//     finalized
 func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	// setup initial state
 	// A is a block containing a valid receipt for block P
@@ -1227,8 +1235,11 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
 	})
 
+	C := unittest.BlockWithParentFixture(B.Header)
+
 	bs.storeBlock(&A)
 	bs.storeBlock(&B)
+	bs.storeBlock(&C)
 
 	// store execution results
 	for _, block := range []*flow.Block{&A, &B} {
@@ -1237,8 +1248,8 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 		}
 	}
 
-	// mark B as finalized
-	bs.finalID = B.ID()
+	// mark A as finalized
+	bs.finalID = A.ID()
 
 	// set up no-op dependencies
 	noopMetrics := metrics.NewNoopCollector()
@@ -1273,15 +1284,18 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	recB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB1))
 	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA2.ExecutionResult))
 	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
+	resC := unittest.ExecutionResultFixture(unittest.WithBlock(&C), unittest.WithPreviousResult(recB1.ExecutionResult))
+	recC := unittest.ExecutionReceiptFixture(unittest.WithResult(resC))
 
 	// Add recB1 and recB2 to the mempool for inclusion in the next candidate
 	_, _ = bs.build.recPool.AddReceipt(recB1, B.Header)
 	_, _ = bs.build.recPool.AddReceipt(recB2, B.Header)
+	_, _ = bs.build.recPool.AddReceipt(recC, C.Header)
 
-	_, err = bs.build.BuildOn(B.ID(), bs.setter)
+	_, err = bs.build.BuildOn(C.ID(), bs.setter)
 	bs.Require().NoError(err)
-	expectedReceipts := flow.ExecutionReceiptMetaList{recB1.Meta(), recB2.Meta()}
-	expectedResults := flow.ExecutionResultList{&recB1.ExecutionResult, &recB2.ExecutionResult}
-	bs.Assert().Equal(expectedReceipts, bs.assembled.Receipts, "payload should contain receipts from valid execution forks")
+	expectedReceipts := flow.ExecutionReceiptMetaList{recB1.Meta(), recB2.Meta(), recC.Meta()}
+	expectedResults := flow.ExecutionResultList{&recB1.ExecutionResult, &recB2.ExecutionResult, &recC.ExecutionResult}
+	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "payload should contain receipts from valid execution forks")
 	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "payload should contain results from valid execution forks")
 }

@@ -50,6 +50,10 @@ func (u *Snapshot) Pending() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
+func (u *Snapshot) ValidPending() ([]flow.Identifier, error) {
+	return nil, u.err
+}
+
 func (u *Snapshot) Seed(_ ...uint32) ([]byte, error) {
 	return nil, u.err
 }
