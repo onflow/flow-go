@@ -700,9 +700,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
-		Counter: epochCounter,
-		// FinalView:    root.Header.View + leader.EstimatedSixMonthOfViews,
-		FinalView:    root.Header.View + 100, // XXX 100 views ~= 2min
+		Counter:      epochCounter,
+		FirstView:    root.Header.View,
+		FinalView:    root.Header.View + 99, // 100 views ~= 2min
 		Participants: participants,
 		Assignments:  clusterAssignments,
 		RandomSource: randomSource,
@@ -720,7 +720,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
-		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView - 1),
+		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView + 1),
 		NumViewsInStakingAuction:     cadence.UInt64(5),
 		NumViewsInDKGPhase:           cadence.UInt64(60),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),

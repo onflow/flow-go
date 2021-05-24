@@ -72,10 +72,14 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	if !ok {
 		return nil, invalidCadenceTypeError("randomSource", cdcEvent.Fields[5], cadence.String(""))
 	}
-	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
+	// Cadence's unsafeRandom().toString() produces a string of variable length.
+	// Here we pad it with enough 0s to meet the required length.
+	paddedRandomSrcHex := fmt.Sprintf("%0*s", 2*flow.EpochSetupRandomSourceLength, string(randomSrcHex))
+	setup.RandomSource, err = hex.DecodeString(paddedRandomSrcHex)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode random source hex: %w", err)
+		return nil, fmt.Errorf("could not decode random source hex (%v): %w", paddedRandomSrcHex, err)
 	}
+
 	dkgPhase1FinalView, ok := cdcEvent.Fields[6].(cadence.UInt64)
 	if !ok {
 		return nil, invalidCadenceTypeError("dkgPhase1FinalView", cdcEvent.Fields[6], cadence.UInt64(0))
