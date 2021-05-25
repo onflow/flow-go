@@ -57,7 +57,7 @@ func TestMachineAccountHappyPath(t *testing.T) {
 	machineInfoFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID))
 	require.NoFileExists(t, machineInfoFilePath)
 
-	// make sure regex matches and file was not created
+	// make sure regex matches and file was created
 	machineAccountRun(nil, nil)
 	require.Regexp(t, regex, hook.logs.String())
 	require.FileExists(t, machineInfoFilePath)
