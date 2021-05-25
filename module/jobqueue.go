@@ -35,6 +35,9 @@ type JobConsumer interface {
 	// NotifyJobIsDone let the workers notify consumer that a job has been finished, so that the consumer
 	// can check if there is new job could be read from storage and give to a worker for processing
 	NotifyJobIsDone(JobID)
+
+	// Size returns the number of processing jobs in consumer.
+	Size() int
 }
 
 type Job interface {
