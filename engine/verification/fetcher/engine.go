@@ -378,7 +378,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	}
 
 	// 3. collection id must match
-	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result, chunk)
+	err := e.validateCollectionID(collection, chunkDataPack, result, chunk)
 	if err != nil {
 		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
 			collection.ID(),
@@ -395,11 +395,10 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 // and returns nil otherwise.
 func (e Engine) validateCollectionID(collection *flow.Collection,
 	chunkDataPack *flow.ChunkDataPack,
-	chunkIndex uint64,
 	result *flow.ExecutionResult,
 	chunk *flow.Chunk) error {
 
-	if IsSystemChunk(chunkIndex, result) {
+	if IsSystemChunk(chunk.Index, result) {
 		return e.validateSystemChunkCollection(collection, chunkDataPack)
 	}
 
@@ -424,7 +423,7 @@ func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunk
 }
 
 // validateNonSystemChunkCollection returns nil if the collection is matching the non-system chunk data pack.
-// A collection is valid against a non-system chunk if it has a matching ID with system chunk's collection ID field, as well as the
+// A collection is valid against a non-system chunk if it has a matching ID with chunk data pack's collection ID field, as well as the
 // collection ID of corresponding guarantee of the chunk in the referenced block payload.
 func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack, chunk *flow.Chunk) error {
 	collID := collection.ID()
