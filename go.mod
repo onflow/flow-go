@@ -37,7 +37,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.16.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210525144105-f31342ba24ef
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0

@@ -1052,37 +1052,6 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 
 	if e.ctx.ServiceAccountEnabled {
 
-		if e.ctx.RestrictedAccountCreationEnabled {
-			invoker := NewTransactionContractFunctionInvocator(
-				common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
-				"isAccountCreator",
-				[]interpreter.Value{
-					interpreter.NewAddressValue(common.BytesToAddress(payer.Bytes())),
-				},
-				[]sema.Type{
-					&sema.AddressType{},
-				},
-				e.ctx.Logger,
-			)
-
-			value, err := invoker.Invoke(env, e.traceSpan)
-
-			txErr, err := errors.SplitErrorTypes(err)
-
-			if err != nil {
-				return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
-			}
-			if txErr != nil {
-				return address, fmt.Errorf("meta-transaction for creating account failed: %w", txErr)
-			}
-
-			isAccountCreator := value.(cadence.Bool)
-
-			if !isAccountCreator {
-				return address, fmt.Errorf("account cannot create new accounts: %s", payer.ShortHexWithPrefix())
-			}
-		}
-
 		invoker := NewTransactionContractFunctionInvocator(
 			common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
 			"setupNewAccount",
@@ -1097,15 +1066,10 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 			e.ctx.Logger,
 		)
 
-		_, err := invoker.Invoke(env, e.traceSpan)
+		_, invokeErr := invoker.Invoke(env, e.traceSpan)
 
-		txErr, err := errors.SplitErrorTypes(err)
-
-		if err != nil {
-			return address, errors.NewMetaTransactionFailuref("failed to invoke account creation meta transaction: %w", err)
-		}
-		if txErr != nil {
-			return address, fmt.Errorf("meta-transaction for creating account failed: %w", txErr)
+		if invokeErr != nil {
+			return address, errors.HandleRuntimeError(invokeErr)
 		}
 	}
 

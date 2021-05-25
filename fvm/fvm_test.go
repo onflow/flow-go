@@ -1600,8 +1600,10 @@ func TestWithServiceAccount(t *testing.T) {
 		tx := fvm.Transaction(txBody, 0)
 
 		err := vm.Run(ctxA, tx, view, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
 		// transaction should fail on non-bootstrapped ledger
-		require.Error(t, err)
+		require.Error(t, tx.Err)
 	})
 
 	t.Run("With service account disabled", func(t *testing.T) {

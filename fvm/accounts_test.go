@@ -22,7 +22,6 @@ import (
 func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	)
 
@@ -337,7 +336,6 @@ func newAccountKey(
 func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
@@ -411,12 +409,13 @@ func TestCreateAccount(t *testing.T) {
 func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(true),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Unauthorized account payer",
-		newVMTest().withContextOptions(options...).
+		newVMTest().
+			withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 
@@ -435,6 +434,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Authorized account payer",
 		newVMTest().withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
@@ -451,6 +451,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer added to allowlist",
 		newVMTest().withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
@@ -471,6 +472,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer removed from allowlist",
 		newVMTest().withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
@@ -516,7 +518,6 @@ func TestUpdateAccountCode(t *testing.T) {
 func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
@@ -781,7 +782,6 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
@@ -1011,7 +1011,6 @@ func TestRemoveAccountKey(t *testing.T) {
 func TestGetAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 		fvm.WithCadenceLogging(true),
 	}
@@ -1211,7 +1210,6 @@ func TestGetAccountKey(t *testing.T) {
 func TestAccountBalanceFields(t *testing.T) {
 	t.Run("Get balance works",
 		newVMTest().withContextOptions(
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
@@ -1245,7 +1243,6 @@ func TestAccountBalanceFields(t *testing.T) {
 
 	t.Run("Get available balance works",
 		newVMTest().withContextOptions(
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
@@ -1283,7 +1280,6 @@ func TestAccountBalanceFields(t *testing.T) {
 
 	t.Run("Get available balance works with minimum balance",
 		newVMTest().withContextOptions(
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
