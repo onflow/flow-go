@@ -48,7 +48,8 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
 	if !keyExists {
-		log.Fatal().Msg("could not read machine account private key file: run `bootstrap machine-account-key` to create one")
+		log.Info().Msg("could not read machine account private key file - run `bootstrap machine-account-key` to create one")
+		return
 	}
 
 	// check if node-machine-account-info.priv.json file exists in boostrap dir
@@ -63,11 +64,11 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	}
 
 	// read in machine account private key
-	machinePrivKey := readMachineAccountPriv(nodeID)
+	machinePrivKey := readMachineAccountKey(nodeID)
 	log.Info().Msg("read machine account private key json")
 
 	// create node-machine-account-info.priv.json file
-	machineAccountInfo := assembleNodeMachineAccountInfo(flagMachineAccountAddress, 0, machinePrivKey)
+	machineAccountInfo := assembleNodeMachineAccountInfo(machinePrivKey, flagMachineAccountAddress)
 
 	// write machine account info
 	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), machineAccountInfo)
