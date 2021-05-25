@@ -223,11 +223,6 @@ func (b *Builder) repopulateExecutionTree() error {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
 	}
 
-	err = b.recPool.PruneUpToHeight(latestSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
-	}
-
 	// at this point execution tree is filled with all results in range [lastSealedBlock, lastFinalizedBlock].
 
 	validPending, err := finalizedSnapshot.ValidPending()
