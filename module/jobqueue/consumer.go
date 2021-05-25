@@ -129,8 +129,8 @@ func (c *Consumer) Stop() {
 }
 
 // Size returns number of in-memory jobs that consumer is processing.
-func (c *Consumer) Size() int {
-	return len(c.processings)
+func (c *Consumer) Size() uint {
+	return uint(len(c.processings))
 }
 
 // NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take

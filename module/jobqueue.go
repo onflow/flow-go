@@ -37,7 +37,7 @@ type JobConsumer interface {
 	NotifyJobIsDone(JobID)
 
 	// Size returns the number of processing jobs in consumer.
-	Size() int
+	Size() uint
 }
 
 type Job interface {

@@ -77,7 +77,7 @@ func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 }
 
 // Size returns number of in-memory block jobs that block consumer is processing.
-func (c *BlockConsumer) Size() int {
+func (c *BlockConsumer) Size() uint {
 	return c.consumer.Size()
 }
 
