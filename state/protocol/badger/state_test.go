@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	mock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -33,10 +34,11 @@ func TestBootstrapAndOpen(t *testing.T) {
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 		// protocol state has been bootstrapped, now open a protocol state with the database
-		metrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(metrics, db)
+		complianceMetrics := mock.ComplianceMetrics{}
+		noopMetrics := new(metrics.NoopCollector)
+		all := storagebadger.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
-			metrics,
+			complianceMetrics,
 			db,
 			all.Headers,
 			all.Seals,

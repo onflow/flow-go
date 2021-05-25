@@ -52,33 +52,6 @@ func Bootstrap(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	phase, err := state.Final().Phase()
-	if err != nil {
-		return nil, fmt.Errorf("could not get epoch phase from state: %w", err)
-	}
-
-	// update metric based of epoch phase
-	switch phase {
-	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
-
-		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
-		finalView, err := state.Final().Epochs().Current().FinalView()
-		if err != nil {
-			return nil, fmt.Errorf("could not get current epoch final view from state: %w", err)
-		}
-		state.metrics.CommittedEpochFinalView(finalView)
-	case flow.EpochPhaseCommitted:
-
-		// if we are in Committed phase, then set the metric value to the next epoch's final view
-		finalView, err := state.Final().Epochs().Next().FinalView()
-		if err != nil {
-			return nil, fmt.Errorf("could not get next epoch final view from state: %w", err)
-		}
-		state.metrics.CommittedEpochFinalView(finalView)
-	default:
-		return nil, fmt.Errorf("invalid phase: %s", phase)
-	}
-
 	if err := isValidRootSnapshot(root); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
@@ -416,6 +389,12 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	// update committed final view metric
+	err = updateCommittedEpochFinalView(state)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update committed epoch final view: %w", err)
+	}
+
 	return state, nil
 }
 
@@ -502,4 +481,40 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 		return false, fmt.Errorf("retrieving finalized height failed: %w", err)
 	}
 	return true, nil
+}
+
+// updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric based on
+// the current epoch phase. For example, suppose we have epochs N and N+1.
+// If we are in epoch N's Setup Phase, then epoch N's final view should be the value of the metric.
+// If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
+func updateCommittedEpochFinalView(state *State) error {
+
+	phase, err := state.Final().Phase()
+	if err != nil {
+		return fmt.Errorf("could not get epoch phase from state: %w", err)
+	}
+
+	// update metric based of epoch phase
+	switch phase {
+	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
+
+		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
+		finalView, err := state.Final().Epochs().Current().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get current epoch final view from state: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	case flow.EpochPhaseCommitted:
+
+		// if we are in Committed phase, then set the metric value to the next epoch's final view
+		finalView, err := state.Final().Epochs().Next().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get next epoch final view from state: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	default:
+		return fmt.Errorf("invalid phase: %s", phase)
+	}
+
+	return nil
 }

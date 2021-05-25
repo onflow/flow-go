@@ -571,6 +571,11 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 
 	// FOURTH: metrics and events
 
+	if epochStatus.NextEpoch.SetupID != flow.ZeroID {
+		// true iff EpochSetup event for NEXT epoch was already included before
+		m.metrics.CommittedEpochFinalView(setup.FinalView)
+	}
+
 	m.metrics.FinalizedHeight(header.Height)
 	m.metrics.SealedHeight(sealed.Height)
 	m.metrics.BlockFinalized(block)
@@ -774,9 +779,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
 				}
-
-				// update `committed_epoch_final_view` metric with new final view
-				m.metrics.CommittedEpochFinalView(setup.FinalView)
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
 				epochStatus.NextEpoch.CommitID = ev.ID()
