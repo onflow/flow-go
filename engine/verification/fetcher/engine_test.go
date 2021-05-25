@@ -834,7 +834,7 @@ func chunkRequestFixture(chunks flow.ChunkList, height uint64, agrees flow.Ident
 // The result has specified number of chunks, which a random subset them are assumed assigned to fetcher engine,
 // and hence have chunk status associated with them, i.e., `statusCount` of them.
 //
-// It returns the block, result, assigned chunk statuses, and their corresponding locators.
+// It returns the block, result, assigned chunk statuses, their corresponding locators, and a map between chunks to their collections.
 func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.Block,
 	*flow.ExecutionResult,
 	verification.ChunkStatusList,
