@@ -294,9 +294,12 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
 				// re-writes collection with a random one that is different than original collection ID
 				// in block's guarantee.
-				c := unittest.CollectionFixture(1)
-				coll = &c
-				cdp.CollectionID = c.ID()
+				txBody := unittest.TransactionBodyFixture()
+				coll.Transactions = []*flow.TransactionBody{
+					&txBody,
+				}
+				require.NotEqual(t, cdp.CollectionID, coll.ID(), "could not generate a different collection ID")
+				cdp.CollectionID = coll.ID()
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				// mocks a valid execution node as originID
