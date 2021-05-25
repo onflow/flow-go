@@ -28,7 +28,7 @@ var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a
 // NodeMachineAccountPriv contains the private configration need to construct a
 // NodeMachineAccountInfo object. This is used as an intemediary by the bootstrap scripts
 // for storing the private key before generating a NodeMachineAccountInfo.
-type NodeMachineAccountPriv struct {
+type NodeMachineAccountKey struct {
 	PrivateKey encodable.MachineAccountPrivKey
 }
 
