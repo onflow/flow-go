@@ -14,10 +14,6 @@ import (
 	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
-var (
-	flagNodeID string
-)
-
 // machineAccountKeyCmd represents the `machine-account-key` command which generates required machine account key
 // and writes it to the default path within the bootstrap directory. Used by existing operators to create the
 // machine account key only
