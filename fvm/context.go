@@ -1,9 +1,10 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -13,7 +14,7 @@ import (
 type Context struct {
 	Chain                            flow.Chain
 	Blocks                           Blocks
-	Metrics                          *MetricsCollector
+	Metrics                          handler.MetricsReporter
 	Tracer                           module.Tracer
 	GasLimit                         uint64
 	MaxStateKeySize                  uint64
@@ -32,14 +33,11 @@ type Context struct {
 	ServiceEventCollectionEnabled    bool
 	AccountFreezeAvailable           bool
 	ExtensiveTracing                 bool
-	SignatureVerifier                SignatureVerifier
+	SignatureVerifier                crypto.SignatureVerifier
 	TransactionProcessors            []TransactionProcessor
 	ScriptProcessors                 []ScriptProcessor
 	Logger                           zerolog.Logger
 }
-
-// SetValueHandler receives a value written by the Cadence runtime.
-type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
 func NewContext(logger zerolog.Logger, opts ...Option) Context {
@@ -71,7 +69,7 @@ func defaultContext(logger zerolog.Logger) Context {
 	return Context{
 		Chain:                            flow.Mainnet.Chain(),
 		Blocks:                           nil,
-		Metrics:                          nil,
+		Metrics:                          &handler.NoopMetricsReporter{},
 		Tracer:                           nil,
 		GasLimit:                         DefaultGasLimit,
 		MaxStateKeySize:                  state.DefaultMaxKeySize,
@@ -88,7 +86,7 @@ func defaultContext(logger zerolog.Logger) Context {
 		ServiceEventCollectionEnabled:    false,
 		AccountFreezeAvailable:           false,
 		ExtensiveTracing:                 false,
-		SignatureVerifier:                NewDefaultSignatureVerifier(),
+		SignatureVerifier:                crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -203,12 +201,14 @@ func WithBlocks(blocks Blocks) Option {
 	}
 }
 
-// WithMetricsCollector sets the metrics collector for a virtual machine context.
+// WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsCollector(mc *MetricsCollector) Option {
+func WithMetricsReporter(mr handler.MetricsReporter) Option {
 	return func(ctx Context) Context {
-		ctx.Metrics = mc
+		if mr != nil {
+			ctx.Metrics = mr
+		}
 		return ctx
 	}
 }
