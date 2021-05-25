@@ -115,10 +115,16 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	e.core, err = NewCore(log, tracer, conMetrics, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, tracer, conMetrics, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
+
+	err = core.RepopulateAssignmentCollectorTree(payloads)
+	if err != nil {
+		return nil, fmt.Errorf("could not repopulate assignment collectors tree: %w", err)
+	}
+	e.core = core
 
 	return e, nil
 }
@@ -278,6 +284,8 @@ func (e *Engine) loop() {
 // to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
 // This will be changed in phase 3.
 func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
+	// TODO: change this when migrating to sealing & verification phase 3.
+	// Incorporated result is created this way only for phase 2.
 	incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)

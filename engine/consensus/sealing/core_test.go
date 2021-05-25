@@ -662,3 +662,52 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	s.conduit.AssertExpectations(s.T())
 }
+
+// TestRepopulateAssignmentCollectorTree tests that the
+// collectors tree will contain execution results and assignment collectors will be created.
+// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}] <- E
+//         |     <- F[ER{A}] <- G[ER{B}] <- H
+//      finalized
+// collectors tree has to be repopulated with incorporated results from blocks [A, B, C, D, F, G]
+func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree() {
+	payloads := &storage.Payloads{}
+	expectedResults := make([]*flow.IncorporatedResult, 0)
+
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&s.Block, nil))
+	s.sealsDB.On("ByBlockID", s.Block.ID()).Return(
+		unittest.Seal.Fixture(
+			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
+
+	payload := unittest.PayloadFixture(
+		unittest.WithReceipts(
+			unittest.ExecutionReceiptFixture(
+				unittest.WithResult(s.IncorporatedResult.Result))))
+	payloads.On("ByBlockID", s.Block.ID()).Return(
+		&payload, nil)
+
+	// two forks
+	for i := 0; i < 2; i++ {
+		fork := unittest.ChainFixtureFrom(i+3, &s.Block)
+		receipts := unittest.ReceiptChainFor(fork, s.IncorporatedResult.Result)
+		for index, receipt := range receipts[:len(receipts)-1] {
+			blockID := fork[index].ID()
+			IR := unittest.IncorporatedResult.Fixture(
+				unittest.IncorporatedResult.WithResult(&receipt.ExecutionResult),
+				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
+			expectedResults = append(expectedResults, IR)
+			payload := unittest.PayloadFixture(unittest.WithReceipts(receipt))
+			payloads.On("ByBlockID", blockID).Return(&payload, nil)
+		}
+	}
+
+	err := s.core.RepopulateAssignmentCollectorTree(payloads)
+	require.NoError(s.T(), err)
+
+	// check collector tree
+	for _, incorporatedResult := range expectedResults {
+		collector, err := s.core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
+		require.NoError(s.T(), err)
+		require.False(s.T(), collector.Created)
+		require.True(s.T(), collector.Processable)
+	}
+}

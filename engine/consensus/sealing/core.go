@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
@@ -108,6 +109,68 @@ func NewCore(
 	core.collectorTree = approvals.NewAssignmentCollectorTree(lastSealed, headers, factoryMethod)
 
 	return core, nil
+}
+
+// RepopulateAssignmentCollectorTree restores latest state of assignment collector tree based on local chain state information.
+// Repopulating is split into two parts:
+// 1) traverse forward all finalized blocks starting from last sealed block till we reach last finalized block . (lastSealedHeight, lastFinalizedHeight]
+// 2) traverse forward all unfinalized(pending) blocks starting from last finalized block.
+// For each block that is being traversed we will collect execution results and process them using sealing.Core.
+func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) error {
+	finalizedSnapshot := c.state.Final()
+	finalized, err := finalizedSnapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not retrieve finalized block: %w", err)
+	}
+	finalizedID := finalized.ID()
+
+	// Get the latest sealed block on this fork, ie the highest block for which
+	// there is a seal in this fork.
+	latestSeal, err := c.seals.ByBlockID(finalizedID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
+	}
+
+	latestSealed, err := c.headers.ByBlockID(latestSeal.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSeal.BlockID, err)
+	}
+
+	// usually we start with empty collectors tree, prune it to minimum height
+	_, err = c.collectorTree.PruneUpToHeight(latestSealed.Height)
+	if err != nil {
+		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
+	}
+
+	// traverse block and process incorporated results
+	traverser := func(header *flow.Header) error {
+		payload, err := payloads.ByBlockID(header.ID())
+		if err != nil {
+			return fmt.Errorf("could not retrieve index for block (%x): %w", header.ID(), err)
+		}
+
+		for _, result := range payload.Results {
+			// TODO: change this when migrating to sealing & verification phase 3.
+			// Incorporated result is created this way only for phase 2.
+			incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+			err = c.ProcessIncorporatedResult(incorporatedResult)
+			if err != nil {
+				return fmt.Errorf("could not process incorporated result: %w", err)
+			}
+		}
+		return nil
+	}
+
+	// traverse chain forward to collect all execution results that were incorporated in this fork
+	// starting from finalized block and finishing with latest sealed block
+	err = fork.TraverseForward(c.headers, finalizedID, traverser, fork.ExcludingHeight(latestSealed.Height))
+	if err != nil {
+		return fmt.Errorf("internal error while traversing fork: %w", err)
+	}
+
+	// at this point we have processed all results in range (lastSealedBlock, lastFinalizedBlock].
+
+	return nil
 }
 
 func (c *Core) lastSealedHeight() uint64 {
