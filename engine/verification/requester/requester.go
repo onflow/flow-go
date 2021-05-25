@@ -30,7 +30,7 @@ const (
 	DefaultBackoffMultiplier = float64(2)
 
 	// DefaultBackoffMinInterval is the minimum time interval a chunk data pack request waits before dispatching.
-	DefaultBackoffMinInterval = 1 * time.Millisecond
+	DefaultBackoffMinInterval = 1000 * time.Millisecond
 
 	// DefaultBackoffMaxInterval is the maximum time interval a chunk data pack request waits before dispatching.
 	DefaultBackoffMaxInterval = 1 * time.Minute
