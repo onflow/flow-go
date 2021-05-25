@@ -128,6 +128,7 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("consumer stopped")
 }
 
+// Size returns number of in-memory jobs that consumer is processing.
 func (c *Consumer) Size() int {
 	return len(c.processings)
 }

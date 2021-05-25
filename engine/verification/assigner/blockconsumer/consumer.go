@@ -76,6 +76,11 @@ func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 	c.consumer.NotifyJobIsDone(jobID)
 }
 
+// Size returns number of in-memory block jobs that block consumer is processing.
+func (c *BlockConsumer) Size() int {
+	return c.consumer.Size()
+}
+
 // OnFinalizedBlock implements FinalizationConsumer, and is invoked by the follower engine whenever
 // a new block is finalized.
 // In this implementation for block consumer, invoking OnFinalizedBlock is enough to only notify the consumer
