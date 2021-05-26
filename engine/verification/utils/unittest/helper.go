@@ -230,6 +230,9 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath finishes")
 }
 
+// MockChunkDataProviderFunc is a test helper function encapsulating the logic of whether to reply a chunk data pack request.
+type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool
+
 // SetupChunkDataPackProvider creates and returns an execution node that only has a chunk data pack provider engine.
 //
 // The mock chunk provider engine replies the chunk back requests by invoking the injected provider method. All chunk data pack
@@ -241,7 +244,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
 	assignedChunkIDs flow.IdentifierList,
-	provider func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool) (*enginemock.GenericNode,
+	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
 	*mocknetwork.Engine, *sync.WaitGroup) {
 
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
@@ -295,7 +298,7 @@ func RespondChunkDataPackRequestImmediately(t *testing.T,
 }
 
 // RespondChunkDataPackRequestAfterNTrials only qualifies a chunk data request for reply by chunk data provider after n times.
-func RespondChunkDataPackRequestAfterNTrials(n uint8) func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool {
+func RespondChunkDataPackRequestAfterNTrials(n uint8) MockChunkDataProviderFunc {
 	tryCount := make(map[flow.Identifier]uint8)
 
 	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
