@@ -318,8 +318,9 @@ func (s *Snapshot) validPending(pendingIDs []flow.Identifier) ([]flow.Identifier
 	for _, pendingID := range pendingIDs {
 		grandchildren, err := s.lookupChildren(pendingID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
+			return nil, fmt.Errorf("could not get pending grandchildren for block (%v): %w", pendingID, err)
 		}
+		// valid pending are unfinalized blocks that have at least one children
 		if len(grandchildren) > 0 {
 			validPendingIds = append(validPendingIds, pendingID)
 			ids, err := s.validPending(grandchildren)

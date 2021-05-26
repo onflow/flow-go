@@ -71,8 +71,10 @@ type Snapshot interface {
 	// are NOT guaranteed to have been validated by HotStuff.
 	Pending() ([]flow.Identifier, error)
 
-	// Pending returns the IDs of all descendants of the Head block. The IDs
-	// are ordered such that parents are included before their children. Includes
+	// ValidPending returns the IDs of all descendants of the Head block. 
+	// Pending means the returned blocks are not finalized yet. 
+	// Valid means the returned bocks have at least one child. 
+	// The IDs are ordered such that parents are included before their children. Includes
 	// only blocks that have child blocks.
 	// These are NOT guaranteed to have been validated by HotStuff.
 	ValidPending() ([]flow.Identifier, error)

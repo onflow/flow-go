@@ -216,8 +216,7 @@ func (b *Builder) repopulateExecutionTree() error {
 		return nil
 	}
 
-	// traverse chain backwards to collect all execution results that were incorporated in this fork
-	// starting from finalized block and finishing with latest sealed block
+	// traverse chain backwards to collect all execution results in unsealed and finalized blocks
 	err = fork.TraverseBackward(b.headers, finalizedID, traverser, fork.IncludingHeight(latestSealed.Height))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
