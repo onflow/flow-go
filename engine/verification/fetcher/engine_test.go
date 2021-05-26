@@ -195,6 +195,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	mockBlockSealingStatus(s.state, s.headers, block, false)
 
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
+	mockBlocksStorage(s.blocks, s.headers, block)
 	mockPendingChunksByID(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
 
