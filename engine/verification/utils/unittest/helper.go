@@ -700,6 +700,12 @@ func withConsumers(t *testing.T,
 		conEngine.AssertNotCalled(t, "Process")
 		exeEngine.AssertNotCalled(t, "Process")
 	}
+
+	// verifies memory resources are cleaned up all over pipeline
+	assert.True(t, verNode.BlockConsumer.Size() == 0)
+	assert.True(t, verNode.ChunkConsumer.Size() == 0)
+	assert.True(t, verNode.ChunkStatuses.Size() == 0)
+	assert.True(t, verNode.ChunkRequests.Size() == 0)
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).

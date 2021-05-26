@@ -1045,6 +1045,9 @@ func NewVerificationNode(t testing.TB,
 			node.ChunksQueue,
 			node.FetcherEngine,
 			int64(3)) // defaults number of workers to 3.
+
+		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
+		require.NoError(t, err)
 	}
 
 	if node.AssignerEngine == nil {
@@ -1065,6 +1068,9 @@ func NewVerificationNode(t testing.TB,
 			node.State,
 			node.AssignerEngine,
 			int64(3)) // defaults number of workers to 3.
+		require.NoError(t, err)
+
+		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)
 		require.NoError(t, err)
 	}
 
