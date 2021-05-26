@@ -167,6 +167,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 
 // LocalFixture creates and returns a Local module for given identity.
 func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
+
 	// Generates test signing oracle for the nodes
 	// Disclaimer: it should not be used for practical applications
 	//
@@ -174,7 +175,7 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 	seed, err := json.Marshal(identity)
 	require.NoError(t, err)
 	// creates signing key of the node
-	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed[:64])
 	require.NoError(t, err)
 
 	// sets staking public key of the node
