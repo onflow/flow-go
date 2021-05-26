@@ -32,6 +32,7 @@ func TestVerificationHappyPath(t *testing.T) {
 		opts            []vertestutils.CompleteExecutionReceiptBuilderOpt
 		msg             string
 		staked          bool
+		retry           int
 		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
 	}{
 		{
@@ -48,6 +49,7 @@ func TestVerificationHappyPath(t *testing.T) {
 			},
 			staked:          true,
 			eventRepetition: 1,
+			retry:           1,
 			msg:             "1 block, 1 result, 1 chunk, no duplicate, staked, no event repetition",
 		},
 		{
@@ -59,6 +61,7 @@ func TestVerificationHappyPath(t *testing.T) {
 			},
 			staked:          false, // unstaked
 			eventRepetition: 1,
+			retry:           1,
 			msg:             "1 block, 1 result, 1 chunk, no duplicate, unstaked, no event repetition",
 		},
 		{
@@ -70,6 +73,7 @@ func TestVerificationHappyPath(t *testing.T) {
 			},
 			staked:          true,
 			eventRepetition: 1,
+			retry:           1,
 			msg:             "1 block, 5 result, 5 chunks, no duplicate, staked, no event repetition",
 		},
 		{
@@ -81,6 +85,7 @@ func TestVerificationHappyPath(t *testing.T) {
 			},
 			staked:          true,
 			eventRepetition: 1,
+			retry:           1,
 			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, staked, no event repetition",
 		},
 		{
@@ -92,7 +97,20 @@ func TestVerificationHappyPath(t *testing.T) {
 			},
 			staked:          true,
 			eventRepetition: 3, // notifies consumer 3 times for each finalized block.
+			retry:           1,
 			msg:             "10 block, 5 result, 5 chunks, 1 duplicates, staked, with event repetition",
+		},
+		{
+			blockCount: 1,
+			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
+				vertestutils.WithResults(1),
+				vertestutils.WithChunksCount(10),
+				vertestutils.WithCopies(1),
+			},
+			staked:          true,
+			eventRepetition: 1,
+			retry:           3,
+			msg:             "1 block, 1 result, 10 chunks, no duplicates, staked, no event repetition, 3 retries",
 		},
 	}
 
@@ -106,6 +124,7 @@ func TestVerificationHappyPath(t *testing.T) {
 				tc.eventRepetition,
 				collector,
 				collector,
+				tc.retry,
 				tc.opts...)
 		})
 	}
