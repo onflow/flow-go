@@ -73,7 +73,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 
 	log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
-	machineAccountPriv := assembleNodeMachineAccountPriv(machineKey)
+	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
