@@ -55,18 +55,22 @@ func (epoch EpochHeights) CommittedRange() []uint64 {
 // EpochBuilder is a testing utility for building epochs into chain state.
 type EpochBuilder struct {
 	t          *testing.T
-	state      protocol.MutableState
+	states     []protocol.MutableState
 	blocks     map[flow.Identifier]*flow.Block
 	built      map[uint64]EpochHeights
 	setupOpts  []func(*flow.EpochSetup)  // options to apply to the EpochSetup event
 	commitOpts []func(*flow.EpochCommit) // options to apply to the EpochCommit event
 }
 
-func NewEpochBuilder(t *testing.T, state protocol.MutableState) *EpochBuilder {
+// NewEpochBuilder returns a new EpochBuilder which will build epochs using the
+// given states. At least one state must be provided. If more than one are
+// provided they must have the same initial state.
+func NewEpochBuilder(t *testing.T, states ...protocol.MutableState) *EpochBuilder {
+	require.True(t, len(states) >= 1, "must provide at least one state")
 
 	builder := &EpochBuilder{
 		t:      t,
-		state:  state,
+		states: states,
 		blocks: make(map[flow.Identifier]*flow.Block),
 		built:  make(map[uint64]EpochHeights),
 	}
@@ -95,7 +99,7 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (EpochHeights, bool) {
 	return epoch, ok
 }
 
-// Build builds and finalizes a sequence of blocks comprising a minimal full
+// BuildEpoch builds and finalizes a sequence of blocks comprising a minimal full
 // epoch (epoch N). We assume the latest finalized block is within staking phase
 // in epoch N.
 //
@@ -132,21 +136,23 @@ func (builder *EpochBuilder) EpochHeights(counter uint64) (EpochHeights, bool) {
 // queried with EpochHeights.
 func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 
+	state := builder.states[0]
+
 	// prepare default values for the service events based on the current state
-	identities, err := builder.state.Final().Identities(filter.Any)
+	identities, err := state.Final().Identities(filter.Any)
 	require.Nil(builder.t, err)
-	epoch := builder.state.Final().Epochs().Current()
+	epoch := state.Final().Epochs().Current()
 	counter, err := epoch.Counter()
 	require.Nil(builder.t, err)
 	finalView, err := epoch.FinalView()
 	require.Nil(builder.t, err)
 
 	// retrieve block A
-	A, err := builder.state.Final().Head()
+	A, err := state.Final().Head()
 	require.Nil(builder.t, err)
 
 	// check that block A satisfies initial condition
-	phase, err := builder.state.Final().Phase()
+	phase, err := state.Final().Phase()
 	require.Nil(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseStaking, phase)
 
@@ -301,13 +307,15 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 // has been capped off, we can build the next epoch with BuildEpoch.
 func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 
-	phase, err := builder.state.Final().Phase()
+	state := builder.states[0]
+
+	phase, err := state.Final().Phase()
 	require.Nil(builder.t, err)
 	require.Equal(builder.t, flow.EpochPhaseCommitted, phase)
-	finalView, err := builder.state.Final().Epochs().Current().FinalView()
+	finalView, err := state.Final().Epochs().Current().FinalView()
 	require.Nil(builder.t, err)
 
-	final, err := builder.state.Final().Head()
+	final, err := state.Final().Head()
 	require.Nil(builder.t, err)
 
 	finalBlock, ok := builder.blocks[final.ID()]
@@ -340,13 +348,16 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 // finalizing the block, marking the block as valid, and caching the block.
 func (builder *EpochBuilder) addBlock(block *flow.Block) {
 
-	err := builder.state.Extend(block)
-	require.NoError(builder.t, err)
-
 	blockID := block.ID()
-	err = builder.state.Finalize(blockID)
-	require.NoError(builder.t, err)
-	err = builder.state.MarkValid(blockID)
-	require.NoError(builder.t, err)
+	for _, state := range builder.states {
+		err := state.Extend(block)
+		require.NoError(builder.t, err)
+
+		err = state.Finalize(blockID)
+		require.NoError(builder.t, err)
+		err = state.MarkValid(blockID)
+		require.NoError(builder.t, err)
+	}
+
 	builder.blocks[block.ID()] = block
 }
