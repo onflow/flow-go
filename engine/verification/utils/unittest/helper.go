@@ -298,8 +298,8 @@ func RespondChunkDataPackRequestImmediately(t *testing.T,
 }
 
 // RespondChunkDataPackRequestAfterNTrials only qualifies a chunk data request for reply by chunk data provider after n times.
-func RespondChunkDataPackRequestAfterNTrials(n uint8) MockChunkDataProviderFunc {
-	tryCount := make(map[flow.Identifier]uint8)
+func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
+	tryCount := make(map[flow.Identifier]int)
 
 	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
 		trials, ok := tryCount[chunkID]
@@ -320,6 +320,7 @@ func RespondChunkDataPackRequestAfterNTrials(n uint8) MockChunkDataProviderFunc 
 			log.Debug().
 				Hex("origin_id", logging.ID(verID)).
 				Hex("chunk_id", logging.ID(chunkID)).
+				Int("trial_time", trials).
 				Msg("chunk data pack request answered by provider")
 		}
 
@@ -598,9 +599,10 @@ func NewVerificationHappyPathTest(t *testing.T,
 	eventRepetition int,
 	verCollector module.VerificationMetrics,
 	mempoolCollector module.MempoolMetrics,
+	retry int,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
-	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, func(
+	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, RespondChunkDataPackRequestAfterNTrials(retry), func(
 		blockConsumer *blockconsumer.BlockConsumer,
 		blocks []*flow.Block,
 		resultApprovalsWG *sync.WaitGroup,
@@ -613,9 +615,9 @@ func NewVerificationHappyPathTest(t *testing.T,
 			blockConsumer.OnFinalizedBlock(&model.Block{})
 		}
 
-		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(2*blockCount)*time.Second,
+		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(2*retry*blockCount)*time.Second,
 			"could not receive chunk data requests on time")
-		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*blockCount)*time.Second,
+		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*retry*blockCount)*time.Second,
 			"could not receive result approvals on time")
 
 	}, ops...)
@@ -631,6 +633,7 @@ func withConsumers(t *testing.T,
 	blockCount int,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
+	providerFunc MockChunkDataProviderFunc,
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
@@ -684,7 +687,7 @@ func withConsumers(t *testing.T,
 		chainID,
 		completeERs,
 		assignedChunkIDs,
-		RespondChunkDataPackRequestImmediately)
+		providerFunc)
 
 	// consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
