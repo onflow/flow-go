@@ -25,6 +25,13 @@ const (
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
+// NodeMachineAccountPriv contains the private configration need to construct a
+// NodeMachineAccountInfo object. This is used as an intemediary by the bootstrap scripts
+// for storing the private key before generating a NodeMachineAccountInfo.
+type NodeMachineAccountKey struct {
+	PrivateKey encodable.MachineAccountPrivKey
+}
+
 // NodeMachineAccountInfo defines the structure for a bootstrapping file containing
 // private information about the node's machine account. The machine account is used
 // by the protocol software to interact with Flow as a client autonomously as needed, in
