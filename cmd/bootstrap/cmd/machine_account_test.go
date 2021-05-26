@@ -64,7 +64,7 @@ func TestMachineAccountHappyPath(t *testing.T) {
 }
 
 func TestMachineAccountInfoFileExists(t *testing.T) {
-	var machineAccountInfoFileExistsRegex = `^node maching account info file already exists`
+	var machineAccountInfoFileExistsRegex = `^node matching account info file already exists`
 
 	dirName := strconv.FormatInt(time.Now().UnixNano(), 10)
 	regex := regexp.MustCompile(machineAccountInfoFileExistsRegex)
