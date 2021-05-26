@@ -114,6 +114,10 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 	return validators, signers, nil
 }
 
+// GenerateQCParticipantData generates QC participant data used to create the
+// random beacon and staking signatures on the QC.
+//
+// allNodes must be in the same order that was used when running the DKG.
 func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
@@ -130,6 +134,7 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 
+	// the index here is important - we assume allNodes is in the same order as the DKG
 	for i := 0; i < len(allNodes); i++ {
 		// assign a node to a DGKdata entry, using the canonical ordering
 		node := allNodes[i]
