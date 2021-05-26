@@ -59,7 +59,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-info.priv.json exists")
 	}
 	if infoExists {
-		log.Info().Str("path", machineAccountInfoPath).Msg("node maching account info file already exists")
+		log.Info().Str("path", machineAccountInfoPath).Msg("node matching account info file already exists")
 		return
 	}
 
