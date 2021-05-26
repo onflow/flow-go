@@ -49,6 +49,11 @@ func (c *ChunkConsumer) NotifyJobIsDone(jobID module.JobID) {
 	c.consumer.NotifyJobIsDone(jobID)
 }
 
+// Size returns number of in-memory chunk jobs that chunk consumer is processing.
+func (c *ChunkConsumer) Size() uint {
+	return c.consumer.Size()
+}
+
 func (c ChunkConsumer) Check() {
 	c.consumer.Check()
 }
