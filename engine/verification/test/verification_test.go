@@ -124,7 +124,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode, exeEngine := vertestutils.SetupChunkDataPackProvider(t,
+	exeNode, exeEngine, _ := vertestutils.SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,

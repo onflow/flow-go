@@ -131,7 +131,7 @@ func VerificationHappyPath(t *testing.T,
 		EvenChunkIndexAssigner)
 
 	// mock execution node
-	exeNode, exeEngine := SetupChunkDataPackProvider(t,
+	exeNode, exeEngine, _ := SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,
@@ -241,14 +241,17 @@ func SetupChunkDataPackProvider(t *testing.T,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
 	assignedChunkIDs flow.IdentifierList,
-	provider func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit)) (*enginemock.GenericNode,
-	*mocknetwork.Engine) {
+	provider func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool) (*enginemock.GenericNode,
+	*mocknetwork.Engine, *sync.WaitGroup) {
 
 	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(assignedChunkIDs))
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
@@ -261,17 +264,20 @@ func SetupChunkDataPackProvider(t *testing.T,
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
-			provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+			responded := provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+			if responded {
+				wg.Done()
+			}
 		}).Return(nil)
 
-	return &exeNode, exeEngine
+	return &exeNode, exeEngine, wg
 }
 
 func RespondChunkDataPackRequest(t *testing.T,
 	completeERs CompleteExecutionReceiptList,
 	chunkID flow.Identifier,
 	verID flow.Identifier,
-	con network.Conduit) {
+	con network.Conduit) bool {
 
 	// finds the chunk data pack of the requested chunk and sends it back.
 	res := completeERs.ChunkDataResponseOf(t, chunkID)
@@ -283,6 +289,8 @@ func RespondChunkDataPackRequest(t *testing.T,
 		Hex("origin_id", logging.ID(verID)).
 		Hex("chunk_id", logging.ID(chunkID)).
 		Msg("chunk data pack request answered by provider")
+
+	return true
 }
 
 // SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
@@ -561,7 +569,8 @@ func NewVerificationHappyPathTest(t *testing.T,
 	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, func(
 		blockConsumer *blockconsumer.BlockConsumer,
 		blocks []*flow.Block,
-		resultApprovalsWG *sync.WaitGroup) {
+		resultApprovalsWG *sync.WaitGroup,
+		chunkDataRequestWG *sync.WaitGroup) {
 
 		for i := 0; i < len(blocks)*eventRepetition; i++ {
 			// consumer is only required to be "notified" that a new finalized block available.
@@ -570,6 +579,8 @@ func NewVerificationHappyPathTest(t *testing.T,
 			blockConsumer.OnFinalizedBlock(&model.Block{})
 		}
 
+		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(2*blockCount)*time.Second,
+			"could not receive chunk data requests on time")
 		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*blockCount)*time.Second,
 			"could not receive result approvals on time")
 
@@ -586,7 +597,7 @@ func withConsumers(t *testing.T,
 	blockCount int,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup),
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := &trace.NoopTracer{}
@@ -632,7 +643,7 @@ func withConsumers(t *testing.T,
 		chainID)
 
 	// execution node
-	exeNode, exeEngine := SetupChunkDataPackProvider(t,
+	exeNode, exeEngine, exeWG := SetupChunkDataPackProvider(t,
 		hub,
 		exeID,
 		participants,
@@ -679,7 +690,7 @@ func withConsumers(t *testing.T,
 		verNode.VerifierEngine)
 
 	// plays test scenario
-	withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
+	withBlockConsumer(verNode.BlockConsumer, blocks, conWG, exeWG)
 
 	// tears down engines and nodes
 	unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
