@@ -234,7 +234,7 @@ static int fp_get_sign(fp_t y) {
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_write_bin
-// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR is any of
+// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
     ep_t t;
@@ -277,7 +277,7 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // The serialization is following:
 // https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-) 
 // The code is a modified version of Relic ep_read_bin
-// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR is any of
+// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
@@ -380,7 +380,7 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 }
 
 // ep2_read_bin_compact imports a point from a buffer in a compressed or uncompressed form.
-// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR is any of
+// It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
