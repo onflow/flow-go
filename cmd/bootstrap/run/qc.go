@@ -130,13 +130,17 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 	participantLookup := make(map[flow.Identifier]flow.DKGParticipant)
 
-	// the QC will be signed by everyone in internalNodes
-	for i, node := range internalNodes {
+	for i := 0; i < len(allNodes); i++ {
 		// assign a node to a DGKdata entry, using the canonical ordering
+		node := allNodes[i]
 		participantLookup[node.NodeID] = flow.DKGParticipant{
 			KeyShare: dkgData.PubKeyShares[i],
 			Index:    uint(i),
 		}
+	}
+
+	// the QC will be signed by everyone in internalNodes
+	for _, node := range internalNodes {
 
 		if node.NodeID == flow.ZeroID {
 			return nil, fmt.Errorf("node id cannot be zero")
@@ -146,19 +150,16 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 			return nil, fmt.Errorf("node (id=%s) cannot have 0 stake", node.NodeID)
 		}
 
+		dkgParticipant, ok := participantLookup[node.NodeID]
+		if !ok {
+			return nil, fmt.Errorf("nonexistannt node id (%x) in participant lookup", node.NodeID)
+		}
+		dkgIndex := dkgParticipant.Index
+
 		qcData.Participants = append(qcData.Participants, Participant{
 			NodeInfo:            node,
-			RandomBeaconPrivKey: dkgData.PrivKeyShares[i],
+			RandomBeaconPrivKey: dkgData.PrivKeyShares[dkgIndex],
 		})
-	}
-
-	for i := len(internalNodes); i < len(allNodes); i++ {
-		// assign a node to a DGKdata entry, using the canonical ordering
-		node := allNodes[i]
-		participantLookup[node.NodeID] = flow.DKGParticipant{
-			KeyShare: dkgData.PubKeyShares[i],
-			Index:    uint(i),
-		}
 	}
 
 	qcData.Lookup = participantLookup
