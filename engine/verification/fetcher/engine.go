@@ -44,7 +44,8 @@ type Engine struct {
 
 	// memory and storage
 	pendingChunks mempool.ChunkStatuses     // stores all pending chunks that their chunk data is requested from requester.
-	blocks        storage.Blocks            // used to for building verifiable chunk data and also verifying collection ID.
+	blocks        storage.Blocks            // used to for verifying collection ID.
+	headers       storage.Headers           // used for building verifiable chunk data.
 	results       storage.ExecutionResults  // used to retrieve execution result of an assigned chunk.
 	receipts      storage.ExecutionReceipts // used to find executor ids of a chunk, for requesting chunk data pack.
 
@@ -61,6 +62,7 @@ func New(
 	verifier network.Engine,
 	state protocol.State,
 	pendingChunks mempool.ChunkStatuses,
+	headers storage.Headers,
 	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
@@ -75,6 +77,7 @@ func New(
 		state:         state,
 		pendingChunks: pendingChunks,
 		blocks:        blocks,
+		headers:       headers,
 		results:       results,
 		receipts:      receipts,
 		requester:     requester,
@@ -511,12 +514,12 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	collection *flow.Collection) error {
 
-	block, err := e.blocks.ByID(chunk.BlockID)
+	header, err := e.headers.ByBlockID(chunk.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not get block: %w", err)
 	}
 
-	vchunk, err := e.makeVerifiableChunkData(chunk, block.Header, result, chunkDataPack, collection)
+	vchunk, err := e.makeVerifiableChunkData(chunk, header, result, chunkDataPack, collection)
 	if err != nil {
 		return fmt.Errorf("could not verify chunk: %w", err)
 	}
@@ -565,7 +568,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 		return fmt.Errorf("could not segregate the agree and disagree executors for result: %x of block: %x", resultID, blockID)
 	}
 
-	block, err := e.blocks.ByID(blockID)
+	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not get header for block: %x", blockID)
 	}
@@ -577,7 +580,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 
 	request := &verification.ChunkDataPackRequest{
 		ChunkID:   chunkID,
-		Height:    block.Header.Height,
+		Height:    header.Height,
 		Agrees:    agrees,
 		Disagrees: disagrees,
 		Targets:   allExecutors,
@@ -605,7 +608,7 @@ func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID 
 // blockIsSealed returns true if the block at specified height by block ID is sealed.
 func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
 	// TODO: as an optimization, we can keep record of last sealed height on a local variable.
-	block, err := e.blocks.ByID(blockID)
+	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get block: %w", err)
 	}
@@ -615,7 +618,7 @@ func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
 		return false, fmt.Errorf("could not get last sealed: %w", err)
 	}
 
-	sealed := block.Header.Height <= lastSealed.Height
+	sealed := header.Height <= lastSealed.Height
 	return sealed, nil
 }
 
