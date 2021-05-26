@@ -156,14 +156,9 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	// in case block is not finalized we will create collector and start processing approvals
 	// no checks for orphans can be made at this point
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
-
 	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
-	}
-
-	if !lazyCollector.Processable {
-		return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", result.ID())
 	}
 
 	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
@@ -177,7 +172,7 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	// approvals for this result, and process them
 	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
 	// time, ensuring that processing of pending approvals happens once for particular assignment
-	if lazyCollector.Created {
+	if lazyCollector.Created && lazyCollector.Processable {
 		err = c.processPendingApprovals(lazyCollector.Collector)
 		if err != nil {
 			return fmt.Errorf("could not process cached approvals:  %w", err)

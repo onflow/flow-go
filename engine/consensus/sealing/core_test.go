@@ -514,7 +514,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 	// create incorporated result for each block in main fork
 	for forkIndex, fork := range forks {
 		previousResult := s.IncorporatedResult.Result
-		for _, block := range fork {
+		for blockIndex, block := range fork {
 			result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*previousResult))
 			result.BlockID = block.Header.ParentID
 			result.Chunks = s.Chunks
@@ -525,11 +525,17 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 				unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 				unittest.IncorporatedResult.WithResult(result))
 			err := s.core.processIncorporatedResult(IR)
+			_, processable := s.core.collectorTree.GetCollector(result.ID())
 			if forkIndex > 0 {
 				require.NoError(s.T(), err)
+				require.True(s.T(), processable)
 			} else {
-				require.Error(s.T(), err)
-				require.True(s.T(), engine.IsOutdatedInputError(err))
+				if blockIndex == 0 {
+					require.Error(s.T(), err)
+					require.True(s.T(), engine.IsOutdatedInputError(err))
+				} else {
+					require.False(s.T(), processable)
+				}
 			}
 		}
 	}
