@@ -85,7 +85,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		// get the participant private keys
 		keys, err := participant.PrivateKeys()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not get private keys for participant: %w", err)
+			return nil, nil, fmt.Errorf("could not get private keys for participant (%v): %w", participant.Public(), err)
 		}
 
 		local, err := local.New(participant.Identity(), keys.StakingKey)
