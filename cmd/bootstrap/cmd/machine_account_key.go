@@ -60,7 +60,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	machineAccountPriv := assembleNodeMachineAccountPriv(machineKey)
 
 	writeJSON(machineAccountKeyPath, machineAccountPriv)
-	log.Info().Str("path", machineAccountKeyPath).Msg("wrote machine account private key")
+	log.Info().Msgf("machine account public key: %s", machineKey.PublicKey().String())
 }
 
 // readNodeID reads the NodeID file
