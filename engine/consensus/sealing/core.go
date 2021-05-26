@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
@@ -54,19 +54,19 @@ func DefaultConfig() Config {
 // 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type Core struct {
-	log                       zerolog.Logger                     // used to log relevant actions with context
-	collectorTree             *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
-	approvalsCache            *approvals.LruCache                // in-memory cache of approvals that weren't verified
-	atomicLastSealedHeight    uint64                             // atomic variable for last sealed block height
-	atomicLastFinalizedHeight uint64                             // atomic variable for last finalized block height
-	headers                   storage.Headers                    // used to access block headers in storage
-	state                     protocol.State                     // used to access protocol state
-	seals                     storage.Seals                      // used to get last sealed block
-	sealsMempool              mempool.IncorporatedResultSeals    // used by tracker.SealingTracker to log info
-	requestTracker            *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
-	metrics                   module.ConsensusMetrics            // used to track consensus metrics
-	tracer                    module.Tracer                      // used to trace execution
-	config                    Config
+	log                        zerolog.Logger                     // used to log relevant actions with context
+	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
+	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
+	counterLastSealedHeight    counters.StrictMonotonousCounter   // monotonous counter for last sealed block height
+	counterLastFinalizedHeight counters.StrictMonotonousCounter   // monotonous counter for last finalized block height
+	headers                    storage.Headers                    // used to access block headers in storage
+	state                      protocol.State                     // used to access protocol state
+	seals                      storage.Seals                      // used to get last sealed block
+	sealsMempool               mempool.IncorporatedResultSeals    // used by tracker.SealingTracker to log info
+	requestTracker             *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
+	metrics                    module.ConsensusMetrics            // used to track consensus metrics
+	tracer                     module.Tracer                      // used to trace execution
+	config                     Config
 }
 
 func NewCore(
@@ -88,16 +88,18 @@ func NewCore(
 	}
 
 	core := &Core{
-		log:            log.With().Str("engine", "sealing.Core").Logger(),
-		tracer:         tracer,
-		metrics:        conMetrics,
-		approvalsCache: approvals.NewApprovalsLRUCache(1000),
-		headers:        headers,
-		state:          state,
-		seals:          sealsDB,
-		sealsMempool:   sealsMempool,
-		config:         config,
-		requestTracker: approvals.NewRequestTracker(10, 30),
+		log:                        log.With().Str("engine", "sealing.Core").Logger(),
+		tracer:                     tracer,
+		metrics:                    conMetrics,
+		approvalsCache:             approvals.NewApprovalsLRUCache(1000),
+		counterLastSealedHeight:    counters.NewMonotonousCounter(lastSealed.Height),
+		counterLastFinalizedHeight: counters.NewMonotonousCounter(lastSealed.Height),
+		headers:                    headers,
+		state:                      state,
+		seals:                      sealsDB,
+		sealsMempool:               sealsMempool,
+		config:                     config,
+		requestTracker:             approvals.NewRequestTracker(10, 30),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
@@ -111,11 +113,11 @@ func NewCore(
 }
 
 func (c *Core) lastSealedHeight() uint64 {
-	return atomic.LoadUint64(&c.atomicLastSealedHeight)
+	return c.counterLastSealedHeight.Value()
 }
 
 func (c *Core) lastFinalizedHeight() uint64 {
-	return atomic.LoadUint64(&c.atomicLastFinalizedHeight)
+	return c.counterLastFinalizedHeight.Value()
 }
 
 // processIncorporatedResult implements business logic for processing single incorporated result
@@ -364,13 +366,10 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
 
-	// no need to process already finalized blocks
-	if finalized.Height <= c.lastFinalizedHeight() {
+	// update last finalized height, counter will return false if there is already a bigger value
+	if !c.counterLastFinalizedHeight.Set(finalized.Height) {
 		return nil
 	}
-
-	// it's important to use atomic operation to make sure that we have correct ordering
-	atomic.StoreUint64(&c.atomicLastFinalizedHeight, finalized.Height)
 
 	seal, err := c.seals.ByBlockID(finalizedBlockID)
 	if err != nil {
@@ -381,8 +380,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
 
-	// it's important to use atomic operation to make sure that we have correct ordering
-	atomic.StoreUint64(&c.atomicLastSealedHeight, lastSealed.Height)
+	// update last sealed height, counter will return false if there is already a bigger value
+	lastSealedHeightIncreased := c.counterLastSealedHeight.Set(lastSealed.Height)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
@@ -396,15 +395,19 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	// finalize forks to stop collecting approvals for orphan collectors
 	c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
 
-	// as soon as we discover new sealed height, proceed with pruning collectors
-	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
-	updateCollectorTreeSpan.Finish()
-	if err != nil {
-		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
-	}
+	// pruning of collectors tree makes sense only with values that are increasing
+	// passing value lower than before is not supported by collectors tree
+	if lastSealedHeightIncreased {
+		// as soon as we discover new sealed height, proceed with pruning collectors
+		pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
+		if err != nil {
+			return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
+		}
 
-	// remove all pending items that we might have requested
-	c.requestTracker.Remove(pruned...)
+		// remove all pending items that we might have requested
+		c.requestTracker.Remove(pruned...)
+		updateCollectorTreeSpan.Finish()
+	}
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)
