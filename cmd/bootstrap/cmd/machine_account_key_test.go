@@ -37,7 +37,6 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 	keyCmdRun(nil, nil)
 	hook.logs.Reset()
 
-	// require log regex to match
 	require.DirExists(t, filepath.Join(flagOutdir, bootstrap.DirnamePublicBootstrap))
 	require.DirExists(t, filepath.Join(flagOutdir, bootstrap.DirPrivateRoot))
 
