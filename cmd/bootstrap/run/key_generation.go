@@ -6,6 +6,14 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+func GenerateMachineAccountKey(seed []byte) (crypto.PrivateKey, error) {
+	keys, err := GenerateKeys(crypto.ECDSAP256, 1, [][]byte{seed})
+	if err != nil {
+		return nil, err
+	}
+	return keys[0], nil
+}
+
 func GenerateNetworkingKey(seed []byte) (crypto.PrivateKey, error) {
 	keys, err := GenerateKeys(crypto.ECDSAP256, 1, [][]byte{seed})
 	if err != nil {

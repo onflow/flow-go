@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -87,6 +88,16 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	)
 
 	return nodeInfo
+}
+
+func assembleNodeMachineAccountKey(machineKey crypto.PrivateKey) model.NodeMachineAccountKey {
+
+	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	machineNodeInfo := model.NodeMachineAccountKey{
+		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
+	}
+
+	return machineNodeInfo
 }
 
 func validateAddressesUnique(ns []model.NodeConfig) {
