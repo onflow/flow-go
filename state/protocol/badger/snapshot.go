@@ -298,7 +298,7 @@ func (s *Snapshot) Pending() ([]flow.Identifier, error) {
 func (s *Snapshot) ValidPending() ([]flow.Identifier, error) {
 	pendingIDs, err := s.lookupChildren(s.blockID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not lookup children for %v: %w", s.blockID, err)
 	}
 
 	return s.validPending(pendingIDs)
@@ -316,14 +316,14 @@ func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, e
 func (s *Snapshot) validPending(pendingIDs []flow.Identifier) ([]flow.Identifier, error) {
 	var validPendingIds []flow.Identifier
 	for _, pendingID := range pendingIDs {
-		grandchildren, err := s.lookupChildren(pendingID)
+		children, err := s.lookupChildren(pendingID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get pending grandchildren for block (%v): %w", pendingID, err)
+			return nil, fmt.Errorf("could not get pending children for block (%v): %w", pendingID, err)
 		}
 		// valid pending are unfinalized blocks that have at least one children
-		if len(grandchildren) > 0 {
+		if len(children) > 0 {
 			validPendingIds = append(validPendingIds, pendingID)
-			ids, err := s.validPending(grandchildren)
+			ids, err := s.validPending(children)
 			if err != nil {
 				return nil, err
 			}
