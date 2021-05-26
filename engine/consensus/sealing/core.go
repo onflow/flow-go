@@ -393,7 +393,11 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
 	updateCollectorTreeSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingUpdateAssignmentCollectorTree)
 	// finalize forks to stop collecting approvals for orphan collectors
-	c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
+	err = c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
+	if err != nil {
+		updateCollectorTreeSpan.Finish()
+		return fmt.Errorf("collectors tree could not finalize fork: %w", err)
+	}
 
 	// pruning of collectors tree makes sense only with values that are increasing
 	// passing value lower than before is not supported by collectors tree
@@ -406,8 +410,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
 		// remove all pending items that we might have requested
 		c.requestTracker.Remove(pruned...)
-		updateCollectorTreeSpan.Finish()
 	}
+	updateCollectorTreeSpan.Finish()
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)

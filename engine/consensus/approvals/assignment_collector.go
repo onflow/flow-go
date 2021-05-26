@@ -190,7 +190,6 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	for _, approval := range ac.verifiedApprovalsCache.All() {
 		// those approvals are verified already and shouldn't yield any errors
 		_ = collector.ProcessApproval(approval)
-
 	}
 
 	return nil

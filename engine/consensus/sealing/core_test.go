@@ -79,6 +79,8 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
 	s.finalizedAtHeight = make(map[uint64]*flow.Header)
+	s.finalizedAtHeight[s.ParentBlock.Height] = &s.ParentBlock
+	s.finalizedAtHeight[s.Block.Height] = &s.Block
 
 	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(s.ChunksAssignment, nil)
 
@@ -93,6 +95,22 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 				return realstorage.ErrNotFound
 			}
 		})
+	s.headers.On("ByHeight", mock.Anything).Return(
+		func(height uint64) *flow.Header {
+			if block, found := s.finalizedAtHeight[height]; found {
+				return block
+			} else {
+				return nil
+			}
+		},
+		func(height uint64) error {
+			_, found := s.finalizedAtHeight[height]
+			if !found {
+				return realstorage.ErrNotFound
+			}
+			return nil
+		},
+	)
 
 	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
 
@@ -134,6 +152,10 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.core, err = NewCore(log, tracer, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
 		s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
+}
+
+func (s *ApprovalProcessingCoreTestSuite) markFinalized(block *flow.Header) {
+	s.finalizedAtHeight[block.Height] = block
 }
 
 // TestOnBlockFinalized_RejectOutdatedApprovals tests that approvals will be rejected as outdated
@@ -206,7 +228,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 		unittest.IncorporatedResult.WithIncorporatedBlockID(blockB2.ID()),
 		unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result))
 
-	s.headers.On("ByHeight", blockB1.Height).Return(&blockB1, nil)
+	s.markFinalized(&blockB1)
+
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
@@ -251,6 +274,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&candidate))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
+	s.markFinalized(&candidate)
 	err := s.core.ProcessFinalizedBlock(candidate.ID())
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), uint64(0), s.core.collectorTree.GetSize())
@@ -353,6 +377,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerifi
 // TestOnBlockFinalized_EmergencySealing tests that emergency sealing kicks in to resolve sealing halt
 func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing() {
 	s.core.config.EmergencySealingActive = true
+	s.sealsPL.On("ByID", mock.Anything).Return(nil, false).Maybe()
 	s.sealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
@@ -369,9 +394,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_EmergencySealing(
 	require.NoError(s.T(), err)
 
 	lastFinalizedBlock := &s.IncorporatedBlock
+	s.markFinalized(lastFinalizedBlock)
 	for i := 0; i < approvals.DefaultEmergencySealingThreshold; i++ {
 		finalizedBlock := unittest.BlockHeaderWithParentFixture(lastFinalizedBlock)
 		s.blocks[finalizedBlock.ID()] = &finalizedBlock
+		s.markFinalized(&finalizedBlock)
 		err := s.core.ProcessFinalizedBlock(finalizedBlock.ID())
 		require.NoError(s.T(), err)
 		lastFinalizedBlock = &finalizedBlock
@@ -423,7 +450,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
 	// block B_1 becomes finalized
-	err := s.core.ProcessFinalizedBlock(forks[0][0].ID())
+	finalized := forks[0][0].Header
+	s.markFinalized(finalized)
+	err := s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
 
 	// verify will be called twice for every approval in first fork
@@ -474,7 +503,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 
 	finalized := forks[1][0].Header
 
-	s.headers.On("ByHeight", finalized.Height).Return(finalized, nil)
+	s.markFinalized(finalized)
 	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.ParentBlock))
 	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
 
@@ -517,7 +546,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 	result := unittest.ExecutionResultFixture(unittest.WithPreviousResult(*s.IncorporatedResult.Result))
 	result.BlockID = unsealedBlock.ID()
 
-	s.headers.On("ByHeight", unsealedBlock.Height).Return(unsealedBlock, nil)
+	s.markFinalized(&unsealedBlock)
 	err := s.core.ProcessFinalizedBlock(unsealedBlock.ID())
 	require.NoError(s.T(), err)
 
@@ -539,6 +568,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 // rate limiting is respected.
 func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	s.core.requestTracker = approvals.NewRequestTracker(1, 3)
+	s.sealsPL.On("ByID", mock.Anything).Return(nil, false)
 
 	// n is the total number of blocks and incorporated-results we add to the
 	// chain and mempool
@@ -630,7 +660,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// start delivering finalization events
 	lastProcessedIndex := 0
 	for ; lastProcessedIndex < int(s.core.config.ApprovalRequestsThreshold); lastProcessedIndex++ {
-		err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
+		finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
+		s.markFinalized(finalized)
+		err := s.core.ProcessFinalizedBlock(finalized.ID())
 		require.NoError(s.T(), err)
 	}
 
@@ -639,7 +671,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	// process two more blocks, this will trigger requesting approvals for lastSealed + 1 height
 	// but they will be in blackout period
 	for i := 0; i < 2; i++ {
-		err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
+		finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
+		s.markFinalized(finalized)
+		err := s.core.ProcessFinalizedBlock(finalized.ID())
 		require.NoError(s.T(), err)
 		lastProcessedIndex += 1
 	}
@@ -654,7 +688,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 		Return(nil).Times(chunkCount)
 
 	// process next block
-	err := s.core.ProcessFinalizedBlock(unsealedFinalizedBlocks[lastProcessedIndex].ID())
+	finalized := unsealedFinalizedBlocks[lastProcessedIndex].Header
+	s.markFinalized(finalized)
+	err := s.core.ProcessFinalizedBlock(finalized.ID())
 	require.NoError(s.T(), err)
 
 	// now 2 results should be pending

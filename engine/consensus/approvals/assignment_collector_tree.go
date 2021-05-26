@@ -43,12 +43,13 @@ type AssignmentCollectorTree struct {
 
 func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
 	return &AssignmentCollectorTree{
-		forest:            forest.NewLevelledForest(lastSealed.Height),
-		lock:              sync.RWMutex{},
-		onCreateCollector: onCreateCollector,
-		size:              0,
-		lastSealedID:      lastSealed.ID(),
-		headers:           headers,
+		forest:              forest.NewLevelledForest(lastSealed.Height),
+		lock:                sync.RWMutex{},
+		onCreateCollector:   onCreateCollector,
+		size:                0,
+		lastSealedID:        lastSealed.ID(),
+		lastFinalizedHeight: lastSealed.Height,
+		headers:             headers,
 	}
 }
 
@@ -73,24 +74,32 @@ func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*Assig
 
 // FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
 // can mark other forks as orphan and stop processing approvals for it. Eventually all forks will be cleaned up by height
-func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, sealed *flow.Header) {
-	finalizedBlockID := finalized.ID()
+func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, sealed *flow.Header) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
 	if t.lastFinalizedHeight >= finalized.Height {
-		return
+		return nil
+	}
+
+	t.lastSealedID = sealed.ID()
+	for height := finalized.Height; height > t.lastFinalizedHeight; height-- {
+		finalizedBlock, err := t.headers.ByHeight(height)
+		if err != nil {
+			return fmt.Errorf("could not retrieve finalized block at height %d: %w", height, err)
+		}
+		finalizedBlockID := finalizedBlock.ID()
+		iter := t.forest.GetVerticesAtLevel(height)
+		for iter.HasNext() {
+			vertex := iter.NextVertex().(*assignmentCollectorVertex)
+			if finalizedBlockID != vertex.collector.BlockID() {
+				t.markForkProcessable(vertex, false)
+			}
+		}
 	}
 
 	t.lastFinalizedHeight = finalized.Height
-	t.lastSealedID = sealed.ID()
-	iter := t.forest.GetVerticesAtLevel(finalized.Height)
-	for iter.HasNext() {
-		vertex := iter.NextVertex().(*assignmentCollectorVertex)
-		if finalizedBlockID != vertex.collector.BlockID() {
-			t.markForkProcessable(vertex, false)
-		}
-	}
+	return nil
 }
 
 // markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
