@@ -138,10 +138,8 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	}
 	incorporatedAtHeight := incorporatedBlock.Height
 
-	lastFinalizedBlockHeight := c.lastFinalizedHeight()
-
 	// check if we are dealing with finalized block or an orphan
-	if incorporatedAtHeight <= lastFinalizedBlockHeight {
+	if incorporatedAtHeight <= c.lastFinalizedHeight() {
 		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
@@ -198,13 +196,8 @@ func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error 
 
 	// we expect that only engine.UnverifiableInputError,
 	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
-	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
-		logger := c.log.Info()
-		if engine.IsInvalidInputError(err) {
-			logger = c.log.Error()
-		}
-
-		logger.Err(err).Msgf("could not process incorporated result %v", result.ID())
+	if engine.IsUnverifiableInputError(err) {
+		c.log.Info().Err(err).Msgf("could not process incorporated result %v", result.ID())
 		return nil
 	}
 

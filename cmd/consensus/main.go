@@ -241,13 +241,9 @@ func main() {
 				config,
 			)
 
-			finalizationConsumer := pubsub.FinalizationConsumer{
-				OnBlockFinalized:    e.OnFinalizedBlock,
-				OnBlockIncorporated: e.OnBlockIncorporated,
-			}
-
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.AddConsumer(finalizationConsumer)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -298,9 +294,7 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			finalizationDistributor.AddConsumer(pubsub.FinalizationConsumer{
-				OnBlockFinalized: e.OnFinalizedBlock,
-			})
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
 
 			return e, err
 		}).

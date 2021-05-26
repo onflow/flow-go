@@ -281,12 +281,7 @@ func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
 	incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-
-	if err != nil {
-		return fmt.Errorf("fatal internal error in sealing core logic: %w", err)
-	}
-
-	return nil
+	return err
 }
 
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
