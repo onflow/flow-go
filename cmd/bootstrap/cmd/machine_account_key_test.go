@@ -51,7 +51,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 	require.FileExists(t, machineKeyFilePath)
 
 	// read file priv key file before command
-	var machineAccountPrivBefore model.NodeMachineAccountPriv
+	var machineAccountPrivBefore model.NodeMachineAccountKey
 	readJSON(machineKeyFilePath, &machineAccountPrivBefore)
 
 	// run command with flags
@@ -61,7 +61,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 	require.Regexp(t, regex, hook.logs.String())
 
 	// read machine account key file again
-	var machineAccountPrivAfter model.NodeMachineAccountPriv
+	var machineAccountPrivAfter model.NodeMachineAccountKey
 	readJSON(machineKeyFilePath, &machineAccountPrivAfter)
 
 	// check if key was modified

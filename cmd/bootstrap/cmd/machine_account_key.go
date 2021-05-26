@@ -57,7 +57,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	log.Info().Msg("generated machine account private key")
 
 	// construct object to write to file
-	machineAccountPriv := assembleNodeMachineAccountPriv(machineKey)
+	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 
 	writeJSON(machineAccountKeyPath, machineAccountPriv)
 	log.Info().Msgf("machine account public key: %s", machineKey.PublicKey().String())
