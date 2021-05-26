@@ -3,15 +3,11 @@ package cmd
 import (
 	"fmt"
 	"path"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	ioutils "github.com/onflow/flow-go/utils/io"
 )
 
 // machineAccountKeyCmd represents the `machine-account-key` command which generates required machine account key
@@ -61,16 +57,4 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 
 	writeJSON(machineAccountKeyPath, machineAccountPriv)
 	log.Info().Msgf("machine account public key: %s", machineKey.PublicKey().String())
-}
-
-// readNodeID reads the NodeID file
-func readNodeID() (string, error) {
-	path := filepath.Join(flagOutdir, bootstrap.PathNodeID)
-
-	data, err := ioutils.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("error reading file %s: %w", path, err)
-	}
-
-	return strings.TrimSpace(string(data)), nil
 }
