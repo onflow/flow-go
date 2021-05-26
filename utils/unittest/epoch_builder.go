@@ -238,6 +238,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 	commitDefaults := []func(*flow.EpochCommit){
 		CommitWithCounter(counter + 1),
 		WithDKGFromParticipants(setup.Participants),
+		WithClusterQCsFromAssignments(setup.Assignments),
 	}
 	commit := EpochCommitFixture(append(commitDefaults, builder.commitOpts...)...)
 
