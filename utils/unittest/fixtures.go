@@ -1399,7 +1399,9 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	for _, apply := range opts {
 		apply(setup)
 	}
-	setup.Assignments = ClusterAssignment(1, setup.Participants)
+	if setup.Assignments == nil {
+		setup.Assignments = ClusterAssignment(1, setup.Participants)
+	}
 	return setup
 }
 
