@@ -406,8 +406,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
 		// remove all pending items that we might have requested
 		c.requestTracker.Remove(pruned...)
-		updateCollectorTreeSpan.Finish()
 	}
+	updateCollectorTreeSpan.Finish()
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)
