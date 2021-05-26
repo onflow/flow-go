@@ -31,29 +31,13 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-// StoreTx ...
-func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
 		}
 		err = b.payloads.storeTx(block.ID(), block.Payload)(tx)
-		if err != nil {
-			return fmt.Errorf("could not store payload: %w", err)
-		}
-		return nil
-	}
-}
-
-// StoreTxn ...
-func (b *Blocks) StoreTxn(block *flow.Block) func(*transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
-		err := b.headers.storeTxn(block.Header)(tx)
-		if err != nil {
-			return fmt.Errorf("could not store header: %w", err)
-		}
-		err = b.payloads.storeTxn(block.ID(), block.Payload)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store payload: %w", err)
 		}
@@ -81,7 +65,7 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 
 // Store ...
 func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflict(b.db.Update, b.StoreTx(block))
+	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block))
 }
 
 // ByID ...

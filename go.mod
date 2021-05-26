@@ -9,7 +9,7 @@ require (
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
-	github.com/fxamacker/cbor/v2 v2.2.1-0.20201006223149-25f67fca9803
+	github.com/fxamacker/cbor/v2 v2.2.1-0.20210510192846-c3f3c69e7bc8
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/mock v1.4.4
 	github.com/golang/protobuf v1.4.2
@@ -36,9 +36,9 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
-	github.com/onflow/cadence v0.15.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210507220547-a2ecda1df019
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210507220547-a2ecda1df019
+	github.com/onflow/cadence v0.16.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210510205428-30d94f82bc8c
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210510205428-30d94f82bc8c
 	github.com/onflow/flow-emulator v0.19.0
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.12.0

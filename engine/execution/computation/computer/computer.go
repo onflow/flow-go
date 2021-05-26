@@ -119,6 +119,7 @@ func (e *blockComputer) executeBlock(
 	}
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
+	systemChunkCtx := fvm.NewContextFromParent(e.systemChunkCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 	res := &execution.ComputationResult{
 		ExecutableBlock:    block,
@@ -173,7 +174,7 @@ func (e *blockComputer) executeBlock(
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
-	_, err = e.executeSystemCollection(blockSpan, txIndex, colView, programs, res)
+	_, err = e.executeSystemCollection(blockSpan, txIndex, systemChunkCtx, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -196,6 +197,7 @@ func (e *blockComputer) executeBlock(
 func (e *blockComputer) executeSystemCollection(
 	blockSpan opentracing.Span,
 	txIndex uint32,
+	systemChunkCtx fvm.Context,
 	collectionView state.View,
 	programs *programs.Programs,
 	res *execution.ComputationResult,
@@ -206,8 +208,7 @@ func (e *blockComputer) executeSystemCollection(
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 	tx := fvm.SystemChunkTransaction(serviceAddress)
-	txMetrics := fvm.NewMetricsCollector()
-	err := e.executeTransaction(tx, colSpan, txMetrics, collectionView, programs, e.systemChunkCtx, txIndex, res)
+	err := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, txIndex, res)
 	txIndex++
 	if err != nil {
 		return txIndex, err
@@ -242,10 +243,9 @@ func (e *blockComputer) executeCollection(
 		colSpan.Finish()
 	}()
 
-	txMetrics := fvm.NewMetricsCollector()
-	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
+	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, programs, txCtx, txIndex, res)
+		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, txIndex, res)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -264,7 +264,6 @@ func (e *blockComputer) executeCollection(
 func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan opentracing.Span,
-	txMetrics *fvm.MetricsCollector,
 	collectionView state.View,
 	programs *programs.Programs,
 	ctx fvm.Context,
@@ -303,11 +302,6 @@ func (e *blockComputer) executeTransaction(
 		return fmt.Errorf("failed to execute transaction: %w", err)
 	}
 
-	if e.metrics != nil {
-		e.metrics.TransactionParsed(txMetrics.Parsed())
-		e.metrics.TransactionChecked(txMetrics.Checked())
-		e.metrics.TransactionInterpreted(txMetrics.Interpreted())
-	}
 	txResult := flow.TransactionResult{
 		TransactionID: tx.ID,
 	}

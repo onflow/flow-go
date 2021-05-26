@@ -153,9 +153,9 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	// mocks metrics
 	// reception of verifiable chunk
-	suite.metrics.On("OnVerifiableChunkReceived").Return()
+	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
 	// emission of result approval
-	suite.metrics.On("OnResultApproval").Return()
+	suite.metrics.On("OnResultApprovalDispatchedInNetwork").Return()
 
 	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
@@ -195,7 +195,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 
 	// mocks metrics
 	// reception of verifiable chunk
-	suite.metrics.On("OnVerifiableChunkReceived").Return()
+	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
 
 	// we shouldn't receive any result approval
 	suite.pushCon.

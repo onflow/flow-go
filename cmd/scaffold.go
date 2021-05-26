@@ -180,8 +180,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			SoftwareVersionFun: func() string {
 				return build.Semver()
 			},
-			LatestFinalizedBlockHeightFun: func() (uint64, error) {
-				head, err := fnb.State.Final().Head()
+			SealedBlockHeightFun: func() (uint64, error) {
+				head, err := fnb.State.Sealed().Head()
 				if err != nil {
 					return 0, err
 				}
@@ -567,12 +567,13 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	vmOpts := []fvm.Option{
 		fvm.WithChain(fnb.RootChainID.Chain()),
 		fvm.WithBlocks(blockFinder),
+		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithAccountStorageLimit(true),
+			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts

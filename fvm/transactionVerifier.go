@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -20,13 +21,13 @@ const (
 )
 
 type TransactionSignatureVerifier struct {
-	SignatureVerifier  SignatureVerifier
+	SignatureVerifier  crypto.SignatureVerifier
 	KeyWeightThreshold int
 }
 
 func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatureVerifier {
 	return &TransactionSignatureVerifier{
-		SignatureVerifier:  DefaultSignatureVerifier{},
+		SignatureVerifier:  crypto.DefaultSignatureVerifier{},
 		KeyWeightThreshold: keyWeightThreshold,
 	}
 }

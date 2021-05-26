@@ -8,7 +8,9 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -36,7 +38,12 @@ type BootstrapProcedure struct {
 	minimumStorageReservation cadence.UFix64
 	storagePerFlow            cadence.UFix64
 
+	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
+
+	// list of initial network participants for whom we will create/stake flow
+	// accounts and retrieve epoch-related resources
+	identities flow.IdentityList
 }
 
 type BootstrapProcedureOption func(*BootstrapProcedure) *BootstrapProcedure
@@ -117,6 +124,13 @@ func WithRootBlock(rootBlock *flow.Header) BootstrapProcedureOption {
 	}
 }
 
+func WithIdentities(identities flow.IdentityList) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.identities = identities
+		return bp
+	}
+}
+
 func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
 	return func(bp *BootstrapProcedure) *BootstrapProcedure {
 		bp.storagePerFlow = ratio
@@ -144,7 +158,10 @@ func Bootstrap(
 
 func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	b.vm = vm
-	b.ctx = NewContextFromParent(ctx, WithRestrictedDeployment(false))
+	b.ctx = NewContextFromParent(
+		ctx,
+		WithRestrictedDeployment(false),
+		WithRestrictedAccountCreation(false))
 	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
@@ -164,6 +181,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	if b.initialTokenSupply > 0 {
 		b.mintInitialTokens(service, fungibleToken, flowToken, b.initialTokenSupply)
 	}
+
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
 	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation, b.storagePerFlow)
@@ -179,6 +197,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		flowToken)
 
 	b.deployEpoch(service, fungibleToken, flowToken)
+
+	b.registerNodes(service, fungibleToken, flowToken)
 
 	return nil
 }
@@ -398,6 +418,51 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
 }
 
+func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flow.Address) {
+	for _, id := range b.identities {
+
+		// create a machine account for the node
+		nodeAddress := b.createAccount()
+
+		// give a vault resource to the machine account
+		txError, err := b.vm.invokeMetaTransaction(
+			b.ctx,
+			setupAccountTransaction(
+				fungibleToken,
+				flowToken,
+				nodeAddress,
+			),
+			b.sth,
+			b.programs,
+		)
+		panicOnMetaInvokeErrf("failed to setup machine account: %s", txError, err)
+
+		// fund the machine account
+		txError, err = b.vm.invokeMetaTransaction(
+			b.ctx,
+			fundAccountTransaction(service,
+				fungibleToken,
+				flowToken,
+				nodeAddress),
+			b.sth,
+			b.programs,
+		)
+		panicOnMetaInvokeErrf("failed to fund machine account: %s", txError, err)
+
+		// register the node
+		txError, err = b.vm.invokeMetaTransaction(
+			b.ctx,
+			registerNodeTransaction(service,
+				flowToken,
+				nodeAddress,
+				id),
+			b.sth,
+			b.programs,
+		)
+		panicOnMetaInvokeErrf("failed to register node: %s", txError, err)
+	}
+}
+
 const deployContractTransactionTemplate = `
 transaction {
   prepare(signer: AuthAccount) {
@@ -547,6 +612,61 @@ transaction() {
 }
 `
 
+const setupAccountTemplate = `
+// This transaction is a template for a transaction
+// to add a Vault resource to their account
+// so that they can use the flowToken
+
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction {
+
+    prepare(signer: AuthAccount) {
+
+        if signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) == nil {
+            // Create a new flowToken Vault and put it in storage
+            signer.save(<-FlowToken.createEmptyVault(), to: /storage/flowTokenVault)
+
+            // Create a public capability to the Vault that only exposes
+            // the deposit function through the Receiver interface
+            signer.link<&FlowToken.Vault{FungibleToken.Receiver}>(
+                /public/flowTokenReceiver,
+                target: /storage/flowTokenVault
+            )
+
+            // Create a public capability to the Vault that only exposes
+            // the balance field through the Balance interface
+            signer.link<&FlowToken.Vault{FungibleToken.Balance}>(
+                /public/flowTokenBalance,
+                target: /storage/flowTokenVault
+            )
+        }
+    }
+}
+`
+
+const fundAccountTemplate = `
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction(amount: UFix64, recipient: Address) {
+	let sentVault: @FungibleToken.Vault
+	prepare(signer: AuthAccount) {
+	let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+		?? panic("failed to borrow reference to sender vault")
+	self.sentVault <- vaultRef.withdraw(amount: amount)
+	}
+	execute {
+	let receiverRef =  getAccount(recipient)
+		.getCapability(/public/flowTokenReceiver)
+		.borrow<&{FungibleToken.Receiver}>()
+		?? panic("failed to borrow reference to recipient vault")
+	receiverRef.deposit(from: <-self.sentVault)
+	}
+}
+`
+
 func deployContractTransaction(address flow.Address, contract []byte, contractName string) *TransactionProcedure {
 	return Transaction(
 		flow.NewTransactionBody().
@@ -688,6 +808,93 @@ func setupStorageForServiceAccountsTransaction(
 			AddAuthorizer(feeContract),
 		0,
 	)
+}
+
+func setupAccountTransaction(
+	fungibleToken flow.Address,
+	flowToken flow.Address,
+	accountAddress flow.Address,
+) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(setupAccountTemplate, fungibleToken, flowToken))).
+			AddAuthorizer(accountAddress),
+		0,
+	)
+}
+
+func fundAccountTransaction(
+	service flow.Address,
+	fungibleToken flow.Address,
+	flowToken flow.Address,
+	nodeAddress flow.Address,
+) *TransactionProcedure {
+
+	// register node
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(fundAccountTemplate, fungibleToken, flowToken))).
+			AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
+			AddAuthorizer(service),
+		0,
+	)
+}
+
+// registerNodeTransaction creates a new node struct object.
+// Then, if the node is a collector node, creates a new account and adds a QC object to it
+// If the node is a consensus node, it creates a new account and adds a DKG object to it
+func registerNodeTransaction(
+	service flow.Address,
+	flowTokenAddress flow.Address,
+	nodeAddress flow.Address,
+	id *flow.Identity,
+) *TransactionProcedure {
+
+	env := templates.Environment{
+		FlowTokenAddress:         flowTokenAddress.HexWithPrefix(),
+		IDTableAddress:           service.HexWithPrefix(),
+		QuorumCertificateAddress: service.HexWithPrefix(),
+		DkgAddress:               service.HexWithPrefix(),
+		EpochAddress:             service.HexWithPrefix(),
+	}
+
+	// Use NetworkingKey as the public key of the machine account.
+	// We do this for tests/localnet but normally it should be a separate key.
+	accountKey := flow.AccountPublicKey{
+		PublicKey: id.NetworkPubKey,
+		SignAlgo:  id.NetworkPubKey.Algorithm(),
+		HashAlgo:  hash.SHA3_256,
+	}
+	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	cadencePublicKeys := cadence.NewArray(
+		[]cadence.Value{
+			bytesToCadenceArray(encAccountKey),
+		},
+	)
+
+	// register node
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NodeID.String()))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.Address))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NetworkPubKey.String()[2:]))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
+			AddArgument(jsoncdc.MustEncode(cadence.UFix64(id.Stake))).
+			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
+			AddAuthorizer(nodeAddress),
+		0,
+	)
+}
+
+func bytesToCadenceArray(b []byte) cadence.Array {
+	values := make([]cadence.Value, len(b))
+	for i, v := range b {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values)
 }
 
 const (

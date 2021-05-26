@@ -25,6 +25,7 @@ import (
 	"github.com/dapperlabs/testingdock"
 
 	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/fvm"
@@ -471,6 +472,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
 
+			nodeContainer.addFlag("access-address", "access_1:9000")
+			nodeContainer.addFlag("qc-contract-address", flow.Testnet.Chain().ServiceAddress().String())
+
 		case flow.RoleExecution:
 
 			hostPort := testingdock.RandomPort(t)
@@ -616,7 +620,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write private key files for each node
-	for _, nodeConfig := range confs {
+	for i, nodeConfig := range confs {
 		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
 
 		// retrieve private representation of the node
@@ -626,6 +630,38 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 
 		err = WriteJSON(path, private)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
+		// We use the network key for the machine account. Normally it would be
+		// a separate key.
+
+		// Accounts are generated in a known order during bootstrapping, and
+		// account addresses are deterministic based on order for a given chain
+		// configuration. During the bootstrapping. We create accounts for the
+		// FungibleToken, FlowToken, and FlowFees smart contracts besides the
+		// service account. The service account has index 0, then these 3
+		// accounts would occupy account indices [1-3], so the node machine
+		// accounts would occupy account indices [4,n+4]. They will be created
+		// in the order defined by the identity list provided to the
+		// BootstrapProcedure, which is the same order as the container configs.
+		accountAddress, err := chainID.Chain().AddressAtIndex(uint64(4 + i))
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
+		info := bootstrap.NodeMachineAccountInfo{
+			Address:           accountAddress.HexWithPrefix(),
+			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
+			KeyIndex:          0,
+			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
+			HashAlgorithm:     crypto.SHA3_256,
+		}
+
+		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeConfig.NodeID))
+
+		err = WriteJSON(infoPath, info)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -707,6 +743,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 		fvm.WithRootBlock(root.Header),
 		fvm.WithEpochConfig(epochConfig),
+		fvm.WithIdentities(participants),
 	)
 	if err != nil {
 		return nil, nil, nil, nil, err

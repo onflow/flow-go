@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ChunkDataPacks struct {
@@ -19,9 +20,9 @@ type ChunkDataPacks struct {
 
 func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCacheSize uint) *ChunkDataPacks {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		chdp := val.(*flow.ChunkDataPack)
-		return operation.SkipDuplicates(operation.InsertChunkDataPack(chdp))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(chdp)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -48,7 +49,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCa
 }
 
 func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
-	err := operation.RetryOnConflict(ch.db.Update, ch.byChunkIDCache.Put(c.ChunkID, c))
+	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(c.ChunkID, c))
 	if err != nil {
 		return fmt.Errorf("could not store chunk datapack: %w", err)
 	}

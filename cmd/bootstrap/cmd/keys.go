@@ -106,10 +106,10 @@ func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress
 
 func assembleNodeMachineAccountKey(machineKey crypto.PrivateKey) model.NodeMachineAccountKey {
 	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
-	machineNodeInfo := model.NodeMachineAccountKey{
+	key := model.NodeMachineAccountKey{
 		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
 	}
-	return machineNodeInfo
+	return key
 }
 
 func validateAddressesUnique(ns []model.NodeConfig) {
