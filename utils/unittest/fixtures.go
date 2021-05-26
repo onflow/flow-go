@@ -1499,7 +1499,11 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithFirstView(root.Header.View),
 		WithFinalView(root.Header.View+1000),
 	)
-	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
+	commit := EpochCommitFixture(
+		CommitWithCounter(counter),
+		WithClusterQCsFromAssignments(setup.Assignments),
+		WithDKGFromParticipants(participants),
+	)
 
 	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
