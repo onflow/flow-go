@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -64,11 +63,12 @@ func (f *HotStuffFactory) Create(
 ) (*hotstuff.EventLoop, error) {
 
 	// setup metrics/logging with the new chain ID
-	metrics := metrics.NewHotstuffCollector(cluster.ChainID())
+	//metrics := metrics.NewHotstuffCollector(cluster.ChainID())
+	metrics := metrics.NewNoopCollector() // TODO
 	notifier := pubsub.NewDistributor()
-	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
+	//notifier.AddConsumer(notifications.NewLogConsumer(f.log)) // TODO
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
+	//notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID())) // TODO
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
 	var committee hotstuff.Committee

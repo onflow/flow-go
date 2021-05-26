@@ -1,6 +1,7 @@
 package test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -41,13 +42,22 @@ type ClusterSwitchoverSuite struct {
 	builder    *unittest.EpochBuilder    // utility for building epochs
 }
 
+// ClusterSwitchoverTestCase represents a test case for the cluster switchover
+// test suite.
+type ClusterSwitchoverTestCase struct {
+	clusters   uint // # of clusters each epoch
+	collectors uint // # of collectors each epoch
+}
+
+// TestClusterSwitchoverSuite runs the cluster switchover test suite.
 func TestClusterSwitchoverSuite(t *testing.T) {
 	suite.Run(t, new(ClusterSwitchoverSuite))
 }
 
-// SetupTest sets up the test with the given identity table, creating mock
-// nodes for all collection nodes.
-func (suite *ClusterSwitchoverSuite) SetupTest(tc testcase) {
+// SetupTest sets up the test based on the given testcase configuration and
+// creates mock collection nodes for each configured collector.
+func (suite *ClusterSwitchoverSuite) SetupTest(tc ClusterSwitchoverTestCase) {
+
 	collectors := unittest.IdentityListFixture(int(tc.collectors), unittest.WithRole(flow.RoleCollection), unittest.WithRandomPublicKeys())
 	suite.identities = unittest.CompleteIdentitySet(collectors...)
 	suite.hub = stub.NewNetworkHub()
@@ -85,6 +95,8 @@ func (suite *ClusterSwitchoverSuite) SetupTest(tc testcase) {
 	suite.builder = unittest.NewEpochBuilder(suite.T(), states...)
 }
 
+// StartNodes starts all collection nodes in the suite and turns on continuous
+// delivery in the stub network.
 func (suite *ClusterSwitchoverSuite) StartNodes() {
 
 	// start all node components
@@ -141,88 +153,9 @@ func (suite *ClusterSwitchoverSuite) ClusterState(node testmock.CollectionNode, 
 	return state
 }
 
-// TestSingleNode tests cluster switchover with a single node.
-func (suite *ClusterSwitchoverSuite) TestSingleNode() {
-
-	tc := testcase{
-		clusters:   1,
-		collectors: 1,
-	}
-	suite.SetupTest(tc)
-
-	// start the nodes
-	suite.StartNodes()
-	defer suite.StopNodes()
-
-	collector := suite.nodes[0]
-
-	// build out the first epoch and begin the second epoch - at this point
-	// the collection node should be running consensus for both epochs 1 & 2
-	builder := unittest.NewEpochBuilder(suite.T(), collector.State)
-	builder.BuildEpoch().CompleteEpoch()
-
-	final, err := collector.State.Final().Head()
-	require.NoError(suite.T(), err)
-
-	// create one transaction for each epoch
-	epoch1Tx := suite.Transaction(func(tx *flow.TransactionBody) {
-		// reference a block in epoch 1, so it is routed to the epoch 1 cluster
-		tx.SetReferenceBlockID(suite.RootBlock().ID())
-	})
-	epoch2Tx := suite.Transaction(func(tx *flow.TransactionBody) {
-		// reference a block in epoch 2, so it is routed to the epoch 2 cluster
-		tx.SetReferenceBlockID(final.ID())
-	})
-
-	// expect 2 collections to be received
-	waitForGuarantees := new(sync.WaitGroup)
-	waitForGuarantees.Add(2)
-	suite.sn.On("Submit", mock.Anything, mock.Anything).
-		Return(nil).
-		Run(func(_ mock.Arguments) {
-			waitForGuarantees.Done()
-		}).
-		Twice()
-
-	// submit both transactions to the node's ingestion engine
-	err = collector.IngestionEngine.ProcessLocal(epoch1Tx)
-	require.NoError(suite.T(), err)
-	err = collector.IngestionEngine.ProcessLocal(epoch2Tx)
-	require.NoError(suite.T(), err)
-
-	// wait for 2 distinct collection guarantees to be received by the consensus node
-	unittest.RequireReturnsBefore(suite.T(), waitForGuarantees.Wait, time.Second, "did not receive 2 collections")
-
-	// open cluster states for both epoch 1 and epoch 2 clusters
-	epoch1Cluster, err := collector.State.Final().Epochs().Previous().Cluster(0)
-	suite.Require().NoError(err)
-	epoch2Cluster, err := collector.State.Final().Epochs().Current().Cluster(0)
-	suite.Require().NoError(err)
-	epoch1ClusterState := suite.ClusterState(collector, epoch1Cluster.ChainID())
-	epoch2ClusterState := suite.ClusterState(collector, epoch2Cluster.ChainID())
-
-	// the transaction referencing a block in epoch 1 should be in the epoch 1 cluster state
-	unittest.NewClusterStateChecker(epoch1ClusterState).
-		ExpectTxCount(1).
-		ExpectContainsTx(epoch1Tx.ID()).
-		ExpectOmitsTx(epoch2Tx.ID()).
-		Assert(suite.T())
-
-	// the transaction referencing a block in epoch 2 should be in the epoch 2 cluster state
-	unittest.NewClusterStateChecker(epoch2ClusterState).
-		ExpectTxCount(1).
-		ExpectContainsTx(epoch2Tx.ID()).
-		ExpectOmitsTx(epoch1Tx.ID()).
-		Assert(suite.T())
-}
-
-type testcase struct {
-	clusters   uint
-	collectors uint
-}
-
-func (suite *ClusterSwitchoverSuite) AnyCollector() testmock.CollectionNode {
-	return suite.nodes[0]
+// State returns the protocol state.
+func (suite *ClusterSwitchoverSuite) State() protocol.State {
+	return suite.nodes[0].State
 }
 
 // Collector returns the mock node for the collector with the given ID.
@@ -251,41 +184,79 @@ func (suite *ClusterSwitchoverSuite) Clusters(epoch protocol.Epoch) []protocol.C
 	return clusters
 }
 
-func (suite *ClusterSwitchoverSuite) TestSwitchoverInstance() {
-	tc := testcase{
-		clusters:   1,
-		collectors: 2,
+// TestSwitchover runs all cluster switchover test cases.
+func (suite *ClusterSwitchoverSuite) TestSwitchover() {
+	cases := []ClusterSwitchoverTestCase{
+		{
+			clusters:   1,
+			collectors: 1,
+		}, {
+			clusters:   1,
+			collectors: 2,
+		}, {
+			clusters:   2,
+			collectors: 2,
+		}, {
+			clusters:   2,
+			collectors: 4,
+		},
 	}
-	suite.TestSwitchover(tc)
+
+	for _, tc := range cases {
+		//suite.Run(fmt.Sprintf("%d clusters, %d collectors", tc.clusters, tc.collectors), func() {
+		suite.RunTestCase(tc)
+		//})
+	}
 }
 
-func (suite *ClusterSwitchoverSuite) TestSwitchover(tc testcase) {
+func (suite *ClusterSwitchoverSuite) Test1Collector1Cluster() {
+	suite.RunTestCase(ClusterSwitchoverTestCase{
+		clusters:   1,
+		collectors: 1,
+	})
+}
+
+func (suite *ClusterSwitchoverSuite) Test2Collectors1() {
+	suite.RunTestCase(ClusterSwitchoverTestCase{
+		clusters:   1,
+		collectors: 2,
+	})
+}
+
+// TestSwitchover comprises the core test logic for cluster switchover. We build
+// an epoch, which triggers the beginning of the epoch 2 cluster consensus, then
+// send transactions targeting clusters from both epochs while both are running.
+func (suite *ClusterSwitchoverSuite) RunTestCase(tc ClusterSwitchoverTestCase) {
 	suite.SetupTest(tc)
 
 	suite.StartNodes()
 	defer suite.StopNodes()
 
-	// TODO check this value
+	// keep track of guarantees received at the mock consensus node
+	// when a guarantee is received, it indicates that the sender has finalized
+	// the corresponding cluster block
 	expectedGuarantees := int(tc.collectors * 2)
 	waitForGuarantees := new(sync.WaitGroup)
 	waitForGuarantees.Add(expectedGuarantees)
 	suite.sn.On("Submit", mock.Anything, mock.Anything).
 		Return(nil).
-		Run(func(_ mock.Arguments) {
+		Run(func(args mock.Arguments) {
+			// TODO remove logs
+			origin := args[0].(flow.Identifier)
+			msg := args[1].(*flow.CollectionGuarantee)
+			fmt.Println("got message origin: ", origin, " colid: ", msg.ID())
 			waitForGuarantees.Done()
 		}).
 		Times(expectedGuarantees)
 
-	// EPOCH 1
-
 	// build the epoch, ending on the first block on the next epoch
 	suite.builder.BuildEpoch().CompleteEpoch()
 
-	final, err := suite.AnyCollector().State.Final().Head()
+	final, err := suite.State().Final().Head()
 	suite.Require().NoError(err)
 
-	epoch1 := suite.AnyCollector().State.Final().Epochs().Previous()
-	epoch2 := suite.AnyCollector().State.Final().Epochs().Current()
+	epoch1 := suite.State().Final().Epochs().Previous()
+	epoch2 := suite.State().Final().Epochs().Current()
 
 	epoch1Clusters := suite.Clusters(epoch1)
 	epoch2Clusters := suite.Clusters(epoch2)
@@ -299,7 +270,7 @@ func (suite *ClusterSwitchoverSuite) TestSwitchover(tc testcase) {
 	epoch1ExpectedTransactions := make(map[int][]flow.Identifier)
 	epoch2ExpectedTransactions := make(map[int][]flow.Identifier)
 
-	// submit transactions targeting epoch 2 clusters
+	// submit transactions targeting epoch 1 clusters
 	for i, cluster := range epoch1Clustering {
 		// create a transaction which will be routed to this cluster in epoch 1
 		tx := suite.Transaction(func(tx *flow.TransactionBody) {
@@ -319,7 +290,6 @@ func (suite *ClusterSwitchoverSuite) TestSwitchover(tc testcase) {
 		tx := suite.Transaction(func(tx *flow.TransactionBody) {
 			tx.SetReferenceBlockID(final.ID())
 		})
-		// TODO - note this down for cluster state checker later
 		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, cluster, nil)
 		epoch2ExpectedTransactions[i] = append(epoch2ExpectedTransactions[i], clusterTx.ID())
 
@@ -328,16 +298,17 @@ func (suite *ClusterSwitchoverSuite) TestSwitchover(tc testcase) {
 		suite.Require().NoError(err)
 	}
 
-	unittest.RequireReturnsBefore(suite.T(), waitForGuarantees.Wait, time.Second, "did not receive guarantees at consensus node")
+	unittest.RequireReturnsBefore(suite.T(), waitForGuarantees.Wait, 10*time.Second, "did not receive guarantees at consensus node")
 
 	// check epoch 1 cluster states
 	for i, cluster := range epoch1Clusters {
 		for _, member := range cluster.Members() {
 			node := suite.Collector(member.NodeID)
 			state := suite.ClusterState(node, cluster.ChainID())
+			expected := epoch1ExpectedTransactions[i]
 			unittest.NewClusterStateChecker(state).
-				ExpectTxCount(1).
-				ExpectContainsTx(epoch1ExpectedTransactions[i]...)
+				ExpectTxCount(len(expected)).
+				ExpectContainsTx(expected...)
 		}
 	}
 
@@ -346,9 +317,10 @@ func (suite *ClusterSwitchoverSuite) TestSwitchover(tc testcase) {
 		for _, member := range cluster.Members() {
 			node := suite.Collector(member.NodeID)
 			state := suite.ClusterState(node, cluster.ChainID())
+			expected := epoch2ExpectedTransactions[i]
 			unittest.NewClusterStateChecker(state).
-				ExpectTxCount(1).
-				ExpectContainsTx(epoch2ExpectedTransactions[i]...)
+				ExpectTxCount(len(expected)).
+				ExpectContainsTx(expected...)
 		}
 	}
 }
