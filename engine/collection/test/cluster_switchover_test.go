@@ -38,6 +38,7 @@ type ClusterSwitchoverSuite struct {
 	root       protocol.Snapshot         // shared root snapshot
 	nodes      []testmock.CollectionNode // collection nodes
 	sn         *mockmodule.Engine        // fake consensus node engine for receiving guarantees
+	builder    *unittest.EpochBuilder    // utility for building epochs
 }
 
 func TestClusterSwitchoverSuite(t *testing.T) {
@@ -46,24 +47,57 @@ func TestClusterSwitchoverSuite(t *testing.T) {
 
 // SetupTest sets up the test with the given identity table, creating mock
 // nodes for all collection nodes.
-func (suite *ClusterSwitchoverSuite) SetupTest(identities flow.IdentityList) {
-	suite.identities = identities
-	suite.root = unittest.RootSnapshotFixture(identities)
+func (suite *ClusterSwitchoverSuite) SetupTest(tc testcase) {
+	collectors := unittest.IdentityListFixture(int(tc.collectors), unittest.WithRole(flow.RoleCollection), unittest.WithRandomPublicKeys())
+	suite.identities = unittest.CompleteIdentitySet(collectors...)
 	suite.hub = stub.NewNetworkHub()
 
-	collectors := identities.Filter(filter.HasRole(flow.RoleCollection))
+	// create a root snapshot with the given number of initial clusters
+	root := unittest.RootSnapshotFixture(suite.identities)
+	encodable := root.Encodable()
+	setup := encodable.LatestResult.ServiceEvents[0].Event.(*flow.EpochSetup)
+	setup.Assignments = unittest.ClusterAssignment(tc.clusters, suite.identities)
+	encodable.LatestSeal.ResultID = encodable.LatestResult.ID()
+	suite.root = root
+
+	// create a mock node for each collector identity
 	for _, collector := range collectors {
 		node := testutil.CollectionNode(suite.T(), suite.hub, collector, suite.root)
 		suite.nodes = append(suite.nodes, node)
 	}
+
+	// create a mock consensus node to receive collection guarantees
+	consensus := testutil.GenericNode(
+		suite.T(),
+		suite.hub,
+		suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
+		suite.root,
+	)
+	suite.sn = new(mockmodule.Engine)
+	_, err := consensus.Net.Register(engine.ReceiveGuarantees, suite.sn)
+	require.NoError(suite.T(), err)
+
+	// create an epoch builder hooked to each collector's protocol state
+	states := make([]protocol.MutableState, 0, len(collectors))
+	for _, node := range suite.nodes {
+		states = append(states, node.State)
+	}
+	suite.builder = unittest.NewEpochBuilder(suite.T(), states...)
 }
 
 func (suite *ClusterSwitchoverSuite) StartNodes() {
+
+	// start all node components
 	nodes := make([]module.ReadyDoneAware, 0, len(suite.nodes))
 	for _, node := range suite.nodes {
 		nodes = append(nodes, node)
 	}
 	unittest.RequireCloseBefore(suite.T(), lifecycle.AllReady(nodes...), time.Second, "could not start nodes")
+
+	// start continuous delivery for all nodes
+	for _, node := range suite.nodes {
+		node.Net.StartConDev(10*time.Millisecond, false)
+	}
 }
 
 func (suite *ClusterSwitchoverSuite) StopNodes() {
@@ -110,27 +144,17 @@ func (suite *ClusterSwitchoverSuite) ClusterState(node testmock.CollectionNode, 
 // TestSingleNode tests cluster switchover with a single node.
 func (suite *ClusterSwitchoverSuite) TestSingleNode() {
 
-	identity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	participants := unittest.CompleteIdentitySet(identity)
-	suite.SetupTest(participants)
+	tc := testcase{
+		clusters:   1,
+		collectors: 1,
+	}
+	suite.SetupTest(tc)
 
 	// start the nodes
 	suite.StartNodes()
 	defer suite.StopNodes()
 
-	// create a mock consensus node to receive collection guarantees
-	consensus := testutil.GenericNode(
-		suite.T(),
-		suite.hub,
-		suite.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
-		suite.root,
-	)
-	guaranteeReceiver := new(mockmodule.Engine)
-	_, err := consensus.Net.Register(engine.ReceiveGuarantees, guaranteeReceiver)
-	require.NoError(suite.T(), err)
-
 	collector := suite.nodes[0]
-	collector.Net.StartConDev(10*time.Millisecond, false)
 
 	// build out the first epoch and begin the second epoch - at this point
 	// the collection node should be running consensus for both epochs 1 & 2
@@ -153,7 +177,7 @@ func (suite *ClusterSwitchoverSuite) TestSingleNode() {
 	// expect 2 collections to be received
 	waitForGuarantees := new(sync.WaitGroup)
 	waitForGuarantees.Add(2)
-	guaranteeReceiver.On("Submit", mock.Anything, mock.Anything).
+	suite.sn.On("Submit", mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(_ mock.Arguments) {
 			waitForGuarantees.Done()
@@ -190,4 +214,141 @@ func (suite *ClusterSwitchoverSuite) TestSingleNode() {
 		ExpectContainsTx(epoch2Tx.ID()).
 		ExpectOmitsTx(epoch1Tx.ID()).
 		Assert(suite.T())
+}
+
+type testcase struct {
+	clusters   uint
+	collectors uint
+}
+
+func (suite *ClusterSwitchoverSuite) AnyCollector() testmock.CollectionNode {
+	return suite.nodes[0]
+}
+
+// Collector returns the mock node for the collector with the given ID.
+func (suite *ClusterSwitchoverSuite) Collector(id flow.Identifier) testmock.CollectionNode {
+	for _, node := range suite.nodes {
+		if node.Me.NodeID() == id {
+			return node
+		}
+	}
+	suite.T().FailNow()
+	return testmock.CollectionNode{}
+}
+
+// Clusters returns the clusters for the current epoch.
+func (suite *ClusterSwitchoverSuite) Clusters(epoch protocol.Epoch) []protocol.Cluster {
+	clustering, err := epoch.Clustering()
+	suite.Require().NoError(err)
+
+	clusters := make([]protocol.Cluster, 0, len(clustering))
+	for i := uint(0); i < uint(len(clustering)); i++ {
+		cluster, err := epoch.Cluster(i)
+		suite.Require().NoError(err)
+		clusters = append(clusters, cluster)
+	}
+
+	return clusters
+}
+
+func (suite *ClusterSwitchoverSuite) TestSwitchoverInstance() {
+	tc := testcase{
+		clusters:   1,
+		collectors: 2,
+	}
+	suite.TestSwitchover(tc)
+}
+
+func (suite *ClusterSwitchoverSuite) TestSwitchover(tc testcase) {
+	suite.SetupTest(tc)
+
+	suite.StartNodes()
+	defer suite.StopNodes()
+
+	// TODO check this value
+	expectedGuarantees := int(tc.collectors * 2)
+	waitForGuarantees := new(sync.WaitGroup)
+	waitForGuarantees.Add(expectedGuarantees)
+	suite.sn.On("Submit", mock.Anything, mock.Anything).
+		Return(nil).
+		Run(func(_ mock.Arguments) {
+			waitForGuarantees.Done()
+		}).
+		Times(expectedGuarantees)
+
+	// EPOCH 1
+
+	// build the epoch, ending on the first block on the next epoch
+	suite.builder.BuildEpoch().CompleteEpoch()
+
+	final, err := suite.AnyCollector().State.Final().Head()
+	suite.Require().NoError(err)
+
+	epoch1 := suite.AnyCollector().State.Final().Epochs().Previous()
+	epoch2 := suite.AnyCollector().State.Final().Epochs().Current()
+
+	epoch1Clusters := suite.Clusters(epoch1)
+	epoch2Clusters := suite.Clusters(epoch2)
+	epoch1Clustering, err := epoch1.Clustering()
+	suite.Require().NoError(err)
+	epoch2Clustering, err := epoch2.Clustering()
+	suite.Require().NoError(err)
+
+	// keep track of which transactions are expected within which cluster for each epoch
+	// clusterIndex -> []transactionID
+	epoch1ExpectedTransactions := make(map[int][]flow.Identifier)
+	epoch2ExpectedTransactions := make(map[int][]flow.Identifier)
+
+	// submit transactions targeting epoch 2 clusters
+	for i, cluster := range epoch1Clustering {
+		// create a transaction which will be routed to this cluster in epoch 1
+		tx := suite.Transaction(func(tx *flow.TransactionBody) {
+			tx.SetReferenceBlockID(suite.RootBlock().ID())
+		})
+		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, cluster, nil)
+		epoch1ExpectedTransactions[i] = append(epoch1ExpectedTransactions[i], clusterTx.ID())
+
+		// submit the transaction to any collector in this cluster
+		err = suite.Collector(cluster[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+		suite.Require().NoError(err)
+	}
+
+	// submit transactions targeting epoch 2 clusters
+	for i, cluster := range epoch2Clustering {
+		// create a transaction which will be routed to this cluster in epoch 2
+		tx := suite.Transaction(func(tx *flow.TransactionBody) {
+			tx.SetReferenceBlockID(final.ID())
+		})
+		// TODO - note this down for cluster state checker later
+		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, cluster, nil)
+		epoch2ExpectedTransactions[i] = append(epoch2ExpectedTransactions[i], clusterTx.ID())
+
+		// submit the transaction to any collector in this cluster
+		err = suite.Collector(cluster[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+		suite.Require().NoError(err)
+	}
+
+	unittest.RequireReturnsBefore(suite.T(), waitForGuarantees.Wait, time.Second, "did not receive guarantees at consensus node")
+
+	// check epoch 1 cluster states
+	for i, cluster := range epoch1Clusters {
+		for _, member := range cluster.Members() {
+			node := suite.Collector(member.NodeID)
+			state := suite.ClusterState(node, cluster.ChainID())
+			unittest.NewClusterStateChecker(state).
+				ExpectTxCount(1).
+				ExpectContainsTx(epoch1ExpectedTransactions[i]...)
+		}
+	}
+
+	// check epoch 2 cluster states
+	for i, cluster := range epoch2Clusters {
+		for _, member := range cluster.Members() {
+			node := suite.Collector(member.NodeID)
+			state := suite.ClusterState(node, cluster.ChainID())
+			unittest.NewClusterStateChecker(state).
+				ExpectTxCount(1).
+				ExpectContainsTx(epoch2ExpectedTransactions[i]...)
+		}
+	}
 }
