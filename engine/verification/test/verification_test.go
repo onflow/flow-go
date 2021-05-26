@@ -131,7 +131,7 @@ func TestSingleCollectionProcessing(t *testing.T) {
 		chainID,
 		[]*vertestutils.CompleteExecutionReceipt{completeER},
 		expectedChunkIDs,
-		vertestutils.RespondChunkDataPackRequest) // always responds to chunk data pack requests.
+		vertestutils.RespondChunkDataPackRequestImmediately) // always responds to chunk data pack requests.
 
 	// consensus node
 	// mock consensus node

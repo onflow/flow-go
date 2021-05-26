@@ -138,7 +138,7 @@ func VerificationHappyPath(t *testing.T,
 		chainID,
 		CompleteExecutionReceiptList{completeER},
 		assignedChunkIDs,
-		RespondChunkDataPackRequest) // always responds to chunk data pack requests.
+		RespondChunkDataPackRequestImmediately) // always responds to chunk data pack requests.
 
 	// mock consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
@@ -273,7 +273,8 @@ func SetupChunkDataPackProvider(t *testing.T,
 	return &exeNode, exeEngine, wg
 }
 
-func RespondChunkDataPackRequest(t *testing.T,
+// RespondChunkDataPackRequestImmediately immediately qualifies a chunk data request for reply by chunk data provider.
+func RespondChunkDataPackRequestImmediately(t *testing.T,
 	completeERs CompleteExecutionReceiptList,
 	chunkID flow.Identifier,
 	verID flow.Identifier,
@@ -291,6 +292,36 @@ func RespondChunkDataPackRequest(t *testing.T,
 		Msg("chunk data pack request answered by provider")
 
 	return true
+}
+
+// RespondChunkDataPackRequestAfterNTrials only qualifies a chunk data request for reply by chunk data provider after n times.
+func RespondChunkDataPackRequestAfterNTrials(n uint8) func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool {
+	tryCount := make(map[flow.Identifier]uint8)
+
+	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
+		trials, ok := tryCount[chunkID]
+		if !ok {
+			tryCount[chunkID] = 1
+			return false
+		}
+
+		trials++
+		tryCount[chunkID] = trials
+		if trials >= n {
+			// finds the chunk data pack of the requested chunk and sends it back.
+			res := completeERs.ChunkDataResponseOf(t, chunkID)
+
+			err := con.Unicast(res, verID)
+			assert.Nil(t, err)
+
+			log.Debug().
+				Hex("origin_id", logging.ID(verID)).
+				Hex("chunk_id", logging.ID(chunkID)).
+				Msg("chunk data pack request answered by provider")
+		}
+
+		return false
+	}
 }
 
 // SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
@@ -650,7 +681,7 @@ func withConsumers(t *testing.T,
 		chainID,
 		completeERs,
 		assignedChunkIDs,
-		RespondChunkDataPackRequest)
+		RespondChunkDataPackRequestImmediately)
 
 	// consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
