@@ -48,14 +48,39 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	}
 }
 
-func (tc *ClusterSwitchoverTestCase) T() *testing.T {
-	return tc.t
+// TestClusterSwitchover_SingleCluster tests cluster switchover with one cluster.
+func TestClusterSwitchover_SingleCluster(t *testing.T) {
+	t.Run("1 collector", func(t *testing.T) {
+		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+			clusters:   1,
+			collectors: 1,
+		}))
+	})
+	t.Run("2 collectors", func(t *testing.T) {
+		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+			clusters:   1,
+			collectors: 2,
+		}))
+	})
+
+}
+
+// TestClusterSwitchover_SingleCluster tests cluster switchover with two clusters.
+func TestClusterSwitchover_MultiCluster(t *testing.T) {
+	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+		clusters:   2,
+		collectors: 4,
+	}))
 }
 
 // ClusterSwitchoverTestConf configures a test case.
 type ClusterSwitchoverTestConf struct {
 	clusters   uint // # of clusters each epoch
 	collectors uint // # of collectors each epoch
+}
+
+func (tc *ClusterSwitchoverTestCase) T() *testing.T {
+	return tc.t
 }
 
 // SetupTest sets up the test based on the given testcase configuration and
@@ -186,31 +211,6 @@ func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.Epoch) []protocol.C
 	}
 
 	return clusters
-}
-
-// TestClusterSwitchover_SingleCluster tests cluster switchover with one cluster.
-func TestClusterSwitchover_SingleCluster(t *testing.T) {
-	t.Run("1 collector", func(t *testing.T) {
-		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-			clusters:   1,
-			collectors: 1,
-		}))
-	})
-	t.Run("2 collectors", func(t *testing.T) {
-		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-			clusters:   1,
-			collectors: 2,
-		}))
-	})
-
-}
-
-// TestClusterSwitchover_SingleCluster tests cluster switchover with two clusters.
-func TestClusterSwitchover_MultiCluster(t *testing.T) {
-	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-		clusters:   2,
-		collectors: 4,
-	}))
 }
 
 // RunTestCase comprises the core test logic for cluster switchover. We build
