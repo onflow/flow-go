@@ -1277,7 +1277,10 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 	bs.storeBlock(&C)
 
 	// store execution results
-	for _, block := range []*flow.Block{&A, &B} {
+	for _, block := range []*flow.Block{&A, &B, &C} {
+		// for current block create empty receipts list
+		bs.receiptsByBlockID[block.ID()] = flow.ExecutionReceiptList{}
+
 		for _, result := range block.Payload.Results {
 			bs.resultByID[result.ID()] = result
 		}
