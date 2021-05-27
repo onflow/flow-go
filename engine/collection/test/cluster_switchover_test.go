@@ -52,8 +52,7 @@ func (tc *ClusterSwitchoverTestCase) T() *testing.T {
 	return tc.t
 }
 
-// ClusterSwitchoverTestConf represents a test case for the cluster switchover
-// test suite.
+// ClusterSwitchoverTestConf configures a test case.
 type ClusterSwitchoverTestConf struct {
 	clusters   uint // # of clusters each epoch
 	collectors uint // # of collectors each epoch
@@ -299,7 +298,8 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 			expected := epoch1ExpectedTransactions[i]
 			unittest.NewClusterStateChecker(state).
 				ExpectTxCount(len(expected)).
-				ExpectContainsTx(expected...)
+				ExpectContainsTx(expected...).
+				Assert(tc.T())
 		}
 	}
 
@@ -311,7 +311,8 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 			expected := epoch2ExpectedTransactions[i]
 			unittest.NewClusterStateChecker(state).
 				ExpectTxCount(len(expected)).
-				ExpectContainsTx(expected...)
+				ExpectContainsTx(expected...).
+				Assert(tc.T())
 		}
 	}
 }
