@@ -22,19 +22,20 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics   module.MempoolMetrics
-	tracer    module.Tracer
-	db        *badger.DB
-	state     protocol.MutableState
-	seals     storage.Seals
-	headers   storage.Headers
-	index     storage.Index
-	blocks    storage.Blocks
-	resultsDB storage.ExecutionResults
-	guarPool  mempool.Guarantees
-	sealPool  mempool.IncorporatedResultSeals
-	recPool   mempool.ExecutionTree
-	cfg       Config
+	metrics    module.MempoolMetrics
+	tracer     module.Tracer
+	db         *badger.DB
+	state      protocol.MutableState
+	seals      storage.Seals
+	headers    storage.Headers
+	index      storage.Index
+	blocks     storage.Blocks
+	resultsDB  storage.ExecutionResults
+	receiptsDB storage.ExecutionReceipts // to persist received execution receipts
+	guarPool   mempool.Guarantees
+	sealPool   mempool.IncorporatedResultSeals
+	recPool    mempool.ExecutionTree
+	cfg        Config
 }
 
 // NewBuilder creates a new block builder.
@@ -152,72 +153,55 @@ func (b *Builder) repopulateExecutionTree() error {
 	}
 	finalizedID := finalized.ID()
 
-	// Get the latest sealed block on this fork, ie the highest block for which
-	// there is a seal in this fork.
+	// Get the latest sealed block on this fork, i.e. the highest
+	// block for which there is a finalized seal.
 	latestSeal, err := b.seals.ByBlockID(finalizedID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
+		return fmt.Errorf("could not retrieve latest seal in fork with head %x: %w", finalizedID, err)
 	}
-
-	latestSealed, err := b.headers.ByBlockID(latestSeal.BlockID)
+	latestSealedBlockID := latestSeal.BlockID
+	latestSealedBlock, err := b.headers.ByBlockID(latestSealedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSeal.BlockID, err)
 	}
-
 	sealedResult, err := b.resultsDB.ByID(latestSeal.ResultID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve sealed result (%x): %w", latestSeal.ResultID, err)
 	}
 
-	// handle latest sealed result manually
-	// this is needed to handle a case when we are building on top of genesis block
-	err = b.recPool.AddResult(sealedResult, latestSealed)
+	// prune execution tree to minimum height (while the tree is still empty, for max efficiency)
+	err = b.recPool.PruneUpToHeight(latestSealedBlock.Height)
+	if err != nil {
+		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealedBlock.Height, err)
+	}
+
+	// At initialization, the execution tree is empty. However, during normal operations, we
+	// generally query the tree for "all receipts, whose results are derived from the latest
+	// sealed and finalized result". This requires the execution tree to know what the latest
+	// sealed and finalized result is, so we add it here.
+	// Note: we only add the sealed and finalized result, without any Execution Receipts. This
+	// is sufficient to create a vertex in the tree. Thereby, we can subsequently traverse the
+	// tree to find derived results and their respective receipts.
+	err = b.recPool.AddResult(sealedResult, latestSealedBlock)
 	if err != nil {
 		return fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
 	}
 
-	blockLookup := make(map[flow.Identifier]*flow.Header)
-
-	// usually we start with empty execution tree, prune it to minimum height before adding results
-	err = b.recPool.PruneUpToHeight(latestSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
-	}
-
-	// traverse block and collect result IDs that were included in that block
-	traverser := func(header *flow.Header) error {
-		index, err := b.index.ByBlockID(header.ID())
-		if err != nil {
-			return fmt.Errorf("could not retrieve index for block (%x): %w", header.ID(), err)
-		}
-
-		for _, resultID := range index.ResultIDs {
-			result, err := b.resultsDB.ByID(resultID)
+	// receiptCollector adds _all known_ receipts for the given block to the execution tree
+	receiptCollector := func(header *flow.Header) error {
+		receipts, err := b.receiptsDB.ByBlockID(header.ID())
+		for _, receipt := range receipts {
+			_, err = b.recPool.AddReceipt(receipt, header)
 			if err != nil {
-				return fmt.Errorf("could not retrieve result by id (%x): %w", resultID, err)
-			}
-
-			// in general case same block can be referenced
-			// by different execution results
-			block, found := blockLookup[result.BlockID]
-			if !found {
-				block, err = b.headers.ByBlockID(result.BlockID)
-				if err != nil {
-					return fmt.Errorf("could not get block (%x): %w", result.BlockID, err)
-				}
-				blockLookup[result.BlockID] = block
-			}
-
-			err = b.recPool.AddResult(result, block)
-			if err != nil {
-				return fmt.Errorf("could not add result to execution tree: %w", err)
+				return fmt.Errorf("could not add receipt (%x) to execution tree: %w", receipt.ID(), err)
 			}
 		}
 		return nil
 	}
 
-	// traverse chain backwards to collect all execution results in unsealed and finalized blocks
-	err = fork.TraverseBackward(b.headers, finalizedID, traverser, fork.IncludingHeight(latestSealed.Height))
+	// Traverse chain backwards and add all known receipts for any finalized, unsealed block to the execution tree.
+	// Thereby, we add superset of all unsealed execution results to the execution tree.
+	err = fork.TraverseBackward(b.headers, finalizedID, receiptCollector, fork.ExcludingBlock(latestSealedBlockID))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
 	}
@@ -235,7 +219,7 @@ func (b *Builder) repopulateExecutionTree() error {
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for unfinalized block %s: %w", blockID, err)
 		}
-		err = traverser(block)
+		err = receiptCollector(block)
 		if err != nil {
 			return fmt.Errorf("could not traverse unfinalized block %s at height %d: %w", blockID, block.Height, err)
 		}
