@@ -66,17 +66,15 @@ type Snapshot interface {
 	//
 	SealingSegment() ([]*flow.Block, error)
 
-	// Pending returns the IDs of all descendants of the Head block. The IDs
+	// Descendants returns the IDs of all descendants of the Head block. The IDs
 	// are ordered such that parents are included before their children. These
 	// are NOT guaranteed to have been validated by HotStuff.
-	Pending() ([]flow.Identifier, error)
+	Descendants() ([]flow.Identifier, error)
 
-	// ValidPending returns the IDs of all descendants of the Head block.
-	// Valid means the returned bocks have at least one child.
+	// ValidDescendants returns the IDs of all descendants of the Head block.
 	// The IDs are ordered such that parents are included before their children. Includes
-	// only blocks that have child blocks.
-	// These are NOT guaranteed to have been validated by HotStuff.
-	ValidPending() ([]flow.Identifier, error)
+	// only blocks that have been validated by HotStuff.
+	ValidDescendants() ([]flow.Identifier, error)
 
 	// Seed returns a deterministic seed for a pseudo random number generator.
 	// The seed is derived from the source of randomness for the Head block.

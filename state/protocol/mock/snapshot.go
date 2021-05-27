@@ -123,7 +123,7 @@ func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 }
 
 // Pending provides a mock function with given fields:
-func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
+func (_m *Snapshot) Descendants() ([]flow.Identifier, error) {
 	ret := _m.Called()
 
 	var r0 []flow.Identifier
@@ -274,7 +274,7 @@ func (_m *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 }
 
 // ValidPending provides a mock function with given fields:
-func (_m *Snapshot) ValidPending() ([]flow.Identifier, error) {
+func (_m *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	ret := _m.Called()
 
 	var r0 []flow.Identifier

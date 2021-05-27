@@ -272,7 +272,7 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.state.On("Final").Return(func() realproto.Snapshot {
 		if block, ok := bs.blocks[bs.finalID]; ok {
 			snapshot := unittest.StateSnapshotForKnownBlock(block.Header, nil)
-			snapshot.On("ValidPending").Return(bs.blockChildren[bs.finalID], nil)
+			snapshot.On("ValidDescendants").Return(bs.blockChildren[bs.finalID], nil)
 			return snapshot
 		}
 		return unittest.StateSnapshotForUnknownBlock()

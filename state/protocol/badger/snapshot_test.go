@@ -52,11 +52,11 @@ func TestHead(t *testing.T) {
 	})
 }
 
-// TestSnapshot_Pending builds a sample chain with next structure:
+// TestSnapshot_Descendants builds a sample chain with next structure:
 // A (finalized) <- B <- C <- D <- E <- F
 //               <- G <- H <- I <- J
-// snapshot.Pending has to return [B, C, D, E, F, G, H, I, J].
-func TestSnapshot_Pending(t *testing.T) {
+// snapshot.Descendants has to return [B, C, D, E, F, G, H, I, J].
+func TestSnapshot_Descendants(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
@@ -71,17 +71,17 @@ func TestSnapshot_Pending(t *testing.T) {
 			}
 		}
 
-		pendingBlocks, err := state.AtBlockID(head.ID()).Pending()
+		pendingBlocks, err := state.AtBlockID(head.ID()).Descendants()
 		require.NoError(t, err)
 		require.ElementsMatch(t, expectedBlocks, pendingBlocks)
 	})
 }
 
-// TestSnapshot_Pending builds a sample chain with next structure:
+// TestSnapshot_ValidDescendants builds a sample chain with next structure:
 // A (finalized) <- B <- C <- D <- E <- F
 //               <- G <- H <- I <- J
-// snapshot.Pending has to return [B, C, D, E, G, H, I]. [F, J] should be excluded because they have no children
-func TestSnapshot_ValidPending(t *testing.T) {
+// snapshot.Descendants has to return [B, C, D, E, G, H, I]. [F, J] should be excluded because they aren't valid
+func TestSnapshot_ValidDescendants(t *testing.T) {
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
@@ -95,12 +95,14 @@ func TestSnapshot_ValidPending(t *testing.T) {
 				require.NoError(t, err)
 				// skip last block from fork
 				if blockIndex < len(fork)-1 {
+					err = state.MarkValid(block.ID())
+					require.NoError(t, err)
 					expectedBlocks = append(expectedBlocks, block.ID())
 				}
 			}
 		}
 
-		pendingBlocks, err := state.AtBlockID(head.ID()).ValidPending()
+		pendingBlocks, err := state.AtBlockID(head.ID()).ValidDescendants()
 		require.NoError(t, err)
 		require.ElementsMatch(t, expectedBlocks, pendingBlocks)
 	})

@@ -462,7 +462,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorFinalize)
 
 	// FIRST: The finalize call on the protocol state can only finalize one
-	// block at a time. This implies that the parent of the pending block that
+	// block at a time. This implies that the parent of the descendants block that
 	// is to be finalized has to be the last finalized block.
 
 	var finalized uint64
@@ -477,7 +477,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	}
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve pending block: %w", err)
+		return fmt.Errorf("could not retrieve descendants block: %w", err)
 	}
 	header := block.Header
 	if header.ParentID != finalID {

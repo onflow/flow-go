@@ -213,7 +213,7 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// at this point execution tree is filled with all results in range [lastSealedBlock, lastFinalizedBlock].
 
-	validPending, err := finalizedSnapshot.ValidPending()
+	validPending, err := finalizedSnapshot.ValidDescendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
