@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
@@ -139,6 +140,8 @@ func (e *Engine) onChunkDataRequest(
 	req *messages.ChunkDataRequest,
 ) error {
 
+	processStart := time.Now()
+
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
 
@@ -185,15 +188,36 @@ func (e *Engine) onChunkDataRequest(
 		Collection:    collection,
 	}
 
-	// sends requested chunk data pack to the requester
-	err = e.chunksConduit.Unicast(response, originID)
-	if err != nil {
-		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
+	sinceProcess := time.Since(processStart)
+
+	log = log.With().Dur("sinceProcess", sinceProcess).Logger()
+
+	if sinceProcess > time.Second*10 {
+		log.Warn().Msg("chunk data pack query takes longer than 10 secs")
 	}
 
-	log.Debug().
-		Hex("collection_id", logging.ID(response.Collection.ID())).
-		Msg("chunk data pack request successfully replied")
+	// sends requested chunk data pack to the requester
+	e.unit.Launch(func() {
+		deliveryStart := time.Now()
+
+		err := e.chunksConduit.Unicast(response, originID)
+
+		sinceDeliver := time.Since(deliveryStart)
+		log = log.With().Dur("since_deliver", sinceDeliver).Logger()
+
+		if sinceDeliver > time.Second*10 {
+			log.Warn().Msg("chunk data pack response delivery takes longer than 10 secs")
+		}
+
+		if err != nil {
+			log.Error().Err(err).Str("origin", fmt.Sprintf("%s", origin)).Msg("could not send requested chunk data pack to")
+			return
+		}
+
+		log.Debug().
+			Hex("collection_id", logging.ID(response.Collection.ID())).
+			Msg("chunk data pack request successfully replied")
+	})
 
 	return nil
 }
