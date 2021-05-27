@@ -107,7 +107,7 @@ func (e *Engine) startPing() {
 // pingNode pings the given peer and updates the metrics with the result and the additional node information
 func (e *Engine) pingNode(peer *flow.Identity) {
 	id := peer.ID()
-	var pingFailed bool
+	pingFailed := false
 
 	// ping the node
 	resp, rtt, err := e.middleware.Ping(id) // ping will timeout in libp2p.PingTimeoutSecs seconds
