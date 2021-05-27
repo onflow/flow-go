@@ -1,7 +1,6 @@
 package test
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -69,7 +68,7 @@ func TestClusterSwitchover_SingleCluster(t *testing.T) {
 func TestClusterSwitchover_MultiCluster(t *testing.T) {
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   2,
-		collectors: 4,
+		collectors: 2,
 	}))
 }
 
@@ -231,10 +230,6 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	tc.sn.On("Submit", mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			// TODO remove logs
-			origin := args[0].(flow.Identifier)
-			msg := args[1].(*flow.CollectionGuarantee)
-			fmt.Println("got message origin: ", origin, " colid: ", msg.ID())
 			waitForGuarantees.Done()
 		}).
 		Times(expectedGuarantees)
