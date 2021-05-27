@@ -12,7 +12,7 @@ import (
 // epochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
 func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
-	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture())
+	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	expected := &flow.EpochSetup{
@@ -99,7 +99,7 @@ func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
 // epochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
 func epochCommitFixture() (flow.Event, *flow.EpochCommit) {
-	event := unittest.EventFixture(flow.EventEpochCommit, 1, 1, unittest.IdentifierFixture())
+	event := unittest.EventFixture(flow.EventEpochCommit, 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{

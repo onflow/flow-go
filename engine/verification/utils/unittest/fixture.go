@@ -304,7 +304,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				collectionID = flow.ZeroID
 			}
 
-			chunk := ingestion.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID())
+			chunk := ingestion.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID(), flow.ZeroID)
 			chunkDataPack := ingestion.GenerateChunkDataPack(chunk, collectionID, computationResult.Proofs[i])
 			chunks = append(chunks, chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
