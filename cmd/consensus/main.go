@@ -338,6 +338,7 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Blocks,
 				node.Storage.Results,
+				node.Storage.Receipts,
 				guarantees,
 				seals,
 				receipts,

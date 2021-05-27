@@ -48,6 +48,7 @@ func NewBuilder(
 	index storage.Index,
 	blocks storage.Blocks,
 	resultsDB storage.ExecutionResults,
+	receiptsDB storage.ExecutionReceipts,
 	guarPool mempool.Guarantees,
 	sealPool mempool.IncorporatedResultSeals,
 	recPool mempool.ExecutionTree,
@@ -71,19 +72,20 @@ func NewBuilder(
 	}
 
 	b := &Builder{
-		metrics:   metrics,
-		db:        db,
-		tracer:    tracer,
-		state:     state,
-		headers:   headers,
-		seals:     seals,
-		index:     index,
-		blocks:    blocks,
-		resultsDB: resultsDB,
-		guarPool:  guarPool,
-		sealPool:  sealPool,
-		recPool:   recPool,
-		cfg:       cfg,
+		metrics:    metrics,
+		db:         db,
+		tracer:     tracer,
+		state:      state,
+		headers:    headers,
+		seals:      seals,
+		index:      index,
+		blocks:     blocks,
+		resultsDB:  resultsDB,
+		receiptsDB: receiptsDB,
+		guarPool:   guarPool,
+		sealPool:   sealPool,
+		recPool:    recPool,
+		cfg:        cfg,
 	}
 
 	err := b.repopulateExecutionTree()
@@ -190,6 +192,9 @@ func (b *Builder) repopulateExecutionTree() error {
 	// receiptCollector adds _all known_ receipts for the given block to the execution tree
 	receiptCollector := func(header *flow.Header) error {
 		receipts, err := b.receiptsDB.ByBlockID(header.ID())
+		if err != nil {
+			return fmt.Errorf("could not retrieve execution reciepts for block %v: %w", header.ID(), err)
+		}
 		for _, receipt := range receipts {
 			_, err = b.recPool.AddReceipt(receipt, header)
 			if err != nil {

@@ -33,13 +33,15 @@ type BuilderSuite struct {
 	suite.Suite
 
 	// test helpers
-	firstID           flow.Identifier                           // first block in the range we look at
-	finalID           flow.Identifier                           // last finalized block
-	parentID          flow.Identifier                           // parent block we build on
-	finalizedBlockIDs []flow.Identifier                         // blocks between first and final
-	pendingBlockIDs   []flow.Identifier                         // blocks between final and parent
-	resultForBlock    map[flow.Identifier]*flow.ExecutionResult // map: BlockID -> Execution Result
-	resultByID        map[flow.Identifier]*flow.ExecutionResult // map: result ID -> Execution Result
+	firstID           flow.Identifier                               // first block in the range we look at
+	finalID           flow.Identifier                               // last finalized block
+	parentID          flow.Identifier                               // parent block we build on
+	finalizedBlockIDs []flow.Identifier                             // blocks between first and final
+	pendingBlockIDs   []flow.Identifier                             // blocks between final and parent
+	resultForBlock    map[flow.Identifier]*flow.ExecutionResult     // map: BlockID -> Execution Result
+	resultByID        map[flow.Identifier]*flow.ExecutionResult     // map: result ID -> Execution Result
+	receiptsByID      map[flow.Identifier]*flow.ExecutionReceipt    // map: receipt ID -> ExecutionReceipt
+	receiptsByBlockID map[flow.Identifier]flow.ExecutionReceiptList // map: block ID -> flow.ExecutionReceiptList
 
 	// used to populate and test the seal mempool
 	chain   []*flow.Seal                                     // chain of seals starting first
@@ -66,12 +68,13 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state    *protocol.MutableState
-	headerDB *storage.Headers
-	sealDB   *storage.Seals
-	indexDB  *storage.Index
-	blockDB  *storage.Blocks
-	resultDB *storage.ExecutionResults
+	state      *protocol.MutableState
+	headerDB   *storage.Headers
+	sealDB     *storage.Seals
+	indexDB    *storage.Index
+	blockDB    *storage.Blocks
+	resultDB   *storage.ExecutionResults
+	receiptsDB *storage.ExecutionReceipts
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
@@ -136,6 +139,8 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		bs.resultForBlock[result.BlockID] = result
 		bs.resultByID[result.ID()] = result
+		bs.receiptsByID[receipt.ID()] = receipt
+		bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 	}
 
 	// record block in dbs
@@ -178,6 +183,8 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.finalizedBlockIDs = nil
 	bs.resultForBlock = make(map[flow.Identifier]*flow.ExecutionResult)
 	bs.resultByID = make(map[flow.Identifier]*flow.ExecutionResult)
+	bs.receiptsByID = make(map[flow.Identifier]*flow.ExecutionReceipt)
+	bs.receiptsByBlockID = make(map[flow.Identifier]flow.ExecutionReceiptList)
 
 	bs.chain = nil
 	bs.irsMap = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
@@ -331,6 +338,32 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 	)
 
+	bs.receiptsDB = &storage.ExecutionReceipts{}
+	bs.receiptsDB.On("ByID", mock.Anything).Return(
+		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
+			return bs.receiptsByID[receiptID]
+		},
+		func(receiptID flow.Identifier) error {
+			_, exists := bs.receiptsByID[receiptID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+	bs.receiptsDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.ExecutionReceiptList {
+			return bs.receiptsByBlockID[blockID]
+		},
+		func(blockID flow.Identifier) error {
+			_, exists := bs.receiptsByBlockID[blockID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
 	// set up memory pool mocks for tests
 	bs.guarPool = &mempool.Guarantees{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
@@ -364,7 +397,8 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe()
 	bs.recPool.On("Size").Return(uint(0)).Maybe() // used for metrics only
-	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil)
+	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil).Maybe()
+	bs.recPool.On("AddReceipt", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(
 		func(resultID flow.Identifier, blockFilter mempoolAPIs.BlockFilter, receiptFilter mempoolAPIs.ReceiptFilter) []*flow.ExecutionReceipt {
 			return bs.pendingReceipts
@@ -382,6 +416,7 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.indexDB,
 		bs.blockDB,
 		bs.resultDB,
+		bs.receiptsDB,
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,
@@ -1246,6 +1281,11 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 		for _, result := range block.Payload.Results {
 			bs.resultByID[result.ID()] = result
 		}
+		for _, meta := range block.Payload.Receipts {
+			receipt := flow.ExecutionReceiptFromMeta(*meta, *bs.resultByID[meta.ResultID])
+			bs.receiptsByID[meta.ID()] = receipt
+			bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
+		}
 	}
 
 	// mark A as finalized
@@ -1269,6 +1309,7 @@ func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
 		bs.indexDB,
 		bs.blockDB,
 		bs.resultDB,
+		bs.receiptsDB,
 		bs.guarPool,
 		bs.sealPool,
 		recPool,
