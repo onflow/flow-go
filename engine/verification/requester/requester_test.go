@@ -41,7 +41,7 @@ type RequesterEngineTestSuite struct {
 	verIdentity *flow.Identity // verification node
 
 	// parameters
-	requestTargets uint
+	requestTargets uint64
 	retryInterval  time.Duration // determines time in milliseconds for retrying chunk data requests.
 }
 
