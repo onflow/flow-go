@@ -73,8 +73,8 @@ func (f *HotStuffFactory) Create(
 	notifier := pubsub.NewDistributor()
 	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID())) // TODO
-	builder = blockproducer.NewMetricsWrapper(builder, metrics)                        // wrapper for measuring time spent building block payload component
+	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
+	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
 	var committee hotstuff.Committee
 	var err error
