@@ -282,12 +282,16 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	aggregator.On("VerifyMany", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	aggregator.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
+	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
+		return metrics.NewNoopCollector()
+	}
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
 		aggregator,
 		node.DB,
 		node.State,
+		createMetrics,
 	)
 	require.NoError(t, err)
 

@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -15,20 +17,22 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	hotmetrics "github.com/onflow/flow-go/module/metrics/hotstuff"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
+type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
+
 type HotStuffFactory struct {
-	log        zerolog.Logger
-	me         module.Local
-	aggregator module.AggregatingSigner
-	db         *badger.DB
-	protoState protocol.State
-	opts       []consensus.Option
+	log           zerolog.Logger
+	me            module.Local
+	aggregator    module.AggregatingSigner
+	db            *badger.DB
+	protoState    protocol.State
+	createMetrics HotStuffMetricsFunc
+	opts          []consensus.Option
 }
 
 func NewHotStuffFactory(
@@ -37,16 +41,18 @@ func NewHotStuffFactory(
 	aggregator module.AggregatingSigner,
 	db *badger.DB,
 	protoState protocol.State,
+	createMetrics HotStuffMetricsFunc,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
 	factory := &HotStuffFactory{
-		log:        log,
-		me:         me,
-		aggregator: aggregator,
-		db:         db,
-		protoState: protoState,
-		opts:       opts,
+		log:           log,
+		me:            me,
+		aggregator:    aggregator,
+		db:            db,
+		protoState:    protoState,
+		createMetrics: createMetrics,
+		opts:          opts,
 	}
 	return factory, nil
 }
@@ -63,13 +69,12 @@ func (f *HotStuffFactory) Create(
 ) (*hotstuff.EventLoop, error) {
 
 	// setup metrics/logging with the new chain ID
-	//metrics := metrics.NewHotstuffCollector(cluster.ChainID())
-	metrics := metrics.NewNoopCollector() // TODO
+	metrics := f.createMetrics(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
-	//notifier.AddConsumer(notifications.NewLogConsumer(f.log)) // TODO
+	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
-	//notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID())) // TODO
-	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
+	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID())) // TODO
+	builder = blockproducer.NewMetricsWrapper(builder, metrics)                        // wrapper for measuring time spent building block payload component
 
 	var committee hotstuff.Committee
 	var err error
