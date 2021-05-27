@@ -186,14 +186,17 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	// sends requested chunk data pack to the requester
-	err = e.chunksConduit.Unicast(response, originID)
-	if err != nil {
-		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
-	}
+	e.unit.Launch(func() {
+		err = e.chunksConduit.Unicast(response, originID)
+		if err != nil {
+			log.Error().Err(err).Hex("origin", originID[:]).Msg("could not send requested chunk data pack to")
+			return
+		}
 
-	log.Debug().
-		Hex("collection_id", logging.ID(response.Collection.ID())).
-		Msg("chunk data pack request successfully replied")
+		log.Debug().
+			Hex("collection_id", logging.ID(response.Collection.ID())).
+			Msg("chunk data pack request successfully replied")
+	})
 
 	return nil
 }
