@@ -24,7 +24,7 @@ type ExecutionTree interface {
 	// a vertex in the tree without attaching any Execution Receipts to it.
 	AddResult(result *flow.ExecutionResult, block *flow.Header) error
 
-	// Add the given execution receipt to the memory pool. Requires height
+	// AddReceipt adds the given execution receipt to the memory pool. Requires height
 	// of the block the receipt is for. We enforce data consistency on an API
 	// level by using the block header as input.
 	AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error)
