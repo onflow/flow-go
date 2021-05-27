@@ -190,7 +190,7 @@ func (e *Engine) onChunkDataRequest(
 
 	sinceProcess := time.Since(processStart)
 
-	log.With().Dur("sinceProcess", sinceProcess).Logger()
+	log = log.With().Dur("sinceProcess", sinceProcess).Logger()
 
 	if sinceProcess > time.Second*10 {
 		log.Warn().Msg("chunk data pack query takes longer than 10 secs")
@@ -200,7 +200,7 @@ func (e *Engine) onChunkDataRequest(
 	e.unit.Launch(func() {
 		deliveryStart := time.Now()
 
-		err = e.chunksConduit.Unicast(response, originID)
+		err := e.chunksConduit.Unicast(response, originID)
 
 		sinceDeliver := time.Since(deliveryStart)
 		log = log.With().Dur("since_deliver", sinceDeliver).Logger()
