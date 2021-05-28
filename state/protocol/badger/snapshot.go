@@ -25,7 +25,7 @@ import (
 // It represents a read-only immutable snapshot of the protocol state at the
 // block it is constructed with. It allows efficient access to data associated directly
 // with blocks at a given state (finalized, sealed), such as the related header, commit,
-// seed or descendants children. A block snapshot can lazily convert to an epoch snapshot in
+// seed or descending blocks. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
 type Snapshot struct {
 	state   *State
@@ -292,36 +292,46 @@ func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
 }
 
 func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
-	return s.descendants(s.blockID)
+	descendants, err := s.descendants(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
+	}
+	return descendants, nil
 }
 
 func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	valid, err := s.lookupValidity(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not determine block %s validity: %w", s.blockID, err)
+		return nil, fmt.Errorf("could not determine validity of block %v: %w", s.blockID, err)
 	}
 	if !valid {
 		return []flow.Identifier{}, nil
 	}
 
-	return s.validDescendants(s.blockID)
+	descendants, err := s.validDescendants(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
+	}
+	return descendants, nil
 }
 
 func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var pendingIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+	var children []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
 	if err != nil {
-		return nil, fmt.Errorf("could not get descendants children: %w", err)
+		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
 	}
-	return pendingIDs, nil
+	return children, nil
 }
 
 func (s *Snapshot) lookupValidity(blockID flow.Identifier) (bool, error) {
 	valid := false
 	err := s.state.db.View(operation.RetrieveBlockValidity(blockID, &valid))
 	if err != nil {
+		// We only store the validity flag for blocks that have been marked valid.
+		// For blocks that haven't been marked valid (yet), the flag is simply absent.
 		if !errors.Is(err, storage.ErrNotFound) {
-			return false, fmt.Errorf("could not retrieve block validity %v: %w", blockID, err)
+			return false, fmt.Errorf("could not retrieve validity of block %v: %w", blockID, err)
 		}
 	}
 	return valid, nil
@@ -338,14 +348,14 @@ func (s *Snapshot) validDescendants(blockID flow.Identifier) ([]flow.Identifier,
 	for _, descendantID := range children {
 		valid, err := s.lookupValidity(descendantID)
 		if err != nil {
-			return nil, fmt.Errorf("could not determine block %s validity: %w", descendantID, err)
+			return nil, err
 		}
 
 		if valid {
 			descendantIDs = append(descendantIDs, descendantID)
 			additionalIDs, err := s.validDescendants(descendantID)
 			if err != nil {
-				return nil, fmt.Errorf("could not get descendants: %w", err)
+				return nil, err
 			}
 			descendantIDs = append(descendantIDs, additionalIDs...)
 		}
@@ -362,7 +372,7 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 	for _, descendantID := range descendantIDs {
 		additionalIDs, err := s.descendants(descendantID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get descendants: %w", err)
+			return nil, err
 		}
 		descendantIDs = append(descendantIDs, additionalIDs...)
 	}

@@ -31,7 +31,7 @@ type Builder struct {
 	index      storage.Index
 	blocks     storage.Blocks
 	resultsDB  storage.ExecutionResults
-	receiptsDB storage.ExecutionReceipts // to persist received execution receipts
+	receiptsDB storage.ExecutionReceipts
 	guarPool   mempool.Guarantees
 	sealPool   mempool.IncorporatedResultSeals
 	recPool    mempool.ExecutionTree
@@ -182,8 +182,8 @@ func (b *Builder) repopulateExecutionTree() error {
 	// sealed and finalized result". This requires the execution tree to know what the latest
 	// sealed and finalized result is, so we add it here.
 	// Note: we only add the sealed and finalized result, without any Execution Receipts. This
-	// is sufficient to create a vertex in the tree. Thereby, we can subsequently traverse the
-	// tree to find derived results and their respective receipts.
+	// is sufficient to create a vertex in the tree. Thereby, we can traverse the tree, starting
+	// from the sealed and finalized result, to find derived results and their respective receipts.
 	err = b.recPool.AddResult(sealedResult, latestSealedBlock)
 	if err != nil {
 		return fmt.Errorf("failed to add sealed result as vertex to ExecutionTree (%x): %w", latestSeal.ResultID, err)
@@ -193,7 +193,7 @@ func (b *Builder) repopulateExecutionTree() error {
 	receiptCollector := func(header *flow.Header) error {
 		receipts, err := b.receiptsDB.ByBlockID(header.ID())
 		if err != nil {
-			return fmt.Errorf("could not retrieve execution reciepts for block %v: %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve execution reciepts for block %x: %w", header.ID(), err)
 		}
 		for _, receipt := range receipts {
 			_, err = b.recPool.AddReceipt(receipt, header)
@@ -208,25 +208,23 @@ func (b *Builder) repopulateExecutionTree() error {
 	// Thereby, we add superset of all unsealed execution results to the execution tree.
 	err = fork.TraverseBackward(b.headers, finalizedID, receiptCollector, fork.ExcludingBlock(latestSealedBlockID))
 	if err != nil {
-		return fmt.Errorf("internal error while traversing fork: %w", err)
+		return fmt.Errorf("failed to traverse unsealed, finalized blocks: %w", err)
 	}
 
-	// at this point execution tree is filled with all results in range [lastSealedBlock, lastFinalizedBlock].
-
+	// At this point execution tree is filled with all results for blocks (lastSealedBlock, lastFinalizedBlock].
+	// Now, we add all known receipts for any valid block that descends from the latest finalized block:
 	validPending, err := finalizedSnapshot.ValidDescendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
-
-	// valid pending has all blocks that were unfinalized excluding blocks without children
 	for _, blockID := range validPending {
 		block, err := b.headers.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve header for unfinalized block %s: %w", blockID, err)
+			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", blockID, err)
 		}
 		err = receiptCollector(block)
 		if err != nil {
-			return fmt.Errorf("could not traverse unfinalized block %s at height %d: %w", blockID, block.Height, err)
+			return fmt.Errorf("failed to add receipts for unfinalized block %x at height %d: %w", blockID, block.Height, err)
 		}
 	}
 
