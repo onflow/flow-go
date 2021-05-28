@@ -414,7 +414,7 @@ func main() {
 
 			// initialize the block builder
 			var build module.Builder
-			build = builder.NewBuilder(
+			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,
@@ -423,6 +423,7 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Blocks,
 				node.Storage.Results,
+				node.Storage.Receipts,
 				guarantees,
 				seals,
 				receipts,
@@ -432,6 +433,10 @@ func main() {
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialized block builder: %w", err)
+			}
+
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			// initialize the block finalizer

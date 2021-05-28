@@ -242,6 +242,17 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
+	payload := PayloadFixture(WithGuarantees(guarantees...))
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+	return &flow.Block{
+		Header:  &header,
+		Payload: &payload,
+	}
+
+}
+
 func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
@@ -422,6 +433,15 @@ func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flo
 	return guarantee
 }
 
+func CollectionGuaranteesWithCollectionIDFixture(collections []*flow.Collection) []*flow.CollectionGuarantee {
+	guarantees := make([]*flow.CollectionGuarantee, 0, len(collections))
+	for i := 0; i < len(collections); i++ {
+		guarantee := CollectionGuaranteeFixture(WithCollection(collections[i]))
+		guarantees = append(guarantees, guarantee)
+	}
+	return guarantees
+}
+
 func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarantee)) []*flow.CollectionGuarantee {
 	guarantees := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 1; i <= n; i++ {
@@ -438,6 +458,16 @@ func BlockSealsFixture(n int) []*flow.Seal {
 		seals = append(seals, seal)
 	}
 	return seals
+}
+
+func CollectionListFixture(n int) []*flow.Collection {
+	collections := make([]*flow.Collection, n)
+	for i := 0; i < n; i++ {
+		collection := CollectionFixture(1)
+		collections[i] = &collection
+	}
+
+	return collections
 }
 
 func CollectionFixture(n int) flow.Collection {
