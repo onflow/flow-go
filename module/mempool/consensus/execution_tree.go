@@ -189,11 +189,13 @@ func (et *ExecutionTree) PruneUpToHeight(limit uint64) error {
 
 	// count how many receipts are stored in the Execution Tree that will be removed
 	numberReceiptsRemoved := uint(0)
-	for l := et.forest.LowestLevel; l < limit; l++ {
-		iterator := et.forest.GetVerticesAtLevel(l)
-		for iterator.HasNext() {
-			vertex := iterator.NextVertex()
-			numberReceiptsRemoved += vertex.(*ReceiptsOfSameResult).Size()
+	if et.size > 0 {
+		for l := et.forest.LowestLevel; l < limit; l++ {
+			iterator := et.forest.GetVerticesAtLevel(l)
+			for iterator.HasNext() {
+				vertex := iterator.NextVertex()
+				numberReceiptsRemoved += vertex.(*ReceiptsOfSameResult).Size()
+			}
 		}
 	}
 

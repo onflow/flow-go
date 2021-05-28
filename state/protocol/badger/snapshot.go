@@ -25,7 +25,7 @@ import (
 // It represents a read-only immutable snapshot of the protocol state at the
 // block it is constructed with. It allows efficient access to data associated directly
 // with blocks at a given state (finalized, sealed), such as the related header, commit,
-// seed or pending children. A block snapshot can lazily convert to an epoch snapshot in
+// seed or descending blocks. A block snapshot can lazily convert to an epoch snapshot in
 // order to make data associated directly with epochs accessible through its API.
 type Snapshot struct {
 	state   *State
@@ -291,25 +291,92 @@ func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	return segment, nil
 }
 
-func (s *Snapshot) Pending() ([]flow.Identifier, error) {
-	return s.pending(s.blockID)
+func (s *Snapshot) Descendants() ([]flow.Identifier, error) {
+	descendants, err := s.descendants(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
+	}
+	return descendants, nil
 }
 
-func (s *Snapshot) pending(blockID flow.Identifier) ([]flow.Identifier, error) {
-	var pendingIDs []flow.Identifier
-	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &pendingIDs))
+func (s *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
+	valid, err := s.lookupValidity(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get pending children: %w", err)
+		return nil, fmt.Errorf("could not determine validity of block %v: %w", s.blockID, err)
+	}
+	if !valid {
+		return []flow.Identifier{}, nil
 	}
 
-	for _, pendingID := range pendingIDs {
-		additionalIDs, err := s.pending(pendingID)
-		if err != nil {
-			return nil, fmt.Errorf("could not get pending grandchildren: %w", err)
-		}
-		pendingIDs = append(pendingIDs, additionalIDs...)
+	descendants, err := s.validDescendants(s.blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to traverse the descendants tree of block %v: %w", s.blockID, err)
 	}
-	return pendingIDs, nil
+	return descendants, nil
+}
+
+func (s *Snapshot) lookupChildren(blockID flow.Identifier) ([]flow.Identifier, error) {
+	var children []flow.Identifier
+	err := s.state.db.View(procedure.LookupBlockChildren(blockID, &children))
+	if err != nil {
+		return nil, fmt.Errorf("could not get children of block %v: %w", blockID, err)
+	}
+	return children, nil
+}
+
+func (s *Snapshot) lookupValidity(blockID flow.Identifier) (bool, error) {
+	valid := false
+	err := s.state.db.View(operation.RetrieveBlockValidity(blockID, &valid))
+	if err != nil {
+		// We only store the validity flag for blocks that have been marked valid.
+		// For blocks that haven't been marked valid (yet), the flag is simply absent.
+		if !errors.Is(err, storage.ErrNotFound) {
+			return false, fmt.Errorf("could not retrieve validity of block %v: %w", blockID, err)
+		}
+	}
+	return valid, nil
+}
+
+func (s *Snapshot) validDescendants(blockID flow.Identifier) ([]flow.Identifier, error) {
+	var descendantIDs []flow.Identifier
+
+	children, err := s.lookupChildren(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, descendantID := range children {
+		valid, err := s.lookupValidity(descendantID)
+		if err != nil {
+			return nil, err
+		}
+
+		if valid {
+			descendantIDs = append(descendantIDs, descendantID)
+			additionalIDs, err := s.validDescendants(descendantID)
+			if err != nil {
+				return nil, err
+			}
+			descendantIDs = append(descendantIDs, additionalIDs...)
+		}
+	}
+	return descendantIDs, nil
+}
+
+func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, error) {
+	descendantIDs, err := s.lookupChildren(blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, descendantID := range descendantIDs {
+		additionalIDs, err := s.descendants(descendantID)
+		if err != nil {
+			return nil, err
+		}
+		descendantIDs = append(descendantIDs, additionalIDs...)
+	}
+	return descendantIDs, nil
 }
 
 // Seed returns the random seed at the given indices for the current block snapshot.

@@ -46,7 +46,11 @@ func (u *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) Pending() ([]flow.Identifier, error) {
+func (u *Snapshot) Descendants() ([]flow.Identifier, error) {
+	return nil, u.err
+}
+
+func (u *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 
