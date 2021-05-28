@@ -253,6 +253,8 @@ func SetupChunkDataPackProvider(t *testing.T,
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
 
+	replied := make(map[flow.Identifier]struct{})
+
 	wg := &sync.WaitGroup{}
 	wg.Add(len(assignedChunkIDs))
 
@@ -267,9 +269,15 @@ func SetupChunkDataPackProvider(t *testing.T,
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
-			responded := provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
-			if responded {
+			shouldReply := provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+			_, alreadyReplied := replied[req.ChunkID]
+			if shouldReply && !alreadyReplied {
+				/*
+					the wait group keeps track of unique chunk requests addressed.
+					we make it done only upon the first successful request of a chunk.
+				*/
 				wg.Done()
+				replied[req.ChunkID] = struct{}{}
 			}
 		}).Return(nil)
 
