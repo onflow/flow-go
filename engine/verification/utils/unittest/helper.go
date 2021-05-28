@@ -302,14 +302,10 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 	tryCount := make(map[flow.Identifier]int)
 
 	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
-		trials, ok := tryCount[chunkID]
-		if !ok {
-			tryCount[chunkID] = 1
-			return false
-		}
-
+		trials := tryCount[chunkID]
 		trials++
 		tryCount[chunkID] = trials
+
 		if trials >= n {
 			// finds the chunk data pack of the requested chunk and sends it back.
 			res := completeERs.ChunkDataResponseOf(t, chunkID)
@@ -322,6 +318,8 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 				Hex("chunk_id", logging.ID(chunkID)).
 				Int("trial_time", trials).
 				Msg("chunk data pack request answered by provider")
+
+			return true
 		}
 
 		return false
@@ -615,7 +613,7 @@ func NewVerificationHappyPathTest(t *testing.T,
 			blockConsumer.OnFinalizedBlock(&model.Block{})
 		}
 
-		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(2*retry*blockCount)*time.Second,
+		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(10*retry*blockCount)*time.Second,
 			"could not receive chunk data requests on time")
 		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*retry*blockCount)*time.Second,
 			"could not receive result approvals on time")
