@@ -572,7 +572,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithAccountStorageLimit(true),
+			fvm.WithAccountStorageLimit(false), // XXX make this configurable, should be true by default
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
