@@ -40,7 +40,8 @@ func TestVerificationHappyPath(t *testing.T) {
 			// one block is passed to block reader. The block contains one
 			// execution result that is not duplicate (single copy).
 			// The result has only one chunk.
-			// The verification node is staked
+			// Each chunk data request is replied upon the first try.
+			// The verification node is staked.
 			blockCount: 1,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(1),
