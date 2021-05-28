@@ -18,6 +18,8 @@ import (
 // state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(event flow.Event) (*flow.ServiceEvent, error) {
 
+	fmt.Println(">>> service event: ", string(event.Payload))
+
 	// depending on type of Epoch event construct Go type
 	switch event.Type {
 	case flow.EventEpochSetup:

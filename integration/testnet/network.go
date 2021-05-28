@@ -258,7 +258,7 @@ type NodeConfig struct {
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
 	c := NodeConfig{
 		Role:       role,
-		Stake:      1000,                         // default stake
+		Stake:      1_250_000,                    // sufficient to exceed minimum for all roles https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowIDTableStaking.cdc#L1161
 		Identifier: unittest.IdentifierFixture(), // default random ID
 		LogLevel:   zerolog.DebugLevel,           // log at debug by default
 	}
@@ -706,6 +706,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		Participants: participants,
 		Assignments:  clusterAssignments,
 		RandomSource: randomSource,
+	}
+
+	fmt.Println("testnet participants:")
+	for _, part := range participants {
+		fmt.Println(part.String())
 	}
 
 	epochCommit := &flow.EpochCommit{

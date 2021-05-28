@@ -421,10 +421,10 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flow.Address) {
 	for _, id := range b.identities {
 
-		// create a machine account for the node
+		// create a staking account for the node
 		nodeAddress := b.createAccount()
 
-		// give a vault resource to the machine account
+		// give a vault resource to the staking account
 		txError, err := b.vm.invokeMetaTransaction(
 			b.ctx,
 			setupAccountTransaction(
@@ -437,7 +437,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		)
 		panicOnMetaInvokeErrf("failed to setup machine account: %s", txError, err)
 
-		// fund the machine account
+		// fund the staking account
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
 			fundAccountTransaction(service,
@@ -447,9 +447,11 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 			b.sth,
 			b.programs,
 		)
-		panicOnMetaInvokeErrf("failed to fund machine account: %s", txError, err)
+		panicOnMetaInvokeErrf("failed to fund node staking account: %s", txError, err)
 
 		// register the node
+		// for collection/consensus nodes this will also create the machine account
+		// and set it up with the QC/DKG participant resource
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
 			registerNodeTransaction(service,
@@ -830,11 +832,15 @@ func fundAccountTransaction(
 	nodeAddress flow.Address,
 ) *TransactionProcedure {
 
-	// register node
+	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", 2_000_000))
+	if err != nil {
+		panic(err)
+	}
+
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(fundAccountTemplate, fungibleToken, flowToken))).
-			AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+			AddArgument(jsoncdc.MustEncode(cdcAmount)).
 			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
 			AddAuthorizer(service),
 		0,
@@ -873,6 +879,11 @@ func registerNodeTransaction(
 		},
 	)
 
+	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Stake))
+	if err != nil {
+		panic(err)
+	}
+
 	// register node
 	return Transaction(
 		flow.NewTransactionBody().
@@ -882,7 +893,7 @@ func registerNodeTransaction(
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.Address))).
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NetworkPubKey.String()[2:]))).
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
-			AddArgument(jsoncdc.MustEncode(cadence.UFix64(id.Stake))).
+			AddArgument(jsoncdc.MustEncode(cdcAmount)).
 			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
 			AddAuthorizer(nodeAddress),
 		0,
