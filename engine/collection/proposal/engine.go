@@ -266,12 +266,13 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 
-		if len(recipients) > 0 {
-			err = e.conduit.Publish(msg, recipients.NodeIDs()...)
-			if err != nil {
-				log.Error().Err(err).Msg("could not broadcast proposal")
-				return
-			}
+		err := e.conduit.Publish(msg, recipients.NodeIDs()...)
+		if errors.Is(err, network.EmptyTargetList) {
+			return
+		}
+		if err != nil {
+			log.Error().Err(err).Msg("could not broadcast proposal")
+			return
 		}
 
 		log.Debug().
