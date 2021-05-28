@@ -38,6 +38,9 @@ type ClusterSwitchoverTestCase struct {
 	nodes      []testmock.CollectionNode // collection nodes
 	sn         *mockmodule.Engine        // fake consensus node engine for receiving guarantees
 	builder    *unittest.EpochBuilder    // utility for building epochs
+
+	// epoch counter -> cluster index -> transaction IDs
+	sentTransactions map[uint64]map[uint]flow.IdentifierList // track submitted transactions
 }
 
 func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) *ClusterSwitchoverTestCase {
@@ -86,6 +89,7 @@ func (tc *ClusterSwitchoverTestCase) T() *testing.T {
 // creates mock collection nodes for each configured collector.
 func (tc *ClusterSwitchoverTestCase) SetupTest() {
 
+	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	collectors := unittest.IdentityListFixture(int(tc.conf.collectors), unittest.WithRole(flow.RoleCollection), unittest.WithRandomPublicKeys())
 	tc.identities = unittest.CompleteIdentitySet(collectors...)
 	tc.hub = stub.NewNetworkHub()
@@ -174,6 +178,17 @@ func (tc *ClusterSwitchoverTestCase) Transaction(opts ...func(*flow.TransactionB
 	return tx
 }
 
+// ExpectTransaction asserts that the test case expects the given transaction
+// to be included in the given cluster state for the given epoch.
+func (tc *ClusterSwitchoverTestCase) ExpectTransaction(epochCounter uint64, clusterIndex uint, txID flow.Identifier) {
+	if _, ok := tc.sentTransactions[epochCounter]; !ok {
+		tc.sentTransactions[epochCounter] = make(map[uint]flow.IdentifierList)
+	}
+	expected := tc.sentTransactions[epochCounter][clusterIndex]
+	expected = append(expected, txID)
+	tc.sentTransactions[epochCounter][clusterIndex] = expected
+}
+
 // ClusterState opens and returns a read-only cluster state for the given node and cluster ID.
 func (tc *ClusterSwitchoverTestCase) ClusterState(node testmock.CollectionNode, clusterID flow.ChainID) cluster.State {
 	state, err := bcluster.OpenState(node.DB, node.Tracer, node.Headers, node.ClusterPayloads, clusterID)
@@ -212,6 +227,47 @@ func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.Epoch) []protocol.C
 	return clusters
 }
 
+// BlockInEpoch returns the first block that exists within the bounds of the
+// epoch with the given epoch counter.
+func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Header {
+	root := tc.RootBlock()
+
+	for height := root.Height; ; height++ {
+		snap := tc.State().AtHeight(height)
+		counter, err := snap.Epochs().Current().Counter()
+		require.NoError(tc.T(), err)
+
+		if counter == epochCounter {
+			head, err := snap.Head()
+			require.NoError(tc.T(), err)
+			return head
+		}
+	}
+}
+
+// SubmitTransactionToCluster submits a transaction to the given cluster in
+// the given epoch and marks the transaction as expected for inclusion in
+// the corresponding cluster state.
+func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
+	epochCounter uint64, // the epoch we are submitting the transacting w.r.t.
+	clustering flow.ClusterList, // the clustering for the epoch
+	clusterIndex uint, // the index of the cluster we are targetting
+) {
+
+	clusterMembers := clustering[int(clusterIndex)]
+	// get any block within the target epoch as the transaction's reference block
+	refBlock := tc.BlockInEpoch(epochCounter)
+	tx := tc.Transaction(func(tx *flow.TransactionBody) {
+		tx.SetReferenceBlockID(refBlock.ID())
+	})
+	clusterTx := unittest.AlterTransactionForCluster(*tx, clustering, clusterMembers, nil)
+	tc.ExpectTransaction(epochCounter, clusterIndex, clusterTx.ID())
+
+	// submit the transaction to any collector in this cluster
+	err := tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+	require.NoError(tc.T(), err)
+}
+
 // RunTestCase comprises the core test logic for cluster switchover. We build
 // an epoch, which triggers the beginning of the epoch 2 cluster consensus, then
 // send transactions targeting clusters from both epochs while both are running.
@@ -241,9 +297,6 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// build the epoch, ending on the first block on the next epoch
 	tc.builder.BuildEpoch().CompleteEpoch()
 
-	final, err := tc.State().Final().Head()
-	require.NoError(tc.T(), err)
-
 	epoch1 := tc.State().Final().Epochs().Previous()
 	epoch2 := tc.State().Final().Epochs().Current()
 
@@ -260,31 +313,13 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	epoch2ExpectedTransactions := make(map[int][]flow.Identifier)
 
 	// submit transactions targeting epoch 1 clusters
-	for i, clusterMembers := range epoch1Clustering {
-		// create a transaction which will be routed to this cluster in epoch 1
-		tx := tc.Transaction(func(tx *flow.TransactionBody) {
-			tx.SetReferenceBlockID(tc.RootBlock().ID())
-		})
-		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, clusterMembers, nil)
-		epoch1ExpectedTransactions[i] = append(epoch1ExpectedTransactions[i], clusterTx.ID())
-
-		// submit the transaction to any collector in this cluster
-		err = tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
-		require.NoError(tc.T(), err)
+	for clusterIndex := range epoch1Clustering {
+		tc.SubmitTransactionToCluster(1, epoch1Clustering, uint(clusterIndex))
 	}
 
 	// submit transactions targeting epoch 2 clusters
-	for i, clusterMembers := range epoch2Clustering {
-		// create a transaction which will be routed to this cluster in epoch 2
-		tx := tc.Transaction(func(tx *flow.TransactionBody) {
-			tx.SetReferenceBlockID(final.ID())
-		})
-		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, clusterMembers, nil)
-		epoch2ExpectedTransactions[i] = append(epoch2ExpectedTransactions[i], clusterTx.ID())
-
-		// submit the transaction to any collector in this cluster
-		err = tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
-		require.NoError(tc.T(), err)
+	for clusterIndex := range epoch2Clustering {
+		tc.SubmitTransactionToCluster(2, epoch2Clustering, uint(clusterIndex))
 	}
 
 	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, 10*time.Second, "did not receive guarantees at consensus node")
@@ -294,7 +329,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		for _, member := range clusterInfo.Members() {
 			node := tc.Collector(member.NodeID)
 			state := tc.ClusterState(node, clusterInfo.ChainID())
-			expected := epoch1ExpectedTransactions[i]
+			expected := tc.sentTransactions[1][uint(i)]
 			unittest.NewClusterStateChecker(state).
 				ExpectTxCount(len(expected)).
 				ExpectContainsTx(expected...).
@@ -307,7 +342,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		for _, member := range clusterInfo.Members() {
 			node := tc.Collector(member.NodeID)
 			state := tc.ClusterState(node, clusterInfo.ChainID())
-			expected := epoch2ExpectedTransactions[i]
+			expected := tc.sentTransactions[2][uint(i)]
 			unittest.NewClusterStateChecker(state).
 				ExpectTxCount(len(expected)).
 				ExpectContainsTx(expected...).
