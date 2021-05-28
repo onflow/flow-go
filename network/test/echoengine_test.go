@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -91,10 +92,14 @@ func (suite *EchoEngineTestSuite) TestSingleMessage_Publish() {
 
 // TestSingleMessage_Unicast tests sending a single message from sender to receiver using
 // the Unicast method of Conduit.
-func (suite *EchoEngineTestSuite) TestSingleMessage_Unicast() {
+func (suite *EchoEngineTestSuite) TestSingleMessage_Unicast_Timeout() {
 	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
 	// set to false for no echo expectation
 	suite.singleMessage(false, suite.Unicast)
+}
+
+func (suite *EchoEngineTestSuite) TestSingleMessage_Unicast() {
+	suite.singleMessageTimeOut(false, suite.Unicast)
 }
 
 // TestSingleMessage_Multicast tests sending a single message from sender to receiver using
@@ -678,4 +683,37 @@ func (suite *EchoEngineTestSuite) skipTest(reason string) {
 	if _, found := os.LookupEnv("AllNetworkTest"); !found {
 		suite.T().Skip(reason)
 	}
+}
+
+func (suite *EchoEngineTestSuite) singleMessageTimeOut(echo bool, send ConduitSendWrapperFunc) {
+	sndID := 0
+	rcvID := 1
+
+	// only creates a sender engine, without any receiving engine
+	sender := NewEchoEngine(suite.Suite.T(), suite.nets[sndID], 10, engine.TestNetwork, echo, send)
+
+	// allows engine startup
+	optionalSleep(send)
+
+	<-suite.nets[rcvID].Done()
+
+	// Sends a message from sender to receiver
+	event := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
+
+	sent := make(chan struct{})
+	go func() {
+		err := send(event, sender.con, suite.ids[rcvID].NodeID)
+		fmt.Println(err)
+		require.Error(suite.Suite.T(), err)
+		close(sent)
+	}()
+
+	select {
+	case <-sent:
+		require.Fail(suite.T(), "timeout happened before expectation")
+
+	case <-time.After(2 * time.Second):
+		break
+	}
+
 }
