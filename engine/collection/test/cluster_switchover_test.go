@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/testutil"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -332,7 +332,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		tc.SubmitTransactionToCluster(2, epoch2Clustering, uint(clusterIndex))
 	}
 
-	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, 10*time.Second, "did not receive guarantees at consensus node")
+	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, time.Second*10*time.Duration(tc.conf.collectors), "did not receive guarantees at consensus node")
 
 	// check epoch 1 cluster states
 	for _, clusterInfo := range epoch1Clusters {
