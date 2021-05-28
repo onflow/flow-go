@@ -302,11 +302,9 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 	tryCount := make(map[flow.Identifier]int)
 
 	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
-		trials := tryCount[chunkID]
-		trials++
-		tryCount[chunkID] = trials
+		tryCount[chunkID]++
 
-		if trials >= n {
+		if tryCount[chunkID] >= n {
 			// finds the chunk data pack of the requested chunk and sends it back.
 			res := completeERs.ChunkDataResponseOf(t, chunkID)
 
@@ -316,7 +314,7 @@ func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
 			log.Debug().
 				Hex("origin_id", logging.ID(verID)).
 				Hex("chunk_id", logging.ID(chunkID)).
-				Int("trial_time", trials).
+				Int("trial_time", tryCount[chunkID]).
 				Msg("chunk data pack request answered by provider")
 
 			return true
