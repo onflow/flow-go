@@ -230,6 +230,10 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	tc.sn.On("Submit", mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
+			_, ok := args[0].(flow.Identifier)
+			require.True(tc.T(), ok)
+			_, ok = args[1].(*flow.CollectionGuarantee)
+			require.True(tc.T(), ok)
 			waitForGuarantees.Done()
 		}).
 		Times(expectedGuarantees)
@@ -256,40 +260,40 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	epoch2ExpectedTransactions := make(map[int][]flow.Identifier)
 
 	// submit transactions targeting epoch 1 clusters
-	for i, cluster := range epoch1Clustering {
+	for i, clusterMembers := range epoch1Clustering {
 		// create a transaction which will be routed to this cluster in epoch 1
 		tx := tc.Transaction(func(tx *flow.TransactionBody) {
 			tx.SetReferenceBlockID(tc.RootBlock().ID())
 		})
-		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, cluster, nil)
+		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, clusterMembers, nil)
 		epoch1ExpectedTransactions[i] = append(epoch1ExpectedTransactions[i], clusterTx.ID())
 
 		// submit the transaction to any collector in this cluster
-		err = tc.Collector(cluster[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+		err = tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
 		require.NoError(tc.T(), err)
 	}
 
 	// submit transactions targeting epoch 2 clusters
-	for i, cluster := range epoch2Clustering {
+	for i, clusterMembers := range epoch2Clustering {
 		// create a transaction which will be routed to this cluster in epoch 2
 		tx := tc.Transaction(func(tx *flow.TransactionBody) {
 			tx.SetReferenceBlockID(final.ID())
 		})
-		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, cluster, nil)
+		clusterTx := unittest.AlterTransactionForCluster(*tx, epoch1Clustering, clusterMembers, nil)
 		epoch2ExpectedTransactions[i] = append(epoch2ExpectedTransactions[i], clusterTx.ID())
 
 		// submit the transaction to any collector in this cluster
-		err = tc.Collector(cluster[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
+		err = tc.Collector(clusterMembers[0].NodeID).IngestionEngine.ProcessLocal(&clusterTx)
 		require.NoError(tc.T(), err)
 	}
 
 	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, 10*time.Second, "did not receive guarantees at consensus node")
 
 	// check epoch 1 cluster states
-	for i, cluster := range epoch1Clusters {
-		for _, member := range cluster.Members() {
+	for i, clusterInfo := range epoch1Clusters {
+		for _, member := range clusterInfo.Members() {
 			node := tc.Collector(member.NodeID)
-			state := tc.ClusterState(node, cluster.ChainID())
+			state := tc.ClusterState(node, clusterInfo.ChainID())
 			expected := epoch1ExpectedTransactions[i]
 			unittest.NewClusterStateChecker(state).
 				ExpectTxCount(len(expected)).
@@ -299,10 +303,10 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	}
 
 	// check epoch 2 cluster states
-	for i, cluster := range epoch2Clusters {
-		for _, member := range cluster.Members() {
+	for i, clusterInfo := range epoch2Clusters {
+		for _, member := range clusterInfo.Members() {
 			node := tc.Collector(member.NodeID)
-			state := tc.ClusterState(node, cluster.ChainID())
+			state := tc.ClusterState(node, clusterInfo.ChainID())
 			expected := epoch2ExpectedTransactions[i]
 			unittest.NewClusterStateChecker(state).
 				ExpectTxCount(len(expected)).
