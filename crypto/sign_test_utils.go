@@ -72,6 +72,8 @@ func testGenSignVerify(t *testing.T, salg SigningAlgorithm, halg hash.Hasher) {
 	}
 }
 
+var expectedError = newInvalidInputs("")
+
 func testKeyGenSeed(t *testing.T, salg SigningAlgorithm, minLen int, maxLen int) {
 	// valid seed lengths
 	seed := make([]byte, minLen)

@@ -45,8 +45,6 @@ func randomSK(t *testing.T, seed []byte) PrivateKey {
 	return sk
 }
 
-var expectedError = newInvalidInputs("")
-
 // BLS tests
 func TestBLSBLS12381Hasher(t *testing.T) {
 	// generate a key pair
