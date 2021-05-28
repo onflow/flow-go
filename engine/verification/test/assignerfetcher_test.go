@@ -36,12 +36,14 @@ func TestVerificationHappyPath(t *testing.T) {
 		eventRepetition int // accounts for consumer being notified of a certain finalized block more than once.
 	}{
 		{
-			// read this test case in this way:
-			// one block is passed to block reader. The block contains one
-			// execution result that is not duplicate (single copy).
-			// The result has only one chunk.
-			// Each chunk data request is replied upon the first try.
-			// The verification node is staked.
+			/*
+				Read this test case in this way:
+				One block is passed to block reader. The block contains one
+				execution result that is not duplicate (single copy).
+				The result has only one chunk.
+				Each chunk data request is replied upon the first try.
+				The verification node is staked.
+			*/
 			blockCount: 1,
 			opts: []vertestutils.CompleteExecutionReceiptBuilderOpt{
 				vertestutils.WithResults(1),
