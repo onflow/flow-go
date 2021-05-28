@@ -92,24 +92,24 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	return tc
 }
 
-// TestClusterSwitchover_SingleCluster tests cluster switchover with one cluster.
-func TestClusterSwitchover_SingleCluster(t *testing.T) {
-	t.Run("1 collector", func(t *testing.T) {
-		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-			clusters:   1,
-			collectors: 1,
-		}))
-	})
-	t.Run("2 collectors", func(t *testing.T) {
-		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-			clusters:   1,
-			collectors: 2,
-		}))
-	})
-
+// TestClusterSwitchover_Simple is the simplest switchover case with one single-node cluster.
+func TestClusterSwitchover_Simple(t *testing.T) {
+	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+		clusters:   1,
+		collectors: 1,
+	}))
 }
 
-// TestClusterSwitchover_SingleCluster tests cluster switchover with two clusters.
+// TestClusterSwitchover_MultiCollectorCluster tests switchover with a cluster
+// containing more than one collector.
+func TestClusterSwitchover_MultiCollectorCluster(t *testing.T) {
+	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+		clusters:   1,
+		collectors: 2,
+	}))
+}
+
+// TestClusterSwitchover_MultiCluster tests cluster switchover with two clusters.
 func TestClusterSwitchover_MultiCluster(t *testing.T) {
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   2,
