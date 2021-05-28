@@ -268,6 +268,22 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 	require.NoError(tc.T(), err)
 }
 
+// CheckClusterState checks the cluster state of the given node (within the given
+// cluster) and asserts that only transaction specified by ExpectTransaction are
+// included.
+func (tc *ClusterSwitchoverTestCase) CheckClusterState(
+	identity *flow.Identity,
+	clusterInfo protocol.Cluster,
+) {
+	node := tc.Collector(identity.NodeID)
+	state := tc.ClusterState(node, clusterInfo.ChainID())
+	expected := tc.sentTransactions[clusterInfo.EpochCounter()][clusterInfo.Index()]
+	unittest.NewClusterStateChecker(state).
+		ExpectTxCount(len(expected)).
+		ExpectContainsTx(expected...).
+		Assert(tc.T())
+}
+
 // RunTestCase comprises the core test logic for cluster switchover. We build
 // an epoch, which triggers the beginning of the epoch 2 cluster consensus, then
 // send transactions targeting clusters from both epochs while both are running.
@@ -319,28 +335,16 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, 10*time.Second, "did not receive guarantees at consensus node")
 
 	// check epoch 1 cluster states
-	for i, clusterInfo := range epoch1Clusters {
+	for _, clusterInfo := range epoch1Clusters {
 		for _, member := range clusterInfo.Members() {
-			node := tc.Collector(member.NodeID)
-			state := tc.ClusterState(node, clusterInfo.ChainID())
-			expected := tc.sentTransactions[1][uint(i)]
-			unittest.NewClusterStateChecker(state).
-				ExpectTxCount(len(expected)).
-				ExpectContainsTx(expected...).
-				Assert(tc.T())
+			tc.CheckClusterState(member, clusterInfo)
 		}
 	}
 
 	// check epoch 2 cluster states
-	for i, clusterInfo := range epoch2Clusters {
+	for _, clusterInfo := range epoch2Clusters {
 		for _, member := range clusterInfo.Members() {
-			node := tc.Collector(member.NodeID)
-			state := tc.ClusterState(node, clusterInfo.ChainID())
-			expected := tc.sentTransactions[2][uint(i)]
-			unittest.NewClusterStateChecker(state).
-				ExpectTxCount(len(expected)).
-				ExpectContainsTx(expected...).
-				Assert(tc.T())
+			tc.CheckClusterState(member, clusterInfo)
 		}
 	}
 }
