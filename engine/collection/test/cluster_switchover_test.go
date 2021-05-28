@@ -5,14 +5,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/testutil"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	mockmodule "github.com/onflow/flow-go/module/mock"
@@ -43,51 +43,14 @@ type ClusterSwitchoverTestCase struct {
 	sentTransactions map[uint64]map[uint]flow.IdentifierList // track submitted transactions
 }
 
+// NewClusterSwitchoverTestCase constructs a new cluster switchover test case
+// given the configuration, creating all dependencies and mock nodes.
 func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) *ClusterSwitchoverTestCase {
-	return &ClusterSwitchoverTestCase{
+
+	tc := &ClusterSwitchoverTestCase{
 		t:    t,
 		conf: conf,
 	}
-}
-
-// TestClusterSwitchover_SingleCluster tests cluster switchover with one cluster.
-func TestClusterSwitchover_SingleCluster(t *testing.T) {
-	t.Run("1 collector", func(t *testing.T) {
-		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-			clusters:   1,
-			collectors: 1,
-		}))
-	})
-	t.Run("2 collectors", func(t *testing.T) {
-		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-			clusters:   1,
-			collectors: 2,
-		}))
-	})
-
-}
-
-// TestClusterSwitchover_SingleCluster tests cluster switchover with two clusters.
-func TestClusterSwitchover_MultiCluster(t *testing.T) {
-	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
-		clusters:   2,
-		collectors: 2,
-	}))
-}
-
-// ClusterSwitchoverTestConf configures a test case.
-type ClusterSwitchoverTestConf struct {
-	clusters   uint // # of clusters each epoch
-	collectors uint // # of collectors each epoch
-}
-
-func (tc *ClusterSwitchoverTestCase) T() *testing.T {
-	return tc.t
-}
-
-// SetupTest sets up the test based on the given testcase configuration and
-// creates mock collection nodes for each configured collector.
-func (tc *ClusterSwitchoverTestCase) SetupTest() {
 
 	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	collectors := unittest.IdentityListFixture(int(tc.conf.collectors), unittest.WithRole(flow.RoleCollection), unittest.WithRandomPublicKeys())
@@ -125,6 +88,43 @@ func (tc *ClusterSwitchoverTestCase) SetupTest() {
 		states = append(states, node.State)
 	}
 	tc.builder = unittest.NewEpochBuilder(tc.T(), states...)
+
+	return tc
+}
+
+// TestClusterSwitchover_SingleCluster tests cluster switchover with one cluster.
+func TestClusterSwitchover_SingleCluster(t *testing.T) {
+	t.Run("1 collector", func(t *testing.T) {
+		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+			clusters:   1,
+			collectors: 1,
+		}))
+	})
+	t.Run("2 collectors", func(t *testing.T) {
+		RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+			clusters:   1,
+			collectors: 2,
+		}))
+	})
+
+}
+
+// TestClusterSwitchover_SingleCluster tests cluster switchover with two clusters.
+func TestClusterSwitchover_MultiCluster(t *testing.T) {
+	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
+		clusters:   2,
+		collectors: 2,
+	}))
+}
+
+// ClusterSwitchoverTestConf configures a test case.
+type ClusterSwitchoverTestConf struct {
+	clusters   uint // # of clusters each epoch
+	collectors uint // # of collectors each epoch
+}
+
+func (tc *ClusterSwitchoverTestCase) T() *testing.T {
+	return tc.t
 }
 
 // StartNodes starts all collection nodes in the suite and turns on continuous
@@ -272,7 +272,6 @@ func (tc *ClusterSwitchoverTestCase) SubmitTransactionToCluster(
 // an epoch, which triggers the beginning of the epoch 2 cluster consensus, then
 // send transactions targeting clusters from both epochs while both are running.
 func RunTestCase(tc *ClusterSwitchoverTestCase) {
-	tc.SetupTest()
 
 	tc.StartNodes()
 	defer tc.StopNodes()
@@ -306,11 +305,6 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	require.NoError(tc.T(), err)
 	epoch2Clustering, err := epoch2.Clustering()
 	require.NoError(tc.T(), err)
-
-	// keep track of which transactions are expected within which cluster for each epoch
-	// clusterIndex -> []transactionID
-	epoch1ExpectedTransactions := make(map[int][]flow.Identifier)
-	epoch2ExpectedTransactions := make(map[int][]flow.Identifier)
 
 	// submit transactions targeting epoch 1 clusters
 	for clusterIndex := range epoch1Clustering {
