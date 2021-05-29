@@ -141,7 +141,7 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
 			orig))
@@ -177,7 +177,7 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"wrong origin, should be positive less than %d, got %d",
 			s.Size(),
 			orig))
@@ -214,7 +214,7 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
 			node))
@@ -229,8 +229,8 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			return newInvalidInputs(fmt.Sprintf("generating shares failed: %s", err))
+		if _, ok := err.(*InvalidInputsError); ok {
+			return newInvalidInputsError(fmt.Sprintf("generating shares failed: %s", err))
 		}
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
@@ -377,7 +377,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 	case valid:
 		return nil
 	case invalid:
-		return newInvalidInputs("the verifcation vector does not serialize G2 points")
+		return newInvalidInputsError("the verifcation vector does not serialize G2 points")
 	default:
 		return errors.New("reading the verifcation vector failed")
 	}

@@ -185,7 +185,7 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	}
 
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
 			orig))
@@ -229,7 +229,7 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"invalid origin, should be positive less than %d, got %d",
 			s.Size(),
 			orig))
@@ -270,7 +270,7 @@ func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"invalid origin input, should be less than %d, got %d",
 			s.Size(), node))
 	}

@@ -47,12 +47,12 @@ func (ct *ctx) initContext() error {
 // relic context must be initialized before seeding.
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"seed length needs to be larger than %d",
 			securityBits/8))
 	}
 	if len(seed) > maxRelicPrgSeed {
-		return newInvalidInputs(
+		return newInvalidInputsError(
 			fmt.Sprintf("seed length needs to be less than %x",
 				maxRelicPrgSeed))
 	}
@@ -108,7 +108,7 @@ func randZrStar(x *scalar) {
 // the resulting scalar is in the range 0 < k < r
 func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"input slice length must be less than %d",
 			maxScalarSize))
 	}
@@ -150,7 +150,7 @@ func readPointG2(a *pointG2, src []byte) error {
 	case valid:
 		return nil
 	case invalid:
-		return newInvalidInputs("input is not a G2 point")
+		return newInvalidInputsError("input is not a G2 point")
 	default:
 		return errors.New("reading a G2 point has failed")
 	}

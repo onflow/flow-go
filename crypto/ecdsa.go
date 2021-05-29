@@ -64,7 +64,7 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return nil, newInvalidInputs("Sign requires a Hasher")
+		return nil, newInvalidInputsError("Sign requires a Hasher")
 	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
@@ -96,7 +96,7 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return false, newInvalidInputs("Verify requires a Hasher")
+		return false, newInvalidInputsError("Verify requires a Hasher")
 	}
 
 	h := alg.ComputeHash(data)
@@ -160,7 +160,7 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// use extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
 	if len(seed) < minSeedLen || len(seed) > KeyGenSeedMaxLenECDSA {
-		return nil, newInvalidInputs(fmt.Sprintf("seed byte length should be between %d and %d",
+		return nil, newInvalidInputsError(fmt.Sprintf("seed byte length should be between %d and %d",
 			minSeedLen, KeyGenSeedMaxLenECDSA))
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
@@ -175,13 +175,13 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	n := a.curve.Params().N
 	nlen := bitsToBytes(n.BitLen())
 	if len(der) != nlen {
-		return nil, newInvalidInputs(fmt.Sprintf("input has incorrect %s key size", a.algo))
+		return nil, newInvalidInputsError(fmt.Sprintf("input has incorrect %s key size", a.algo))
 	}
 	var d big.Int
 	d.SetBytes(der)
 
 	if d.Cmp(n) >= 0 {
-		return nil, newInvalidInputs(fmt.Sprintf("input is not a valid %s key", a.algo))
+		return nil, newInvalidInputsError(fmt.Sprintf("input is not a valid %s key", a.algo))
 	}
 
 	priv := goecdsa.PrivateKey{
@@ -204,7 +204,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	p := (a.curve.Params().P)
 	plen := bitsToBytes(p.BitLen())
 	if len(der) != 2*plen {
-		return nil, newInvalidInputs(fmt.Sprintf("input has incorrect %s key size", a.algo))
+		return nil, newInvalidInputsError(fmt.Sprintf("input has incorrect %s key size", a.algo))
 	}
 	var x, y big.Int
 	x.SetBytes(der[:plen])
@@ -213,7 +213,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	// all the curves supported for now have a cofactor equal to 1,
 	// so that IsOnCurve guarantees the point is on the right subgroup.
 	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
-		return nil, newInvalidInputs(fmt.Sprintf("input is not a valid %s key", a.algo))
+		return nil, newInvalidInputsError(fmt.Sprintf("input is not a valid %s key", a.algo))
 	}
 
 	pk := goecdsa.PublicKey{

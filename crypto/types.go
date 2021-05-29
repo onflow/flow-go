@@ -101,18 +101,18 @@ const (
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte
 
-// InvalidInputs is an error returned when a crypto API receives invalid inputs.
+// InvalidInputsError is an error returned when a crypto API receives invalid inputs.
 // It allows a function caller differentiate unexpected program errors from errors caused by
 // invalid inputs.
-type InvalidInputs struct {
+type InvalidInputsError struct {
 	message string
 }
 
 // NewAccountAlreadyExistsError constructs a new AccountAlreadyExistsError
-func newInvalidInputs(s string) error {
-	return &InvalidInputs{message: s}
+func newInvalidInputsError(s string) error {
+	return &InvalidInputsError{message: s}
 }
 
-func (e InvalidInputs) Error() string {
+func (e InvalidInputsError) Error() string {
 	return e.message
 }

@@ -76,17 +76,17 @@ type thresholdSigner struct {
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1]
 func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"size should be between %d and %d, got %d",
 			ThresholdSignMinSize, ThresholdSignMaxSize, size))
 	}
 	if currentIndex >= size || currentIndex < 0 {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"The current index must be between 0 and %d, got %d",
 			size-1, currentIndex))
 	}
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold, size-1, threshold))
 	}
@@ -123,7 +123,7 @@ func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	sharePublicKeys []PublicKey) error {
 
 	if len(sharePublicKeys) != s.size {
-		return newInvalidInputs(fmt.Sprintf(
+		return newInvalidInputsError(fmt.Sprintf(
 			"size of public key shares should be %d, but got %d",
 			s.size, len(sharePublicKeys)))
 	}
@@ -152,16 +152,16 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 	// sign
 	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 	if err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			newInvalidInputs(fmt.Sprintf("share signature failed: %s", err))
+		if _, ok := err.(*InvalidInputsError); ok {
+			newInvalidInputsError(fmt.Sprintf("share signature failed: %s", err))
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
 	// add the node own signature
 	valid, err := s.AddShare(s.currentIndex, share)
 	if err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			return nil, newInvalidInputs(fmt.Sprintf("share signature failed: %s", err))
+		if _, ok := err.(*InvalidInputsError); ok {
+			return nil, newInvalidInputsError(fmt.Sprintf("share signature failed: %s", err))
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
@@ -217,8 +217,8 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 	// stage the share
 	verif, err := s.VerifyAndStageShare(orig, share)
 	if err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			return false, newInvalidInputs(fmt.Sprintf("add signature failed: %s", err))
+		if _, ok := err.(*InvalidInputsError); ok {
+			return false, newInvalidInputsError(fmt.Sprintf("add signature failed: %s", err))
 		}
 		return false, fmt.Errorf("add signature failed: %w", err)
 	}
@@ -226,8 +226,8 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 		// commit the share
 		err = s.CommitShare()
 		if err != nil {
-			if _, ok := err.(*InvalidInputs); ok {
-				return true, newInvalidInputs(fmt.Sprintf("add signature failed: %s", err))
+			if _, ok := err.(*InvalidInputsError); ok {
+				return true, newInvalidInputsError(fmt.Sprintf("add signature failed: %s", err))
 			}
 			return true, fmt.Errorf("add signature failed: %w", err)
 		}
@@ -247,15 +247,15 @@ func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, 
 	s.emptyStagedShare()
 
 	if orig >= s.size || orig < 0 {
-		return false, newInvalidInputs(fmt.Sprintf(
+		return false, newInvalidInputsError(fmt.Sprintf(
 			"origin input is invalid, should be positive less than %d, got %d",
 			s.size, orig))
 	}
 
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			return false, newInvalidInputs(fmt.Sprintf(
+		if _, ok := err.(*InvalidInputsError); ok {
+			return false, newInvalidInputsError(fmt.Sprintf(
 				"verification of share failed: %s", err))
 		}
 		return false, fmt.Errorf("verification of share failed: %w", err)
@@ -323,7 +323,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
 	if len(s.shares) != len(s.signers)*signatureLengthBLSBLS12381 {
 		s.ClearShares()
-		return nil, newInvalidInputs("The number of signature shares is not matching the number of signers")
+		return nil, newInvalidInputsError("The number of signature shares is not matching the number of signers")
 	}
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
@@ -333,7 +333,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 		(*C.uint8_t)(&s.signers[0]), (C.int)(len(s.signers)))
 	if result != valid {
 		if result == invalid { // sanity check, but shouldn't happen
-			return nil, newInvalidInputs("a signature share is not valid")
+			return nil, newInvalidInputsError("a signature share is not valid")
 		}
 		return nil, errors.New("reading signatures has failed")
 	}
@@ -341,8 +341,8 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// Verify the computed signature
 	verif, err := s.VerifyThresholdSignature(thresholdSignature)
 	if err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			return nil, newInvalidInputs(fmt.Sprintf("verify threshold signature failed: %s", err))
+		if _, ok := err.(*InvalidInputsError); ok {
+			return nil, newInvalidInputsError(fmt.Sprintf("verify threshold signature failed: %s", err))
 		}
 		return nil, fmt.Errorf("verify threshold signature failed: %w", err)
 	}
@@ -373,25 +373,25 @@ func ReconstructThresholdSignature(size int, threshold int,
 	blsInstance.reInit()
 
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"size should be between %d and %d",
 			ThresholdSignMinSize,
 			ThresholdSignMaxSize))
 	}
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold, size-1,
 			threshold))
 	}
 
 	if len(shares) != len(signers) {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"The number of signature shares is not matching the number of signers"))
 	}
 
 	if len(shares) < threshold+1 {
-		return nil, newInvalidInputs(fmt.Sprintf(
+		return nil, newInvalidInputsError(fmt.Sprintf(
 			"The number of signatures does not reach the threshold"))
 	}
 
@@ -405,12 +405,12 @@ func ReconstructThresholdSignature(size int, threshold int,
 		flatShares = append(flatShares, share...)
 		// check the index is valid
 		if signers[i] >= size || signers[i] < 0 {
-			return nil, newInvalidInputs(fmt.Sprintf(
+			return nil, newInvalidInputsError(fmt.Sprintf(
 				"signer index #%d is invalid", i))
 		}
 		// check the index is new
 		if _, isSeen := m[index(signers[i])]; isSeen {
-			return nil, newInvalidInputs(fmt.Sprintf(
+			return nil, newInvalidInputsError(fmt.Sprintf(
 				"%d is a duplicate signer", index(signers[i])))
 		}
 		m[index(signers[i])] = true
@@ -434,7 +434,7 @@ func ReconstructThresholdSignature(size int, threshold int,
 // to reconstruct a threshold signature.
 func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 	if threshold < MinimumThreshold {
-		return false, newInvalidInputs(fmt.Sprintf(
+		return false, newInvalidInputsError(fmt.Sprintf(
 			"The threshold can't be smaller than %d, got %d",
 			MinimumThreshold, threshold))
 	}
@@ -446,14 +446,14 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, nil, nil, newInvalidInputs(fmt.Sprintf(
+		return nil, nil, nil, newInvalidInputsError(fmt.Sprintf(
 			"size should be between %d and %d, got %d",
 			ThresholdSignMinSize,
 			ThresholdSignMaxSize,
 			size))
 	}
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, nil, nil, newInvalidInputs(fmt.Sprintf(
+		return nil, nil, nil, newInvalidInputsError(fmt.Sprintf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold,
 			size-1,
@@ -470,8 +470,8 @@ func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 
 	// seed relic
 	if err := seedRelic(seed); err != nil {
-		if _, ok := err.(*InvalidInputs); ok {
-			return nil, nil, nil, newInvalidInputs(fmt.Sprintf(
+		if _, ok := err.(*InvalidInputsError); ok {
+			return nil, nil, nil, newInvalidInputsError(fmt.Sprintf(
 				"seeding relic failed: %s",
 				err))
 		}
