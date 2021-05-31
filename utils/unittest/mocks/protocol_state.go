@@ -100,7 +100,7 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Head").Return(final.Header, nil)
 	finalID := final.ID()
-	mocked := snapshot.On("Pending")
+	mocked := snapshot.On("Descendants")
 	mocked.RunFn = func(args mock.Arguments) {
 		// not concurrent safe
 		pendings := pending(ps, finalID)

@@ -128,6 +128,11 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("consumer stopped")
 }
 
+// Size returns number of in-memory jobs that consumer is processing.
+func (c *Consumer) Size() uint {
+	return uint(len(c.processings))
+}
+
 // NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
 // the next job from the job queue if there are workers available
 func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {

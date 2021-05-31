@@ -917,6 +917,7 @@ func NewVerificationNode(t testing.TB,
 			node.State,
 			node.ChunkStatuses,
 			node.Headers,
+			node.Blocks,
 			node.Results,
 			node.Receipts,
 			node.RequesterEngine,
@@ -929,6 +930,8 @@ func NewVerificationNode(t testing.TB,
 			node.ChunksQueue,
 			node.FetcherEngine,
 			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
+		require.NoError(t, err)
 	}
 
 	if node.AssignerEngine == nil {
@@ -949,6 +952,9 @@ func NewVerificationNode(t testing.TB,
 			node.State,
 			node.AssignerEngine,
 			blockconsumer.DefaultBlockWorkers)
+		require.NoError(t, err)
+
+		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)
 		require.NoError(t, err)
 	}
 
