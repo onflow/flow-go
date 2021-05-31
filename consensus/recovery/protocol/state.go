@@ -21,7 +21,7 @@ func FindLatest(state protocol.State, headers storage.Headers) (*flow.Header, []
 	}
 
 	// find all pending blockIDs
-	pendingIDs, err := state.Final().Pending()
+	pendingIDs, err := state.Final().Descendants()
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find pending block")
 	}
