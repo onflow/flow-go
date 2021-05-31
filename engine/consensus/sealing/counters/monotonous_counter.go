@@ -4,7 +4,8 @@ import "sync/atomic"
 
 // StrictMonotonousCounter is a helper struct which implements a strict monotonous counter.
 // StrictMonotonousCounter is implemented using atomic operations and doesn't allow to set a value
-// which is lower or equal to already stored. Uses atomic operations + spin lock to implement concurrent access guarantees
+// which is lower or equal to the already stored one. The counter is implemented
+// solely with  non-blocking atomic operations for concurrency safety.
 type StrictMonotonousCounter struct {
 	atomicCounter uint64
 }

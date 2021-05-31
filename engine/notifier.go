@@ -5,24 +5,29 @@ package engine
 // channels in that they can be passed by value and still allow concurrent
 // updates of the same internal state.
 type Notifier struct {
-	notifier chan struct{}
+	// Illustrative description of the Notifier:
+	// * When the gate is activate, it will let a _single_  person step through the gate.
+	// * When somebody steps through the gate, it deactivates (atomic operation) and
+	//   prevents subsequent people from passing (until it is activated again).
+	// * The gate has a memory and remembers whether it is activated. I.e. the gate
+	//   can be activated while no-one is waiting. When a person arrives later, they
+	//   can pass through the gate.
+	// * Activating an already-activated gate is a no-op.
+	//
+	// Implementation:
+	// We implement the Notifier using a channel. Activating the gate corresponds to
+	// calling `Notify()` on the Notifier, which pushes an element to the channel.
+	// Passing through the gate corresponds to receiving from the `Channel()`.
+	// As we don't want the routine sending the notification to wait until a worker
+	// routine reads from the channel, we need a buffered channel with capacity 1.
+
+	notifier chan struct{} // buffered channel with capacity 1
 }
 
 // NewNotifier instantiates a Notifier. Notifiers essentially behave like
 // channels in that they can be passed by value and still allow concurrent
 // updates of the same internal state.
 func NewNotifier() Notifier {
-	// the 1 message buffer is important to avoid the race condition.
-	// the consumer might decide to listen to the notify channel, and drain the messages in the
-	// message store, however there is a blind period start from the point the consumer learned
-	// the message store is empty to the point the consumer start listening to the notifier channel
-	// again. During this blind period, if the notifier had no buffer, then `doNotify` call will not
-	// able to push message to the notifier channel, therefore has to drop the message and cause the
-	// consumer waiting forever with unconsumed message in the message store.
-	// having 1 message buffer covers the "blind period", so that during the blind period if there is
-	// a new message arrived, it will be buffered, and once the blind period is over, the consumer
-	// will empty the buffer and start draining the message store again.
-
 	return Notifier{make(chan struct{}, 1)}
 }
 
