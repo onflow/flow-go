@@ -16,7 +16,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
-	flowCrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
@@ -614,7 +613,7 @@ func (e *hostEnv) hashKMAC(data []byte, tag string, hashAlgorithm hash.HashingAl
 		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
 
-	hasher := flowCrypto.NewBLSKMAC(tag)
+	hasher := crypto.NewKMACHasher(hashAlgorithm, tag)
 	return hasher.ComputeHash(data), nil
 }
 

@@ -67,6 +67,15 @@ func NewHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 	return nil
 }
 
+// NewKMACHasher returns a kmac crypto hasher supported by runtime.
+func NewKMACHasher(hashAlgo hash.HashingAlgorithm, tag string) hash.Hasher {
+	switch hashAlgo {
+	case hash.KMAC128:
+		return crypto.NewBLSKMAC(tag)
+	}
+	return nil
+}
+
 // RuntimeToCryptoSigningAlgorithm converts a runtime signature algorithm to a crypto signature algorithm.
 func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.SigningAlgorithm {
 	switch s {
@@ -149,9 +158,6 @@ func VerifySignatureFromRuntime(
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
 		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
-	}
-	if hashAlgo == hash.KMAC128 {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "hashing algorithm %s not supported", hash.KMAC128.String())
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)

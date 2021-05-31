@@ -3,10 +3,10 @@ package fvm_test
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"testing"
 
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/rs/zerolog"
@@ -595,7 +595,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t,"68fb87dfba69b956f4ba98b748a75a604f99b38a4f2740290037957f7e830da8", result)
+				require.Equal(t, "68fb87dfba69b956f4ba98b748a75a604f99b38a4f2740290037957f7e830da8", result)
 			},
 		},
 		{
@@ -604,7 +604,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t,"a9b3e62ab9b2a33020e015f245b82e063afd1398211326408bc8fc31c2c15859594b0aee263fbb02f6d8b5065ad49df2", result)
+				require.Equal(t, "a9b3e62ab9b2a33020e015f245b82e063afd1398211326408bc8fc31c2c15859594b0aee263fbb02f6d8b5065ad49df2", result)
 			},
 		},
 		{
@@ -628,7 +628,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA2_256,
 			WithTag: true,
-			Tag: "some_tag",
+			Tag:     "some_tag",
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
@@ -638,7 +638,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA2_384,
 			WithTag: true,
-			Tag: "some_tag",
+			Tag:     "some_tag",
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
@@ -648,7 +648,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA3_256,
 			WithTag: true,
-			Tag: "some_tag",
+			Tag:     "some_tag",
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
@@ -658,7 +658,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmSHA3_384,
 			WithTag: true,
-			Tag: "some_tag",
+			Tag:     "some_tag",
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
@@ -677,7 +677,7 @@ func TestHashing(t *testing.T) {
 		{
 			Algo:    runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
 			WithTag: true,
-			Tag: "some_tag",
+			Tag:     "some_tag",
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
