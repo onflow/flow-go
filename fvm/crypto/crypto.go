@@ -55,7 +55,7 @@ func (DefaultSignatureVerifier) Verify(
 	}
 
 	if hashAlgo != hash.KMAC128 {
-	message = append(tag, message...)
+		message = append(tag, message...)
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
@@ -88,11 +88,11 @@ func Hash(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, erro
 	case hash.KMAC128:
 		hashFunc = func(tag string, data []byte) hash.Hash {
 			return crypto.NewBLSKMAC(tag).ComputeHash(data)
-	}
+		}
 	default:
 		err := errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
-}
+	}
 
 	return hashFunc(tag, data), nil
 }
@@ -104,6 +104,8 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 		return crypto.ECDSAP256
 	case runtime.SignatureAlgorithmECDSA_secp256k1:
 		return crypto.ECDSASecp256k1
+	case runtime.SignatureAlgorithmBLS_BLS12_381:
+		return crypto.BLSBLS12381
 	default:
 		return crypto.UnknownSigningAlgorithm
 	}
@@ -172,8 +174,14 @@ func VerifySignatureFromRuntime(
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
 	}
-	if sigAlgo == crypto.BLSBLS12381 {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported", crypto.BLSBLS12381.String())
+
+	tag := parseRuntimeDomainTag(rawTag)
+	if tag == nil {
+		return false, errors.NewValueErrorf(rawTag, "invalid domain tag")
+	}
+
+	if len(tag) > 0 && sigAlgo != crypto.BLSBLS12381 && string(tag) != string(flow.UserDomainTag[:]) {
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported with tag different than %s", sigAlgo.String(), string(flow.UserDomainTag[:]))
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
@@ -184,11 +192,6 @@ func VerifySignatureFromRuntime(
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
 		return false, errors.NewValueErrorf(string(rawPublicKey), "cannot decode public key: %w", err)
-	}
-
-	tag := parseRuntimeDomainTag(rawTag)
-	if tag == nil {
-		return false, errors.NewValueErrorf(string(rawTag), "invalid domain tag")
 	}
 
 	valid, err := verifier.Verify(
