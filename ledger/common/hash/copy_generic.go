@@ -74,7 +74,7 @@ func copyIn512(d *state, buf1, buf2 Hash) {
 func copyIn256(d *state, buf Hash) {
 	sliceBuf := buf[:]
 
-	for i = 0; i < 4; i++ {
+	for i := 0; i < 4; i++ {
 		d.a[i] = binary.LittleEndian.Uint64(sliceBuf)
 		sliceBuf = sliceBuf[8:]
 	}

@@ -19,7 +19,7 @@ import (
 func TestProcessableJobs(t *testing.T) {
 	t.Parallel()
 
-	maxProcessing := int64(3)
+	maxProcessing := uint64(3)
 
 	t.Run("no job, nothing to process", func(t *testing.T) {
 		jobs := NewMockJobs() // no job in the queue
@@ -136,7 +136,7 @@ func TestProcessedIndexDeletion(t *testing.T) {
 			jobs := NewMockJobs()
 			progress := badger.NewConsumerProgress(db, "consumer")
 			worker := newMockWorker()
-			maxProcessing := int64(3)
+			maxProcessing := uint64(3)
 			c := NewConsumer(log, jobs, progress, worker, maxProcessing)
 			worker.WithConsumer(c)
 

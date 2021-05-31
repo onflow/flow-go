@@ -38,7 +38,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
-	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
+	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -907,19 +907,22 @@ func NewVerificationNode(t testing.TB,
 	}
 
 	if node.RequesterEngine == nil {
-		node.RequesterEngine, err = verificationrequester.New(node.Log,
+		node.RequesterEngine, err = vereq.New(node.Log,
 			node.State,
 			node.Net,
 			node.Tracer,
 			collector,
 			node.ChunkRequests,
-			100*time.Millisecond,
+			vereq.DefaultRequestInterval,
 			// requests are only qualified if their retryAfter is elapsed.
-			verificationrequester.RetryAfterQualifier,
+			vereq.RetryAfterQualifier,
 			// exponential backoff with multiplier of 2, minimum interval of a second, and
 			// maximum interval of an hour.
-			mempool.ExponentialUpdater(2, time.Hour, time.Second),
-			2)
+			mempool.ExponentialUpdater(
+				vereq.DefaultBackoffMultiplier,
+				vereq.DefaultBackoffMaxInterval,
+				vereq.DefaultBackoffMinInterval),
+			vereq.DefaultRequestTargets)
 
 		require.NoError(t, err)
 	}
@@ -932,6 +935,7 @@ func NewVerificationNode(t testing.TB,
 			node.State,
 			node.ChunkStatuses,
 			node.Headers,
+			node.Blocks,
 			node.Results,
 			node.Receipts,
 			node.RequesterEngine,
@@ -943,7 +947,9 @@ func NewVerificationNode(t testing.TB,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
-			int64(3)) // defaults number of workers to 3.
+			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
+		require.NoError(t, err)
 	}
 
 	if node.AssignerEngine == nil {
@@ -963,7 +969,10 @@ func NewVerificationNode(t testing.TB,
 			node.Blocks,
 			node.State,
 			node.AssignerEngine,
-			int64(3)) // defaults number of workers to 3.
+			blockconsumer.DefaultBlockWorkers)
+		require.NoError(t, err)
+
+		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)
 		require.NoError(t, err)
 	}
 
