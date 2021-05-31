@@ -102,6 +102,8 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 		return hash.SHA2_384
 	case runtime.HashAlgorithmSHA3_384:
 		return hash.SHA3_384
+	case runtime.HashAlgorithmKMAC128_BLS_BLS12_381:
+		return hash.KMAC128
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -118,6 +120,8 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 		return runtime.HashAlgorithmSHA2_384
 	case hash.SHA3_384:
 		return runtime.HashAlgorithmSHA3_384
+	case hash.KMAC128:
+		return runtime.HashAlgorithmKMAC128_BLS_BLS12_381
 	default:
 		return runtime.HashAlgorithmUnknown
 	}
