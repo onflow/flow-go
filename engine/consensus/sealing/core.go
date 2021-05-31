@@ -133,19 +133,20 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		return fmt.Errorf("could not retrieve parent seal (%x): %w", finalizedID, err)
 	}
 
-	latestSealed, err := c.headers.ByBlockID(latestSeal.BlockID)
+	latestSealedBlockID := latestSeal.BlockID
+	latestSealedBlock, err := c.headers.ByBlockID(latestSealedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSeal.BlockID, err)
+		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSealedBlockID, err)
 	}
 
 	// usually we start with empty collectors tree, prune it to minimum height
-	_, err = c.collectorTree.PruneUpToHeight(latestSealed.Height)
+	_, err = c.collectorTree.PruneUpToHeight(latestSealedBlock.Height)
 	if err != nil {
-		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealed.Height, err)
+		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealedBlock.Height, err)
 	}
 
-	// traverse block and process incorporated results
-	traverser := func(header *flow.Header) error {
+	// resultProcessor adds _all known_ results for the given block to the assignment collector tree
+	resultProcessor := func(header *flow.Header) error {
 		payload, err := payloads.ByBlockID(header.ID())
 		if err != nil {
 			return fmt.Errorf("could not retrieve index for block (%x): %w", header.ID(), err)
@@ -165,12 +166,27 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// traverse chain forward to collect all execution results that were incorporated in this fork
 	// starting from finalized block and finishing with latest sealed block
-	err = fork.TraverseForward(c.headers, finalizedID, traverser, fork.ExcludingHeight(latestSealed.Height))
+	err = fork.TraverseForward(c.headers, finalizedID, resultProcessor, fork.ExcludingBlock(latestSealedBlockID))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
 	}
 
 	// at this point we have processed all results in range (lastSealedBlock, lastFinalizedBlock].
+	// Now, we add all known results for any valid block that descends from the latest finalized block:
+	validPending, err := finalizedSnapshot.ValidDescendants()
+	if err != nil {
+		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
+	}
+	for _, blockID := range validPending {
+		block, err := c.headers.ByBlockID(blockID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", blockID, err)
+		}
+		err = resultProcessor(block)
+		if err != nil {
+			return fmt.Errorf("failed to process results for unfinalized block %x at height %d: %w", blockID, block.Height, err)
+		}
+	}
 
 	return nil
 }
@@ -221,7 +237,7 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
 	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
 	if err != nil {
-		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
+		return fmt.Errorf("cannot create collector: %w", err)
 	}
 
 	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
