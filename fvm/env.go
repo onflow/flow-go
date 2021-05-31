@@ -16,7 +16,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -578,43 +577,7 @@ func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgori
 	}
 
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	if hashAlgo == hash.UnknownHashingAlgorithm {
-		err := errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("hashing failed: %w", err)
-	}
-	if hashAlgo == hash.KMAC128 {
-		return e.hashKMAC(data, tag, hashAlgo)
-	} else {
-		return e.hashSHA(data, tag, hashAlgo)
-	}
-}
-
-func (e *hostEnv) hashSHA(data []byte, tag string, hashAlgorithm hash.HashingAlgorithm) ([]byte, error) {
-	if hashAlgorithm != hash.SHA2_256 &&
-		hashAlgorithm != hash.SHA3_256 &&
-		hashAlgorithm != hash.SHA2_384 &&
-		hashAlgorithm != hash.SHA3_384 {
-		err := errors.NewValueErrorf(hashAlgorithm.String(), "incorrect hashing algorithm type")
-		return nil, fmt.Errorf("hashing failed: %w", err)
-	}
-
-	message := data
-	if len(tag) > 0 {
-		message = append([]byte(tag), message...)
-	}
-
-	hasher := crypto.NewHasher(hashAlgorithm)
-	return hasher.ComputeHash(message), nil
-}
-
-func (e *hostEnv) hashKMAC(data []byte, tag string, hashAlgorithm hash.HashingAlgorithm) ([]byte, error) {
-	if hashAlgorithm != hash.KMAC128 {
-		err := errors.NewValueErrorf(hashAlgorithm.String(), "incorrect hashing algorithm type")
-		return nil, fmt.Errorf("hashing failed: %w", err)
-	}
-
-	hasher := crypto.NewKMACHasher(hashAlgorithm, tag)
-	return hasher.ComputeHash(data), nil
+	return crypto.Hash(hashAlgo, tag, data)
 }
 
 func (e *hostEnv) VerifySignature(

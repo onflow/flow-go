@@ -37,12 +37,26 @@ func (DefaultSignatureVerifier) Verify(
 	publicKey crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
 ) (bool, error) {
-	hasher := NewHasher(hashAlgo)
-	if hasher == nil {
+	var hasher hash.Hasher
+
+	switch hashAlgo {
+	case hash.SHA2_256:
+		hasher = hash.NewSHA2_256()
+	case hash.SHA3_256:
+		hasher = hash.NewSHA3_256()
+	case hash.SHA2_384:
+		hasher = hash.NewSHA2_384()
+	case hash.SHA3_384:
+		hasher = hash.NewSHA3_384()
+	case hash.KMAC128:
+		hasher = crypto.NewBLSKMAC(string(tag))
+	default:
 		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 	}
 
+	if hashAlgo != hash.KMAC128 {
 	message = append(tag, message...)
+	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
 	if err != nil {
@@ -52,28 +66,35 @@ func (DefaultSignatureVerifier) Verify(
 	return valid, nil
 }
 
-// NewHasher returns a crypto hasher supported by runtime.
-func NewHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
+func Hash(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
+	var hashFunc func(tag string, data []byte) hash.Hash
+
+	shaHashWrapper := func(f func([]byte) hash.Hash) func(tag string, data []byte) hash.Hash {
+		return func(tag string, data []byte) hash.Hash {
+			message := append([]byte(tag), data...)
+			return f(message)
+		}
+	}
+
 	switch hashAlgo {
 	case hash.SHA2_256:
-		return hash.NewSHA2_256()
+		hashFunc = shaHashWrapper(hash.NewSHA2_256().ComputeHash)
 	case hash.SHA3_256:
-		return hash.NewSHA3_256()
+		hashFunc = shaHashWrapper(hash.NewSHA3_256().ComputeHash)
 	case hash.SHA2_384:
-		return hash.NewSHA2_384()
+		hashFunc = shaHashWrapper(hash.NewSHA2_384().ComputeHash)
 	case hash.SHA3_384:
-		return hash.NewSHA3_384()
+		hashFunc = shaHashWrapper(hash.NewSHA3_384().ComputeHash)
+	case hash.KMAC128:
+		hashFunc = func(tag string, data []byte) hash.Hash {
+			return crypto.NewBLSKMAC(tag).ComputeHash(data)
 	}
-	return nil
+	default:
+		err := errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
+		return nil, fmt.Errorf("hashing failed: %w", err)
 }
 
-// NewKMACHasher returns a kmac crypto hasher supported by runtime.
-func NewKMACHasher(hashAlgo hash.HashingAlgorithm, tag string) hash.Hasher {
-	switch hashAlgo {
-	case hash.KMAC128:
-		return crypto.NewBLSKMAC(tag)
-	}
-	return nil
+	return hashFunc(tag, data), nil
 }
 
 // RuntimeToCryptoSigningAlgorithm converts a runtime signature algorithm to a crypto signature algorithm.
