@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -14,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
@@ -55,19 +55,19 @@ func DefaultConfig() Config {
 // 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type Core struct {
-	log                       zerolog.Logger                     // used to log relevant actions with context
-	collectorTree             *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
-	approvalsCache            *approvals.LruCache                // in-memory cache of approvals that weren't verified
-	atomicLastSealedHeight    uint64                             // atomic variable for last sealed block height
-	atomicLastFinalizedHeight uint64                             // atomic variable for last finalized block height
-	headers                   storage.Headers                    // used to access block headers in storage
-	state                     protocol.State                     // used to access protocol state
-	seals                     storage.Seals                      // used to get last sealed block
-	sealsMempool              mempool.IncorporatedResultSeals    // used by tracker.SealingTracker to log info
-	requestTracker            *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
-	metrics                   module.ConsensusMetrics            // used to track consensus metrics
-	tracer                    module.Tracer                      // used to trace execution
-	config                    Config
+	log                        zerolog.Logger                     // used to log relevant actions with context
+	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
+	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
+	counterLastSealedHeight    counters.StrictMonotonousCounter   // monotonous counter for last sealed block height
+	counterLastFinalizedHeight counters.StrictMonotonousCounter   // monotonous counter for last finalized block height
+	headers                    storage.Headers                    // used to access block headers in storage
+	state                      protocol.State                     // used to access protocol state
+	seals                      storage.Seals                      // used to get last sealed block
+	sealsMempool               mempool.IncorporatedResultSeals    // used by tracker.SealingTracker to log info
+	requestTracker             *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
+	metrics                    module.ConsensusMetrics            // used to track consensus metrics
+	tracer                     module.Tracer                      // used to trace execution
+	config                     Config
 }
 
 func NewCore(
@@ -89,16 +89,18 @@ func NewCore(
 	}
 
 	core := &Core{
-		log:            log.With().Str("engine", "sealing.Core").Logger(),
-		tracer:         tracer,
-		metrics:        conMetrics,
-		approvalsCache: approvals.NewApprovalsLRUCache(1000),
-		headers:        headers,
-		state:          state,
-		seals:          sealsDB,
-		sealsMempool:   sealsMempool,
-		config:         config,
-		requestTracker: approvals.NewRequestTracker(10, 30),
+		log:                        log.With().Str("engine", "sealing.Core").Logger(),
+		tracer:                     tracer,
+		metrics:                    conMetrics,
+		approvalsCache:             approvals.NewApprovalsLRUCache(1000),
+		counterLastSealedHeight:    counters.NewMonotonousCounter(lastSealed.Height),
+		counterLastFinalizedHeight: counters.NewMonotonousCounter(lastSealed.Height),
+		headers:                    headers,
+		state:                      state,
+		seals:                      sealsDB,
+		sealsMempool:               sealsMempool,
+		config:                     config,
+		requestTracker:             approvals.NewRequestTracker(10, 30),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
@@ -174,11 +176,11 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 }
 
 func (c *Core) lastSealedHeight() uint64 {
-	return atomic.LoadUint64(&c.atomicLastSealedHeight)
+	return c.counterLastSealedHeight.Value()
 }
 
 func (c *Core) lastFinalizedHeight() uint64 {
-	return atomic.LoadUint64(&c.atomicLastFinalizedHeight)
+	return c.counterLastFinalizedHeight.Value()
 }
 
 // processIncorporatedResult implements business logic for processing single incorporated result
@@ -201,10 +203,8 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	}
 	incorporatedAtHeight := incorporatedBlock.Height
 
-	lastFinalizedBlockHeight := c.lastFinalizedHeight()
-
 	// check if we are dealing with finalized block or an orphan
-	if incorporatedAtHeight <= lastFinalizedBlockHeight {
+	if incorporatedAtHeight <= c.lastFinalizedHeight() {
 		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
@@ -219,14 +219,9 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	// in case block is not finalized we will create collector and start processing approvals
 	// no checks for orphans can be made at this point
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
-
 	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated result, cannot create collector: %w", err)
-	}
-
-	if !lazyCollector.Processable {
-		return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", result.ID())
 	}
 
 	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
@@ -240,7 +235,7 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	// approvals for this result, and process them
 	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
 	// time, ensuring that processing of pending approvals happens once for particular assignment
-	if lazyCollector.Created {
+	if lazyCollector.Created && lazyCollector.Processable {
 		err = c.processPendingApprovals(lazyCollector.Collector)
 		if err != nil {
 			return fmt.Errorf("could not process cached approvals:  %w", err)
@@ -261,13 +256,8 @@ func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error 
 
 	// we expect that only engine.UnverifiableInputError,
 	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
-	if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
-		logger := c.log.Info()
-		if engine.IsInvalidInputError(err) {
-			logger = c.log.Error()
-		}
-
-		logger.Err(err).Msgf("could not process incorporated result %v", result.ID())
+	if engine.IsUnverifiableInputError(err) {
+		c.log.Info().Err(err).Msgf("could not process incorporated result %v", result.ID())
 		return nil
 	}
 
@@ -434,13 +424,10 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
 
-	// no need to process already finalized blocks
-	if finalized.Height <= c.lastFinalizedHeight() {
+	// update last finalized height, counter will return false if there is already a bigger value
+	if !c.counterLastFinalizedHeight.Set(finalized.Height) {
 		return nil
 	}
-
-	// it's important to use atomic operation to make sure that we have correct ordering
-	atomic.StoreUint64(&c.atomicLastFinalizedHeight, finalized.Height)
 
 	seal, err := c.seals.ByBlockID(finalizedBlockID)
 	if err != nil {
@@ -451,8 +438,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
 
-	// it's important to use atomic operation to make sure that we have correct ordering
-	atomic.StoreUint64(&c.atomicLastSealedHeight, lastSealed.Height)
+	// update last sealed height, counter will return false if there is already a bigger value
+	lastSealedHeightIncreased := c.counterLastSealedHeight.Set(lastSealed.Height)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
@@ -464,17 +451,25 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
 	updateCollectorTreeSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingUpdateAssignmentCollectorTree)
 	// finalize forks to stop collecting approvals for orphan collectors
-	c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
-
-	// as soon as we discover new sealed height, proceed with pruning collectors
-	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
-	updateCollectorTreeSpan.Finish()
+	err = c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
 	if err != nil {
-		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
+		updateCollectorTreeSpan.Finish()
+		return fmt.Errorf("collectors tree could not finalize fork: %w", err)
 	}
 
-	// remove all pending items that we might have requested
-	c.requestTracker.Remove(pruned...)
+	// pruning of collectors tree makes sense only with values that are increasing
+	// passing value lower than before is not supported by collectors tree
+	if lastSealedHeightIncreased {
+		// as soon as we discover new sealed height, proceed with pruning collectors
+		pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
+		if err != nil {
+			return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
+		}
+
+		// remove all pending items that we might have requested
+		c.requestTracker.Remove(pruned...)
+	}
+	updateCollectorTreeSpan.Finish()
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)

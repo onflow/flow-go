@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,6 +17,7 @@ import (
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -31,13 +33,15 @@ type BuilderSuite struct {
 	suite.Suite
 
 	// test helpers
-	firstID           flow.Identifier                           // first block in the range we look at
-	finalID           flow.Identifier                           // last finalized block
-	parentID          flow.Identifier                           // parent block we build on
-	finalizedBlockIDs []flow.Identifier                         // blocks between first and final
-	pendingBlockIDs   []flow.Identifier                         // blocks between final and parent
-	resultForBlock    map[flow.Identifier]*flow.ExecutionResult // map: BlockID -> Execution Result
-	resultByID        map[flow.Identifier]*flow.ExecutionResult // map: result ID -> Execution Result
+	firstID           flow.Identifier                               // first block in the range we look at
+	finalID           flow.Identifier                               // last finalized block
+	parentID          flow.Identifier                               // parent block we build on
+	finalizedBlockIDs []flow.Identifier                             // blocks between first and final
+	pendingBlockIDs   []flow.Identifier                             // blocks between final and parent
+	resultForBlock    map[flow.Identifier]*flow.ExecutionResult     // map: BlockID -> Execution Result
+	resultByID        map[flow.Identifier]*flow.ExecutionResult     // map: result ID -> Execution Result
+	receiptsByID      map[flow.Identifier]*flow.ExecutionReceipt    // map: receipt ID -> ExecutionReceipt
+	receiptsByBlockID map[flow.Identifier]flow.ExecutionReceiptList // map: block ID -> flow.ExecutionReceiptList
 
 	// used to populate and test the seal mempool
 	chain   []*flow.Seal                                     // chain of seals starting first
@@ -50,9 +54,10 @@ type BuilderSuite struct {
 	pendingSeals      map[flow.Identifier]*flow.IncorporatedResultSeal // storage for the seal mempool
 
 	// storage for dbs
-	headers map[flow.Identifier]*flow.Header
-	index   map[flow.Identifier]*flow.Index
-	blocks  map[flow.Identifier]*flow.Block
+	headers       map[flow.Identifier]*flow.Header
+	index         map[flow.Identifier]*flow.Index
+	blocks        map[flow.Identifier]*flow.Block
+	blockChildren map[flow.Identifier][]flow.Identifier // ids of children blocks
 
 	lastSeal *flow.Seal
 
@@ -63,12 +68,13 @@ type BuilderSuite struct {
 	setter   func(*flow.Header) error
 
 	// mocked dependencies
-	state    *protocol.MutableState
-	headerDB *storage.Headers
-	sealDB   *storage.Seals
-	indexDB  *storage.Index
-	blockDB  *storage.Blocks
-	resultDB *storage.ExecutionResults
+	state      *protocol.MutableState
+	headerDB   *storage.Headers
+	sealDB     *storage.Seals
+	indexDB    *storage.Index
+	blockDB    *storage.Blocks
+	resultDB   *storage.ExecutionResults
+	receiptsDB *storage.ExecutionReceipts
 
 	guarPool *mempool.Guarantees
 	sealPool *mempool.IncorporatedResultSeals
@@ -85,6 +91,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	bs.headers[block.ID()] = block.Header
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
+	bs.blockChildren[block.Header.ParentID] = append(bs.blockChildren[block.Header.ParentID], block.ID())
 }
 
 // createAndRecordBlock creates a new block chained to the previous block (if it
@@ -132,6 +139,8 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		bs.resultForBlock[result.BlockID] = result
 		bs.resultByID[result.ID()] = result
+		bs.receiptsByID[receipt.ID()] = receipt
+		bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 	}
 
 	// record block in dbs
@@ -174,6 +183,8 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.finalizedBlockIDs = nil
 	bs.resultForBlock = make(map[flow.Identifier]*flow.ExecutionResult)
 	bs.resultByID = make(map[flow.Identifier]*flow.ExecutionResult)
+	bs.receiptsByID = make(map[flow.Identifier]*flow.ExecutionReceipt)
+	bs.receiptsByBlockID = make(map[flow.Identifier]flow.ExecutionReceiptList)
 
 	bs.chain = nil
 	bs.irsMap = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
@@ -190,6 +201,7 @@ func (bs *BuilderSuite) SetupTest() {
 	//bs.heights = make(map[uint64]*flow.Header)
 	bs.index = make(map[flow.Identifier]*flow.Index)
 	bs.blocks = make(map[flow.Identifier]*flow.Block)
+	bs.blockChildren = make(map[flow.Identifier][]flow.Identifier)
 
 	// initialize behaviour tracking
 	bs.assembled = nil
@@ -257,6 +269,14 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
 		bs.assembled = block.Payload
 	}).Return(nil)
+	bs.state.On("Final").Return(func() realproto.Snapshot {
+		if block, ok := bs.blocks[bs.finalID]; ok {
+			snapshot := unittest.StateSnapshotForKnownBlock(block.Header, nil)
+			snapshot.On("ValidDescendants").Return(bs.blockChildren[bs.finalID], nil)
+			return snapshot
+		}
+		return unittest.StateSnapshotForUnknownBlock()
+	})
 
 	// set up storage mocks for tests
 	bs.sealDB = &storage.Seals{}
@@ -318,6 +338,32 @@ func (bs *BuilderSuite) SetupTest() {
 		},
 	)
 
+	bs.receiptsDB = &storage.ExecutionReceipts{}
+	bs.receiptsDB.On("ByID", mock.Anything).Return(
+		func(receiptID flow.Identifier) *flow.ExecutionReceipt {
+			return bs.receiptsByID[receiptID]
+		},
+		func(receiptID flow.Identifier) error {
+			_, exists := bs.receiptsByID[receiptID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+	bs.receiptsDB.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) flow.ExecutionReceiptList {
+			return bs.receiptsByBlockID[blockID]
+		},
+		func(blockID flow.Identifier) error {
+			_, exists := bs.receiptsByBlockID[blockID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
 	// set up memory pool mocks for tests
 	bs.guarPool = &mempool.Guarantees{}
 	bs.guarPool.On("Size").Return(uint(0)) // only used by metrics
@@ -349,8 +395,10 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	bs.recPool = &mempool.ExecutionTree{}
+	bs.recPool.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe()
 	bs.recPool.On("Size").Return(uint(0)).Maybe() // used for metrics only
-	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil)
+	bs.recPool.On("AddResult", mock.Anything, mock.Anything).Return(nil).Maybe()
+	bs.recPool.On("AddReceipt", mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	bs.recPool.On("ReachableReceipts", mock.Anything, mock.Anything, mock.Anything).Return(
 		func(resultID flow.Identifier, blockFilter mempoolAPIs.BlockFilter, receiptFilter mempoolAPIs.ReceiptFilter) []*flow.ExecutionReceipt {
 			return bs.pendingReceipts
@@ -359,7 +407,7 @@ func (bs *BuilderSuite) SetupTest() {
 	)
 
 	// initialize the builder
-	bs.build = NewBuilder(
+	bs.build, err = NewBuilder(
 		noopMetrics,
 		bs.db,
 		bs.state,
@@ -368,11 +416,13 @@ func (bs *BuilderSuite) SetupTest() {
 		bs.indexDB,
 		bs.blockDB,
 		bs.resultDB,
+		bs.receiptsDB,
 		bs.guarPool,
 		bs.sealPool,
 		bs.recPool,
 		noopTracer,
 	)
+	require.NoError(bs.T(), err)
 
 	bs.build.cfg.expiry = 11
 
@@ -691,7 +741,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// building on top of X0: latest finalized block in fork is [lastSeal]; expect search to start with sealed result
 	bs.sealDB.On("ByBlockID", x0.ID()).Return(bs.lastSeal, nil)
-	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err := bs.build.BuildOn(x0.ID(), bs.setter)
 	bs.Require().NoError(err)
@@ -699,7 +748,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// building on top of X1: latest finalized block in fork is [F4]; expect search to start with sealed result
 	bs.sealDB.On("ByBlockID", x1.ID()).Return(f4Seal, nil)
-	bs.recPool.On("AddResult", bs.resultByID[f4Seal.ResultID], bs.blocks[bs.finalID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", f4Seal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(x1.ID(), bs.setter)
 	bs.Require().NoError(err)
@@ -707,7 +755,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 
 	// building on top of A3 (with ID bs.parentID): latest finalized block in fork is [F4]; expect search to start with sealed result
 	bs.sealDB.On("ByBlockID", bs.parentID).Return(f2eal, nil)
-	bs.recPool.On("AddResult", bs.resultByID[f2eal.ResultID], f2.Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", f2eal.ResultID, mock.Anything, mock.Anything).Return([]*flow.ExecutionReceipt{}, nil).Once()
 	_, err = bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
@@ -752,7 +799,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() 
 	// setup mock to test the BlockFilter provided by Builder
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
-	bs.recPool.On("AddResult", bs.resultByID[b1Seal.ResultID], b1.Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", b1Seal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			blockFilter := args[1].(mempoolAPIs.BlockFilter)
@@ -780,7 +826,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipDuplicatedReceipts() {
 	// setup mock to test the ReceiptFilter provided by Builder
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
-	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
@@ -818,7 +863,6 @@ func (bs *BuilderSuite) TestPayloadReceipts_SkipReceiptsForSealedBlock() {
 	// setup mock to test the ReceiptFilter provided by Builder
 	bs.recPool = &mempool.ExecutionTree{}
 	bs.recPool.On("Size").Return(uint(0)).Maybe()
-	bs.recPool.On("AddResult", bs.resultByID[bs.lastSeal.ResultID], bs.blocks[bs.lastSeal.BlockID].Header).Return(nil).Once()
 	bs.recPool.On("ReachableReceipts", bs.lastSeal.ResultID, mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			receiptFilter := args[2].(mempoolAPIs.ReceiptFilter)
@@ -1196,4 +1240,106 @@ func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingB
 	)
 	pendingSeals[incorporatedResultSeal.ID()] = incorporatedResultSeal
 	return incorporatedResultSeal
+}
+
+// TestIntegration_RepopulateExecutionTreeAtStartup tests that the
+// builder includes receipts for candidate block after fresh start, meaning
+// it will repopulate execution tree in constructor
+// P <- A[ER{P}] <- B[ER{A}, ER{A}'] <- C <- X[ER{B}, ER{B}', ER{C} ]
+//        |
+//     finalized
+func (bs *BuilderSuite) TestIntegration_RepopulateExecutionTreeAtStartup() {
+	// setup initial state
+	// A is a block containing a valid receipt for block P
+	recP := unittest.ExecutionReceiptFixture(unittest.WithResult(bs.resultForBlock[bs.parentID]))
+	A := unittest.BlockWithParentFixture(bs.headers[bs.parentID])
+	A.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{recP.Meta()},
+		Results:  []*flow.ExecutionResult{&recP.ExecutionResult},
+	})
+
+	// B is a block containing two valid receipts, with different results, for
+	// block A
+	resA1 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	recA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA1))
+	resA2 := unittest.ExecutionResultFixture(unittest.WithBlock(&A), unittest.WithPreviousResult(recP.ExecutionResult))
+	recA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resA2))
+	B := unittest.BlockWithParentFixture(A.Header)
+	B.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{recA1.Meta(), recA2.Meta()},
+		Results:  []*flow.ExecutionResult{&recA1.ExecutionResult, &recA2.ExecutionResult},
+	})
+
+	C := unittest.BlockWithParentFixture(B.Header)
+
+	bs.storeBlock(&A)
+	bs.storeBlock(&B)
+	bs.storeBlock(&C)
+
+	// store execution results
+	for _, block := range []*flow.Block{&A, &B, &C} {
+		// for current block create empty receipts list
+		bs.receiptsByBlockID[block.ID()] = flow.ExecutionReceiptList{}
+
+		for _, result := range block.Payload.Results {
+			bs.resultByID[result.ID()] = result
+		}
+		for _, meta := range block.Payload.Receipts {
+			receipt := flow.ExecutionReceiptFromMeta(*meta, *bs.resultByID[meta.ResultID])
+			bs.receiptsByID[meta.ID()] = receipt
+			bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
+		}
+	}
+
+	// mark A as finalized
+	bs.finalID = A.ID()
+
+	// set up no-op dependencies
+	noopMetrics := metrics.NewNoopCollector()
+	noopTracer := trace.NewNoopTracer()
+
+	// Instantiate real Execution Tree mempool;
+	recPool := mempoolImpl.NewExecutionTree()
+
+	// create builder which has to repopulate execution tree
+	var err error
+	bs.build, err = NewBuilder(
+		noopMetrics,
+		bs.db,
+		bs.state,
+		bs.headerDB,
+		bs.sealDB,
+		bs.indexDB,
+		bs.blockDB,
+		bs.resultDB,
+		bs.receiptsDB,
+		bs.guarPool,
+		bs.sealPool,
+		recPool,
+		noopTracer,
+	)
+	require.NoError(bs.T(), err)
+	bs.build.cfg.expiry = 11
+
+	// Create two valid receipts for block B which build on different receipts
+	// for the parent block (A); recB1 builds on top of RecA1, whilst recB2
+	// builds on top of RecA2.
+	resB1 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA1.ExecutionResult))
+	recB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB1))
+	resB2 := unittest.ExecutionResultFixture(unittest.WithBlock(&B), unittest.WithPreviousResult(recA2.ExecutionResult))
+	recB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resB2))
+	resC := unittest.ExecutionResultFixture(unittest.WithBlock(&C), unittest.WithPreviousResult(recB1.ExecutionResult))
+	recC := unittest.ExecutionReceiptFixture(unittest.WithResult(resC))
+
+	// Add recB1 and recB2 to the mempool for inclusion in the next candidate
+	_, _ = bs.build.recPool.AddReceipt(recB1, B.Header)
+	_, _ = bs.build.recPool.AddReceipt(recB2, B.Header)
+	_, _ = bs.build.recPool.AddReceipt(recC, C.Header)
+
+	_, err = bs.build.BuildOn(C.ID(), bs.setter)
+	bs.Require().NoError(err)
+	expectedReceipts := flow.ExecutionReceiptMetaList{recB1.Meta(), recB2.Meta(), recC.Meta()}
+	expectedResults := flow.ExecutionResultList{&recB1.ExecutionResult, &recB2.ExecutionResult, &recC.ExecutionResult}
+	bs.Assert().ElementsMatch(expectedReceipts, bs.assembled.Receipts, "payload should contain receipts from valid execution forks")
+	bs.Assert().ElementsMatch(expectedResults, bs.assembled.Results, "payload should contain results from valid execution forks")
 }

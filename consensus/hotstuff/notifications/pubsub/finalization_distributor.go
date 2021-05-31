@@ -7,28 +7,33 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type FinalizationConsumer struct {
-	OnBlockFinalized    func(finalizedBlockID flow.Identifier)
-	OnBlockIncorporated func(incorporatedBlockID flow.Identifier)
-}
+type OnBlockFinalizedConsumer = func(finalizedBlockID flow.Identifier)
+type OnBlockIncorporatedConsumer = func(incorporatedBlockID flow.Identifier)
 
 // FinalizationDistributor subscribes for finalization events from hotstuff and distributes it to subscribers
 type FinalizationDistributor struct {
-	subscribers []FinalizationConsumer
-	lock        sync.RWMutex
+	blockFinalizedConsumers    []OnBlockFinalizedConsumer
+	blockIncorporatedConsumers []OnBlockIncorporatedConsumer
+	lock                       sync.RWMutex
 }
 
 func NewFinalizationDistributor() *FinalizationDistributor {
 	return &FinalizationDistributor{
-		subscribers: make([]FinalizationConsumer, 0),
-		lock:        sync.RWMutex{},
+		blockFinalizedConsumers:    make([]OnBlockFinalizedConsumer, 0),
+		blockIncorporatedConsumers: make([]OnBlockIncorporatedConsumer, 0),
+		lock:                       sync.RWMutex{},
 	}
 }
 
-func (p *FinalizationDistributor) AddConsumer(consumer FinalizationConsumer) {
+func (p *FinalizationDistributor) AddOnBlockFinalizedConsumer(consumer OnBlockFinalizedConsumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.subscribers = append(p.subscribers, consumer)
+	p.blockFinalizedConsumers = append(p.blockFinalizedConsumers, consumer)
+}
+func (p *FinalizationDistributor) AddOnBlockIncorporatedConsumer(consumer OnBlockIncorporatedConsumer) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.blockIncorporatedConsumers = append(p.blockIncorporatedConsumers, consumer)
 }
 
 func (p *FinalizationDistributor) OnEventProcessed() {}
@@ -36,20 +41,16 @@ func (p *FinalizationDistributor) OnEventProcessed() {}
 func (p *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, consumer := range p.subscribers {
-		if consumer.OnBlockIncorporated != nil {
-			consumer.OnBlockIncorporated(block.BlockID)
-		}
+	for _, consumer := range p.blockIncorporatedConsumers {
+		consumer(block.BlockID)
 	}
 }
 
 func (p *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-	for _, consumer := range p.subscribers {
-		if consumer.OnBlockFinalized != nil {
-			consumer.OnBlockFinalized(block.BlockID)
-		}
+	for _, consumer := range p.blockFinalizedConsumers {
+		consumer(block.BlockID)
 	}
 }
 

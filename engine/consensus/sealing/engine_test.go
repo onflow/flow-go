@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
@@ -128,13 +129,18 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 
 	numApprovalsPerReceipt := 1
 	approvals := make([]*flow.ResultApproval, 0, len(receipts)*numApprovalsPerReceipt)
+	responseApprovals := make([]*messages.ApprovalResponse, 0)
 	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
 			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ID()),
 				unittest.WithApproverID(approverID))
+			responseApproval := &messages.ApprovalResponse{
+				Approval: *approval,
+			}
+			responseApprovals = append(responseApprovals, responseApproval)
 			approvals = append(approvals, approval)
-			s.core.On("ProcessApproval", approval).Return(nil).Once()
+			s.core.On("ProcessApproval", approval).Return(nil).Twice()
 		}
 	}
 
@@ -143,6 +149,14 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
+			err := s.engine.Process(approverID, approval)
+			s.Require().NoError(err, "should process approval")
+		}
+	}()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, approval := range responseApprovals {
 			err := s.engine.Process(approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}

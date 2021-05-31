@@ -241,13 +241,9 @@ func main() {
 				config,
 			)
 
-			finalizationConsumer := pubsub.FinalizationConsumer{
-				OnBlockFinalized:    e.OnFinalizedBlock,
-				OnBlockIncorporated: e.OnBlockIncorporated,
-			}
-
 			// subscribe for finalization events from hotstuff
-			finalizationDistributor.AddConsumer(finalizationConsumer)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -298,9 +294,7 @@ func main() {
 
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
-			finalizationDistributor.AddConsumer(pubsub.FinalizationConsumer{
-				OnBlockFinalized: e.OnFinalizedBlock,
-			})
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
 
 			return e, err
 		}).
@@ -363,7 +357,7 @@ func main() {
 
 			// initialize the block builder
 			var build module.Builder
-			build = builder.NewBuilder(
+			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,
@@ -372,6 +366,7 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Blocks,
 				node.Storage.Results,
+				node.Storage.Receipts,
 				guarantees,
 				seals,
 				receipts,
@@ -381,6 +376,10 @@ func main() {
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialized block builder: %w", err)
+			}
+
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			// initialize the block finalizer

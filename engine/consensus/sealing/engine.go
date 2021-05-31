@@ -203,9 +203,10 @@ func (e *Engine) setupMessageHandler() error {
 					return nil, false
 				}
 
+				approval := msg.Payload.(*messages.ApprovalResponse).Approval
 				return &engine.Message{
 					OriginID: msg.OriginID,
-					Payload:  msg.Payload.(*messages.ApprovalResponse).Approval,
+					Payload:  &approval,
 				}, true
 			},
 			Store: e.pendingRequestedApprovals,
@@ -289,12 +290,7 @@ func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
 	incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-
-	if err != nil {
-		return fmt.Errorf("fatal internal error in sealing core logic: %w", err)
-	}
-
-	return nil
+	return err
 }
 
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
@@ -360,7 +356,7 @@ func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	go func() {
+	e.unit.Launch(func() {
 		// We can't process incorporated block because of how sealing engine handles assignments we need to
 		// make sure that block has children. Instead we will process parent block
 
@@ -385,5 +381,5 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 			e.pendingIncorporatedResults.Push(result)
 		}
 		e.notifier.Notify()
-	}()
+	})
 }
