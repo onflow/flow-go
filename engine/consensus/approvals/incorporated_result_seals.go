@@ -20,7 +20,7 @@ type IncorporatedResultSeals struct {
 	receiptsDB storage.ExecutionReceipts       // receipts DB to decide if we have multiple receipts for same result
 }
 
-// NewIncorporatedResults creates a mempool for the incorporated result seals
+// NewIncorporatedResultSeals creates a mempool for the incorporated result seals
 func NewIncorporatedResultSeals(mempool mempool.IncorporatedResultSeals) *IncorporatedResultSeals {
 	return &IncorporatedResultSeals{
 		seals: mempool,

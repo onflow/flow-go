@@ -58,7 +58,7 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 
 	for i, chunk := range s.Chunks {
 		var err error
-		sigCollector := flow.NewSignatureCollector()
+		sigCollector := NewSignatureCollector()
 		for verID := range s.AuthorizedVerifiers {
 			approval := unittest.ResultApprovalFixture(unittest.WithChunk(chunk.Index), unittest.WithApproverID(verID))
 			err = s.collector.ProcessApproval(approval)
