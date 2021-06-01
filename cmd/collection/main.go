@@ -364,9 +364,11 @@ func main() {
 				return nil, err
 			}
 
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
+				staking,
 				node.DB,
 				node.State,
 				consensus.WithBlockRateDelay(blockRateDelay),
@@ -380,7 +382,6 @@ func main() {
 				return nil, err
 			}
 
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// check if required fields are left empty

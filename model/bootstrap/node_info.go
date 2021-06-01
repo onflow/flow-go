@@ -25,6 +25,13 @@ const (
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
+// NodeMachineAccountPriv contains the private configration need to construct a
+// NodeMachineAccountInfo object. This is used as an intemediary by the bootstrap scripts
+// for storing the private key before generating a NodeMachineAccountInfo.
+type NodeMachineAccountKey struct {
+	PrivateKey encodable.MachineAccountPrivKey
+}
+
 // NodeMachineAccountInfo defines the structure for a bootstrapping file containing
 // private information about the node's machine account. The machine account is used
 // by the protocol software to interact with Flow as a client autonomously as needed, in
@@ -264,12 +271,14 @@ func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	return filtered
 }
 
-// Sort sorts the NodeInfo list in place using the given ordering.
+// Sort sorts the NodeInfo list using the given ordering.
 func Sort(nodes []NodeInfo, order flow.IdentityOrder) []NodeInfo {
-	sort.Slice(nodes, func(i, j int) bool {
-		return order(nodes[i].Identity(), nodes[j].Identity())
+	dup := make([]NodeInfo, len(nodes))
+	copy(dup, nodes)
+	sort.Slice(dup, func(i, j int) bool {
+		return order(dup[i].Identity(), dup[j].Identity())
 	})
-	return nodes
+	return dup
 }
 
 func ToIdentityList(nodes []NodeInfo) flow.IdentityList {

@@ -30,7 +30,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 
 		// assemble DB operations to store result (no execution)
 		storeResultOps := results.store(&receipt.ExecutionResult)
-		// assemble DB operations to to index receipt (no execution)
+		// assemble DB operations to index receipt (no execution)
 		storeReceiptOps := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receiptID, receipt.Meta())))
 		// assemble DB operations to index receipt by the block it computes (no execution)
 		indexReceiptOps := transaction.WithTx(operation.SkipDuplicates(

@@ -394,7 +394,8 @@ func (suite *ConcurrencyTestSuite) bootstrapSystem(staked bool) {
 	identities := flow.IdentityList{colID, conID, exeID, verID}
 
 	// bootstraps the system
-	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.collector, suite.tracer, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(suite.T(), suite.collector, suite.tracer, rootSnapshot)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch

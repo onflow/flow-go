@@ -52,6 +52,62 @@ func TestHead(t *testing.T) {
 	})
 }
 
+// TestSnapshot_Descendants builds a sample chain with next structure:
+// A (finalized) <- B <- C <- D <- E <- F
+//               <- G <- H <- I <- J
+// snapshot.Descendants has to return [B, C, D, E, F, G, H, I, J].
+func TestSnapshot_Descendants(t *testing.T) {
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		var expectedBlocks []flow.Identifier
+		for i := 5; i > 3; i-- {
+			for _, block := range unittest.ChainFixtureFrom(i, head) {
+				err := state.Extend(block)
+				require.NoError(t, err)
+				expectedBlocks = append(expectedBlocks, block.ID())
+			}
+		}
+
+		pendingBlocks, err := state.AtBlockID(head.ID()).Descendants()
+		require.NoError(t, err)
+		require.ElementsMatch(t, expectedBlocks, pendingBlocks)
+	})
+}
+
+// TestSnapshot_ValidDescendants builds a sample chain with next structure:
+// A (finalized) <- B <- C <- D <- E <- F
+//               <- G <- H <- I <- J
+// snapshot.Descendants has to return [B, C, D, E, G, H, I]. [F, J] should be excluded because they aren't valid
+func TestSnapshot_ValidDescendants(t *testing.T) {
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	head, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		var expectedBlocks []flow.Identifier
+		for i := 5; i > 3; i-- {
+			fork := unittest.ChainFixtureFrom(i, head)
+			for blockIndex, block := range fork {
+				err := state.Extend(block)
+				require.NoError(t, err)
+				// skip last block from fork
+				if blockIndex < len(fork)-1 {
+					err = state.MarkValid(block.ID())
+					require.NoError(t, err)
+					expectedBlocks = append(expectedBlocks, block.ID())
+				}
+			}
+		}
+
+		pendingBlocks, err := state.AtBlockID(head.ID()).ValidDescendants()
+		require.NoError(t, err)
+		require.ElementsMatch(t, expectedBlocks, pendingBlocks)
+	})
+}
+
 func TestIdentities(t *testing.T) {
 	identities := unittest.IdentityListFixture(5, unittest.WithAllRoles())
 	rootSnapshot := unittest.RootSnapshotFixture(identities)

@@ -244,7 +244,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	provider func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit)) (*enginemock.GenericNode,
 	*mocknetwork.Engine) {
 
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
+	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
@@ -309,7 +309,7 @@ func SetupMockConsensusNode(t *testing.T,
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
+	conNode := testutil.GenericNodeFromParticipants(t, hub, conIdentity, othersIdentity, chainID)
 	conEngine := new(mocknetwork.Engine)
 
 	// map form verIds --> result approval ID
@@ -700,6 +700,12 @@ func withConsumers(t *testing.T,
 		conEngine.AssertNotCalled(t, "Process")
 		exeEngine.AssertNotCalled(t, "Process")
 	}
+
+	// verifies memory resources are cleaned up all over pipeline
+	assert.True(t, verNode.BlockConsumer.Size() == 0)
+	assert.True(t, verNode.ChunkConsumer.Size() == 0)
+	assert.True(t, verNode.ChunkStatuses.Size() == 0)
+	assert.True(t, verNode.ChunkRequests.Size() == 0)
 }
 
 // bootstrapSystem is a test helper that bootstraps a flow system with node of each main roles (except execution nodes that are two).
@@ -716,7 +722,8 @@ func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemo
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch
