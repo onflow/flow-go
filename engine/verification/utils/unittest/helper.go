@@ -131,14 +131,14 @@ func VerificationHappyPath(t *testing.T,
 		EvenChunkIndexAssigner)
 
 	// mock execution node
-	exeNode, exeEngine := SetupChunkDataPackProvider(t,
+	exeNode, exeEngine, _ := SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,
 		chainID,
 		CompleteExecutionReceiptList{completeER},
 		assignedChunkIDs,
-		RespondChunkDataPackRequest) // always responds to chunk data pack requests.
+		RespondChunkDataPackRequestImmediately) // always responds to chunk data pack requests.
 
 	// mock consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
@@ -230,6 +230,9 @@ func VerificationHappyPath(t *testing.T,
 		Msg("TestHappyPath finishes")
 }
 
+// MockChunkDataProviderFunc is a test helper function encapsulating the logic of whether to reply a chunk data pack request.
+type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool
+
 // SetupChunkDataPackProvider creates and returns an execution node that only has a chunk data pack provider engine.
 //
 // The mock chunk provider engine replies the chunk back requests by invoking the injected provider method. All chunk data pack
@@ -241,14 +244,19 @@ func SetupChunkDataPackProvider(t *testing.T,
 	chainID flow.ChainID,
 	completeERs CompleteExecutionReceiptList,
 	assignedChunkIDs flow.IdentifierList,
-	provider func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit)) (*enginemock.GenericNode,
-	*mocknetwork.Engine) {
+	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
+	*mocknetwork.Engine, *sync.WaitGroup) {
 
 	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
 	assert.Nil(t, err)
+
+	replied := make(map[flow.Identifier]struct{})
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(assignedChunkIDs))
 
 	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
@@ -261,17 +269,27 @@ func SetupChunkDataPackProvider(t *testing.T,
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
-			provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+			shouldReply := provider(t, completeERs, req.ChunkID, originID, exeChunkDataConduit)
+			_, alreadyReplied := replied[req.ChunkID]
+			if shouldReply && !alreadyReplied {
+				/*
+					the wait group keeps track of unique chunk requests addressed.
+					we make it done only upon the first successful request of a chunk.
+				*/
+				wg.Done()
+				replied[req.ChunkID] = struct{}{}
+			}
 		}).Return(nil)
 
-	return &exeNode, exeEngine
+	return &exeNode, exeEngine, wg
 }
 
-func RespondChunkDataPackRequest(t *testing.T,
+// RespondChunkDataPackRequestImmediately immediately qualifies a chunk data request for reply by chunk data provider.
+func RespondChunkDataPackRequestImmediately(t *testing.T,
 	completeERs CompleteExecutionReceiptList,
 	chunkID flow.Identifier,
 	verID flow.Identifier,
-	con network.Conduit) {
+	con network.Conduit) bool {
 
 	// finds the chunk data pack of the requested chunk and sends it back.
 	res := completeERs.ChunkDataResponseOf(t, chunkID)
@@ -283,6 +301,35 @@ func RespondChunkDataPackRequest(t *testing.T,
 		Hex("origin_id", logging.ID(verID)).
 		Hex("chunk_id", logging.ID(chunkID)).
 		Msg("chunk data pack request answered by provider")
+
+	return true
+}
+
+// RespondChunkDataPackRequestAfterNTrials only qualifies a chunk data request for reply by chunk data provider after n times.
+func RespondChunkDataPackRequestAfterNTrials(n int) MockChunkDataProviderFunc {
+	tryCount := make(map[flow.Identifier]int)
+
+	return func(t *testing.T, completeERs CompleteExecutionReceiptList, chunkID flow.Identifier, verID flow.Identifier, con network.Conduit) bool {
+		tryCount[chunkID]++
+
+		if tryCount[chunkID] >= n {
+			// finds the chunk data pack of the requested chunk and sends it back.
+			res := completeERs.ChunkDataResponseOf(t, chunkID)
+
+			err := con.Unicast(res, verID)
+			assert.Nil(t, err)
+
+			log.Debug().
+				Hex("origin_id", logging.ID(verID)).
+				Hex("chunk_id", logging.ID(chunkID)).
+				Int("trial_time", tryCount[chunkID]).
+				Msg("chunk data pack request answered by provider")
+
+			return true
+		}
+
+		return false
+	}
 }
 
 // SetupMockConsensusNode creates and returns a mock consensus node (conIdentity) and its registered engine in the
@@ -556,12 +603,14 @@ func NewVerificationHappyPathTest(t *testing.T,
 	eventRepetition int,
 	verCollector module.VerificationMetrics,
 	mempoolCollector module.MempoolMetrics,
+	retry int,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
-	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, func(
+	withConsumers(t, staked, blockCount, verCollector, mempoolCollector, RespondChunkDataPackRequestAfterNTrials(retry), func(
 		blockConsumer *blockconsumer.BlockConsumer,
 		blocks []*flow.Block,
-		resultApprovalsWG *sync.WaitGroup) {
+		resultApprovalsWG *sync.WaitGroup,
+		chunkDataRequestWG *sync.WaitGroup) {
 
 		for i := 0; i < len(blocks)*eventRepetition; i++ {
 			// consumer is only required to be "notified" that a new finalized block available.
@@ -570,7 +619,9 @@ func NewVerificationHappyPathTest(t *testing.T,
 			blockConsumer.OnFinalizedBlock(&model.Block{})
 		}
 
-		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*blockCount)*time.Second,
+		unittest.RequireReturnsBefore(t, chunkDataRequestWG.Wait, time.Duration(10*retry*blockCount)*time.Second,
+			"could not receive chunk data requests on time")
+		unittest.RequireReturnsBefore(t, resultApprovalsWG.Wait, time.Duration(2*retry*blockCount)*time.Second,
 			"could not receive result approvals on time")
 
 	}, ops...)
@@ -586,7 +637,8 @@ func withConsumers(t *testing.T,
 	blockCount int,
 	verCollector module.VerificationMetrics, // verification metrics collector
 	mempoolCollector module.MempoolMetrics, // memory pool metrics collector
-	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup),
+	providerFunc MockChunkDataProviderFunc,
+	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block, *sync.WaitGroup, *sync.WaitGroup),
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := &trace.NoopTracer{}
@@ -632,14 +684,14 @@ func withConsumers(t *testing.T,
 		chainID)
 
 	// execution node
-	exeNode, exeEngine := SetupChunkDataPackProvider(t,
+	exeNode, exeEngine, exeWG := SetupChunkDataPackProvider(t,
 		hub,
 		exeID,
 		participants,
 		chainID,
 		completeERs,
 		assignedChunkIDs,
-		RespondChunkDataPackRequest)
+		providerFunc)
 
 	// consensus node
 	conNode, conEngine, conWG := SetupMockConsensusNode(t,
@@ -679,7 +731,7 @@ func withConsumers(t *testing.T,
 		verNode.VerifierEngine)
 
 	// plays test scenario
-	withBlockConsumer(verNode.BlockConsumer, blocks, conWG)
+	withBlockConsumer(verNode.BlockConsumer, blocks, conWG, exeWG)
 
 	// tears down engines and nodes
 	unittest.RequireReturnsBefore(t, verNet.StopConDev, 100*time.Millisecond, "failed to stop verification network")
