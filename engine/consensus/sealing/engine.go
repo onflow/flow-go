@@ -285,6 +285,11 @@ func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
 }
 
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	// don't process approval if originID is mismatched
+	if originID != approval.Body.ApproverID {
+		return nil
+	}
+
 	err := e.core.ProcessApproval(approval)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 	if err != nil {
