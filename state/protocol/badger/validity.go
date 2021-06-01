@@ -16,8 +16,6 @@ func isValidEpochSetup(setup *flow.EpochSetup) error {
 		return fmt.Errorf("seed has incorrect length (%d != %d)", len(setup.RandomSource), flow.EpochSetupRandomSourceLength)
 	}
 
-	fmt.Printf("XXX setup participants: %#v\n", setup.Participants)
-
 	// STEP 2: sanity checks of all nodes listed as participants
 	// there should be no duplicate node IDs
 	identLookup := make(map[flow.Identifier]struct{})

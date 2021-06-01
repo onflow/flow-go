@@ -38,7 +38,7 @@ type Consumer interface {
 	// phase for the current epoch.
 	//
 	// Referencing the diagram below, the event is emitted when block c is incorporated.
-	// The block parameter is the first block of the epoch setup phase (block b).
+	// The block parameter is the first block of the epoch setup phase (block c).
 	//
 	// |<-- Epoch N ------------------------------------------------->|
 	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
@@ -54,7 +54,7 @@ type Consumer interface {
 	// phase for the current epoch.
 	//
 	// Referencing the diagram below, the event is emitted when block f is received.
-	// The block parameter is the first block of the epoch committed phase (block e).
+	// The block parameter is the first block of the epoch committed phase (block f).
 	//
 	// |<-- Epoch N ------------------------------------------------->|
 	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
