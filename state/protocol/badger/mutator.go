@@ -507,7 +507,16 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
 
-	payload := block.Payload
+	// We will process service events from blocks which are sealed by this
+	// block's PARENT. The events are emitted when we finalize the first child
+	// of the block containing the seal for the result containing the
+	// corresponding service event.
+	parent, err := m.blocks.ByID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not get parent (id=%x): %w", header.ParentID, err)
+	}
+
+	payload := parent.Payload
 	// track protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {

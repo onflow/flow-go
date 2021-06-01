@@ -38,13 +38,14 @@ type Consumer interface {
 	// phase for the current epoch.
 	//
 	// Referencing the diagram below, the event is emitted when block c is incorporated.
-	// The block parameter is the first block of the epoch setup phase (block b).
+	// The block parameter is the first block of the epoch setup phase (block c).
 	//
 	// |<-- Epoch N ------------------------------------------------->|
 	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
 	//                    ^--- block A - this block's execution result contains an EpochSetup event
-	//                      ^--- block b - contains seal for block A, first block of Setup phase
-	//                         ^--- block c - finalizes block b and triggers `EpochSetupPhaseStarted`
+	//                      ^--- block b - contains seal for block A
+	//                         ^--- block c - contains qc for block b, first block of Setup phase
+	//                           ^--- block d - finalizes block c, triggers EpochSetupPhaseStarted event
 	//
 	// NOTE: Only called once the phase transition has been finalized.
 	EpochSetupPhaseStarted(epoch uint64, first *flow.Header)
@@ -54,13 +55,14 @@ type Consumer interface {
 	// phase for the current epoch.
 	//
 	// Referencing the diagram below, the event is emitted when block f is received.
-	// The block parameter is the first block of the epoch committed phase (block e).
+	// The block parameter is the first block of the epoch committed phase (block f).
 	//
 	// |<-- Epoch N ------------------------------------------------->|
 	// |<-- StakingPhase -->|<-- SetupPhase -->|<-- CommittedPhase -->|
 	//                                       ^--- block D - this block's execution result contains an EpochCommit event
-	//                                         ^--- block e - contains seal for block D, first block of Committed phase
-	//                                            ^--- block f - this block finalizes block e, and triggers `EpochCommittedPhaseStarted`
+	//                                         ^--- block e - contains seal for block D
+	//                                            ^--- block f - contains qc for block e, first block of Committed phase
+	//                                              ^--- block g - finalizes block f, triggers EpochCommittedPhaseStarted event
 	///
 	//
 	// NOTE: Only called once the phase transition has been finalized.
