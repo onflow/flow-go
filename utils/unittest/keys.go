@@ -2,6 +2,7 @@ package unittest
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 
 	"github.com/onflow/flow-go/crypto"
 )
@@ -54,4 +55,24 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 	}
 
 	return keys, nil
+}
+
+func MustDecodePublicKeyHex(algo crypto.SigningAlgorithm, keyHex string) crypto.PublicKey {
+	keyBytes, err := hex.DecodeString(keyHex)
+	if err != nil {
+		panic(err)
+	}
+	key, err := crypto.DecodePublicKey(algo, keyBytes)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
+func MustDecodeSignatureHex(sigHex string) crypto.Signature {
+	sigBytes, err := hex.DecodeString(sigHex)
+	if err != nil {
+		panic(err)
+	}
+	return sigBytes
 }
