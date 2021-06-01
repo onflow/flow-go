@@ -54,8 +54,8 @@ func (as *AggregatedSignatures) Collect() []flow.AggregatedSignature {
 	return aggregatedSigs
 }
 
-// CollectChunksWithMissingApprovals returns indexes of chunks that don't have an aggregated signature
-func (as *AggregatedSignatures) CollectChunksWithMissingApprovals() []uint64 {
+// ChunksWithoutAggregatedSignature returns indexes of chunks that don't have an aggregated signature
+func (as *AggregatedSignatures) ChunksWithoutAggregatedSignature() []uint64 {
 	// provide enough capacity to avoid allocations while we hold the lock
 	missingChunks := make([]uint64, 0, as.numberOfChunks)
 	as.lock.RLock()

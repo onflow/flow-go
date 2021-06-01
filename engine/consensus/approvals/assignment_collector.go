@@ -27,12 +27,16 @@ const DefaultEmergencySealingThreshold = 400
 // helper functor that can be used to retrieve cached block height
 type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
 
-// AssignmentCollector is responsible collecting approvals that satisfy one assignment, meaning that we will
-// have multiple collectorTree for one execution result as same result can be incorporated in multiple forks.
-// AssignmentCollector has a strict ordering of processing, before processing approvals at least one incorporated result has to be
-// processed.
+// AssignmentCollector
+// Context:
+//  * When the same result is incorporated in multiple different forks,
+//    unique verifier assignment is determined for each fork.
+//  * The assignment collector is intended to encapsulate the known
+//    assignments for a particular execution result.
+// AssignmentCollector has a strict ordering of processing, before processing
+// approvals at least one incorporated result has to be processed.
 // AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
-// AssignmentCollector is responsible for validating approvals on result-level(checking signature, identity).
+// AssignmentCollector is responsible for validating approvals on result-level (checking signature, identity).
 // TODO: currently AssignmentCollector doesn't cleanup collectorTree when blocks that incorporate results get orphaned
 // For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
 // when fork gets orphaned
@@ -61,12 +65,19 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 	if err != nil {
 		return nil, err
 	}
+	// pre-select all authorized verifiers at the block that is being sealed
+	authorizedApprovers, err := authorizedVerifiersAtBlock(state, result.BlockID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
+	}
 
 	collector := &AssignmentCollector{
 		ResultID:                             result.ID(),
 		result:                               result,
 		BlockHeight:                          block.Height,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
+		authorizedApprovers:                  authorizedApprovers,
+		verifiedApprovalsCache:               NewApprovalsCache(uint(result.Chunks.Len() * len(authorizedApprovers))),
 		state:                                state,
 		assigner:                             assigner,
 		seals:                                seals,
@@ -76,15 +87,6 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		headers:                              headers,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
-
-	// pre-select all authorized verifiers at the block that is being sealed
-	collector.authorizedApprovers, err = collector.authorizedVerifiersAtBlock(result.BlockID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
-	}
-
-	collector.verifiedApprovalsCache = NewApprovalsCache(uint(result.Chunks.Len() * len(collector.authorizedApprovers)))
-
 	return collector, nil
 }
 
@@ -99,36 +101,10 @@ func (ac *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Ident
 	return ac.collectors[incorporatedBlockID]
 }
 
-// authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
-// The method returns the set of all node IDs that:
-//   * are authorized members of the network at the given block and
-//   * have the Verification role and
-//   * have _positive_ weight and
-//   * are not ejected
-func (ac *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
-	authorizedVerifierList, err := ac.state.AtBlockID(blockID).Identities(
-		filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
-			filter.Not(filter.Ejected),
-		))
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)
-	}
-	if len(authorizedVerifierList) == 0 {
-		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
-	}
-	identities := make(map[flow.Identifier]*flow.Identity)
-	for _, identity := range authorizedVerifierList {
-		identities[identity.NodeID] = identity
-	}
-	return identities, nil
-}
-
 // emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
 // ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
-// sealing kicks in. This will be removed when implementation of seal & verification is finished.
+// sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
@@ -372,4 +348,30 @@ func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.S
 
 	}
 	return requestCount, nil
+}
+
+// authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
+// The method returns the set of all node IDs that:
+//   * are authorized members of the network at the given block and
+//   * have the Verification role and
+//   * have _positive_ weight and
+//   * are not ejected
+func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
+	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
+		filter.And(
+			filter.HasRole(flow.RoleVerification),
+			filter.HasStake(true),
+			filter.Not(filter.Ejected),
+		))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)
+	}
+	if len(authorizedVerifierList) == 0 {
+		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
+	}
+	identities := make(map[flow.Identifier]*flow.Identity)
+	for _, identity := range authorizedVerifierList {
+		identities[identity.NodeID] = identity
+	}
+	return identities, nil
 }

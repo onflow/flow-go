@@ -114,7 +114,7 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 // Returns: map { ChunkIndex -> []VerifierId }
 func (c *ApprovalCollector) CollectMissingVerifiers() map[uint64]flow.IdentifierList {
 	targetIDs := make(map[uint64]flow.IdentifierList)
-	for _, chunkIndex := range c.aggregatedSignatures.CollectChunksWithMissingApprovals() {
+	for _, chunkIndex := range c.aggregatedSignatures.ChunksWithoutAggregatedSignature() {
 		missingSigners := c.chunkCollectors[chunkIndex].GetMissingSigners()
 		if missingSigners.Len() > 0 {
 			targetIDs[chunkIndex] = missingSigners
