@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/verification"
 
@@ -72,7 +73,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	}
 
 	// transaction body of system chunk
-	txBody := fvm.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
+	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
 	tx := fvm.Transaction(txBody, uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
@@ -134,7 +135,14 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			if errors.Is(err, ledger.ErrMissingKeys{}) {
 
 				unknownRegTouch[registerID.String()] = &registerKey
-				return nil, fmt.Errorf("missing register")
+
+				// don't send error just return empty byte slice
+				// we always assume empty value for missing registers (which might cause the transaction to fail)
+				// but after execution we check unknownRegTouch and if any
+				// register is inside it, code won't generate approvals and
+				// it activates a challenge
+
+				return []byte{}, nil
 			}
 			// append to missing keys if error is ErrMissingKeys
 

@@ -18,10 +18,10 @@ type Guarantees struct {
 
 func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		collID := key.(flow.Identifier)
 		guarantee := val.(*flow.CollectionGuarantee)
-		return operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertGuarantee(collID, guarantee)))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -44,12 +44,8 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 	return g
 }
 
-func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*badger.Txn) error {
-	return g.cache.Put(guarantee.ID(), guarantee)
-}
-
-func (g *Guarantees) storeTxn(guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
-	return g.cache.PutTxn(guarantee.ID(), guarantee)
+func (g *Guarantees) storeTx(guarantee *flow.CollectionGuarantee) func(*transaction.Tx) error {
+	return g.cache.PutTx(guarantee.ID(), guarantee)
 }
 
 func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow.CollectionGuarantee, error) {
@@ -63,7 +59,7 @@ func (g *Guarantees) retrieveTx(collID flow.Identifier) func(*badger.Txn) (*flow
 }
 
 func (g *Guarantees) Store(guarantee *flow.CollectionGuarantee) error {
-	return operation.RetryOnConflict(g.db.Update, g.storeTx(guarantee))
+	return operation.RetryOnConflictTx(g.db, transaction.Update, g.storeTx(guarantee))
 }
 
 func (g *Guarantees) ByCollectionID(collID flow.Identifier) (*flow.CollectionGuarantee, error) {
