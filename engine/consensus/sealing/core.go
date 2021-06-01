@@ -102,7 +102,7 @@ func NewCore(
 		requestTracker:             approvals.NewRequestTracker(10, 30),
 	}
 
-	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
+	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
 		return approvals.NewAssignmentCollector(result, core.state, core.headers, assigner, sealsMempool, verifier,
 			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
 	}
@@ -329,14 +329,15 @@ func (c *Core) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint6
 	return nil
 }
 
-func (c *Core) processPendingApprovals(collector *approvals.AssignmentCollector) error {
+func (c *Core) processPendingApprovals(collector approvals.AssignmentCollector) error {
+	resultID := collector.ResultID()
 	// filter cached approvals for concrete execution result
-	for _, approval := range c.approvalsCache.TakeByResultID(collector.ResultID) {
+	for _, approval := range c.approvalsCache.TakeByResultID(resultID) {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
 				c.log.Debug().
-					Hex("result_id", collector.ResultID[:]).
+					Hex("result_id", resultID[:]).
 					Err(err).
 					Msgf("invalid approval with id %s", approval.ID())
 			} else {

@@ -12,20 +12,20 @@ import (
 // assignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
 // AssignmentCollector and information if collector is processable or not
 type assignmentCollectorVertex struct {
-	collector   *AssignmentCollector
+	collector   *assignmentCollector
 	processable bool
 }
 
 /* Methods implementing LevelledForest's Vertex interface */
 
-func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collector.ResultID }
+func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collector.ResultID() }
 func (v *assignmentCollectorVertex) Level() uint64             { return v.collector.BlockHeight }
 func (v *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
 	return v.collector.result.PreviousResultID, v.collector.BlockHeight - 1
 }
 
 // NewCollector is a factory method to generate an AssignmentCollector for an execution result
-type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
+type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (AssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
 // formed by the execution results. The mempool supports pruning by height: only collectors
@@ -60,7 +60,7 @@ func (t *AssignmentCollectorTree) GetSize() uint64 {
 }
 
 // GetCollector returns collector by ID and whether it is processable or not
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*AssignmentCollector, bool) {
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (AssignmentCollector, bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
@@ -112,8 +112,8 @@ func (t *AssignmentCollectorTree) markForkProcessable(vertex *assignmentCollecto
 }
 
 // GetCollectorsByInterval returns processable collectors that satisfy interval [from; to)
-func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollector {
-	var vertices []*AssignmentCollector
+func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []AssignmentCollector {
+	var vertices []AssignmentCollector
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -136,7 +136,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
-	Collector   *AssignmentCollector
+	Collector   AssignmentCollector
 	Processable bool // whether collector is processable
 	Created     bool // whether collector was created or retrieved from cache
 }
@@ -160,7 +160,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 	vertex := &assignmentCollectorVertex{
-		collector:   collector,
+		collector:   collector.(*assignmentCollector),
 		processable: false,
 	}
 
