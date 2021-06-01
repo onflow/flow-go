@@ -292,6 +292,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 		node.DB,
 		node.State,
 		createMetrics,
+		consensus.WithInitialTimeout(time.Second*2),
 	)
 	require.NoError(t, err)
 
