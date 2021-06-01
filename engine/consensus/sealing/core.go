@@ -145,11 +145,15 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealedBlock.Height, err)
 	}
 
+	blocksProcessed := uint64(0)
+	totalBlocks := finalized.Height - latestSealedBlock.Height
+
 	// resultProcessor adds _all known_ results for the given block to the assignment collector tree
 	resultProcessor := func(header *flow.Header) error {
-		payload, err := payloads.ByBlockID(header.ID())
+		blockID := header.ID()
+		payload, err := payloads.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve index for block (%x): %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve index for block (%x): %w", blockID, err)
 		}
 
 		for _, result := range payload.Results {
@@ -158,11 +162,20 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 			incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
-				return fmt.Errorf("could not process incorporated result: %w", err)
+				return fmt.Errorf("could not process incorporated result for block %s: %w", blockID, err)
 			}
 		}
+
+		blocksProcessed++
+		if (blocksProcessed%20) == 0 || blocksProcessed >= totalBlocks {
+			c.log.Info().Msgf("%d/%d have been loaded to collector tree", blocksProcessed, totalBlocks)
+		}
+
 		return nil
 	}
+
+	c.log.Info().Msgf("there are %d finalized and unsealed blocks in total to reload into collector tree with assignment",
+		totalBlocks)
 
 	// traverse chain forward to collect all execution results that were incorporated in this fork
 	// starting from finalized block and finishing with latest sealed block
@@ -177,6 +190,13 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
+
+	blocksProcessed = 0
+	totalBlocks = uint64(len(validPending))
+
+	c.log.Info().Msgf("there are %d unfinalized blocks to load into the collector tree with assignment",
+		totalBlocks)
+
 	for _, blockID := range validPending {
 		block, err := c.headers.ByBlockID(blockID)
 		if err != nil {
