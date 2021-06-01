@@ -185,7 +185,7 @@ func (builder *EpochBuilder) BuildEpoch() *EpochBuilder {
 		WithParticipants(identities),
 		SetupWithCounter(counter + 1),
 		WithFirstView(finalView + 1),
-		WithFinalView(finalView + 1000),
+		WithFinalView(finalView + 1_000_000),
 	}
 	setup := EpochSetupFixture(append(setupDefaults, builder.setupOpts...)...)
 
@@ -343,6 +343,19 @@ func (builder *EpochBuilder) CompleteEpoch() *EpochBuilder {
 	builder.addBlock(&A)
 
 	return builder
+}
+
+// BuildBlocks builds empty blocks on top of the finalized state. It is used
+// to build epochs that are not the minimum possible length, which is the
+// default result from chaining BuildEpoch and CompleteEpoch.
+func (builder *EpochBuilder) BuildBlocks(n uint) {
+	head, err := builder.states[0].Final().Head()
+	require.NoError(builder.t, err)
+	for i := uint(0); i < n; i++ {
+		next := BlockWithParentFixture(head)
+		builder.addBlock(&next)
+		head = next.Header
+	}
 }
 
 // addBlock adds the given block to the state by: extending the state,
