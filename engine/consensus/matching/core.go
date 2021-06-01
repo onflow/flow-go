@@ -187,7 +187,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not find sealed block: %w", err)
 	}
-
 	isSealed := head.Height <= sealed.Height
 	if isSealed {
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
@@ -266,17 +265,18 @@ func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (
 // it returns the number of pending receipts requests being created, and
 // the first finalized height at which there is no receipt for the block
 func (c *Core) requestPendingReceipts() (int, uint64, error) {
-
-	// last sealed block
-	sealed, err := c.state.Sealed().Head()
-	if err != nil {
-		return 0, 0, fmt.Errorf("could not get sealed height: %w", err)
-	}
-
-	// last finalized block
-	final, err := c.state.Final().Head()
+	finalSnapshot := c.state.Final()
+	final, err := finalSnapshot.Head() // last finalized block
 	if err != nil {
 		return 0, 0, fmt.Errorf("could not get finalized height: %w", err)
+	}
+	_, seal, err := finalSnapshot.SealedResult() // last finalized seal
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not latest finalized seal: %w", err)
+	}
+	sealed, err := c.headersDB.ByBlockID(seal.BlockID) // last sealed block
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not get sealed height: %w", err)
 	}
 
 	// only request if number of unsealed finalized blocks exceeds the threshold
