@@ -184,6 +184,7 @@ func (tc *ClusterSwitchoverTestCase) ExpectTransaction(epochCounter uint64, clus
 	if _, ok := tc.sentTransactions[epochCounter]; !ok {
 		tc.sentTransactions[epochCounter] = make(map[uint]flow.IdentifierList)
 	}
+	tc.T().Logf("expecting transaction %x in epoch %d for cluster %d", txID, epochCounter, clusterIndex)
 	expected := tc.sentTransactions[epochCounter][clusterIndex]
 	expected = append(expected, txID)
 	tc.sentTransactions[epochCounter][clusterIndex] = expected
@@ -227,18 +228,29 @@ func (tc *ClusterSwitchoverTestCase) Clusters(epoch protocol.Epoch) []protocol.C
 	return clusters
 }
 
-// BlockInEpoch returns the first block that exists within the bounds of the
+// BlockInEpoch returns the highest block that exists within the bounds of the
 // epoch with the given epoch counter.
 func (tc *ClusterSwitchoverTestCase) BlockInEpoch(epochCounter uint64) *flow.Header {
 	root := tc.RootBlock()
 
 	for height := root.Height; ; height++ {
-		snap := tc.State().AtHeight(height)
-		counter, err := snap.Epochs().Current().Counter()
+		curr := tc.State().AtHeight(height)
+		next := tc.State().AtHeight(height + 1)
+		curCounter, err := curr.Epochs().Current().Counter()
 		require.NoError(tc.T(), err)
+		nextCounter, err := next.Epochs().Current().Counter()
+		// if we reach a point where the next block doesn't exist, but the
+		// current block has the correct counter, return the current block
+		if err != nil && curCounter == epochCounter {
+			head, err := curr.Head()
+			require.NoError(tc.T(), err)
+			return head
+		}
 
-		if counter == epochCounter {
-			head, err := snap.Head()
+		// otherwise, wait until we reach the block where the next block is in
+		// the next epoch - this is the highest block in the requested epoch
+		if curCounter == epochCounter && nextCounter == epochCounter+1 {
+			head, err := curr.Head()
 			require.NoError(tc.T(), err)
 			return head
 		}
@@ -286,8 +298,11 @@ func (tc *ClusterSwitchoverTestCase) CheckClusterState(
 
 // Timeout returns the timeout for async tasks for this test case.
 func (tc *ClusterSwitchoverTestCase) Timeout() time.Duration {
-	// 30s + 10s for each collector
-	return 30*time.Second + 10*time.Second*time.Duration(tc.conf.collectors)
+	// 60s + 10s for each collector
+	// locally the whole suite takes
+	// * ~8s when run alone
+	// * ~15-20s when run in parallel with other packages (default)
+	return 60*time.Second + 10*time.Second*time.Duration(tc.conf.collectors)
 }
 
 // RunTestCase comprises the core test logic for cluster switchover. We build
@@ -301,22 +316,25 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	// keep track of guarantees received at the mock consensus node
 	// when a guarantee is received, it indicates that the sender has finalized
 	// the corresponding cluster block
-	expectedGuarantees := int(tc.conf.collectors * 2)
+	expectedGuaranteesPerEpoch := int(tc.conf.collectors)
 	waitForGuarantees := new(sync.WaitGroup)
-	waitForGuarantees.Add(expectedGuarantees)
+	waitForGuarantees.Add(expectedGuaranteesPerEpoch)
 	tc.sn.On("Submit", mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			_, ok := args[0].(flow.Identifier)
+			id, ok := args[0].(flow.Identifier)
 			require.True(tc.T(), ok)
 			_, ok = args[1].(*flow.CollectionGuarantee)
+			tc.T().Log("got guarantee from", id.String())
 			require.True(tc.T(), ok)
 			waitForGuarantees.Done()
 		}).
-		Times(expectedGuarantees)
+		Times(expectedGuaranteesPerEpoch * 2)
 
 	// build the epoch, ending on the first block on the next epoch
 	tc.builder.BuildEpoch().CompleteEpoch()
+	// build halfway through the grace period for the epoch 1 cluster
+	tc.builder.BuildBlocks(flow.DefaultTransactionExpiry / 2)
 
 	epoch1 := tc.State().Final().Epochs().Previous()
 	epoch2 := tc.State().Final().Epochs().Current()
@@ -333,12 +351,24 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		tc.SubmitTransactionToCluster(1, epoch1Clustering, uint(clusterIndex))
 	}
 
+	// wait for epoch 1 transactions to be guaranteed
+	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, tc.Timeout(), "did not receive guarantees at consensus node")
+
 	// submit transactions targeting epoch 2 clusters
 	for clusterIndex := range epoch2Clustering {
 		tc.SubmitTransactionToCluster(2, epoch2Clustering, uint(clusterIndex))
 	}
 
-	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, 30*time.Second+time.Second*10*time.Duration(tc.conf.collectors), "did not receive guarantees at consensus node")
+	waitForGuarantees.Add(expectedGuaranteesPerEpoch)
+
+	// build enough blocks to terminate the epoch 1 cluster consensus
+	// NOTE: this is here solely to improve test reliability, as it means that
+	// while we are waiting for a guarantee there is only one cluster consensus
+	// instance running (per node) rather than two.
+	tc.builder.BuildBlocks(flow.DefaultTransactionExpiry/2 + 1)
+
+	// wait for epoch 2 transactions to be guaranteed
+	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, tc.Timeout(), "did not receive guarantees at consensus node")
 
 	// check epoch 1 cluster states
 	for _, clusterInfo := range epoch1Clusters {
