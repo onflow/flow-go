@@ -79,7 +79,7 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
 		)
 		receipts[i] = receipt
-		s.core.On("ProcessReceipt", originID, receipt).Return(nil).Once()
+		s.core.On("ProcessReceipt", receipt).Return(nil).Once()
 	}
 
 	var wg sync.WaitGroup
