@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -1183,7 +1184,7 @@ func (e *Engine) generateExecutionResultForBlock(
 	// convert Cadence service event representation to flow-go representation
 	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
 	for _, event := range serviceEvents {
-		converted, err := flow.ConvertServiceEvent(event)
+		converted, err := convert.ServiceEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
