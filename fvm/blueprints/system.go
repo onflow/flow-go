@@ -1,10 +1,12 @@
-package fvm
+package blueprints
 
 import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// TODO (Ramtin) after changes to this method are merged into master move them here.
 
 const systemChunkTransactionTemplate = `
 import FlowServiceAccount from 0x%s
