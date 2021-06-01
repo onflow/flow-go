@@ -28,9 +28,6 @@ const defaultApprovalQueueCapacity = 10000
 // defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
 const defaultApprovalResponseQueueCapacity = 10000
 
-// defaultIncorporatedResultsQueueCapacity maximum capacity of incorporates results queue
-const defaultIncorporatedResultsQueueCapacity = 10000
-
 // defaultFinalizationEventsQueueCapacity maximum capacity of finalization events
 const defaultFinalizationEventsQueueCapacity = 1000
 
@@ -154,8 +151,7 @@ func (e *Engine) setupMessageHandler() error {
 		return fmt.Errorf("failed to create queue for finalization events: %w", err)
 	}
 
-	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultIncorporatedResultsQueueCapacity))
+	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
 		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
 	}
@@ -218,15 +214,19 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
 func (e *Engine) processAvailableMessages() error {
-
 	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
+
 		event, ok := e.pendingFinalizationEvents.Pop()
 		if ok {
 			err := e.core.ProcessFinalizedBlock(event.(flow.Identifier))
 			if err != nil {
 				return fmt.Errorf("could not process finalized block: %w", err)
 			}
-
 			continue
 		}
 
@@ -245,7 +245,6 @@ func (e *Engine) processAvailableMessages() error {
 		if !ok {
 			msg, ok = e.pendingApprovals.Get()
 		}
-
 		if ok {
 			err := e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
 			if err != nil {
@@ -286,11 +285,6 @@ func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
 }
 
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
-	// don't process approval if originID is mismatched
-	if originID != approval.Body.ApproverID {
-		return nil
-	}
-
 	err := e.core.ProcessApproval(approval)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 	if err != nil {
@@ -349,8 +343,11 @@ func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 	e.unit.Launch(func() {
-		// We can't process incorporated block because of how sealing engine handles assignments we need to
-		// make sure that block has children. Instead we will process parent block
+		// In order to process a block within the sealing engine, we need the block's source of
+		// randomness (to compute the chunk assignment). The source of randomness can be taken from _any_
+		// QC for the block. We know that we have such a QC, once a valid child block is incorporated.
+		// Vice-versa, once a block is incorporated, we know that _its parent_ has a valid child, i.e.
+		// the parent's source of randomness is now know.
 
 		incorporatedBlock, err := e.headers.ByBlockID(incorporatedBlockID)
 		if err != nil {
@@ -370,7 +367,13 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 		}
 
 		for _, result := range payload.Results {
-			e.pendingIncorporatedResults.Push(result)
+			added := e.pendingIncorporatedResults.Push(result)
+			if !added {
+				// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the
+				// queue capacity is depleted. However, we cannot dropped the incorporated result, because there
+				// is no way that an incorporated result can be re-added later once dropped.
+				e.log.Fatal().Msg("failed to queue incorporated result")
+			}
 		}
 		e.notifier.Notify()
 	})

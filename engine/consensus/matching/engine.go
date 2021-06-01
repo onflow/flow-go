@@ -162,6 +162,12 @@ func (e *Engine) loop() {
 // from other nodes as well as internally trusted
 func (e *Engine) processAvailableEvents() error {
 	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
+
 		finalizedBlockID, ok := e.pendingFinalizationEvents.Pop()
 		if ok {
 			err := e.core.ProcessFinalizedBlock(finalizedBlockID.(flow.Identifier))
@@ -173,7 +179,7 @@ func (e *Engine) processAvailableEvents() error {
 
 		msg, ok := e.pendingReceipts.Get()
 		if ok {
-			err := e.core.ProcessReceipt(msg.OriginID, msg.Payload.(*flow.ExecutionReceipt))
+			err := e.core.ProcessReceipt(msg.Payload.(*flow.ExecutionReceipt))
 			if err != nil {
 				return fmt.Errorf("could not handle execution receipt: %w", err)
 			}

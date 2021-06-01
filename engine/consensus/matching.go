@@ -10,7 +10,7 @@ type MatchingCore interface {
 	// Returns:
 	// * exception in case of unexpected error
 	// * nil - successfully processed receipt
-	ProcessReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error
+	ProcessReceipt(receipt *flow.ExecutionReceipt) error
 	// ProcessFinalizedBlock processes finalization events in blocking way.
 	// Returns:
 	// * exception in case of unexpected error

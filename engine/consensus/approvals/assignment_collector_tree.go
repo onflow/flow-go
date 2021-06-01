@@ -206,13 +206,17 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 }
 
 // PruneUpToHeight prunes all results for all assignment collectors with height up to but
-// NOT INCLUDING `limit`. Errors if limit is lower than
-// the previous value (as we cannot recover previously pruned results).
+// NOT INCLUDING `limit`. Noop, if limit is lower than the previous value (caution:
+// this is different than the levelled forest's convention).
 // Returns list of resultIDs that were pruned
 func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifier, error) {
 	var pruned []flow.Identifier
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	if t.forest.LowestLevel >= limit {
+		return pruned, nil
+	}
 
 	if t.size > 0 {
 		// collect IDs of vertices that were pruned

@@ -89,7 +89,7 @@ func NewCore(
 // ProcessReceipt processes a new execution receipt.
 // Any error indicates an unexpected problem in the protocol logic. The node's
 // internal state might be corrupted. Hence, returned errors should be treated as fatal.
-func (c *Core) ProcessReceipt(originID flow.Identifier, receipt *flow.ExecutionReceipt) error {
+func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 	// When receiving a receipt, we might not be able to verify it if its previous result
 	// is unknown.  In this case, instead of dropping it, we store it in the pending receipts
 	// mempool, and process it later when its parent result has been received and processed.
@@ -105,7 +105,7 @@ func (c *Core) ProcessReceipt(originID flow.Identifier, receipt *flow.ExecutionR
 			marshalled = []byte("json_marshalling_failed")
 		}
 		c.log.Error().Err(err).
-			Hex("origin", logging.ID(originID)).
+			Hex("origin", logging.ID(receipt.ExecutorID)).
 			Hex("receipt_id", receiptID[:]).
 			Hex("result_id", resultID[:]).
 			Str("receipt", string(marshalled)).
@@ -123,7 +123,7 @@ func (c *Core) ProcessReceipt(originID flow.Identifier, receipt *flow.ExecutionR
 
 	for _, childReceipt := range childReceipts {
 		// recursively processing the child receipts
-		err := c.ProcessReceipt(childReceipt.ExecutorID, childReceipt)
+		err := c.ProcessReceipt(childReceipt)
 		if err != nil {
 			// we don't want to wrap the error with any info from its parent receipt,
 			// because the error has nothing to do with its parent receipt.
@@ -187,7 +187,6 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not find sealed block: %w", err)
 	}
-
 	isSealed := head.Height <= sealed.Height
 	if isSealed {
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
@@ -266,17 +265,18 @@ func (c *Core) storeReceipt(receipt *flow.ExecutionReceipt, head *flow.Header) (
 // it returns the number of pending receipts requests being created, and
 // the first finalized height at which there is no receipt for the block
 func (c *Core) requestPendingReceipts() (int, uint64, error) {
-
-	// last sealed block
-	sealed, err := c.state.Sealed().Head()
-	if err != nil {
-		return 0, 0, fmt.Errorf("could not get sealed height: %w", err)
-	}
-
-	// last finalized block
-	final, err := c.state.Final().Head()
+	finalSnapshot := c.state.Final()
+	final, err := finalSnapshot.Head() // last finalized block
 	if err != nil {
 		return 0, 0, fmt.Errorf("could not get finalized height: %w", err)
+	}
+	_, seal, err := finalSnapshot.SealedResult() // last finalized seal
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not latest finalized seal: %w", err)
+	}
+	sealed, err := c.headersDB.ByBlockID(seal.BlockID) // last sealed block
+	if err != nil {
+		return 0, 0, fmt.Errorf("could not get sealed height: %w", err)
 	}
 
 	// only request if number of unsealed finalized blocks exceeds the threshold

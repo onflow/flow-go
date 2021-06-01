@@ -14,7 +14,12 @@ type PingMetrics struct {
 	mock.Mock
 }
 
-// NodeReachable provides a mock function with given fields: node, nodeInfo, rtt, version, sealedHeight
-func (_m *PingMetrics) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration, version string, sealedHeight uint64) {
-	_m.Called(node, nodeInfo, rtt, version, sealedHeight)
+// NodeInfo provides a mock function with given fields: node, nodeInfo, version, sealedHeight
+func (_m *PingMetrics) NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64) {
+	_m.Called(node, nodeInfo, version, sealedHeight)
+}
+
+// NodeReachable provides a mock function with given fields: node, nodeInfo, rtt
+func (_m *PingMetrics) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration) {
+	_m.Called(node, nodeInfo, rtt)
 }
