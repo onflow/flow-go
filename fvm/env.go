@@ -1051,7 +1051,7 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-
+		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
 		invoker := NewTransactionContractFunctionInvocator(
 			common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
 			"setupNewAccount",
