@@ -30,16 +30,18 @@ type ProviderEngine interface {
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
 type Engine struct {
-	unit               *engine.Unit
-	log                zerolog.Logger
-	tracer             module.Tracer
-	receiptCon         network.Conduit
-	state              protocol.State
-	execState          state.ReadOnlyExecutionState
-	me                 module.Local
-	chunksConduit      network.Conduit
-	metrics            module.ExecutionMetrics
-	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	tracer              module.Tracer
+	receiptCon          network.Conduit
+	state               protocol.State
+	execState           state.ReadOnlyExecutionState
+	me                  module.Local
+	chunksConduit       network.Conduit
+	metrics             module.ExecutionMetrics
+	checkStakedAtBlock  func(blockID flow.Identifier) (bool, error)
+	chdpQueryTimeout    time.Duration
+	chdpDeliveryTimeout time.Duration
 }
 
 func New(
@@ -51,19 +53,23 @@ func New(
 	execState state.ReadOnlyExecutionState,
 	metrics module.ExecutionMetrics,
 	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
+	chdpQueryTimeout uint,
+	chdpDeliveryTimeout uint,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
-		unit:               engine.NewUnit(),
-		log:                log,
-		tracer:             tracer,
-		state:              state,
-		me:                 me,
-		execState:          execState,
-		metrics:            metrics,
-		checkStakedAtBlock: checkStakedAtBlock,
+		unit:                engine.NewUnit(),
+		log:                 log,
+		tracer:              tracer,
+		state:               state,
+		me:                  me,
+		execState:           execState,
+		metrics:             metrics,
+		checkStakedAtBlock:  checkStakedAtBlock,
+		chdpQueryTimeout:    time.Duration(chdpQueryTimeout) * time.Second,
+		chdpDeliveryTimeout: time.Duration(chdpDeliveryTimeout) * time.Second,
 	}
 
 	var err error
@@ -192,8 +198,8 @@ func (e *Engine) onChunkDataRequest(
 
 	log = log.With().Dur("sinceProcess", sinceProcess).Logger()
 
-	if sinceProcess > time.Second*10 {
-		log.Warn().Msg("chunk data pack query takes longer than 10 secs")
+	if sinceProcess > e.chdpQueryTimeout {
+		log.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
 
 	// sends requested chunk data pack to the requester
@@ -205,12 +211,12 @@ func (e *Engine) onChunkDataRequest(
 		sinceDeliver := time.Since(deliveryStart)
 		log = log.With().Dur("since_deliver", sinceDeliver).Logger()
 
-		if sinceDeliver > time.Second*10 {
-			log.Warn().Msg("chunk data pack response delivery takes longer than 10 secs")
+		if sinceDeliver > e.chdpDeliveryTimeout {
+			log.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
 		}
 
 		if err != nil {
-			log.Error().Err(err).Str("origin", fmt.Sprintf("%s", origin)).Msg("could not send requested chunk data pack to")
+			log.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
 			return
 		}
 
