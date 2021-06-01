@@ -284,6 +284,12 @@ func (tc *ClusterSwitchoverTestCase) CheckClusterState(
 		Assert(tc.T())
 }
 
+// Timeout returns the timeout for async tasks for this test case.
+func (tc *ClusterSwitchoverTestCase) Timeout() time.Duration {
+	// 30s + 10s for each collector
+	return 30*time.Second + 10*time.Second*time.Duration(tc.conf.collectors)
+}
+
 // RunTestCase comprises the core test logic for cluster switchover. We build
 // an epoch, which triggers the beginning of the epoch 2 cluster consensus, then
 // send transactions targeting clusters from both epochs while both are running.
@@ -332,7 +338,7 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 		tc.SubmitTransactionToCluster(2, epoch2Clustering, uint(clusterIndex))
 	}
 
-	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, time.Second*10*time.Duration(tc.conf.collectors), "did not receive guarantees at consensus node")
+	unittest.RequireReturnsBefore(tc.T(), waitForGuarantees.Wait, 30*time.Second+time.Second*10*time.Duration(tc.conf.collectors), "did not receive guarantees at consensus node")
 
 	// check epoch 1 cluster states
 	for _, clusterInfo := range epoch1Clusters {
