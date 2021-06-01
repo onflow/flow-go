@@ -272,7 +272,7 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 	}
 	_, seal, err := finalSnapshot.SealedResult() // last finalized seal
 	if err != nil {
-		return 0, 0, fmt.Errorf("could not latest finalized seal: %w", err)
+		return 0, 0, fmt.Errorf("could not retrieve latest finalized seal: %w", err)
 	}
 	sealed, err := c.headersDB.ByBlockID(seal.BlockID) // last sealed block
 	if err != nil {
