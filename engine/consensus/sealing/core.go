@@ -191,14 +191,6 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	return nil
 }
 
-func (c *Core) lastSealedHeight() uint64 {
-	return c.counterLastSealedHeight.Value()
-}
-
-func (c *Core) lastFinalizedHeight() uint64 {
-	return c.counterLastFinalizedHeight.Value()
-}
-
 // processIncorporatedResult implements business logic for processing single incorporated result
 // Returns:
 // * engine.InvalidInputError - incorporated result is invalid
@@ -220,7 +212,7 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	incorporatedAtHeight := incorporatedBlock.Height
 
 	// check if we are dealing with finalized block or an orphan
-	if incorporatedAtHeight <= c.lastFinalizedHeight() {
+	if incorporatedAtHeight <= c.counterLastFinalizedHeight.Value() {
 		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
@@ -232,7 +224,7 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 		}
 	}
 
-	// in case block is not finalized we will create collector and start processing approvals
+	// in case block is not finalized, we will create collector and start processing approvals
 	// no checks for orphans can be made at this point
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
 	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
@@ -270,10 +262,10 @@ func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error 
 	err := c.processIncorporatedResult(result)
 	span.Finish()
 
-	// we expect that only engine.UnverifiableInputError,
-	// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
-	if engine.IsUnverifiableInputError(err) {
-		c.log.Info().Err(err).Msgf("could not process incorporated result %v", result.ID())
+	// We expect only engine.IsOutdatedInputError. If we encounter OutdatedInputError, InvalidInputError, we
+	// have a serious problem, because these results are coming from the node's local HotStuff, which is trusted.
+	if engine.IsOutdatedInputError(err) {
+		c.log.Debug().Err(err).Msgf("dropping outdated incorporated result %v", result.ID())
 		return nil
 	}
 
@@ -296,7 +288,7 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 	}
 
 	// it's important to use atomic operation to make sure that we have correct ordering
-	lastSealedHeight := c.lastSealedHeight()
+	lastSealedHeight := c.counterLastSealedHeight.Value()
 	// drop approval, if it is for block whose height is lower or equal to already sealed height
 	if lastSealedHeight >= block.Height {
 		return engine.NewOutdatedInputErrorf("requested processing for already sealed block height")
@@ -319,7 +311,7 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	approvalSpan.Finish()
 
 	if err != nil {
-		// we expect that only engine.UnverifiableInputError,
+		// only engine.UnverifiableInputError,
 		// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
 		if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
 			logger := c.log.Info()
@@ -454,8 +446,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
 
-	// update last sealed height, counter will return false if there is already a bigger value
-	lastSealedHeightIncreased := c.counterLastSealedHeight.Set(lastSealed.Height)
+	c.counterLastSealedHeight.Set(lastSealed.Height)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
@@ -473,18 +464,11 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return fmt.Errorf("collectors tree could not finalize fork: %w", err)
 	}
 
-	// pruning of collectors tree makes sense only with values that are increasing
-	// passing value lower than before is not supported by collectors tree
-	if lastSealedHeightIncreased {
-		// as soon as we discover new sealed height, proceed with pruning collectors
-		pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
-		if err != nil {
-			return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
-		}
-
-		// remove all pending items that we might have requested
-		c.requestTracker.Remove(pruned...)
+	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
+	if err != nil {
+		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
 	}
+	c.requestTracker.Remove(pruned...) // remove all pending items that we might have requested
 	updateCollectorTreeSpan.Finish()
 
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
