@@ -37,7 +37,7 @@ func init() {
 }
 
 func addResetCmdFlags() {
-	resetCmd.Flags().StringVar(&flagBootDir, "boot-dir", "", "path to the directory containing the bootstrap file")
+	resetCmd.Flags().StringVar(&flagBootDir, "boot-dir", "", "path to the directory containing the bootstrap files")
 	_ = resetCmd.MarkFlagRequired("boot-dir")
 }
 
@@ -143,11 +143,11 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) (cadence.Array) {
 
 	// TODO: read in QCs
 
-	return generateResetEpochArgsCadence(randomSource, payout, firstView, finalView, clustering, []string{}, dkgKeys)
+	return convertResetEpochArgs(randomSource, payout, firstView, finalView, clustering, []string{}, dkgKeys)
 }
 
-// generateResetEpochArgsCadence creates the arguments required by 
-func generateResetEpochArgsCadence(randomSource []byte,
+// convertResetEpochArgscreates converts the arguments required by `resetEpoch` to cadence representations
+func convertResetEpochArgs(randomSource []byte,
 	payout, firstView, finalView uint64,
 	clustering flow.ClusterList, clusterQCs []string, dkgPubKeys []crypto.PublicKey) cadence.Array {
 
