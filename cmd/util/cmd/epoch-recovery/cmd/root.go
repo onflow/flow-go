@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -14,9 +15,7 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "epoch-revocery",
-
-	// TODO: Change description
+	Use: "epoch-recovery",
 	Short: `If the epoch setup phase fails (either the DKG, QC voting, or smart contract bug), 
 	manual intervention is needed to transition to the next epoch. The manual intervention 
 	involves invoking a reset function on the EpochLifecycle smart contract and a spork.`,
