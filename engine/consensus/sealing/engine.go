@@ -349,7 +349,6 @@ func (e *Engine) Done() <-chan struct{} {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	e.log.Info().Msgf("discovered new finalized block %v", finalizedBlockID)
 	e.pendingFinalizationEvents.Push(finalizedBlockID)
 	e.notifier.Notify()
 }

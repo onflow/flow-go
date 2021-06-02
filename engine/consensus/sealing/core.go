@@ -358,8 +358,6 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return nil
 	}
 
-	c.log.Info().Msgf("processing finalized block %v at height %d", finalizedBlockID, finalized.Height)
-
 	seal, err := c.seals.ByBlockID(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
@@ -368,6 +366,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	if err != nil {
 		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
+
+	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
 
 	c.counterLastSealedHeight.Set(lastSealed.Height)
 
