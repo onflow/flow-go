@@ -170,7 +170,7 @@ func convertResetEpochArgs(randomSource []byte,
 	// add final view
 	args = append(args, cadence.NewUInt64(finalView))
 
-	// add clusters	
+	// add clusters
 	cdcClusters := make([]cadence.Value, len(clustering))
 	for i, cluster := range clustering {
 		clusterNodeIDs := cluster.NodeIDs()
@@ -182,7 +182,7 @@ func convertResetEpochArgs(randomSource []byte,
 	}
 	args = append(args, cadence.NewArray(cdcClusters))
 
-	// TODO:  clusterQC 
+	// TODO:  clusterQC
 
 	// add dkg keys
 	cdcDKGKeys := make([]cadence.Value, len(dkgPubKeys))
