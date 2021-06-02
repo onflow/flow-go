@@ -12,7 +12,7 @@ import (
 // assignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
 // AssignmentCollector and information if collector is processable or not
 type assignmentCollectorVertex struct {
-	collector   *assignmentCollector
+	collector   *VerifyingAssignmentCollector
 	processable bool
 }
 
@@ -25,7 +25,7 @@ func (v *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
 }
 
 // NewCollector is a factory method to generate an AssignmentCollector for an execution result
-type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (AssignmentCollector, error)
+type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*VerifyingAssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
 // formed by the execution results. The mempool supports pruning by height: only collectors
@@ -159,7 +159,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 	vertex := &assignmentCollectorVertex{
-		collector:   collector.(*assignmentCollector),
+		collector:   collector,
 		processable: false,
 	}
 

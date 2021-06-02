@@ -24,24 +24,21 @@ import (
 // sealing.
 const DefaultEmergencySealingThreshold = 400
 
-// helper functor that can be used to retrieve cached block height
-type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
-
-// AssignmentCollector
+// VerifyingAssignmentCollector
 // Context:
 //  * When the same result is incorporated in multiple different forks,
 //    unique verifier assignment is determined for each fork.
 //  * The assignment collector is intended to encapsulate the known
 //    assignments for a particular execution result.
-// AssignmentCollector has a strict ordering of processing, before processing
+// VerifyingAssignmentCollector has a strict ordering of processing, before processing
 // approvals at least one incorporated result has to be processed.
-// AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
-// AssignmentCollector is responsible for validating approvals on result-level (checking signature, identity).
-// TODO: currently AssignmentCollector doesn't cleanup collectorTree when blocks that incorporate results get orphaned
+// VerifyingAssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
+// VerifyingAssignmentCollector is responsible for validating approvals on result-level (checking signature, identity).
+// TODO: currently VerifyingAssignmentCollector doesn't cleanup collectorTree when blocks that incorporate results get orphaned
 // For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
 // when fork gets orphaned
-type AssignmentCollector struct {
-	ResultID                             flow.Identifier                        // ID of execution result
+type VerifyingAssignmentCollector struct {
+	resultID                             flow.Identifier                        // ID of execution result
 	result                               *flow.ExecutionResult                  // execution result that we are collecting approvals for
 	BlockHeight                          uint64                                 // height of block targeted by execution result
 	collectors                           map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
@@ -60,7 +57,7 @@ type AssignmentCollector struct {
 
 func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
 	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *RequestTracker, requiredApprovalsForSealConstruction uint,
-) (*AssignmentCollector, error) {
+) (*VerifyingAssignmentCollector, error) {
 	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
 		return nil, err
@@ -71,8 +68,8 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 
-	collector := &AssignmentCollector{
-		ResultID:                             result.ID(),
+	collector := &VerifyingAssignmentCollector{
+		resultID:                             result.ID(),
 		result:                               result,
 		BlockHeight:                          block.Height,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
@@ -90,12 +87,16 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 	return collector, nil
 }
 
+func (ac *VerifyingAssignmentCollector) ResultID() flow.Identifier {
+	return ac.resultID
+}
+
 // BlockID returns the ID of the executed block
-func (ac *AssignmentCollector) BlockID() flow.Identifier {
+func (ac *VerifyingAssignmentCollector) BlockID() flow.Identifier {
 	return ac.result.BlockID
 }
 
-func (ac *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
+func (ac *VerifyingAssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Identifier) *ApprovalCollector {
 	ac.lock.RLock()
 	defer ac.lock.RUnlock()
 	return ac.collectors[incorporatedBlockID]
@@ -105,21 +106,21 @@ func (ac *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Ident
 // ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
 // sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
-func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
+func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
 	// the block that _incorporates_ result and the latest finalized block
 	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
 
-func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
+func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
 	for _, collector := range ac.allCollectors() {
 		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
 		if sealable {
 			err := collector.SealResult()
 			if err != nil {
 				return fmt.Errorf("could not create emergency seal for result %x incorporated at %x: %w",
-					ac.ResultID, collector.IncorporatedBlockID(), err)
+					ac.resultID, collector.IncorporatedBlockID(), err)
 			}
 		}
 	}
@@ -127,10 +128,10 @@ func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64
 	return nil
 }
 
-func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
-	// check that result is the one that this AssignmentCollector manages
-	if irID := incorporatedResult.Result.ID(); irID != ac.ResultID {
-		return fmt.Errorf("this AssignmentCollector manages result %x but got %x", ac.ResultID, irID)
+func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
+	// check that result is the one that this VerifyingAssignmentCollector manages
+	if irID := incorporatedResult.Result.ID(); irID != ac.resultID {
+		return fmt.Errorf("this VerifyingAssignmentCollector manages result %x but got %x", ac.resultID, irID)
 	}
 
 	incorporatedBlockID := incorporatedResult.IncorporatedBlockID
@@ -139,7 +140,7 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	}
 
 	// Constructing ApprovalCollector for IncorporatedResult
-	// The AssignmentCollector is not locked while instantiating the ApprovalCollector. Hence, it is possible that
+	// The VerifyingAssignmentCollector is not locked while instantiating the ApprovalCollector. Hence, it is possible that
 	// multiple threads simultaneously compute the verifier assignment. Nevertheless, the implementation is safe in
 	// that only one of the instantiated ApprovalCollectors will be stored in the cache. In terms of locking duration,
 	// it's better to perform extra computation in edge cases than lock this logic with a mutex,
@@ -155,7 +156,7 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	}
 	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
 
-	// Now, we add the ApprovalCollector to the AssignmentCollector:
+	// Now, we add the ApprovalCollector to the VerifyingAssignmentCollector:
 	// no-op if an ApprovalCollector has already been added by a different routine
 	isDuplicate := ac.putCollector(incorporatedBlockID, collector)
 	if isDuplicate {
@@ -171,7 +172,7 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	return nil
 }
 
-func (ac *AssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) bool {
+func (ac *VerifyingAssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) bool {
 	ac.lock.Lock()
 	defer ac.lock.Unlock()
 	if _, ok := ac.collectors[incorporatedBlockID]; ok {
@@ -181,7 +182,7 @@ func (ac *AssignmentCollector) putCollector(incorporatedBlockID flow.Identifier,
 	return false
 }
 
-func (ac *AssignmentCollector) allCollectors() []*ApprovalCollector {
+func (ac *VerifyingAssignmentCollector) allCollectors() []*ApprovalCollector {
 	ac.lock.RLock()
 	defer ac.lock.RUnlock()
 	collectors := make([]*ApprovalCollector, 0, len(ac.collectors))
@@ -191,7 +192,7 @@ func (ac *AssignmentCollector) allCollectors() []*ApprovalCollector {
 	return collectors
 }
 
-func (ac *AssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
+func (ac *VerifyingAssignmentCollector) verifyAttestationSignature(approval *flow.ResultApprovalBody, nodeIdentity *flow.Identity) error {
 	id := approval.Attestation.ID()
 	valid, err := ac.verifier.Verify(id[:], approval.AttestationSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
@@ -205,7 +206,7 @@ func (ac *AssignmentCollector) verifyAttestationSignature(approval *flow.ResultA
 	return nil
 }
 
-func (ac *AssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
+func (ac *VerifyingAssignmentCollector) verifySignature(approval *flow.ResultApproval, nodeIdentity *flow.Identity) error {
 	id := approval.Body.ID()
 	valid, err := ac.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
@@ -230,10 +231,10 @@ func (ac *AssignmentCollector) verifySignature(approval *flow.ResultApproval, no
 // - engine.InvalidInputError - result approval is invalid
 // - exception in case of any other error, usually this is not expected
 // - nil on successful check
-func (ac *AssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
+func (ac *VerifyingAssignmentCollector) validateApproval(approval *flow.ResultApproval) error {
 	// check that approval is for the expected result to reject incompatible inputs
-	if approval.Body.ExecutionResultID != ac.ResultID {
-		return fmt.Errorf("this AssignmentCollector processes only approvals for result (%x) but got an approval for (%x)", ac.ResultID, approval.Body.ExecutionResultID)
+	if approval.Body.ExecutionResultID != ac.resultID {
+		return fmt.Errorf("this VerifyingAssignmentCollector processes only approvals for result (%x) but got an approval for (%x)", ac.resultID, approval.Body.ExecutionResultID)
 	}
 
 	// approval has to refer same block as execution result
@@ -265,7 +266,7 @@ func (ac *AssignmentCollector) validateApproval(approval *flow.ResultApproval) e
 	return nil
 }
 
-func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
+func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	// we have this approval cached already, no need to process it again
 	approvalCacheID := approval.Body.PartialID()
 	if cached := ac.verifiedApprovalsCache.Get(approvalCacheID); cached != nil {
@@ -295,7 +296,7 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 // RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
 // approvals from verifiers.
 // Returns number of requests made and error in case something goes wrong.
-func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
+func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
 	requestCount := 0
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
@@ -312,18 +313,18 @@ func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.S
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := ac.requestTracker.Get(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex)
+			requestTrackerItem := ac.requestTracker.Get(ac.resultID, collector.IncorporatedBlockID(), chunkIndex)
 			if requestTrackerItem.IsBlackout() {
 				continue
 			}
 			requestTrackerItem.Update()
-			ac.requestTracker.Set(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
+			ac.requestTracker.Set(ac.resultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
 			if requestTrackerItem.Requests >= 10 {
 				log.Debug().Msgf("requesting approvals for result %v, incorporatedBlockID %v chunk %d: %d requests",
-					ac.ResultID,
+					ac.resultID,
 					collector.IncorporatedBlockID(),
 					chunkIndex,
 					requestTrackerItem.Requests,
@@ -333,7 +334,7 @@ func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.S
 			// prepare the request
 			req := &messages.ApprovalRequest{
 				Nonce:      rand.Uint64(),
-				ResultID:   ac.ResultID,
+				ResultID:   ac.resultID,
 				ChunkIndex: chunkIndex,
 			}
 

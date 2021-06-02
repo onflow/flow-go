@@ -48,7 +48,7 @@ type AssignmentCollectorTestSuite struct {
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
 	requestTracker  *RequestTracker
 
-	collector *assignmentCollector
+	collector *VerifyingAssignmentCollector
 }
 
 func (s *AssignmentCollectorTestSuite) SetupTest() {
