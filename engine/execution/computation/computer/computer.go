@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -212,7 +213,7 @@ func (e *blockComputer) executeSystemCollection(
 	defer colSpan.Finish()
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
-	tx := fvm.SystemChunkTransaction(serviceAddress)
+	tx := blueprints.SystemChunkTransaction(serviceAddress)
 	err := e.executeTransaction(tx, colSpan, collectionView, programs, e.systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
 	if err != nil {
