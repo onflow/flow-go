@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"crypto"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -9,13 +10,11 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/cadence"
-
-	"github.com/onflow/flow-core-contracts/lib/go/templates"
-
-	sdk "github.com/onflow/flow-go-sdk"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -46,8 +45,13 @@ func addResetCmdFlags() {
 // from the root-protocol-snapshot.json
 func resetRun(cmd *cobra.Command, args []string) {
 
-	// check if root-protocol-snapshot.json file exists under the dir provided
+	// path to the JSON encoded cadence arguments for the `resetEpoch` transaction
+	argsPath := ""
+
+	// path to the root protocol snapshot json file
 	snapshotPath := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
+
+	// check if root-protocol-snapshot.json file exists under the dir provided
 	exists, err := pathExists(snapshotPath)
 	if err != nil {
 		log.Fatal().Err(err).Str("path", snapshotPath).Msgf("could not check if root protocol-snapshot.json exists")
@@ -73,16 +77,24 @@ func resetRun(cmd *cobra.Command, args []string) {
 
 	// extract arguments from reset epoch tx from snapshot
 	payout := uint64(0)
-	rndSource, firstView, finalView, clustering, qcs, dkgKeys := extractResetEpochTxArgs(epoch)
+	rndSource, firstView, finalView, clustering, qcs, dkgKeys := extractResetEpochArgs(epoch)
 
 	// create resetEpoch transaction (to be signed by service account)
-	_ = createResetEpochTx(rndSource, payout, firstView, finalView, clustering, qcs, dkgKeys)
+	cdcArgs := generateResetEpochArgsCadence(rndSource, payout, firstView, finalView, clustering, qcs, dkgKeys)
 
-	// TODO: handle generating required files for signing with service account
+	// handle generating arguments json file 
+	encoded, err := jsoncdc.Encode(cdcArgs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not encode cadence arguments")
+	}
+	err = io.WriteFile(argsPath, encoded)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+	}
 }
 
 // extractResetEpochTxArguments
-func extractResetEpochTxArgs(epoch protocol.Epoch) ([]byte, uint64, uint64, [][]string, []string, []string) {
+func extractResetEpochArgs(epoch protocol.Epoch) ([]byte, uint64, uint64, flow.ClusterList, []string, []crypto.PublicKey) {
 
 	// read random source from epoch
 	randomSource, err := epoch.RandomSource()
@@ -108,16 +120,6 @@ func extractResetEpochTxArgs(epoch protocol.Epoch) ([]byte, uint64, uint64, [][]
 		log.Fatal().Err(err).Msg("could not get clustering from epoch")
 	}
 
-	clusterStrings := make([][]string, len(clustering))
-	for i, cluster := range clustering {
-		clusterNodeIDs := cluster.NodeIDs()
-		nodeIDStrings := make([]string, len(clusterNodeIDs))
-		for j, nodeID := range clusterNodeIDs {
-			nodeIDStrings[j] = nodeID.String()
-		}
-		clusterStrings[i] = nodeIDStrings
-	}
-
 	// read dkg public keys for all participants
 	initialIdentities, err := epoch.InitialIdentities()
 	if err != nil {
@@ -129,59 +131,56 @@ func extractResetEpochTxArgs(epoch protocol.Epoch) ([]byte, uint64, uint64, [][]
 		log.Fatal().Err(err).Msg("could not get dkg from epoch")
 	}
 
-	dkgKeys := make([]string, 0, len(initialIdentities))
+	dkgKeys := make([]crypto.PublicKey, 0, len(initialIdentities))
 	for _, identity := range initialIdentities {
 		keyShare, err := dkg.KeyShare(identity.NodeID)
 		if err != nil {
 			log.Fatal().Str("node_id", identity.NodeID.String()).Err(err).Msg("coiuld get key share for node id")
 		}
-		dkgKeys = append(dkgKeys, keyShare.String())
+		dkgKeys = append(dkgKeys, keyShare)
 	}
 
 	// TODO: read in QCs
 
-	return randomSource, firstView, finalView, clusterStrings, []string{}, dkgKeys
+	return randomSource, firstView, finalView, clustering, []string{}, dkgKeys
 }
 
-// createResetEpochTx creates the reset epoch transaction to be signed by the service account
-func createResetEpochTx(randomSource []byte,
+// generateResetEpochArgsCadence creates the arguments required by 
+func generateResetEpochArgsCadence(randomSource []byte,
 	payout, firstView, finalView uint64,
-	clustering [][]string, clusterQCs, dkgPubKeys []string) *sdk.Transaction {
+	clustering flow.ClusterList, clusterQCs []string, dkgPubKeys []crypto.PublicKey) cadence.Array {
 
-	env := templates.Environment{}
-
-	// TODO: define authoriser, payer and proposer as Service Account
-	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateResetEpochScript(env)).
-		SetGasLimit(9999)
-
-	err := tx.AddArgument(cadence.NewString(hex.EncodeToString(randomSource)))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not add random source to tx arguments")
-	}
-
+	args := make([]cadence.Value, 0)
+	
+	// add random source 
+	args = append(args, cadence.NewString(hex.EncodeToString(randomSource)))
+	
+	// add payout
 	cdcPayout, err := cadence.NewUFix64(fmt.Sprint(payout))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not convert payout to cadence type")
 	}
-	err = tx.AddArgument(cdcPayout)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not add random source to tx arguments")
-	}
+	args = append(args, cdcPayout)
+	
+	// add first view
+	args = append(args, cadence.NewUInt64(firstView))
 
-	err = tx.AddArgument(cadence.NewUInt64(firstView))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not add first view to tx arguments")
-	}
+	// add final view
+	args = append(args, cadence.NewUInt64(finalView))
 
-	err = tx.AddArgument(cadence.NewUInt64(finalView))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not add final view to tx arguments")
-	}
+	// TODO: convert clustering, clusterQC and dkg pub keys to cadence repr
+	
+	// clusterStrings := make([][]string, len(clustering))
+	// for i, cluster := range clustering {
+	// 	clusterNodeIDs := cluster.NodeIDs()
+	// 	nodeIDStrings := make([]string, len(clusterNodeIDs))
+	// 	for j, nodeID := range clusterNodeIDs {
+	// 		nodeIDStrings[j] = nodeID.String()
+	// 	}
+	// 	clusterStrings[i] = nodeIDStrings
+	// }
 
-	// TODO: add to tx aerguments for clustering, QCs and DKG keys
-
-	return tx
+	return cadence.NewArray(args)
 }
 
 // TODO: unify methods from transit, bootstrap and here
