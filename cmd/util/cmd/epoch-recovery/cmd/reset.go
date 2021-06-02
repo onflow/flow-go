@@ -47,7 +47,7 @@ func addResetCmdFlags() {
 func resetRun(cmd *cobra.Command, args []string) {
 
 	// path to the JSON encoded cadence arguments for the `resetEpoch` transaction
-	argsPath := ""
+	argsPath := filepath.Join(flagBootDir, "reset-epoch-args.json")
 
 	// path to the root protocol snapshot json file
 	snapshotPath := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
