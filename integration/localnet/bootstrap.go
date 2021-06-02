@@ -307,7 +307,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessAdd
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--access-address", accessAddress),
+		fmt.Sprintf("--access-address=%s", accessAddress),
 	)
 
 	return service

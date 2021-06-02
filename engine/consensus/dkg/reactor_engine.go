@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -151,6 +152,10 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
 	epoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
+
+	jsonEpoch, _ := json.Marshal(epoch)
+	fmt.Printf("XXX epoch: %s\n", string(jsonEpoch))
+
 	identities, err := epoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
