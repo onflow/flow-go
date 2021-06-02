@@ -953,6 +953,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
+	serviceEvents := storage.NewMockServiceEvents(ctrl)
 	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
@@ -974,7 +975,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		blocks,
 		collections,
 		events,
-		events,
+		serviceEvents,
 		txResults,
 		computationManager,
 		providerEngine,
