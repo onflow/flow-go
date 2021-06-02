@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/cadence"
+
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -89,7 +90,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 }
 
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
-func extractResetEpochArgs(snapshot *inmem.Snapshot) (cadence.Array) {
+func extractResetEpochArgs(snapshot *inmem.Snapshot) cadence.Array {
 
 	// get current epoch
 	epoch := snapshot.Epochs().Current()
@@ -152,34 +153,35 @@ func convertResetEpochArgs(randomSource []byte,
 	clustering flow.ClusterList, clusterQCs []string, dkgPubKeys []crypto.PublicKey) cadence.Array {
 
 	args := make([]cadence.Value, 0)
-	
-	// add random source 
+
+	// add random source
 	args = append(args, cadence.NewString(hex.EncodeToString(randomSource)))
-	
+
 	// add payout
 	cdcPayout, err := cadence.NewUFix64(fmt.Sprint(payout))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not convert payout to cadence type")
 	}
 	args = append(args, cdcPayout)
-	
+
 	// add first view
 	args = append(args, cadence.NewUInt64(firstView))
 
 	// add final view
 	args = append(args, cadence.NewUInt64(finalView))
 
-	// TODO: convert clustering, clusterQC and dkg pub keys to cadence repr
+	cdcClusters := make([]cadence.Value, len(clustering))
+	for i, cluster := range clustering {
+		clusterNodeIDs := cluster.NodeIDs()
+		nodeIDStrings := make([]cadence.Value, len(clusterNodeIDs))
+		for j, nodeID := range clusterNodeIDs {
+			nodeIDStrings[j] = cadence.NewString(nodeID.String())
+		}
+		cdcClusters[i] = cadence.NewArray(nodeIDStrings)
+	}
+	args = append(args, cadence.NewArray(cdcClusters))
 
-	// clusterStrings := make([][]string, len(clustering))
-	// for i, cluster := range clustering {
-	// 	clusterNodeIDs := cluster.NodeIDs()
-	// 	nodeIDStrings := make([]string, len(clusterNodeIDs))
-	// 	for j, nodeID := range clusterNodeIDs {
-	// 		nodeIDStrings[j] = nodeID.String()
-	// 	}
-	// 	clusterStrings[i] = nodeIDStrings
-	// }
+	// TODO:  clusterQC and dkg pub keys to cadence repr
 
 	return cadence.NewArray(args)
 }
