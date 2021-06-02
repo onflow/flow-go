@@ -20,11 +20,16 @@ func NewApprovalsCache(capacity uint) *Cache {
 	}
 }
 
-// Put saves approval into cache
-func (c *Cache) Put(approval *flow.ResultApproval) {
+// Put saves approval into cache; returns true iff approval was newly added
+func (c *Cache) Put(approval *flow.ResultApproval) bool {
+	approvalCacheID := approval.Body.PartialID()
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.cache[approval.Body.PartialID()] = approval
+	if _, found := c.cache[approvalCacheID]; !found {
+		c.cache[approvalCacheID] = approval
+		return true
+	}
+	return false
 }
 
 // Get returns approval that is saved in cache

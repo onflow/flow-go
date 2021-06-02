@@ -457,6 +457,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return nil
 	}
 
+	c.log.Info().Msgf("processing finalized block %v at height %d", finalizedBlockID, finalized.Height)
+
 	seal, err := c.seals.ByBlockID(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
