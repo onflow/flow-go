@@ -17,7 +17,7 @@ func init() {
 
 	collectionsCmd.Flags().StringVarP(&flagCollectionID, "id", "i", "", "the id of the collection")
 	collectionsCmd.Flags().StringVarP(&flagTransactionID, "transaction-id", "t", "", "the id of the transaction (always retrieves a light collection regardless of the --light flag)")
-	collectionsCmd.Flags().BoolVarP(&flagLightCollection, "light", "l", false, "whether to return the light collection (only transaction IDs)")
+	collectionsCmd.Flags().BoolVar(&flagLightCollection, "light", false, "whether to return the light collection (only transaction IDs)")
 }
 
 var collectionsCmd = &cobra.Command{

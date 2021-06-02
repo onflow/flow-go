@@ -67,7 +67,7 @@ func RequireReturnsBefore(t testing.TB, f func(), duration time.Duration, messag
 		close(done)
 	}()
 
-	RequireCloseBefore(t, done, duration, "could not close done channel on time")
+	RequireCloseBefore(t, done, duration, message+": function did not return on time")
 }
 
 // RequireComponentsDoneBefore invokes the done method of each of the input components concurrently, and
@@ -89,7 +89,7 @@ func RequireComponentsReadyBefore(t testing.TB, duration time.Duration, componen
 func RequireCloseBefore(t testing.TB, c <-chan struct{}, duration time.Duration, message string) {
 	select {
 	case <-time.After(duration):
-		require.Fail(t, "function did not return in time: "+message)
+		require.Fail(t, "could not close done channel on time: "+message)
 	case <-c:
 		return
 	}
