@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -55,7 +54,7 @@ func (DefaultSignatureVerifier) Verify(
 	}
 
 	if hashAlgo != hash.KMAC128 {
-	message = append(tag, message...)
+		message = append(tag, message...)
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
@@ -88,11 +87,11 @@ func Hash(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, erro
 	case hash.KMAC128:
 		hashFunc = func(tag string, data []byte) hash.Hash {
 			return crypto.NewBLSKMAC(tag).ComputeHash(data)
-	}
+		}
 	default:
 		err := errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 		return nil, fmt.Errorf("hashing failed: %w", err)
-}
+	}
 
 	return hashFunc(tag, data), nil
 }
@@ -203,42 +202,6 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
-}
-
-//  NewAccountPublicKey construct an account public key given a runtime public key.
-func NewAccountPublicKey(publicKey *runtime.PublicKey,
-	hashAlgo sema.HashAlgorithm,
-	keyIndex int,
-	weight int,
-) (*flow.AccountPublicKey, error) {
-	var err error
-	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgorithm == crypto.UnknownSigningAlgorithm {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.Name(), "signature algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
-	if hashAlgorithm == hash.UnknownHashingAlgorithm {
-		err = errors.NewValueErrorf(hashAlgo.Name(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
-	if err != nil {
-		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	return &flow.AccountPublicKey{
-		Index:     keyIndex,
-		PublicKey: decodedPublicKey,
-		SignAlgo:  signAlgorithm,
-		HashAlgo:  hashAlgorithm,
-		SeqNumber: 0,
-		Weight:    weight,
-		Revoked:   false,
-	}, nil
 }
 
 func parseRuntimeDomainTag(tag string) []byte {
