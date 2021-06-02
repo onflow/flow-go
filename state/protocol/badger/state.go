@@ -489,7 +489,9 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 // If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
 func updateCommittedEpochFinalView(state *State) error {
 
-	phase, err := state.Final().Phase()
+	finalizedState := state.Final()
+
+	phase, err := finalizedState.Phase()
 	if err != nil {
 		return fmt.Errorf("could not get epoch phase from state: %w", err)
 	}
@@ -499,7 +501,7 @@ func updateCommittedEpochFinalView(state *State) error {
 	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
 
 		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
-		finalView, err := state.Final().Epochs().Current().FinalView()
+		finalView, err := finalizedState.Epochs().Current().FinalView()
 		if err != nil {
 			return fmt.Errorf("could not get current epoch final view from state: %w", err)
 		}
@@ -507,7 +509,7 @@ func updateCommittedEpochFinalView(state *State) error {
 	case flow.EpochPhaseCommitted:
 
 		// if we are in Committed phase, then set the metric value to the next epoch's final view
-		finalView, err := state.Final().Epochs().Next().FinalView()
+		finalView, err := finalizedState.Epochs().Next().FinalView()
 		if err != nil {
 			return fmt.Errorf("could not get next epoch final view from state: %w", err)
 		}
