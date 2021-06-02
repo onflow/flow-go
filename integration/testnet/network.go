@@ -16,6 +16,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
@@ -25,7 +26,6 @@ import (
 	"github.com/dapperlabs/testingdock"
 
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -618,52 +618,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 	}
 
-	// write private key files for each node
-	for i, nodeConfig := range confs {
-		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
-
-		// retrieve private representation of the node
-		private, err := nodeConfig.NodeInfo.Private()
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-
-		err = WriteJSON(path, private)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-
-		// We use the network key for the machine account. Normally it would be
-		// a separate key.
-
-		// Accounts are generated in a known order during bootstrapping, and
-		// account addresses are deterministic based on order for a given chain
-		// configuration. During the bootstrapping. We create accounts for the
-		// FungibleToken, FlowToken, and FlowFees smart contracts besides the
-		// service account. The service account has index 0, then these 3
-		// accounts would occupy account indices [1-3], so the node machine
-		// accounts would occupy account indices [4,n+4]. They will be created
-		// in the order defined by the identity list provided to the
-		// BootstrapProcedure, which is the same order as the container configs.
-		accountAddress, err := chainID.Chain().AddressAtIndex(uint64(4 + i))
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-
-		info := bootstrap.NodeMachineAccountInfo{
-			Address:           accountAddress.HexWithPrefix(),
-			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
-			KeyIndex:          0,
-			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
-			HashAlgorithm:     crypto.SHA3_256,
-		}
-
-		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeConfig.NodeID))
-
-		err = WriteJSON(infoPath, info)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
+	// write staking and machine account private key files
+	err = writePrivateKeyFiles(bootstrapDir, chainID, nodeInfos)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
 
 	// define root block parameters
@@ -910,4 +868,76 @@ func setupClusterGenesisBlockQCs(nClusters uint, epochCounter uint64, confs []Co
 	}
 
 	return assignments, qcs, nil
+}
+
+// writePrivateKeyFiles writes the staking and machine account private key files.
+func writePrivateKeyFiles(bootstrapDir string, chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo) error {
+
+	// write private key files for each node (staking key, random beacon key, machine account key)
+	//
+	// for the machine account key, we keep track of the address index to map
+	// the Flow address of the machine account to the key.
+	addressIndex := uint64(4)
+	for _, nodeInfo := range nodeInfos {
+		fmt.Println("writing private files for ", nodeInfo.NodeID)
+		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeInfo.NodeID))
+
+		// retrieve private representation of the node
+		private, err := nodeInfo.Private()
+		if err != nil {
+			return err
+		}
+
+		err = WriteJSON(path, private)
+		if err != nil {
+			return err
+		}
+
+		// We use the network key for the machine account. Normally it would be
+		// a separate key.
+
+		// Accounts are generated in a known order during bootstrapping, and
+		// account addresses are deterministic based on order for a given chain
+		// configuration. During the bootstrapping we create 4 Flow accounts besides
+		// the service account (index 0) so node accounts will start at index 5.
+		//
+		// All nodes have a staking account created for them, only collection and
+		// consensus nodes have a second machine account created.
+		//
+		// The accounts are created in the same order defined by the identity list
+		// provided to BootstrapProcedure, which is the same order as this iteration.
+		if nodeInfo.Role == flow.RoleCollection || nodeInfo.Role == flow.RoleConsensus {
+			// increment the address index to account for both the staking account
+			// and the machine account.
+			// now addressIndex points to the machine account address index
+			addressIndex += 2
+		} else {
+			// increment the address index to account for the staking account
+			// we don't need to persist anything related to the staking account
+			addressIndex += 1
+			continue
+		}
+
+		accountAddress, err := chainID.Chain().AddressAtIndex(addressIndex)
+		if err != nil {
+			return err
+		}
+
+		info := bootstrap.NodeMachineAccountInfo{
+			Address:           accountAddress.HexWithPrefix(),
+			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
+			KeyIndex:          0,
+			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
+			HashAlgorithm:     crypto.SHA3_256,
+		}
+
+		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID))
+
+		err = WriteJSON(infoPath, info)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
