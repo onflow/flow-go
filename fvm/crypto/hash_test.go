@@ -44,7 +44,7 @@ func TestPrefixedHash(t *testing.T) {
 	t.Logf("math rand seed is %d", r)
 
 	for hashAlgo, testFunction := range hashingAlgoToTestingAlgo {
-		t.Run(hashAlgo.String(), func(t *testing.T) {
+		t.Run(hashAlgo.String()+" with a prefix", func(t *testing.T) {
 			for i := 32; i < 5000; i++ {
 				// first 32 bytes of data are the tag
 				data := make([]byte, i)
@@ -56,6 +56,20 @@ func TestPrefixedHash(t *testing.T) {
 				hasher, err := crypto.NewPrefixedHashing(hashAlgo, tag)
 				require.NoError(t, err)
 				h := hasher.ComputeHash(message)
+				assert.Equal(t, expected, []byte(h))
+			}
+		})
+
+		t.Run(hashAlgo.String()+" without a prefix", func(t *testing.T) {
+			for i := 0; i < 5000; i++ {
+				data := make([]byte, i)
+				rand.Read(data)
+				expected := testFunction(data)
+
+				tag := ""
+				hasher, err := crypto.NewPrefixedHashing(hashAlgo, tag)
+				require.NoError(t, err)
+				h := hasher.ComputeHash(data)
 				assert.Equal(t, expected, []byte(h))
 			}
 		})

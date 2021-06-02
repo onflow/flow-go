@@ -11,7 +11,8 @@ import (
 // prefixedHashing, embeds a crypto hasher
 type prefixedHashing struct {
 	hash.Hasher
-	tag [flow.DomainTagLength]byte
+	usePrefix bool
+	tag       [flow.DomainTagLength]byte
 }
 
 // paddedDomainTag converts a string into a padded byte array
@@ -50,7 +51,9 @@ func NewPrefixedHashing(shaAlgo hash.HashingAlgorithm, tag string) (hash.Hasher,
 
 	return &prefixedHashing{
 		Hasher: hasher,
-		tag:    paddedTag,
+		// if tag is empty, do not use any prefix (standard hashing)
+		usePrefix: tag != "",
+		tag:       paddedTag,
 	}, nil
 }
 
@@ -65,5 +68,8 @@ func (s *prefixedHashing) ComputeHash(data []byte) hash.Hash {
 // Reset gets the hasher back to its original state.
 func (s *prefixedHashing) Reset() {
 	s.Hasher.Reset()
-	_, _ = s.Write(s.tag[:])
+	// include the tag only when using a prefix is enabled
+	if s.usePrefix {
+		_, _ = s.Write(s.tag[:])
+	}
 }
