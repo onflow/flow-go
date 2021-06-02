@@ -147,7 +147,7 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) cadence.Array {
 	return convertResetEpochArgs(randomSource, payout, firstView, finalView, clustering, []string{}, dkgKeys)
 }
 
-// convertResetEpochArgscreates converts the arguments required by `resetEpoch` to cadence representations
+// convertResetEpochArgs converts the arguments required by `resetEpoch` to cadence representations
 func convertResetEpochArgs(randomSource []byte,
 	payout, firstView, finalView uint64,
 	clustering flow.ClusterList, clusterQCs []string, dkgPubKeys []crypto.PublicKey) cadence.Array {
