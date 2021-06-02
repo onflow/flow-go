@@ -702,6 +702,7 @@ func registerNodeTransaction(
 		PublicKey: id.NetworkPubKey,
 		SignAlgo:  id.NetworkPubKey.Algorithm(),
 		HashAlgo:  hash.SHA3_256,
+		Weight:    1000,
 	}
 	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
 	cadencePublicKeys := cadence.NewArray(
