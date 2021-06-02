@@ -24,13 +24,13 @@ func NewAggregatedSignatures(chunks uint64) *AggregatedSignatures {
 
 // PutSignature adds the AggregatedSignature from the collector to `aggregatedSignatures`.
 // The returned int is the resulting number of approved chunks.
-func (as *AggregatedSignatures) PutSignature(chunkIndex uint64, aggregatedSignature flow.AggregatedSignature) int {
+func (as *AggregatedSignatures) PutSignature(chunkIndex uint64, aggregatedSignature flow.AggregatedSignature) uint64 {
 	as.lock.Lock()
 	defer as.lock.Unlock()
 	if _, found := as.signatures[chunkIndex]; !found {
 		as.signatures[chunkIndex] = aggregatedSignature
 	}
-	return len(as.signatures)
+	return uint64(len(as.signatures))
 }
 
 // HasSignature returns boolean depending if we have signature for particular chunk
