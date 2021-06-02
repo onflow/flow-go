@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -72,29 +72,30 @@ func resetRun(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not convert array of bytes to snapshot")
 	}
 
-	// get current epoch
-	epoch := snapshot.Epochs().Current()
-
 	// extract arguments from reset epoch tx from snapshot
-	payout := uint64(0)
-	rndSource, firstView, finalView, clustering, qcs, dkgKeys := extractResetEpochArgs(epoch)
+	cdcArgs := extractResetEpochArgs(snapshot)
 
-	// create resetEpoch transaction (to be signed by service account)
-	cdcArgs := generateResetEpochArgsCadence(rndSource, payout, firstView, finalView, clustering, qcs, dkgKeys)
-
-	// handle generating arguments json file 
+	// encode cadence arguments to JSON
 	encoded, err := jsoncdc.Encode(cdcArgs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not encode cadence arguments")
 	}
+
+	// write JSON args to file
 	err = io.WriteFile(argsPath, encoded)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
 }
 
-// extractResetEpochTxArguments
-func extractResetEpochArgs(epoch protocol.Epoch) ([]byte, uint64, uint64, flow.ClusterList, []string, []crypto.PublicKey) {
+// extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
+func extractResetEpochArgs(snapshot *inmem.Snapshot) (cadence.Array) {
+
+	// get current epoch
+	epoch := snapshot.Epochs().Current()
+
+	// set payout
+	payout := uint64(0)
 
 	// read random source from epoch
 	randomSource, err := epoch.RandomSource()
@@ -142,7 +143,7 @@ func extractResetEpochArgs(epoch protocol.Epoch) ([]byte, uint64, uint64, flow.C
 
 	// TODO: read in QCs
 
-	return randomSource, firstView, finalView, clustering, []string{}, dkgKeys
+	return generateResetEpochArgsCadence(randomSource, payout, firstView, finalView, clustering, []string{}, dkgKeys)
 }
 
 // generateResetEpochArgsCadence creates the arguments required by 
