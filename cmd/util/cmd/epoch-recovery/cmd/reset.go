@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"crypto"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -13,6 +12,7 @@ import (
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -170,6 +170,7 @@ func convertResetEpochArgs(randomSource []byte,
 	// add final view
 	args = append(args, cadence.NewUInt64(finalView))
 
+	// add clusters	
 	cdcClusters := make([]cadence.Value, len(clustering))
 	for i, cluster := range clustering {
 		clusterNodeIDs := cluster.NodeIDs()
@@ -181,7 +182,14 @@ func convertResetEpochArgs(randomSource []byte,
 	}
 	args = append(args, cadence.NewArray(cdcClusters))
 
-	// TODO:  clusterQC and dkg pub keys to cadence repr
+	// TODO:  clusterQC 
+
+	// add dkg keys
+	cdcDKGKeys := make([]cadence.Value, len(dkgPubKeys))
+	for index, pubKey := range dkgPubKeys {
+		cdcDKGKeys[index] = cadence.NewString(pubKey.String())
+	}
+	args = append(args, cadence.NewArray(cdcDKGKeys))
 
 	return cadence.NewArray(args)
 }
