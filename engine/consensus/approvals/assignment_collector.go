@@ -138,26 +138,25 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 		return nil
 	}
 
+	// Constructing ApprovalCollector for IncorporatedResult
 	// The AssignmentCollector is not locked while instantiating the ApprovalCollector. Hence, it is possible that
 	// multiple threads simultaneously compute the verifier assignment. Nevertheless, the implementation is safe in
 	// that only one of the instantiated ApprovalCollectors will be stored in the cache. In terms of locking duration,
 	// it's better to perform extra computation in edge cases than lock this logic with a mutex,
 	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously
-
-	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := ac.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
-
 	incorporatedBlock, err := ac.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve header of incorporated block %s: %w",
 			incorporatedBlockID, err)
 	}
-
 	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
 
+	// Now, we add the ApprovalCollector to the AssignmentCollector:
+	// no-op if an ApprovalCollector has already been added by a different routine
 	isDuplicate := ac.putCollector(incorporatedBlockID, collector)
 	if isDuplicate {
 		return nil
@@ -210,7 +209,7 @@ func (ac *AssignmentCollector) verifySignature(approval *flow.ResultApproval, no
 	id := approval.Body.ID()
 	valid, err := ac.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
-		return fmt.Errorf("failed to verify signature: %w", err)
+		return fmt.Errorf("failed to verify approval signature: %w", err)
 	}
 
 	if !valid {
@@ -267,17 +266,21 @@ func (ac *AssignmentCollector) validateApproval(approval *flow.ResultApproval) e
 }
 
 func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
+	// we have this approval cached already, no need to process it again
+	approvalCacheID := approval.Body.PartialID()
+	if cached := ac.verifiedApprovalsCache.Get(approvalCacheID); cached != nil {
+		return nil
+	}
+
 	err := ac.validateApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not validate approval: %w", err)
 	}
 
-	if cached := ac.verifiedApprovalsCache.Get(approval.Body.PartialID()); cached != nil {
-		// we have this approval cached already, no need to process it again
+	newlyAdded := ac.verifiedApprovalsCache.Put(approval)
+	if !newlyAdded {
 		return nil
 	}
-
-	ac.verifiedApprovalsCache.Put(approval)
 
 	for _, collector := range ac.allCollectors() {
 		err := collector.ProcessApproval(approval)
@@ -370,7 +373,7 @@ func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (
 	if len(authorizedVerifierList) == 0 {
 		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
 	}
-	identities := make(map[flow.Identifier]*flow.Identity)
+	identities := make(map[flow.Identifier]*flow.Identity, len(authorizedVerifierList))
 	for _, identity := range authorizedVerifierList {
 		identities[identity.NodeID] = identity
 	}
