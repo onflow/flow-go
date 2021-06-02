@@ -45,18 +45,19 @@ func (s *SealingEngineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.engine = &Engine{
-		log:                                  log,
-		unit:                                 engine.NewUnit(),
-		core:                                 s.core,
-		me:                                   me,
-		engineMetrics:                        metrics,
-		cacheMetrics:                         metrics,
-		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
-		rootHeader:                           rootHeader,
+		log:           log,
+		unit:          engine.NewUnit(),
+		core:          s.core,
+		me:            me,
+		engineMetrics: metrics,
+		cacheMetrics:  metrics,
+		rootHeader:    rootHeader,
 	}
 
-	// setups message handler
-	err = s.engine.setupMessageHandler()
+	// setup inbound queues for trusted inputs and message handler for untrusted inputs
+	err = s.engine.setupTrustedInboundQueues()
+	require.NoError(s.T(), err)
+	err = s.engine.setupMessageHandler(RequiredApprovalsForSealConstructionTestingValue)
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
