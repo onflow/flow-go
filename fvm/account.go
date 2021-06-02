@@ -1,8 +1,6 @@
 package fvm
 
 import (
-	"fmt"
-
 	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/programs"
@@ -35,41 +33,4 @@ func getAccount(
 	}
 
 	return account, nil
-}
-
-const getFlowTokenBalanceScriptTemplate = `
-import FlowServiceAccount from 0x%s
-
-pub fun main(): UFix64 {
-  let acct = getAccount(0x%s)
-  return FlowServiceAccount.defaultTokenBalance(acct)
-}
-`
-
-const getFlowTokenAvailableBalanceScriptTemplate = `
-import FlowStorageFees from 0x%s
-
-pub fun main(): UFix64 {
-  return FlowStorageFees.defaultTokenAvailableBalance(0x%s)
-}
-`
-
-const getStorageCapacityScriptTemplate = `
-import FlowStorageFees from 0x%s
-
-pub fun main(): UFix64 {
-	return FlowStorageFees.calculateAccountCapacity(0x%s)
-}
-`
-
-func getFlowTokenBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
-	return Script([]byte(fmt.Sprintf(getFlowTokenBalanceScriptTemplate, serviceAddress, accountAddress)))
-}
-
-func getFlowTokenAvailableBalanceScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
-	return Script([]byte(fmt.Sprintf(getFlowTokenAvailableBalanceScriptTemplate, serviceAddress, accountAddress)))
-}
-
-func getStorageCapacityScript(accountAddress, serviceAddress flow.Address) *ScriptProcedure {
-	return Script([]byte(fmt.Sprintf(getStorageCapacityScriptTemplate, serviceAddress, accountAddress)))
 }

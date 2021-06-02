@@ -250,7 +250,7 @@ func (e *hostEnv) GetStorageCapacity(address common.Address) (value uint64, err 
 		defer sp.Finish()
 	}
 
-	script := getStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	script := Script(blueprints.GetStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
 	// and we handle the errors and still compute the state interactions
@@ -285,7 +285,7 @@ func (e *hostEnv) GetAccountBalance(address common.Address) (value uint64, err e
 		defer sp.Finish()
 	}
 
-	script := getFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	script := Script(blueprints.GetFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -313,7 +313,7 @@ func (e *hostEnv) GetAccountAvailableBalance(address common.Address) (value uint
 		defer sp.Finish()
 	}
 
-	script := getFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress())
+	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
