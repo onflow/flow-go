@@ -34,18 +34,18 @@ type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (AssignmentC
 type AssignmentCollectorTree struct {
 	forest              *forest.LevelledForest
 	lock                sync.RWMutex
-	onCreateCollector   NewCollectorFactoryMethod
+	createCollector     NewCollectorFactoryMethod
 	size                uint64
 	lastSealedID        flow.Identifier
 	lastFinalizedHeight uint64
 	headers             storage.Headers
 }
 
-func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers, onCreateCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
+func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers, createCollector NewCollectorFactoryMethod) *AssignmentCollectorTree {
 	return &AssignmentCollectorTree{
 		forest:              forest.NewLevelledForest(lastSealed.Height),
 		lock:                sync.RWMutex{},
-		onCreateCollector:   onCreateCollector,
+		createCollector:     createCollector,
 		size:                0,
 		lastSealedID:        lastSealed.ID(),
 		lastFinalizedHeight: lastSealed.Height,
@@ -141,8 +141,7 @@ type LazyInitCollector struct {
 	Created     bool // whether collector was created or retrieved from cache
 }
 
-// GetOrCreateCollector performs lazy initialization of AssignmentCollector using double checked locking
-// Returns, (AssignmentCollector, true or false whenever it was created, error)
+// GetOrCreateCollector performs lazy initialization of AssignmentCollector using double-checked locking.
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*LazyInitCollector, error) {
 	resultID := result.ID()
 	// first let's check if we have a collector already
@@ -155,7 +154,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		}, nil
 	}
 
-	collector, err := t.onCreateCollector(result)
+	collector, err := t.createCollector(result)
 	if err != nil {
 		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
@@ -169,12 +168,11 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("could not fetch executed block %v: %w", result.BlockID, err)
 	}
 
-	// fast check shows that there is no collector, need to create one
+	// Initial check showed that there was no collector. However, it's possible that after the
+	// initial check but before acquiring the lock to add the newly-created collector, another
+	// goroutine already added the needed collector. Hence we need to check again:
 	t.lock.Lock()
 	defer t.lock.Unlock()
-
-	// we need to check again, since it's possible that after checking for existing collector but before taking a lock
-	// new collector was created by concurrent goroutine
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
@@ -183,6 +181,10 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 			Created:     false,
 		}, nil
 	}
+
+	// An assignment collector is processable if and only if:
+	// either (i) the parent result is the latest sealed result (seal is finalized)
+	//    or (ii) the result's parent is processable
 	parent, parentFound := t.forest.GetVertex(result.PreviousResultID)
 	if parentFound {
 		vertex.processable = parent.(*assignmentCollectorVertex).processable

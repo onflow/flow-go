@@ -122,6 +122,40 @@ func (bc *BaseChainSuite) SetupChain() {
 		},
 		nil,
 	)
+	bc.FinalSnapshot.On("SealedResult").Return(
+		func() *flow.ExecutionResult {
+			blockID := bc.LatestFinalizedBlock.ID()
+			seal, found := bc.SealsIndex[blockID]
+			if !found {
+				return nil
+			}
+			result, found := bc.PersistedResults[seal.ResultID]
+			if !found {
+				return nil
+			}
+			return result
+		},
+		func() *flow.Seal {
+			blockID := bc.LatestFinalizedBlock.ID()
+			seal, found := bc.SealsIndex[blockID]
+			if !found {
+				return nil
+			}
+			return seal
+		},
+		func() error {
+			blockID := bc.LatestFinalizedBlock.ID()
+			seal, found := bc.SealsIndex[blockID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			_, found = bc.PersistedResults[seal.ResultID]
+			if !found {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
 
 	// define the protocol state snapshot of the latest sealed block
 	bc.State.On("Sealed").Return(

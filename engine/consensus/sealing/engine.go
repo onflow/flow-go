@@ -43,22 +43,21 @@ type (
 // Purpose of this struct is to provide an efficient way how to consume messages from network layer and pass
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
-	unit                                 *engine.Unit
-	core                                 sealing.SealingCore
-	log                                  zerolog.Logger
-	me                                   module.Local
-	headers                              storage.Headers
-	payloads                             storage.Payloads
-	cacheMetrics                         module.MempoolMetrics
-	engineMetrics                        module.EngineMetrics
-	pendingApprovals                     engine.MessageStore
-	pendingRequestedApprovals            engine.MessageStore
-	pendingFinalizationEvents            *fifoqueue.FifoQueue
-	pendingIncorporatedResults           *fifoqueue.FifoQueue
-	notifier                             engine.Notifier
-	messageHandler                       *engine.MessageHandler
-	requiredApprovalsForSealConstruction uint
-	rootHeader                           *flow.Header
+	unit                       *engine.Unit
+	core                       sealing.SealingCore
+	log                        zerolog.Logger
+	me                         module.Local
+	headers                    storage.Headers
+	payloads                   storage.Payloads
+	cacheMetrics               module.MempoolMetrics
+	engineMetrics              module.EngineMetrics
+	pendingApprovals           engine.MessageStore
+	pendingRequestedApprovals  engine.MessageStore
+	pendingFinalizationEvents  *fifoqueue.FifoQueue
+	pendingIncorporatedResults *fifoqueue.FifoQueue
+	notifier                   engine.Notifier
+	messageHandler             *engine.MessageHandler
+	rootHeader                 *flow.Header
 }
 
 // NewEngine constructs new `Engine` which runs on it's own unit.
@@ -84,20 +83,24 @@ func NewEngine(log zerolog.Logger,
 	}
 
 	e := &Engine{
-		unit:                                 engine.NewUnit(),
-		log:                                  log.With().Str("engine", "sealing.Engine").Logger(),
-		me:                                   me,
-		engineMetrics:                        engineMetrics,
-		cacheMetrics:                         mempool,
-		headers:                              headers,
-		payloads:                             payloads,
-		requiredApprovalsForSealConstruction: options.RequiredApprovalsForSealConstruction,
-		rootHeader:                           rootHeader,
+		unit:          engine.NewUnit(),
+		log:           log.With().Str("engine", "sealing.Engine").Logger(),
+		me:            me,
+		engineMetrics: engineMetrics,
+		cacheMetrics:  mempool,
+		headers:       headers,
+		payloads:      payloads,
+		rootHeader:    rootHeader,
 	}
 
-	err = e.setupMessageHandler()
+	err = e.setupTrustedInboundQueues()
 	if err != nil {
-		return nil, fmt.Errorf("could not initialize message handler: %w", err)
+		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
+	}
+
+	err = e.setupMessageHandler(options.RequiredApprovalsForSealConstruction)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize message handler for untrusted inputs: %w", err)
 	}
 
 	// register engine with the approval provider
@@ -120,7 +123,26 @@ func NewEngine(log zerolog.Logger,
 	return e, nil
 }
 
-func (e *Engine) setupMessageHandler() error {
+// setupTrustedInboundQueues initializes inbound queues for TRUSTED INPUTS (from other components within the
+// consensus node). We deliberately separate the queues for trusted inputs from the MessageHandler, which
+// handles external, untrusted inputs. This reduces the attack surface, as it makes it impossible for an external
+// attacker to feed values into the inbound channels for trusted inputs, even in the presence of bugs in
+// the networking layer or message handler
+func (e *Engine) setupTrustedInboundQueues() error {
+	var err error
+	e.pendingFinalizationEvents, err = fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultFinalizationEventsQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for finalization events: %w", err)
+	}
+	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
+	if err != nil {
+		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+	}
+	return nil
+}
+
+// setupMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED INPUTS.
+func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) error {
 	// FIFO queue for broadcasted approvals
 	pendingApprovalsQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultApprovalQueueCapacity),
@@ -145,17 +167,6 @@ func (e *Engine) setupMessageHandler() error {
 		FifoQueue: pendingRequestedApprovalsQueue,
 	}
 
-	e.pendingFinalizationEvents, err = fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultFinalizationEventsQueueCapacity))
-	if err != nil {
-		return fmt.Errorf("failed to create queue for finalization events: %w", err)
-	}
-
-	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
-	if err != nil {
-		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
-	}
-
 	e.notifier = engine.NewNotifier()
 	// define message queueing behaviour
 	e.messageHandler = engine.NewMessageHandler(
@@ -170,7 +181,7 @@ func (e *Engine) setupMessageHandler() error {
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if e.requiredApprovalsForSealConstruction < 1 {
+				if requiredApprovalsForSealConstruction < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -188,7 +199,7 @@ func (e *Engine) setupMessageHandler() error {
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				if e.requiredApprovalsForSealConstruction < 1 {
+				if requiredApprovalsForSealConstruction < 1 {
 					// if we don't require approvals to construct a seal, don't even process approvals.
 					return nil, false
 				}
@@ -285,6 +296,11 @@ func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
 }
 
 func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultApproval) error {
+	// don't process approval if originID is mismatched
+	if originID != approval.Body.ApproverID {
+		return nil
+	}
+
 	err := e.core.ProcessApproval(approval)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageResultApproval)
 	if err != nil {

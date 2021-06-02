@@ -368,6 +368,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
 
+	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
+
 	c.counterLastSealedHeight.Set(lastSealed.Height)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
