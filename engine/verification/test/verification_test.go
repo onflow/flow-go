@@ -124,14 +124,14 @@ func TestSingleCollectionProcessing(t *testing.T) {
 	verNet.StartConDev(100, true)
 
 	// execution node
-	exeNode, exeEngine := vertestutils.SetupChunkDataPackProvider(t,
+	exeNode, exeEngine, _ := vertestutils.SetupChunkDataPackProvider(t,
 		hub,
 		exeIdentity,
 		identities,
 		chainID,
 		[]*vertestutils.CompleteExecutionReceipt{completeER},
 		expectedChunkIDs,
-		vertestutils.RespondChunkDataPackRequest) // always responds to chunk data pack requests.
+		vertestutils.RespondChunkDataPackRequestImmediately) // always responds to chunk data pack requests.
 
 	// consensus node
 	// mock consensus node
