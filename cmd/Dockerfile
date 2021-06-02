@@ -49,7 +49,9 @@ WORKDIR /app
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static" -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
+    -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
 
@@ -66,7 +68,9 @@ WORKDIR /app
 RUN --mount=type=ssh \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static"  -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
+    GO111MODULE=on CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build --tags "relic,netgo" -ldflags "-extldflags -static \
+    -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
+    -gcflags="all=-N -l" -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
 
@@ -85,7 +89,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=ssh \
     GO111MODULE=on CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-extldflags -static \
-    -X 'github.com/onflow/flow-go/cmd/bootstrap/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/bootstrap/build.semver=${VERSION}'" \
+    -X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' -X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
     -o ./app ./cmd/${TARGET}
 
 RUN chmod a+x /app/app
