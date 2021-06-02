@@ -17,8 +17,8 @@ var (
 var rootCmd = &cobra.Command{
 	Use: "epoch-recovery",
 	Short: `If the epoch setup phase fails (either the DKG, QC voting, or smart contract bug), 
-	manual intervention is needed to transition to the next epoch. The manual intervention 
-	involves invoking a reset function on the EpochLifecycle smart contract and a spork.`,
+	manual intervention is needed to transition to the next epoch. This tool encapsulates the commands
+	needed for such intervention.`,
 }
 
 var RootCmd = rootCmd

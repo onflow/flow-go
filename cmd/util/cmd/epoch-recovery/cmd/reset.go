@@ -26,8 +26,8 @@ var (
 // resetCmd represents a command to reset epoch data in the Epoch smart contract
 var resetCmd = &cobra.Command{
 	Use:   "reset",
-	Short: "Reset Epoch details in the Epoch smart contract",
-	Long:  ``,
+	Short: "Generates `resetEpoch` JSON transaction arguments.",
+	Long:  "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file",
 	Run:   resetRun,
 }
 
@@ -169,7 +169,7 @@ func generateResetEpochArgsCadence(randomSource []byte,
 	args = append(args, cadence.NewUInt64(finalView))
 
 	// TODO: convert clustering, clusterQC and dkg pub keys to cadence repr
-	
+
 	// clusterStrings := make([][]string, len(clustering))
 	// for i, cluster := range clustering {
 	// 	clusterNodeIDs := cluster.NodeIDs()
