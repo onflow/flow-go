@@ -169,15 +169,15 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 
 	// if the receipt is for an unknown block, skip it. It will be re-requested
 	// later by `requestPending` function.
-	head, err := c.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
+	executedBlock, err := c.headersDB.ByBlockID(receipt.ExecutionResult.BlockID)
 	if err != nil {
 		log.Debug().Msg("discarding receipt for unknown block")
 		return false, nil
 	}
 
 	log = log.With().
-		Uint64("block_view", head.View).
-		Uint64("block_height", head.Height).
+		Uint64("block_view", executedBlock.View).
+		Uint64("block_height", executedBlock.Height).
 		Logger()
 	log.Debug().Msg("execution receipt received")
 
@@ -187,8 +187,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could not find sealed block: %w", err)
 	}
-	isSealed := head.Height <= sealed.Height
-	if isSealed {
+	if executedBlock.Height <= sealed.Height {
 		log.Debug().Msg("discarding receipt for already sealed and finalized block height")
 		return false, nil
 	}
@@ -224,7 +223,7 @@ func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 		return false, fmt.Errorf("failed to validate execution receipt: %w", err)
 	}
 
-	_, err = c.storeReceipt(receipt, head)
+	_, err = c.storeReceipt(receipt, executedBlock)
 	if err != nil {
 		return false, fmt.Errorf("failed to store receipt: %w", err)
 	}
