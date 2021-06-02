@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
-
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -320,6 +320,9 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 
 func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error {
 
+	spew.Config.DisableMethods = true
+	spew.Config.DisablePointerMethods = true
+
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
 
@@ -355,8 +358,24 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 
 	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
 
-	for i, e := range events {
+	fmt.Printf("megaevents\n")
+	spew.Dump(events)
+	fmt.Printf("/megaevents\n")
+
+	for i := range events {
+
+		e := events[i]
+
 		err = s.events.BatchStore(blockID, e, batch)
+
+		if len(e) > 0 {
+			fmt.Printf("savings events %d\n", i)
+			for _, ee := range e {
+				spew.Dump(ee)
+			}
+			fmt.Printf("/savings events %d\n", i)
+		}
+
 		if err != nil {
 			return fmt.Errorf("cannot store events for chunk %d: %w", i, err)
 		}

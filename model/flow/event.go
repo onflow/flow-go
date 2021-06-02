@@ -57,7 +57,7 @@ func (e Event) Encode() []byte {
 }
 
 func (e Event) Fingerprint() []byte {
-	return fingerprint.Fingerprint(wrapEvent(e))
+	return fingerprint.Fingerprint(wrapEventID(e))
 }
 
 // Defines only the fields needed to uniquely identify an event.
