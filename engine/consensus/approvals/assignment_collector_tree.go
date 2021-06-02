@@ -12,8 +12,9 @@ import (
 // assignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
 // AssignmentCollector and information if collector is processable or not
 type assignmentCollectorVertex struct {
-	collector   *VerifyingAssignmentCollector
-	processable bool
+	collector               *VerifyingAssignmentCollector
+	nonProcessableCollector AssignmentCollector
+	processable             bool
 }
 
 /* Methods implementing LevelledForest's Vertex interface */
@@ -22,6 +23,25 @@ func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collec
 func (v *assignmentCollectorVertex) Level() uint64             { return v.collector.BlockHeight }
 func (v *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
 	return v.collector.result.PreviousResultID, v.collector.BlockHeight - 1
+}
+
+func (v *assignmentCollectorVertex) SelectCollector() AssignmentCollector {
+	if v.processable {
+		return v.collector
+	} else {
+		return v.nonProcessableCollector
+	}
+}
+
+func (v *assignmentCollectorVertex) Update(processable bool) {
+	if processable != v.processable {
+		// if became unprocessable means it's orphan now
+		if v.processable {
+			v.nonProcessableCollector = NewOrphanAssignmentCollector(v.collector.ResultID(), v.collector.BlockID())
+		}
+
+		v.processable = processable
+	}
 }
 
 // NewCollector is a factory method to generate an AssignmentCollector for an execution result
@@ -60,16 +80,16 @@ func (t *AssignmentCollectorTree) GetSize() uint64 {
 }
 
 // GetCollector returns collector by ID and whether it is processable or not
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (AssignmentCollector, bool) {
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollector {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
 	if !found {
-		return nil, false
+		return nil
 	}
 
 	v := vertex.(*assignmentCollectorVertex)
-	return v.collector, v.processable
+	return v.SelectCollector()
 }
 
 // FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
@@ -104,7 +124,7 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 
 // markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
 func (t *AssignmentCollectorTree) markForkProcessable(vertex *assignmentCollectorVertex, processable bool) {
-	vertex.processable = processable
+	vertex.Update(processable)
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
 		t.markForkProcessable(iter.NextVertex().(*assignmentCollectorVertex), processable)
@@ -126,7 +146,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []Ass
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
 			if vertex.processable {
-				vertices = append(vertices, vertex.collector)
+				vertices = append(vertices, vertex.SelectCollector())
 			}
 		}
 	}
@@ -136,21 +156,19 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []Ass
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
-	Collector   AssignmentCollector
-	Processable bool // whether collector is processable
-	Created     bool // whether collector was created or retrieved from cache
+	Collector AssignmentCollector
+	Created   bool // whether collector was created or retrieved from cache
 }
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double-checked locking.
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*LazyInitCollector, error) {
 	resultID := result.ID()
 	// first let's check if we have a collector already
-	cachedCollector, processable := t.GetCollector(resultID)
+	cachedCollector := t.GetCollector(resultID)
 	if cachedCollector != nil {
 		return &LazyInitCollector{
-			Collector:   cachedCollector,
-			Processable: processable,
-			Created:     false,
+			Collector: cachedCollector,
+			Created:   false,
 		}, nil
 	}
 
@@ -159,8 +177,9 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 	vertex := &assignmentCollectorVertex{
-		collector:   collector,
-		processable: false,
+		collector:               collector,
+		nonProcessableCollector: NewCachingAssignmentCollector(result),
+		processable:             false,
 	}
 
 	executedBlock, err := t.headers.ByBlockID(result.BlockID)
@@ -176,9 +195,8 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
-			Collector:   v.(*assignmentCollectorVertex).collector,
-			Processable: v.(*assignmentCollectorVertex).processable,
-			Created:     false,
+			Collector: v.(*assignmentCollectorVertex).collector,
+			Created:   false,
 		}, nil
 	}
 
@@ -201,9 +219,8 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	t.size += 1
 	t.markForkProcessable(vertex, vertex.processable)
 	return &LazyInitCollector{
-		Collector:   vertex.collector,
-		Processable: vertex.processable,
-		Created:     true,
+		Collector: vertex.SelectCollector(),
+		Created:   true,
 	}, nil
 }
 

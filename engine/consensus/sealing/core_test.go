@@ -525,16 +525,18 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 				unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 				unittest.IncorporatedResult.WithResult(result))
 			err := s.core.processIncorporatedResult(IR)
-			_, processable := s.core.collectorTree.GetCollector(result.ID())
+			collector := s.core.collectorTree.GetCollector(result.ID())
 			if forkIndex > 0 {
 				require.NoError(s.T(), err)
-				require.True(s.T(), processable)
+				_, isOk := collector.(*approvals.VerifyingAssignmentCollector)
+				require.True(s.T(), isOk)
 			} else {
 				if blockIndex == 0 {
 					require.Error(s.T(), err)
 					require.True(s.T(), engine.IsOutdatedInputError(err))
 				} else {
-					require.False(s.T(), processable)
+					_, isOk := collector.(*approvals.CachingAssignmentCollector)
+					require.True(s.T(), isOk)
 				}
 			}
 		}

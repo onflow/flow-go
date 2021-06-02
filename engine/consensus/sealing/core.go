@@ -102,7 +102,7 @@ func NewCore(
 		requestTracker:             approvals.NewRequestTracker(10, 30),
 	}
 
-	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
+	factoryMethod := func(result *flow.ExecutionResult) (*approvals.VerifyingAssignmentCollector, error) {
 		return approvals.NewAssignmentCollector(result, core.state, core.headers, assigner, sealsMempool, verifier,
 			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
 	}
@@ -164,7 +164,7 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 	// approvals for this result, and process them
 	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
 	// time, ensuring that processing of pending approvals happens once for particular assignment
-	if lazyCollector.Created && lazyCollector.Processable {
+	if lazyCollector.Created {
 		err = c.processPendingApprovals(lazyCollector.Collector)
 		if err != nil {
 			return fmt.Errorf("could not process cached approvals:  %w", err)
@@ -275,11 +275,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
 	}
 
-	if collector, processable := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
-		if !processable {
-			return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", approval.Body.ExecutionResultID)
-		}
-
+	if collector := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
 		// if there is a collector it means that we have received execution result and we are ready
 		// to process approvals
 		err = collector.ProcessApproval(approval)

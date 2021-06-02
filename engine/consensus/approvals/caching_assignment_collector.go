@@ -8,9 +8,19 @@ import (
 )
 
 type CachingAssignmentCollector struct {
-	resultID       flow.Identifier
-	blockID        flow.Identifier
-	approvalsCache *Cache // in-memory cache of approvals (not-verified)
+	resultID            flow.Identifier
+	blockID             flow.Identifier
+	approvalsCache      *Cache                                       // in-memory cache of approvals (not-verified)
+	incorporatedResults map[flow.Identifier]*flow.IncorporatedResult // in-memory cache for incorporated results that were processed
+}
+
+func NewCachingAssignmentCollector(result *flow.ExecutionResult) *CachingAssignmentCollector {
+	return &CachingAssignmentCollector{
+		resultID:            result.ID(),
+		blockID:             result.BlockID,
+		approvalsCache:      NewApprovalsCache(0),
+		incorporatedResults: make(map[flow.Identifier]*flow.IncorporatedResult),
+	}
 }
 
 func (ac *CachingAssignmentCollector) BlockID() flow.Identifier {
@@ -21,7 +31,11 @@ func (ac *CachingAssignmentCollector) ResultID() flow.Identifier {
 	return ac.resultID
 }
 
-func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(*flow.IncorporatedResult) error {
+func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
+	irID := incorporatedResult.ID()
+	if _, found := ac.incorporatedResults[irID]; !found {
+		ac.incorporatedResults[irID] = incorporatedResult
+	}
 	return nil
 }
 
