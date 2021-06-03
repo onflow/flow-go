@@ -17,7 +17,7 @@ const runtimeUserDomainTag = "user"
 type SignatureVerifier interface {
 	Verify(
 		signature []byte,
-		tag []byte,
+		tag string,
 		message []byte,
 		publicKey crypto.PublicKey,
 		hashAlgo hash.HashingAlgorithm,
@@ -32,7 +32,7 @@ func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
 
 func (DefaultSignatureVerifier) Verify(
 	signature []byte,
-	tag []byte,
+	tag string,
 	message []byte,
 	publicKey crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
@@ -49,13 +49,13 @@ func (DefaultSignatureVerifier) Verify(
 	case hash.SHA3_384:
 		hasher = hash.NewSHA3_384()
 	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(string(tag))
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 	}
 
 	if hashAlgo != hash.KMAC128 {
-		message = append(tag, message...)
+		message = append([]byte(tag), message...)
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
@@ -118,6 +118,8 @@ func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) runtime.Signatur
 		return runtime.SignatureAlgorithmECDSA_P256
 	case crypto.ECDSASecp256k1:
 		return runtime.SignatureAlgorithmECDSA_secp256k1
+	case crypto.BLSBLS12381:
+		return runtime.SignatureAlgorithmBLS_BLS12_381
 	default:
 		return runtime.SignatureAlgorithmUnknown
 	}
@@ -175,12 +177,14 @@ func VerifySignatureFromRuntime(
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
 	}
 
-	tag := parseRuntimeDomainTag(rawTag)
-	if tag == nil {
-		return false, errors.NewValueErrorf(rawTag, "invalid domain tag")
+	tag := rawTag
+	// if the tag is `runtimeUserDomainTag` replace it with `flow.UserDomainTag`
+	// this is for backwards compatibility. In the future cadence should send `flow.UserDomainTag` directly
+	if tag == runtimeUserDomainTag {
+		tag = string(flow.UserDomainTag[:])
 	}
 
-	if len(tag) > 0 && sigAlgo != crypto.BLSBLS12381 && string(tag) != string(flow.UserDomainTag[:]) {
+	if (sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1) && tag != string(flow.UserDomainTag[:]) {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported with tag different than %s", sigAlgo.String(), string(flow.UserDomainTag[:]))
 	}
 
@@ -242,12 +246,4 @@ func NewAccountPublicKey(publicKey *runtime.PublicKey,
 		Weight:    weight,
 		Revoked:   false,
 	}, nil
-}
-
-func parseRuntimeDomainTag(tag string) []byte {
-	if tag == runtimeUserDomainTag {
-		return flow.UserDomainTag[:]
-	}
-
-	return nil
 }
