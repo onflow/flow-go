@@ -168,17 +168,16 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 		blocksProcessed++
 		if (blocksProcessed%20) == 0 || blocksProcessed >= totalBlocks {
-			c.log.Info().Msgf("%d/%d have been loaded to collector tree", blocksProcessed, totalBlocks)
+			c.log.Debug().Msgf("%d/%d have been loaded to collector tree", blocksProcessed, totalBlocks)
 		}
 
 		return nil
 	}
 
-	c.log.Info().Msgf("there are %d finalized and unsealed blocks in total to reload into collector tree with assignment",
-		totalBlocks)
+ c.log.Info().Msgf("reloading assignments from %d finalized, unsealed blocks into collector tree", totalBlocks)
 
 	// traverse chain forward to collect all execution results that were incorporated in this fork
-	// starting from finalized block and finishing with latest sealed block
+	// we start with processing the direct child of the last finalized block and end with the last finalized block
 	err = fork.TraverseForward(c.headers, finalizedID, resultProcessor, fork.ExcludingBlock(latestSealedBlockID))
 	if err != nil {
 		return fmt.Errorf("internal error while traversing fork: %w", err)
@@ -194,8 +193,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	blocksProcessed = 0
 	totalBlocks = uint64(len(validPending))
 
-	c.log.Info().Msgf("there are %d unfinalized blocks to load into the collector tree with assignment",
-		totalBlocks)
+	c.log.Info().Msgf("reloading assignments from %d unfinalized blocks into collector tree", len(validPending))
 
 	for _, blockID := range validPending {
 		block, err := c.headers.ByBlockID(blockID)
