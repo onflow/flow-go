@@ -174,7 +174,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		return nil
 	}
 
- c.log.Info().Msgf("reloading assignments from %d finalized, unsealed blocks into collector tree", totalBlocks)
+	c.log.Info().Msgf("reloading assignments from %d finalized, unsealed blocks into collector tree", totalBlocks)
 
 	// traverse chain forward to collect all execution results that were incorporated in this fork
 	// we start with processing the direct child of the last finalized block and end with the last finalized block
