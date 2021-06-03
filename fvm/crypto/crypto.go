@@ -66,7 +66,7 @@ func (DefaultSignatureVerifier) Verify(
 	return valid, nil
 }
 
-func Hash(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
+func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
 	var hashFunc func(tag string, data []byte) hash.Hash
 
 	shaHashWrapper := func(f func([]byte) hash.Hash) func(tag string, data []byte) hash.Hash {

@@ -577,7 +577,7 @@ func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgori
 	}
 
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	return crypto.Hash(hashAlgo, tag, data)
+	return crypto.HashWithTag(hashAlgo, tag, data)
 }
 
 func (e *hostEnv) VerifySignature(
