@@ -657,14 +657,21 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, err
 	}
 
+	numViewsInDKGPhase := uint64(20)
+	numViewsInStakingAuction := uint64(10)
+	numViewsInEpoch := uint64(100)
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
-		Counter:      epochCounter,
-		FirstView:    root.Header.View,
-		FinalView:    root.Header.View + 99, // 100 views ~= 2min
-		Participants: participants,
-		Assignments:  clusterAssignments,
-		RandomSource: randomSource,
+		Counter:            epochCounter,
+		FirstView:          root.Header.View,
+		DKGPhase1FinalView: root.Header.View + numViewsInStakingAuction + numViewsInDKGPhase,
+		DKGPhase2FinalView: root.Header.View + numViewsInStakingAuction + numViewsInDKGPhase*2,
+		DKGPhase3FinalView: root.Header.View + numViewsInStakingAuction + numViewsInDKGPhase*3,
+		FinalView:          root.Header.View + numViewsInEpoch - 1,
+		Participants:       participants,
+		Assignments:        clusterAssignments,
+		RandomSource:       randomSource,
 	}
 
 	fmt.Println("testnet participants:")
@@ -684,9 +691,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
-		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView + 1),
-		NumViewsInStakingAuction:     cadence.UInt64(5),
-		NumViewsInDKGPhase:           cadence.UInt64(60),
+		NumViewsInEpoch:              cadence.UInt64(numViewsInEpoch),
+		NumViewsInStakingAuction:     cadence.UInt64(numViewsInStakingAuction),
+		NumViewsInDKGPhase:           cadence.UInt64(numViewsInDKGPhase),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
 		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
