@@ -704,3 +704,80 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 	s.conduit.AssertExpectations(s.T())
 }
+
+// TestRepopulateAssignmentCollectorTree tests that the
+// collectors tree will contain execution results and assignment collectors will be created.
+// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}] <- E
+//         |     <- F[ER{A}] <- G[ER{B}] <- H
+//      finalized
+// collectors tree has to be repopulated with incorporated results from blocks [A, B, C, D, F, G]
+func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree() {
+	payloads := &storage.Payloads{}
+	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
+	blockChildren := make([]flow.Identifier, 0)
+
+	s.sealsDB.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
+		unittest.Seal.Fixture(
+			unittest.Seal.WithBlock(&s.ParentBlock)), nil)
+
+	payload := unittest.PayloadFixture(
+		unittest.WithReceipts(
+			unittest.ExecutionReceiptFixture(
+				unittest.WithResult(s.IncorporatedResult.Result))))
+	emptyPayload := flow.EmptyPayload()
+	payloads.On("ByBlockID", s.Block.ID()).Return(&emptyPayload, nil)
+	payloads.On("ByBlockID", s.IncorporatedBlock.ID()).Return(
+		&payload, nil)
+
+	s.identitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+
+	// two forks
+	for i := 0; i < 2; i++ {
+		fork := unittest.ChainFixtureFrom(i+3, &s.IncorporatedBlock)
+		prevResult := s.IncorporatedResult.Result
+		// create execution results for all blocks except last one, since it won't be valid by definition
+		for _, block := range fork[:len(fork)-1] {
+			blockID := block.ID()
+
+			// create execution result for previous block in chain
+			// this result will be incorporated in current block.
+			result := unittest.ExecutionResultFixture(
+				unittest.WithPreviousResult(*prevResult),
+			)
+			result.BlockID = block.Header.ParentID
+
+			// update caches
+			s.blocks[blockID] = block.Header
+			s.identitiesCache[blockID] = s.AuthorizedVerifiers
+			blockChildren = append(blockChildren, blockID)
+
+			IR := unittest.IncorporatedResult.Fixture(
+				unittest.IncorporatedResult.WithResult(result),
+				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
+			expectedResults = append(expectedResults, IR)
+
+			payload := unittest.PayloadFixture()
+			payload.Results = append(payload.Results, result)
+			payloads.On("ByBlockID", blockID).Return(&payload, nil)
+
+			prevResult = result
+		}
+	}
+
+	// ValidDescendants has to return all valid descendants from finalized block
+	finalSnapShot := unittest.StateSnapshotForKnownBlock(&s.IncorporatedBlock, nil)
+	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
+	s.state.On("Final").Return(finalSnapShot)
+
+	err := s.core.RepopulateAssignmentCollectorTree(payloads)
+	require.NoError(s.T(), err)
+
+	// check collector tree, after repopulating we should have all collectors for execution results that we have
+	// traversed and they have to be processable.
+	for _, incorporatedResult := range expectedResults {
+		collector, err := s.core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
+		require.NoError(s.T(), err)
+		require.False(s.T(), collector.Created)
+		require.True(s.T(), collector.Processable)
+	}
+}
