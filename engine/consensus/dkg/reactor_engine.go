@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -151,28 +152,29 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
-	epoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
+	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
+	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
 
-	jsonEpoch, _ := json.Marshal(epoch)
-	fmt.Printf("XXX epoch: %s\n", string(jsonEpoch))
+	jsonEpoch, _ := json.Marshal(nextEpoch.(*inmem.Epoch).Encodable())
+	fmt.Printf("XXX ReactorEngine.getNextEpochInfo: %T, %s\n", nextEpoch, string(jsonEpoch))
 
-	identities, err := epoch.InitialIdentities()
+	identities, err := nextEpoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
 	}
-	phase1Final, err := epoch.DKGPhase1FinalView()
+	phase1Final, err := currEpoch.DKGPhase1FinalView()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch phase 1 final view: %w", err)
 	}
-	phase2Final, err := epoch.DKGPhase2FinalView()
+	phase2Final, err := currEpoch.DKGPhase2FinalView()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch phase 2 final view: %w", err)
 	}
-	phase3Final, err := epoch.DKGPhase3FinalView()
+	phase3Final, err := currEpoch.DKGPhase3FinalView()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch phase 3 final view: %w", err)
 	}
-	seed, err := epoch.Seed(SeedIndices...)
+	seed, err := nextEpoch.Seed(SeedIndices...)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch seed: %w", err)
 	}
