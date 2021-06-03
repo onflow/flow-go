@@ -221,9 +221,9 @@ func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *Transac
 		[]sema.Type{
 			sema.AuthAccountType,
 		},
-		zerolog.Nop(),
+		env.ctx.Logger,
 	)
-	_, err := invocator.Invoke(env, proc)
+	_, err := invocator.Invoke(env, proc.TraceSpan)
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not
