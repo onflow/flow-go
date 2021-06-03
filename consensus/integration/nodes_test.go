@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -185,7 +186,7 @@ func createNode(
 
 	// initialize the block builder
 	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
-		guarantees, seals, receipts, tracer)
+		guarantees, approvals.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
 	require.NoError(t, err)
 
 	signer := &Signer{identity.ID()}
