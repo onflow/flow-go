@@ -8,14 +8,19 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// prefixedHashing, embeds a crypto hasher
+// prefixedHashing embeds a crypto hasher and implements
+// hashing with a prefix : prefixedHashing(data) = hasher(prefix || data)
+//
+// Prefixes are padded tags till 32 bytes to guarantee prefixedHashers are independant
+// hashers.
+// Prefixes are disabled with the particular tag value ""
 type prefixedHashing struct {
 	hash.Hasher
 	usePrefix bool
 	tag       [flow.DomainTagLength]byte
 }
 
-// paddedDomainTag converts a string into a padded byte array
+// paddedDomainTag converts a string into a padded byte array.
 func paddedDomainTag(s string) ([flow.DomainTagLength]byte, error) {
 	var tag [flow.DomainTagLength]byte
 	if len(s) > flow.DomainTagLength {
@@ -26,7 +31,7 @@ func paddedDomainTag(s string) ([flow.DomainTagLength]byte, error) {
 }
 
 // NewPrefixedHashing returns a new hasher that prefixes the tag for all
-// hash computations.
+// hash computations (only when tag is not empty).
 // Only SHA2 and SHA3 algorithms are supported.
 func NewPrefixedHashing(shaAlgo hash.HashingAlgorithm, tag string) (hash.Hasher, error) {
 
