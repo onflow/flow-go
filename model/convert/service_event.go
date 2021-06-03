@@ -14,7 +14,7 @@ import (
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
-// type to a ServiceEvent type for use within protocol software and protocol
+// type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(event flow.Event) (*flow.ServiceEvent, error) {
 

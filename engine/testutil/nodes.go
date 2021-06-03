@@ -167,6 +167,7 @@ func GenericNodeWithStateFixture(t testing.TB,
 
 // LocalFixture creates and returns a Local module for given identity.
 func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
+
 	// Generates test signing oracle for the nodes
 	// Disclaimer: it should not be used for practical applications
 	//
@@ -174,7 +175,7 @@ func LocalFixture(t testing.TB, identity *flow.Identity) module.Local {
 	seed, err := json.Marshal(identity)
 	require.NoError(t, err)
 	// creates signing key of the node
-	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed[:64])
 	require.NoError(t, err)
 
 	// sets staking public key of the node
@@ -222,6 +223,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
 	transactions := storage.NewTransactions(node.Metrics, node.DB)
 	collections := storage.NewCollections(node.DB, transactions)
+	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.DB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
@@ -280,12 +282,17 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	aggregator.On("VerifyMany", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	aggregator.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
+	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
+		return metrics.NewNoopCollector()
+	}
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
 		aggregator,
 		node.DB,
 		node.State,
+		createMetrics,
+		consensus.WithInitialTimeout(time.Second*2),
 	)
 	require.NoError(t, err)
 
@@ -316,10 +323,13 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	)
 	require.NoError(t, err)
 
+	node.ProtocolEvents.AddConsumer(epochManager)
+
 	return testmock.CollectionNode{
 		GenericNode:        node,
 		Collections:        collections,
 		Transactions:       transactions,
+		ClusterPayloads:    clusterPayloads,
 		IngestionEngine:    ingestionEngine,
 		PusherEngine:       pusherEngine,
 		ProviderEngine:     providerEngine,
