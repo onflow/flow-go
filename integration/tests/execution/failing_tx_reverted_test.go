@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -44,6 +45,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	finalStateBlockB, err := erBlockB.ExecutionResult.FinalStateCommitment()
 	require.NoError(s.T(), err)
 
+	time.Sleep(5 * time.Second)
 	// send transaction that panics and should revert
 	tx := common.SDKTransactionFixture(
 		common.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
