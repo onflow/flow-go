@@ -246,11 +246,11 @@ func (h *handler) GetTransactionResult(
 	if txResult.ErrorMessage != "" {
 		cadenceErrMessage := txResult.ErrorMessage
 		if !utf8.ValidString(cadenceErrMessage) {
-			h.log.Error().
+			h.log.Warn().
 				Str("block_id", blockID.String()).
 				Str("transaction_id", txID.String()).
 				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
-				Msg("invalid character in Cadence error")
+				Msg("invalid character in Cadence error message")
 			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
 			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
 		}
