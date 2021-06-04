@@ -5,9 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/cadence/runtime"
 	"strconv"
 	"testing"
+
+	"github.com/onflow/cadence/runtime"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
@@ -1654,7 +1655,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "cd323b6743f8c72d1b19697aebb0c6c90240c258cd58a2f183c4fde9753143e2", result)
+				require.Equal(t, "4e07609b9a856a5e10703d1dba73be34d9ca0f4e780859d66983f41d746ec8b2", result)
 			},
 		},
 		{
@@ -1664,7 +1665,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "bb7c965165ab02e8196cc2ba1159a3212ed94b8ca27b34698a08bd8f1dcfe2cd5806561e3d66fde304f786069fb89094", result)
+				require.Equal(t, "f9bd89e15f341a225656944dc8b3c405e66a0f97838ad44c9803164c911e677aea7ad4e24486fba3f803d83ed1ccfce5", result)
 			},
 		},
 		{
@@ -1674,7 +1675,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "8cd65b26b10c596628357d9ab47c4730228d27db11580ddd584e490107cb9c76", result)
+				require.Equal(t, "f59e2ccc9d7f008a96948a31573670d9976a4a161601ab1cd1d2da019779a0f6", result)
 			},
 		},
 		{
@@ -1684,7 +1685,7 @@ func TestHashing(t *testing.T) {
 			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
 				require.NoError(t, scriptErr)
 				require.NoError(t, executionErr)
-				require.Equal(t, "8f3d63c56dda4ea9dd638a22bda104b1e272feb11c415ac48f4d3dd1dfd3de5f091a5417501615968d5e3729a74f03fa", result)
+				require.Equal(t, "e7875eafdb53327faeace8478d1650c6547d04fb4fb42f34509ad64bde0267bea7e1b3af8fda3ef9d9c9327dd4e97a96", result)
 			},
 		},
 		{
