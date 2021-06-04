@@ -106,7 +106,7 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 		s.fvss[i].running = false
 		err := s.fvss[i].Start(seed)
 		if err != nil {
-			if _, ok := err.(*InvalidInputsError); ok {
+			if IsInvalidInputsError(err) {
 				newInvalidInputsError(fmt.Sprintf("error when starting dkg: %s", err))
 			}
 			return fmt.Errorf("error when starting dkg: %w", err)
@@ -206,7 +206,7 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
 		if err != nil {
-			if _, ok := err.(*InvalidInputsError); ok {
+			if IsInvalidInputsError(err) {
 				newInvalidInputsError(fmt.Sprintf("handle message has failed: %s", err))
 			}
 			return fmt.Errorf("handle message has failed: %w", err)
@@ -224,7 +224,7 @@ func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)
 		if err != nil {
-			if _, ok := err.(*InvalidInputsError); ok {
+			if IsInvalidInputsError(err) {
 				newInvalidInputsError(fmt.Sprintf("handle message has failed: %s", err))
 			}
 			return fmt.Errorf("handle message has failed: %w", err)
@@ -249,7 +249,7 @@ func (s *JointFeldmanState) ForceDisqualify(node int) error {
 	// disqualify the node in the fvss instance where they are a leader
 	err := s.fvss[node].ForceDisqualify(node)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			newInvalidInputsError(fmt.Sprintf("handle message has failed: %s", err))
 		}
 		return fmt.Errorf("disqualif has failed: %w", err)

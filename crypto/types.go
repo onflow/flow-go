@@ -1,5 +1,7 @@
 package crypto
 
+import "errors"
+
 //revive:disable:var-naming
 
 //go:generate bash ./build_dependency.sh
@@ -108,11 +110,17 @@ type InvalidInputsError struct {
 	message string
 }
 
-// NewAccountAlreadyExistsError constructs a new AccountAlreadyExistsError
+// newInvalidInputsError constructs a new InvalidInputsError
 func newInvalidInputsError(s string) error {
 	return &InvalidInputsError{message: s}
 }
 
 func (e InvalidInputsError) Error() string {
 	return e.message
+}
+
+// IsInvalidInputsError checks if the input error is of a InvalidInputsError type
+func IsInvalidInputsError(err error) bool {
+	var errInvalidInputsError InvalidInputsError
+	return errors.As(err, &errInvalidInputsError)
 }

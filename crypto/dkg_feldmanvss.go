@@ -229,7 +229,7 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return newInvalidInputsError(fmt.Sprintf("generating shares failed: %s", err))
 		}
 		return fmt.Errorf("generating shares failed: %w", err)

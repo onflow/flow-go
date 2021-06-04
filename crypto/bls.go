@@ -212,7 +212,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	var pk PubKeyBLSBLS12381
 	err := readPointG2(&pk.point, publicKeyBytes)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return nil, newInvalidInputsError("the input does not encode a BLS12-381 point")
 		}
 		return nil, errors.New("decode public key failed")

@@ -152,7 +152,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 	// sign
 	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			newInvalidInputsError(fmt.Sprintf("share signature failed: %s", err))
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
@@ -160,7 +160,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 	// add the node own signature
 	valid, err := s.AddShare(s.currentIndex, share)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return nil, newInvalidInputsError(fmt.Sprintf("share signature failed: %s", err))
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
@@ -217,7 +217,7 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 	// stage the share
 	verif, err := s.VerifyAndStageShare(orig, share)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return false, newInvalidInputsError(fmt.Sprintf("add signature failed: %s", err))
 		}
 		return false, fmt.Errorf("add signature failed: %w", err)
@@ -226,7 +226,7 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 		// commit the share
 		err = s.CommitShare()
 		if err != nil {
-			if _, ok := err.(*InvalidInputsError); ok {
+			if IsInvalidInputsError(err) {
 				return true, newInvalidInputsError(fmt.Sprintf("add signature failed: %s", err))
 			}
 			return true, fmt.Errorf("add signature failed: %w", err)
@@ -254,7 +254,7 @@ func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, 
 
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return false, newInvalidInputsError(fmt.Sprintf(
 				"verification of share failed: %s", err))
 		}
@@ -341,7 +341,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// Verify the computed signature
 	verif, err := s.VerifyThresholdSignature(thresholdSignature)
 	if err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return nil, newInvalidInputsError(fmt.Sprintf("verify threshold signature failed: %s", err))
 		}
 		return nil, fmt.Errorf("verify threshold signature failed: %w", err)
@@ -470,7 +470,7 @@ func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 
 	// seed relic
 	if err := seedRelic(seed); err != nil {
-		if _, ok := err.(*InvalidInputsError); ok {
+		if IsInvalidInputsError(err) {
 			return nil, nil, nil, newInvalidInputsError(fmt.Sprintf(
 				"seeding relic failed: %s",
 				err))
