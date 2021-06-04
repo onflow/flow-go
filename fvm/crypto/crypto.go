@@ -16,7 +16,7 @@ const runtimeUserDomainTag = "user"
 type SignatureVerifier interface {
 	Verify(
 		signature []byte,
-		tag []byte,
+		tag string,
 		message []byte,
 		publicKey crypto.PublicKey,
 		hashAlgo hash.HashingAlgorithm,
@@ -31,7 +31,7 @@ func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
 
 func (DefaultSignatureVerifier) Verify(
 	signature []byte,
-	tag []byte,
+	tag string,
 	message []byte,
 	publicKey crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
@@ -48,7 +48,7 @@ func (DefaultSignatureVerifier) Verify(
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(string(tag))
+		hasher = crypto.NewBLSKMAC(tag)
 	default:
 		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 	}
@@ -93,6 +93,8 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 		return crypto.ECDSAP256
 	case runtime.SignatureAlgorithmECDSA_secp256k1:
 		return crypto.ECDSASecp256k1
+	case runtime.SignatureAlgorithmBLS_BLS12_381:
+		return crypto.BLSBLS12381
 	default:
 		return crypto.UnknownSigningAlgorithm
 	}
@@ -105,6 +107,8 @@ func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) runtime.Signatur
 		return runtime.SignatureAlgorithmECDSA_P256
 	case crypto.ECDSASecp256k1:
 		return runtime.SignatureAlgorithmECDSA_secp256k1
+	case crypto.BLSBLS12381:
+		return runtime.SignatureAlgorithmBLS_BLS12_381
 	default:
 		return runtime.SignatureAlgorithmUnknown
 	}
@@ -161,8 +165,16 @@ func VerifySignatureFromRuntime(
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
 	}
-	if sigAlgo == crypto.BLSBLS12381 {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported", crypto.BLSBLS12381.String())
+
+	tag := rawTag
+	// if the tag is `runtimeUserDomainTag` replace it with `flow.UserDomainTag`
+	// this is for backwards compatibility. In the future cadence should send `flow.UserDomainTag` directly
+	if tag == runtimeUserDomainTag {
+		tag = string(flow.UserDomainTag[:])
+	}
+
+	if (sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1) && tag != string(flow.UserDomainTag[:]) {
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported with tag different than %s", sigAlgo.String(), string(flow.UserDomainTag[:]))
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
@@ -173,11 +185,6 @@ func VerifySignatureFromRuntime(
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
 		return false, errors.NewValueErrorf(string(rawPublicKey), "cannot decode public key: %w", err)
-	}
-
-	tag := parseRuntimeDomainTag(rawTag)
-	if tag == nil {
-		return false, errors.NewValueErrorf(string(rawTag), "invalid domain tag")
 	}
 
 	valid, err := verifier.Verify(
@@ -192,12 +199,4 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
-}
-
-func parseRuntimeDomainTag(tag string) []byte {
-	if tag == runtimeUserDomainTag {
-		return flow.UserDomainTag[:]
-	}
-
-	return nil
 }
