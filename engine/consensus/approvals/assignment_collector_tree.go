@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/storage"
@@ -57,6 +59,7 @@ type AssignmentCollectorTree struct {
 	createCollector     NewCollectorFactoryMethod
 	size                uint64
 	lastSealedID        flow.Identifier
+	lastSealedHeight    uint64
 	lastFinalizedHeight uint64
 	headers             storage.Headers
 }
@@ -69,6 +72,7 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 		size:                0,
 		lastSealedID:        lastSealed.ID(),
 		lastFinalizedHeight: lastSealed.Height,
+		lastSealedHeight:    lastSealed.Height,
 		headers:             headers,
 	}
 }
@@ -119,7 +123,57 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 	}
 
 	t.lastFinalizedHeight = finalized.Height
+
+	// WARNING: next block of code implements a special fallback mechanism to recover from sealing halt.
+	// CONTEXT: as blocks are incorporated into chain they are picked up by sealing.Core and added to AssignmentCollectorTree
+	// by definition all blocks should be reported to sealing.Core and that's why all results should be saved in AssignmentCollectorTree.
+	// When finalization kicks in we must have a finalized processable fork of assignment collectors.
+	// Next section checks if we indeed have a finalized fork, starting from last finalized seal. By definition it has to be
+	// processable. If it's not then we have a critical bug which results in blocks being missed by sealing.Core.
+	// TODO: remove this at some point when this logic matures.
+	if t.lastSealedHeight < sealed.Height {
+		finalizedFork, err := t.selectFinalizedFork(sealed.Height+1, finalized.Height)
+		if err != nil {
+			return fmt.Errorf("could not select finalized fork: %w", err)
+		}
+
+		if len(finalizedFork) > 0 {
+			if !finalizedFork[0].processable {
+				log.Error().Msgf("AssignmentCollectorTree has found not processable finalized fork %v,"+
+					" this is unexpected and shouldn't happen, recovering", finalizedFork[0].collector.BlockID())
+				for _, vertex := range finalizedFork {
+					vertex.processable = true
+				}
+				t.markForkProcessable(finalizedFork[len(finalizedFork)-1], true)
+			}
+		}
+
+		t.lastSealedHeight = sealed.Height
+	}
+
 	return nil
+}
+
+// selectFinalizedFork traverses chain of collectors starting from some height and picks every collector which executed
+// block was finalized
+func (t *AssignmentCollectorTree) selectFinalizedFork(startHeight, finalizedHeight uint64) ([]*assignmentCollectorVertex, error) {
+	var fork []*assignmentCollectorVertex
+	for height := startHeight; height <= finalizedHeight; height++ {
+		iter := t.forest.GetVerticesAtLevel(height)
+		finalizedBlock, err := t.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve finalized block at height %d: %w", height, err)
+		}
+		finalizedBlockID := finalizedBlock.ID()
+		for iter.HasNext() {
+			vertex := iter.NextVertex().(*assignmentCollectorVertex)
+			if finalizedBlockID == vertex.collector.BlockID() {
+				fork = append(fork, vertex)
+				break
+			}
+		}
+	}
+	return fork, nil
 }
 
 // markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
@@ -254,5 +308,6 @@ func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifi
 		return nil, fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
 	t.size -= uint64(len(pruned))
+
 	return pruned, nil
 }

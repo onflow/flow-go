@@ -21,9 +21,10 @@ type IncorporatedResultSeals struct {
 }
 
 // NewIncorporatedResultSeals creates a mempool for the incorporated result seals
-func NewIncorporatedResultSeals(mempool mempool.IncorporatedResultSeals) *IncorporatedResultSeals {
+func NewIncorporatedResultSeals(mempool mempool.IncorporatedResultSeals, receiptsDB storage.ExecutionReceipts) *IncorporatedResultSeals {
 	return &IncorporatedResultSeals{
-		seals: mempool,
+		seals:      mempool,
+		receiptsDB: receiptsDB,
 	}
 }
 
@@ -74,9 +75,19 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 	return seal, true
 }
 
+// Limit returns the size limit of the mempool
+func (ir *IncorporatedResultSeals) Limit() uint {
+	return ir.seals.Limit()
+}
+
 // Rem removes an IncorporatedResultSeal from the mempool
 func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 	return ir.seals.Rem(id)
+}
+
+// Size returns the number of items in the mempool
+func (ir *IncorporatedResultSeals) Size() uint {
+	return ir.seals.Size()
 }
 
 // Clear removes all entities from the pool.

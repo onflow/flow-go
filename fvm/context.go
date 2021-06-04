@@ -12,31 +12,30 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                            flow.Chain
-	Blocks                           Blocks
-	Metrics                          handler.MetricsReporter
-	Tracer                           module.Tracer
-	GasLimit                         uint64
-	MaxStateKeySize                  uint64
-	MaxStateValueSize                uint64
-	MaxStateInteractionSize          uint64
-	EventCollectionByteSizeLimit     uint64
-	MaxNumOfTxRetries                uint8
-	BlockHeader                      *flow.Header
-	ServiceAccountEnabled            bool
-	RestrictedAccountCreationEnabled bool
-	RestrictedDeploymentEnabled      bool
-	LimitAccountStorage              bool
-	TransactionFeesEnabled           bool
-	CadenceLoggingEnabled            bool
-	EventCollectionEnabled           bool
-	ServiceEventCollectionEnabled    bool
-	AccountFreezeAvailable           bool
-	ExtensiveTracing                 bool
-	SignatureVerifier                crypto.SignatureVerifier
-	TransactionProcessors            []TransactionProcessor
-	ScriptProcessors                 []ScriptProcessor
-	Logger                           zerolog.Logger
+	Chain                         flow.Chain
+	Blocks                        Blocks
+	Metrics                       handler.MetricsReporter
+	Tracer                        module.Tracer
+	GasLimit                      uint64
+	MaxStateKeySize               uint64
+	MaxStateValueSize             uint64
+	MaxStateInteractionSize       uint64
+	EventCollectionByteSizeLimit  uint64
+	MaxNumOfTxRetries             uint8
+	BlockHeader                   *flow.Header
+	ServiceAccountEnabled         bool
+	RestrictedDeploymentEnabled   bool
+	LimitAccountStorage           bool
+	TransactionFeesEnabled        bool
+	CadenceLoggingEnabled         bool
+	EventCollectionEnabled        bool
+	ServiceEventCollectionEnabled bool
+	AccountFreezeAvailable        bool
+	ExtensiveTracing              bool
+	SignatureVerifier             crypto.SignatureVerifier
+	TransactionProcessors         []TransactionProcessor
+	ScriptProcessors              []ScriptProcessor
+	Logger                        zerolog.Logger
 }
 
 // NewContext initializes a new execution context with the provided options.
@@ -67,26 +66,25 @@ const (
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                            flow.Mainnet.Chain(),
-		Blocks:                           nil,
-		Metrics:                          &handler.NoopMetricsReporter{},
-		Tracer:                           nil,
-		GasLimit:                         DefaultGasLimit,
-		MaxStateKeySize:                  state.DefaultMaxKeySize,
-		MaxStateValueSize:                state.DefaultMaxValueSize,
-		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
-		BlockHeader:                      nil,
-		ServiceAccountEnabled:            true,
-		RestrictedAccountCreationEnabled: true,
-		RestrictedDeploymentEnabled:      true,
-		CadenceLoggingEnabled:            false,
-		EventCollectionEnabled:           true,
-		ServiceEventCollectionEnabled:    false,
-		AccountFreezeAvailable:           false,
-		ExtensiveTracing:                 false,
-		SignatureVerifier:                crypto.NewDefaultSignatureVerifier(),
+		Chain:                         flow.Mainnet.Chain(),
+		Blocks:                        nil,
+		Metrics:                       &handler.NoopMetricsReporter{},
+		Tracer:                        nil,
+		GasLimit:                      DefaultGasLimit,
+		MaxStateKeySize:               state.DefaultMaxKeySize,
+		MaxStateValueSize:             state.DefaultMaxValueSize,
+		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
+		BlockHeader:                   nil,
+		ServiceAccountEnabled:         true,
+		RestrictedDeploymentEnabled:   true,
+		CadenceLoggingEnabled:         false,
+		EventCollectionEnabled:        true,
+		ServiceEventCollectionEnabled: false,
+		AccountFreezeAvailable:        false,
+		ExtensiveTracing:              false,
+		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -252,15 +250,6 @@ func WithRestrictedDeployment(enabled bool) Option {
 func WithCadenceLogging(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.CadenceLoggingEnabled = enabled
-		return ctx
-	}
-}
-
-// WithRestrictedAccountCreation enables or disables restricted account creation for a
-// virtual machine context
-func WithRestrictedAccountCreation(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.RestrictedAccountCreationEnabled = enabled
 		return ctx
 	}
 }
