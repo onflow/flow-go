@@ -218,10 +218,10 @@ func CreateAccountsWithSimpleAddresses(
 				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
-
+		}
+		if addr == flow.EmptyAddress {
 			return nil, errors.New("no account creation event emitted")
 		}
-
 		accounts = append(accounts, addr)
 	}
 

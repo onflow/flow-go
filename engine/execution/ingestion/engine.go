@@ -239,7 +239,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.Pending()
+	pendings, err := finalized.Descendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -1078,7 +1078,11 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID, blockID, result.Events[i].Hash())
+		eventsHash, err := result.Events[i].Hash()
+		if err != nil {
+			return nil, fmt.Errorf("error while calculating events collection hash: %w", err)
+		}
+		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
 
 		// chunkDataPack
 		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])

@@ -116,7 +116,7 @@ func withConsumer(
 	withBlockConsumer func(*blockconsumer.BlockConsumer, []*flow.Block),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		maxProcessing := int64(workerCount)
+		maxProcessing := uint64(workerCount)
 
 		processedHeight := bstorage.NewConsumerProgress(db, module.ConsumeProgressVerificationBlockHeight)
 		collector := &metrics.NoopCollector{}

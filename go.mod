@@ -8,6 +8,7 @@ require (
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
@@ -36,8 +37,8 @@ require (
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.16.0
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.2
+	github.com/onflow/cadence v0.16.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.12.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0

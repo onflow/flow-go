@@ -52,8 +52,13 @@ func (s Snapshot) SealingSegment() ([]*flow.Block, error) {
 	return s.enc.SealingSegment, nil
 }
 
-func (s Snapshot) Pending() ([]flow.Identifier, error) {
-	// canonical snapshots don't have any pending blocks
+func (s Snapshot) Descendants() ([]flow.Identifier, error) {
+	// canonical snapshots don't have any descendants
+	return nil, nil
+}
+
+func (s Snapshot) ValidDescendants() ([]flow.Identifier, error) {
+	// canonical snapshots don't have any descendants
 	return nil, nil
 }
 

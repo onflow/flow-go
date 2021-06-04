@@ -35,6 +35,12 @@ jobs:
       uses: actions/checkout@v2
     - name: Run tests
       run: make ci
+    - name: Upload coverage report
+      uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.txt
+        flags: unittests
+        name: codecov-umbrella
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest

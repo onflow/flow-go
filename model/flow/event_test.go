@@ -79,11 +79,19 @@ func TestEventsList(t *testing.T) {
 		eventC,
 	}
 
+	ABHash, err := listAB.Hash()
+	assert.NoError(t, err)
+	ACHash, err := listAC.Hash()
+	assert.NoError(t, err)
+	BAHash, err := listBA.Hash()
+	assert.NoError(t, err)
+
 	t.Run("different events have different hash", func(t *testing.T) {
-		assert.NotEqual(t, listAB.Hash(), listAC.Hash())
+
+		assert.NotEqual(t, ABHash, ACHash)
 	})
 
-	t.Run("order doesnt matter", func(t *testing.T) {
-		assert.Equal(t, listAB.Hash(), listBA.Hash())
+	t.Run("order does matter", func(t *testing.T) {
+		assert.NotEqual(t, ABHash, BAHash)
 	})
 }
