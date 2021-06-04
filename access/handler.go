@@ -3,11 +3,11 @@ package access
 import (
 	"context"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -458,10 +458,7 @@ func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result
 	for i, event := range block.Events {
 		eventMessages[i] = convert.EventToMessage(event)
 	}
-	timestamp, err := ptypes.TimestampProto(block.BlockTimestamp)
-	if err != nil {
-		return nil, err
-	}
+	timestamp := timestamppb.New(block.BlockTimestamp)
 	return &access.EventsResponse_Result{
 		BlockId:        block.BlockID[:],
 		BlockHeight:    block.BlockHeight,
