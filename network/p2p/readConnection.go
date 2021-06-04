@@ -79,7 +79,7 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 				rc.closeStream()
 				return
 			}
-			rc.log.Error().Err(err)
+			rc.log.Error().Err(err).Msg("failed to read message")
 			rc.resetStream()
 			return
 		}
