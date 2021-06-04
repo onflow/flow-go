@@ -21,7 +21,7 @@ import (
 
 var (
 	flagBootDir string
-	flagPayout uint64
+	flagPayout  uint64
 )
 
 type TransactionArguments = []interface{}
@@ -139,8 +139,6 @@ func convertResetEpochArgs(randomSource []byte, payout, firstView, finalView uin
 			log.Fatal().Err(err).Msg("could not convert payout to cadence type")
 		}
 		args = append(args, cdcPayout)
-	} else {
-		cdcPayout = nil
 	}
 
 	// add first view
@@ -158,7 +156,7 @@ func encodeArgs(args []cadence.Value) []byte {
 	arguments := make([]interface{}, 0, len(args))
 
 	for index, cdcVal := range args {
-		
+
 		encoded, err := jsoncdc.Encode(cdcVal)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not encode cadence arguments")
@@ -167,13 +165,13 @@ func encodeArgs(args []cadence.Value) []byte {
 		var arg interface{}
 		err = json.Unmarshal(encoded, &arg)
 		if err != nil {
-			log.Fatal().Err(err).Msg("could not unmarshal cadence arguments")	
+			log.Fatal().Err(err).Msg("could not unmarshal cadence arguments")
 		}
 
 		arguments[index] = arg
 	}
 
-	bz, err := json.Marshal(arguments)	
+	bz, err := json.Marshal(arguments)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not marshal interface")
 	}
