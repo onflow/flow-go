@@ -238,7 +238,7 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
-				approvals.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				seals,
 				config,
 			)
 

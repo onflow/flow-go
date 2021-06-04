@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/storage"
@@ -37,6 +39,7 @@ type AssignmentCollectorTree struct {
 	createCollector     NewCollectorFactoryMethod
 	size                uint64
 	lastSealedID        flow.Identifier
+	lastSealedHeight    uint64
 	lastFinalizedHeight uint64
 	headers             storage.Headers
 }
@@ -49,6 +52,7 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 		size:                0,
 		lastSealedID:        lastSealed.ID(),
 		lastFinalizedHeight: lastSealed.Height,
+		lastSealedHeight:    lastSealed.Height,
 		headers:             headers,
 	}
 }
@@ -99,7 +103,48 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 	}
 
 	t.lastFinalizedHeight = finalized.Height
+
+	// we have a new sealed block, need to update collectors
+	if t.lastSealedHeight < sealed.Height {
+		finalizedFork, err := t.selectFinalizedFork(sealed.Height+1, finalized.Height)
+		if err != nil {
+			return fmt.Errorf("could not select finalized fork: %w", err)
+		}
+
+		if len(finalizedFork) > 0 {
+			if !finalizedFork[0].processable {
+				log.Error().Msgf("AssignmentCollectorTree has found not processable finalized fork, this is unexpected")
+				for _, vertex := range finalizedFork {
+					vertex.processable = true
+				}
+				t.markForkProcessable(finalizedFork[len(finalizedFork)-1], true)
+			}
+		}
+
+		t.lastSealedHeight = sealed.Height
+	}
+
 	return nil
+}
+
+func (t *AssignmentCollectorTree) selectFinalizedFork(startHeight, finalizedHeight uint64) ([]*assignmentCollectorVertex, error) {
+	var fork []*assignmentCollectorVertex
+	for height := startHeight; height <= finalizedHeight; height++ {
+		iter := t.forest.GetVerticesAtLevel(height)
+		finalizedBlock, err := t.headers.ByHeight(height)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve finalized block at height %d: %w", height, err)
+		}
+		finalizedBlockID := finalizedBlock.ID()
+		for iter.HasNext() {
+			vertex := iter.NextVertex().(*assignmentCollectorVertex)
+			if finalizedBlockID == vertex.collector.BlockID() {
+				fork = append(fork, vertex)
+				break
+			}
+		}
+	}
+	return fork, nil
 }
 
 // markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
@@ -237,5 +282,6 @@ func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifi
 		return nil, fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
 	t.size -= uint64(len(pruned))
+
 	return pruned, nil
 }

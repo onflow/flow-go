@@ -781,3 +781,82 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		require.True(s.T(), collector.Processable)
 	}
 }
+
+// TestProcessFinalizedBlock_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
+// after parent block gets sealed. More specifically this case:
+// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
+//               <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
+//                     |
+//                 finalized
+// Initially P was executed,  B is finalized and incorporates ER for A, C incorporates ER for B, D was forked from
+// A but wasn't finalized, E incorporates ER for D.
+// Let's take a case where we have collectors for ER incorporated in blocks B, C, D, E. Since we don't
+// have a collector for A, {B, C, D, E} are not processable. Test that when A becomes sealed {B, C, D} become processable
+// but E is unprocessable since D wasn't part of finalized fork.
+// TODO: move this test to assignment_collector_tree_test when implemented an interface for assignment collectors.
+func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_ProcessableAfterSealedParent() {
+	s.identitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
+	// two forks
+	forks := make([][]*flow.Block, 2)
+	results := make([][]*flow.IncorporatedResult, 2)
+	for i := 0; i < len(forks); i++ {
+		fork := unittest.ChainFixtureFrom(3, &s.IncorporatedBlock)
+		forks[i] = fork
+		prevResult := s.IncorporatedResult.Result
+		// create execution results for all blocks except last one, since it won't be valid by definition
+		for _, block := range fork {
+			blockID := block.ID()
+
+			// create execution result for previous block in chain
+			// this result will be incorporated in current block.
+			result := unittest.ExecutionResultFixture(
+				unittest.WithPreviousResult(*prevResult),
+			)
+			result.BlockID = block.Header.ParentID
+
+			// update caches
+			s.blocks[blockID] = block.Header
+			s.identitiesCache[blockID] = s.AuthorizedVerifiers
+
+			IR := unittest.IncorporatedResult.Fixture(
+				unittest.IncorporatedResult.WithResult(result),
+				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
+
+			results[i] = append(results[i], IR)
+
+			err := s.core.ProcessIncorporatedResult(IR)
+			require.NoError(s.T(), err)
+
+			_, processable := s.core.collectorTree.GetCollector(IR.Result.ID())
+			require.False(s.T(), processable)
+
+			prevResult = result
+		}
+	}
+
+	finalized := forks[0][0].Header
+
+	// A becomes sealed
+	s.sealsDB.On("ByBlockID", finalized.ID()).Return(
+		unittest.Seal.Fixture(
+			unittest.Seal.WithBlock(&s.Block)), nil)
+
+	s.markFinalized(&s.IncorporatedBlock)
+	s.markFinalized(finalized)
+
+	// B becomes finalized
+	err := s.core.ProcessFinalizedBlock(finalized.ID())
+	require.NoError(s.T(), err)
+
+	// at this point collectors for forks[0] should be processable and for forks[1] not
+	for forkIndex := range forks {
+		for _, result := range results[forkIndex][1:] {
+			_, processable := s.core.collectorTree.GetCollector(result.Result.ID())
+			if forkIndex == 0 {
+				require.True(s.T(), processable)
+			} else {
+				require.False(s.T(), processable)
+			}
+		}
+	}
+}
