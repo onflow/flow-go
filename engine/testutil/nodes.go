@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -236,13 +237,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
-	results, err := stdmap.NewIncorporatedResults(1000)
-	require.NoError(t, err)
-
 	receipts := consensusMempools.NewExecutionTree()
-
-	approvals, err := stdmap.NewApprovals(1000)
-	require.NoError(t, err)
 
 	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
 	pendingReceipts := stdmap.NewPendingReceipts(1000)
@@ -261,41 +256,64 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
 		signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
+
+	approvalVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+	sealingConfig := sealing.DefaultConfig()
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
-		node.Metrics,
 		node.Tracer,
 		node.Metrics,
 		node.Metrics,
+		node.Metrics,
 		node.Net,
-		node.State,
 		node.Me,
-		receiptRequester,
-		receiptsDB,
 		node.Headers,
-		node.Index,
-		results,
-		receipts,
-		approvals,
-		seals,
-		pendingReceipts,
+		node.Payloads,
+		node.State,
+		node.Seals,
 		assigner,
+		approvalVerifier,
+		seals,
+		sealingConfig)
+	require.NoError(t, err)
+
+	matchingConfig := matching.DefaultConfig()
+
+	matchingCore := matching.NewCore(
+		node.Log,
+		node.Tracer,
+		node.Metrics,
+		node.Metrics,
+		node.State,
+		node.Headers,
+		receiptsDB,
+		receipts,
+		pendingReceipts,
+		seals,
 		receiptValidator,
-		approvalValidator,
-		validation.DefaultRequiredApprovalsForSealValidation,
-		sealing.DefaultEmergencySealingActive)
-	require.Nil(t, err)
+		receiptRequester,
+		matchingConfig)
+
+	matchingEngine, err := matching.NewEngine(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.Metrics,
+		node.Metrics,
+		matchingCore,
+	)
+	require.NoError(t, err)
 
 	return testmock.ConsensusNode{
 		GenericNode:     node,
 		Guarantees:      guarantees,
-		Approvals:       approvals,
 		Receipts:        receipts,
 		Seals:           seals,
 		IngestionEngine: ingestionEngine,
 		SealingEngine:   sealingEngine,
+		MatchingEngine:  matchingEngine,
 	}
 }
 

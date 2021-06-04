@@ -73,7 +73,7 @@ func GetStorageCapacityScript(accountAddress, serviceAddress flow.Address) []byt
 const setupFeesTransactionTemplate = `
 import FlowStorageFees, FlowServiceAccount from 0x%s
 
-transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageReservation: UFix64, storageMegaBytesPerReservedFLOW: UFix64) {
+transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageReservation: UFix64, storageMegaBytesPerReservedFLOW: UFix64, restrictedAccountCreationEnabled: Bool) {
     prepare(service: AuthAccount) {
         let serviceAdmin = service.borrow<&FlowServiceAccount.Administrator>(from: /storage/flowServiceAdmin)
             ?? panic("Could not borrow reference to the flow service admin!");
@@ -83,6 +83,7 @@ transaction(transactionFee: UFix64, accountCreationFee: UFix64, minimumStorageRe
 
         serviceAdmin.setTransactionFee(transactionFee)
         serviceAdmin.setAccountCreationFee(accountCreationFee)
+        serviceAdmin.setIsAccountCreationRestricted(restrictedAccountCreationEnabled)
         storageAdmin.setMinimumStorageReservation(minimumStorageReservation)
         storageAdmin.setStorageMegaBytesPerReservedFLOW(storageMegaBytesPerReservedFLOW)
     }
@@ -95,6 +96,7 @@ func SetupFeesTransaction(
 	addressCreationFee,
 	minimumStorageReservation,
 	storagePerFlow cadence.UFix64,
+	restrictedAccountCreationEnabled cadence.Bool,
 ) *flow.TransactionBody {
 	transactionFeeArg, err := jsoncdc.Encode(transactionFee)
 	if err != nil {
@@ -112,6 +114,10 @@ func SetupFeesTransaction(
 	if err != nil {
 		panic(fmt.Sprintf("failed to encode storage ratio: %s", err.Error()))
 	}
+	restrictedAccountCreationEnabledArg, err := jsoncdc.Encode(restrictedAccountCreationEnabled)
+	if err != nil {
+		panic(fmt.Sprintf("failed to encode restrictedAccountCreationEnabled: %s", err.Error()))
+	}
 
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(setupFeesTransactionTemplate, service))).
@@ -119,6 +125,7 @@ func SetupFeesTransaction(
 		AddArgument(addressCreationFeeArg).
 		AddArgument(minimumStorageReservationArg).
 		AddArgument(storagePerFlowArg).
+		AddArgument(restrictedAccountCreationEnabledArg).
 		AddAuthorizer(service)
 }
 
