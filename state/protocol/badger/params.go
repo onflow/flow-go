@@ -22,6 +22,14 @@ func (p *Params) ChainID() (flow.ChainID, error) {
 	return root.ChainID, nil
 }
 
+func (p *Params) SporkID() (flow.Identifier, error) {
+	panic("not implemented")
+}
+
+func (p *Params) ProtocolVersion() (uint, error) {
+	panic("not implemented")
+}
+
 func (p *Params) Root() (*flow.Header, error) {
 
 	// retrieve the root height

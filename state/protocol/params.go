@@ -13,6 +13,8 @@ type Params interface {
 }
 
 // InstanceParams represents protocol state parameters that vary between instances.
+// For example, two nodes both running in the same spork on Flow Mainnet may have
+// different instance params.
 type InstanceParams interface {
 
 	// Root returns the root header of the current protocol state. This will be
@@ -27,6 +29,8 @@ type InstanceParams interface {
 }
 
 // GlobalParams represents protocol state parameters that do not vary between instances.
+// Any nodes running in the same spork, on the same network (same chain ID) must
+// have the same global params.
 type GlobalParams interface {
 
 	// ChainID returns the chain ID for the current Flow network.
