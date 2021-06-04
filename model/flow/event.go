@@ -46,11 +46,6 @@ func (e Event) ID() Identifier {
 	return MakeID(wrapEventID(e))
 }
 
-// Body returns the body of the execution receipt.
-//func (e *Event) Body() interface{} {
-//	return wrapEventID(*e)
-//}
-
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
 	w := wrapEventID(e)

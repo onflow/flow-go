@@ -1080,7 +1080,7 @@ func (e *Engine) saveExecutionResults(
 
 		eventsHash, err := result.Events[i].Hash()
 		if err != nil {
-
+			return nil, fmt.Errorf("error while calculating events collection hash: %w", err)
 		}
 		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
 
