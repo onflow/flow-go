@@ -186,7 +186,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
 	}
 
-	eventsHash := events.Hash()
+	eventsHash, err := events.Hash()
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
+	}
 	if chunk.EventCollection != eventsHash {
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
 	}
