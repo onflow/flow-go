@@ -22,6 +22,23 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const (
+	// DefaultRequestInterval is the time interval that requester engine tries requesting chunk data packs.
+	DefaultRequestInterval = 1000 * time.Millisecond
+
+	// DefaultBackoffMultiplier is the base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
+	DefaultBackoffMultiplier = float64(2)
+
+	// DefaultBackoffMinInterval is the minimum time interval a chunk data pack request waits before dispatching.
+	DefaultBackoffMinInterval = 1000 * time.Millisecond
+
+	// DefaultBackoffMaxInterval is the maximum time interval a chunk data pack request waits before dispatching.
+	DefaultBackoffMaxInterval = 1 * time.Minute
+
+	// DefaultRequestTargets is the  maximum number of execution nodes a chunk data pack request is dispatched to.
+	DefaultRequestTargets = 2
+)
+
 // Engine implements a ChunkDataPackRequester that is responsible of receiving chunk data pack requests,
 // dispatching it to the execution nodes, receiving the requested chunk data pack from execution nodes,
 // and passing it to the registered handler.
@@ -41,7 +58,7 @@ type Engine struct {
 
 	// internal logic
 	retryInterval    time.Duration                          // determines time in milliseconds for retrying chunk data requests.
-	requestTargets   uint                                   // maximum number of execution nodes being asked for a chunk data pack.
+	requestTargets   uint64                                 // maximum number of execution nodes being asked for a chunk data pack.
 	pendingRequests  mempool.ChunkRequests                  // used to track requested chunks.
 	reqQualifierFunc RequestQualifierFunc                   // used to decide whether to dispatch a request at a certain cycle.
 	reqUpdaterFunc   mempool.ChunkRequestHistoryUpdaterFunc // used to atomically update chunk request info on mempool.
@@ -56,7 +73,7 @@ func New(log zerolog.Logger,
 	retryInterval time.Duration,
 	reqQualifierFunc RequestQualifierFunc,
 	reqUpdaterFunc mempool.ChunkRequestHistoryUpdaterFunc,
-	requestTargets uint) (*Engine, error) {
+	requestTargets uint64) (*Engine, error) {
 
 	e := &Engine{
 		log:              log.With().Str("engine", "requester").Logger(),
@@ -116,10 +133,6 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 
 // Ready initializes the engine and returns a channel that is closed when the initialization is done.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.handler == nil {
-		e.log.Fatal().Msg("could not start requester engine with missing chunk data pack handler")
-	}
-
 	delay := time.Duration(0)
 	// run a periodic check to retry requesting chunk data packs.
 	// if onTimer takes longer than retryInterval, the next call will be blocked until the previous

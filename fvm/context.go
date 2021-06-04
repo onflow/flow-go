@@ -1,9 +1,10 @@
 package fvm
 
 import (
-	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -11,35 +12,31 @@ import (
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
-	Chain                            flow.Chain
-	Blocks                           Blocks
-	Metrics                          *MetricsCollector
-	Tracer                           module.Tracer
-	GasLimit                         uint64
-	MaxStateKeySize                  uint64
-	MaxStateValueSize                uint64
-	MaxStateInteractionSize          uint64
-	EventCollectionByteSizeLimit     uint64
-	MaxNumOfTxRetries                uint8
-	BlockHeader                      *flow.Header
-	ServiceAccountEnabled            bool
-	RestrictedAccountCreationEnabled bool
-	RestrictedDeploymentEnabled      bool
-	LimitAccountStorage              bool
-	TransactionFeesEnabled           bool
-	CadenceLoggingEnabled            bool
-	EventCollectionEnabled           bool
-	ServiceEventCollectionEnabled    bool
-	AccountFreezeAvailable           bool
-	ExtensiveTracing                 bool
-	SignatureVerifier                SignatureVerifier
-	TransactionProcessors            []TransactionProcessor
-	ScriptProcessors                 []ScriptProcessor
-	Logger                           zerolog.Logger
+	Chain                         flow.Chain
+	Blocks                        Blocks
+	Metrics                       handler.MetricsReporter
+	Tracer                        module.Tracer
+	GasLimit                      uint64
+	MaxStateKeySize               uint64
+	MaxStateValueSize             uint64
+	MaxStateInteractionSize       uint64
+	EventCollectionByteSizeLimit  uint64
+	MaxNumOfTxRetries             uint8
+	BlockHeader                   *flow.Header
+	ServiceAccountEnabled         bool
+	RestrictedDeploymentEnabled   bool
+	LimitAccountStorage           bool
+	TransactionFeesEnabled        bool
+	CadenceLoggingEnabled         bool
+	EventCollectionEnabled        bool
+	ServiceEventCollectionEnabled bool
+	AccountFreezeAvailable        bool
+	ExtensiveTracing              bool
+	SignatureVerifier             crypto.SignatureVerifier
+	TransactionProcessors         []TransactionProcessor
+	ScriptProcessors              []ScriptProcessor
+	Logger                        zerolog.Logger
 }
-
-// SetValueHandler receives a value written by the Cadence runtime.
-type SetValueHandler func(owner flow.Address, key string, value cadence.Value) error
 
 // NewContext initializes a new execution context with the provided options.
 func NewContext(logger zerolog.Logger, opts ...Option) Context {
@@ -69,26 +66,25 @@ const (
 
 func defaultContext(logger zerolog.Logger) Context {
 	return Context{
-		Chain:                            flow.Mainnet.Chain(),
-		Blocks:                           nil,
-		Metrics:                          nil,
-		Tracer:                           nil,
-		GasLimit:                         DefaultGasLimit,
-		MaxStateKeySize:                  state.DefaultMaxKeySize,
-		MaxStateValueSize:                state.DefaultMaxValueSize,
-		MaxStateInteractionSize:          state.DefaultMaxInteractionSize,
-		EventCollectionByteSizeLimit:     DefaultEventCollectionByteSizeLimit,
-		MaxNumOfTxRetries:                DefaultMaxNumOfTxRetries,
-		BlockHeader:                      nil,
-		ServiceAccountEnabled:            true,
-		RestrictedAccountCreationEnabled: true,
-		RestrictedDeploymentEnabled:      true,
-		CadenceLoggingEnabled:            false,
-		EventCollectionEnabled:           true,
-		ServiceEventCollectionEnabled:    false,
-		AccountFreezeAvailable:           false,
-		ExtensiveTracing:                 false,
-		SignatureVerifier:                NewDefaultSignatureVerifier(),
+		Chain:                         flow.Mainnet.Chain(),
+		Blocks:                        nil,
+		Metrics:                       &handler.NoopMetricsReporter{},
+		Tracer:                        nil,
+		GasLimit:                      DefaultGasLimit,
+		MaxStateKeySize:               state.DefaultMaxKeySize,
+		MaxStateValueSize:             state.DefaultMaxValueSize,
+		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
+		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
+		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
+		BlockHeader:                   nil,
+		ServiceAccountEnabled:         true,
+		RestrictedDeploymentEnabled:   true,
+		CadenceLoggingEnabled:         false,
+		EventCollectionEnabled:        true,
+		ServiceEventCollectionEnabled: false,
+		AccountFreezeAvailable:        false,
+		ExtensiveTracing:              false,
+		SignatureVerifier:             crypto.NewDefaultSignatureVerifier(),
 		TransactionProcessors: []TransactionProcessor{
 			NewTransactionAccountFrozenChecker(),
 			NewTransactionSignatureVerifier(AccountKeyWeightThreshold),
@@ -203,12 +199,14 @@ func WithBlocks(blocks Blocks) Option {
 	}
 }
 
-// WithMetricsCollector sets the metrics collector for a virtual machine context.
+// WithMetricsReporter sets the metrics collector for a virtual machine context.
 //
 // A metrics collector is used to gather metrics reported by the Cadence runtime.
-func WithMetricsCollector(mc *MetricsCollector) Option {
+func WithMetricsReporter(mr handler.MetricsReporter) Option {
 	return func(ctx Context) Context {
-		ctx.Metrics = mc
+		if mr != nil {
+			ctx.Metrics = mr
+		}
 		return ctx
 	}
 }
@@ -252,15 +250,6 @@ func WithRestrictedDeployment(enabled bool) Option {
 func WithCadenceLogging(enabled bool) Option {
 	return func(ctx Context) Context {
 		ctx.CadenceLoggingEnabled = enabled
-		return ctx
-	}
-}
-
-// WithRestrictedAccountCreation enables or disables restricted account creation for a
-// virtual machine context
-func WithRestrictedAccountCreation(enabled bool) Option {
-	return func(ctx Context) Context {
-		ctx.RestrictedAccountCreationEnabled = enabled
 		return ctx
 	}
 }

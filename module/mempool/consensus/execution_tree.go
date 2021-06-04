@@ -84,9 +84,9 @@ func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block
 	return vertex.(*ReceiptsOfSameResult), nil
 }
 
-// Add the given execution receipt to the memory pool. Requires height
-// of the block the receipt is for. We enforce data consistency on an API
-// level by using the block header as input.
+// AddReceipt adds the given execution receipt to the memory pool. Requires
+// height of the block the receipt is for. We enforce data consistency on
+// an API level by using the block header as input.
 func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
 	et.Lock()
 	defer et.Unlock()
@@ -189,11 +189,13 @@ func (et *ExecutionTree) PruneUpToHeight(limit uint64) error {
 
 	// count how many receipts are stored in the Execution Tree that will be removed
 	numberReceiptsRemoved := uint(0)
-	for l := et.forest.LowestLevel; l < limit; l++ {
-		iterator := et.forest.GetVerticesAtLevel(l)
-		for iterator.HasNext() {
-			vertex := iterator.NextVertex()
-			numberReceiptsRemoved += vertex.(*ReceiptsOfSameResult).Size()
+	if et.size > 0 {
+		for l := et.forest.LowestLevel; l < limit; l++ {
+			iterator := et.forest.GetVerticesAtLevel(l)
+			for iterator.HasNext() {
+				vertex := iterator.NextVertex()
+				numberReceiptsRemoved += vertex.(*ReceiptsOfSameResult).Size()
+			}
 		}
 	}
 
