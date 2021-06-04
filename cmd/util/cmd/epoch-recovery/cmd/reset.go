@@ -136,10 +136,10 @@ func convertResetEpochArgs(randomSource []byte, payout, firstView, finalView uin
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not convert payout to cadence type")
 		}
-		args = append(args, cdcPayout)
 	} else {
 		cdcPayout = cadence.NewOptional(nil)
 	}
+	args = append(args, cdcPayout)
 
 	// add first view
 	args = append(args, cadence.NewUInt64(firstView))
