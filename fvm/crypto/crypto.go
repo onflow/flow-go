@@ -61,7 +61,7 @@ func (DefaultSignatureVerifier) Verify(
 	return valid, nil
 }
 
-func Hash(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
+func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
 	var hasher hash.Hasher
 
 	switch hashAlgo {
