@@ -185,10 +185,10 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	}
 
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
-			orig))
+			orig)
 	}
 
 	// In case a message is received by the origin node,
@@ -229,10 +229,10 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"invalid origin, should be positive less than %d, got %d",
 			s.Size(),
-			orig))
+			orig)
 	}
 
 	// In case a private message is received by the origin node,
@@ -270,9 +270,9 @@ func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"invalid origin input, should be less than %d, got %d",
-			s.Size(), node))
+			s.Size(), node)
 	}
 	if index(node) == s.leaderIndex {
 		s.disqualified = true

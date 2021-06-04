@@ -1,6 +1,9 @@
 package crypto
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 //revive:disable:var-naming
 
@@ -111,8 +114,8 @@ type InvalidInputsError struct {
 }
 
 // newInvalidInputsError constructs a new InvalidInputsError
-func newInvalidInputsError(s string) error {
-	return &InvalidInputsError{message: s}
+func newInvalidInputsError(msg string, args ...interface{}) error {
+	return &InvalidInputsError{message: fmt.Sprintf(msg, args...)}
 }
 
 func (e InvalidInputsError) Error() string {

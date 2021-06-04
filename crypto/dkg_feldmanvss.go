@@ -141,10 +141,10 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
-			orig))
+			orig)
 	}
 
 	if len(msg) == 0 {
@@ -177,10 +177,10 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"wrong origin, should be positive less than %d, got %d",
 			s.Size(),
-			orig))
+			orig)
 	}
 
 	if len(msg) == 0 {
@@ -214,10 +214,10 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
-			node))
+			node)
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false
@@ -230,7 +230,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			return newInvalidInputsError(fmt.Sprintf("generating shares failed: %s", err))
+			return newInvalidInputsError("generating shares failed: %s", err)
 		}
 		return fmt.Errorf("generating shares failed: %w", err)
 	}

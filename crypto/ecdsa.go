@@ -160,8 +160,8 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// use extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
 	if len(seed) < minSeedLen || len(seed) > KeyGenSeedMaxLenECDSA {
-		return nil, newInvalidInputsError(fmt.Sprintf("seed byte length should be between %d and %d",
-			minSeedLen, KeyGenSeedMaxLenECDSA))
+		return nil, newInvalidInputsError("seed byte length should be between %d and %d",
+			minSeedLen, KeyGenSeedMaxLenECDSA)
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
 	return &PrKeyECDSA{
@@ -175,13 +175,13 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	n := a.curve.Params().N
 	nlen := bitsToBytes(n.BitLen())
 	if len(der) != nlen {
-		return nil, newInvalidInputsError(fmt.Sprintf("input has incorrect %s key size", a.algo))
+		return nil, newInvalidInputsError("input has incorrect %s key size", a.algo)
 	}
 	var d big.Int
 	d.SetBytes(der)
 
 	if d.Cmp(n) >= 0 {
-		return nil, newInvalidInputsError(fmt.Sprintf("input is not a valid %s key", a.algo))
+		return nil, newInvalidInputsError("input is not a valid %s key", a.algo)
 	}
 
 	priv := goecdsa.PrivateKey{
@@ -204,7 +204,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	p := (a.curve.Params().P)
 	plen := bitsToBytes(p.BitLen())
 	if len(der) != 2*plen {
-		return nil, newInvalidInputsError(fmt.Sprintf("input has incorrect %s key size", a.algo))
+		return nil, newInvalidInputsError("input has incorrect %s key size", a.algo)
 	}
 	var x, y big.Int
 	x.SetBytes(der[:plen])
@@ -213,7 +213,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	// all the curves supported for now have a cofactor equal to 1,
 	// so that IsOnCurve guarantees the point is on the right subgroup.
 	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
-		return nil, newInvalidInputsError(fmt.Sprintf("input is not a valid %s key", a.algo))
+		return nil, newInvalidInputsError("input is not a valid %s key", a.algo)
 	}
 
 	pk := goecdsa.PublicKey{

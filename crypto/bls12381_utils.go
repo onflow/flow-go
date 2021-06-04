@@ -12,7 +12,6 @@ package crypto
 import "C"
 import (
 	"errors"
-	"fmt"
 )
 
 // Go wrappers to Relic C types
@@ -47,14 +46,14 @@ func (ct *ctx) initContext() error {
 // relic context must be initialized before seeding.
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"seed length needs to be larger than %d",
-			securityBits/8))
+			securityBits/8)
 	}
 	if len(seed) > maxRelicPrgSeed {
 		return newInvalidInputsError(
-			fmt.Sprintf("seed length needs to be less than %x",
-				maxRelicPrgSeed))
+			"seed length needs to be less than %x",
+			maxRelicPrgSeed)
 	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
@@ -108,9 +107,9 @@ func randZrStar(x *scalar) {
 // the resulting scalar is in the range 0 < k < r
 func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
-		return newInvalidInputsError(fmt.Sprintf(
+		return newInvalidInputsError(
 			"input slice length must be less than %d",
-			maxScalarSize))
+			maxScalarSize)
 	}
 	C.bn_map_to_Zr_star((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),

@@ -32,7 +32,7 @@ func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	case ECDSASecp256k1:
 		return secp256k1Instance, nil
 	default:
-		return nil, newInvalidInputsError(fmt.Sprintf("the signature scheme %s is not supported", algo))
+		return nil, newInvalidInputsError("the signature scheme %s is not supported", algo)
 	}
 }
 
@@ -59,9 +59,9 @@ func signatureFormatCheckNonRelic(algo SigningAlgorithm, s Signature) (bool, err
 	case ECDSASecp256k1:
 		return secp256k1Instance.signatureFormatCheck(s), nil
 	default:
-		return false, newInvalidInputsError(fmt.Sprintf(
+		return false, newInvalidInputsError(
 			"the signature scheme %s is not supported",
-			algo))
+			algo)
 	}
 }
 
@@ -84,7 +84,7 @@ func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, newInvalidInputsError(fmt.Sprintf("key generation failed: %s", err))
+		return nil, newInvalidInputsError("key generation failed: %s", err)
 	}
 	return signer.generatePrivateKey(seed)
 }
@@ -93,7 +93,7 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, newInvalidInputsError(fmt.Sprintf("decode private key failed: %s", err))
+		return nil, newInvalidInputsError("decode private key failed: %s", err)
 	}
 	return signer.decodePrivateKey(data)
 }
@@ -102,7 +102,7 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, newInvalidInputsError(fmt.Sprintf("decode public key failed: %s", err))
+		return nil, newInvalidInputsError("decode public key failed: %s", err)
 	}
 	return signer.decodePublicKey(data)
 }

@@ -18,9 +18,9 @@ import (
 // SPOCKProve generates a spock poof for data under the private key sk.
 func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
 	if sk.Algorithm() != BLSBLS12381 {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"private key must be a BLS key, got %s",
-			sk.Algorithm()))
+			sk.Algorithm())
 	}
 
 	// BLS signature of data
@@ -34,9 +34,9 @@ func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error)
 // and public key.
 func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if pk.Algorithm() != BLSBLS12381 {
-		return false, newInvalidInputsError(fmt.Sprintf(
+		return false, newInvalidInputsError(
 			"public key must be a BLS key, got %s",
-			pk.Algorithm()))
+			pk.Algorithm())
 	}
 	// BLS verification of data
 	return pk.Verify(proof, data, kmac)

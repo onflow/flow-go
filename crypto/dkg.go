@@ -21,10 +21,6 @@ package crypto
 // Private keys are scalar in Zr, where r is the group order of G1/G2.
 // Public keys are in G2.
 
-import (
-	"fmt"
-)
-
 type DKGState interface {
 	// Size returns the size of the DKG group n
 	Size() int
@@ -64,25 +60,25 @@ type index byte
 func newDKGCommon(size int, threshold int, currentIndex int,
 	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"size should be between %d and %d",
 			DKGMinSize,
-			DKGMaxSize))
+			DKGMaxSize)
 	}
 
 	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"indices of current and leader nodes must be between 0 and %d, got %d",
 			size-1,
-			currentIndex))
+			currentIndex)
 	}
 
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold,
 			size-1,
-			threshold))
+			threshold)
 	}
 
 	return &dkgCommon{

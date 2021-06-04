@@ -91,10 +91,10 @@ func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, erro
 	}
 	// check hasher output size
 	if kmac.Size() < minHashSizeBLSBLS12381 {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"Hasher with at least %d output byte size is required, current size is %d",
 			minHashSizeBLSBLS12381,
-			kmac.Size()))
+			kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
@@ -131,10 +131,10 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 	// check hasher output size
 	if kmac.Size() < minHashSizeBLSBLS12381 {
-		return false, newInvalidInputsError(fmt.Sprintf(
+		return false, newInvalidInputsError(
 			"Hasher with at least %d output byte size is required, current size is %d",
 			minHashSizeBLSBLS12381,
-			kmac.Size()))
+			kmac.Size())
 	}
 
 	// hash the input to 128 bytes
@@ -165,10 +165,10 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 // The seed must have enough entropy and should be sampled uniformly at random.
 func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if len(seed) < KeyGenSeedMinLenBLSBLS12381 || len(seed) > KeyGenSeedMaxLenBLSBLS12381 {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"seed length should be between %d and %d bytes",
 			KeyGenSeedMinLenBLSBLS12381,
-			KeyGenSeedMaxLenBLSBLS12381))
+			KeyGenSeedMaxLenBLSBLS12381)
 	}
 
 	sk := &PrKeyBLSBLS12381{
@@ -186,9 +186,9 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 // This function checks the scalar is less than the group order
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	if len(privateKeyBytes) != prKeyLengthBLSBLS12381 {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"the input length has to be equal to %d",
-			prKeyLengthBLSBLS12381))
+			prKeyLengthBLSBLS12381)
 	}
 	sk := &PrKeyBLSBLS12381{
 		pk: nil,
@@ -205,9 +205,9 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 // This function includes a membership check in G2 and rejects the infinity point.
 func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
-		return nil, newInvalidInputsError(fmt.Sprintf(
+		return nil, newInvalidInputsError(
 			"the input length has to be %d",
-			pubKeyLengthBLSBLS12381))
+			pubKeyLengthBLSBLS12381)
 	}
 	var pk PubKeyBLSBLS12381
 	err := readPointG2(&pk.point, publicKeyBytes)
