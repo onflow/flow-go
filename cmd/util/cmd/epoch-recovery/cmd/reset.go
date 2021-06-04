@@ -24,8 +24,6 @@ var (
 	flagPayout  uint64
 )
 
-type TransactionArguments = []interface{}
-
 // resetCmd represents a command to reset epoch data in the Epoch smart contract
 var resetCmd = &cobra.Command{
 	Use:   "reset",
