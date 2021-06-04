@@ -403,7 +403,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
