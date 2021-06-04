@@ -41,10 +41,10 @@ func NewTransactionContractFunctionInvocator(
 	}
 }
 
-func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, proc *TransactionProcedure) (cadence.Value, error) {
+func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
-	if env.ctx.Tracer != nil && proc.TraceSpan != nil {
-		span = env.ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMInvokeContractFunction)
+	if env.ctx.Tracer != nil && parentTraceSpan != nil {
+		span = env.ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
 		span.LogFields(
 			i.logSpanFields...,
 		)
