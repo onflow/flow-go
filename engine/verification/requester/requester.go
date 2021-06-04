@@ -271,15 +271,18 @@ func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verifi
 		Uint64("block_height", request.Height).
 		Logger()
 
-	// if block has been sealed, then we can finish
-	if request.Height <= lastSealedHeight {
-		removed := e.pendingRequests.Rem(request.ID())
-		e.handler.NotifyChunkDataPackSealed(request.ID())
-		lg.Info().
-			Bool("removed", removed).
-			Msg("drops requesting chunk of a sealed block")
-		return
-	}
+	/*
+		We comment this part out for sake of benchmarking, we should not merge it!
+	*/
+	//// if block has been sealed, then we can finish
+	//if request.Height <= lastSealedHeight {
+	//	removed := e.pendingRequests.Rem(request.ID())
+	//	e.handler.NotifyChunkDataPackSealed(request.ID())
+	//	lg.Info().
+	//		Bool("removed", removed).
+	//		Msg("drops requesting chunk of a sealed block")
+	//	return
+	//}
 
 	qualified := e.canDispatchRequest(request.ChunkID)
 	if !qualified {

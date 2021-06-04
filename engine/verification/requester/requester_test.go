@@ -171,6 +171,8 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 // sealed blocks, and also notifies the handler that this requested chunk has been sealed, so it no longer requests
 // from the network it.
 func TestRequestPendingChunkSealedBlock(t *testing.T) {
+	t.Skip("we skip this test as sealing check is disabled for benchmarking")
+
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
@@ -249,6 +251,8 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 // On timer, the requester should submit pending requests for unsealed chunks to the network, while dropping the requests for the
 // sealed chunks, and notify the handler.
 func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
+	t.Skip("we skip this test as sealing check is disabled for benchmarking")
+
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 

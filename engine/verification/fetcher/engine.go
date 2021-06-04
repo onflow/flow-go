@@ -186,14 +186,18 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
 	// skips processing a chunk if it belongs to a sealed block.
 	chunkID := chunk.ID()
-	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
-	if err != nil {
-		return false, fmt.Errorf("could not determine whether block has been sealed: %w", err)
-	}
-	if sealed {
-		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		return false, nil
-	}
+
+	/*
+		We comment this part out for sake of benchmarking, we should not merge it!
+	*/
+	//sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
+	//if err != nil {
+	//	return false, fmt.Errorf("could not determine whether block has been sealed: %w", err)
+	//}
+	//if sealed {
+	//	e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
+	//	return false, nil
+	//}
 
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{
@@ -206,7 +210,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, fmt.Errorf("data race detected, received a duplicate chunk locator")
 	}
 
-	err = e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
+	err := e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
 	if err != nil {
 		return false, fmt.Errorf("could not request chunk data pack: %w", err)
 	}

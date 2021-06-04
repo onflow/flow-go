@@ -454,6 +454,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 // it drops it without processing it any further and and notifies consumer
 // that it is done with processing that chunk.
 func TestSkipChunkOfSealedBlock(t *testing.T) {
+	t.Skip("we skip this test as sealing check is disabled for benchmarking")
 	s := setupTest()
 	e := newFetcherEngine(s)
 
