@@ -1,0 +1,83 @@
+package pubsub
+
+import (
+	"sync"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+)
+
+type OnBlockFinalizedConsumer = func(finalizedBlockID flow.Identifier)
+type OnBlockIncorporatedConsumer = func(incorporatedBlockID flow.Identifier)
+
+// FinalizationDistributor subscribes for finalization events from hotstuff and distributes it to subscribers
+type FinalizationDistributor struct {
+	blockFinalizedConsumers    []OnBlockFinalizedConsumer
+	blockIncorporatedConsumers []OnBlockIncorporatedConsumer
+	lock                       sync.RWMutex
+}
+
+func NewFinalizationDistributor() *FinalizationDistributor {
+	return &FinalizationDistributor{
+		blockFinalizedConsumers:    make([]OnBlockFinalizedConsumer, 0),
+		blockIncorporatedConsumers: make([]OnBlockIncorporatedConsumer, 0),
+		lock:                       sync.RWMutex{},
+	}
+}
+
+func (p *FinalizationDistributor) AddOnBlockFinalizedConsumer(consumer OnBlockFinalizedConsumer) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.blockFinalizedConsumers = append(p.blockFinalizedConsumers, consumer)
+}
+func (p *FinalizationDistributor) AddOnBlockIncorporatedConsumer(consumer OnBlockIncorporatedConsumer) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.blockIncorporatedConsumers = append(p.blockIncorporatedConsumers, consumer)
+}
+
+func (p *FinalizationDistributor) OnEventProcessed() {}
+
+func (p *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, consumer := range p.blockIncorporatedConsumers {
+		consumer(block.BlockID)
+	}
+}
+
+func (p *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, consumer := range p.blockFinalizedConsumers {
+		consumer(block.BlockID)
+	}
+}
+
+func (p *FinalizationDistributor) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+
+func (p *FinalizationDistributor) OnReceiveVote(uint64, *model.Vote) {}
+
+func (p *FinalizationDistributor) OnReceiveProposal(uint64, *model.Proposal) {}
+
+func (p *FinalizationDistributor) OnEnteringView(uint64, flow.Identifier) {}
+
+func (p *FinalizationDistributor) OnQcTriggeredViewChange(*flow.QuorumCertificate, uint64) {}
+
+func (p *FinalizationDistributor) OnProposingBlock(*model.Proposal) {}
+
+func (p *FinalizationDistributor) OnVoting(*model.Vote) {}
+
+func (p *FinalizationDistributor) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+
+func (p *FinalizationDistributor) OnStartingTimeout(*model.TimerInfo) {}
+
+func (p *FinalizationDistributor) OnReachedTimeout(*model.TimerInfo) {}
+
+func (p *FinalizationDistributor) OnQcIncorporated(*flow.QuorumCertificate) {}
+
+func (p *FinalizationDistributor) OnForkChoiceGenerated(uint64, *flow.QuorumCertificate) {}
+
+func (p *FinalizationDistributor) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
+
+func (p *FinalizationDistributor) OnInvalidVoteDetected(*model.Vote) {}
