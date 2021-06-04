@@ -104,7 +104,13 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 
 	t.lastFinalizedHeight = finalized.Height
 
-	// we have a new sealed block, need to update collectors
+	// WARNING: next block of code implements a special fallback mechanism to recover from sealing halt.
+	// CONTEXT: as blocks are incorporated into chain they are picked up by sealing.Core and added to AssignmentCollectorTree
+	// by definition all blocks should be reported to sealing.Core and that's why all results should be saved in AssignmentCollectorTree.
+	// When finalization kicks in we must have a finalized processable fork of assignment collectors.
+	// Next section checks if we indeed have a finalized fork, starting from last finalized seal. By definition it has to be
+	// processable. If it's not then we have a critical bug which results in blocks being missed by sealing.Core.
+	// TODO: remove this at some point when this logic matures.
 	if t.lastSealedHeight < sealed.Height {
 		finalizedFork, err := t.selectFinalizedFork(sealed.Height+1, finalized.Height)
 		if err != nil {
@@ -113,7 +119,8 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 
 		if len(finalizedFork) > 0 {
 			if !finalizedFork[0].processable {
-				log.Error().Msgf("AssignmentCollectorTree has found not processable finalized fork, this is unexpected")
+				log.Error().Msgf("AssignmentCollectorTree has found not processable finalized fork %v,"+
+					" this is unexpected and shouldn't happen, recovering", finalizedFork[0].collector.BlockID())
 				for _, vertex := range finalizedFork {
 					vertex.processable = true
 				}
@@ -127,6 +134,8 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 	return nil
 }
 
+// selectFinalizedFork traverses chain of collectors starting from some height and picks every collector which executed
+// block was finalized
 func (t *AssignmentCollectorTree) selectFinalizedFork(startHeight, finalizedHeight uint64) ([]*assignmentCollectorVertex, error) {
 	var fork []*assignmentCollectorVertex
 	for height := startHeight; height <= finalizedHeight; height++ {
