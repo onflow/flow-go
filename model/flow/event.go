@@ -104,16 +104,16 @@ type EventsList []Event
 
 // Hash calculates a hash of events list,
 // by simply hashing byte representation of events in the lists
-func (e EventsList) Hash() (hash.Hash, error) {
+func (e EventsList) Hash() (Identifier, error) {
 
 	hasher := hash.NewSHA3_256()
 
 	for _, event := range e {
 		_, err := hasher.Write(event.Fingerprint())
 		if err != nil {
-			return nil, fmt.Errorf("cannot write to hasher: %w", err)
+			return ZeroID, fmt.Errorf("cannot write to hasher: %w", err)
 		}
 	}
 
-	return hasher.SumHash(), nil
+	return HashToID(hasher.SumHash()), nil
 }
