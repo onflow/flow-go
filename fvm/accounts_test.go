@@ -762,7 +762,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not found")
+						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not supported")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)

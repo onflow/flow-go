@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -37,12 +36,22 @@ func (DefaultSignatureVerifier) Verify(
 	publicKey crypto.PublicKey,
 	hashAlgo hash.HashingAlgorithm,
 ) (bool, error) {
-	hasher := NewHasher(hashAlgo)
-	if hasher == nil {
+
+	var hasher hash.Hasher
+
+	switch hashAlgo {
+	case hash.SHA2_256:
+		fallthrough
+	case hash.SHA3_256:
+		var err error
+		if hasher, err = NewPrefixedHashing(hashAlgo, string(tag)); err != nil {
+			return false, errors.NewValueErrorf(err.Error(), "verification failed")
+		}
+	case hash.KMAC128:
+		hasher = crypto.NewBLSKMAC(string(tag))
+	default:
 		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 	}
-
-	message = append(tag, message...)
 
 	valid, err := publicKey.Verify(signature, message, hasher)
 	if err != nil {
@@ -52,19 +61,29 @@ func (DefaultSignatureVerifier) Verify(
 	return valid, nil
 }
 
-// NewHasher returns a crypto hasher supported by runtime.
-func NewHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
+func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
+	var hasher hash.Hasher
+
 	switch hashAlgo {
 	case hash.SHA2_256:
-		return hash.NewSHA2_256()
+		fallthrough
 	case hash.SHA3_256:
-		return hash.NewSHA3_256()
+		fallthrough
 	case hash.SHA2_384:
-		return hash.NewSHA2_384()
+		fallthrough
 	case hash.SHA3_384:
-		return hash.NewSHA3_384()
+		var err error
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
+			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
+		}
+	case hash.KMAC128:
+		hasher = crypto.NewBLSKMAC(tag)
+	default:
+		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
+		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
-	return nil
+
+	return hasher.ComputeHash(data), nil
 }
 
 // RuntimeToCryptoSigningAlgorithm converts a runtime signature algorithm to a crypto signature algorithm.
@@ -102,6 +121,8 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 		return hash.SHA2_384
 	case runtime.HashAlgorithmSHA3_384:
 		return hash.SHA3_384
+	case runtime.HashAlgorithmKMAC128_BLS_BLS12_381:
+		return hash.KMAC128
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -118,6 +139,8 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 		return runtime.HashAlgorithmSHA2_384
 	case hash.SHA3_384:
 		return runtime.HashAlgorithmSHA3_384
+	case hash.KMAC128:
+		return runtime.HashAlgorithmKMAC128_BLS_BLS12_381
 	default:
 		return runtime.HashAlgorithmUnknown
 	}
@@ -146,9 +169,6 @@ func VerifySignatureFromRuntime(
 	if hashAlgo == hash.UnknownHashingAlgorithm {
 		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 	}
-	if hashAlgo == hash.KMAC128 {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "hashing algorithm %s not supported", hash.KMAC128.String())
-	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
@@ -172,42 +192,6 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
-}
-
-//  NewAccountPublicKey construct an account public key given a runtime public key.
-func NewAccountPublicKey(publicKey *runtime.PublicKey,
-	hashAlgo sema.HashAlgorithm,
-	keyIndex int,
-	weight int,
-) (*flow.AccountPublicKey, error) {
-	var err error
-	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgorithm == crypto.UnknownSigningAlgorithm {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.Name(), "signature algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
-	if hashAlgorithm == hash.UnknownHashingAlgorithm {
-		err = errors.NewValueErrorf(hashAlgo.Name(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
-	if err != nil {
-		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	return &flow.AccountPublicKey{
-		Index:     keyIndex,
-		PublicKey: decodedPublicKey,
-		SignAlgo:  signAlgorithm,
-		HashAlgo:  hashAlgorithm,
-		SeqNumber: 0,
-		Weight:    weight,
-		Revoked:   false,
-	}, nil
 }
 
 func parseRuntimeDomainTag(tag string) []byte {
