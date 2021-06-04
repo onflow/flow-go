@@ -67,6 +67,7 @@ func NewEngine(log zerolog.Logger, capacity int) (*TestEngine, error) {
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
 		log,
+		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				switch msg.Payload.(type) {
