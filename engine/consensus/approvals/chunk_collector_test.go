@@ -60,7 +60,7 @@ func (s *ChunkApprovalCollectorTestSuite) TestProcessApproval_InvalidChunkAssign
 func (s *ChunkApprovalCollectorTestSuite) TestGetAggregatedSignature_MultipleApprovals() {
 	var aggregatedSig flow.AggregatedSignature
 	var collected bool
-	sigCollector := flow.NewSignatureCollector()
+	sigCollector := NewSignatureCollector()
 	for verID := range s.AuthorizedVerifiers {
 		approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.chunk.Index), unittest.WithApproverID(verID))
 		aggregatedSig, collected = s.collector.ProcessApproval(approval)
