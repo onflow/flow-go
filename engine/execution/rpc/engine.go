@@ -3,7 +3,10 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"strings"
+	"unicode/utf8"
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
@@ -76,6 +79,7 @@ func New(
 			events:             events,
 			exeResults:         exeResults,
 			transactionResults: txResults,
+			log:                log,
 		},
 		server: server,
 		config: config,
@@ -131,6 +135,7 @@ type handler struct {
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
+	log                zerolog.Logger
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -237,9 +242,21 @@ func (h *handler) GetTransactionResult(
 
 		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
+
 	if txResult.ErrorMessage != "" {
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Str("transaction_id", txID.String()).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+
 		statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
-		errMsg = txResult.ErrorMessage
+		errMsg = cadenceErrMessage
 	}
 
 	// lookup events by block id and transaction ID
