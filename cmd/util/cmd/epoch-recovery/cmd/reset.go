@@ -155,9 +155,9 @@ func convertResetEpochArgs(randomSource []byte, payout, firstView, finalView uin
 // encodeArgs JSON encodes `resetEpoch` transaction arguments
 func encodeArgs(args []cadence.Value) []byte {
 
-	arguments := make([]interface{}, 0)
+	arguments := make([]interface{}, 0, len(args))
 
-	for _, cdcVal := range args {
+	for index, cdcVal := range args {
 		
 		encoded, err := jsoncdc.Encode(cdcVal)
 		if err != nil {
@@ -170,7 +170,7 @@ func encodeArgs(args []cadence.Value) []byte {
 			log.Fatal().Err(err).Msg("could not unmarshal cadence arguments")	
 		}
 
-		arguments = append(arguments, arg)
+		arguments[index] = arg
 	}
 
 	bz, err := json.Marshal(arguments)	
