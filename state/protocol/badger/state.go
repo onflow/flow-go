@@ -102,6 +102,12 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
+		// 6) initialize spork params
+		err = transaction.WithTx(state.bootstrapSporkInfo(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap spork info: %w", err)
+		}
+
 		state.metrics.BlockSealed(tail)
 		state.metrics.SealedHeight(tail.Header.Height)
 		state.metrics.FinalizedHeight(head.Header.Height)
@@ -363,6 +369,34 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			if err != nil {
 				return fmt.Errorf("could not store epoch status for block (id=%x): %w", blockID, err)
 			}
+		}
+
+		return nil
+	}
+}
+
+// bootstrapSporkInfo bootstraps the protocol state with information about the
+// spork which is used to disambiguate Flow networks.
+func (s *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		params := root.Params()
+
+		sporkID, err := params.SporkID()
+		if err != nil {
+			return fmt.Errorf("could not get spork ID: %w", err)
+		}
+		err = operation.InsertSporkID(sporkID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert spork ID: %w", err)
+		}
+
+		version, err := params.ProtocolVersion()
+		if err != nil {
+			return fmt.Errorf("could not get protocol version: %w", err)
+		}
+		err = operation.InsertProtocolVersion(version)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert protocol version: %w", err)
 		}
 
 		return nil
