@@ -153,7 +153,7 @@ func convertResetEpochArgs(randomSource []byte, payout, firstView, finalView uin
 // encodeArgs JSON encodes `resetEpoch` transaction arguments
 func encodeArgs(args []cadence.Value) []byte {
 
-	arguments := make([]interface{}, 0, len(args))
+	arguments := make([]interface{}, len(args))
 
 	for index, cdcVal := range args {
 
