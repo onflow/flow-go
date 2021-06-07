@@ -64,7 +64,6 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 	})
 }
 
-
 // TestResetHappyPathWithPayout tests that given the root snapshot file and payout, the command
 // writes file containing the correct argument values
 func TestResetHappyPathWithPayout(t *testing.T) {
