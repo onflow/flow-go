@@ -111,7 +111,7 @@ func TestHashWithTag(t *testing.T) {
 	})
 }
 
-func TestVerifySignatureFaromRuntime(t *testing.T) {
+func TestVerifySignatureFromRuntime(t *testing.T) {
 	t.Run("verify should fail on incorrect combinations", func(t *testing.T) {
 		correctCombinations := make(map[runtime.SignatureAlgorithm]map[runtime.HashAlgorithm]struct{})
 
