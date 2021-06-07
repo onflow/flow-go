@@ -287,6 +287,10 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
 
+		emptyEventsList := new(flow.EventsList)
+		emptyEventsListHash, err := emptyEventsList.Hash()
+		require.NoError(t, err)
+
 		for i, stateSnapshot := range computationResult.StateSnapshots {
 
 			ids, values := view.Delta().RegisterUpdates()
@@ -318,7 +322,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 					// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
 					// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
 					// startState stays the same if blocks are empty
-					EventCollection: collectionID,
+					EventCollection: emptyEventsListHash,
 					BlockID:         executableBlock.ID(),
 					// TODO: record gas used
 					TotalComputationUsed: 0,
