@@ -131,6 +131,18 @@ func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 		)
 }
 
+func filterAccountCreatedEvents(events []flow.Event) []flow.Event {
+	var accountCreatedEvents []flow.Event
+	for _, event := range events {
+		if event.Type != flow.EventAccountCreated {
+			continue
+		}
+		accountCreatedEvents = append(accountCreatedEvents, event)
+		break
+	}
+	return accountCreatedEvents
+}
+
 func TestPrograms(t *testing.T) {
 
 	t.Run(
@@ -324,8 +336,9 @@ func TestBlockContext_ExecuteTransaction(t *testing.T) {
 
 		assert.NoError(t, tx.Err)
 
-		require.Len(t, tx.Events, 1)
-		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].Type)
+		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+
+		require.Len(t, accountCreatedEvents, 1)
 	})
 }
 
@@ -1096,11 +1109,12 @@ func TestBlockContext_GetAccount(t *testing.T) {
 
 		assert.NoError(t, tx.Err)
 
-		assert.Len(t, tx.Events, 2)
-		assert.EqualValues(t, flow.EventAccountCreated, tx.Events[0].Type)
+		accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+
+		require.Len(t, accountCreatedEvents, 1)
 
 		// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-		data, err := jsoncdc.Decode(tx.Events[0].Payload)
+		data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 		require.NoError(t, err)
 		address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -1232,10 +1246,11 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 
 	assert.NoError(t, tx.Err)
 
-	require.Len(t, tx.Events, 1)
-	require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
+	accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 
-	data, err := jsoncdc.Decode(tx.Events[0].Payload)
+	require.Len(t, accountCreatedEvents, 1)
+
+	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -1793,7 +1808,7 @@ func TestWithServiceAccount(t *testing.T) {
 		require.NoError(t, err)
 
 		// transaction should fail on non-bootstrapped ledger
-		assert.Error(t, tx.Err)
+		require.Error(t, tx.Err)
 	})
 
 	t.Run("With service account disabled", func(t *testing.T) {
@@ -2284,20 +2299,14 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 				assert.NoError(t, tx.Err)
 
-				assert.Len(t, tx.Events, 5)
+				assert.Len(t, tx.Events, 10)
 
-				var accountCreatedEvent *flow.Event
-				for _, event := range tx.Events {
-					if event.Type != flow.EventAccountCreated {
-						continue
-					}
-					accountCreatedEvent = &event
-					break
-				}
-				assert.NotNil(t, accountCreatedEvent)
+				accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+
+				require.Len(t, accountCreatedEvents, 1)
 
 				// read the address of the account created (e.g. "0x01" and convert it to flow.address)
-				data, err := jsoncdc.Decode(accountCreatedEvent.Payload)
+				data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 

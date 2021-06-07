@@ -104,8 +104,9 @@ int G1_lagrangeInterpolateAtZero(byte* dest, const byte* shares, const uint8_t* 
     ep_set_infty(acc);
 
     for (int i=0; i < len; i++) {
-        if (ep_read_bin_compact(share, &shares[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK)
-            return INVALID;
+        int read_ret = ep_read_bin_compact(share, &shares[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if (read_ret != RLC_OK)
+            return read_ret;
         Zr_lagrangeCoefficientAtZero(bn_lagr_coef, signers[i], signers, len);
         ep_mul_lwnaf(mult, share, bn_lagr_coef);
         ep_add_jacob(acc, acc, mult);

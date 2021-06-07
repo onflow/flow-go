@@ -1,7 +1,6 @@
 package mtrie
 
 import (
-	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -340,12 +339,7 @@ func (f *Forest) GetEmptyRootHash() ledger.RootHash {
 func (f *Forest) MostRecentTouchedRootHash() (ledger.RootHash, error) {
 	keys := f.tries.Keys()
 	if len(keys) > 0 {
-		encodedRootHash := keys[len(keys)-1].(string)
-		rootHashBytes, err := hex.DecodeString(encodedRootHash)
-		if err != nil {
-			return ledger.RootHash(hash.DummyHash), fmt.Errorf("failed to decode the root string: %w", err)
-		}
-		return ledger.ToRootHash(rootHashBytes)
+		return keys[len(keys)-1].(ledger.RootHash), nil
 	}
 	return ledger.RootHash(hash.DummyHash), fmt.Errorf("no trie is stored in the forest")
 }
