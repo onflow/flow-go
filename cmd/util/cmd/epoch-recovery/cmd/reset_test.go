@@ -17,9 +17,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestResetHappyPath tests that given the correct inputs the command and the
-// write file contains the correct argument values
-func TestResetHappyPath(t *testing.T) {
+// TestResetHappyPathWithoutPayout tests that given the root snapshot file and no payout, the command
+// writes file containing the correct argument values
+func TestResetHappyPathWithoutPayout(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(bootDir string) {
 
@@ -46,6 +46,67 @@ func TestResetHappyPath(t *testing.T) {
 		// set initial flag values
 		flagBootDir = bootDir
 		flagPayout = ""
+
+		// run command
+		resetRun(nil, nil)
+
+		// check if args file was created
+		require.FileExists(t, argsPath)
+
+		// read file and make sure values are exactly as expected
+		var resetEpochArgs []interface{}
+		readJSON(argsPath, &resetEpochArgs)
+
+		// extract args
+		args := extractResetEpochArgs(rootSnapshot)
+
+		for index, arg := range resetEpochArgs {
+
+			// marshal to bytes
+			bz, err := json.Marshal(arg)
+			require.NoError(t, err)
+
+			// parse cadence value
+			decoded, err := jsoncdc.Decode(bz)
+			if err != nil {
+				log.Fatal().Err(err).Msg("could not encode cadence arguments")
+			}
+
+			require.Equal(t, args[index], decoded)
+		}
+	})
+}
+
+
+// TestResetHappyPathWithPayout tests that given the root snapshot file and payout, the command
+// writes file containing the correct argument values
+func TestResetHappyPathWithPayout(t *testing.T) {
+
+	unittest.RunWithTempDir(t, func(bootDir string) {
+
+		nodesPerCluster := 5
+
+		// path to args file (if created)
+		path, err := os.Getwd()
+		require.NoError(t, err)
+		argsPath := filepath.Join(path, resetArgsFileName)
+
+		// remove args file once test finishes
+		defer func() {
+			err := os.Remove(argsPath)
+			require.NoError(t, err)
+		}()
+
+		// create a root snapshot
+		rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(nodesPerCluster))
+
+		// write snapshot to correct path in bootDir
+		err = writeRootSnapshot(bootDir, rootSnapshot)
+		require.NoError(t, err)
+
+		// set initial flag values
+		flagBootDir = bootDir
+		flagPayout = "10000.0"
 
 		// run command
 		resetRun(nil, nil)

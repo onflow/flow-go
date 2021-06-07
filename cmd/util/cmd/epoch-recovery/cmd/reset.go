@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -146,7 +147,11 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	var err error
 
 	if payout != "" {
-		cdcPayout, err = cadence.NewUFix64(fmt.Sprintf("%s.0", payout))
+		if ok := strings.HasSuffix(payout, ".0"); !ok {
+			payout = fmt.Sprintf("%s.0", payout)
+		}
+
+		cdcPayout, err = cadence.NewUFix64(payout)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not convert payout to cadence type")
 		}
