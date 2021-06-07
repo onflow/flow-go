@@ -210,7 +210,7 @@ func (e *Engine) onChunkDataRequest(
 		}
 
 		if err != nil {
-			log.Error().Err(err).Str("origin", fmt.Sprintf("%s", origin)).Msg("could not send requested chunk data pack to")
+			log.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
 			return
 		}
 
