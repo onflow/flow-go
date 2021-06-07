@@ -5,11 +5,13 @@ import (
 	"errors"
 	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
 	state "github.com/onflow/flow-go/engine/execution/state/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -27,7 +29,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+		e := Engine{state: ps, unit: engine.NewUnit(), execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -63,7 +65,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+		e := Engine{state: ps, unit: engine.NewUnit(), execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -99,7 +101,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+		e := Engine{state: ps, unit: engine.NewUnit(), execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
@@ -138,7 +140,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
 			Return(nil, errors.New("not found!"))
 
-		e := Engine{state: ps, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+		e := Engine{state: ps, unit: engine.NewUnit(), execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -163,7 +165,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		execState := new(state.ExecutionState)
 
-		e := Engine{state: ps, chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+		e := Engine{state: ps, unit: engine.NewUnit(), chunksConduit: con, execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
@@ -205,8 +207,10 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		con.AssertExpectations(t)
 		execState.AssertExpectations(t)
+		assert.Eventually(t, func() bool {
+			return con.AssertExpectations(t)
+		}, time.Second, time.Millisecond)
 	})
 
 	t.Run("reply to chunk data pack request only when staked", func(t *testing.T) {
@@ -222,6 +226,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		e := Engine{
 			state:              ps,
+			unit:               engine.NewUnit(),
 			chunksConduit:      con,
 			execState:          execState,
 			metrics:            metrics.NewNoopCollector(),
@@ -273,7 +278,10 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 
 		ps.AssertExpectations(t)
 		ss.AssertExpectations(t)
-		con.AssertExpectations(t)
 		execState.AssertExpectations(t)
+
+		assert.Eventually(t, func() bool {
+			return con.AssertExpectations(t)
+		}, time.Second, time.Millisecond)
 	})
 }

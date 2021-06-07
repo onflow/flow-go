@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -22,8 +23,10 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -73,24 +76,22 @@ func main() {
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
 
-		err               error
-		mutableState      protocol.MutableState
-		privateDKGData    *bootstrap.DKGParticipantPriv
-		guarantees        mempool.Guarantees
-		results           mempool.IncorporatedResults
-		receipts          mempool.ExecutionTree
-		approvals         mempool.Approvals
-		seals             mempool.IncorporatedResultSeals
-		pendingReceipts   mempool.PendingReceipts
-		prov              *provider.Engine
-		receiptRequester  *requester.Engine
-		syncCore          *synchronization.Core
-		comp              *compliance.Engine
-		conMetrics        module.ConsensusMetrics
-		mainMetrics       module.HotstuffMetrics
-		receiptValidator  module.ReceiptValidator
-		approvalValidator module.ApprovalValidator
-		chunkAssigner     *chmodule.ChunkAssigner
+		err                     error
+		mutableState            protocol.MutableState
+		privateDKGData          *bootstrap.DKGParticipantPriv
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		prov                    *provider.Engine
+		receiptRequester        *requester.Engine
+		syncCore                *synchronization.Core
+		comp                    *compliance.Engine
+		conMetrics              module.ConsensusMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		finalizationDistributor *pubsub.FinalizationDistributor
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -150,10 +151,6 @@ func main() {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
-			approvalValidator = validation.NewApprovalValidator(
-				node.State,
-				resultApprovalSigVerifier)
-
 			sealValidator := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
@@ -183,10 +180,6 @@ func main() {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
 		}).
-		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results, err = stdmap.NewIncorporatedResults(resultLimit)
-			return err
-		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
@@ -195,10 +188,6 @@ func main() {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
-		}).
-		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
-			approvals, err = stdmap.NewApprovals(approvalLimit)
-			return err
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
@@ -223,8 +212,43 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
+		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			return nil
+		}).
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+			config := sealing.DefaultConfig()
+			config.EmergencySealingActive = emergencySealing
+			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
+
+			e, err := sealing.NewEngine(
+				node.Logger,
+				node.Tracer,
+				conMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				node.Network,
+				node.Me,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				node.Storage.Seals,
+				chunkAssigner,
+				resultApprovalSigVerifier,
+				seals,
+				config,
+			)
+
+			// subscribe for finalization events from hotstuff
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+
+			return e, err
+		}).
+		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -241,34 +265,39 @@ func main() {
 				return nil, err
 			}
 
-			match, err := sealing.NewEngine(
+			core := matching.NewCore(
 				node.Logger,
-				node.Metrics.Engine,
 				node.Tracer,
-				node.Metrics.Mempool,
 				conMetrics,
-				node.Network,
+				node.Metrics.Mempool,
 				node.State,
-				node.Me,
-				receiptRequester,
-				node.Storage.Receipts,
 				node.Storage.Headers,
-				node.Storage.Index,
-				results,
+				node.Storage.Receipts,
 				receipts,
-				approvals,
-				seals,
 				pendingReceipts,
-				chunkAssigner,
+				seals,
 				receiptValidator,
-				approvalValidator,
-				requiredApprovalsForSealConstruction,
-				emergencySealing,
+				receiptRequester,
+				matching.DefaultConfig(),
 			)
 
-			receiptRequester.WithHandle(match.HandleReceipt)
+			e, err := matching.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				core,
+			)
+			if err != nil {
+				return nil, err
+			}
 
-			return match, err
+			// subscribe engine to inputs from other node-internal components
+			receiptRequester.WithHandle(e.HandleReceipt)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+
+			return e, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
@@ -340,7 +369,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				seals,
+				approvals.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),
@@ -404,7 +433,9 @@ func main() {
 				node.Storage.Index,
 				node.RootChainID,
 			)
-			// make compliance engine as a FinalizationConsumer
+
+			notifier.AddConsumer(finalizationDistributor)
+
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
