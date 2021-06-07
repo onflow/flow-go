@@ -611,9 +611,8 @@ func (e *hostEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
-	// TODO: this is a stub for now
-	return false, nil
+func (e *hostEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
 // Block Environment Functions

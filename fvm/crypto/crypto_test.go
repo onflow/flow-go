@@ -227,3 +227,53 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		}
 	})
 }
+
+func TestValidatePublicKey(t *testing.T) {
+
+	validPublicKey := func(t *testing.T, s runtime.SignatureAlgorithm) []byte {
+		seed := make([]byte, 256)
+		rand.Read(seed)
+		pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
+		require.NoError(t, err)
+		return pk.PublicKey().Encode()
+	}
+
+	t.Run("Unknown algorithm should return false", func(t *testing.T) {
+		valid, err := crypto.ValidatePublicKey(runtime.SignatureAlgorithmUnknown, validPublicKey(t, runtime.SignatureAlgorithmECDSA_P256))
+		require.NoError(t, err)
+		require.False(t, valid)
+	})
+
+	t.Run("valid public key should return true", func(t *testing.T) {
+		signatureAlgos := []runtime.SignatureAlgorithm{
+			runtime.SignatureAlgorithmECDSA_P256,
+			runtime.SignatureAlgorithmECDSA_secp256k1,
+			runtime.SignatureAlgorithmBLS_BLS12_381,
+		}
+		for i, s := range signatureAlgos {
+			t.Run(fmt.Sprintf("case %v: %v", i, s), func(t *testing.T) {
+				valid, err := crypto.ValidatePublicKey(s, validPublicKey(t, s))
+				require.NoError(t, err)
+				require.True(t, valid)
+			})
+		}
+	})
+
+	t.Run("invalid public key should return false", func(t *testing.T) {
+		signatureAlgos := []runtime.SignatureAlgorithm{
+			runtime.SignatureAlgorithmECDSA_P256,
+			runtime.SignatureAlgorithmECDSA_secp256k1,
+			runtime.SignatureAlgorithmBLS_BLS12_381,
+		}
+		for i, s := range signatureAlgos {
+			t.Run(fmt.Sprintf("case %v: %v", i, s), func(t *testing.T) {
+				key := make([]byte, 256)
+				rand.Read(key)
+
+				valid, err := crypto.ValidatePublicKey(s, key)
+				require.NoError(t, err)
+				require.False(t, valid)
+			})
+		}
+	})
+}

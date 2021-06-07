@@ -150,6 +150,22 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 	}
 }
 
+// ValidatePublicKey returns true if public key is valid
+func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bool, err error) {
+	sigAlgo := RuntimeToCryptoSigningAlgorithm(signAlgo)
+
+	_, err = crypto.DecodePublicKey(sigAlgo, pk)
+
+	if err != nil {
+		// TODO: `crypto.IsInvalidInputsError(err)` doesn't work here!
+		if _, ok := err.(*crypto.InvalidInputsError); ok {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
 // raw values provided by the Cadence runtime.
 func VerifySignatureFromRuntime(
