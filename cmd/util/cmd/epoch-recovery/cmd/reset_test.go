@@ -63,7 +63,7 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 
 		// run command
 		resetRun(nil, nil)
-		require.Regexp(t, happyPathLogs, hook.logs.String())
+		require.Regexp(t, happyPathRegex, hook.logs.String())
 
 		// check if args file was created
 		require.FileExists(t, argsPath)
@@ -114,7 +114,7 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 
 		// run command
 		resetRun(nil, nil)
-		require.Regexp(t, happyPathLogs, hook.logs.String())
+		require.Regexp(t, happyPathRegex, hook.logs.String())
 
 		// check if args file was created
 		require.FileExists(t, argsPath)
