@@ -51,13 +51,6 @@ func addResetCmdFlags() {
 // from the root-protocol-snapshot.json
 func resetRun(cmd *cobra.Command, args []string) {
 
-	// path to the JSON encoded cadence arguments for the `resetEpoch` transaction
-	path, err := os.Getwd()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get working directory path")
-	}
-	argsPath := filepath.Join(path, resetArgsFileName)
-
 	// path to the root protocol snapshot json file
 	snapshotPath := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
 
@@ -70,11 +63,19 @@ func resetRun(cmd *cobra.Command, args []string) {
 		log.Fatal().Str("path", snapshotPath).Msgf("root-protocol-snapshot.json file does not exists in the `boot-dir` given")
 	}
 
+	// path to the JSON encoded cadence arguments for the `resetEpoch` transaction
+	path, err := os.Getwd()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get working directory path")
+	}
+	argsPath := filepath.Join(path, resetArgsFileName)
+
 	// read root protocol-snapshot.json
 	bz, err := io.ReadFile(snapshotPath)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not read root snapshot file")
 	}
+	log.Info().Str("snapshot_path", snapshotPath).Msg("read in root-protocol-snapshot.json")
 
 	// unmarshal bytes to inmem protocol snapshot
 	snapshot, err := convert.BytesToInmemSnapshot(bz)
@@ -84,6 +85,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 
 	// extract arguments from reset epoch tx from snapshot
 	txArgs := extractResetEpochArgs(snapshot)
+	log.Info().Msg("extracted resetEpoch transaction arguments from snapshot")
 
 	// ancode to JSON
 	enc := encodeArgs(txArgs)
@@ -93,7 +95,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
-	log.Info().Str("path", argsPath).Msg("wrote `resetEpoch` transaction arguments")
+	log.Info().Str("path", argsPath).Msg("wrote resetEpoch transaction arguments")
 }
 
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction

@@ -5,8 +5,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -18,6 +21,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const happyPathLogs = `^read in root-protocol-snapshot.json` +
+	`extracted resetEpoch transaction arguments from snapshot` +
+	`wrote resetEpoch transaction arguments`
+
+var happyPathRegex = regexp.MustCompile(happyPathLogs)
+
 // TestResetHappyPathWithoutPayout tests that given the root snapshot file and no payout, the command
 // writes file containing the correct argument values
 func TestResetHappyPathWithoutPayout(t *testing.T) {
@@ -25,6 +34,10 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 	unittest.RunWithTempDir(t, func(bootDir string) {
 
 		nodesPerCluster := 5
+
+		// to match regex
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
 
 		// path to args file (if created)
 		path, err := os.Getwd()
@@ -50,6 +63,7 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 
 		// run command
 		resetRun(nil, nil)
+		require.Regexp(t, happyPathLogs, hook.logs.String())
 
 		// check if args file was created
 		require.FileExists(t, argsPath)
@@ -71,6 +85,10 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 	unittest.RunWithTempDir(t, func(bootDir string) {
 
 		nodesPerCluster := 5
+
+		// to match regex
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
 
 		// path to args file (if created)
 		path, err := os.Getwd()
@@ -96,6 +114,7 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 
 		// run command
 		resetRun(nil, nil)
+		require.Regexp(t, happyPathLogs, hook.logs.String())
 
 		// check if args file was created
 		require.FileExists(t, argsPath)
@@ -133,6 +152,7 @@ func writeRootSnapshot(bootDir string, snapshot *inmem.Snapshot) error {
 }
 
 // TODO: unify methods from all commands
+// TODO: move this to common module
 func writeJSON(path string, data interface{}) error {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -152,6 +172,7 @@ func writeJSON(path string, data interface{}) error {
 	return nil
 }
 
+// TODO: move this to common module
 func readJSON(path string, target interface{}) {
 	dat, err := io.ReadFile(path)
 	if err != nil {
@@ -161,4 +182,13 @@ func readJSON(path string, target interface{}) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
 	}
+}
+
+// TODO: move this to common module
+type zeroLoggerHook struct {
+	logs *strings.Builder
+}
+
+func (h zeroLoggerHook) Run(_ *zerolog.Event, _ zerolog.Level, msg string) {
+	h.logs.WriteString(msg)
 }
