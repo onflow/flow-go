@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -33,8 +34,11 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+
 		// protocol state has been bootstrapped, now open a protocol state with the database
-		complianceMetrics := mock.ComplianceMetrics{}
+		complianceMetrics := new(mock.ComplianceMetrics)
+		complianceMetrics.On("CommittedEpochFinalView", testifymock.Anything).Once()
+		
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
@@ -48,6 +52,9 @@ func TestBootstrapAndOpen(t *testing.T) {
 			all.EpochCommits,
 			all.Statuses)
 		require.NoError(t, err)
+
+		// assert update final view was called
+		complianceMetrics.AssertCalled(t, "CommittedEpochFinalView", testifymock.Anything)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
 	})

@@ -602,6 +602,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
 
+		// TODO: verify that final view was updated
+		
+
 		// finalize block 7 so we can finalize subsequent blocks
 		err = state.Finalize(block7.ID())
 		require.NoError(t, err)
