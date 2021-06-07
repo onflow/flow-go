@@ -38,7 +38,7 @@ func TestBootstrapAndOpen(t *testing.T) {
 		// protocol state has been bootstrapped, now open a protocol state with the database
 		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CommittedEpochFinalView", testifymock.Anything).Once()
-		
+
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(
