@@ -327,12 +327,9 @@ func identityList(identityMap map[flow.Identifier]flow.Identity) flow.IdentityLi
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// qualify the logger with local and remote address
-	log := m.log.With().
-		Str("local_addr", s.Conn().LocalMultiaddr().String()).
-		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
-		Logger()
+	log := streamLogger(m.log, s)
 
-	log.Info().Msg("incoming connection established")
+	log.Info().Msg("incoming stream received")
 
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
