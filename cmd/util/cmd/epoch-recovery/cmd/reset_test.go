@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence"
@@ -143,7 +144,7 @@ func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{
 		decoded, err := jsoncdc.Decode(bz)
 		require.NoError(t, err)
 
-		require.Equal(t, expected[index], decoded)
+		assert.Equal(t, expected[index], decoded)
 	}
 }
 
