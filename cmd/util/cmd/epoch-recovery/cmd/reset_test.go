@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -59,21 +60,7 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 
 		// extract args
 		args := extractResetEpochArgs(rootSnapshot)
-
-		for index, arg := range resetEpochArgs {
-
-			// marshal to bytes
-			bz, err := json.Marshal(arg)
-			require.NoError(t, err)
-
-			// parse cadence value
-			decoded, err := jsoncdc.Decode(bz)
-			if err != nil {
-				log.Fatal().Err(err).Msg("could not encode cadence arguments")
-			}
-
-			require.Equal(t, args[index], decoded)
-		}
+		verifyArguments(t, args, resetEpochArgs)
 	})
 }
 
@@ -120,22 +107,25 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 
 		// extract args
 		args := extractResetEpochArgs(rootSnapshot)
-
-		for index, arg := range resetEpochArgs {
-
-			// marshal to bytes
-			bz, err := json.Marshal(arg)
-			require.NoError(t, err)
-
-			// parse cadence value
-			decoded, err := jsoncdc.Decode(bz)
-			if err != nil {
-				log.Fatal().Err(err).Msg("could not encode cadence arguments")
-			}
-
-			require.Equal(t, args[index], decoded)
-		}
+		verifyArguments(t, args, resetEpochArgs)
 	})
+}
+
+func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
+	for index, arg := range actual {
+
+		// marshal to bytes
+		bz, err := json.Marshal(arg)
+		require.NoError(t, err)
+
+		// parse cadence value
+		decoded, err := jsoncdc.Decode(bz)
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not encode cadence arguments")
+		}
+
+		require.Equal(t, expected[index], decoded)
+	}
 }
 
 func writeRootSnapshot(bootDir string, snapshot *inmem.Snapshot) error {
