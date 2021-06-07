@@ -69,12 +69,13 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 		require.FileExists(t, argsPath)
 
 		// read file and make sure values are exactly as expected
-		var resetEpochArgs []interface{}
-		readJSON(argsPath, &resetEpochArgs)
+		var actualArgs []interface{}
+		err = readJSON(argsPath, &actualArgs)
+		require.NoError(t, err)
 
 		// extract args
-		args := extractResetEpochArgs(rootSnapshot)
-		verifyArguments(t, args, resetEpochArgs)
+		expectedArgs := extractResetEpochArgs(rootSnapshot)
+		verifyArguments(t, expectedArgs, actualArgs)
 	})
 }
 
@@ -120,16 +121,18 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 		require.FileExists(t, argsPath)
 
 		// read file and make sure values are exactly as expected
-		var resetEpochArgs []interface{}
-		readJSON(argsPath, &resetEpochArgs)
+		var actualArgs []interface{}
+		err = readJSON(argsPath, &actualArgs)
+		require.NoError(t, err)
 
 		// extract args
-		args := extractResetEpochArgs(rootSnapshot)
-		verifyArguments(t, args, resetEpochArgs)
+		expectedArgs := extractResetEpochArgs(rootSnapshot)
+		verifyArguments(t, expectedArgs, actualArgs)
 	})
 }
 
 func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{}) {
+
 	for index, arg := range actual {
 
 		// marshal to bytes
@@ -138,9 +141,7 @@ func verifyArguments(t *testing.T, expected []cadence.Value, actual []interface{
 
 		// parse cadence value
 		decoded, err := jsoncdc.Decode(bz)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not encode cadence arguments")
-		}
+		require.NoError(t, err)
 
 		require.Equal(t, expected[index], decoded)
 	}
@@ -173,15 +174,19 @@ func writeJSON(path string, data interface{}) error {
 }
 
 // TODO: move this to common module
-func readJSON(path string, target interface{}) {
+func readJSON(path string, target interface{}) error {
+
 	dat, err := io.ReadFile(path)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot read json")
+		return err
 	}
+
 	err = json.Unmarshal(dat, target)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
+		return err
 	}
+
+	return nil
 }
 
 // TODO: move this to common module
