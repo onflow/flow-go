@@ -19,6 +19,8 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
+const resetArgsFileName = "reset-epoch-args.json"
+
 var (
 	flagBootDir string
 	flagPayout  string
@@ -53,7 +55,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get working directory path")
 	}
-	argsPath := filepath.Join(path, "reset-epoch-args.json")
+	argsPath := filepath.Join(path, resetArgsFileName)
 
 	// path to the root protocol snapshot json file
 	snapshotPath := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
