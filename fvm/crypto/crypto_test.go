@@ -267,8 +267,8 @@ func TestValidatePublicKey(t *testing.T) {
 		}
 		for i, s := range signatureAlgos {
 			t.Run(fmt.Sprintf("case %v: %v", i, s), func(t *testing.T) {
-				key := make([]byte, 256)
-				rand.Read(key)
+				key := validPublicKey(t, s)
+				key[0] ^= 1 // alter one bit of the valid key
 
 				valid, err := crypto.ValidatePublicKey(s, key)
 				require.NoError(t, err)

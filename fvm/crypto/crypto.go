@@ -161,7 +161,7 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bo
 		if _, ok := err.(*crypto.InvalidInputsError); ok {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("validate public key failed: %w", err)
 	}
 	return true, nil
 }
