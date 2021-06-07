@@ -64,10 +64,10 @@ func TestResetHappyPathWithoutPayout(t *testing.T) {
 
 		// run command
 		resetRun(nil, nil)
-		require.Regexp(t, happyPathRegex, hook.logs.String())
+		assert.Regexp(t, happyPathRegex, hook.logs.String())
 
 		// check if args file was created
-		require.FileExists(t, argsPath)
+		assert.FileExists(t, argsPath)
 
 		// read file and make sure values are exactly as expected
 		var actualArgs []interface{}
@@ -116,10 +116,10 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 
 		// run command
 		resetRun(nil, nil)
-		require.Regexp(t, happyPathRegex, hook.logs.String())
+		assert.Regexp(t, happyPathRegex, hook.logs.String())
 
 		// check if args file was created
-		require.FileExists(t, argsPath)
+		assert.FileExists(t, argsPath)
 
 		// read file and make sure values are exactly as expected
 		var actualArgs []interface{}
@@ -129,6 +129,37 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 		// extract args
 		expectedArgs := extractResetEpochArgs(rootSnapshot)
 		verifyArguments(t, expectedArgs, actualArgs)
+	})
+}
+
+// TestResetNoSnapshot tests that without the root snapshot file in the bootstrap
+// dir, the command exits and does not output a args json file
+func TestResetNoSnapshot(t *testing.T) {
+
+	unittest.RunWithTempDir(t, func(bootDir string) {
+
+		var noSnapshotRegex = regexp.MustCompile(`^root-protocol-snapshot.json file does not exists in the --boot-dir given`)
+
+		// to match regex
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
+
+		// path to args file (if created)
+		path, err := os.Getwd()
+		require.NoError(t, err)
+		argsPath := filepath.Join(path, resetArgsFileName)
+
+		// set initial flag values
+		// root snapshot json file does not exist within this dir
+		flagBootDir = bootDir
+		flagPayout = ""
+
+		// run command
+		resetRun(nil, nil)
+		assert.Regexp(t, noSnapshotRegex, hook.logs.String())
+
+		// check if args file was created
+		assert.NoFileExists(t, argsPath)
 	})
 }
 

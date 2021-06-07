@@ -60,7 +60,8 @@ func resetRun(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Str("path", snapshotPath).Msgf("could not check if root protocol-snapshot.json exists")
 	}
 	if !exists {
-		log.Fatal().Str("path", snapshotPath).Msgf("root-protocol-snapshot.json file does not exists in the `boot-dir` given")
+		log.Error().Str("path", snapshotPath).Msgf("root-protocol-snapshot.json file does not exists in the --boot-dir given")
+		return
 	}
 
 	// path to the JSON encoded cadence arguments for the `resetEpoch` transaction
