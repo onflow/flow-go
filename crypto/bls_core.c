@@ -44,7 +44,7 @@ int check_membership_G1(const ep_t p){
     // section 3.2 from https://eprint.iacr.org/2019/814.pdf
     return bowe_subgroup_check_G1(p);
     #else
-    return INVALID;
+    return UNDEFINED;
     #endif
 #endif
     return VALID;
@@ -65,9 +65,9 @@ int check_membership_G2(const ep2_t p){
     return simple_subgroup_check_G2(p);
     #elif MEMBERSHIP_CHECK_G2 == BOWE
     // TODO: implement Bowe's check
-    return INVALID;
+    return UNDEFINED;
     #else
-    return INVALID;
+    return UNDEFINED;
     #endif
 #endif
     return VALID;
@@ -162,8 +162,9 @@ int bls_verifyPerDistinctMessage(const byte* sig,
 
     // elemsG1[0] = sig
     ep_new(elemsG1[0]);
-    if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
-        return INVALID;
+    int read_ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
+    if (read_ret != RLC_OK) 
+        return read_ret;
 
     // check s is on curve and in G1
     if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
@@ -237,8 +238,9 @@ int bls_verifyPerDistinctKey(const byte* sig,
 
     // elemsG1[0] = s
     ep_new(elemsG1[0]);
-    if (ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN) != RLC_OK) 
-        return INVALID;
+    int read_ret = ep_read_bin_compact(elemsG1[0], sig, SIGNATURE_LEN);
+    if (read_ret != RLC_OK) 
+        return read_ret;
 
     // check s is on curve and in G1
     if (check_membership_G1(elemsG1[0]) != VALID) // only enabled if MEMBERSHIP_CHECK==1
@@ -306,8 +308,9 @@ int bls_verify(const ep2_t pk, const byte* sig, const byte* data, const int len)
     ep_new(s);
     
     // deserialize the signature
-    if (ep_read_bin_compact(s, sig, SIGNATURE_LEN) != RLC_OK) 
-        return INVALID;
+    int read_ret = ep_read_bin_compact(s, sig, SIGNATURE_LEN);
+    if (read_ret != RLC_OK) 
+        return read_ret;
 
     // check s is on curve and in G1
     if (check_membership_G1(s) != VALID) // only enabled if MEMBERSHIP_CHECK==1
@@ -428,8 +431,10 @@ void bls_batchVerify(const int sigs_len, byte* results, const ep2_st* pks_input,
         // the tree aggregations remain valid.
         // - valid points are multiplied by a random scalar (same for public keys at same index)
         // to make sure a signature at index (i) is verified against the public key at the same index.
-        if ( ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN) != RLC_OK || \
-                check_membership_G1(&sigs[i]) != VALID) {
+        int read_ret = ep_read_bin_compact(&sigs[i], &sigs_bytes[SIGNATURE_LEN*i], SIGNATURE_LEN);
+        if ( read_ret != RLC_OK || check_membership_G1(&sigs[i]) != VALID) {
+            if (read_ret == UNDEFINED) // unexpected error case 
+                return;
             // set signature as infinity and set result as invald
             ep_set_infty(&sigs[i]);
             ep2_copy(&pks[i], (ep2_st*) &pks_input[i]);
