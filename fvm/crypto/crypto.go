@@ -44,7 +44,7 @@ func (DefaultSignatureVerifier) Verify(
 		fallthrough
 	case hash.SHA3_256:
 		var err error
-		if hasher, err = NewPrefixedHashing(hashAlgo, string(tag)); err != nil {
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
