@@ -21,13 +21,13 @@ import (
 
 var (
 	flagBootDir string
-	flagPayout  uint64
+	flagPayout  string
 )
 
 // resetCmd represents a command to reset epoch data in the Epoch smart contract
 var resetCmd = &cobra.Command{
 	Use:   "reset",
-	Short: "Generates `resetEpoch` JSON transaction arguments.",
+	Short: "Generates `resetEpoch` JSON transaction arguments",
 	Long:  "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file",
 	Run:   resetRun,
 }
@@ -41,7 +41,7 @@ func addResetCmdFlags() {
 	resetCmd.Flags().StringVar(&flagBootDir, "boot-dir", "", "path to the directory containing the bootstrap files")
 	_ = resetCmd.MarkFlagRequired("boot-dir")
 
-	resetCmd.Flags().Uint64Var(&flagPayout, "payout", 0, "the payout")
+	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout")
 }
 
 // resetRun resets epoch data in the Epoch smart contract with fields generated
@@ -90,6 +90,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
+	log.Info().Str("path", argsPath).Msg("wrote `resetEpoch` transaction arguments")
 }
 
 // extractResetEpochArgs extracts the required transaction arguments for the `resetEpoch` transaction
@@ -97,6 +98,12 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 
 	// get current epoch
 	epoch := snapshot.Epochs().Current()
+
+	// read epoch counter
+	epochCounter, err := epoch.Counter()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get epoch counter")
+	}
 
 	// read random source from epoch
 	randomSource, err := epoch.RandomSource()
@@ -116,13 +123,18 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		log.Fatal().Err(err).Msg("could not get final view from epoch")
 	}
 
-	return convertResetEpochArgs(randomSource, flagPayout, firstView, finalView)
+	return convertResetEpochArgs(epochCounter, randomSource, flagPayout, firstView, finalView)
 }
 
 // convertResetEpochArgs converts the arguments required by `resetEpoch` to cadence representations
-func convertResetEpochArgs(randomSource []byte, payout, firstView, finalView uint64) []cadence.Value {
+// Ref: https://github.com/onflow/flow-core-contracts/blob/feature/epochs/contracts/epochs/FlowEpoch.cdc#L370-L410
+// TODO: set ordering of the arguments for the transaction (should be same order as tx args)
+func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout string, firstView, finalView uint64) []cadence.Value {
 
 	args := make([]cadence.Value, 0)
+
+	// add epoch counter
+	args = append(args, cadence.NewUInt64(epochCounter))
 
 	// add random source
 	args = append(args, cadence.NewString(hex.EncodeToString(randomSource)))
@@ -131,8 +143,8 @@ func convertResetEpochArgs(randomSource []byte, payout, firstView, finalView uin
 	var cdcPayout cadence.Value
 	var err error
 
-	if payout != 0 {
-		cdcPayout, err = cadence.NewUFix64(fmt.Sprintf("%d.0", payout))
+	if payout != "" {
+		cdcPayout, err = cadence.NewUFix64(fmt.Sprintf("%s.0", payout))
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not convert payout to cadence type")
 		}
