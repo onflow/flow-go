@@ -44,7 +44,7 @@ func (DefaultSignatureVerifier) Verify(
 		fallthrough
 	case hash.SHA3_256:
 		var err error
-		if hasher, err = NewPrefixedHashing(hashAlgo, string(tag)); err != nil {
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
 		}
 	case hash.KMAC128:
@@ -175,6 +175,11 @@ func VerifySignatureFromRuntime(
 
 	if (sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1) && tag != string(flow.UserDomainTag[:]) {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported with tag different than %s", sigAlgo.String(), string(flow.UserDomainTag[:]))
+	}
+
+	// HashAlgorithmKMAC128_BLS_BLS12_381 and SignatureAlgorithmBLS_BLS12_381 only function with each other
+	if (signatureAlgorithm == runtime.SignatureAlgorithmBLS_BLS12_381) != (hashAlgorithm == runtime.HashAlgorithmKMAC128_BLS_BLS12_381) {
+		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "cannot use hashing algorithm type %s with signature signature algorithm type %s", hashAlgorithm.String(), signatureAlgorithm.String())
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
