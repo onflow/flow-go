@@ -44,7 +44,7 @@ func addResetCmdFlags() {
 	resetCmd.Flags().StringVar(&flagBootDir, "boot-dir", "", "path to the directory containing the bootstrap files")
 	_ = resetCmd.MarkFlagRequired("boot-dir")
 
-	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout")
+	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout eg. 10000.0")
 }
 
 // resetRun resets epoch data in the Epoch smart contract with fields generated
@@ -150,7 +150,8 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	var err error
 
 	if payout != "" {
-		if ok := strings.HasSuffix(payout, ".0"); !ok {
+		index := strings.Index(payout, ".")
+		if index == -1 {
 			payout = fmt.Sprintf("%s.0", payout)
 		}
 

@@ -112,7 +112,7 @@ func TestResetHappyPathWithPayout(t *testing.T) {
 
 		// set initial flag values
 		flagBootDir = bootDir
-		flagPayout = "10000.0"
+		flagPayout = "10000.0254"
 
 		// run command
 		resetRun(nil, nil)
