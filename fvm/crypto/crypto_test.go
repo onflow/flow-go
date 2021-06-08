@@ -172,6 +172,20 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 				},
 			}, {
 				signTag:   string(flow.UserDomainTag[:]),
+				verifyTag: string(flow.UserDomainTag[:]),
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			}, {
+				signTag:   flow.UserTagString,
+				verifyTag: flow.UserTagString,
+				require: func(t *testing.T, sigOk bool, err error) {
+					require.NoError(t, err)
+					require.True(t, sigOk)
+				},
+			}, {
+				signTag:   string(flow.UserDomainTag[:]),
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
