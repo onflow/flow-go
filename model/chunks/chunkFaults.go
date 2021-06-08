@@ -84,7 +84,7 @@ type CFInvalidEventsCollection struct {
 	expected   flow.Identifier
 	computed   flow.Identifier
 	chunkIndex uint64
-	execResID  flow.Identifier
+	resultID   flow.Identifier
 }
 
 func NewCFInvalidEventsCollection(expected flow.Identifier, computed flow.Identifier, chInx uint64, execResID flow.Identifier) *CFInvalidEventsCollection {
@@ -92,7 +92,7 @@ func NewCFInvalidEventsCollection(expected flow.Identifier, computed flow.Identi
 		expected:   expected,
 		computed:   computed,
 		chunkIndex: chInx,
-		execResID:  execResID,
+		resultID:   execResID,
 	}
 }
 
@@ -101,11 +101,11 @@ func (c *CFInvalidEventsCollection) ChunkIndex() uint64 {
 }
 
 func (c *CFInvalidEventsCollection) ExecutionResultID() flow.Identifier {
-	return c.execResID
+	return c.resultID
 }
 
 func (c *CFInvalidEventsCollection) String() string {
-	return fmt.Sprintf("events collection hash differs, got %x expected %x", c.computed, c.expected)
+	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
 }
 
 // CFInvalidVerifiableChunk is returned when a verifiable chunk is invalid

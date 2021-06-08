@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -44,11 +45,6 @@ func (e Event) String() string {
 func (e Event) ID() Identifier {
 	return MakeID(wrapEventID(e))
 }
-
-// Body returns the body of the execution receipt.
-//func (e *Event) Body() interface{} {
-//	return wrapEventID(*e)
-//}
 
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
@@ -101,18 +97,18 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// Hash calculates a hash of merkle trie build of events inside a list
-// based on their IDs and Fingerprint
-// The order of items does *NOT* matter, however every Event inside has
-// internal index inside transaction so any discrepancies there would result
-// in different hashes and list inequality anyway.
-func (e EventsList) Hash() Identifier {
+// Hash calculates a hash of events list,
+// by simply hashing byte representation of events in the lists
+func (e EventsList) Hash() (Identifier, error) {
 
-	ids := make([]IDWithFingerprint, len(e))
+	hasher := hash.NewSHA3_256()
 
-	for i, event := range e {
-		ids[i] = event
+	for _, event := range e {
+		_, err := hasher.Write(event.Fingerprint())
+		if err != nil {
+			return ZeroID, fmt.Errorf("cannot write to hasher: %w", err)
+		}
 	}
 
-	return MerkleRootOfList(ids)
+	return HashToID(hasher.SumHash()), nil
 }

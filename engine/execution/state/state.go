@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -320,6 +321,9 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 
 func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error {
 
+	spew.Config.DisableMethods = true
+	spew.Config.DisablePointerMethods = true
+
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
 
@@ -355,11 +359,10 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 
 	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
 
-	for i, e := range events {
-		err = s.events.BatchStore(blockID, e, batch)
-		if err != nil {
-			return fmt.Errorf("cannot store events for chunk %d: %w", i, err)
-		}
+	err = s.events.BatchStore(blockID, events, batch)
+
+	if err != nil {
+		return fmt.Errorf("cannot store events: %w", err)
 	}
 
 	err = s.serviceEvents.BatchStore(blockID, serviceEvents, batch)

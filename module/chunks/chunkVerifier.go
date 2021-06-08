@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/verification"
 
@@ -34,7 +35,6 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 		vm:    vm,
 		vmCtx: vmCtx,
 		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithRestrictedDeployment(false),
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
@@ -72,7 +72,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	}
 
 	// transaction body of system chunk
-	txBody := fvm.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
+	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
 	tx := fvm.Transaction(txBody, uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
@@ -186,7 +186,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
 	}
 
-	eventsHash := events.Hash()
+	eventsHash, err := events.Hash()
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
+	}
 	if chunk.EventCollection != eventsHash {
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
 	}

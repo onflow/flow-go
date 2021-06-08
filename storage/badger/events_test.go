@@ -21,13 +21,14 @@ func TestEventStoreRetrieve(t *testing.T) {
 		blockID := unittest.IdentifierFixture()
 		tx1ID := unittest.IdentifierFixture()
 		tx2ID := unittest.IdentifierFixture()
-		evt1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID, 0)
-		evt2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID, 0)
-		evt3 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID, 0)
-		expected := []flow.Event{
-			evt1,
-			evt2,
-			evt3,
+		evt1_1 := unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx1ID, 0)
+		evt1_2 := unittest.EventFixture(flow.EventAccountCreated, 1, 1, tx2ID, 0)
+
+		evt2_1 := unittest.EventFixture(flow.EventAccountUpdated, 2, 2, tx2ID, 0)
+
+		expected := []flow.EventsList{
+			{evt1_1, evt1_2},
+			{evt2_1},
 		}
 
 		batch := badgerstorage.NewBatch(db)
@@ -42,21 +43,21 @@ func TestEventStoreRetrieve(t *testing.T) {
 		actual, err := store.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Len(t, actual, 3)
-		require.Contains(t, actual, evt1)
-		require.Contains(t, actual, evt2)
-		require.Contains(t, actual, evt3)
+		require.Contains(t, actual, evt1_1)
+		require.Contains(t, actual, evt1_2)
+		require.Contains(t, actual, evt2_1)
 
 		// retrieve by blockID and event type
 		actual, err = store.ByBlockIDEventType(blockID, flow.EventAccountCreated)
 		require.NoError(t, err)
 		require.Len(t, actual, 2)
-		require.Contains(t, actual, evt1)
-		require.Contains(t, actual, evt2)
+		require.Contains(t, actual, evt1_1)
+		require.Contains(t, actual, evt1_2)
 
 		actual, err = store.ByBlockIDEventType(blockID, flow.EventAccountUpdated)
 		require.NoError(t, err)
 		require.Len(t, actual, 1)
-		require.Contains(t, actual, evt3)
+		require.Contains(t, actual, evt2_1)
 
 		actual, err = store.ByBlockIDEventType(blockID, flow.EventEpochSetup)
 		require.NoError(t, err)
@@ -66,7 +67,7 @@ func TestEventStoreRetrieve(t *testing.T) {
 		actual, err = store.ByBlockIDTransactionID(blockID, tx1ID)
 		require.NoError(t, err)
 		require.Len(t, actual, 1)
-		require.Contains(t, actual, evt1)
+		require.Contains(t, actual, evt1_1)
 
 		// test loading from database
 
@@ -74,9 +75,9 @@ func TestEventStoreRetrieve(t *testing.T) {
 		actual, err = newStore.ByBlockID(blockID)
 		require.NoError(t, err)
 		require.Len(t, actual, 3)
-		require.Contains(t, actual, evt1)
-		require.Contains(t, actual, evt2)
-		require.Contains(t, actual, evt3)
+		require.Contains(t, actual, evt1_1)
+		require.Contains(t, actual, evt1_2)
+		require.Contains(t, actual, evt2_1)
 	})
 }
 
