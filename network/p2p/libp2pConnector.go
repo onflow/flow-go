@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -117,6 +118,7 @@ func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 	allCurrentConns := l.host.Network().Conns()
 
 	// for each connection, check if that connection should be trimmed
+ConnectionLoop:
 	for _, conn := range allCurrentConns {
 
 		// get the remote peer ID for this connection
@@ -124,11 +126,23 @@ func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 
 		// check if the peer ID is included in the current fanout
 		if peersToKeep[peerID] {
-			continue
+			continue ConnectionLoop
 		}
 
 		peerInfo := l.host.Network().Peerstore().PeerInfo(peerID)
 		log := l.log.With().Str("remote_peer", peerInfo.String()).Logger()
+
+		// retain the connection if there is a Flow One-to-One stream on that connection
+		// (we do not want to sever a connection with on going direct one-to-one traffic)
+		for _, s := range conn.GetStreams() {
+			streamProtocol := string(s.Protocol())
+			if strings.HasPrefix(streamProtocol, FlowLibP2PProtocolCommonPrefix) {
+				log.Info().
+					Str("stream_protocol", streamProtocol).
+					Msg("skipping connection pruning with peer due to one-to-one stream")
+				continue ConnectionLoop
+			}
+		}
 
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)

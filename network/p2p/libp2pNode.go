@@ -35,9 +35,16 @@ import (
 )
 
 const (
+
+	// The common prefix for all Libp2p protocol IDs used for Flow
+	FlowLibP2PProtocolCommonPrefix = "/flow"
+
 	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
 	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
-	FlowLibP2PProtocolIDPrefix = "/flow/push/"
+	FlowLibP2POneToOneProtocolIDPrefix = FlowLibP2PProtocolCommonPrefix + "/push/"
+
+	// the Flow Ping protocol prefix
+	FlowLibP2PPingProtocolPrefix = FlowLibP2PProtocolCommonPrefix + "/ping/"
 
 	// Maximum time to wait for a ping reply from a remote node
 	PingTimeoutSecs = time.Second * 4

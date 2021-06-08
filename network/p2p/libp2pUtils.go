@@ -160,11 +160,11 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 }
 
 func generateFlowProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID)
 }
 
 func generatePingProtcolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PPingPrefix + rootBlockID)
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID)
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
