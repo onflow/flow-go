@@ -24,8 +24,8 @@ func TestHashWithTag(t *testing.T) {
 			hash.SHA3_384,
 		}
 
-		okTag := [32]byte{}
-		longTag := [33]byte{}
+		okTag := [flow.DomainTagLength / 2]byte{}   // tag does not exceed 32 bytes
+		longTag := [flow.DomainTagLength + 1]byte{} // tag larger that 32 bytes
 
 		for i, algorithm := range algorithms {
 			t.Run(fmt.Sprintf("algo %d: %v", i, algorithm), func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		pk, err := gocrypto.GeneratePrivateKey(gocrypto.BLSBLS12381, seed)
 		require.NoError(t, err)
 
-		tag := make([]byte, 256) // cosntant larger than 32 (padded tag length)
+		tag := make([]byte, 2*flow.DomainTagLength) // cosntant larger than 32 (padded tag length)
 		rand.Read(tag)
 		hasher := gocrypto.NewBLSKMAC(string(tag))
 
