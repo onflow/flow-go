@@ -277,13 +277,13 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to flush stream for %s: %w", targetIdentity.String(), err)
 	}
 
 	// close the stream immediately
 	err = stream.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close the stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to close the stream for %s: %w", targetIdentity.String(), err)
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
@@ -327,12 +327,9 @@ func identityList(identityMap map[flow.Identifier]flow.Identity) flow.IdentityLi
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// qualify the logger with local and remote address
-	log := m.log.With().
-		Str("local_addr", s.Conn().LocalMultiaddr().String()).
-		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
-		Logger()
+	log := streamLogger(m.log, s)
 
-	log.Info().Msg("incoming connection established")
+	log.Info().Msg("incoming stream received")
 
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
