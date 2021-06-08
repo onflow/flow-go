@@ -37,8 +37,8 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.16.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210510205428-30d94f82bc8c
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210510205428-30d94f82bc8c
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210602203947-82cffc9c55ed
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210602203947-82cffc9c55ed
 	github.com/onflow/flow-emulator v0.19.0
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.12.0
@@ -48,9 +48,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/zerolog v1.19.0
-	github.com/spf13/cobra v0.0.6
-	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.4.0
+	github.com/spf13/cobra v1.1.3
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-client-go v2.22.1+incompatible
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
