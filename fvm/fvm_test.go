@@ -1587,7 +1587,9 @@ func TestSignatureVerification(t *testing.T) {
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
 		func() hash.Hasher {
-			return crypto.NewBLSKMAC(string(flow.UserDomainTag[:]))
+			// TODO: once the crypto cobtract tag is updated and the tag used is not hardcoded to "user",
+			// the tag below can be updated.
+			return crypto.NewBLSKMAC("user")
 		},
 	})
 }

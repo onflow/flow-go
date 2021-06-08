@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/cadence/runtime"
 
@@ -120,7 +121,7 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bo
 func VerifySignatureFromRuntime(
 	verifier SignatureVerifier,
 	signature []byte,
-	rawTag string,
+	tag string,
 	message []byte,
 	rawPublicKey []byte,
 	signatureAlgorithm runtime.SignatureAlgorithm,
@@ -137,13 +138,6 @@ func VerifySignatureFromRuntime(
 		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 	}
 
-	tag := rawTag
-	// if the tag is `runtimeUserDomainTag` replace it with `flow.UserDomainTag`
-	// this is for backwards compatibility. In the future cadence should send `flow.UserDomainTag` directly
-	if tag == runtimeUserDomainTag {
-		tag = string(flow.UserDomainTag[:])
-	}
-
 	// check ECDSA compatibilites
 	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
 		// hashing compatibility
@@ -151,15 +145,20 @@ func VerifySignatureFromRuntime(
 			return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo.String(), sigAlgo.String())
 		}
+		// if the tag is `runtimeUserDomainTag` replace it with `flow.UserDomainTag`.
+		// this is for backwards compatibility of the crypto contract.
+		// In the future cadence should send `flow.UserDomainTag` directly.
+		if tag == runtimeUserDomainTag {
+			tag = flow.UserTagString
+		}
 		// tag compatibility
-		if tag != string(flow.UserDomainTag[:]) {
-			return false, errors.NewValueErrorf("signature algorithm type %s not supported with tag different than %s",
-				sigAlgo.String(), string(flow.UserDomainTag[:]))
+		if !tagECDSACheck(tag) {
+			return false, errors.NewValueErrorf("tag %s is not supported", tag)
 		}
 	}
 
 	// check BLS compatibilites
-	if (sigAlgo == crypto.BLSBLS12381) != (hashAlgo == hash.KMAC128) {
+	if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
 		// hashing compatibility
 		return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
 			hashAlgo.String(), sigAlgo.String())
@@ -183,6 +182,29 @@ func VerifySignatureFromRuntime(
 	}
 
 	return valid, nil
+}
+
+// check compatible tags with ECDSA
+//
+// Only tags with a prefix flow.UserTagString and zero paddings are accepted.
+func tagECDSACheck(tag string) bool {
+
+	if len(tag) > flow.DomainTagLength {
+		return false
+	}
+
+	if !strings.HasPrefix(tag, flow.UserTagString) {
+		return false
+	}
+
+	// check the remaining bytes are zeros
+	remaining := tag[len(flow.UserTagString):]
+	for _, b := range []byte(remaining) {
+		if b != 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // TODO: to delete and only rely on flow.UserDomainTag
