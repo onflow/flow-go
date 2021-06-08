@@ -108,6 +108,35 @@ func (c *CFInvalidEventsCollection) String() string {
 	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
 }
 
+// CFInvalidSystemEventsEmitted is returned when service events are different from the chunk's one
+type CFInvalidSystemEventsEmitted struct {
+	expected   flow.Identifier
+	computed   flow.Identifier
+	chunkIndex uint64
+	resultID   flow.Identifier
+}
+
+func CFInvalidServiceSystemEventsEmitted(expected flow.Identifier, computed flow.Identifier, chInx uint64, execResID flow.Identifier) *CFInvalidSystemEventsEmitted {
+	return &CFInvalidSystemEventsEmitted{
+		expected:   expected,
+		computed:   computed,
+		chunkIndex: chInx,
+		resultID:   execResID,
+	}
+}
+
+func (c *CFInvalidSystemEventsEmitted) ChunkIndex() uint64 {
+	return c.chunkIndex
+}
+
+func (c *CFInvalidSystemEventsEmitted) ExecutionResultID() flow.Identifier {
+	return c.resultID
+}
+
+func (c *CFInvalidSystemEventsEmitted) String() string {
+	return fmt.Sprintf("service events differs, got [%s] expected [%s] for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
+}
+
 // CFInvalidVerifiableChunk is returned when a verifiable chunk is invalid
 // this includes cases that code fails to construct a partial trie,
 // collection hashes doesn't match

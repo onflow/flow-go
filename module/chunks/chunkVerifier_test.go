@@ -144,6 +144,17 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 	assert.IsType(s.T(), &chunksmodels.CFInvalidEventsCollection{}, chFault)
 }
 
+// TestServiceEventsMismatch tests verification behavior in case
+// of emitted service events not matching chunks'
+func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
+	vch := GetBaselineVerifiableChunk(s.T(), "serviceEventsMismatch")
+	assert.NotNil(s.T(), vch)
+	_, chFault, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFault)
+	assert.IsType(s.T(), &chunksmodels.CFInvalidSystemEventsEmitted{}, chFault)
+}
+
 // TestVerifyWrongChunkType evaluates that following invocations return an error:
 // - verifying a system chunk with Verify method.
 // - verifying a non-system chunk with SystemChunkVerify method.
