@@ -10,9 +10,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -207,6 +209,16 @@ func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 		validIDs = append(validIDs, peerInfo)
 	}
 	return validIDs, invalidIDs
+}
+
+// streamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
+func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
+	logger := log.With().
+		Str("remote_peer", stream.Conn().RemotePeer().String()).
+		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
+		Str("local_peer", stream.Conn().LocalPeer().String()).
+		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
+	return logger
 }
 
 // flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
