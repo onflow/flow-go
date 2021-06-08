@@ -42,6 +42,10 @@ func TestHashWithTag(t *testing.T) {
 }
 
 func TestVerifySignatureFromRuntime(t *testing.T) {
+
+	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
+	seedLength := 64
+
 	t.Run("verify should fail on incorrect combinations", func(t *testing.T) {
 		correctCombinations := make(map[runtime.SignatureAlgorithm]map[runtime.HashAlgorithm]struct{})
 
@@ -70,7 +74,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		for _, s := range signatureAlgos {
 			for _, h := range hashAlgos {
 				t.Run(fmt.Sprintf("combination: %v, %v", s, h), func(t *testing.T) {
-					seed := make([]byte, 256)
+					seed := make([]byte, seedLength)
 					rand.Read(seed)
 					pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 					require.NoError(t, err)
@@ -117,12 +121,12 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 	})
 
 	t.Run("BLS verification tag size > 32 bytes should pass", func(t *testing.T) {
-		seed := make([]byte, 256)
+		seed := make([]byte, seedLength)
 		rand.Read(seed)
 		pk, err := gocrypto.GeneratePrivateKey(gocrypto.BLSBLS12381, seed)
 		require.NoError(t, err)
 
-		tag := make([]byte, 256)
+		tag := make([]byte, 256) // cosntant larger than 32 (padded tag length)
 		rand.Read(tag)
 		hasher := gocrypto.NewBLSKMAC(string(tag))
 
@@ -198,7 +202,7 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 			for _, s := range signatureAlgos {
 				for _, h := range hashAlgos {
 					t.Run(fmt.Sprintf("hash tag: %v, verify tag: %v [%v, %v]", c.hashTag, c.verifyTag, s, h), func(t *testing.T) {
-						seed := make([]byte, 256)
+						seed := make([]byte, seedLength)
 						rand.Read(seed)
 						pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 						require.NoError(t, err)
@@ -230,8 +234,11 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 
 func TestValidatePublicKey(t *testing.T) {
 
+	// make sure the seed length is larger than miniumum seed lengths of all signature schemes
+	seedLength := 64
+
 	validPublicKey := func(t *testing.T, s runtime.SignatureAlgorithm) []byte {
-		seed := make([]byte, 256)
+		seed := make([]byte, seedLength)
 		rand.Read(seed)
 		pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 		require.NoError(t, err)
