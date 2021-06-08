@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,7 +151,7 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	if payout != "" {
 		index := strings.Index(payout, ".")
 		if index == -1 {
-			payout = fmt.Sprintf("%s.0", payout)
+			log.Fatal().Msg("invalid --payout, eg: 10000.0")
 		}
 
 		cdcPayout, err = cadence.NewUFix64(payout)
