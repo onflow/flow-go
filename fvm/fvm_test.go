@@ -23,6 +23,7 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	crypto2 "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -1773,6 +1774,55 @@ func TestHashing(t *testing.T) {
 			}
 
 			c.Check(t, hex.EncodeToString(byteResult), script.Err, err)
+		})
+	}
+
+	hashAlgos := []runtime.HashAlgorithm{
+		runtime.HashAlgorithmSHA2_256,
+		runtime.HashAlgorithmSHA3_256,
+		runtime.HashAlgorithmSHA2_384,
+		runtime.HashAlgorithmSHA3_384,
+		runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+	}
+
+	for i, algo := range hashAlgos {
+		t.Run(fmt.Sprintf("compare hash results without tag %v: %v", i, algo), func(t *testing.T) {
+			code := hashWithTagScript(algo.Name())
+			script := fvm.Script(code)
+			script = script.WithArguments(
+				cadenceData,
+				jsoncdc.MustEncode(cadence.String("")),
+			)
+			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.NoError(t, script.Err)
+
+			result1 := make([]byte, 0)
+			cadenceArray := script.Value.(cadence.Array)
+			for _, value := range cadenceArray.Values {
+				result1 = append(result1, value.(cadence.UInt8).ToGoValue().(uint8))
+			}
+
+			code = hashScript(algo.Name())
+			script = fvm.Script(code)
+			script = script.WithArguments(
+				cadenceData,
+			)
+			err = vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.NoError(t, script.Err)
+
+			result2 := make([]byte, 0)
+			cadenceArray = script.Value.(cadence.Array)
+			for _, value := range cadenceArray.Values {
+				result2 = append(result2, value.(cadence.UInt8).ToGoValue().(uint8))
+			}
+
+			result3, err := crypto2.HashWithTag(crypto2.RuntimeToCryptoHashingAlgorithm(algo), "", data)
+			require.NoError(t, err)
+
+			require.Equal(t, result1, result2)
+			require.Equal(t, result1, result3)
 		})
 	}
 }
