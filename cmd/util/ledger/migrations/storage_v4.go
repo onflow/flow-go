@@ -295,7 +295,7 @@ func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) 
 
 	fmt.Printf(
 		"Rewriting TokenForwarding Forwarder: %s\n\treference: %#+v\n\tcapability: %#+v\n",
-		compositeValue.String(interpreter.StringResults{}),
+		compositeValue.String(),
 		recipientRef,
 		recipientCap,
 	)
