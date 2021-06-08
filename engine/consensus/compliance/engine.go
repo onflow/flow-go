@@ -41,8 +41,8 @@ type Engine struct {
 	state          protocol.State
 	prov           network.Engine
 	core           *Core
-	pendingBlocks  *engine.FifoMessageStore
-	pendingVotes   *engine.FifoMessageStore
+	pendingBlocks  engine.MessageStore
+	pendingVotes   engine.MessageStore
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
 }
@@ -79,6 +79,7 @@ func NewEngine(
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
 		log.With().Str("compliance", "engine").Logger(),
+		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockProposal)

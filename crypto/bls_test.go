@@ -56,16 +56,20 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 	t.Run("Empty hasher", func(t *testing.T) {
 		_, err := sk.Sign(seed, nil)
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		_, err = sk.PublicKey().Verify(sig, seed, nil)
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 	})
 
 	// short size hasher
 	t.Run("Empty hasher", func(t *testing.T) {
 		_, err := sk.Sign(seed, hash.NewSHA2_256())
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		_, err = sk.PublicKey().Verify(sig, seed, hash.NewSHA2_256())
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 	})
 
 	t.Run("NewBLSKMAC sanity check", func(t *testing.T) {
@@ -91,11 +95,13 @@ func TestBLSEncodeDecode(t *testing.T) {
 	skBytes := make([]byte, PrKeyLenBLSBLS12381)
 	_, err := DecodePrivateKey(BLSBLS12381, skBytes)
 	require.Error(t, err, "the key decoding should fail - key value is zero")
+	assert.IsType(t, expectedError, err)
 	//  identity public key
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
 	pkBytes[0] = 0xC0
 	_, err = DecodePublicKey(BLSBLS12381, pkBytes)
 	require.Error(t, err, "the key decoding should fail - key value is identity")
+	assert.IsType(t, expectedError, err)
 }
 
 // TestBLSEquals tests equal for BLS keys
@@ -254,6 +260,7 @@ func TestAggregateSignatures(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		_, err = AggregateBLSSignatures(sigs[:0])
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 	})
 }
 
@@ -299,9 +306,11 @@ func TestAggregatePubKeys(t *testing.T) {
 		// private keys
 		_, err := AggregateBLSPrivateKeys(sks[:0])
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		// public keys
 		_, err = AggregateBLSPublicKeys(pks[:0])
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 	})
 
 	// aggregate an empty list
@@ -415,7 +424,6 @@ func TestBatchVerify(t *testing.T) {
 	// hasher
 	kmac := NewBLSKMAC("test tag")
 	// number of signatures to aggregate
-	// TODO: add a test for 1 signature
 	sigsNum := mrand.Intn(100) + 2
 	sigs := make([]Signature, 0, sigsNum)
 	sks := make([]PrivateKey, 0, sigsNum)
@@ -439,6 +447,15 @@ func TestBatchVerify(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, kmac)
 		require.NoError(t, err)
 		assert.Equal(t, valid, expectedValid,
+			fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
+				sigs, sks, input, valid))
+	})
+
+	// one valid signature
+	t.Run("one valid signature", func(t *testing.T) {
+		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:1], sigs[:1], input, kmac)
+		require.NoError(t, err)
+		assert.Equal(t, valid, expectedValid[:1],
 			fmt.Sprintf("Verification of %s failed, private keys are %s, input is %x, results is %v",
 				sigs, sks, input, valid))
 	})
@@ -491,6 +508,7 @@ func TestBatchVerify(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:0], sigs[:0], input, kmac)
 		require.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		assert.Equal(t, valid, []bool{},
 			fmt.Sprintf("verification should fail with empty list key, got %v", valid))
 	})
@@ -499,6 +517,7 @@ func TestBatchVerify(t *testing.T) {
 	t.Run("inconsistent inputs", func(t *testing.T) {
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks[:len(pks)-1], sigs, input, kmac)
 		require.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		assert.Equal(t, valid, []bool{},
 			fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
 	})
@@ -510,6 +529,7 @@ func TestBatchVerify(t *testing.T) {
 		}
 		valid, err := BatchVerifyBLSSignaturesOneMessage(pks, sigs, input, nil)
 		require.Error(t, err)
+		assert.IsType(t, expectedError, err)
 
 		assert.Equal(t, valid, expectedValid,
 			fmt.Sprintf("verification should fail with incorrect input lenghts, got %v", valid))
@@ -670,6 +690,7 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 	t.Run("empty list", func(t *testing.T) {
 		valid, err := VerifyBLSSignatureManyMessages(inputPks[:0], aggSig, inputMsgs, inputKmacs)
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		assert.False(t, valid,
 			fmt.Sprintf("verification should fail with an empty key list"))
 	})
@@ -678,11 +699,13 @@ func TestAggregateSignaturesManyMessages(t *testing.T) {
 	t.Run("inconsistent inputs", func(t *testing.T) {
 		valid, err := VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs[:sigsNum-1], inputKmacs)
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		assert.False(t, valid,
 			fmt.Sprintf("verification should fail with empty list key"))
 
 		valid, err = VerifyBLSSignatureManyMessages(inputPks, aggSig, inputMsgs, inputKmacs[:sigsNum-1])
 		assert.Error(t, err)
+		assert.IsType(t, expectedError, err)
 		assert.False(t, valid,
 			fmt.Sprintf("verification should fail with empty list key"))
 	})

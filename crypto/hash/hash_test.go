@@ -163,7 +163,6 @@ func TestKmac128(t *testing.T) {
 	// test short key length
 	_, err = NewKMAC_128(key[:15], customizers[0], outputSize)
 	assert.Error(t, err)
-
 }
 
 // TestHashersAPI tests the expected definition of the hashers APIs

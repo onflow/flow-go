@@ -22,6 +22,20 @@ func (_m *JobConsumer) NotifyJobIsDone(_a0 module.JobID) {
 	_m.Called(_a0)
 }
 
+// Size provides a mock function with given fields:
+func (_m *JobConsumer) Size() uint {
+	ret := _m.Called()
+
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint)
+	}
+
+	return r0
+}
+
 // Start provides a mock function with given fields: defaultIndex
 func (_m *JobConsumer) Start(defaultIndex uint64) error {
 	ret := _m.Called(defaultIndex)

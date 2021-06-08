@@ -16,7 +16,7 @@ IMAGE_TAG := ${SHORT_COMMIT}
 endif
 
 # Name of the cover profile
-COVER_PROFILE := cover.out
+COVER_PROFILE := coverage.txt
 # Disable go sum database lookup for private repos
 GOPRIVATE=github.com/dapperlabs/*
 # OS
@@ -60,7 +60,7 @@ install-tools: crypto/relic/build check-go-version
 .PHONY: unittest
 unittest:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
@@ -112,6 +112,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol/events" -case=underscore -output="./state/protocol/events/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/consensus -case=underscore -output="./engine/consensus/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"

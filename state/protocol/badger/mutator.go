@@ -478,7 +478,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	}
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve pending block: %w", err)
+		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
 	}
 	header := block.Header
 	if header.ParentID != finalID {
