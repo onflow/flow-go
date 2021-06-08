@@ -47,16 +47,20 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 	seedLength := 64
 
 	t.Run("verify should fail on incorrect combinations", func(t *testing.T) {
-		correctCombinations := make(map[runtime.SignatureAlgorithm]map[runtime.HashAlgorithm]struct{})
+		correctCombinations := map[runtime.SignatureAlgorithm]map[runtime.HashAlgorithm]struct{}{
 
-		correctCombinations[runtime.SignatureAlgorithmBLS_BLS12_381] = make(map[runtime.HashAlgorithm]struct{})
-		correctCombinations[runtime.SignatureAlgorithmBLS_BLS12_381][runtime.HashAlgorithmKMAC128_BLS_BLS12_381] = struct{}{}
-		correctCombinations[runtime.SignatureAlgorithmECDSA_P256] = make(map[runtime.HashAlgorithm]struct{})
-		correctCombinations[runtime.SignatureAlgorithmECDSA_P256][runtime.HashAlgorithmSHA2_256] = struct{}{}
-		correctCombinations[runtime.SignatureAlgorithmECDSA_P256][runtime.HashAlgorithmSHA3_256] = struct{}{}
-		correctCombinations[runtime.SignatureAlgorithmECDSA_secp256k1] = make(map[runtime.HashAlgorithm]struct{})
-		correctCombinations[runtime.SignatureAlgorithmECDSA_secp256k1][runtime.HashAlgorithmSHA2_256] = struct{}{}
-		correctCombinations[runtime.SignatureAlgorithmECDSA_secp256k1][runtime.HashAlgorithmSHA3_256] = struct{}{}
+			runtime.SignatureAlgorithmBLS_BLS12_381: map[runtime.HashAlgorithm]struct{}{
+				runtime.HashAlgorithmKMAC128_BLS_BLS12_381: struct{}{},
+			},
+			runtime.SignatureAlgorithmECDSA_P256: map[runtime.HashAlgorithm]struct{}{
+				runtime.HashAlgorithmSHA2_256: struct{}{},
+				runtime.HashAlgorithmSHA3_256: struct{}{},
+			},
+			runtime.SignatureAlgorithmECDSA_secp256k1: map[runtime.HashAlgorithm]struct{}{
+				runtime.HashAlgorithmSHA2_256: struct{}{},
+				runtime.HashAlgorithmSHA3_256: struct{}{},
+			},
+		}
 
 		signatureAlgos := []runtime.SignatureAlgorithm{
 			runtime.SignatureAlgorithmECDSA_P256,
@@ -155,33 +159,33 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 	t.Run("tag combinations", func(t *testing.T) {
 
 		cases := []struct {
-			hashTag   string
+			signTag   string
 			verifyTag string
 			require   func(t *testing.T, sigOk bool, err error)
 		}{
 			{
-				hashTag:   "user",
+				signTag:   "user",
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.False(t, sigOk)
 				},
 			}, {
-				hashTag:   string(flow.UserDomainTag[:]),
+				signTag:   string(flow.UserDomainTag[:]),
 				verifyTag: "user",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.True(t, sigOk)
 				},
 			}, {
-				hashTag:   "user",
+				signTag:   "user",
 				verifyTag: string(flow.UserDomainTag[:]),
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.NoError(t, err)
 					require.False(t, sigOk)
 				},
 			}, {
-				hashTag:   "random_tag",
+				signTag:   "random_tag",
 				verifyTag: "random_tag",
 				require: func(t *testing.T, sigOk bool, err error) {
 					require.Error(t, err)
@@ -201,13 +205,13 @@ func TestVerifySignatureFromRuntime(t *testing.T) {
 		for _, c := range cases {
 			for _, s := range signatureAlgos {
 				for _, h := range hashAlgos {
-					t.Run(fmt.Sprintf("hash tag: %v, verify tag: %v [%v, %v]", c.hashTag, c.verifyTag, s, h), func(t *testing.T) {
+					t.Run(fmt.Sprintf("hash tag: %v, verify tag: %v [%v, %v]", c.signTag, c.verifyTag, s, h), func(t *testing.T) {
 						seed := make([]byte, seedLength)
 						rand.Read(seed)
 						pk, err := gocrypto.GeneratePrivateKey(crypto.RuntimeToCryptoSigningAlgorithm(s), seed)
 						require.NoError(t, err)
 
-						hasher, err := crypto.NewPrefixedHashing(crypto.RuntimeToCryptoHashingAlgorithm(h), c.hashTag)
+						hasher, err := crypto.NewPrefixedHashing(crypto.RuntimeToCryptoHashingAlgorithm(h), c.signTag)
 						require.NoError(t, err)
 
 						sig, err := pk.Sign([]byte("some data"), hasher)
