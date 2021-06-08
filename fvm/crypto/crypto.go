@@ -11,56 +11,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const runtimeUserDomainTag = "user"
-
-type SignatureVerifier interface {
-	Verify(
-		signature []byte,
-		tag string,
-		message []byte,
-		publicKey crypto.PublicKey,
-		hashAlgo hash.HashingAlgorithm,
-	) (bool, error)
-}
-
-type DefaultSignatureVerifier struct{}
-
-func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
-	return DefaultSignatureVerifier{}
-}
-
-func (DefaultSignatureVerifier) Verify(
-	signature []byte,
-	tag string,
-	message []byte,
-	publicKey crypto.PublicKey,
-	hashAlgo hash.HashingAlgorithm,
-) (bool, error) {
-
-	var hasher hash.Hasher
-
-	switch hashAlgo {
-	case hash.SHA2_256:
-		fallthrough
-	case hash.SHA3_256:
-		var err error
-		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
-			return false, errors.NewValueErrorf(err.Error(), "verification failed")
-		}
-	case hash.KMAC128:
-		hasher = crypto.NewBLSKMAC(tag)
-	default:
-		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
-	}
-
-	valid, err := publicKey.Verify(signature, message, hasher)
-	if err != nil {
-		return false, fmt.Errorf("failed to verify signature: %w", err)
-	}
-
-	return valid, nil
-}
-
 func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
 	var hasher hash.Hasher
 
@@ -176,9 +126,15 @@ func VerifySignatureFromRuntime(
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
+
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
+	}
+
+	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	if hashAlgo == hash.UnknownHashingAlgorithm {
+		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 	}
 
 	tag := rawTag
@@ -188,18 +144,26 @@ func VerifySignatureFromRuntime(
 		tag = string(flow.UserDomainTag[:])
 	}
 
-	if (sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1) && tag != string(flow.UserDomainTag[:]) {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported with tag different than %s", sigAlgo.String(), string(flow.UserDomainTag[:]))
+	// check ECDSA compatibilites
+	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
+		// hashing compatibility
+		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+			return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
+				hashAlgo.String(), sigAlgo.String())
+		}
+		// tag compatibility
+		if tag != string(flow.UserDomainTag[:]) {
+			return false, errors.NewValueErrorf("signature algorithm type %s not supported with tag different than %s",
+				sigAlgo.String(), string(flow.UserDomainTag[:]))
+		}
 	}
 
-	// HashAlgorithmKMAC128_BLS_BLS12_381 and SignatureAlgorithmBLS_BLS12_381 only function with each other
-	if (signatureAlgorithm == runtime.SignatureAlgorithmBLS_BLS12_381) != (hashAlgorithm == runtime.HashAlgorithmKMAC128_BLS_BLS12_381) {
-		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "cannot use hashing algorithm type %s with signature signature algorithm type %s", hashAlgorithm.String(), signatureAlgorithm.String())
-	}
-
-	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
+	// check BLS compatibilites
+	if (sigAlgo == crypto.BLSBLS12381) != (hashAlgo == hash.KMAC128) {
+		// hashing compatibility
+		return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
+			hashAlgo.String(), sigAlgo.String())
+		// there are no tag constraints
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
@@ -216,6 +180,57 @@ func VerifySignatureFromRuntime(
 	)
 	if err != nil {
 		return false, err
+	}
+
+	return valid, nil
+}
+
+// TODO: to delete and only rely on flow.UserDomainTag
+const runtimeUserDomainTag = "user"
+
+type SignatureVerifier interface {
+	Verify(
+		signature []byte,
+		tag string,
+		message []byte,
+		publicKey crypto.PublicKey,
+		hashAlgo hash.HashingAlgorithm,
+	) (bool, error)
+}
+
+type DefaultSignatureVerifier struct{}
+
+func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
+	return DefaultSignatureVerifier{}
+}
+
+func (DefaultSignatureVerifier) Verify(
+	signature []byte,
+	tag string,
+	message []byte,
+	publicKey crypto.PublicKey,
+	hashAlgo hash.HashingAlgorithm,
+) (bool, error) {
+
+	var hasher hash.Hasher
+
+	switch hashAlgo {
+	case hash.SHA2_256:
+		fallthrough
+	case hash.SHA3_256:
+		var err error
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
+			return false, errors.NewValueErrorf(err.Error(), "verification failed")
+		}
+	case hash.KMAC128:
+		hasher = crypto.NewBLSKMAC(tag)
+	default:
+		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
+	}
+
+	valid, err := publicKey.Verify(signature, message, hasher)
+	if err != nil {
+		return false, fmt.Errorf("failed to verify signature: %w", err)
 	}
 
 	return valid, nil
