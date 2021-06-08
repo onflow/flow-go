@@ -21,8 +21,8 @@ const (
 	FlowLibP2PPingProtocolPrefix = FlowLibP2PProtocolCommonPrefix + "/ping/"
 )
 
-// isFlowProtocol returns true if the libp2p stream is for a Flow protocol
-func isFlowProtocol(stream network.Stream) bool {
+// isFlowProtocolStream returns true if the libp2p stream is for a Flow protocol
+func isFlowProtocolStream(stream network.Stream) bool {
 	protocol := string(stream.Protocol())
 	return strings.HasPrefix(protocol, FlowLibP2PProtocolCommonPrefix)
 }

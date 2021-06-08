@@ -224,7 +224,7 @@ func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logge
 // flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
 func flowStream(conn network.Conn) network.Stream {
 	for _, s := range conn.GetStreams() {
-		if isFlowProtocol(s) {
+		if isFlowProtocolStream(s) {
 			return s
 		}
 	}
