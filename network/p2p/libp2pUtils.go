@@ -208,3 +208,13 @@ func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 	}
 	return validIDs, invalidIDs
 }
+
+// flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
+func flowStream(conn network.Conn) network.Stream {
+	for _, s := range conn.GetStreams() {
+		if isFlowProtocol(s) {
+			return s
+		}
+	}
+	return nil
+}

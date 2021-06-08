@@ -36,22 +36,12 @@ import (
 
 const (
 
-	// The common prefix for all Libp2p protocol IDs used for Flow
-	FlowLibP2PProtocolCommonPrefix = "/flow"
-
-	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
-	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
-	FlowLibP2POneToOneProtocolIDPrefix = FlowLibP2PProtocolCommonPrefix + "/push/"
-
-	// the Flow Ping protocol prefix
-	FlowLibP2PPingProtocolPrefix = FlowLibP2PProtocolCommonPrefix + "/ping/"
-
 	// Maximum time to wait for a ping reply from a remote node
 	PingTimeoutSecs = time.Second * 4
-)
 
-// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-const maxConnectAttempt = 3
+	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
+	maxConnectAttempt = 3
+)
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (*Node, error)
