@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -155,11 +156,11 @@ func (n CollectionNode) Done() <-chan struct{} {
 type ConsensusNode struct {
 	GenericNode
 	Guarantees      mempool.Guarantees
-	Approvals       mempool.Approvals
 	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	SealingEngine   *sealing.Engine
+	MatchingEngine  *matching.Engine
 }
 
 func (cn ConsensusNode) Ready() {

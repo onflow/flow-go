@@ -34,10 +34,11 @@ type BootstrapProcedure struct {
 	initialTokenSupply      cadence.UFix64
 	addressGenerator        flow.AddressGenerator
 
-	accountCreationFee        cadence.UFix64
-	transactionFee            cadence.UFix64
-	minimumStorageReservation cadence.UFix64
-	storagePerFlow            cadence.UFix64
+	accountCreationFee               cadence.UFix64
+	transactionFee                   cadence.UFix64
+	minimumStorageReservation        cadence.UFix64
+	storagePerFlow                   cadence.UFix64
+	restrictedAccountCreationEnabled cadence.Bool
 
 	// config values for epoch smart-contracts
 	epochConfig epochs.EpochConfig
@@ -139,6 +140,13 @@ func WithStorageMBPerFLOW(ratio cadence.UFix64) BootstrapProcedureOption {
 	}
 }
 
+func WithRestrictedAccountCreationEnabled(enabled cadence.Bool) BootstrapProcedureOption {
+	return func(bp *BootstrapProcedure) *BootstrapProcedure {
+		bp.restrictedAccountCreationEnabled = enabled
+		return bp
+	}
+}
+
 // Bootstrap returns a new BootstrapProcedure instance configured with the provided
 // genesis parameters.
 func Bootstrap(
@@ -161,8 +169,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.vm = vm
 	b.ctx = NewContextFromParent(
 		ctx,
-		WithRestrictedDeployment(false),
-		WithRestrictedAccountCreation(false))
+		WithRestrictedDeployment(false))
 	b.rootBlock = flow.Genesis(flow.ChainID(ctx.Chain.String())).Header
 	b.sth = sth
 	b.programs = programs
@@ -185,7 +192,14 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployServiceAccount(service, fungibleToken, flowToken, feeContract)
 
-	b.setupFees(service, b.transactionFee, b.accountCreationFee, b.minimumStorageReservation, b.storagePerFlow)
+	b.setupParameters(
+		service,
+		b.transactionFee,
+		b.accountCreationFee,
+		b.minimumStorageReservation,
+		b.storagePerFlow,
+		b.restrictedAccountCreationEnabled,
+	)
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
@@ -412,12 +426,13 @@ func (b *BootstrapProcedure) mintInitialTokens(
 	panicOnMetaInvokeErrf("failed to mint initial token supply: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) setupFees(
+func (b *BootstrapProcedure) setupParameters(
 	service flow.Address,
 	transactionFee,
 	addressCreationFee,
 	minimumStorageReservation,
 	storagePerFlow cadence.UFix64,
+	restrictedAccountCreationEnabled cadence.Bool,
 ) {
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
@@ -427,7 +442,9 @@ func (b *BootstrapProcedure) setupFees(
 				transactionFee,
 				addressCreationFee,
 				minimumStorageReservation,
-				storagePerFlow),
+				storagePerFlow,
+				restrictedAccountCreationEnabled,
+			),
 			0),
 		b.sth,
 		b.programs,

@@ -110,26 +110,27 @@ func (r *PendingReceipts) Rem(receiptID flow.Identifier) bool {
 }
 
 // ByPreviousResultID returns receipts whose previous result ID matches the given ID
-func (r *PendingReceipts) ByPreviousResultID(previousReusltID flow.Identifier) []*flow.ExecutionReceipt {
+func (r *PendingReceipts) ByPreviousResultID(previousResultID flow.Identifier) []*flow.ExecutionReceipt {
 	var receipts []*flow.ExecutionReceipt
 	err := r.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		siblings, foundIndex := r.byPreviousResultID[previousReusltID]
-		if foundIndex {
-			for _, receiptID := range siblings {
-				entity, ok := entities[receiptID]
-				if !ok {
-					return fmt.Errorf("inconsistent index. can not find entity by id: %v", receiptID)
-				}
-				receipt, ok := entity.(*flow.ExecutionReceipt)
-				if !ok {
-					return fmt.Errorf("could not convert entity to receipt: %v", receiptID)
-				}
-				receipts = append(receipts, receipt)
+		siblings, foundIndex := r.byPreviousResultID[previousResultID]
+		if !foundIndex {
+			return nil
+		}
+		receipts = make([]*flow.ExecutionReceipt, 0, len(siblings))
+		for _, receiptID := range siblings {
+			entity, ok := entities[receiptID]
+			if !ok {
+				return fmt.Errorf("inconsistent index. can not find entity by id: %v", receiptID)
 			}
+			receipt, ok := entity.(*flow.ExecutionReceipt)
+			if !ok {
+				return fmt.Errorf("could not convert entity to receipt: %v", receiptID)
+			}
+			receipts = append(receipts, receipt)
 		}
 		return nil
 	})
-
 	if err != nil {
 		panic(err)
 	}

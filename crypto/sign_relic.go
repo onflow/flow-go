@@ -16,7 +16,7 @@ func newSigner(algo SigningAlgorithm) (signer, error) {
 	return newNonRelicSigner(algo)
 }
 
-// newNonRelicSigner returns a signer that depends on Relic library.
+// relicSigner returns a signer that depends on Relic library.
 func relicSigner(algo SigningAlgorithm) signer {
 	if algo == BLSBLS12381 {
 		return blsInstance

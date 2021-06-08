@@ -62,7 +62,6 @@ func NewBlockComputer(
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
