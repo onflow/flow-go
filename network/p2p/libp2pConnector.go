@@ -130,6 +130,15 @@ func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 		peerInfo := l.host.Network().Peerstore().PeerInfo(peerID)
 		log := l.log.With().Str("remote_peer", peerInfo.String()).Logger()
 
+		// check if there are any streams on that connection
+		connStreamCnt := len(conn.GetStreams())
+		if connStreamCnt > 0 {
+			log.Trace().
+				Int("connection_stream_count", connStreamCnt).
+				Msg("skipping connection pruning with peer")
+			continue
+		}
+
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)
 		if err != nil {
