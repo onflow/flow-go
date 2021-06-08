@@ -186,19 +186,10 @@ func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain,
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
 
-	eventsList := make(flow.EventsList, 0)
-
 	// setups up the first collection of block consists of three transactions
-	tx1, tx1Events := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
+	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
-
-	// update ID after tx has been signed
-	for _, event := range tx1Events {
-		event.TransactionID = tx1.ID()
-	}
-
-	eventsList = append(eventsList, tx1Events...)
 
 	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)

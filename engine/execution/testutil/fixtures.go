@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) (*flow.TransactionBody, []flow.Event) {
+func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 
 	encoded := hex.EncodeToString([]byte(contract))
 
@@ -55,20 +55,20 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 		valueStrings[i] = fmt.Sprintf("{\"type\":\"UInt8\",\"value\":\"%d\"}", uint8)
 	}
 
-	hashValue := strings.Join(valueStrings, ",")
+	//hashValue := strings.Join(valueStrings, ",")
 
-	payload := fmt.Sprintf("{\"type\":\"Event\",\"value\":{\"id\":\"flow.AccountContractAdded\",\"fields\":[{\"name\":\"address\",\"value\":{\"type\":\"Address\",\"value\":\"%s\"}},{\"name\":\"codeHash\",\"value\":{\"type\":\"Array\",\"value\":[%s]}\"]}},{\"name\":\"contract\",\"value\":{\"type\":\"String\",\"value\":\"%s\"}}]}}",
-		authorizer, hashValue, contractName)
+	//payload := fmt.Sprintf("{\"type\":\"Event\",\"value\":{\"id\":\"flow.AccountContractAdded\",\"fields\":[{\"name\":\"address\",\"value\":{\"type\":\"Address\",\"value\":\"%s\"}},{\"name\":\"codeHash\",\"value\":{\"type\":\"Array\",\"value\":[%s]}\"]}},{\"name\":\"contract\",\"value\":{\"type\":\"String\",\"value\":\"%s\"}}]}}",
+	//	authorizer, hashValue, contractName)
 
-	event := flow.Event{
-		Type:             "flow.AccountContractAdded",
-		TransactionID:    flow.Identifier{},
-		TransactionIndex: 0,
-		EventIndex:       0,
-		Payload:          []byte(payload),
-	}
+	//event := flow.Event{
+	//	Type:             "flow.AccountContractAdded",
+	//	TransactionID:    flow.Identifier{},
+	//	TransactionIndex: 0,
+	//	EventIndex:       0,
+	//	Payload:          []byte(payload),
+	//}
 
-	return txBody, []flow.Event{event}
+	return txBody
 }
 
 func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {

@@ -24,7 +24,7 @@ access(all) contract Container {
 }
 `
 
-func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) (*flow.TransactionBody, []flow.Event) {
+func DeployCounterContractTransaction(authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
 	return CreateContractDeploymentTransaction("Container", CounterContract, authorizer, chain)
 }
 
