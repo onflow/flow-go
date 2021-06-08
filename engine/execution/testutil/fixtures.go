@@ -10,6 +10,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -24,18 +26,49 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) (*flow.TransactionBody, []flow.Event) {
+
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+	script := []byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount, service: AuthAccount) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, contractName, encoded)),
-		).
+            }`, contractName, encoded))
+
+	txBody := flow.NewTransactionBody().
+		SetScript(script).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
+
+	// to synthetically generate event using Cadence code we would need a lot of
+	// copying, so its easier to just hardcode the json string
+	// TODO - extract parts of Cadence to make exporting events easy without interpreter
+
+	interpreterHash := runtime.CodeToHashValue(script)
+	hashElements := interpreterHash.Elements()
+
+	valueStrings := make([]string, len(hashElements))
+
+	for i, value := range hashElements {
+		uint8 := value.(interpreter.UInt8Value)
+		valueStrings[i] = fmt.Sprintf("{\"type\":\"UInt8\",\"value\":\"%d\"}", uint8)
+	}
+
+	hashValue := strings.Join(valueStrings, ",")
+
+	payload := fmt.Sprintf("{\"type\":\"Event\",\"value\":{\"id\":\"flow.AccountContractAdded\",\"fields\":[{\"name\":\"address\",\"value\":{\"type\":\"Address\",\"value\":\"%s\"}},{\"name\":\"codeHash\",\"value\":{\"type\":\"Array\",\"value\":[%s]}\"]}},{\"name\":\"contract\",\"value\":{\"type\":\"String\",\"value\":\"%s\"}}]}}",
+		authorizer, hashValue, contractName)
+
+	event := flow.Event{
+		Type:             "flow.AccountContractAdded",
+		TransactionID:    flow.Identifier{},
+		TransactionIndex: 0,
+		EventIndex:       0,
+		Payload:          []byte(payload),
+	}
+
+	return txBody, []flow.Event{event}
 }
 
 func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
