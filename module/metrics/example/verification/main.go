@@ -56,7 +56,17 @@ func happyPathExample() {
 			vertestutils.WithChunksCount(10),
 			vertestutils.WithCopies(1),
 		}
-		vertestutils.NewVerificationHappyPathTest(t, true, 10, 1, verificationCollector, mempoolCollector, ops...)
+		blockCount := 10
+		eventRepetition := 1
+		trials := 1
+		vertestutils.NewVerificationHappyPathTest(t,
+			true,
+			blockCount,
+			eventRepetition,
+			verificationCollector,
+			mempoolCollector,
+			trials,
+			ops...)
 		<-mempoolCollector.Done()
 	})
 }

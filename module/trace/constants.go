@@ -48,14 +48,18 @@ const (
 	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
 
 	// Matching
-	CONMatchCheckSealing                        SpanName = "con.sealing.checkSealing"
-	CONMatchCheckSealingSealableResults         SpanName = "con.sealing.checkSealing.sealableResults"
-	CONMatchCheckSealingClearPools              SpanName = "con.sealing.checkSealing.clearPools"
-	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.sealing.checkSealing.requestPendingReceipts"
-	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.sealing.checkSealing.requestPendingApprovals"
-	CONMatchOnReceipt                           SpanName = "con.sealing.onReceipt"
-	CONMatchOnReceiptVal                        SpanName = "con.sealing.onReceipt.validation"
-	CONMatchOnApproval                          SpanName = "con.sealing.onApproval"
+	CONMatchRequestPendingReceipts SpanName = "con.matching.requestPendingReceipts"
+	CONMatchProcessReceiptVal      SpanName = "con.matching.processReceipt.validation"
+	CONMatchProcessReceipt         SpanName = "con.matching.processReceipt"
+
+	// Sealing
+	CONSealingProcessFinalizedBlock           SpanName = "con.sealing.processFinalizedBlock"
+	CONSealingCheckForEmergencySealableBlocks SpanName = "con.sealing.processFinalizedBlock.checkEmergencySealing"
+	CONSealingUpdateAssignmentCollectorTree   SpanName = "con.sealing.processFinalizedBlock.updateAssignmentCollectorTree"
+	CONSealingRequestingPendingApproval       SpanName = "con.sealing.processFinalizedBlock.requestPendingApprovals"
+
+	CONSealingProcessIncorporatedResult SpanName = "con.sealing.processIncorporatedResult"
+	CONSealingProcessApproval           SpanName = "con.sealing.processApproval"
 
 	// Builder
 	CONBuildOn                        SpanName = "con.builder"
