@@ -110,13 +110,13 @@ func (c *CFInvalidEventsCollection) String() string {
 
 // CFInvalidSystemEventsEmitted is returned when service events are different from the chunk's one
 type CFInvalidSystemEventsEmitted struct {
-	expected   flow.Identifier
-	computed   flow.Identifier
+	expected   flow.ServiceEventsList
+	computed   flow.ServiceEventsList
 	chunkIndex uint64
 	resultID   flow.Identifier
 }
 
-func CFInvalidServiceSystemEventsEmitted(expected flow.Identifier, computed flow.Identifier, chInx uint64, execResID flow.Identifier) *CFInvalidSystemEventsEmitted {
+func CFInvalidServiceSystemEventsEmitted(expected flow.ServiceEventsList, computed flow.ServiceEventsList, chInx uint64, execResID flow.Identifier) *CFInvalidSystemEventsEmitted {
 	return &CFInvalidSystemEventsEmitted{
 		expected:   expected,
 		computed:   computed,

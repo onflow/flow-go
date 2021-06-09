@@ -7,6 +7,7 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -80,14 +81,14 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 		fvm.WithBlockHeader(vc.Header),
 	)
 
-	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState)
+	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState, true)
 }
 
 func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment, systemChunk bool) ([]byte, chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
@@ -101,6 +102,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	}
 
 	events := make(flow.EventsList, 0)
+	serviceEvents := make(flow.EventsList, 0)
 
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
@@ -169,6 +171,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		}
 
 		events = append(events, tx.Events...)
+		serviceEvents = append(serviceEvents, tx.ServiceEvents...)
 
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
 		err = chunkView.MergeView(txView)
@@ -192,6 +195,27 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	}
 	if chunk.EventCollection != eventsHash {
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
+	}
+
+	if systemChunk {
+
+		computedServiceEvents := make(flow.ServiceEventsList, len(result.ServiceEvents))
+
+		for i, serviceEvent := range serviceEvents {
+			realServiceEvent, err := convert.ServiceEvent(serviceEvent)
+			if err != nil {
+				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
+			}
+			computedServiceEvents[i] = *realServiceEvent
+		}
+
+		equal, err := result.ServiceEvents.EqualTo(computedServiceEvents)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error while compariong service events: %w", err)
+		}
+		if !equal {
+			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, computedServiceEvents, chIndex, execResID), nil
+		}
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
@@ -241,5 +265,5 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// build a block context
 	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
-	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState)
+	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState, false)
 }

@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/convert"
+
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
@@ -44,21 +46,38 @@ var eventsList = flow.EventsList{
 	},
 }
 
+var epochSetupEvent, _ = convert.EpochSetupFixture()
+var epochCommitEvent, _ = convert.EpochCommitFixture()
+
+var epochSetupServiceEvent, _ = convert.ServiceEvent(epochSetupEvent)
+
+var serviceEventsList = []flow.ServiceEvent{
+	*epochSetupServiceEvent,
+}
+
 type ChunkVerifierTestSuite struct {
 	suite.Suite
-	verifier *chunks.ChunkVerifier
+	verifier          *chunks.ChunkVerifier
+	systemOkVerifier  *chunks.ChunkVerifier
+	systemBadVerifier *chunks.ChunkVerifier
 }
 
 // Make sure variables are set properly
 // SetupTest is executed prior to each individual test in this test suite
-func (s *ChunkVerifierTestSuite) SetupTest() {
+func (s *ChunkVerifierTestSuite) SetupSuite() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
 	vm := new(vmMock)
+	systemOkVm := new(vmSystemOkMock)
+	systemBadVm := new(vmSystemBadMock)
 	vmCtx := fvm.NewContext(zerolog.Nop())
 
+	// system chunk runs predefined system transaction, hence we can't distinguish
+	// based on its content and we need separate VMs
 	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
+	s.systemOkVerifier = chunks.NewChunkVerifier(systemOkVm, vmCtx)
+	s.systemBadVerifier = chunks.NewChunkVerifier(systemBadVm, vmCtx)
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -68,7 +87,7 @@ func TestChunkVerifier(t *testing.T) {
 
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
-	vch := GetBaselineVerifiableChunk(s.T(), "")
+	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -80,7 +99,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	s.T().Skip("Check new partial ledger for missing keys")
 
-	vch := GetBaselineVerifiableChunk(s.T(), "")
+	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
@@ -95,7 +114,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	s.T().Skip("Check new partial ledger for missing keys")
-	vch := GetBaselineVerifiableChunk(s.T(), "")
+	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
@@ -111,7 +130,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 // the state commitment computed after updating the partial trie
 // doesn't match the one provided by the chunks
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
-	vch := GetBaselineVerifiableChunk(s.T(), "wrongEndState")
+	vch := GetBaselineVerifiableChunk(s.T(), "wrongEndState", false)
 	assert.NotNil(s.T(), vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -125,7 +144,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 // of failed transaction. if a transaction fails, it should
 // still change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
-	vch := GetBaselineVerifiableChunk(s.T(), "failedTx")
+	vch := GetBaselineVerifiableChunk(s.T(), "failedTx", false)
 	assert.NotNil(s.T(), vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -136,7 +155,7 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 // TestEventsMismatch tests verification behavior in case
 // of emitted events not matching chunks
 func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
-	vch := GetBaselineVerifiableChunk(s.T(), "eventsMismatch")
+	vch := GetBaselineVerifiableChunk(s.T(), "eventsMismatch", false)
 	assert.NotNil(s.T(), vch)
 	_, chFault, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -147,12 +166,21 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
 func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
-	vch := GetBaselineVerifiableChunk(s.T(), "serviceEventsMismatch")
+	vch := GetBaselineVerifiableChunk(s.T(), "serviceEventsMismatch", true)
 	assert.NotNil(s.T(), vch)
-	_, chFault, err := s.verifier.Verify(vch)
+	_, chFault, err := s.systemBadVerifier.SystemChunkVerify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFault)
 	assert.IsType(s.T(), &chunksmodels.CFInvalidSystemEventsEmitted{}, chFault)
+}
+
+// TestServiceEventsAreChecked ensures that service events are in fact checked
+func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
+	vch := GetBaselineVerifiableChunk(s.T(), "serviceEventsMismatch", true)
+	assert.NotNil(s.T(), vch)
+	_, chFault, err := s.systemOkVerifier.SystemChunkVerify(vch)
+	assert.Nil(s.T(), err)
+	assert.Nil(s.T(), chFault)
 }
 
 // TestVerifyWrongChunkType evaluates that following invocations return an error:
@@ -179,7 +207,7 @@ func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
 // TestEmptyCollection tests verification behaviour if a
 // collection doesn't have any transaction.
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
-	vch := GetBaselineVerifiableChunk(s.T(), "")
+	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	col := unittest.CollectionFixture(0)
 	vch.Collection = &col
@@ -195,7 +223,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
 // of a transaction in the middle of the collection to some value to signal the
 // mocked vm on what to return as tx exec outcome.
-func GetBaselineVerifiableChunk(t *testing.T, script string) *verification.VerifiableChunkData {
+func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verification.VerifiableChunkData {
 
 	// Collection setup
 
@@ -273,15 +301,24 @@ func GetBaselineVerifiableChunk(t *testing.T, script string) *verification.Verif
 
 	// events
 	chunkEvents := make(flow.EventsList, 0)
-	for i := 0; i < collectionSize; i++ {
-		if i == magicTxIndex {
-			switch script {
-			case "failedTx":
-				continue
+
+	erServiceEvents := make([]flow.ServiceEvent, 0)
+
+	if system {
+		chunkEvents = flow.EventsList{}
+		erServiceEvents = serviceEventsList
+	} else {
+		for i := 0; i < collectionSize; i++ {
+			if i == magicTxIndex {
+				switch script {
+				case "failedTx":
+					continue
+				}
 			}
+			chunkEvents = append(chunkEvents, eventsList...)
 		}
-		chunkEvents = append(chunkEvents, eventsList...)
 	}
+
 	eventsListHash, err := chunkEvents.Hash()
 	require.NoError(t, err)
 
@@ -304,12 +341,13 @@ func GetBaselineVerifiableChunk(t *testing.T, script string) *verification.Verif
 
 	// ExecutionResult setup
 	result := flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  flow.ChunkList{&chunk},
+		BlockID:       blockID,
+		Chunks:        flow.ChunkList{&chunk},
+		ServiceEvents: erServiceEvents,
 	}
 
 	verifiableChunkData = verification.VerifiableChunkData{
-		IsSystemChunk: false,
+		IsSystemChunk: system,
 		Chunk:         &chunk,
 		Header:        &header,
 		Result:        &result,
@@ -324,6 +362,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string) *verification.Verif
 type vmMock struct{}
 
 func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+
 	tx, ok := proc.(*fvm.TransactionProcedure)
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
@@ -354,6 +393,37 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 		tx.Logs = []string{"log1", "log2"}
 		tx.Events = eventsList
 	}
+
+	return nil
+}
+
+type vmSystemOkMock struct{}
+
+func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+	tx, ok := proc.(*fvm.TransactionProcedure)
+	if !ok {
+		return fmt.Errorf("invokable is not a transaction")
+	}
+
+	tx.ServiceEvents = []flow.Event{epochSetupEvent}
+
+	_, _ = led.Get("00", "", "")
+	_, _ = led.Get("05", "", "")
+	_ = led.Set("05", "", "", []byte{'B'})
+	tx.Logs = []string{"log1", "log2"}
+
+	return nil
+}
+
+type vmSystemBadMock struct{}
+
+func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, programs *programs.Programs) error {
+	tx, ok := proc.(*fvm.TransactionProcedure)
+	if !ok {
+		return fmt.Errorf("invokable is not a transaction")
+	}
+
+	tx.ServiceEvents = []flow.Event{epochCommitEvent}
 
 	return nil
 }
