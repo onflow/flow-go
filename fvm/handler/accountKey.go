@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/sema"
 
+	fgcrypto "github.com/onflow/flow-go/crypto"
+	fghash "github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/state"
@@ -15,6 +18,43 @@ import (
 // with account keys such as get/set/revoke
 type AccountKeyHandler struct {
 	accounts *state.Accounts
+}
+
+//  NewAccountPublicKey construct an account public key given a runtime public key.
+func NewAccountPublicKey(publicKey *runtime.PublicKey,
+	hashAlgo sema.HashAlgorithm,
+	keyIndex int,
+	weight int,
+) (*flow.AccountPublicKey, error) {
+
+	var err error
+	signAlgorithm := crypto.RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
+	if signAlgorithm != fgcrypto.ECDSAP256 && signAlgorithm != fgcrypto.ECDSASecp256k1 {
+		err = errors.NewValueErrorf(string(publicKey.SignAlgo), "signature algorithm type not supported")
+		return nil, fmt.Errorf("adding account key failed: %w", err)
+	}
+
+	hashAlgorithm := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgo)
+	if hashAlgorithm != fghash.SHA2_256 && hashAlgorithm != fghash.SHA3_256 {
+		err = errors.NewValueErrorf(string(hashAlgo), "hashing algorithm type not supported")
+		return nil, fmt.Errorf("adding account key failed: %w", err)
+	}
+
+	decodedPublicKey, err := fgcrypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
+	if err != nil {
+		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
+		return nil, fmt.Errorf("adding account key failed: %w", err)
+	}
+
+	return &flow.AccountPublicKey{
+		Index:     keyIndex,
+		PublicKey: decodedPublicKey,
+		SignAlgo:  signAlgorithm,
+		HashAlgo:  hashAlgorithm,
+		SeqNumber: 0,
+		Weight:    weight,
+		Revoked:   false,
+	}, nil
 }
 
 func NewAccountKeyHandler(accounts *state.Accounts) *AccountKeyHandler {
@@ -51,7 +91,7 @@ func (h *AccountKeyHandler) AddAccountKey(address runtime.Address,
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
 
-	accountPublicKey, err := crypto.NewAccountPublicKey(publicKey, hashAlgo, int(keyIndex), weight)
+	accountPublicKey, err := NewAccountPublicKey(publicKey, hashAlgo, int(keyIndex), weight)
 	if err != nil {
 		return nil, fmt.Errorf("adding account key failed: %w", err)
 	}
