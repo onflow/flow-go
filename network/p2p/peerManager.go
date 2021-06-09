@@ -21,29 +21,44 @@ type Connector interface {
 	UpdatePeers(ctx context.Context, ids flow.IdentityList) error
 }
 
-// PeerUpdateInterval is how long the peer manager waits in between attempts to update peer connections
-var PeerUpdateInterval = 1 * time.Minute
+// DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
+var DefaultPeerUpdateInterval = 10 * time.Minute
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
-	unit         *engine.Unit
-	logger       zerolog.Logger
-	idsProvider  func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
-	peerRequestQ chan struct{}                     // a channel to queue a peer update request
-	connector    Connector                         // connector to connect or disconnect from peers
+	unit               *engine.Unit
+	logger             zerolog.Logger
+	idsProvider        func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
+	peerRequestQ       chan struct{}                     // a channel to queue a peer update request
+	connector          Connector                         // connector to connect or disconnect from peers
+	peerUpdateInterval time.Duration                     // interval the peer manager runs on
+}
+
+// Option represents an option for the peer manager.
+type Option func(*PeerManager)
+
+func WithInterval(period time.Duration) Option {
+	return func(pm *PeerManager) {
+		pm.peerUpdateInterval = period
+	}
 }
 
 // NewPeerManager creates a new peer manager which calls the idsProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
 func NewPeerManager(logger zerolog.Logger, idsProvider func() (flow.IdentityList, error),
-	connector Connector) *PeerManager {
-	return &PeerManager{
+	connector Connector, options ...Option) *PeerManager {
+	pm := &PeerManager{
 		unit:         engine.NewUnit(),
 		logger:       logger,
 		idsProvider:  idsProvider,
 		connector:    connector,
 		peerRequestQ: make(chan struct{}, 1),
 	}
+	// apply options
+	for _, o := range options {
+		o(pm)
+	}
+	return pm
 }
 
 // Ready kicks off the ambient periodic connection updates.
@@ -53,7 +68,7 @@ func (pm *PeerManager) Ready() <-chan struct{} {
 	pm.RequestPeerUpdate()
 
 	// also starts running it periodically
-	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, PeerUpdateInterval, time.Duration(0))
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, time.Duration(0))
 
 	pm.unit.Launch(pm.updateLoop)
 
