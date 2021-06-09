@@ -13,7 +13,7 @@ import (
 
 const (
 	DefaultJobIndex     = uint64(0)
-	DefaultChunkWorkers = uint64(5)
+	DefaultChunkWorkers = uint64(3)
 )
 
 // ChunkConsumer consumes the jobs from the job queue, and pass it to the

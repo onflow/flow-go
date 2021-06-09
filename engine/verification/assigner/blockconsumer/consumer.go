@@ -15,7 +15,7 @@ import (
 )
 
 // DefaultBlockWorkers is the number of blocks processed in parallel.
-const DefaultBlockWorkers = uint64(2)
+const DefaultBlockWorkers = uint64(1)
 
 // BlockConsumer listens to the OnFinalizedBlock event
 // and notifies the consumer to check in the job queue
