@@ -37,15 +37,19 @@ const DefaultValueLogGCFrequency = 10 * 60
 
 const DomainTagLength = 32
 
+const TransactionTagString = "FLOW-V0.0-transaction"
+
+const UserTagString = "FLOW-V0.0-user"
+
 // TransactionDomainTag is the prefix of all signed transaction payloads.
 //
 // A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
-var TransactionDomainTag = paddedDomainTag("FLOW-V0.0-transaction")
+var TransactionDomainTag = paddedDomainTag(TransactionTagString)
 
 // UserDomainTag is the prefix of all signed user space payloads.
 //
 // A domain tag is encoded as UTF-8 bytes, right padded to a total length of 32 bytes.
-var UserDomainTag = paddedDomainTag("FLOW-V0.0-user")
+var UserDomainTag = paddedDomainTag(UserTagString)
 
 func paddedDomainTag(s string) [DomainTagLength]byte {
 	var tag [DomainTagLength]byte
