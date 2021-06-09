@@ -190,7 +190,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root procotol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, rootQC)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithProtocolVersion(block, result, seal, rootQC, flagProtocolVersion)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -281,7 +281,7 @@ func assemblePartnerNodes() []model.NodeInfo {
 	return nodes
 }
 
-// readParnterNodes reads the partner node information
+// readPartnerNodes reads the partner node information
 func readPartnerNodes() []model.NodeInfoPub {
 	var partners []model.NodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)
