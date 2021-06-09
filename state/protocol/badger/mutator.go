@@ -571,9 +571,9 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 
 	// FOURTH: metrics and events
 
-	if epochStatus.NextEpoch.SetupID != flow.ZeroID {
-		// true iff EpochSetup event for NEXT epoch was already included before
-		m.metrics.CommittedEpochFinalView(setup.FinalView)
+	nextEpochSetup := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+	if epochStatus.NextEpoch.CommitID != flow.ZeroID {
+		m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView)
 	}
 
 	m.metrics.FinalizedHeight(header.Height)
