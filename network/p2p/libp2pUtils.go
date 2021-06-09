@@ -162,11 +162,11 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 }
 
 func generateFlowProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID)
 }
 
 func generatePingProtcolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PPingPrefix + rootBlockID)
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID)
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
@@ -219,4 +219,14 @@ func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logge
 		Str("local_peer", stream.Conn().LocalPeer().String()).
 		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
 	return logger
+}
+
+// flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
+func flowStream(conn network.Conn) network.Stream {
+	for _, s := range conn.GetStreams() {
+		if isFlowProtocolStream(s) {
+			return s
+		}
+	}
+	return nil
 }
