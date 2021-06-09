@@ -16,13 +16,7 @@ func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byt
 	var hasher hash.Hasher
 
 	switch hashAlgo {
-	case hash.SHA2_256:
-		fallthrough
-	case hash.SHA3_256:
-		fallthrough
-	case hash.SHA2_384:
-		fallthrough
-	case hash.SHA3_384:
+	case hash.SHA2_256, hash.SHA3_256, hash.SHA2_384, hash.SHA3_384:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
@@ -155,10 +149,9 @@ func VerifySignatureFromRuntime(
 		if !tagECDSACheck(tag) {
 			return false, errors.NewValueErrorf("tag %s is not supported", tag)
 		}
-	}
 
-	// check BLS compatibilites
-	if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
+		// check BLS compatibilites
+	} else if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
 		// hashing compatibility
 		return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
 			hashAlgo.String(), sigAlgo.String())
@@ -237,9 +230,7 @@ func (DefaultSignatureVerifier) Verify(
 	var hasher hash.Hasher
 
 	switch hashAlgo {
-	case hash.SHA2_256:
-		fallthrough
-	case hash.SHA3_256:
+	case hash.SHA2_256, hash.SHA3_256:
 		var err error
 		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
 			return false, errors.NewValueErrorf(err.Error(), "verification failed")
