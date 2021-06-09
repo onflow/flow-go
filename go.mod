@@ -37,7 +37,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/marten-seemann/qtls-go1-15 v0.1.4 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.16.1-0.20210608160810-5d86ba9068bf
+	github.com/onflow/cadence v0.17.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.12.0
