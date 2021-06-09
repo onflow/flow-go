@@ -139,12 +139,7 @@ func VerifySignatureFromRuntime(
 			return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
 				hashAlgo.String(), sigAlgo.String())
 		}
-		// if the tag is `runtimeUserDomainTag` replace it with `flow.UserDomainTag`.
-		// this is for backwards compatibility of the crypto contract.
-		// In the future cadence should send `flow.UserDomainTag` directly.
-		if tag == runtimeUserDomainTag {
-			tag = flow.UserTagString
-		}
+
 		// tag compatibility
 		if !tagECDSACheck(tag) {
 			return false, errors.NewValueErrorf("tag %s is not supported", tag)
@@ -180,28 +175,39 @@ func VerifySignatureFromRuntime(
 // check compatible tags with ECDSA
 //
 // Only tags with a prefix flow.UserTagString and zero paddings are accepted.
+// runtimeUserDomainTag is temporarily accepted too for backwards compatibility
+// TODO : do not accept runtimeUserDomainTag as a valid tag.
 func tagECDSACheck(tag string) bool {
 
 	if len(tag) > flow.DomainTagLength {
 		return false
 	}
 
-	if !strings.HasPrefix(tag, flow.UserTagString) {
-		return false
-	}
-
-	// check the remaining bytes are zeros
-	remaining := tag[len(flow.UserTagString):]
-	for _, b := range []byte(remaining) {
-		if b != 0 {
-			return false
+	if strings.HasPrefix(tag, flow.UserTagString) {
+		// check the remaining bytes are zeros
+		remaining := tag[len(flow.UserTagString):]
+		for _, b := range []byte(remaining) {
+			if b != 0 {
+				return false
+			}
 		}
+		return true
+		// runtimeUserDomainTag is also accepted temporarily for
+		// backward compatibility of the crtypto contract.
+	} else if strings.HasPrefix(tag, RuntimeUserDomainTag) {
+		remaining := tag[len(RuntimeUserDomainTag):]
+		for _, b := range []byte(remaining) {
+			if b != 0 {
+				return false
+			}
+		}
+		return true
 	}
-	return true
+	return false
 }
 
 // TODO: to delete and only rely on flow.UserDomainTag
-const runtimeUserDomainTag = "user"
+const RuntimeUserDomainTag = "user"
 
 type SignatureVerifier interface {
 	Verify(
