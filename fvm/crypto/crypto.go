@@ -192,9 +192,11 @@ func tagECDSACheck(tag string) bool {
 			}
 		}
 		return true
-		// runtimeUserDomainTag is also accepted temporarily for
-		// backward compatibility of the crtypto contract.
-	} else if strings.HasPrefix(tag, RuntimeUserDomainTag) {
+	}
+
+	// runtimeUserDomainTag is also accepted temporarily for
+	// backward compatibility of the crtypto contract.
+	if strings.HasPrefix(tag, RuntimeUserDomainTag) {
 		remaining := tag[len(RuntimeUserDomainTag):]
 		for _, b := range []byte(remaining) {
 			if b != 0 {
