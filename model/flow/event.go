@@ -15,7 +15,7 @@ const (
 	EventAccountCreated EventType = "FlowEpoch.AccountCreated"
 	EventAccountUpdated EventType = "FlowEpoch.AccountUpdated"
 	EventEpochSetup     EventType = "FlowEpoch.EpochSetup"
-	EventEpochCommit    EventType = "FlowEpoch.EpochCommit"
+	EventEpochCommit    EventType = "FlowEpoch.EpochCommitted"
 )
 
 type EventType string
