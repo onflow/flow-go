@@ -60,7 +60,7 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 }
 
 func DKGParticipantPriv() *dkg.DKGParticipantPriv {
-	privKey, _ := NetworkingKey()
+	privKey, _ := StakingKey()
 	randBeaconKey := encodable.RandomBeaconPrivKey{
 		PrivateKey: privKey,
 	}
