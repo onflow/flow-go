@@ -61,8 +61,8 @@ func TestShort(t *testing.T) {
 func TestAccountAddress(t *testing.T) {
 	t.Run("address constants", testAddressConstants)
 	t.Run("address generation", testAddressGeneration)
-	// t.Run("chain address intersections", testAddressesIntersection)
-	// t.Run("index from address", testIndexFromAddress)
+	t.Run("chain address intersections", testAddressesIntersection)
+	t.Run("index from address", testIndexFromAddress)
 }
 
 func testAddressConstants(t *testing.T) {
@@ -236,10 +236,12 @@ func testAddressesIntersection(t *testing.T) {
 
 		// All valid test addresses must fail Flow Mainnet check
 		r := uint64(rand.Intn(maxIndex - loop))
+		expectedIdx := r
 		state := chain.newAddressGeneratorAtIndex(r)
 		for i := 0; i < loop; i++ {
 			address, idx, err := state.NextAddress()
-			assert.Equal(t, r+uint64(i)+1, idx)
+			expectedIdx++
+			assert.Equal(t, expectedIdx, idx)
 			require.NoError(t, err)
 			check := Mainnet.Chain().IsValid(address)
 			assert.False(t, check, "test account address format should be invalid in Flow")
@@ -250,9 +252,8 @@ func testAddressesIntersection(t *testing.T) {
 		// sanity check: mainnet addresses must fail the test check
 		r = uint64(rand.Intn(maxIndex - loop))
 		for i := 0; i < loop; i++ {
-			invalidAddress, idx, err := Mainnet.Chain().newAddressGeneratorAtIndex(r).NextAddress()
+			invalidAddress, _, err := Mainnet.Chain().newAddressGeneratorAtIndex(r).NextAddress()
 			require.NoError(t, err)
-			assert.Equal(t, r+uint64(i)+1, idx)
 			check := chain.IsValid(invalidAddress)
 			assert.False(t, check, "account address format should be invalid")
 		}
@@ -265,10 +266,12 @@ func testAddressesIntersection(t *testing.T) {
 		r = uint64(rand.Intn(maxIndex - loop))
 
 		state = chain.newAddressGeneratorAtIndex(r)
+		expectedIdx = r
 		for i := 0; i < loop; i++ {
 			address, idx, err := state.NextAddress()
+			expectedIdx++
 			require.NoError(t, err)
-			assert.Equal(t, r+uint64(i)+1, idx)
+			assert.Equal(t, expectedIdx, idx)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
 			// must fail test network check
 			check = chain.IsValid(invalidAddress)
