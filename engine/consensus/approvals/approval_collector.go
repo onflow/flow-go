@@ -13,13 +13,12 @@ import (
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
-	incorporatedBlock                    *flow.Header                    // block that incorporates execution result
-	incorporatedResult                   *flow.IncorporatedResult        // incorporated result that is being sealed
-	chunkCollectors                      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
-	aggregatedSignatures                 *AggregatedSignatures           // aggregated signature for each chunk
-	seals                                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
-	numberOfChunks                       int                             // number of chunks for execution result, remains constant
-	requiredApprovalsForSealConstruction uint                            // min number of approvals required for constructing a candidate seal
+	incorporatedBlock    *flow.Header                    // block that incorporates execution result
+	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
+	chunkCollectors      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
+	aggregatedSignatures *AggregatedSignatures           // aggregated signature for each chunk
+	seals                mempool.IncorporatedResultSeals // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
+	numberOfChunks       uint64                          // number of chunks for execution result, remains constant
 }
 
 func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
@@ -30,16 +29,27 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 		chunkCollectors = append(chunkCollectors, collector)
 	}
 
-	numberOfChunks := result.Result.Chunks.Len()
-	return &ApprovalCollector{
-		incorporatedResult:                   result,
-		incorporatedBlock:                    incorporatedBlock,
-		numberOfChunks:                       numberOfChunks,
-		chunkCollectors:                      chunkCollectors,
-		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		aggregatedSignatures:                 NewAggregatedSignatures(uint64(numberOfChunks)),
-		seals:                                seals,
+	numberOfChunks := uint64(result.Result.Chunks.Len())
+	collector := ApprovalCollector{
+		incorporatedResult:   result,
+		incorporatedBlock:    incorporatedBlock,
+		numberOfChunks:       numberOfChunks,
+		chunkCollectors:      chunkCollectors,
+		aggregatedSignatures: NewAggregatedSignatures(numberOfChunks),
+		seals:                seals,
 	}
+
+	// The following code implements a TEMPORARY SHORTCUT: In case no approvals are required
+	// to seal an incorporated result, we seal right away when creating the ApprovalCollector.
+	if requiredApprovalsForSealConstruction == 0 {
+		err := collector.SealResult()
+		if err != nil {
+			err = fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
+			panic(err.Error())
+		}
+	}
+
+	return &collector
 }
 
 // IncorporatedBlockID returns the ID of block which incorporates execution result
@@ -116,7 +126,7 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 // Returns: map { ChunkIndex -> []VerifierId }
 func (c *ApprovalCollector) CollectMissingVerifiers() map[uint64]flow.IdentifierList {
 	targetIDs := make(map[uint64]flow.IdentifierList)
-	for _, chunkIndex := range c.aggregatedSignatures.CollectChunksWithMissingApprovals() {
+	for _, chunkIndex := range c.aggregatedSignatures.ChunksWithoutAggregatedSignature() {
 		missingSigners := c.chunkCollectors[chunkIndex].GetMissingSigners()
 		if missingSigners.Len() > 0 {
 			targetIDs[chunkIndex] = missingSigners

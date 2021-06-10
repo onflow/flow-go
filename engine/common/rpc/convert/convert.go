@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -122,10 +122,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 	id := h.ID()
 
-	t, err := ptypes.TimestampProto(h.Timestamp)
-	if err != nil {
-		return nil, err
-	}
+	t := timestamppb.New(h.Timestamp)
 
 	return &entities.BlockHeader{
 		Id:        id[:],
@@ -140,11 +137,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t, err := ptypes.TimestampProto(h.Header.Timestamp)
-	if err != nil {
-		return nil, err
-	}
-
+	t := timestamppb.New(h.Header.Timestamp)
 	cg := make([]*entities.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {
 		cg[i] = collectionGuaranteeToMessage(g)

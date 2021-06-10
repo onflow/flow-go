@@ -38,28 +38,16 @@ type MapFunc func(*Message) (*Message, bool)
 
 type MessageHandler struct {
 	log      zerolog.Logger
-	notify   chan struct{}
+	notifier Notifier
 	patterns []Pattern
 }
 
-func NewMessageHandler(log zerolog.Logger, patterns ...Pattern) *MessageHandler {
-	// the 1 message buffer is important to avoid the race condition.
-	// the consumer might decide to listen to the notify channel, and drain the messages in the
-	// message store, however there is a blind period start from the point the consumer learned
-	// the message store is empty to the point the consumer start listening to the notifier channel
-	// again. During this blind period, if the notifier had no buffer, then `doNotify` call will not
-	// able to push message to the notifier channel, therefore has to drop the message and cause the
-	// consumer waiting forever with unconsumed message in the message store.
-	// having 1 message buffer covers the "blind period", so that during the blind period if there is
-	// a new message arrived, it will be buffered, and once the blind period is over, the consumer
-	// will empty the buffer and start draining the message store again.
-	notifier := make(chan struct{}, 1)
-	enqueuer := &MessageHandler{
+func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Pattern) *MessageHandler {
+	return &MessageHandler{
 		log:      log.With().Str("component", "message_handler").Logger(),
-		notify:   notifier,
+		notifier: notifier,
 		patterns: patterns,
 	}
-	return enqueuer
 }
 
 func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) (err error) {
@@ -76,7 +64,6 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 
 	for _, pattern := range e.patterns {
 		if pattern.Match(msg) {
-
 			var keep bool
 			if pattern.Map != nil {
 				msg, keep = pattern.Map(msg)
@@ -90,8 +77,7 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 				log.Msg("failed to store message - discarding")
 				return
 			}
-
-			e.doNotify()
+			e.notifier.Notify()
 
 			// message can only be matched by one pattern, and processed by one handler
 			return
@@ -101,16 +87,6 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 	return fmt.Errorf("no matching processor pattern for message, type: %T, origin: %x", payload, originID[:])
 }
 
-// notify the handler to pick new message from the queue
-func (e *MessageHandler) doNotify() {
-	select {
-	// to prevent from getting blocked by dropping the notification if
-	// there is no handler subscribing the channel.
-	case e.notify <- struct{}{}:
-	default:
-	}
-}
-
 func (e *MessageHandler) GetNotifier() <-chan struct{} {
-	return e.notify
+	return e.notifier.Channel()
 }

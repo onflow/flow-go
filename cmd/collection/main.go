@@ -364,6 +364,9 @@ func main() {
 				return nil, err
 			}
 
+			createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
+				return metrics.NewHotstuffCollector(chainID)
+			}
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
@@ -371,6 +374,7 @@ func main() {
 				staking,
 				node.DB,
 				node.State,
+				createMetrics,
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),

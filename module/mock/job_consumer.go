@@ -23,14 +23,14 @@ func (_m *JobConsumer) NotifyJobIsDone(_a0 module.JobID) {
 }
 
 // Size provides a mock function with given fields:
-func (_m *JobConsumer) Size() int {
+func (_m *JobConsumer) Size() uint {
 	ret := _m.Called()
 
-	var r0 int
-	if rf, ok := ret.Get(0).(func() int); ok {
+	var r0 uint
+	if rf, ok := ret.Get(0).(func() uint); ok {
 		r0 = rf()
 	} else {
-		r0 = ret.Get(0).(int)
+		r0 = ret.Get(0).(uint)
 	}
 
 	return r0
