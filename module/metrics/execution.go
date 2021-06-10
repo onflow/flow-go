@@ -657,7 +657,7 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 	ec.stateSyncActive.Set(float64(0))
 }
 
-func (ec *ExecutionCollector) RuntimeNumberOfAccounts(count uint64) {
+func (ec *ExecutionCollector) RuntimeSetNumberOfAccounts(count uint64) {
 	ec.numberOfAccounts.Set(float64(count))
 }
 

@@ -12,7 +12,7 @@ type MetricsReporter interface {
 	RuntimeTransactionParsed(time.Duration)
 	RuntimeTransactionChecked(time.Duration)
 	RuntimeTransactionInterpreted(time.Duration)
-	RuntimeNumberOfAccounts(count uint64)
+	RuntimeSetNumberOfAccounts(count uint64)
 }
 
 // A MetricsHandler accumulates performance metrics reported by the Cadence runtime.
@@ -71,7 +71,7 @@ func (m *MetricsHandler) ProgramInterpreted(location common.Location, duration t
 
 // SetNumberOfAccounts captures total number of accounts on the network
 func (m *MetricsHandler) SetNumberOfAccounts(count uint64) {
-	m.Reporter.RuntimeNumberOfAccounts(count)
+	m.Reporter.RuntimeSetNumberOfAccounts(count)
 }
 
 // ValueEncoded accumulates time spend on runtime value encoding
@@ -96,5 +96,5 @@ func (NoopMetricsReporter) RuntimeTransactionChecked(time.Duration) {}
 // TransactionInterpreted is a noop
 func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
 
-// RuntimeNumberOfAccounts is a noop
-func (NoopMetricsReporter) RuntimeNumberOfAccounts(count uint64) {}
+// RuntimeSetNumberOfAccounts is a noop
+func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}

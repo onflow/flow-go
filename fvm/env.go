@@ -1073,7 +1073,7 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 		}
 	}
 
-	e.ctx.Metrics.RuntimeNumberOfAccounts(idx)
+	e.ctx.Metrics.RuntimeSetNumberOfAccounts(idx)
 	return runtime.Address(flowAddress), nil
 }
 

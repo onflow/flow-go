@@ -124,7 +124,7 @@ func (nc *NoopCollector) ExecutionCollectionRequestRetried()                    
 func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                             {}
 func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                            {}
 func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                        {}
-func (nc *NoopCollector) RuntimeNumberOfAccounts(count uint64)                                   {}
+func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                                {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)               {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)               {}

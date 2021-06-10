@@ -300,8 +300,8 @@ type RuntimeMetrics interface {
 	// TransactionInterpreted reports the time spent interpreting a single transaction
 	RuntimeTransactionInterpreted(dur time.Duration)
 
-	// Sets the total number of accounts on the network
-	RuntimeNumberOfAccounts(count uint64)
+	// RuntimeSetNumberOfAccounts Sets the total number of accounts on the network
+	RuntimeSetNumberOfAccounts(count uint64)
 }
 
 type ProviderMetrics interface {

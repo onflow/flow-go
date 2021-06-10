@@ -13,8 +13,8 @@ type RuntimeMetrics struct {
 	mock.Mock
 }
 
-// RuntimeNumberOfAccounts provides a mock function with given fields: count
-func (_m *RuntimeMetrics) RuntimeNumberOfAccounts(count uint64) {
+// RuntimeSetNumberOfAccounts provides a mock function with given fields: count
+func (_m *RuntimeMetrics) RuntimeSetNumberOfAccounts(count uint64) {
 	_m.Called(count)
 }
 
