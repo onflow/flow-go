@@ -17,13 +17,13 @@ require (
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.16.1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210510205428-30d94f82bc8c
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210510205428-30d94f82bc8c
-	github.com/onflow/flow-emulator v0.19.0
-	github.com/onflow/flow-go v0.16.3-0.20210427194927-6050c2a3ae42 // replaced by version on-disk
+	github.com/onflow/cadence v0.17.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210602203947-82cffc9c55ed
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210602203947-82cffc9c55ed
+	github.com/onflow/flow-emulator v0.20.3
+	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
-	github.com/onflow/flow-go/crypto v0.12.0 // replaced by version on-disk
+	github.com/onflow/flow-go/crypto v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/client_golang v1.10.0 // indirect
@@ -37,7 +37,7 @@ require (
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20210405174219-a39eb2f71cb9 // indirect
 	google.golang.org/grpc v1.36.1
-	gopkg.in/yaml.v2 v2.3.0
+	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
