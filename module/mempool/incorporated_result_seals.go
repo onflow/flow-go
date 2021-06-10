@@ -32,4 +32,7 @@ type IncorporatedResultSeals interface {
 
 	// Clear removes all entities from the pool.
 	Clear()
+
+	// Prune the IncorporatedResultSeal by sealed height
+	PruneByHeight(height uint64) error
 }

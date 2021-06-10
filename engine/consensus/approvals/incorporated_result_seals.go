@@ -99,3 +99,7 @@ func (ir *IncorporatedResultSeals) Clear() {
 func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	ir.seals.RegisterEjectionCallbacks(callbacks...)
 }
+
+func (ir *IncorporatedResultSeals) PruneByHeight(height uint64) error {
+	return ir.seals.PruneByHeight(height)
+}

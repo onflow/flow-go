@@ -93,6 +93,20 @@ func (_m *IncorporatedResultSeals) Limit() uint {
 	return r0
 }
 
+// PruneByHeight provides a mock function with given fields: height
+func (_m *IncorporatedResultSeals) PruneByHeight(height uint64) error {
+	ret := _m.Called(height)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(height)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RegisterEjectionCallbacks provides a mock function with given fields: callbacks
 func (_m *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	_va := make([]interface{}, len(callbacks))

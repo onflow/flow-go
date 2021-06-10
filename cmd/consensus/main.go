@@ -41,7 +41,6 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
-	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -190,10 +189,7 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
-			// use a custom ejector so we don't eject seals that would break
-			// the chain of seals
-			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
+			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
