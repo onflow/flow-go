@@ -139,8 +139,8 @@ func (_m *ExecutionMetrics) ReadValuesSize(byte uint64) {
 	_m.Called(byte)
 }
 
-// RuntimeNumberOfAccounts provides a mock function with given fields: count
-func (_m *ExecutionMetrics) RuntimeNumberOfAccounts(count uint64) {
+// RuntimeSetNumberOfAccounts provides a mock function with given fields: count
+func (_m *ExecutionMetrics) RuntimeSetNumberOfAccounts(count uint64) {
 	_m.Called(count)
 }
 
