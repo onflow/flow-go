@@ -73,21 +73,21 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "forest_approx_memory_size",
-		Help:      "approximate size of in-memory forest in bytes",
+		Help:      "an approximate size of in-memory forest in bytes",
 	})
 
 	forestNumberOfTrees := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "forest_number_of_trees",
-		Help:      "number of trees in memory",
+		Help:      "the number of trees in memory",
 	})
 
 	latestTrieRegCount := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "latest_trie_reg_count",
-		Help:      "number of allocated registers (latest created trie)",
+		Help:      "the number of allocated registers (latest created trie)",
 	})
 
 	latestTrieRegCountDiff := prometheus.NewGauge(prometheus.GaugeOpts{
@@ -101,49 +101,49 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "latest_trie_max_depth",
-		Help:      "maximum depth of the latest created trie",
+		Help:      "the maximum depth of the latest created trie",
 	})
 
 	latestTrieMaxDepthDiff := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "latest_trie_max_depth_diff",
-		Help:      "the difference between the max depth of the latest created trie and parent trie",
+		Help:      "the the difference between the max depth of the latest created trie and parent trie",
 	})
 
 	updatedCount := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "updates_counted",
-		Help:      "number of updates",
+		Help:      "the number of updates",
 	})
 
 	proofSize := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "average_proof_size",
-		Help:      "average size of a single generated proof in bytes",
+		Help:      "the average size of a single generated proof in bytes",
 	})
 
 	updatedValuesNumber := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_values_number",
-		Help:      "total number of values updated",
+		Help:      "the total number of values updated",
 	})
 
 	updatedValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_values_size",
-		Help:      "total size of values for single update in bytes",
+		Help:      "the total size of values for single update in bytes",
 	})
 
 	updatedDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_duration",
-		Help:      "duration of update operation",
+		Help:      "the duration of update operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
@@ -151,7 +151,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "update_duration_per_Value",
-		Help:      "duration of update operation per value",
+		Help:      "the duration of update operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
@@ -159,21 +159,21 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_number",
-		Help:      "total number of values read",
+		Help:      "the total number of values read",
 	})
 
 	readValuesSize := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_values_size",
-		Help:      "total size of values for single read in bytes",
+		Help:      "the total size of values for single read in bytes",
 	})
 
 	readDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_duration",
-		Help:      "duration of read operation",
+		Help:      "the duration of read operation",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
@@ -181,7 +181,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemMTrie,
 		Name:      "read_duration_per_value",
-		Help:      "duration of read operation per value",
+		Help:      "the duration of read operation per value",
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
@@ -189,63 +189,63 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_execution_time_nanoseconds",
-		Help:      "total amount of time spent on block execution in nanoseconds",
+		Help:      "the total time spent on block execution in nanoseconds",
 	})
 
 	blockComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_computation_used",
-		Help:      "total amount of computation used by a block",
+		Help:      "the total amount of computation used by a block",
 	})
 
 	blockTransactionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_transaction_counts",
-		Help:      "total number of transactions per block",
+		Help:      "the total number of transactions per block",
 	})
 
 	blockCollectionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "block_collection_counts",
-		Help:      "total number of collections per block",
+		Help:      "the total number of collections per block",
 	})
 
 	collectionExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "collection_execution_time_nanoseconds",
-		Help:      "total amount of time spent on collection execution in nanoseconds",
+		Help:      "the total time spent on collection execution in nanoseconds",
 	})
 
 	collectionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "collection_computation_used",
-		Help:      "total amount of computation used by a collection",
+		Help:      "the total amount of computation used by a collection",
 	})
 
 	collectionTransactionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "collection_transaction_counts",
-		Help:      "total number of transactions per collection",
+		Help:      "the total number of transactions per collection",
 	})
 
 	collectionRequestsSent := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemIngestion,
 		Name:      "collection_requests_sent",
-		Help:      "number of collection requests sent",
+		Help:      "the number of collection requests sent",
 	})
 
 	collectionRequestsRetries := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemIngestion,
 		Name:      "collection_requests_retries",
-		Help:      "number of collection requests retried",
+		Help:      "the number of collection requests retried",
 	})
 
 	transactionParseTime := prometheus.NewHistogram(prometheus.HistogramOpts{
@@ -273,42 +273,42 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_execution_time_nanoseconds",
-		Help:      "total amount of time spent on transaction execution in nanoseconds",
+		Help:      "the total time spent on transaction execution in nanoseconds",
 	})
 
 	transactionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_computation_used",
-		Help:      "total amount of computation used by a transaction",
+		Help:      "the total amount of computation used by a transaction",
 	})
 
 	transactionEmittedEvents := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_emitted_events",
-		Help:      "total number of events emitted by a transaction",
+		Help:      "the total number of events emitted by a transaction",
 	})
 
 	scriptExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "script_execution_time_nanoseconds",
-		Help:      "total amount of time spent on script execution in nanoseconds",
+		Help:      "the total time spent on script execution in nanoseconds",
 	})
 
 	scriptComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
 		Name:      "script_computation_used",
-		Help:      "total amount of computation used by an script",
+		Help:      "the total amount of computation used by an script",
 	})
 
 	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
 		Name:      "chunk_data_packs_requested_total",
-		Help:      "total number of chunk data pack requests provider engine received",
+		Help:      "the total number of chunk data pack requests provider engine received",
 	})
 
 	registerer.MustRegister(forestApproxMemorySize)
@@ -457,16 +457,16 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 
 		numberOfAccounts: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
-			Subsystem: subsystemIngestion,
+			Subsystem: subsystemRuntime,
 			Name:      "number_of_accounts",
-			Help:      "captures number of accounts",
+			Help:      "the number of existing accounts on the network",
 		}),
 
 		executionStateDiskUsage: promauto.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemMTrie,
 			Name:      "execution_state_disk_usage",
-			Help:      "disk usage of execution state",
+			Help:      "the disk usage of execution state",
 		}),
 	}
 
