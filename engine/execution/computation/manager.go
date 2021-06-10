@@ -166,7 +166,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
 
-	e.metrics.ExecutionScriptExecuted(time.Since(startedAt))
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed)
 
 	return encodedValue, nil
 }

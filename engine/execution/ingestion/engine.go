@@ -592,6 +592,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
+	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.GasUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
+
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
 		e.log.Err(err).Msg("failed in process block's children")
@@ -1019,9 +1021,6 @@ func (e *Engine) handleComputationResult(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
-
-	// There is one result per transaction
-	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResults))
 
 	receipt, err := e.saveExecutionResults(
 		ctx,

@@ -232,6 +232,7 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
+	computationUsedUpToNow := res.GasUsed
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
 		colSpan.SetTag("collection.txCount", len(collection.Transactions))
@@ -255,6 +256,8 @@ func (e *blockComputer) executeCollection(
 		Int("numberOfTransactions", len(collection.Transactions)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
+
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), res.GasUsed-computationUsedUpToNow, len(collection.Transactions))
 
 	return txIndex, nil
 }
@@ -338,10 +341,7 @@ func (e *blockComputer) executeTransaction(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.GasUsed, len(tx.Events))
-	if tx.Err != nil {
-		e.metrics.ExecutionTotalFailedTransactions(1)
-	}
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.GasUsed, len(tx.Events), tx.Err != nil)
 	return nil
 }
 

@@ -19,9 +19,11 @@ const (
 
 type ExecutionCollector struct {
 	tracer                           module.Tracer
-	gasUsedPerBlock                  prometheus.Histogram
 	stateReadsPerBlock               prometheus.Histogram
+	totalExecutedBlocksCounter       prometheus.Counter
+	totalExecutedCollectionsCounter  prometheus.Counter
 	totalExecutedTransactionsCounter prometheus.Counter
+	totalExecutedScriptsCounter      prometheus.Counter
 	totalFailedTransactionsCounter   prometheus.Counter
 	lastExecutedBlockHeightGauge     prometheus.Gauge
 	stateStorageDiskTotal            prometheus.Gauge
@@ -42,14 +44,22 @@ type ExecutionCollector struct {
 	readValuesSize                   prometheus.Gauge
 	readDuration                     prometheus.Histogram
 	readDurationPerValue             prometheus.Histogram
+	blockComputationUsed             prometheus.Histogram
+	blockExecutionTime               prometheus.Histogram
+	blockTransactionCounts           prometheus.Histogram
+	blockCollectionCounts            prometheus.Histogram
+	collectionComputationUsed        prometheus.Histogram
+	collectionExecutionTime          prometheus.Histogram
+	collectionTransactionCounts      prometheus.Histogram
 	collectionRequestSent            prometheus.Counter
 	collectionRequestRetried         prometheus.Counter
 	transactionParseTime             prometheus.Histogram
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
 	transactionExecutionTime         prometheus.Histogram
-	scriptExecutionTime              prometheus.Histogram
 	transactionComputationUsed       prometheus.Histogram
+	scriptExecutionTime              prometheus.Histogram
+	scriptComputationUsed            prometheus.Histogram
 	transactionEmittedEvents         prometheus.Histogram
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
@@ -175,6 +185,55 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Buckets:   []float64{0.05, 0.2, 0.5, 1, 2, 5},
 	})
 
+	blockExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_execution_time_nanoseconds",
+		Help:      "total amount of time spent on block execution in nanoseconds",
+	})
+
+	blockComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_computation_used",
+		Help:      "total amount of computation used by a block",
+	})
+
+	blockTransactionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_transaction_counts",
+		Help:      "total number of transactions per block",
+	})
+
+	blockCollectionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "block_collection_counts",
+		Help:      "total number of collections per block",
+	})
+
+	collectionExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_execution_time_nanoseconds",
+		Help:      "total amount of time spent on collection execution in nanoseconds",
+	})
+
+	collectionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_computation_used",
+		Help:      "total amount of computation used by a collection",
+	})
+
+	collectionTransactionCounts := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "collection_transaction_counts",
+		Help:      "total number of transactions per collection",
+	})
+
 	collectionRequestsSent := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemIngestion,
@@ -217,13 +276,6 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Help:      "total amount of time spent on transaction execution in nanoseconds",
 	})
 
-	scriptExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: namespaceExecution,
-		Subsystem: subsystemRuntime,
-		Name:      "script_execution_time_nanoseconds",
-		Help:      "total amount of time spent on script execution in nanoseconds",
-	})
-
 	transactionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemRuntime,
@@ -236,6 +288,20 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Subsystem: subsystemRuntime,
 		Name:      "transaction_emitted_events",
 		Help:      "total number of events emitted by a transaction",
+	})
+
+	scriptExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_execution_time_nanoseconds",
+		Help:      "total amount of time spent on script execution in nanoseconds",
+	})
+
+	scriptComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_computation_used",
+		Help:      "total amount of computation used by an script",
 	})
 
 	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
@@ -261,6 +327,13 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(readValuesSize)
 	registerer.MustRegister(readDuration)
 	registerer.MustRegister(readDurationPerValue)
+	registerer.MustRegister(blockExecutionTime)
+	registerer.MustRegister(blockComputationUsed)
+	registerer.MustRegister(blockTransactionCounts)
+	registerer.MustRegister(blockCollectionCounts)
+	registerer.MustRegister(collectionExecutionTime)
+	registerer.MustRegister(collectionComputationUsed)
+	registerer.MustRegister(collectionTransactionCounts)
 	registerer.MustRegister(collectionRequestsSent)
 	registerer.MustRegister(collectionRequestsRetries)
 	registerer.MustRegister(transactionParseTime)
@@ -270,45 +343,46 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(transactionComputationUsed)
 	registerer.MustRegister(transactionEmittedEvents)
 	registerer.MustRegister(scriptExecutionTime)
+	registerer.MustRegister(scriptComputationUsed)
 	registerer.MustRegister(totalChunkDataPackRequests)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
 
-		forestApproxMemorySize:     forestApproxMemorySize,
-		forestNumberOfTrees:        forestNumberOfTrees,
-		latestTrieRegCount:         latestTrieRegCount,
-		latestTrieRegCountDiff:     latestTrieRegCountDiff,
-		latestTrieMaxDepth:         latestTrieMaxDepth,
-		latestTrieMaxDepthDiff:     latestTrieMaxDepthDiff,
-		updated:                    updatedCount,
-		proofSize:                  proofSize,
-		updatedValuesNumber:        updatedValuesNumber,
-		updatedValuesSize:          updatedValuesSize,
-		updatedDuration:            updatedDuration,
-		updatedDurationPerValue:    updatedDurationPerValue,
-		readValuesNumber:           readValuesNumber,
-		readValuesSize:             readValuesSize,
-		readDuration:               readDuration,
-		readDurationPerValue:       readDurationPerValue,
-		collectionRequestSent:      collectionRequestsSent,
-		collectionRequestRetried:   collectionRequestsRetries,
-		transactionParseTime:       transactionParseTime,
-		transactionCheckTime:       transactionCheckTime,
-		transactionInterpretTime:   transactionInterpretTime,
-		transactionExecutionTime:   transactionExecutionTime,
-		transactionComputationUsed: transactionComputationUsed,
-		transactionEmittedEvents:   transactionEmittedEvents,
-		scriptExecutionTime:        scriptExecutionTime,
-		totalChunkDataPackRequests: totalChunkDataPackRequests,
-
-		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
-			Namespace: namespaceExecution,
-			Subsystem: subsystemRuntime,
-			Buckets:   []float64{1}, //TODO(andrew) Set once there are some figures around gas usage and limits
-			Name:      "used_gas",
-			Help:      "the gas used per block",
-		}),
+		forestApproxMemorySize:      forestApproxMemorySize,
+		forestNumberOfTrees:         forestNumberOfTrees,
+		latestTrieRegCount:          latestTrieRegCount,
+		latestTrieRegCountDiff:      latestTrieRegCountDiff,
+		latestTrieMaxDepth:          latestTrieMaxDepth,
+		latestTrieMaxDepthDiff:      latestTrieMaxDepthDiff,
+		updated:                     updatedCount,
+		proofSize:                   proofSize,
+		updatedValuesNumber:         updatedValuesNumber,
+		updatedValuesSize:           updatedValuesSize,
+		updatedDuration:             updatedDuration,
+		updatedDurationPerValue:     updatedDurationPerValue,
+		readValuesNumber:            readValuesNumber,
+		readValuesSize:              readValuesSize,
+		readDuration:                readDuration,
+		readDurationPerValue:        readDurationPerValue,
+		blockExecutionTime:          blockExecutionTime,
+		blockComputationUsed:        blockComputationUsed,
+		blockTransactionCounts:      blockTransactionCounts,
+		blockCollectionCounts:       blockCollectionCounts,
+		collectionExecutionTime:     collectionExecutionTime,
+		collectionComputationUsed:   collectionComputationUsed,
+		collectionTransactionCounts: collectionTransactionCounts,
+		collectionRequestSent:       collectionRequestsSent,
+		collectionRequestRetried:    collectionRequestsRetries,
+		transactionParseTime:        transactionParseTime,
+		transactionCheckTime:        transactionCheckTime,
+		transactionInterpretTime:    transactionInterpretTime,
+		transactionExecutionTime:    transactionExecutionTime,
+		transactionComputationUsed:  transactionComputationUsed,
+		transactionEmittedEvents:    transactionEmittedEvents,
+		scriptExecutionTime:         scriptExecutionTime,
+		scriptComputationUsed:       scriptComputationUsed,
+		totalChunkDataPackRequests:  totalChunkDataPackRequests,
 
 		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -318,11 +392,18 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 			Help:      "count of state access/read operations performed per block",
 		}),
 
-		totalFailedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+		totalExecutedBlocksCounter: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Name:      "total_failed_transactions",
-			Help:      "the total number of transactions that has failed when executed",
+			Name:      "total_executed_blocks",
+			Help:      "the total number of blocks that have been executed",
+		}),
+
+		totalExecutedCollectionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "total_executed_collections",
+			Help:      "the total number of collections that have been executed",
 		}),
 
 		totalExecutedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
@@ -330,6 +411,20 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 			Subsystem: subsystemRuntime,
 			Name:      "total_executed_transactions",
 			Help:      "the total number of transactions that have been executed",
+		}),
+
+		totalFailedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "total_failed_transactions",
+			Help:      "the total number of transactions that has failed when executed",
+		}),
+
+		totalExecutedScriptsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "total_executed_scripts",
+			Help:      "the total number of scripts that have been executed",
 		}),
 
 		lastExecutedBlockHeightGauge: promauto.NewGauge(prometheus.GaugeOpts{
@@ -390,9 +485,39 @@ func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identif
 	ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
-// ExecutionGasUsedPerBlock reports gas used per block
-func (ec *ExecutionCollector) ExecutionGasUsedPerBlock(gas uint64) {
-	ec.gasUsedPerBlock.Observe(float64(gas))
+// ExecutionBlockExecuted reports computation and total time spent on a block computation
+func (ec *ExecutionCollector) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
+	ec.totalExecutedBlocksCounter.Inc()
+	ec.blockExecutionTime.Observe(float64(dur))
+	ec.blockComputationUsed.Observe(float64(compUsed))
+	ec.blockTransactionCounts.Observe(float64(txCounts))
+	ec.blockCollectionCounts.Observe(float64(colCounts))
+}
+
+// ExecutionCollectionExecuted reports computation and total time spent on a block computation
+func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
+	ec.totalExecutedCollectionsCounter.Inc()
+	ec.collectionExecutionTime.Observe(float64(dur))
+	ec.collectionComputationUsed.Observe(float64(compUsed))
+	ec.collectionTransactionCounts.Observe(float64(txCounts))
+}
+
+// TransactionExecuted reports the time and computation spent executing a single transaction
+func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
+	ec.totalExecutedTransactionsCounter.Inc()
+	ec.transactionExecutionTime.Observe(float64(dur))
+	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionEmittedEvents.Observe(float64(eventCounts))
+	if failed {
+		ec.totalFailedTransactionsCounter.Inc()
+	}
+}
+
+// ScriptExecuted reports the time spent executing a single script
+func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
+	ec.totalExecutedScriptsCounter.Inc()
+	ec.scriptExecutionTime.Observe(float64(dur))
+	ec.scriptComputationUsed.Observe(float64(compUsed))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
@@ -413,28 +538,6 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 // ExecutionLastExecutedBlockHeight reports last executed block height
 func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 	ec.lastExecutedBlockHeightGauge.Set(float64(height))
-}
-
-// ExecutionTotalFailedTransactions reports total number of failed transactions
-func (ec *ExecutionCollector) ExecutionTotalFailedTransactions(numberOfTx int) {
-	ec.totalFailedTransactionsCounter.Add(float64(numberOfTx))
-}
-
-// ExecutionTotalExecutedTransactions reports total executed transactions
-func (ec *ExecutionCollector) ExecutionTotalExecutedTransactions(numberOfTx int) {
-	ec.totalExecutedTransactionsCounter.Add(float64(numberOfTx))
-}
-
-// TransactionExecuted reports the time and computation spent executing a single transaction
-func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int) {
-	ec.transactionExecutionTime.Observe(float64(dur))
-	ec.transactionComputationUsed.Observe(float64(compUsed))
-	ec.transactionEmittedEvents.Observe(float64(eventCounts))
-}
-
-// ScriptExecuted reports the time spent executing a single script
-func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration) {
-	ec.scriptExecutionTime.Observe(float64(dur))
 }
 
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)

@@ -336,17 +336,17 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
+	// ExecutionTransactionExecuted reports the total time and computation spent on executing a block
+	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
+
+	// ExecutionTransactionExecuted reports the total time and computation spent on executing a collection
+	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
+
 	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int)
+	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool)
 
 	// ExecutionScriptExecuted reports the time spent on executing an script
-	ExecutionScriptExecuted(dur time.Duration)
-
-	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
-	ExecutionTotalExecutedTransactions(numExecuted int)
-
-	// ExecutionTotalFailedTransactions adds num to the total number of failed transactions
-	ExecutionTotalFailedTransactions(numFailed int)
+	ExecutionScriptExecuted(dur time.Duration, compUsed uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
