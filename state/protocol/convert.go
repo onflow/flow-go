@@ -20,6 +20,18 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 		return nil, fmt.Errorf("could not get epoch first view: %w", err)
 	}
 	finalView, err := epoch.FinalView()
+	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("could not get dkg phase 1 final view: %w", err)
+	}
+	dkgPhase2FinalView, err := epoch.DKGPhase2FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("could not get dkg phase 2 final view: %w", err)
+	}
+	dkgPhase3FinalView, err := epoch.DKGPhase3FinalView()
+	if err != nil {
+		return nil, fmt.Errorf("could not get dkg phase 3 final view: %w", err)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch final view: %w", err)
 	}
@@ -38,12 +50,15 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	}
 
 	setup := &flow.EpochSetup{
-		Counter:      counter,
-		FirstView:    firstView,
-		FinalView:    finalView,
-		Participants: participants,
-		Assignments:  assignments,
-		RandomSource: randomSource,
+		Counter:            counter,
+		FirstView:          firstView,
+		DKGPhase1FinalView: dkgPhase1FinalView,
+		DKGPhase2FinalView: dkgPhase2FinalView,
+		DKGPhase3FinalView: dkgPhase3FinalView,
+		FinalView:          finalView,
+		Participants:       participants,
+		Assignments:        assignments,
+		RandomSource:       randomSource,
 	}
 	return setup, nil
 }
