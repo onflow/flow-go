@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -16,6 +15,7 @@ import (
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 )
 
