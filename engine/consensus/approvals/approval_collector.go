@@ -1,18 +1,21 @@
 package approvals
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/rs/zerolog"
 )
 
 // ApprovalCollector is responsible for distributing work to chunk collectorTree,
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
+	log                  zerolog.Logger
 	incorporatedBlock    *flow.Header                    // block that incorporates execution result
 	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
 	chunkCollectors      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
@@ -21,7 +24,7 @@ type ApprovalCollector struct {
 	numberOfChunks       uint64                          // number of chunks for execution result, remains constant
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(log zerolog.Logger, result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := assignment.Verifiers(chunk).Lookup()
@@ -31,6 +34,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 
 	numberOfChunks := uint64(result.Result.Chunks.Len())
 	collector := ApprovalCollector{
+		log:                  log,
 		incorporatedResult:   result,
 		incorporatedBlock:    incorporatedBlock,
 		numberOfChunks:       numberOfChunks,
@@ -79,6 +83,13 @@ func (c *ApprovalCollector) SealResult() error {
 		FinalState:             finalState,
 		AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
 	}
+
+	sj, err := json.Marshal(seal)
+	if err != nil {
+		sj = []byte("json_marshalling_failed")
+	}
+
+	c.log.Info().Str("seal", string(sj)).Msg("adding seal to mempool")
 
 	// we don't care if the seal is already in the mempool
 	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
