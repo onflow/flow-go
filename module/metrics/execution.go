@@ -415,6 +415,17 @@ func (ec *ExecutionCollector) ExecutionTotalExecutedTransactions(numberOfTx int)
 	ec.totalExecutedTransactionsCounter.Add(float64(numberOfTx))
 }
 
+// TransactionExecuted reports the time and computation spent executing a single transaction
+func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, comp uint64) {
+	ec.transactionExecutionTime.Observe(float64(dur))
+	ec.transactionComputationUsed.Observe(float64(comp))
+}
+
+// ScriptExecuted reports the time spent executing a single script
+func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration) {
+	ec.scriptExecutionTime.Observe(float64(dur))
+}
+
 // ForestApproxMemorySize records approximate memory usage of forest (all in-memory trees)
 func (ec *ExecutionCollector) ForestApproxMemorySize(bytes uint64) {
 	ec.forestApproxMemorySize.Set(float64(bytes))
@@ -504,29 +515,18 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
 }
 
 // TransactionParsed reports the time spent parsing a single transaction
-func (ec *ExecutionCollector) TransactionParsed(dur time.Duration) {
+func (ec *ExecutionCollector) RuntimeTransactionParsed(dur time.Duration) {
 	ec.transactionParseTime.Observe(float64(dur))
 }
 
 // TransactionChecked reports the time spent checking a single transaction
-func (ec *ExecutionCollector) TransactionChecked(dur time.Duration) {
+func (ec *ExecutionCollector) RuntimeTransactionChecked(dur time.Duration) {
 	ec.transactionCheckTime.Observe(float64(dur))
 }
 
 // TransactionInterpreted reports the time spent interpreting a single transaction
-func (ec *ExecutionCollector) TransactionInterpreted(dur time.Duration) {
+func (ec *ExecutionCollector) RuntimeTransactionInterpreted(dur time.Duration) {
 	ec.transactionInterpretTime.Observe(float64(dur))
-}
-
-// TransactionExecuted reports the time spent executing a single transaction
-func (ec *ExecutionCollector) TransactionExecuted(dur time.Duration, comp uint64) {
-	ec.transactionExecutionTime.Observe(float64(dur))
-	ec.transactionComputationUsed.Observe(float64(comp))
-}
-
-// ScriptExecuted reports the time spent executing a single script
-func (ec *ExecutionCollector) ScriptExecuted(dur time.Duration) {
-	ec.scriptExecutionTime.Observe(float64(dur))
 }
 
 // ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
@@ -543,7 +543,7 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 	ec.stateSyncActive.Set(float64(0))
 }
 
-func (ec *ExecutionCollector) SetNumberOfAccounts(count uint64) {
+func (ec *ExecutionCollector) RuntimeNumberOfAccounts(count uint64) {
 	ec.numberOfAccounts.Set(float64(count))
 }
 

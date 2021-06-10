@@ -424,8 +424,8 @@ func (*testRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ runtime.Conte
 
 type RandomAddressGenerator struct{}
 
-func (r *RandomAddressGenerator) NextAddress() (flow.Address, error) {
-	return flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), nil
+func (r *RandomAddressGenerator) NextAddress() (flow.Address, uint64, error) {
+	return flow.HexToAddress(fmt.Sprintf("0%d", rand.Intn(1000))), 0, nil
 }
 
 func (r *RandomAddressGenerator) CurrentAddress() flow.Address {
@@ -436,12 +436,16 @@ func (r *RandomAddressGenerator) Bytes() []byte {
 	panic("not implemented")
 }
 
+func (r *RandomAddressGenerator) TotalAddressCounts() uint64 {
+	panic("not implemented")
+}
+
 type FixedAddressGenerator struct {
 	Address flow.Address
 }
 
-func (f *FixedAddressGenerator) NextAddress() (flow.Address, error) {
-	return f.Address, nil
+func (f *FixedAddressGenerator) NextAddress() (flow.Address, uint64, error) {
+	return f.Address, 0, nil
 }
 
 func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
@@ -449,6 +453,10 @@ func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
 }
 
 func (f *FixedAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+func (f *FixedAddressGenerator) TotalAddressCounts() uint64 {
 	panic("not implemented")
 }
 
@@ -572,7 +580,7 @@ func generateCollection(transactionCount int, addressGenerator flow.AddressGener
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
-		nextAddress, err := addressGenerator.NextAddress()
+		nextAddress, _, err := addressGenerator.NextAddress()
 		if err != nil {
 			panic(fmt.Errorf("cannot generate next address in test: %w", err))
 		}

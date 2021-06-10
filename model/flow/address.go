@@ -13,9 +13,10 @@ import (
 type Address [AddressLength]byte
 
 type AddressGenerator interface {
-	NextAddress() (Address, error)
+	NextAddress() (Address, uint64, error) // returning address, index and error
 	CurrentAddress() Address
 	Bytes() []byte
+	TotalAddressCounts() uint64
 }
 
 type MonotonicAddressGenerator struct {
@@ -136,17 +137,22 @@ func (gen *linearCodeAddressGenerator) Bytes() []byte {
 
 // NextAddress increments the internal index and generates the new address
 // corresponding to the new index.
-func (gen *MonotonicAddressGenerator) NextAddress() (Address, error) {
+func (gen *MonotonicAddressGenerator) NextAddress() (Address, uint64, error) {
 	gen.index++
 	if uint64(gen.index) > maxIndex {
-		return EmptyAddress, fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
+		return EmptyAddress, gen.index, fmt.Errorf("the new index value is not valid, it must be less or equal to %x", maxIndex)
 	}
-	return gen.CurrentAddress(), nil
+	return gen.CurrentAddress(), gen.index, nil
 }
 
 // CurrentAddress returns the address corresponding to the internal index.
 func (gen *MonotonicAddressGenerator) CurrentAddress() Address {
 	return uint64ToAddress(gen.index)
+}
+
+// TotalAddressCounts returns the total number of addresses generated so far
+func (gen *MonotonicAddressGenerator) TotalAddressCounts() uint64 {
+	return gen.index
 }
 
 // NextAddress generates an account address from the addressing index.
@@ -159,16 +165,16 @@ func (gen *MonotonicAddressGenerator) CurrentAddress() Address {
 // as indices.
 // zeroAddress() corresponds to the index "0" while ServiceAddress() corresponds to the
 // index "1".
-func (gen *linearCodeAddressGenerator) NextAddress() (Address, error) {
+func (gen *linearCodeAddressGenerator) NextAddress() (Address, uint64, error) {
 	err := gen.nextIndex()
 	if err != nil {
-		return EmptyAddress, err
+		return EmptyAddress, 0, err
 	}
 	index := gen.index
 	address := encodeWord(index)
 	// customize the code word for a specific network
 	address ^= gen.chainCodeWord
-	return uint64ToAddress(address), nil
+	return uint64ToAddress(address), index, nil
 }
 
 // CurrentAddress returns the current account address.
@@ -180,6 +186,11 @@ func (gen *linearCodeAddressGenerator) CurrentAddress() Address {
 	// customize the code word for a specific network
 	address ^= gen.chainCodeWord
 	return uint64ToAddress(address)
+}
+
+// TotalAddressCounts returns the total number of addresses generated so far
+func (gen *linearCodeAddressGenerator) TotalAddressCounts() uint64 {
+	return gen.index
 }
 
 // increments the internal index of the generator.

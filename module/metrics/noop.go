@@ -100,6 +100,9 @@ func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)            
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                         {}
 func (nc *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)                      {}
+func (nc *NoopCollector) ExecutionTotalFailedTransactions(numberOfTx int)                        {}
+func (nc *NoopCollector) ExecutionTransactionExecuted(dur time.Duration, comp uint64)            {}
+func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration)                              {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                    {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                      {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                       {}
@@ -118,9 +121,10 @@ func (nc *NoopCollector) ReadDuration(duration time.Duration)                   
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                             {}
 func (nc *NoopCollector) ExecutionCollectionRequestSent()                                        {}
 func (nc *NoopCollector) ExecutionCollectionRequestRetried()                                     {}
-func (nc *NoopCollector) TransactionParsed(dur time.Duration)                                    {}
-func (nc *NoopCollector) TransactionChecked(dur time.Duration)                                   {}
-func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                               {}
+func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                             {}
+func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                            {}
+func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                        {}
+func (nc *NoopCollector) RuntimeNumberOfAccounts(count uint64)                                   {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)               {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)               {}

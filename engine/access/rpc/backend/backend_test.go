@@ -1126,7 +1126,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 func (suite *Suite) TestGetAccount() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
-	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
+	address, _, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
 	suite.Require().NoError(err)
 
 	account := &entitiesproto.Account{

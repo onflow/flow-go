@@ -337,6 +337,11 @@ func (e *blockComputer) executeTransaction(
 		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
+
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.GasUsed)
+	if tx.Err != nil {
+		e.metrics.ExecutionTotalFailedTransactions(1)
+	}
 	return nil
 }
 

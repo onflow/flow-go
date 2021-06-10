@@ -105,7 +105,7 @@ func run(*cobra.Command, []string) {
 	generator := chain.NewAddressGenerator()
 
 	for !bytes.Equal(generator.Bytes(), finalState) {
-		address, err := generator.NextAddress()
+		address, _, err := generator.NextAddress()
 		if err != nil {
 			log.Fatal().Err(err).Msgf("cannot get address")
 		}

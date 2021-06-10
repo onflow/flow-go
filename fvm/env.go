@@ -1040,7 +1040,7 @@ func (e *transactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (address runtime.Address, err error) {
-	flowAddress, err := e.addressGenerator.NextAddress()
+	flowAddress, idx, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
 	}
@@ -1073,6 +1073,7 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 		}
 	}
 
+	e.ctx.Metrics.RuntimeNumberOfAccounts(idx)
 	return runtime.Address(flowAddress), nil
 }
 

@@ -292,13 +292,16 @@ type WALMetrics interface {
 
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
-	TransactionParsed(dur time.Duration)
+	RuntimeTransactionParsed(dur time.Duration)
 
 	// TransactionChecked reports the time spent checking a single transaction
-	TransactionChecked(dur time.Duration)
+	RuntimeTransactionChecked(dur time.Duration)
 
 	// TransactionInterpreted reports the time spent interpreting a single transaction
-	TransactionInterpreted(dur time.Duration)
+	RuntimeTransactionInterpreted(dur time.Duration)
+
+	// Sets the total number of accounts on the network
+	RuntimeNumberOfAccounts(count uint64)
 }
 
 type ProviderMetrics interface {
@@ -333,8 +336,17 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
+	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration, comp uint64)
+
+	// ExecutionScriptExecuted reports the time spent on executing an script
+	ExecutionScriptExecuted(dur time.Duration)
+
 	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
 	ExecutionTotalExecutedTransactions(numExecuted int)
+
+	// ExecutionTotalFailedTransactions adds num to the total number of failed transactions
+	ExecutionTotalFailedTransactions(numFailed int)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
