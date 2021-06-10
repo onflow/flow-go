@@ -74,7 +74,38 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		snap.Epochs.Next = &next.enc
 	}
 
+	// convert global state parameters
+	params, err := FromParams(from.Params())
+	if err != nil {
+		return nil, fmt.Errorf("could not get params: %w", err)
+	}
+	snap.Params = params.enc
+
 	return &Snapshot{snap}, nil
+}
+
+// FromParams converts any protocol.GlobalParams to a memory-backed Params.
+func FromParams(from protocol.GlobalParams) (*Params, error) {
+
+	var (
+		params EncodableParams
+		err    error
+	)
+
+	params.ChainID, err = from.ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain id: %w", err)
+	}
+	params.SporkID, err = from.SporkID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork id: %w", err)
+	}
+	params.ProtocolVersion, err = from.ProtocolVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol version: %w", err)
+	}
+
+	return &Params{params}, nil
 }
 
 // FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
@@ -204,6 +235,13 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		Current: current.enc,
 	}
 
+	// create spork parameters deterministically from input root state
+	params := EncodableParams{
+		ChainID:         root.Header.ChainID,
+		SporkID:         root.ID(),
+		ProtocolVersion: 42,
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:              root.Header,
 		Identities:        setup.Participants,
@@ -213,6 +251,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,
 		Epochs:            epochs,
+		Params:            params,
 	})
 	return snap, nil
 }
