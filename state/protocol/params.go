@@ -33,7 +33,8 @@ type InstanceParams interface {
 // have the same global params.
 type GlobalParams interface {
 
-	// ChainID returns the chain ID for the current Flow network.
+	// ChainID returns the chain ID for the current Flow network. The chain ID
+	// uniquely identifies a Flow network in perpetuity across epochs and sporks.
 	ChainID() (flow.ChainID, error)
 
 	// SporkID returns the unique identifier for this network within the current spork.
