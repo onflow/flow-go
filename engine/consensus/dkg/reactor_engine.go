@@ -23,7 +23,7 @@ import (
 // to the DKG smart-contract to read broadcast messages.
 const DefaultPollStep = 10
 
-// ATTENTION what should this be?
+// TODO what should this be?
 var SeedIndices = []uint32{1, 1, 1}
 
 type epochInfo struct {
