@@ -44,7 +44,7 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 
 	_, idx, err := generator.NextAddress()
 	require.NoError(t, err)
-	require.Equal(t, uint64(1), idx)
+	require.Equal(t, uint64(2), idx)
 
 	stateBytes, err := view.Get("", "", "account_address_state")
 	require.NoError(t, err)
