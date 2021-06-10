@@ -60,18 +60,19 @@ const (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx               context.Context
-	cancel            context.CancelFunc
-	log               zerolog.Logger
-	ov                network.Overlay
-	wg                *sync.WaitGroup
-	libP2PNode        *Node
-	libP2PNodeFactory LibP2PFactoryFunc
-	me                flow.Identifier
-	metrics           module.NetworkMetrics
-	rootBlockID       string
-	validators        []network.MessageValidator
-	peerManager       *PeerManager
+	ctx                context.Context
+	cancel             context.CancelFunc
+	log                zerolog.Logger
+	ov                 network.Overlay
+	wg                 *sync.WaitGroup
+	libP2PNode         *Node
+	libP2PNodeFactory  LibP2PFactoryFunc
+	me                 flow.Identifier
+	metrics            module.NetworkMetrics
+	rootBlockID        string
+	validators         []network.MessageValidator
+	peerManager        *PeerManager
+	peerUpdateInterval time.Duration
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -81,6 +82,7 @@ func NewMiddleware(log zerolog.Logger,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
 	rootBlockID string,
+	peerUpdateInterval time.Duration,
 	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
@@ -92,15 +94,16 @@ func NewMiddleware(log zerolog.Logger,
 
 	// create the node entity and inject dependencies & config
 	return &Middleware{
-		ctx:               ctx,
-		cancel:            cancel,
-		log:               log,
-		wg:                &sync.WaitGroup{},
-		me:                flowID,
-		libP2PNodeFactory: libP2PNodeFactory,
-		metrics:           metrics,
-		rootBlockID:       rootBlockID,
-		validators:        validators,
+		ctx:                ctx,
+		cancel:             cancel,
+		log:                log,
+		wg:                 &sync.WaitGroup{},
+		me:                 flowID,
+		libP2PNodeFactory:  libP2PNodeFactory,
+		metrics:            metrics,
+		rootBlockID:        rootBlockID,
+		validators:         validators,
+		peerUpdateInterval: peerUpdateInterval,
 	}
 }
 
@@ -148,7 +151,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
 
-	m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector)
+	m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector, WithInterval(m.peerUpdateInterval))
 	select {
 	case <-m.peerManager.Ready():
 		m.log.Debug().Msg("peer manager successfully started")

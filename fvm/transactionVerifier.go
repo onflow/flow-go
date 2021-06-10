@@ -181,7 +181,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 
 	valid, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
-		flow.TransactionDomainTag[:],
+		string(flow.TransactionDomainTag[:]),
 		message,
 		accountKey.PublicKey,
 		accountKey.HashAlgo,
