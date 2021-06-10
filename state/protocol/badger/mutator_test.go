@@ -448,7 +448,27 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	consumer.On("BlockFinalized", mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// set up state and mock ComplianceMetrics object
+		metrics := new(mockmodule.ComplianceMetrics)
+		metrics.On("BlockSealed", mock.Anything).Once()
+		metrics.On("SealedHeight", mock.Anything).Once()
+		metrics.On("FinalizedHeight", mock.Anything).Once()
+
+		seg, err := rootSnapshot.SealingSegment()
+		require.NoError(t, err)
+		metrics.On("BlockFinalized", mock.Anything).Times(len(seg))
+
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		require.NoError(t, err)
+		receiptValidator := util.MockReceiptValidator()
+		sealValidator := util.MockSealValidator(seals)
+		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()

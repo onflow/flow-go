@@ -571,7 +571,10 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 
 	// FOURTH: metrics and events
 
-	nextEpochSetup := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+	nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+	if err != nil {
+		return fmt.Errorf("could not get epoch setup by ID: %w", err)
+	}
 	if epochStatus.NextEpoch.CommitID != flow.ZeroID {
 		m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView)
 	}
