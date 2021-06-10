@@ -12,7 +12,6 @@ package crypto
 import "C"
 import (
 	"errors"
-	"fmt"
 )
 
 // Go wrappers to Relic C types
@@ -47,11 +46,13 @@ func (ct *ctx) initContext() error {
 // relic context must be initialized before seeding.
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
-		return fmt.Errorf("seed length needs to be larger than %d",
+		return newInvalidInputsError(
+			"seed length needs to be larger than %d",
 			securityBits/8)
 	}
 	if len(seed) > maxRelicPrgSeed {
-		return fmt.Errorf("seed length needs to be less than %x",
+		return newInvalidInputsError(
+			"seed length needs to be less than %x",
 			maxRelicPrgSeed)
 	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
@@ -106,7 +107,9 @@ func randZrStar(x *scalar) {
 // the resulting scalar is in the range 0 < k < r
 func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
-		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
+		return newInvalidInputsError(
+			"input slice length must be less than %d",
+			maxScalarSize)
 	}
 	C.bn_map_to_Zr_star((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
@@ -140,13 +143,16 @@ func writePointG2(dest []byte, a *pointG2) {
 
 // readVerifVector reads a G2 point from a slice of bytes
 func readPointG2(a *pointG2, src []byte) error {
-	if C.ep2_read_bin_compact((*C.ep2_st)(a),
+	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(src)),
-	) != valid {
+		(C.int)(len(src))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("input is not a G2 point")
+	default:
 		return errors.New("reading a G2 point has failed")
 	}
-	return nil
 }
 
 // This is only a TEST function.

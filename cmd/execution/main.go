@@ -91,6 +91,8 @@ func main() {
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 		diskWAL                     *wal.DiskWAL
 		scriptLogThreshold          time.Duration
+		chdpQueryTimeout            uint
+		chdpDeliveryTimeout         uint
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -115,6 +117,8 @@ func main() {
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
+			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -278,6 +282,8 @@ func main() {
 				executionState,
 				collector,
 				checkStakedAtBlock,
+				chdpQueryTimeout,
+				chdpDeliveryTimeout,
 			)
 
 			return providerEngine, err
