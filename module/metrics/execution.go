@@ -58,9 +58,9 @@ type ExecutionCollector struct {
 	transactionInterpretTime         prometheus.Histogram
 	transactionExecutionTime         prometheus.Histogram
 	transactionComputationUsed       prometheus.Histogram
+	transactionEmittedEvents         prometheus.Histogram
 	scriptExecutionTime              prometheus.Histogram
 	scriptComputationUsed            prometheus.Histogram
-	transactionEmittedEvents         prometheus.Histogram
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
