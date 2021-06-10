@@ -242,6 +242,10 @@ func (s *ExecForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEj
 	s.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
+func (s *ExecForkSuppressor) PruneByHeight(height uint64) error {
+	return s.seals.PruneByHeight(height)
+}
+
 // enforceValidChunks checks that seal has valid non-zero number of chunks.
 // In case a seal fails the check, a detailed error message is logged and an
 // engine.InvalidInputError (sentinel error) is returned.

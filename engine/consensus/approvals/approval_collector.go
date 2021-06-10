@@ -14,6 +14,7 @@ import (
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
 	incorporatedBlock    *flow.Header                    // block that incorporates execution result
+	executedBlock        *flow.Header                    // block that was executed
 	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
 	chunkCollectors      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
 	aggregatedSignatures *AggregatedSignatures           // aggregated signature for each chunk
@@ -21,7 +22,7 @@ type ApprovalCollector struct {
 	numberOfChunks       uint64                          // number of chunks for execution result, remains constant
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, executedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := assignment.Verifiers(chunk).Lookup()
@@ -33,6 +34,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 	collector := ApprovalCollector{
 		incorporatedResult:   result,
 		incorporatedBlock:    incorporatedBlock,
+		executedBlock:        executedBlock,
 		numberOfChunks:       numberOfChunks,
 		chunkCollectors:      chunkCollectors,
 		aggregatedSignatures: NewAggregatedSignatures(numberOfChunks),
@@ -84,6 +86,7 @@ func (c *ApprovalCollector) SealResult() error {
 	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: c.incorporatedResult,
 		Seal:               seal,
+		Header:             c.executedBlock,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store IncorporatedResultSeal in mempool: %w", err)
