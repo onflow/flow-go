@@ -104,11 +104,13 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 	// get current epoch
 	epoch := snapshot.Epochs().Current()
 
-	// read epoch counter
+	// Note: The epochCounter value expected by the smart contract is the epoch being
+	// replaced, which is one less than the epoch beginning after the spork.
 	epochCounter, err := epoch.Counter()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not get epoch counter")
 	}
+	epochCounter = epochCounter - 1
 
 	// read random source from epoch
 	randomSource, err := epoch.RandomSource()
