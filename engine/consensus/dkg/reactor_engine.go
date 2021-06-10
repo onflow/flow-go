@@ -1,7 +1,6 @@
 package dkg
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -15,7 +14,6 @@ import (
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -62,7 +60,7 @@ func NewReactorEngine(
 
 	return &ReactorEngine{
 		unit:              engine.NewUnit(),
-		log:               log,
+		log:               log.With().Str("engine", "dkg_reactor").Logger(),
 		me:                me,
 		State:             state,
 		keyStorage:        keyStorage,
@@ -104,6 +102,13 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	}
 
 	committee := epochInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
+
+	e.log.Info().
+		Uint64("phase1", epochInfo.phase1FinalView).
+		Uint64("phase2", epochInfo.phase2FinalView).
+		Uint64("phase3", epochInfo.phase3FinalView).
+		Interface("members", committee.NodeIDs()).
+		Msg("epoch info")
 
 	controller, err := e.controllerFactory.Create(
 		fmt.Sprintf("dkg-%d", counter),
@@ -148,15 +153,12 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter))
+	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter+1))
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
 	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
-
-	jsonEpoch, _ := json.Marshal(nextEpoch.(*inmem.Epoch).Encodable())
-	fmt.Printf("XXX ReactorEngine.getNextEpochInfo: %T, %s\n", nextEpoch, string(jsonEpoch))
 
 	identities, err := nextEpoch.InitialIdentities()
 	if err != nil {
