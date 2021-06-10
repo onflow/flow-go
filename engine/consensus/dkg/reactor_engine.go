@@ -174,6 +174,7 @@ func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochIn
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch phase 3 final view: %w", err)
 	}
+	// TODO define / use canonical seed value
 	seed, err := nextEpoch.Seed(SeedIndices...)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch seed: %w", err)
