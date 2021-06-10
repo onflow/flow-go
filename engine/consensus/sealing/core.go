@@ -513,11 +513,6 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
 func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uint64) error {
-	// skip requesting approvals if they are not required for sealing
-	if c.config.RequiredApprovalsForSealConstruction == 0 {
-		return nil
-	}
-
 	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
 		return nil
 	}
@@ -531,22 +526,28 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
 
 	pendingApprovalRequests := 0
-	collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)
-	for _, collector := range collectors {
-		// Note:
-		// * The `AssignmentCollectorTree` works with the height of the _executed_ block. However,
-		//   the `maxHeightForRequesting` should use the height of the block _incorporating the result_
-		//   as reference.
-		// * There might be blocks whose height is below `maxHeightForRequesting`, while their result
-		//   is incorporated into blocks with _larger_ height than `maxHeightForRequesting`. Therefore,
-		//   filtering based on the executed block height is a useful pre-filter, but not quite
-		//   precise enough.
-		// * The `AssignmentCollector` will apply the precise filter to avoid unnecessary overhead.
-		requestCount, err := collector.RequestMissingApprovals(sealingTracker, maxHeightForRequesting)
-		if err != nil {
-			return err
+	pendingCollectors := 0
+
+	// skip requesting approvals if they are not required for sealing
+	if c.config.RequiredApprovalsForSealConstruction != 0 {
+		collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)
+		for _, collector := range collectors {
+			// Note:
+			// * The `AssignmentCollectorTree` works with the height of the _executed_ block. However,
+			//   the `maxHeightForRequesting` should use the height of the block _incorporating the result_
+			//   as reference.
+			// * There might be blocks whose height is below `maxHeightForRequesting`, while their result
+			//   is incorporated into blocks with _larger_ height than `maxHeightForRequesting`. Therefore,
+			//   filtering based on the executed block height is a useful pre-filter, but not quite
+			//   precise enough.
+			// * The `AssignmentCollector` will apply the precise filter to avoid unnecessary overhead.
+			requestCount, err := collector.RequestMissingApprovals(sealingTracker, maxHeightForRequesting)
+			if err != nil {
+				return err
+			}
+			pendingApprovalRequests += requestCount
 		}
-		pendingApprovalRequests += requestCount
+		pendingCollectors = len(collectors)
 	}
 
 	c.log.Info().
@@ -555,7 +556,7 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 		Uint("seals_size", c.sealsMempool.Size()).
 		Uint64("last_sealed_height", lastSealedHeight).
 		Uint64("last_finalized_height", lastFinalizedHeight).
-		Int("pending_collectors", len(collectors)).
+		Int("pending_collectors", pendingCollectors).
 		Int("pending_approval_requests", pendingApprovalRequests).
 		Int64("duration_ms", time.Since(startTime).Milliseconds()).
 		Msg("requested pending approvals successfully")
