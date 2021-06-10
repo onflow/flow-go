@@ -657,9 +657,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, err
 	}
 
-	numViewsInDKGPhase := uint64(20)
-	numViewsInStakingAuction := uint64(10)
-	numViewsInEpoch := uint64(100)
+	numViewsInDKGPhase := uint64(100)
+	numViewsInStakingAuction := uint64(5)
+	numViewsInEpoch := uint64(350)
 
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
