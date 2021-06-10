@@ -50,6 +50,7 @@ type ExecutionCollector struct {
 	transactionExecutionTime         prometheus.Histogram
 	scriptExecutionTime              prometheus.Histogram
 	transactionComputationUsed       prometheus.Histogram
+	transactionEmittedEvents         prometheus.Histogram
 	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
@@ -230,6 +231,13 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Help:      "total amount of computation used by a transaction",
 	})
 
+	transactionEmittedEvents := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_emitted_events",
+		Help:      "total number of events emitted by a transaction",
+	})
+
 	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
@@ -260,6 +268,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(transactionInterpretTime)
 	registerer.MustRegister(transactionExecutionTime)
 	registerer.MustRegister(transactionComputationUsed)
+	registerer.MustRegister(transactionEmittedEvents)
 	registerer.MustRegister(scriptExecutionTime)
 	registerer.MustRegister(totalChunkDataPackRequests)
 
@@ -289,6 +298,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		transactionInterpretTime:   transactionInterpretTime,
 		transactionExecutionTime:   transactionExecutionTime,
 		transactionComputationUsed: transactionComputationUsed,
+		transactionEmittedEvents:   transactionEmittedEvents,
 		scriptExecutionTime:        scriptExecutionTime,
 		totalChunkDataPackRequests: totalChunkDataPackRequests,
 
@@ -416,9 +426,10 @@ func (ec *ExecutionCollector) ExecutionTotalExecutedTransactions(numberOfTx int)
 }
 
 // TransactionExecuted reports the time and computation spent executing a single transaction
-func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, comp uint64) {
+func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int) {
 	ec.transactionExecutionTime.Observe(float64(dur))
-	ec.transactionComputationUsed.Observe(float64(comp))
+	ec.transactionComputationUsed.Observe(float64(compUsed))
+	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 }
 
 // ScriptExecuted reports the time spent executing a single script

@@ -338,7 +338,7 @@ func (e *blockComputer) executeTransaction(
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.GasUsed)
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.GasUsed, len(tx.Events))
 	if tx.Err != nil {
 		e.metrics.ExecutionTotalFailedTransactions(1)
 	}

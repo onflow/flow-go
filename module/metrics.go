@@ -337,7 +337,7 @@ type ExecutionMetrics interface {
 	ExecutionLastExecutedBlockHeight(height uint64)
 
 	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
-	ExecutionTransactionExecuted(dur time.Duration, comp uint64)
+	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int)
 
 	// ExecutionScriptExecuted reports the time spent on executing an script
 	ExecutionScriptExecuted(dur time.Duration)
