@@ -24,6 +24,16 @@ func (_m *ExecutionMetrics) DiskSize(_a0 uint64) {
 	_m.Called(_a0)
 }
 
+// ExecutionBlockExecuted provides a mock function with given fields: dur, compUsed, txCounts, colCounts
+func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
+	_m.Called(dur, compUsed, txCounts, colCounts)
+}
+
+// ExecutionCollectionExecuted provides a mock function with given fields: dur, compUsed, txCounts
+func (_m *ExecutionMetrics) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
+	_m.Called(dur, compUsed, txCounts)
+}
+
 // ExecutionCollectionRequestRetried provides a mock function with given fields:
 func (_m *ExecutionMetrics) ExecutionCollectionRequestRetried() {
 	_m.Called()
@@ -44,6 +54,11 @@ func (_m *ExecutionMetrics) ExecutionLastExecutedBlockHeight(height uint64) {
 	_m.Called(height)
 }
 
+// ExecutionScriptExecuted provides a mock function with given fields: dur, compUsed
+func (_m *ExecutionMetrics) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
+	_m.Called(dur, compUsed)
+}
+
 // ExecutionStateReadsPerBlock provides a mock function with given fields: reads
 func (_m *ExecutionMetrics) ExecutionStateReadsPerBlock(reads uint64) {
 	_m.Called(reads)
@@ -59,9 +74,9 @@ func (_m *ExecutionMetrics) ExecutionSync(syncing bool) {
 	_m.Called(syncing)
 }
 
-// ExecutionTotalExecutedTransactions provides a mock function with given fields: numExecuted
-func (_m *ExecutionMetrics) ExecutionTotalExecutedTransactions(numExecuted int) {
-	_m.Called(numExecuted)
+// ExecutionTransactionExecuted provides a mock function with given fields: dur, compUsed, eventCounts, failed
+func (_m *ExecutionMetrics) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
+	_m.Called(dur, compUsed, eventCounts, failed)
 }
 
 // FinishBlockReceivedToExecuted provides a mock function with given fields: blockID
@@ -124,24 +139,29 @@ func (_m *ExecutionMetrics) ReadValuesSize(byte uint64) {
 	_m.Called(byte)
 }
 
+// RuntimeNumberOfAccounts provides a mock function with given fields: count
+func (_m *ExecutionMetrics) RuntimeNumberOfAccounts(count uint64) {
+	_m.Called(count)
+}
+
+// RuntimeTransactionChecked provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) RuntimeTransactionChecked(dur time.Duration) {
+	_m.Called(dur)
+}
+
+// RuntimeTransactionInterpreted provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) RuntimeTransactionInterpreted(dur time.Duration) {
+	_m.Called(dur)
+}
+
+// RuntimeTransactionParsed provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) RuntimeTransactionParsed(dur time.Duration) {
+	_m.Called(dur)
+}
+
 // StartBlockReceivedToExecuted provides a mock function with given fields: blockID
 func (_m *ExecutionMetrics) StartBlockReceivedToExecuted(blockID flow.Identifier) {
 	_m.Called(blockID)
-}
-
-// TransactionChecked provides a mock function with given fields: dur
-func (_m *ExecutionMetrics) TransactionChecked(dur time.Duration) {
-	_m.Called(dur)
-}
-
-// TransactionInterpreted provides a mock function with given fields: dur
-func (_m *ExecutionMetrics) TransactionInterpreted(dur time.Duration) {
-	_m.Called(dur)
-}
-
-// TransactionParsed provides a mock function with given fields: dur
-func (_m *ExecutionMetrics) TransactionParsed(dur time.Duration) {
-	_m.Called(dur)
 }
 
 // UpdateCount provides a mock function with given fields:
