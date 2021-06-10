@@ -16,9 +16,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
-// the Flow Ping protocol prefix
-const FlowLibP2PPingPrefix = "/flow/ping/"
-
 const maxPingMessageSize = 5 * kb
 
 const pingTimeout = time.Second * 60
