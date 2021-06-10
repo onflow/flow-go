@@ -22,6 +22,7 @@ type ExecutionCollector struct {
 	gasUsedPerBlock                  prometheus.Histogram
 	stateReadsPerBlock               prometheus.Histogram
 	totalExecutedTransactionsCounter prometheus.Counter
+	totalFailedTransactionsCounter   prometheus.Counter
 	lastExecutedBlockHeightGauge     prometheus.Gauge
 	stateStorageDiskTotal            prometheus.Gauge
 	storageStateCommitment           prometheus.Gauge
@@ -46,6 +47,10 @@ type ExecutionCollector struct {
 	transactionParseTime             prometheus.Histogram
 	transactionCheckTime             prometheus.Histogram
 	transactionInterpretTime         prometheus.Histogram
+	transactionExecutionTime         prometheus.Histogram
+	scriptExecutionTime              prometheus.Histogram
+	transactionComputationUsed       prometheus.Histogram
+	numberOfAccounts                 prometheus.Gauge
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
 	executionStateDiskUsage          prometheus.Gauge
@@ -204,6 +209,27 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Help:      "the interpretation time for a transaction in nanoseconds",
 	})
 
+	transactionExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_execution_time_nanoseconds",
+		Help:      "total amount of time spent on transaction execution in nanoseconds",
+	})
+
+	scriptExecutionTime := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "script_execution_time_nanoseconds",
+		Help:      "total amount of time spent on script execution in nanoseconds",
+	})
+
+	transactionComputationUsed := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemRuntime,
+		Name:      "transaction_computation_used",
+		Help:      "total amount of computation used by a transaction",
+	})
+
 	totalChunkDataPackRequests := prometheus.NewCounter(prometheus.CounterOpts{
 		Namespace: namespaceExecution,
 		Subsystem: subsystemProvider,
@@ -232,6 +258,9 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(transactionParseTime)
 	registerer.MustRegister(transactionCheckTime)
 	registerer.MustRegister(transactionInterpretTime)
+	registerer.MustRegister(transactionExecutionTime)
+	registerer.MustRegister(transactionComputationUsed)
+	registerer.MustRegister(scriptExecutionTime)
 	registerer.MustRegister(totalChunkDataPackRequests)
 
 	ec := &ExecutionCollector{
@@ -258,6 +287,9 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		transactionParseTime:       transactionParseTime,
 		transactionCheckTime:       transactionCheckTime,
 		transactionInterpretTime:   transactionInterpretTime,
+		transactionExecutionTime:   transactionExecutionTime,
+		transactionComputationUsed: transactionComputationUsed,
+		scriptExecutionTime:        scriptExecutionTime,
 		totalChunkDataPackRequests: totalChunkDataPackRequests,
 
 		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
@@ -274,6 +306,13 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 			Buckets:   []float64{5, 10, 50, 100, 500},
 			Name:      "block_state_reads",
 			Help:      "count of state access/read operations performed per block",
+		}),
+
+		totalFailedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemRuntime,
+			Name:      "total_failed_transactions",
+			Help:      "the total number of transactions that has failed when executed",
 		}),
 
 		totalExecutedTransactionsCounter: promauto.NewCounter(prometheus.CounterOpts{
@@ -309,6 +348,13 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 			Subsystem: subsystemIngestion,
 			Name:      "state_sync_active",
 			Help:      "indicates if the state sync is active",
+		}),
+
+		numberOfAccounts: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceExecution,
+			Subsystem: subsystemIngestion,
+			Name:      "number_of_accounts",
+			Help:      "captures number of accounts",
 		}),
 
 		executionStateDiskUsage: promauto.NewGauge(prometheus.GaugeOpts{
@@ -357,6 +403,11 @@ func (ec *ExecutionCollector) ExecutionStorageStateCommitment(bytes int64) {
 // ExecutionLastExecutedBlockHeight reports last executed block height
 func (ec *ExecutionCollector) ExecutionLastExecutedBlockHeight(height uint64) {
 	ec.lastExecutedBlockHeightGauge.Set(float64(height))
+}
+
+// ExecutionTotalFailedTransactions reports total number of failed transactions
+func (ec *ExecutionCollector) ExecutionTotalFailedTransactions(numberOfTx int) {
+	ec.totalFailedTransactionsCounter.Add(float64(numberOfTx))
 }
 
 // ExecutionTotalExecutedTransactions reports total executed transactions
@@ -467,6 +518,17 @@ func (ec *ExecutionCollector) TransactionInterpreted(dur time.Duration) {
 	ec.transactionInterpretTime.Observe(float64(dur))
 }
 
+// TransactionExecuted reports the time spent executing a single transaction
+func (ec *ExecutionCollector) TransactionExecuted(dur time.Duration, comp uint64) {
+	ec.transactionExecutionTime.Observe(float64(dur))
+	ec.transactionComputationUsed.Observe(float64(comp))
+}
+
+// ScriptExecuted reports the time spent executing a single script
+func (ec *ExecutionCollector) ScriptExecuted(dur time.Duration) {
+	ec.scriptExecutionTime.Observe(float64(dur))
+}
+
 // ChunkDataPackRequested is executed every time a chunk data pack request is arrived at execution node.
 // It increases the request counter by one.
 func (ec *ExecutionCollector) ChunkDataPackRequested() {
@@ -479,6 +541,10 @@ func (ec *ExecutionCollector) ExecutionSync(syncing bool) {
 		return
 	}
 	ec.stateSyncActive.Set(float64(0))
+}
+
+func (ec *ExecutionCollector) SetNumberOfAccounts(count uint64) {
+	ec.numberOfAccounts.Set(float64(count))
 }
 
 func (ec *ExecutionCollector) DiskSize(bytes uint64) {
