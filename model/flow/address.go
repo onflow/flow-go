@@ -16,7 +16,7 @@ type AddressGenerator interface {
 	NextAddress() (Address, error)
 	CurrentAddress() Address
 	Bytes() []byte
-	AddressCount() uint64 // returns total number of addresses has been generated up to this
+	AddressCount() uint64 // returns the total number of addresses that have been generated so far
 }
 
 type MonotonicAddressGenerator struct {
