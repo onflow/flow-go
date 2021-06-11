@@ -384,11 +384,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	}
 
 	// Prune Execution Tree
-	_, seal, err := c.state.AtBlockID(finalizedBlockID).SealedResult()
-	if err != nil {
-		return fmt.Errorf("could not retrieve latest seal for the finalized block %v: %w", finalizedBlockID, err)
-	}
-	lastSealed, err := c.headersDB.ByBlockID(seal.BlockID)
+	lastSealed, err := c.state.Sealed().Head()
 	if err != nil {
 		return fmt.Errorf("could not retrieve last sealed block %v: %w", seal.BlockID, err)
 	}
