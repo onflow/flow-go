@@ -40,7 +40,7 @@ require (
 	github.com/onflow/cadence v0.17.1-0.20210610211746-3141dd5d2e38
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
-	github.com/onflow/flow-go/crypto v0.12.0
+	github.com/onflow/flow-go/crypto v0.18.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pkg/errors v0.9.1
