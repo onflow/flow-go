@@ -11,6 +11,10 @@ type IncorporatedResultSeal struct {
 
 	// Seal is a seal for the result contained in IncorporatedResult.
 	Seal *Seal
+
+	// the header of the executed block
+	// useful for indexing the seal by height in the mempool in order for fast pruning
+	Header *Header
 }
 
 // ID implements flow.Entity.ID for IncorporatedResultSeal to make it capable of

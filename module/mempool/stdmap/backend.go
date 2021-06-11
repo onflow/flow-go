@@ -40,13 +40,13 @@ func (b *Backdata) Add(entity flow.Entity) bool {
 }
 
 // Rem will remove the item with the given hash.
-func (b *Backdata) Rem(entityID flow.Identifier) bool {
-	_, exists := b.entities[entityID]
+func (b *Backdata) Rem(entityID flow.Identifier) (flow.Entity, bool) {
+	entity, exists := b.entities[entityID]
 	if !exists {
-		return false
+		return nil, false
 	}
 	delete(b.entities, entityID)
-	return true
+	return entity, true
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
@@ -141,7 +141,7 @@ func (b *Backend) Add(entity flow.Entity) bool {
 func (b *Backend) Rem(entityID flow.Identifier) bool {
 	b.Lock()
 	defer b.Unlock()
-	removed := b.Backdata.Rem(entityID)
+	_, removed := b.Backdata.Rem(entityID)
 	return removed
 }
 

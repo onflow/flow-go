@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -124,6 +123,6 @@ func (e InvalidInputsError) Error() string {
 
 // IsInvalidInputsError checks if the input error is of a InvalidInputsError type
 func IsInvalidInputsError(err error) bool {
-	var errInvalidInputsError InvalidInputsError
-	return errors.As(err, &errInvalidInputsError)
+	_, ok := err.(*InvalidInputsError)
+	return ok
 }

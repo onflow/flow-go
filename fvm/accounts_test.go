@@ -767,7 +767,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not found")
+						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not supported")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)
@@ -1089,12 +1089,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1141,12 +1141,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1193,12 +1193,12 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(interpreter.StringResults{}),
+						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
