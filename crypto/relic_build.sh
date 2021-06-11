@@ -17,12 +17,21 @@ pushd "$DIR/relic/build"
 #
 GENERAL=(-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF)
 LIBS=(-DSHLIB=OFF -DSTLIB=ON)
-COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=native")
+
+# "-march=native" is not supported on ARM
+ARCH=$(uname -m 2>/dev/null ||true)
+ARCH=${ARCH:-x86_64}
+if [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ ]]; then
+    COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer -mtune=native")
+else
+    COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer -march=native -mtune=native")
+fi
+
 RAND=(-DRAND=HASHD -DSEED=)
 
 #
 BN_REP=(-DALLOC=AUTO -DALIGN=1 -DWSIZE=64 -DBN_PRECI=1024 -DBN_MAGNI=DOUBLE)
-ARITH=(-DARITH=EASY) 
+ARITH=(-DARITH=EASY)
 PRIME=(-DFP_PRIME=381)
 
 #
