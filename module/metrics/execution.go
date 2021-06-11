@@ -19,7 +19,7 @@ const (
 
 type ExecutionCollector struct {
 	tracer                           module.Tracer
-	gasUsedPerBlock                  prometheus.Histogram
+	computationUsedPerBlock          prometheus.Histogram
 	stateReadsPerBlock               prometheus.Histogram
 	totalExecutedTransactionsCounter prometheus.Counter
 	lastExecutedBlockHeightGauge     prometheus.Gauge
@@ -260,12 +260,12 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		transactionInterpretTime:   transactionInterpretTime,
 		totalChunkDataPackRequests: totalChunkDataPackRequests,
 
-		gasUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
+		computationUsedPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
 			Subsystem: subsystemRuntime,
-			Buckets:   []float64{1}, //TODO(andrew) Set once there are some figures around gas usage and limits
-			Name:      "used_gas",
-			Help:      "the gas used per block",
+			Buckets:   []float64{1}, //TODO(andrew) Set once there are some figures around compuation usage and limits
+			Name:      "used_computation",
+			Help:      "total computation used per block",
 		}),
 
 		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
@@ -334,9 +334,9 @@ func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identif
 	ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
-// ExecutionGasUsedPerBlock reports gas used per block
-func (ec *ExecutionCollector) ExecutionGasUsedPerBlock(gas uint64) {
-	ec.gasUsedPerBlock.Observe(float64(gas))
+// ExecutionComputationUsedPerBlock reports total computation used per block
+func (ec *ExecutionCollector) ExecutionComputationUsedPerBlock(inp uint64) {
+	ec.computationUsedPerBlock.Observe(float64(inp))
 }
 
 // ExecutionStateReadsPerBlock reports number of state access/read operations per block
