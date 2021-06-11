@@ -4,7 +4,7 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
-VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
+VERSION := $(shell git describe --tags --abbrev=2 --match "v*" 2>/dev/null)
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
@@ -112,6 +112,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol/events" -case=underscore -output="./state/protocol/events/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/consensus -case=underscore -output="./engine/consensus/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"

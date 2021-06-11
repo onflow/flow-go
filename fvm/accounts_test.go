@@ -22,7 +22,6 @@ import (
 func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	)
 
@@ -36,9 +35,11 @@ func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx f
 	require.NoError(t, err)
 	require.NoError(t, tx.Err)
 
-	require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
+	accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
 
-	data, err := jsoncdc.Decode(tx.Events[0].Payload)
+	require.Len(t, accountCreatedEvents, 1)
+
+	data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 	require.NoError(t, err)
 	address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -335,7 +336,6 @@ func newAccountKey(
 func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
@@ -355,11 +355,10 @@ func TestCreateAccount(t *testing.T) {
 
 				assert.NoError(t, tx.Err)
 
-				require.Len(t, tx.Events, 1)
+				accountCreatedEvents := filterAccountCreatedEvents(tx.Events)
+				require.Len(t, accountCreatedEvents, 1)
 
-				require.Equal(t, flow.EventAccountCreated, tx.Events[0].Type)
-
-				data, err := jsoncdc.Decode(tx.Events[0].Payload)
+				data, err := jsoncdc.Decode(accountCreatedEvents[0].Payload)
 				require.NoError(t, err)
 				address := flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 
@@ -387,10 +386,12 @@ func TestCreateAccount(t *testing.T) {
 
 				assert.NoError(t, tx.Err)
 
-				require.Len(t, tx.Events, count)
-
-				for i := 0; i < count; i++ {
-					require.Equal(t, flow.EventAccountCreated, tx.Events[i].Type)
+				accountCreatedEventCount := 0
+				for i := 0; i < len(tx.Events); i++ {
+					if tx.Events[i].Type != flow.EventAccountCreated {
+						continue
+					}
+					accountCreatedEventCount += 1
 
 					data, err := jsoncdc.Decode(tx.Events[i].Payload)
 					require.NoError(t, err)
@@ -400,6 +401,7 @@ func TestCreateAccount(t *testing.T) {
 					require.NoError(t, err)
 					require.NotNil(t, account)
 				}
+				require.Equal(t, count, accountCreatedEventCount)
 			}),
 	)
 }
@@ -407,12 +409,13 @@ func TestCreateAccount(t *testing.T) {
 func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(true),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
 	t.Run("Unauthorized account payer",
-		newVMTest().withContextOptions(options...).
+		newVMTest().
+			withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 
@@ -431,6 +434,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Authorized account payer",
 		newVMTest().withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				txBody := flow.NewTransactionBody().
 					SetScript([]byte(createAccountTransaction)).
@@ -447,6 +451,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer added to allowlist",
 		newVMTest().withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
@@ -467,6 +472,7 @@ func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	t.Run("Account payer removed from allowlist",
 		newVMTest().withContextOptions(options...).
+			withBootstrapProcedureOptions(fvm.WithRestrictedAccountCreationEnabled(true)).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				payer := createAccount(t, vm, chain, ctx, view, programs)
 				addAccountCreator(t, vm, chain, ctx, view, programs, payer)
@@ -512,7 +518,6 @@ func TestUpdateAccountCode(t *testing.T) {
 func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
@@ -762,7 +767,7 @@ func TestAddAccountKey(t *testing.T) {
 						require.NoError(t, err)
 
 						require.Error(t, tx.Err)
-						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not found")
+						assert.Contains(t, tx.Err.Error(), "hashing algorithm type not supported")
 
 						after, err := vm.GetAccount(ctx, address, view, programs)
 						require.NoError(t, err)
@@ -777,7 +782,6 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 	}
 
@@ -1007,7 +1011,6 @@ func TestRemoveAccountKey(t *testing.T) {
 func TestGetAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 		fvm.WithCadenceLogging(true),
 	}
@@ -1086,12 +1089,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1138,12 +1141,12 @@ func TestGetAccountKey(t *testing.T) {
 				expected := fmt.Sprintf(
 					"AccountKey("+
 						"keyIndex: %d, "+
-						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
+						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(interpreter.StringResults{}),
+					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1190,12 +1193,12 @@ func TestGetAccountKey(t *testing.T) {
 					expected := fmt.Sprintf(
 						"AccountKey("+
 							"keyIndex: %d, "+
-							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: false), "+
+							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(interpreter.StringResults{}),
+						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
@@ -1207,7 +1210,6 @@ func TestGetAccountKey(t *testing.T) {
 func TestAccountBalanceFields(t *testing.T) {
 	t.Run("Get balance works",
 		newVMTest().withContextOptions(
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
@@ -1241,7 +1243,6 @@ func TestAccountBalanceFields(t *testing.T) {
 
 	t.Run("Get available balance works",
 		newVMTest().withContextOptions(
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
@@ -1279,7 +1280,6 @@ func TestAccountBalanceFields(t *testing.T) {
 
 	t.Run("Get available balance works with minimum balance",
 		newVMTest().withContextOptions(
-			fvm.WithRestrictedAccountCreation(false),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),

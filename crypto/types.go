@@ -1,5 +1,9 @@
 package crypto
 
+import (
+	"fmt"
+)
+
 //revive:disable:var-naming
 
 //go:generate bash ./build_dependency.sh
@@ -100,3 +104,25 @@ const (
 
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte
+
+// InvalidInputsError is an error returned when a crypto API receives invalid inputs.
+// It allows a function caller differentiate unexpected program errors from errors caused by
+// invalid inputs.
+type InvalidInputsError struct {
+	message string
+}
+
+// newInvalidInputsError constructs a new InvalidInputsError
+func newInvalidInputsError(msg string, args ...interface{}) error {
+	return &InvalidInputsError{message: fmt.Sprintf(msg, args...)}
+}
+
+func (e InvalidInputsError) Error() string {
+	return e.message
+}
+
+// IsInvalidInputsError checks if the input error is of a InvalidInputsError type
+func IsInvalidInputsError(err error) bool {
+	_, ok := err.(*InvalidInputsError)
+	return ok
+}

@@ -2,13 +2,14 @@ package approvals
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/sealing"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -19,15 +20,23 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
+// sealing.
+const DefaultEmergencySealingThreshold = 400
+
 // helper functor that can be used to retrieve cached block height
 type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
 
-// AssignmentCollector is responsible collecting approvals that satisfy one assignment, meaning that we will
-// have multiple collectorTree for one execution result as same result can be incorporated in multiple forks.
-// AssignmentCollector has a strict ordering of processing, before processing approvals at least one incorporated result has to be
-// processed.
+// AssignmentCollector
+// Context:
+//  * When the same result is incorporated in multiple different forks,
+//    unique verifier assignment is determined for each fork.
+//  * The assignment collector is intended to encapsulate the known
+//    assignments for a particular execution result.
+// AssignmentCollector has a strict ordering of processing, before processing
+// approvals at least one incorporated result has to be processed.
 // AssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
-// AssignmentCollector is responsible for validating approvals on result-level(checking signature, identity).
+// AssignmentCollector is responsible for validating approvals on result-level (checking signature, identity).
 // TODO: currently AssignmentCollector doesn't cleanup collectorTree when blocks that incorporate results get orphaned
 // For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
 // when fork gets orphaned
@@ -46,15 +55,20 @@ type AssignmentCollector struct {
 	verifier                             module.Verifier                        // used to validate result approvals
 	seals                                mempool.IncorporatedResultSeals        // holds candidate seals for incorporated results that have acquired sufficient approvals; candidate seals are constructed  without consideration of the sealability of parent results
 	approvalConduit                      network.Conduit                        // used to request missing approvals from verification nodes
-	requestTracker                       *sealing.RequestTracker                // used to keep track of number of approval requests, and blackout periods, by chunk
+	requestTracker                       *RequestTracker                        // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
 func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *sealing.RequestTracker, requiredApprovalsForSealConstruction uint,
+	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *RequestTracker, requiredApprovalsForSealConstruction uint,
 ) (*AssignmentCollector, error) {
 	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
 		return nil, err
+	}
+	// pre-select all authorized verifiers at the block that is being sealed
+	authorizedApprovers, err := authorizedVerifiersAtBlock(state, result.BlockID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 
 	collector := &AssignmentCollector{
@@ -62,6 +76,8 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		result:                               result,
 		BlockHeight:                          block.Height,
 		collectors:                           make(map[flow.Identifier]*ApprovalCollector),
+		authorizedApprovers:                  authorizedApprovers,
+		verifiedApprovalsCache:               NewApprovalsCache(uint(result.Chunks.Len() * len(authorizedApprovers))),
 		state:                                state,
 		assigner:                             assigner,
 		seals:                                seals,
@@ -71,15 +87,6 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 		headers:                              headers,
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
-
-	// pre-select all authorized verifiers at the block that is being sealed
-	collector.authorizedApprovers, err = collector.authorizedVerifiersAtBlock(result.BlockID)
-	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
-	}
-
-	collector.verifiedApprovalsCache = NewApprovalsCache(uint(result.Chunks.Len() * len(collector.authorizedApprovers)))
-
 	return collector, nil
 }
 
@@ -94,41 +101,15 @@ func (ac *AssignmentCollector) collectorByBlockID(incorporatedBlockID flow.Ident
 	return ac.collectors[incorporatedBlockID]
 }
 
-// authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
-// The method returns the set of all node IDs that:
-//   * are authorized members of the network at the given block and
-//   * have the Verification role and
-//   * have _positive_ weight and
-//   * are not ejected
-func (ac *AssignmentCollector) authorizedVerifiersAtBlock(blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
-	authorizedVerifierList, err := ac.state.AtBlockID(blockID).Identities(
-		filter.And(
-			filter.HasRole(flow.RoleVerification),
-			filter.HasStake(true),
-			filter.Not(filter.Ejected),
-		))
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)
-	}
-	if len(authorizedVerifierList) == 0 {
-		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
-	}
-	identities := make(map[flow.Identifier]*flow.Identity)
-	for _, identity := range authorizedVerifierList {
-		identities[identity.NodeID] = identity
-	}
-	return identities, nil
-}
-
 // emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
 // ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
 // hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
-// sealing kicks in. This will be removed when implementation of seal & verification is finished.
+// sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
 	// Criterion for emergency sealing:
 	// there must be at least DefaultEmergencySealingThreshold number of blocks between
 	// the block that _incorporates_ result and the latest finalized block
-	return collector.IncorporatedBlock().Height+sealing.DefaultEmergencySealingThreshold <= finalizedBlockHeight
+	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
 
 func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
@@ -157,25 +138,30 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 		return nil
 	}
 
-	// This function is not exactly thread safe, it can perform double computation of assignment and authorized verifiers
-	// It is safe in regards that only one collector will be stored to the cache
-	// In terms of locking time it's better to perform extra computation in edge cases than lock this logic with mutex
+	// Constructing ApprovalCollector for IncorporatedResult
+	// The AssignmentCollector is not locked while instantiating the ApprovalCollector. Hence, it is possible that
+	// multiple threads simultaneously compute the verifier assignment. Nevertheless, the implementation is safe in
+	// that only one of the instantiated ApprovalCollectors will be stored in the cache. In terms of locking duration,
+	// it's better to perform extra computation in edge cases than lock this logic with a mutex,
 	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously
-
-	// chunk assigment is based on the first block in the fork that incorporates the result
 	assignment, err := ac.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
-
 	incorporatedBlock, err := ac.headers.ByBlockID(incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve header of incorporated block %s: %w",
 			incorporatedBlockID, err)
 	}
+	executedBlock, err := ac.headers.ByBlockID(incorporatedResult.Result.BlockID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve header of incorporatedResult %s: %w",
+			incorporatedResult.Result.BlockID, err)
+	}
+	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
 
-	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
-
+	// Now, we add the ApprovalCollector to the AssignmentCollector:
+	// no-op if an ApprovalCollector has already been added by a different routine
 	isDuplicate := ac.putCollector(incorporatedBlockID, collector)
 	if isDuplicate {
 		return nil
@@ -185,7 +171,6 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 	for _, approval := range ac.verifiedApprovalsCache.All() {
 		// those approvals are verified already and shouldn't yield any errors
 		_ = collector.ProcessApproval(approval)
-
 	}
 
 	return nil
@@ -229,7 +214,7 @@ func (ac *AssignmentCollector) verifySignature(approval *flow.ResultApproval, no
 	id := approval.Body.ID()
 	valid, err := ac.verifier.Verify(id[:], approval.VerifierSignature, nodeIdentity.StakingPubKey)
 	if err != nil {
-		return fmt.Errorf("failed to verify signature: %w", err)
+		return fmt.Errorf("failed to verify approval signature: %w", err)
 	}
 
 	if !valid {
@@ -286,17 +271,21 @@ func (ac *AssignmentCollector) validateApproval(approval *flow.ResultApproval) e
 }
 
 func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
+	// we have this approval cached already, no need to process it again
+	approvalCacheID := approval.Body.PartialID()
+	if cached := ac.verifiedApprovalsCache.Get(approvalCacheID); cached != nil {
+		return nil
+	}
+
 	err := ac.validateApproval(approval)
 	if err != nil {
 		return fmt.Errorf("could not validate approval: %w", err)
 	}
 
-	if cached := ac.verifiedApprovalsCache.Get(approval.Body.PartialID()); cached != nil {
-		// we have this approval cached already, no need to process it again
+	newlyAdded := ac.verifiedApprovalsCache.Put(approval)
+	if !newlyAdded {
 		return nil
 	}
-
-	ac.verifiedApprovalsCache.Put(approval)
 
 	for _, collector := range ac.allCollectors() {
 		err := collector.ProcessApproval(approval)
@@ -308,13 +297,23 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 	return nil
 }
 
-func (ac *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64) error {
+// RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
+// approvals from verifiers.
+// Returns number of requests made and error in case something goes wrong.
+func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
+	requestCount := 0
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
 			continue
 		}
 
-		for chunkIndex, verifiers := range collector.CollectMissingVerifiers() {
+		firstChunkWithMissingApproval := uint64(math.MaxUint64)
+		missingChunks := collector.CollectMissingVerifiers()
+		for chunkIndex, verifiers := range missingChunks {
+			if firstChunkWithMissingApproval < chunkIndex {
+				firstChunkWithMissingApproval = chunkIndex
+			}
+
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
@@ -343,12 +342,45 @@ func (ac *AssignmentCollector) RequestMissingApprovals(maxHeightForRequesting ui
 				ChunkIndex: chunkIndex,
 			}
 
+			requestCount++
 			err := ac.approvalConduit.Publish(req, verifiers...)
 			if err != nil {
 				log.Error().Err(err).
 					Msgf("could not publish approval request for chunk %d", chunkIndex)
 			}
 		}
+
+		if sealingTracker != nil && len(missingChunks) > 0 {
+			sealingRecord := tracker.NewRecordWithInsufficientApprovals(collector.incorporatedResult, firstChunkWithMissingApproval)
+			sealingTracker.Track(sealingRecord)
+		}
+
 	}
-	return nil
+	return requestCount, nil
+}
+
+// authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.
+// The method returns the set of all node IDs that:
+//   * are authorized members of the network at the given block and
+//   * have the Verification role and
+//   * have _positive_ weight and
+//   * are not ejected
+func authorizedVerifiersAtBlock(state protocol.State, blockID flow.Identifier) (map[flow.Identifier]*flow.Identity, error) {
+	authorizedVerifierList, err := state.AtBlockID(blockID).Identities(
+		filter.And(
+			filter.HasRole(flow.RoleVerification),
+			filter.HasStake(true),
+			filter.Not(filter.Ejected),
+		))
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve Identities for block %v: %w", blockID, err)
+	}
+	if len(authorizedVerifierList) == 0 {
+		return nil, fmt.Errorf("no authorized verifiers found for block %v", blockID)
+	}
+	identities := make(map[flow.Identifier]*flow.Identity, len(authorizedVerifierList))
+	for _, identity := range authorizedVerifierList {
+		identities[identity.NodeID] = identity
+	}
+	return identities, nil
 }

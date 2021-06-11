@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -47,7 +46,7 @@ type AssignmentCollectorTestSuite struct {
 	sigVerifier     *module.Verifier
 	conduit         *mocknetwork.Conduit
 	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	requestTracker  *sealing.RequestTracker
+	requestTracker  *RequestTracker
 
 	collector *AssignmentCollector
 }
@@ -62,7 +61,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.conduit = &mocknetwork.Conduit{}
 	s.headers = &storage.Headers{}
 
-	s.requestTracker = sealing.NewRequestTracker(1, 3)
+	s.requestTracker = NewRequestTracker(1, 3)
 
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)
@@ -111,7 +110,13 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+		},
+	).Return(true, nil).Once()
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	blockID := s.Block.ID()
@@ -127,7 +132,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 		}
 	}
 
-	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	s.sealsPL.AssertExpectations(s.T())
 }
 
 // TestProcessIncorporatedResult_ReusingCachedApprovals tests a scenario where we successfully processed approvals for one incorporated result
@@ -164,7 +169,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 
 	err = s.collector.ProcessIncorporatedResult(incorporatedResult)
 	require.NoError(s.T(), err)
-	s.sealsPL.AssertCalled(s.T(), "Add", mock.Anything)
+	s.sealsPL.AssertExpectations(s.T())
 
 }
 
@@ -377,24 +382,27 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 			requests = append(requests, ar)
 		})
 
-	err := s.collector.RequestMissingApprovals(lastHeight)
+	requestCount, err := s.collector.RequestMissingApprovals(nil, lastHeight)
 	require.NoError(s.T(), err)
 
 	// first time it goes through, no requests should be made because of the
 	// blackout period
 	require.Len(s.T(), requests, 0)
+	require.Zero(s.T(), requestCount)
 
 	// wait for the max blackout period to elapse and retry
 	time.Sleep(3 * time.Second)
 
 	// requesting with immature height will be ignored
-	err = s.collector.RequestMissingApprovals(lastHeight - uint64(len(incorporatedBlocks)) - 1)
+	requestCount, err = s.collector.RequestMissingApprovals(nil, lastHeight-uint64(len(incorporatedBlocks))-1)
 	s.Require().NoError(err)
 	require.Len(s.T(), requests, 0)
+	require.Zero(s.T(), requestCount)
 
-	err = s.collector.RequestMissingApprovals(lastHeight)
+	requestCount, err = s.collector.RequestMissingApprovals(nil, lastHeight)
 	s.Require().NoError(err)
 
+	require.Equal(s.T(), requestCount, s.Chunks.Len()*len(s.collector.collectors))
 	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
 
 	resultID := s.IncorporatedResult.Result.ID()
@@ -418,9 +426,15 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 	err = s.collector.CheckEmergencySealing(s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Once()
+	s.sealsPL.On("Add", mock.Anything).Run(
+		func(args mock.Arguments) {
+			seal := args.Get(0).(*flow.IncorporatedResultSeal)
+			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+		},
+	).Return(true, nil).Once()
 
-	err = s.collector.CheckEmergencySealing(sealing.DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.sealsPL.AssertExpectations(s.T())
