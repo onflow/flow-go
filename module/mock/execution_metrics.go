@@ -34,9 +34,9 @@ func (_m *ExecutionMetrics) ExecutionCollectionRequestSent() {
 	_m.Called()
 }
 
-// ExecutionGasUsedPerBlock provides a mock function with given fields: gas
-func (_m *ExecutionMetrics) ExecutionGasUsedPerBlock(gas uint64) {
-	_m.Called(gas)
+// ExecutionComputationUsedPerBlock provides a mock function with given fields: computation
+func (_m *ExecutionMetrics) ExecutionComputationUsedPerBlock(computation uint64) {
+	_m.Called(computation)
 }
 
 // ExecutionLastExecutedBlockHeight provides a mock function with given fields: height
