@@ -242,6 +242,8 @@ func (s *ExecForkSuppressor) RegisterEjectionCallbacks(callbacks ...mempool.OnEj
 	s.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
+// PruneUpToHeight remove all seals for blocks whose height is strictly
+// smaller that height. Note: seals for blocks at height are retained.
 func (s *ExecForkSuppressor) PruneUpToHeight(height uint64) error {
 	return s.seals.PruneUpToHeight(height)
 }

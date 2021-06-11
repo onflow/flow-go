@@ -7,12 +7,14 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 )
 
+type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
+
 // IncorporatedResultSeals implements the incorporated result seals memory pool
 // of the consensus nodes, used to store seals that need to be added to blocks.
 type IncorporatedResultSeals struct {
 	*Backend
 	// index the seals by the height of the executed block
-	byHeight     map[uint64][]flow.Identifier
+	byHeight     map[uint64]sealSet
 	lowestHeight uint64
 }
 
@@ -20,111 +22,84 @@ func indexByHeight(seal *flow.IncorporatedResultSeal) uint64 {
 	return seal.Header.Height
 }
 
-// NewIncorporatedResults creates a mempool for the incorporated result seals
-func NewIncorporatedResultSeals(opts ...OptionFunc) *IncorporatedResultSeals {
-	r := &IncorporatedResultSeals{
-		Backend:  NewBackend(opts...),
-		byHeight: make(map[uint64][]flow.Identifier),
-	}
+// NewIncorporatedResultSeals creates a mempool for the incorporated result seals
+func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
+	byHeight := make(map[uint64]sealSet)
 
 	// assuming all the entities are for unsealed blocks, then we will remove a seal
-	// with the highest height.
-	r.eject = func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	// with the largest height.
+	ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
 		maxHeight := uint64(0)
-		for height := range r.byHeight {
+		var sealsAtMaxHeight sealSet
+		for height, seals := range byHeight {
 			if height > maxHeight {
 				maxHeight = height
+				sealsAtMaxHeight = seals
 			}
 		}
-		seals, ok := r.byHeight[maxHeight]
-		if !ok {
-			panic(fmt.Sprintf("can't find seals by height: %v", maxHeight))
+		if len(sealsAtMaxHeight) == 0 {
+			// this can only happen if mempool is empty or if the secondary index was inconsistently updated
+			panic("cannot eject element from empty mempool")
 		}
 
-		if len(seals) == 0 {
-			panic(fmt.Sprintf("empty seal at height: %v", maxHeight))
+		for sealID, seal := range sealsAtMaxHeight {
+			return sealID, seal
 		}
+		panic("cannot eject element from empty mempool")
+	}
 
-		sealID := seals[0]
-		seal, ok := entities[sealID]
-		if !ok {
-			panic(fmt.Sprintf("inconsistent index, can not find seal by id: %v", sealID))
-		}
-		return sealID, seal
+	r := &IncorporatedResultSeals{
+		Backend:  NewBackend(WithLimit(limit), WithEject(ejector)),
+		byHeight: byHeight,
 	}
 
 	// when eject a entity, also update the secondary indx
 	r.RegisterEjectionCallbacks(func(entity flow.Entity) {
 		seal := entity.(*flow.IncorporatedResultSeal)
-		removeSeal(seal, r.entities, r.byHeight)
+		sealID := seal.ID()
+		r.removeFromIndex(sealID, seal.Header.Height)
 	})
 
 	return r
 }
 
-func removeSeal(seal *flow.IncorporatedResultSeal,
-	entities map[flow.Identifier]flow.Entity,
-	byHeight map[uint64][]flow.Identifier) {
-	sealID := seal.ID()
-	delete(entities, sealID)
-	index := indexByHeight(seal)
-	siblings := byHeight[index]
-	newsiblings := make([]flow.Identifier, 0, len(siblings))
-	for _, sibling := range siblings {
-		if sibling != sealID {
-			newsiblings = append(newsiblings, sibling)
-		}
-	}
-
-	if len(newsiblings) == 0 {
-		delete(byHeight, index)
-	} else {
-		byHeight[index] = newsiblings
+func (ir *IncorporatedResultSeals) removeFromIndex(id flow.Identifier, height uint64) {
+	sealsAtHeight := ir.byHeight[height]
+	delete(sealsAtHeight, id)
+	if len(sealsAtHeight) == 0 {
+		delete(ir.byHeight, height)
 	}
 }
 
-func removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity,
-	byHeight map[uint64][]flow.Identifier) error {
-	sameHeight, ok := byHeight[height]
-	if !ok {
-		return fmt.Errorf("cannot find seals by height: %v", height)
+func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
+	for sealID := range ir.byHeight[height] {
+		ir.Backdata.Rem(sealID)
 	}
-	for _, s := range sameHeight {
-		entity, ok := entities[s]
-		if !ok {
-			return fmt.Errorf("inconsistent index, could not find seal at height %v by id %v", height, s)
-		}
-		seal := entity.(*flow.IncorporatedResultSeal)
-		removeSeal(seal, entities, byHeight)
-	}
-	return nil
+	delete(ir.byHeight, height)
 }
 
-// Add adds an IncorporatedResultSeal to the mempool and update the secondary index
+// Add adds an IncorporatedResultSeal to the mempool
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
+	sealID := seal.ID()
 	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		// skip sealed height
-		if seal.Header.Height <= ir.lowestHeight {
+		// skip elements below the pruned
+		if seal.Header.Height < ir.lowestHeight {
 			return nil
 		}
 
-		sealID := seal.ID()
-		_, exists := entities[sealID]
-		if exists {
+		added = ir.Backdata.Add(seal)
+		if !added {
 			return nil
 		}
-
-		entities[sealID] = seal
 
 		height := indexByHeight(seal)
 		sameHeight, ok := ir.byHeight[height]
 		if !ok {
-			ir.byHeight[height] = []flow.Identifier{sealID}
-		} else {
-			ir.byHeight[height] = append(sameHeight, sealID)
+			sameHeight = make(sealSet)
+			ir.byHeight[height] = sameHeight
 		}
-		added = true
+		sameHeight[sealID] = seal
 		return nil
 	})
 
@@ -156,12 +131,13 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 	removed := false
 	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		entity, ok := entities[id]
-		if ok {
-			seal := entity.(*flow.IncorporatedResultSeal)
-			removeSeal(seal, entities, ir.byHeight)
-			removed = true
+		var entity flow.Entity
+		entity, removed = ir.Backdata.Rem(id)
+		if !removed {
+			return nil
 		}
+		seal := entity.(*flow.IncorporatedResultSeal)
+		ir.removeFromIndex(id, seal.Header.Height)
 		return nil
 	})
 	if err != nil {
@@ -171,11 +147,9 @@ func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 }
 
 func (ir *IncorporatedResultSeals) Clear() {
-	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		for k := range entities {
-			delete(entities, k)
-		}
-		ir.byHeight = make(map[uint64][]flow.Identifier)
+	err := ir.Backend.Run(func(_ map[flow.Identifier]flow.Entity) error {
+		ir.Backdata.Clear()
+		ir.byHeight = make(map[uint64]sealSet)
 		return nil
 	})
 	if err != nil {
@@ -200,24 +174,18 @@ func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 			ir.lowestHeight = height
 			return nil
 		}
-		// optimization, if there are less height than the height range to prune,
-		// then just go through each seal.
-		// otherwise, go through each height to prune
+		// Optimization: if there are less height in the index than the height range to prune,
+		// range to prune, then just go through each seal.
+		// Otherwise, go through each height to prune.
 		if uint64(len(ir.byHeight)) < height-ir.lowestHeight {
 			for h := range ir.byHeight {
-				if h <= height {
-					err := removeByHeight(h, entities, ir.byHeight)
-					if err != nil {
-						return err
-					}
+				if h < height {
+					ir.removeByHeight(h)
 				}
 			}
 		} else {
-			for h := ir.lowestHeight + 1; h <= height; h++ {
-				err := removeByHeight(h, entities, ir.byHeight)
-				if err != nil {
-					return err
-				}
+			for h := ir.lowestHeight; h < height; h++ {
+				ir.removeByHeight(h)
 			}
 		}
 		ir.lowestHeight = height
