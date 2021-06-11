@@ -105,7 +105,7 @@ func (suite *Suite) SetupTest() {
 	suite.finalizer = new(module.Finalizer)
 	suite.pending = new(module.PendingClusterBlockBuffer)
 	suite.pending.On("Size").Return(uint(0))
-	suite.pending.On("PruneByHeight", mock.Anything).Return()
+	suite.pending.On("PruneUpToHeight", mock.Anything).Return()
 	suite.sync = new(module.BlockRequester)
 	suite.hotstuff = new(module.HotStuff)
 

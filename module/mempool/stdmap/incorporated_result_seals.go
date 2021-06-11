@@ -28,7 +28,7 @@ func NewIncorporatedResultSeals(opts ...OptionFunc) *IncorporatedResultSeals {
 	}
 
 	// assuming all the entities are for unsealed blocks, then we will remove a seal
-	// with the highest height.
+	// with the largest height.
 	r.eject = func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
 		maxHeight := uint64(0)
 		for height := range r.byHeight {
@@ -64,9 +64,9 @@ func NewIncorporatedResultSeals(opts ...OptionFunc) *IncorporatedResultSeals {
 
 func removeSeal(seal *flow.IncorporatedResultSeal,
 	entities map[flow.Identifier]flow.Entity,
-	byHeight map[uint64][]flow.Identifier) {
+	byHeight map[uint64][]flow.Identifier,
+) {
 	sealID := seal.ID()
-	delete(entities, sealID)
 	index := indexByHeight(seal)
 	siblings := byHeight[index]
 	newsiblings := make([]flow.Identifier, 0, len(siblings))
@@ -84,7 +84,8 @@ func removeSeal(seal *flow.IncorporatedResultSeal,
 }
 
 func removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity,
-	byHeight map[uint64][]flow.Identifier) error {
+	byHeight map[uint64][]flow.Identifier,
+) error {
 	sameHeight, ok := byHeight[height]
 	if !ok {
 		return fmt.Errorf("cannot find seals by height: %v", height)
@@ -104,8 +105,8 @@ func removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity,
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		// skip sealed height
-		if seal.Header.Height <= ir.lowestHeight {
+		// skip elements below the pruned
+		if seal.Header.Height < ir.lowestHeight {
 			return nil
 		}
 
@@ -188,9 +189,9 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 	ir.Backend.RegisterEjectionCallbacks(callbacks...)
 }
 
-// PruneByHeight remove all seals equal and below the given height
-// after the prune the mempoo only has unsealed results
-func (ir *IncorporatedResultSeals) PruneByHeight(height uint64) error {
+// PruneUpToHeight remove all seals for blocks whose height is strictly
+// smaller that height. Note: seals for blocks at height are retained.
+func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {
 			return fmt.Errorf("new pruning height %v cannot be smaller than previous pruned height:%v", height, ir.lowestHeight)
@@ -200,12 +201,13 @@ func (ir *IncorporatedResultSeals) PruneByHeight(height uint64) error {
 			ir.lowestHeight = height
 			return nil
 		}
-		// optimization, if there are less height than the height range to prune,
-		// then just go through each seal.
-		// otherwise, go through each height to prune
+		// Optimization: if there are less seals in the mempool than the height
+		// range to prune, then just go through each seal.
+		// Otherwise, go through each height to prune
 		if uint64(len(ir.byHeight)) < height-ir.lowestHeight {
+			fmt.Println("option 1")
 			for h := range ir.byHeight {
-				if h <= height {
+				if h < height {
 					err := removeByHeight(h, entities, ir.byHeight)
 					if err != nil {
 						return err
@@ -213,7 +215,8 @@ func (ir *IncorporatedResultSeals) PruneByHeight(height uint64) error {
 				}
 			}
 		} else {
-			for h := ir.lowestHeight + 1; h <= height; h++ {
+			fmt.Println("option 2")
+			for h := ir.lowestHeight; h < height; h++ {
 				err := removeByHeight(h, entities, ir.byHeight)
 				if err != nil {
 					return err
