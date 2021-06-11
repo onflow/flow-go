@@ -2,9 +2,11 @@ package unittest
 
 import "github.com/onflow/flow-go/model/flow"
 
-type IncorporatedResultSealFactory struct{}
+var IncorporatedResultSeal incorporatedResultSealFactory
 
-func (f *IncorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedResultSeal)) *flow.IncorporatedResultSeal {
+type incorporatedResultSealFactory struct{}
+
+func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedResultSeal)) *flow.IncorporatedResultSeal {
 	result := ExecutionResultFixture()
 	header := BlockHeaderFixture()
 	incorporatedBlockID := header.ID()
@@ -27,22 +29,22 @@ func (f *IncorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedR
 	return irSeal
 }
 
-func (f *IncorporatedResultSealFactory) Fixtures(n int) []*flow.IncorporatedResultSeal {
+func (f *incorporatedResultSealFactory) Fixtures(n int) []*flow.IncorporatedResultSeal {
 	seals := make([]*flow.IncorporatedResultSeal, 0, n)
 	for i := 0; i < n; i++ {
-		seals = append(seals, f.Fixture())
+		seals = append(seals, IncorporatedResultSeal.Fixture())
 	}
 	return seals
 }
 
-func (f *IncorporatedResultSealFactory) WithResult(result *flow.ExecutionResult) func(*flow.IncorporatedResultSeal) {
+func (f *incorporatedResultSealFactory) WithResult(result *flow.ExecutionResult) func(*flow.IncorporatedResultSeal) {
 	return func(irSeal *flow.IncorporatedResultSeal) {
 		IncorporatedResult.WithResult(result)(irSeal.IncorporatedResult)
 		Seal.WithResult(result)(irSeal.Seal)
 	}
 }
 
-func (f *IncorporatedResultSealFactory) WithIncorporatedBlockID(id flow.Identifier) func(*flow.IncorporatedResultSeal) {
+func (f *incorporatedResultSealFactory) WithIncorporatedBlockID(id flow.Identifier) func(*flow.IncorporatedResultSeal) {
 	return func(irSeal *flow.IncorporatedResultSeal) {
 		IncorporatedResult.WithIncorporatedBlockID(id)(irSeal.IncorporatedResult)
 	}

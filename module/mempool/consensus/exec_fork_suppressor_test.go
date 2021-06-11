@@ -316,7 +316,7 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 		assert.Fail(t, "no call to onExecFork expected ")
 	}
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		wrappedMempool := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(3))
+		wrappedMempool := stdmap.NewIncorporatedResultSeals(3)
 		wrapper, err := NewExecStateForkSuppressor(onExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)

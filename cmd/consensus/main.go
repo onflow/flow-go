@@ -189,7 +189,7 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
-			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
+			resultSeals := stdmap.NewIncorporatedResultSeals(sealLimit)
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
