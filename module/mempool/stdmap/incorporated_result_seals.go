@@ -184,7 +184,6 @@ func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 				}
 			}
 		} else {
-			fmt.Println("option 2")
 			for h := ir.lowestHeight; h < height; h++ {
 				ir.removeByHeight(h)
 			}
