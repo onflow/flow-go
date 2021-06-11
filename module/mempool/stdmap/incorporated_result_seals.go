@@ -162,6 +162,7 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 
 // PruneUpToHeight remove all seals for blocks whose height is strictly
 // smaller that height. Note: seals for blocks at height are retained.
+// After pruned, seals below the height will never be added
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {
