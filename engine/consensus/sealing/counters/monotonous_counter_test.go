@@ -3,8 +3,9 @@ package counters
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSet(t *testing.T) {
