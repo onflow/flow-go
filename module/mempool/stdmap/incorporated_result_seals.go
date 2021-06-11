@@ -105,8 +105,8 @@ func removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity,
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		// skip elements below the pruned
-		if seal.Header.Height < ir.lowestHeight {
+		// skip sealed height
+		if seal.Header.Height <= ir.lowestHeight {
 			return nil
 		}
 
@@ -201,13 +201,12 @@ func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 			ir.lowestHeight = height
 			return nil
 		}
-		// Optimization: if there are less seals in the mempool than the height
-		// range to prune, then just go through each seal.
-		// Otherwise, go through each height to prune
+		// optimization, if there are less height than the height range to prune,
+		// then just go through each seal.
+		// otherwise, go through each height to prune
 		if uint64(len(ir.byHeight)) < height-ir.lowestHeight {
-			fmt.Println("option 1")
 			for h := range ir.byHeight {
-				if h < height {
+				if h <= height {
 					err := removeByHeight(h, entities, ir.byHeight)
 					if err != nil {
 						return err
@@ -215,8 +214,7 @@ func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 				}
 			}
 		} else {
-			fmt.Println("option 2")
-			for h := ir.lowestHeight; h < height; h++ {
+			for h := ir.lowestHeight + 1; h <= height; h++ {
 				err := removeByHeight(h, entities, ir.byHeight)
 				if err != nil {
 					return err

@@ -17,8 +17,7 @@ func TestIncorporatedResultSeals(t *testing.T) {
 	t.Run("add remove get", func(t *testing.T) {
 		pool := NewIncorporatedResultSeals()
 
-		is := &unittest.IncorporatedResultSealFactory{}
-		seal := is.Fixture()
+		seal := unittest.IncorporatedResultSeal.Fixture()
 
 		ok, err := pool.Add(seal)
 		require.NoError(t, err)
@@ -38,13 +37,14 @@ func TestIncorporatedResultSeals(t *testing.T) {
 	t.Run("add 100 prune by height", func(t *testing.T) {
 		pool := NewIncorporatedResultSeals()
 
-		is := &unittest.IncorporatedResultSealFactory{}
-		seals := make([]*flow.IncorporatedResultSeal, 0, 100)
-		for i := 0; i < 100; i++ {
-			seals = append(seals, is.Fixture(func(s *flow.IncorporatedResultSeal) {
-				s.Header.Height = uint64(i)
-			}))
-		}
+seals := make([]*flow.IncorporatedResultSeal, 0, 100)
+for i := 0; i < 100; i++ {
+seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
+s.Header.Height = uint64(i)
+})
+
+seals = append(seals, seal)
+}
 
 		for _, seal := range seals {
 			ok, err := pool.Add(seal)
@@ -53,11 +53,13 @@ func TestIncorporatedResultSeals(t *testing.T) {
 		}
 		verifyPresent(t, pool, seals)
 
-		pool.PruneUpToHeight(5)
+err := pool.PruneUpToHeight(5)
+require.NoError(t, err)
 		verifyAbsent(t, pool, seals[:5])
 		verifyPresent(t, pool, seals[5:])
 
-		pool.PruneUpToHeight(10)
+err = pool.PruneUpToHeight(10)
+require.NoError(t, err)
 		verifyAbsent(t, pool, seals[:10])
 		verifyPresent(t, pool, seals[10:])
 	})
