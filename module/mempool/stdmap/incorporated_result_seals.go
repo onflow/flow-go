@@ -174,7 +174,7 @@ func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 			ir.lowestHeight = height
 			return nil
 		}
-		// Optimization: if there are less seals in the mempool than the height
+		// Optimization: if there are less height in the index than the height range to prune,
 		// range to prune, then just go through each seal.
 		// Otherwise, go through each height to prune.
 		if uint64(len(ir.byHeight)) < height-ir.lowestHeight {
