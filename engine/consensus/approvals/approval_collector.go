@@ -7,12 +7,14 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/rs/zerolog"
 )
 
 // ApprovalCollector is responsible for distributing work to chunk collectorTree,
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
+	log                  zerolog.Logger
 	incorporatedBlock    *flow.Header                    // block that incorporates execution result
 	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
 	chunkCollectors      []*ChunkApprovalCollector       // slice of chunk collectorTree that is created on construction and doesn't change
@@ -21,7 +23,7 @@ type ApprovalCollector struct {
 	numberOfChunks       uint64                          // number of chunks for execution result, remains constant
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(log zerolog.Logger, result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := assignment.Verifiers(chunk).Lookup()
@@ -31,6 +33,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 
 	numberOfChunks := uint64(result.Result.Chunks.Len())
 	collector := ApprovalCollector{
+		log:                  log,
 		incorporatedResult:   result,
 		incorporatedBlock:    incorporatedBlock,
 		numberOfChunks:       numberOfChunks,
@@ -42,6 +45,12 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 	// The following code implements a TEMPORARY SHORTCUT: In case no approvals are required
 	// to seal an incorporated result, we seal right away when creating the ApprovalCollector.
 	if requiredApprovalsForSealConstruction == 0 {
+		// The high-level logic is: as soon as we have collected enough approvals, we aggregate
+		// them and store them in collector.aggregatedSignatures. If we don't require any signatures,
+		// this condition is satisfied right away. Hence, we add aggregated signature for each chunk.
+		for i := uint64(0); i < numberOfChunks; i++ {
+			collector.aggregatedSignatures.PutSignature(i, flow.AggregatedSignature{})
+		}
 		err := collector.SealResult()
 		if err != nil {
 			err = fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
@@ -81,14 +90,20 @@ func (c *ApprovalCollector) SealResult() error {
 	}
 
 	// we don't care if the seal is already in the mempool
-	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
+	added, err := c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: c.incorporatedResult,
 		Seal:               seal,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to store IncorporatedResultSeal in mempool: %w", err)
 	}
-
+	if added {
+		c.log.Info().
+			Str("executed_block_id", seal.BlockID.String()).
+			Str("result_id", seal.ResultID.String()).
+			Str("incorporating_block", c.IncorporatedBlockID().String()).
+			Msg("added candidate seal to IncorporatedResultSeals mempool")
+	}
 	return nil
 }
 

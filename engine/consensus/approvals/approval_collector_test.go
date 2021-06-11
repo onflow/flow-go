@@ -1,8 +1,10 @@
 package approvals
 
 import (
+	"os"
 	"testing"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -33,7 +35,7 @@ func (s *ApprovalCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
-	s.collector = NewApprovalCollector(s.IncorporatedResult, &s.IncorporatedBlock, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
+	s.collector = NewApprovalCollector(zerolog.New(os.Stderr), s.IncorporatedResult, &s.IncorporatedBlock, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
 }
 
 // TestProcessApproval_ValidApproval tests that valid approval is processed without error

@@ -104,7 +104,7 @@ func NewCore(
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
-		return approvals.NewAssignmentCollector(result, core.state, core.headers, assigner, sealsMempool, verifier,
+		return approvals.NewAssignmentCollector(core.log, result, core.state, core.headers, assigner, sealsMempool, verifier,
 			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
 	}
 
