@@ -100,6 +100,6 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 	ir.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
-func (ir *IncorporatedResultSeals) PruneByHeight(height uint64) error {
-	return ir.seals.PruneByHeight(height)
+func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
+	return ir.seals.PruneUpToHeight(height)
 }

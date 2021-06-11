@@ -100,7 +100,7 @@ func removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity,
 	return nil
 }
 
-// Add adds an IncorporatedResultSeal to the mempool
+// Add adds an IncorporatedResultSeal to the mempool and update the secondary index
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
@@ -188,9 +188,9 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 	ir.Backend.RegisterEjectionCallbacks(callbacks...)
 }
 
-// PruneByHeight remove all seals equal and below the given height
-// after the prune the mempoo only has unsealed results
-func (ir *IncorporatedResultSeals) PruneByHeight(height uint64) error {
+// PruneUpToHeight remove all seals for blocks whose height is strictly
+// smaller that height. Note: seals for blocks at height are retained.
+func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {
 			return fmt.Errorf("new pruning height %v cannot be smaller than previous pruned height:%v", height, ir.lowestHeight)

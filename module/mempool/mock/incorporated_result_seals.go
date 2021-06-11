@@ -93,8 +93,8 @@ func (_m *IncorporatedResultSeals) Limit() uint {
 	return r0
 }
 
-// PruneByHeight provides a mock function with given fields: height
-func (_m *IncorporatedResultSeals) PruneByHeight(height uint64) error {
+// PruneUpToHeight provides a mock function with given fields: height
+func (_m *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	ret := _m.Called(height)
 
 	var r0 error

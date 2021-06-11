@@ -34,5 +34,5 @@ type IncorporatedResultSeals interface {
 	Clear()
 
 	// Prune the IncorporatedResultSeal by sealed height
-	PruneByHeight(height uint64) error
+	PruneUpToHeight(height uint64) error
 }
