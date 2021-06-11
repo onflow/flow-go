@@ -167,7 +167,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 }
 
 func (b *BootstrapProcedure) createAccount() flow.Address {
-	address, _, err := b.addressGenerator.NextAddress()
+	address, err := b.addressGenerator.NextAddress()
 	if err != nil {
 		panic(fmt.Sprintf("failed to generate address: %s", err))
 	}
@@ -181,7 +181,7 @@ func (b *BootstrapProcedure) createAccount() flow.Address {
 }
 
 func (b *BootstrapProcedure) createServiceAccount(accountKey flow.AccountPublicKey) flow.Address {
-	address, _, err := b.addressGenerator.NextAddress()
+	address, err := b.addressGenerator.NextAddress()
 	if err != nil {
 		panic(fmt.Sprintf("failed to generate address: %s", err))
 	}

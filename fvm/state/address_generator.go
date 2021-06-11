@@ -43,26 +43,25 @@ func (g *StateBoundAddressGenerator) constructAddressGen() (flow.AddressGenerato
 	return g.chain.BytesToAddressGenerator(stateBytes), nil
 }
 
-func (g *StateBoundAddressGenerator) NextAddress() (flow.Address, uint64, error) {
+func (g *StateBoundAddressGenerator) NextAddress() (flow.Address, error) {
 
 	var address flow.Address
-	var idx uint64
 	addressGenerator, err := g.constructAddressGen()
 	if err != nil {
-		return address, 0, err
+		return address, err
 	}
 
-	address, idx, err = addressGenerator.NextAddress()
+	address, err = addressGenerator.NextAddress()
 	if err != nil {
-		return address, 0, err
+		return address, err
 	}
 
 	// update the ledger state
 	err = g.stateHolder.State().Set("", "", keyAddressState, addressGenerator.Bytes())
 	if err != nil {
-		return address, 0, fmt.Errorf("failed to update the state with address generator state: %w", err)
+		return address, fmt.Errorf("failed to update the state with address generator state: %w", err)
 	}
-	return address, idx, nil
+	return address, nil
 }
 
 func (g *StateBoundAddressGenerator) CurrentAddress() flow.Address {
@@ -78,12 +77,12 @@ func (g *StateBoundAddressGenerator) CurrentAddress() flow.Address {
 	return address
 }
 
-func (g *StateBoundAddressGenerator) TotalAddressCounts() uint64 {
+func (g *StateBoundAddressGenerator) AddressCount() uint64 {
 	addressGenerator, err := g.constructAddressGen()
 	if err != nil {
 		// TODO update CurrentAddress to return an error if needed
 		panic(err)
 	}
 
-	return addressGenerator.TotalAddressCounts()
+	return addressGenerator.AddressCount()
 }
