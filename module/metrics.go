@@ -333,10 +333,10 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
-	// ExecutionTransactionExecuted reports the total time and computation spent on executing a block
+	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
 	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
 
-	// ExecutionTransactionExecuted reports the total time and computation spent on executing a collection
+	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
 	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
 
 	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
