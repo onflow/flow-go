@@ -171,12 +171,12 @@ func testAddressGeneration(t *testing.T) {
 			refAddress, idx, err := state.NextAddress()
 			expectedIndex++
 			require.NoError(t, err)
-			assert.Equal(t, expectedIndex, idx)
+			assert.Equal(t, r+1, idx)
 			for i := 0; i < loop; i++ {
 				address, idx, err := state.NextAddress()
 				expectedIndex++
 				require.NoError(t, err)
-				assert.Equal(t, expectedIndex, idx)
+				assert.Equal(t, r+1+i, idx)
 				distance := bits.OnesCount64(address.uint64() ^ refAddress.uint64())
 				assert.LessOrEqual(t, linearCodeD, distance)
 			}
@@ -192,7 +192,7 @@ func testAddressGeneration(t *testing.T) {
 			address, idx, err := state.NextAddress()
 			expectedIndex++
 			require.NoError(t, err)
-			assert.Equal(t, expectedIndex, idx)
+			assert.Equal(t, r+1+i, idx)
 			check := chain.IsValid(address)
 			assert.True(t, check, "account address format should be valid")
 		}
@@ -209,7 +209,7 @@ func testAddressGeneration(t *testing.T) {
 			address, idx, err := state.NextAddress()
 			expectedIndex++
 			require.NoError(t, err)
-			assert.Equal(t, expectedIndex, idx)
+			assert.Equal(t, r+1+i, idx)
 			invalidAddress = uint64ToAddress(address.uint64() ^ invalidCodeWord)
 			check := chain.IsValid(invalidAddress)
 			assert.False(t, check, "account address format should be invalid")
@@ -241,7 +241,7 @@ func testAddressesIntersection(t *testing.T) {
 		for i := 0; i < loop; i++ {
 			address, idx, err := state.NextAddress()
 			expectedIdx++
-			assert.Equal(t, expectedIdx, idx)
+			assert.Equal(t, r+1+i, idx)
 			require.NoError(t, err)
 			check := Mainnet.Chain().IsValid(address)
 			assert.False(t, check, "test account address format should be invalid in Flow")

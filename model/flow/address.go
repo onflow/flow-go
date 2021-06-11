@@ -16,7 +16,7 @@ type AddressGenerator interface {
 	NextAddress() (Address, uint64, error) // returning address, index and error
 	CurrentAddress() Address
 	Bytes() []byte
-	TotalAddressCounts() uint64
+	AddressCount() uint64
 }
 
 type MonotonicAddressGenerator struct {
