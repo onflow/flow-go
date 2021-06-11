@@ -37,14 +37,12 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 				sealsAtMaxHeight = seals
 			}
 		}
-		if len(sealsAtMaxHeight) == 0 {
-			// this can only happen if mempool is empty or if the secondary index was inconsistently updated
-			panic("cannot eject element from empty mempool")
-		}
 
 		for sealID, seal := range sealsAtMaxHeight {
 			return sealID, seal
 		}
+
+		// this can only happen if mempool is empty or if the secondary index was inconsistently updated
 		panic("cannot eject element from empty mempool")
 	}
 
