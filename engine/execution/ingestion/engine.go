@@ -591,7 +591,7 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
 
-	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.GasUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
+	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.ComputationUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
