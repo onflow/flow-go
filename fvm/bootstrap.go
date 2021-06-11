@@ -203,6 +203,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
+	b.createMinter(service, flowToken)
+
 	b.deployDKG(service)
 
 	b.deployQC(service)
@@ -316,6 +318,20 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) createMinter(service, flowToken flow.Address) {
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.CreateFlowTokenMinterTransaction(
+				service,
+				flowToken),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to create flow token minter: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) deployDKG(service flow.Address) {
