@@ -383,17 +383,6 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
 
-	// Prune Execution Tree
-	lastSealed, err := c.state.Sealed().Head()
-	if err != nil {
-		return fmt.Errorf("could not retrieve last sealed block : %w", err)
-	}
-	err = c.receipts.PruneUpToHeight(lastSealed.Height)
-	if err != nil {
-		return fmt.Errorf("failed to prune execution tree up to latest sealed and finalized block %v, height: %v: %w",
-			lastSealed.ID(), lastSealed.Height, err)
-	}
-
 	c.log.Info().
 		Hex("finalized_block_id", finalizedBlockID[:]).
 		Uint64("first_height_missing_result", firstMissingHeight).
