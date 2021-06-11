@@ -446,7 +446,7 @@ func (r *RandomAddressGenerator) Bytes() []byte {
 	panic("not implemented")
 }
 
-func (r *RandomAddressGenerator) AddressCounts() uint64 {
+func (r *RandomAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
@@ -466,7 +466,7 @@ func (f *FixedAddressGenerator) Bytes() []byte {
 	panic("not implemented")
 }
 
-func (f *FixedAddressGenerator) AddressCounts() uint64 {
+func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
@@ -590,7 +590,7 @@ func generateCollection(transactionCount int, addressGenerator flow.AddressGener
 	transactions := make([]*flow.TransactionBody, transactionCount)
 
 	for i := 0; i < transactionCount; i++ {
-		nextAddress, _, err := addressGenerator.NextAddress()
+		nextAddress, err := addressGenerator.NextAddress()
 		if err != nil {
 			panic(fmt.Errorf("cannot generate next address in test: %w", err))
 		}
