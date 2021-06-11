@@ -536,7 +536,16 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil, nil, nil).
 		Times(1) // only system chunk
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	metrics := new(modulemock.ExecutionMetrics)
+	metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Times(1) // system collection
+
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Times(1) // system chunk tx
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
