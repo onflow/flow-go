@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/engine"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
@@ -535,12 +536,19 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// 1) whose result connects all the way to the last sealed result
 	// 2) is unique (never seen in unsealed blocks)
 	receipts, err := b.recPool.ReachableReceipts(latestSeal.ResultID, isResultForUnsealedBlock, isReceiptUniqueAndUnsealed)
-	if err != nil {
+	// Occurrence of UnknownExecutionResultError:
+	// Populating the execution with receipts from incoming blocks happens concurrently in
+	// matching.Core. Hence, the following edge case can occur (rarely): matching.Core is
+	// just in the process of populating the Execution Tree with the receipts from the
+	// latest blocks, while the builder is already trying to build on top. In this rare
+	// situation, the Execution Tree might not yet know the latest sealed result.
+	// TODO: we should probably remove this edge case by _synchronously_ populating
+	//       the Execution Tree in the Fork's finalizationCallback
+	if err != nil && !engine.IsUnknownExecutionResultError(err) {
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 
 	insertables := toInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
-
 	return insertables, nil
 }
 

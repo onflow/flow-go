@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/module/mempool"
@@ -136,13 +137,17 @@ func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.
 // the receipt committing to the derived result.
 // The algorithm only traverses to results, for which there exists a
 // sequence of interim result in the mempool without any gaps.
+//
+// Error returns:
+// * UnknownExecutionResultError (sentinel) if resultID is unknown
+// * all other error are unexpected and potential indicators of corrupted internal state
 func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter) ([]*flow.ExecutionReceipt, error) {
 	et.RLock()
 	defer et.RUnlock()
 
 	vertex, found := et.forest.GetVertex(resultID)
 	if !found {
-		return nil, fmt.Errorf("unknown result id %x", resultID)
+		return nil, engine.NewUnknownExecutionResultErrorf("unknown result id %x", resultID)
 	}
 
 	receipts := make([]*flow.ExecutionReceipt, 0, 10) // we expect just below 10 execution Receipts per call
