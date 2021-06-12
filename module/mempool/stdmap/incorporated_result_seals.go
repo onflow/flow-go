@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -166,7 +164,10 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {
-			return fmt.Errorf("new pruning height %v cannot be smaller than previous pruned height:%v", height, ir.lowestHeight)
+			// when it was called concurrently with different heights, the caller can't ensure the strict
+			// order of heights passed, in that case, we will just ignore the height instead
+			// of returning an error.
+			return nil
 		}
 
 		if len(entities) == 0 {
