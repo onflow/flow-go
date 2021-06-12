@@ -35,6 +35,7 @@ var (
 	flagRootTimestamp               string
 	flagRootCommit                  string
 	flagEpochCounter                uint64
+	flagProtocolVersion             uint
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
 )
@@ -80,12 +81,14 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
+	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", 0, "major software version used for the duration of this spork")
 
 	_ = finalizeCmd.MarkFlagRequired("root-chain")
 	_ = finalizeCmd.MarkFlagRequired("root-parent")
 	_ = finalizeCmd.MarkFlagRequired("root-height")
 	_ = finalizeCmd.MarkFlagRequired("root-commit")
 	_ = finalizeCmd.MarkFlagRequired("epoch-counter")
+	_ = finalizeCmd.MarkFlagRequired("protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,
@@ -187,7 +190,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root procotol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, rootQC)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithProtocolVersion(block, result, seal, rootQC, flagProtocolVersion)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -278,7 +281,7 @@ func assemblePartnerNodes() []model.NodeInfo {
 	return nodes
 }
 
-// readParnterNodes reads the partner node information
+// readPartnerNodes reads the partner node information
 func readPartnerNodes() []model.NodeInfoPub {
 	var partners []model.NodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)
