@@ -91,6 +91,7 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, pInfos []peer.Addr
 	peerCh := make(chan peer.AddrInfo, len(pInfos))
 
 	// stuff all the peer.AddrInfo it into the channel
+	// mark those peer addresses as protected
 	for _, peerInfo := range pInfos {
 		peerCh <- peerInfo
 	}
@@ -139,6 +140,7 @@ func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 				Msg("skipping connection pruning with peer due to one-to-one stream")
 			continue // flow stream found, skip pruning
 		}
+
 
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)

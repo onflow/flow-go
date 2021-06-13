@@ -209,6 +209,12 @@ func (n *Node) AddPeer(ctx context.Context, identity flow.Identity) error {
 		return fmt.Errorf("failed to add peer %s: %w", identity.String(), err)
 	}
 
+	// protect the one-to-one connection from being pruned by the connection manager
+	n.host.ConnManager().Protect(pInfo.ID, "OneToOneConnection")
+	n.logger.Trace().
+		Str("target_identity", identity.String()).
+		Str("peer_id", pInfo.ID.String()).
+		Msg("protected from connection pruning")
 	err = n.host.Connect(ctx, pInfo)
 	if err != nil {
 		return err
@@ -224,6 +230,12 @@ func (n *Node) RemovePeer(ctx context.Context, identity flow.Identity) error {
 		return fmt.Errorf("failed to remove peer %x: %w", identity, err)
 	}
 
+	// protect the one-to-one connection from being pruned by the connection manager
+	n.host.ConnManager().Unprotect(pInfo.ID, "OneToOneConnection")
+	n.logger.Trace().
+		Str("target_identity", identity.String()).
+		Str("peer_id", pInfo.ID.String()).
+		Msg("unprotected from connection pruning")
 	err = n.host.Network().ClosePeer(pInfo.ID)
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", identity, err)
