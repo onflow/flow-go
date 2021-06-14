@@ -9,10 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/verification/match"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/messages"
-	vermodel "github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -96,16 +94,6 @@ func demo() {
 			panic(err)
 		}
 
-		// creates a pending receipts mempool and registers a metric on its size
-		pendingReceipts, err := stdmap.NewReceiptDataPacks(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mc.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
-		if err != nil {
-			panic(err)
-		}
-
 		// creates pending receipt ids by block mempool, and registers size method of backend for metrics
 		receiptIDsByBlock, err := stdmap.NewIdentifierMap(100)
 		if err != nil {
@@ -122,20 +110,6 @@ func demo() {
 			panic(err)
 		}
 		err = mc.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
-		if err != nil {
-			panic(err)
-		}
-
-		// creates pending results mempool, and registers size method of backend for metrics
-		pendingResults := stdmap.NewResultDataPacks(100)
-		err = mc.Register(metrics.ResourcePendingResult, pendingResults.Size)
-		if err != nil {
-			panic(err)
-		}
-
-		// creates pending chunks mempool, and registers size method of backend for metrics
-		pendingChunks := match.NewChunks(100)
-		err = mc.Register(metrics.ResourcePendingChunk, pendingChunks.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -204,13 +178,6 @@ func demo() {
 			})
 
 			tryRandomCall(func() {
-				pendingReceipts.Add(&vermodel.ReceiptDataPack{
-					Receipt:  receipt,
-					OriginID: unittest.IdentifierFixture(),
-				})
-			})
-
-			tryRandomCall(func() {
 				err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
 				if err != nil {
 					panic(err)
@@ -222,23 +189,6 @@ func demo() {
 				if err != nil {
 					panic(err)
 				}
-			})
-
-			tryRandomCall(func() {
-				pendingResults.Add(&vermodel.ResultDataPack{
-					ExecutorID:      receipt.ExecutorID,
-					ExecutionResult: &receipt.ExecutionResult,
-				})
-			})
-
-			tryRandomCall(func() {
-				pendingChunks.Add(&match.ChunkStatus{
-					Chunk:             receipt.ExecutionResult.Chunks[0],
-					ExecutionResultID: receipt.ExecutionResult.ID(),
-					ExecutorID:        receipt.ExecutorID,
-					LastAttempt:       time.Time{},
-					Attempt:           0,
-				})
 			})
 
 			tryRandomCall(func() {
