@@ -182,7 +182,7 @@ func createNode(
 
 	receipts := consensusMempools.NewExecutionTree()
 
-	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
 	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
