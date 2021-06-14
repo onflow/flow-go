@@ -8,7 +8,8 @@ type incorporatedResultSealFactory struct{}
 
 func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedResultSeal)) *flow.IncorporatedResultSeal {
 	result := ExecutionResultFixture()
-	incorporatedBlockID := IdentifierFixture()
+	header := BlockHeaderFixture()
+	incorporatedBlockID := header.ID()
 
 	ir := IncorporatedResult.Fixture(
 		IncorporatedResult.WithResult(result),
@@ -19,6 +20,7 @@ func (f *incorporatedResultSealFactory) Fixture(opts ...func(*flow.IncorporatedR
 	irSeal := &flow.IncorporatedResultSeal{
 		IncorporatedResult: ir,
 		Seal:               seal,
+		Header:             &header,
 	}
 
 	for _, apply := range opts {
