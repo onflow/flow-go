@@ -421,7 +421,6 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 	}
 
 	n.connMgr.ProtectPeer(targetInfo.ID)
-	// unprotect it once done
 	defer n.connMgr.UnprotectPeer(targetInfo.ID)
 
 	// connect to the target node
