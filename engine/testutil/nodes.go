@@ -59,7 +59,6 @@ import (
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -602,12 +601,6 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 }
 
 type VerificationOpt func(*testmock.VerificationNode)
-
-func WithMatchEngine(eng network.Engine) VerificationOpt {
-	return func(node *testmock.VerificationNode) {
-		node.MatchEngine = eng
-	}
-}
 
 func WithChunkConsumer(chunkConsumer *chunkconsumer.ChunkConsumer) VerificationOpt {
 	return func(node *testmock.VerificationNode) {
