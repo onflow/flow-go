@@ -101,13 +101,13 @@ func TestEventsHashesAreIncluded(t *testing.T) {
 		require.Len(t, receiptA.ExecutionResult.Chunks, 2)
 		require.Len(t, receiptB.ExecutionResult.Chunks, 2)
 
-		eventListAHash, err := eventsListA.Hash()
+		eventListAHash, err := flow.EventsListHash(eventsListA)
 		require.NoError(t, err)
-		eventListBHash, err := eventsListB.Hash()
+		eventListBHash, err := flow.EventsListHash(eventsListB)
 		require.NoError(t, err)
-		eventListCHash, err := eventsListC.Hash()
+		eventListCHash, err := flow.EventsListHash(eventsListC)
 		require.NoError(t, err)
-		emptyListHash, err := eventsListsEmpty.Hash()
+		emptyListHash, err := flow.EventsListHash(eventsListsEmpty)
 		require.NoError(t, err)
 
 		require.Equal(t, eventListAHash, receiptA.ExecutionResult.Chunks[0].EventCollection)

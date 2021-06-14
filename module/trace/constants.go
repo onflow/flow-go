@@ -117,6 +117,7 @@ const (
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
+	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
 	//
