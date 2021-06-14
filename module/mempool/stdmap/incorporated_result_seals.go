@@ -167,7 +167,8 @@ func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 			// when it was called concurrently with different heights, the caller can't ensure the strict
 			// order of heights passed, in that case, we will just ignore the height instead
 			// of returning an error.
-			return nil
+			return mempool.NewDecreasingPruningHeightErrorf(
+				"pruning height: %v, existing height: %v", height, ir.lowestHeight)
 		}
 
 		if len(entities) == 0 {

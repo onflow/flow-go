@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/module/mempool"
@@ -147,7 +146,7 @@ func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter
 
 	vertex, found := et.forest.GetVertex(resultID)
 	if !found {
-		return nil, engine.NewUnknownExecutionResultErrorf("unknown result id %x", resultID)
+		return nil, mempool.NewUnknownExecutionResultErrorf("unknown result id %x", resultID)
 	}
 
 	receipts := make([]*flow.ExecutionReceipt, 0, 10) // we expect just below 10 execution Receipts per call

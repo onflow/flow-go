@@ -8,7 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
@@ -544,7 +543,7 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// situation, the Execution Tree might not yet know the latest sealed result.
 	// TODO: we should probably remove this edge case by _synchronously_ populating
 	//       the Execution Tree in the Fork's finalizationCallback
-	if err != nil && !engine.IsUnknownExecutionResultError(err) {
+	if err != nil && !mempool.IsUnknownExecutionResultError(err) {
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 

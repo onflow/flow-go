@@ -158,32 +158,3 @@ func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
 	// all other errors should just be logged as usual
 	log.Error().Str("error_type", "internal_error").Err(err).Msg(msg)
 }
-
-// UnknownExecutionResultError indicates that the Execution Result is unknown
-type UnknownExecutionResultError struct {
-	err error
-}
-
-func NewUnknownExecutionResultError(msg string) error {
-	return NewUnknownExecutionResultErrorf(msg)
-}
-
-func NewUnknownExecutionResultErrorf(msg string, args ...interface{}) error {
-	return UnknownExecutionResultError{
-		err: fmt.Errorf(msg, args...),
-	}
-}
-
-func (e UnknownExecutionResultError) Unwrap() error {
-	return e.err
-}
-
-func (e UnknownExecutionResultError) Error() string {
-	return e.err.Error()
-}
-
-// IsUnknownExecutionResultError returns whether the given error is an UnknownExecutionResultError error
-func IsUnknownExecutionResultError(err error) bool {
-	var unknownExecutionResultError UnknownExecutionResultError
-	return errors.As(err, &unknownExecutionResultError)
-}

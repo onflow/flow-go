@@ -492,7 +492,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	updateCollectorTreeSpan.Finish()
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height)
-	if err != nil {
+	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
 		return fmt.Errorf("could not prune seals mempool at block %v, by height: %v: %w", finalizedBlockID, lastSealed.Height, err)
 	}
 
