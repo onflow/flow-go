@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
@@ -41,6 +42,7 @@ type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
 // For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
 // when fork gets orphaned
 type AssignmentCollector struct {
+	log                                  zerolog.Logger
 	ResultID                             flow.Identifier                        // ID of execution result
 	result                               *flow.ExecutionResult                  // execution result that we are collecting approvals for
 	BlockHeight                          uint64                                 // height of block targeted by execution result
@@ -58,8 +60,17 @@ type AssignmentCollector struct {
 	requestTracker                       *RequestTracker                        // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
-func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *RequestTracker, requiredApprovalsForSealConstruction uint,
+func NewAssignmentCollector(
+	logger zerolog.Logger,
+	result *flow.ExecutionResult,
+	state protocol.State,
+	headers storage.Headers,
+	assigner module.ChunkAssigner,
+	seals mempool.IncorporatedResultSeals,
+	sigVerifier module.Verifier,
+	approvalConduit network.Conduit,
+	requestTracker *RequestTracker,
+	requiredApprovalsForSealConstruction uint,
 ) (*AssignmentCollector, error) {
 	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
@@ -72,6 +83,7 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 	}
 
 	collector := &AssignmentCollector{
+		log:                                  logger,
 		ResultID:                             result.ID(),
 		result:                               result,
 		BlockHeight:                          block.Height,
@@ -158,7 +170,7 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 		return fmt.Errorf("failed to retrieve header of incorporatedResult %s: %w",
 			incorporatedResult.Result.BlockID, err)
 	}
-	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
+	collector := NewApprovalCollector(ac.log, incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
 
 	// Now, we add the ApprovalCollector to the AssignmentCollector:
 	// no-op if an ApprovalCollector has already been added by a different routine

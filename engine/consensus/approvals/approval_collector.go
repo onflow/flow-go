@@ -24,8 +24,15 @@ type ApprovalCollector struct {
 	numberOfChunks       uint64                          // number of chunks for execution result, remains constant
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, executedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
-func NewApprovalCollector(log zerolog.Logger, result *flow.IncorporatedResult, incorporatedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(
+	log zerolog.Logger,
+	result *flow.IncorporatedResult,
+	incorporatedBlock *flow.Header,
+	executedBlock *flow.Header,
+	assignment *chunks.Assignment,
+	seals mempool.IncorporatedResultSeals,
+	requiredApprovalsForSealConstruction uint,
+) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := assignment.Verifiers(chunk).Lookup()
