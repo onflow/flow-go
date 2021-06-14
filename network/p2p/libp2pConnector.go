@@ -91,7 +91,6 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, pInfos []peer.Addr
 	peerCh := make(chan peer.AddrInfo, len(pInfos))
 
 	// stuff all the peer.AddrInfo it into the channel
-	// mark those peer addresses as protected
 	for _, peerInfo := range pInfos {
 		peerCh <- peerInfo
 	}
