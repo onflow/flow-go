@@ -240,9 +240,10 @@ func (e *Engine) processAvailableMessages() error {
 
 		event, ok := e.pendingFinalizationEvents.Pop()
 		if ok {
-			err := e.core.ProcessFinalizedBlock(event.(flow.Identifier))
+			finalizedBlockID := event.(flow.Identifier)
+			err := e.core.ProcessFinalizedBlock(finalizedBlockID)
 			if err != nil {
-				return fmt.Errorf("could not process finalized block: %w", err)
+				return fmt.Errorf("could not process finalized block %v: %w", finalizedBlockID, err)
 			}
 			continue
 		}
