@@ -171,6 +171,9 @@ func (i *TransactionInvocator) Process(
 		txError = i.deductTransactionFees(env, proc)
 	}
 
+	proc.Logs = append(proc.Logs, env.getLogs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
+
 	if txError != nil {
 		// drop delta
 		childState.View().DropDelta()
@@ -191,8 +194,6 @@ func (i *TransactionInvocator) Process(
 
 	proc.Events = append(proc.Events, env.getEvents()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
-	proc.Logs = append(proc.Logs, env.getLogs()...)
-	proc.GasUsed = proc.GasUsed + env.GetComputationUsed()
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
