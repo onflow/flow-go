@@ -13,8 +13,11 @@ import (
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/verification/finder"
-	"github.com/onflow/flow-go/engine/verification/match"
+	"github.com/onflow/flow-go/engine/verification/assigner"
+	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
+	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
+	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/encodable"
@@ -24,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -33,57 +37,55 @@ import (
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
-const (
-	// requestInterval represents the time interval in milliseconds that the
-	// match engine retries sending resource requests to the network
-	// this value is set following this issue (3443)
-	requestInterval = 5000 * time.Millisecond
-
-	// processInterval represents the time interval in milliseconds that the
-	// finder engine iterates over the execution receipts ready to process
-	// this value is set following this issue (3443)
-	processInterval = 1000 * time.Millisecond
-
-	// failureThreshold represents the number of retries match engine sends
-	// at `requestInterval` milliseconds for each of the missing resources.
-	// When it reaches the threshold ingest engine makes a missing challenge for the resources.
-	// This value is currently set to account for a single 24-hour failure of an Execution node.
-	failureThreshold = 17500
-)
-
 func main() {
 	var (
-		followerState       protocol.MutableState
-		err                 error
-		receiptLimit        uint                       // size of execution-receipt/result related mempools
-		chunkAlpha          uint                       // number of verifiers assigned per chunk
-		chunkLimit          uint                       // size of chunk-related mempools
-		cachedReceipts      *stdmap.ReceiptDataPacks   // used in finder engine
-		pendingReceipts     *stdmap.ReceiptDataPacks   // used in finder engine
-		readyReceipts       *stdmap.ReceiptDataPacks   // used in finder engine
-		blockIDsCache       *stdmap.Identifiers        // used in finder engine
-		processedResultsIDs *stdmap.Identifiers        // used in finder engine
-		discardedResultIDs  *stdmap.Identifiers        // used in finder engine
-		receiptIDsByBlock   *stdmap.IdentifierMap      // used in finder engine
-		receiptIDsByResult  *stdmap.IdentifierMap      // used in finder engine
-		chunkIDsByResult    *stdmap.IdentifierMap      // used in match engine
-		pendingResults      *stdmap.ResultDataPacks    // used in match engine
-		pendingChunks       *match.Chunks              // used in match engine
-		headerStorage       *storage.Headers           // used in match and finder engines
-		syncCore            *synchronization.Core      // used in follower engine
-		pendingBlocks       *buffer.PendingBlocks      // used in follower engine
-		finderEng           *finder.Engine             // the finder engine
-		verifierEng         *verifier.Engine           // the verifier engine
-		matchEng            *match.Engine              // the match engine
-		followerEng         *followereng.Engine        // the follower engine
-		collector           module.VerificationMetrics // used to collect metrics of all engines
+		followerState protocol.MutableState
+		err           error
+		receiptLimit  uint // size of execution-receipt/result related memory pools.
+		chunkAlpha    uint // number of verifiers assigned per chunk.
+		chunkLimit    uint // size of chunk-related memory pools.
+
+		requestInterval    time.Duration // time interval that requester engine tries requesting chunk data packs.
+		backoffMinInterval time.Duration // minimum time interval a chunk data pack request waits before dispatching.
+		backoffMaxInterval time.Duration // maximum time interval a chunk data pack request waits before dispatching.
+		backoffMultiplier  float64       // base of exponent in exponential backoff multiplier for backing off requests for chunk data packs.
+		requestTargets     uint64        // maximum number of execution nodes a chunk data pack request is dispatched to.
+
+		blockWorkers uint64 // number of blocks processed in parallel.
+		chunkWorkers uint64 // number of chunks processed in parallel.
+
+		chunkStatuses        *stdmap.ChunkStatuses     // used in fetcher engine
+		chunkRequests        *stdmap.ChunkRequests     // used in requester engine
+		processedChunkIndex  *storage.ConsumerProgress // used in chunk consumer
+		processedBlockHeight *storage.ConsumerProgress // used in block consumer
+		chunkQueue           *storage.ChunksQueue      // used in chunk consumer
+
+		syncCore        *synchronization.Core // used in follower engine
+		pendingBlocks   *buffer.PendingBlocks // used in follower engine
+		assignerEngine  *assigner.Engine      // the assigner engine
+		fetcherEngine   *fetcher.Engine       // the fetcher engine
+		requesterEngine *vereq.Engine         // the requester engine
+		verifierEng     *verifier.Engine      // the verifier engine
+		chunkConsumer   *chunkconsumer.ChunkConsumer
+		blockConsumer   *blockconsumer.BlockConsumer
+
+		followerEng *followereng.Engine        // the follower engine
+		collector   module.VerificationMetrics // used to collect metrics of all engines
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
+			flags.DurationVar(&requestInterval, "chunk-request-interval", vereq.DefaultRequestInterval, "time interval chunk data pack request is processed")
+			flags.DurationVar(&backoffMinInterval, "backoff-min-interval", vereq.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
+			flags.DurationVar(&backoffMaxInterval, "backoff-max-interval", vereq.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
+			flags.Float64Var(&backoffMultiplier, "backoff-multiplier", vereq.DefaultBackoffMultiplier, "base of exponent in exponential backoff requesting mechanism")
+			flags.Uint64Var(&requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
+			flags.Uint64Var(&blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
+			flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
+
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -105,142 +107,42 @@ func main() {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("cached execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			cachedReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceCachedReceipt, cachedReceipts.Size)
+		Module("chunk status memory pool", func(node *cmd.FlowNodeBuilder) error {
+			chunkStatuses = stdmap.NewChunkStatuses(chunkLimit)
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("pending execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
+		Module("chunk requests memory pool", func(node *cmd.FlowNodeBuilder) error {
+			chunkRequests = stdmap.NewChunkRequests(chunkLimit)
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("ready execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			readyReceipts, err = stdmap.NewReceiptDataPacks(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, readyReceipts.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
+		Module("processed chunk index consumer progress", func(node *cmd.FlowNodeBuilder) error {
+			processedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
-		Module("pending execution receipts ids by block mempool", func(node *cmd.FlowNodeBuilder) error {
-			receiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-
+		Module("processed block height consumer progress", func(node *cmd.FlowNodeBuilder) error {
+			processedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
-		Module("execution receipt ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
-			receiptIDsByResult, err = stdmap.NewIdentifierMap(receiptLimit)
+		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
+			chunkQueue = storage.NewChunkQueue(node.DB)
+			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
-				return err
+				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
 
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
+			node.Logger.Info().
+				Str("component", "node-builder").
+				Bool("init_to_default", ok).
+				Msg("chunks queue index has been initialized")
 
-			return nil
-		}).
-		Module("chunk ids by result mempool", func(node *cmd.FlowNodeBuilder) error {
-			chunkIDsByResult, err = stdmap.NewIdentifierMap(chunkLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceChunkIDsByResult, chunkIDsByResult.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-
-			return nil
-		}).
-		Module("cached block ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			blockIDsCache, err = stdmap.NewIdentifiers(receiptLimit)
-			if err != nil {
-				return err
-			}
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceCachedBlockID, blockIDsCache.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-
-			return nil
-		}).
-		Module("pending results mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingResults = stdmap.NewResultDataPacks(receiptLimit)
-
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingResult, pendingResults.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-			return nil
-		}).
-		Module("pending chunks mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingChunks = match.NewChunks(chunkLimit)
-
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingChunk, pendingChunks.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-			return nil
-		}).
-		Module("processed results ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			processedResultsIDs, err = stdmap.NewIdentifiers(receiptLimit)
-			if err != nil {
-				return err
-			}
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
-			return nil
-		}).
-		Module("discarded results ids mempool", func(node *cmd.FlowNodeBuilder) error {
-			discardedResultIDs, err = stdmap.NewIdentifiers(receiptLimit)
-			if err != nil {
-				return err
-			}
-			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceDiscardedResultID, discardedResultIDs.Size)
-			if err != nil {
-				return fmt.Errorf("could not register backend metric: %w", err)
-			}
 			return nil
 		}).
 		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
@@ -253,10 +155,6 @@ func main() {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 
-			return nil
-		}).
-		Module("header storage", func(node *cmd.FlowNodeBuilder) error {
-			headerStorage = storage.NewHeaders(node.Metrics.Cache, node.DB)
 			return nil
 		}).
 		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
@@ -280,46 +178,82 @@ func main() {
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Component("match engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			assigner, err := chunks.NewChunkAssigner(chunkAlpha, node.State)
-			if err != nil {
-				return nil, err
-			}
-			matchEng, err = match.New(node.Logger,
-				collector,
-				node.Tracer,
-				node.Network,
-				node.Me,
-				pendingResults,
-				chunkIDsByResult,
-				verifierEng,
-				assigner,
+		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			requesterEngine, err = vereq.New(
+				node.Logger,
 				node.State,
-				pendingChunks,
-				headerStorage,
+				node.Network,
+				node.Tracer,
+				collector,
+				chunkRequests,
 				requestInterval,
-				failureThreshold)
-			return matchEng, err
-		}).
-		Component("finder engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			finderEng, err = finder.New(node.Logger,
+				vereq.RetryAfterQualifier,
+				mempool.ExponentialUpdater(backoffMultiplier, backoffMaxInterval, backoffMinInterval),
+				requestTargets)
+
+			fetcherEngine = fetcher.New(
+				node.Logger,
 				collector,
 				node.Tracer,
-				node.Network,
+				verifierEng,
+				node.State,
+				chunkStatuses,
+				node.Storage.Headers,
+				node.Storage.Blocks,
+				node.Storage.Results,
+				node.Storage.Receipts,
+				requesterEngine)
+
+			// requester and fetcher engines are started by chunk consumer
+			chunkConsumer = chunkconsumer.NewChunkConsumer(
+				node.Logger,
+				processedChunkIndex,
+				chunkQueue,
+				fetcherEngine,
+				chunkWorkers)
+
+			return chunkConsumer, nil
+		}).
+		Component("assigner engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			var chunkAssigner module.ChunkAssigner
+			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize chunk assigner: %w", err)
+			}
+
+			assignerEngine = assigner.New(
+				node.Logger,
+				collector,
+				node.Tracer,
 				node.Me,
 				node.State,
-				matchEng,
-				cachedReceipts,
-				pendingReceipts,
-				readyReceipts,
-				headerStorage,
-				processedResultsIDs,
-				discardedResultIDs,
-				receiptIDsByBlock,
-				receiptIDsByResult,
-				blockIDsCache,
-				processInterval)
-			return finderEng, err
+				chunkAssigner,
+				chunkQueue,
+				chunkConsumer)
+
+			return assignerEngine, nil
+		}).
+		Component("block consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			var initBlockHeight uint64
+
+			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
+				node.Logger,
+				processedBlockHeight,
+				node.Storage.Blocks,
+				node.State,
+				assignerEngine,
+				blockWorkers)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
+			}
+
+			node.Logger.Info().
+				Str("component", "node-builder").
+				Uint64("init_height", initBlockHeight).
+				Msg("block consumer initialized")
+
+			return blockConsumer, nil
 		}).
 		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
@@ -353,7 +287,8 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finderEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, blockConsumer, node.RootBlock.Header,
+				node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
