@@ -226,15 +226,6 @@ func (n *Node) RemovePeer(ctx context.Context, identity flow.Identity) error {
 		return fmt.Errorf("failed to remove peer %x: %w", identity, err)
 	}
 
-	// unprotect the one-to-one connection making connection with this peer eligible for pruning
-	defer func() {
-		n.host.ConnManager().Unprotect(pInfo.ID, "OneToOneConnection")
-		n.logger.Trace().
-			Str("target_identity", identity.String()).
-			Str("peer_id", pInfo.ID.String()).
-			Msg("unprotected from connection pruning")
-	}()
-
 	err = n.host.Network().ClosePeer(pInfo.ID)
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", identity, err)

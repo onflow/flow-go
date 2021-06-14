@@ -31,9 +31,9 @@ type ConnManager struct {
 
 func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnManager {
 	cn := &ConnManager{
-		log:         log,
-		NullConnMgr: connmgr.NullConnMgr{},
-		metrics:     metrics,
+		log:                      log,
+		NullConnMgr:              connmgr.NullConnMgr{},
+		metrics:                  metrics,
 		streamSetupInProgressCnt: make(map[peer.ID]int),
 	}
 	n := &network.NotifyBundle{ListenCloseF: cn.ListenCloseNotifee,
