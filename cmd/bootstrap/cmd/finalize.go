@@ -37,6 +37,9 @@ var (
 	flagEpochCounter                uint64
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
+
+	// this flag is used to seed the DKG, clustering and cluster QC generation
+	flagBootstrapRandomSeed []byte
 )
 
 // PartnerStakes ...
@@ -88,10 +91,9 @@ func addFinalizeCmdFlags() {
 	_ = finalizeCmd.MarkFlagRequired("epoch-counter")
 
 	// optional parameters to influence various aspects of identity generation
-	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,
-		"number of collection clusters")
-	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation "+
-		"instead of DKG")
+	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", generateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
+	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation instead of DKG")
 
 	// these two flags are only used when setup a network from genesis
 	finalizeCmd.Flags().StringVar(&flagServiceAccountPublicKeyJSON, "service-account-public-key-json",
@@ -102,6 +104,9 @@ func addFinalizeCmdFlags() {
 }
 
 func finalize(cmd *cobra.Command, args []string) {
+
+	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("bootstrap random seed")
+	log.Info().Msg("")
 
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := assemblePartnerNodes()
@@ -156,7 +161,6 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
-	blockID := block.ID()
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
@@ -169,7 +173,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("computing collection node clusters")
-	clusterAssignmentSeed := binary.BigEndian.Uint64(blockID[:])
+	clusterAssignmentSeed := binary.BigEndian.Uint64(flagBootstrapRandomSeed)
 	assignments, clusters := constructClusterAssignment(partnerNodes, internalNodes, int64(clusterAssignmentSeed))
 	log.Info().Msg("")
 

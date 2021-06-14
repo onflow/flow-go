@@ -41,7 +41,7 @@ func constructRootResultAndSeal(
 		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
 		Participants: participants.Sort(order.Canonical),
 		Assignments:  assignments,
-		RandomSource: getRandomSource(block.ID()),
+		RandomSource: getRandomSource(flagBootstrapRandomSeed),
 	}
 
 	epochCommit := &flow.EpochCommit{
@@ -68,10 +68,10 @@ func constructRootResultAndSeal(
 // EpochSetup event and is used for leader selection. The random source is
 // generated deterministically based on the root block ID, so that the
 // bootstrapping files are deterministic across runs for the same inputs.
-func getRandomSource(rootBlockID flow.Identifier) []byte {
+func getRandomSource(seed []byte) []byte {
 
-	seed := int64(binary.BigEndian.Uint64(rootBlockID[:]))
-	rng := rand.New(rand.NewSource(seed))
+	seedInt := int64(binary.BigEndian.Uint64(seed))
+	rng := rand.New(rand.NewSource(seedInt))
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err := rng.Read(randomSource)
 	if err != nil {

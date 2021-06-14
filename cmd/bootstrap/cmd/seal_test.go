@@ -11,7 +11,7 @@ import (
 func TestRandomSource_Deterministic(t *testing.T) {
 	blockID := unittest.IdentifierFixture()
 
-	randomSource1 := getRandomSource(blockID)
-	randomSource2 := getRandomSource(blockID)
+	randomSource1 := getRandomSource(blockID[:])
+	randomSource2 := getRandomSource(blockID[:])
 	assert.Equal(t, randomSource1, randomSource2)
 }
