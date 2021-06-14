@@ -130,6 +130,10 @@ func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 
 		peerInfo := l.host.Network().Peerstore().PeerInfo(peerID)
 		log := l.log.With().Str("remote_peer", peerInfo.String()).Logger()
+		if l.host.ConnManager().IsProtected(peerID, "") {
+			log.Trace().Msg("skipping pruning since connection is protected")
+			continue // connection is protected (stream or connection in progress), skip pruning
+		}
 
 		// retain the connection if there is a Flow One-to-One stream on that connection
 		// (we do not want to sever a connection with on going direct one-to-one traffic)
@@ -140,7 +144,6 @@ func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
 				Msg("skipping connection pruning with peer due to one-to-one stream")
 			continue // flow stream found, skip pruning
 		}
-
 
 		// close the connection with the peer if it is not part of the current fanout
 		err := l.host.Network().ClosePeer(peerID)

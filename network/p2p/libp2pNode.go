@@ -78,12 +78,13 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	pingService          *PingService
+	connMgr              *ConnManager
 }
 
 func NewLibP2PNode(logger zerolog.Logger,
 	id flow.Identifier,
 	address string,
-	conMgr ConnManager,
+	conMgr *ConnManager,
 	key fcrypto.PrivateKey,
 	allowList bool,
 	rootBlockID string,
@@ -126,6 +127,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		id:                   id,
 		flowLibP2PProtocolID: flowLibP2PProtocolID,
 		pingService:          pingService,
+		connMgr:              conMgr,
 	}
 
 	ip, port, err := n.GetIPPort()
@@ -209,12 +211,6 @@ func (n *Node) AddPeer(ctx context.Context, identity flow.Identity) error {
 		return fmt.Errorf("failed to add peer %s: %w", identity.String(), err)
 	}
 
-	// protect the one-to-one connection from being pruned by the connection manager
-	n.host.ConnManager().Protect(pInfo.ID, "OneToOneConnection")
-	n.logger.Trace().
-		Str("target_identity", identity.String()).
-		Str("peer_id", pInfo.ID.String()).
-		Msg("protected from connection pruning")
 	err = n.host.Connect(ctx, pInfo)
 	if err != nil {
 		return err
@@ -230,12 +226,15 @@ func (n *Node) RemovePeer(ctx context.Context, identity flow.Identity) error {
 		return fmt.Errorf("failed to remove peer %x: %w", identity, err)
 	}
 
-	// protect the one-to-one connection from being pruned by the connection manager
-	n.host.ConnManager().Unprotect(pInfo.ID, "OneToOneConnection")
-	n.logger.Trace().
-		Str("target_identity", identity.String()).
-		Str("peer_id", pInfo.ID.String()).
-		Msg("unprotected from connection pruning")
+	// unprotect the one-to-one connection making connection with this peer eligible for pruning
+	defer func() {
+		n.host.ConnManager().Unprotect(pInfo.ID, "OneToOneConnection")
+		n.logger.Trace().
+			Str("target_identity", identity.String()).
+			Str("peer_id", pInfo.ID.String()).
+			Msg("unprotected from connection pruning")
+	}()
+
 	err = n.host.Network().ClosePeer(pInfo.ID)
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", identity, err)
@@ -267,6 +266,12 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 	if err != nil {
 		return nil, fmt.Errorf("could not get peer ID: %w", err)
 	}
+
+	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
+	// connection creation is being attempted
+	n.connMgr.ProtectPeer(peerID)
+	// unprotect it once done
+	defer n.connMgr.UnprotectPeer(peerID)
 
 	var errs error
 	var s libp2pnet.Stream
@@ -424,6 +429,10 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 		return message.PingResponse{}, -1, pingError(err)
 	}
 
+	n.connMgr.ProtectPeer(targetInfo.ID)
+	// unprotect it once done
+	defer n.connMgr.UnprotectPeer(targetInfo.ID)
+
 	// connect to the target node
 	err = n.host.Connect(ctx, targetInfo)
 	if err != nil {
@@ -488,7 +497,7 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 func bootstrapLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
 	address string,
-	conMgr ConnManager,
+	conMgr *ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
 	psOption ...pubsub.Option) (host.Host, *connGater, *pubsub.PubSub, error) {
