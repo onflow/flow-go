@@ -211,9 +211,9 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConf
 		Nodes:                 nodes,
 		Name:                  name,
 		NClusters:             1, // default to 1 cluster
-		ViewsInDKGPhase:       100,
+		ViewsInDKGPhase:       50,
 		ViewsInStakingAuction: 5,
-		ViewsInEpoch:          350,
+		ViewsInEpoch:          180,
 	}
 
 	for _, apply := range opts {
