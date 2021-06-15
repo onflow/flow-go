@@ -452,13 +452,15 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// set up state and mock ComplianceMetrics object
 		metrics := new(mockmodule.ComplianceMetrics)
-		metrics.On("BlockSealed", mock.Anything).Once()
-		metrics.On("SealedHeight", mock.Anything).Once()
-		metrics.On("FinalizedHeight", mock.Anything).Once()
+		metrics.On("BlockSealed", mock.Anything)
+		metrics.On("SealedHeight", mock.Anything)
+		metrics.On("FinalizedHeight", mock.Anything)
+		metrics.On("BlockFinalized", mock.Anything)
 
-		seg, err := rootSnapshot.SealingSegment()
+		// expect committed epoch final view metric at bootstrap
+		finalView, err := rootSnapshot.Epochs().Current().FinalView()
 		require.NoError(t, err)
-		metrics.On("BlockFinalized", mock.Anything).Times(len(seg))
+		metrics.On("CommittedEpochFinalView", finalView)
 
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
@@ -618,11 +620,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch phase transition once we finalize block 6
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+		// expect committed final view to be updated, since we are committing epoch 2
+		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
 		err = state.Finalize(block6.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
-
-		// TODO: verify that final view was updated
+		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 
 		// finalize block 7 so we can finalize subsequent blocks
 		err = state.Finalize(block7.ID())
