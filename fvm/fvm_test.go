@@ -1374,11 +1374,8 @@ func TestSignatureVerification(t *testing.T) {
 			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
 				message := m
 				if hashAlgorithm.name != "KMAC128_BLS_BLS12_381" {
-					// TODO: use flow.UserDomainTag as signingTag
-					var signingTag [flow.DomainTagLength]byte
-					copy(signingTag[:], []byte(crypto2.RuntimeUserDomainTag))
 					message = append(
-						signingTag[:],
+						flow.UserDomainTag[:],
 						m...,
 					)
 				}
@@ -1590,9 +1587,7 @@ func TestSignatureVerification(t *testing.T) {
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
 		func() hash.Hasher {
-			// TODO: once the crypto contract tag is updated and the tag used is not hardcoded to "user",
-			// the tag below can be updated to any random tag.
-			return crypto.NewBLSKMAC(crypto2.RuntimeUserDomainTag)
+			return crypto.NewBLSKMAC(flow.UserTagString)
 		},
 	})
 }
