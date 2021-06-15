@@ -90,8 +90,9 @@ func addFinalizeCmdFlags() {
 	_ = finalizeCmd.MarkFlagRequired("root-commit")
 	_ = finalizeCmd.MarkFlagRequired("epoch-counter")
 
-	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", generateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+
+	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
 	finalizeCmd.Flags().BoolVar(&flagFastKG, "fast-kg", false, "use fast (centralized) random beacon key generation instead of DKG")
 
