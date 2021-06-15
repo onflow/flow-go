@@ -19,11 +19,19 @@ type ComplianceCollector struct {
 	sealedPayload            *prometheus.CounterVec
 	lastBlockFinalizedAt     time.Time
 	finalizedBlocksPerSecond prometheus.Summary
+	committedEpochFinalView  prometheus.Gauge
 }
 
 func NewComplianceCollector() *ComplianceCollector {
 
 	cc := &ComplianceCollector{
+
+		committedEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "committed_epoch_final_view",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the final view of the committed epoch with the greatest counter",
+		}),
 
 		finalizedHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "finalized_height",
@@ -127,4 +135,8 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 
 func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
 	cc.blockProposalDuration.Add(duration.Seconds())
+}
+
+func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
+	cc.committedEpochFinalView.Set(float64(view))
 }

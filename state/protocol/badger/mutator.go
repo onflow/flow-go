@@ -32,6 +32,7 @@ import (
 // the non-consensus nodes have to perform.
 type FollowerState struct {
 	*State
+
 	index    storage.Index
 	payloads storage.Payloads
 	tracer   module.Tracer
@@ -502,7 +503,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	currentEpochSetup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
@@ -517,7 +518,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	}
 
 	payload := parent.Payload
-	// track protocol events that should be emitted
+	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {
 		result, err := m.results.ByID(seal.ResultID)
@@ -527,9 +528,17 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				// track epoch phase transition (staking->setup)
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
+				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
+				// track final view of committed epoch
+				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+				if err != nil {
+					return fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
+				}
+				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -545,7 +554,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// if this block's view exceeds the final view of its parent's current epoch,
 	// this block begins the next epoch
 	if header.View > finalView {
-		events = append(events, func() { m.consumer.EpochTransition(setup.Counter, header) })
+		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
