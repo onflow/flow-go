@@ -66,6 +66,7 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		ctx:       ctx,
 		cancel:    cancel,
 		channel:   channel,
+		close:     n.Unregister,
 		publish:   n.publish,
 		unicast:   n.unicast,
 		multicast: n.multicast,

@@ -22,6 +22,18 @@ func (u *Epoch) FinalView() (uint64, error) {
 	return 0, u.err
 }
 
+func (u *Epoch) DKGPhase1FinalView() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *Epoch) DKGPhase2FinalView() (uint64, error) {
+	return 0, u.err
+}
+
+func (u *Epoch) DKGPhase3FinalView() (uint64, error) {
+	return 0, u.err
+}
+
 func (u *Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return nil, u.err
 }

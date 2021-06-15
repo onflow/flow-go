@@ -15,38 +15,44 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/metrics"
 	hotmetrics "github.com/onflow/flow-go/module/metrics/hotstuff"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
+type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
+
 type HotStuffFactory struct {
-	log        zerolog.Logger
-	me         module.Local
-	db         *badger.DB
-	protoState protocol.State
-	opts       []consensus.Option
+	log           zerolog.Logger
+	me            module.Local
+	aggregator    module.AggregatingSigner
+	db            *badger.DB
+	protoState    protocol.State
+	createMetrics HotStuffMetricsFunc
+	opts          []consensus.Option
 }
 
 func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
+	aggregator module.AggregatingSigner,
 	db *badger.DB,
 	protoState protocol.State,
+	createMetrics HotStuffMetricsFunc,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
 	factory := &HotStuffFactory{
-		log:        log,
-		me:         me,
-		db:         db,
-		protoState: protoState,
-		opts:       opts,
+		log:           log,
+		me:            me,
+		aggregator:    aggregator,
+		db:            db,
+		protoState:    protoState,
+		createMetrics: createMetrics,
+		opts:          opts,
 	}
 	return factory, nil
 }
@@ -63,7 +69,7 @@ func (f *HotStuffFactory) Create(
 ) (*hotstuff.EventLoop, error) {
 
 	// setup metrics/logging with the new chain ID
-	metrics := metrics.NewHotstuffCollector(cluster.ChainID())
+	metrics := f.createMetrics(cluster.ChainID())
 	notifier := pubsub.NewDistributor()
 	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
@@ -79,8 +85,7 @@ func (f *HotStuffFactory) Create(
 	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, f.me)
-	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, staking, f.me.NodeID())
+	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	persist := persister.New(f.db, cluster.ChainID())

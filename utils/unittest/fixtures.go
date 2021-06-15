@@ -823,6 +823,13 @@ func WithNodeID(id flow.Identifier) func(*flow.Identity) {
 	}
 }
 
+// WithStakingPubKey adds a staking public key to the identity
+func WithStakingPubKey(pubKey crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.StakingPubKey = pubKey
+	}
+}
+
 // WithRandomPublicKeys adds random public keys to an identity.
 func WithRandomPublicKeys() func(*flow.Identity) {
 	return func(identity *flow.Identity) {
@@ -1377,6 +1384,12 @@ func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
 	}
 }
 
+func QCWithSignerIDs(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
+		qc.SignerIDs = signerIDs
+	}
+}
+
 func VoteFixture() *hotstuff.Vote {
 	return &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
@@ -1422,7 +1435,9 @@ func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	for _, apply := range opts {
 		apply(setup)
 	}
-	setup.Assignments = ClusterAssignment(1, setup.Participants)
+	if setup.Assignments == nil {
+		setup.Assignments = ClusterAssignment(1, setup.Participants)
+	}
 	return setup
 }
 
@@ -1455,6 +1470,16 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 	count := len(participants.Filter(filter.IsValidDKGParticipant))
 	return func(commit *flow.EpochCommit) {
 		commit.DKGParticipantKeys = PublicKeysFixture(count, crypto.BLSBLS12381)
+	}
+}
+
+func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
+	qcs := make([]*flow.QuorumCertificate, 0, len(assignments))
+	for _, cluster := range assignments {
+		qcs = append(qcs, QuorumCertificateFixture(QCWithSignerIDs(cluster)))
+	}
+	return func(commit *flow.EpochCommit) {
+		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
 	}
 }
 
@@ -1504,7 +1529,11 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithFirstView(root.Header.View),
 		WithFinalView(root.Header.View+1000),
 	)
-	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
+	commit := EpochCommitFixture(
+		CommitWithCounter(counter),
+		WithClusterQCsFromAssignments(setup.Assignments),
+		WithDKGFromParticipants(participants),
+	)
 
 	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
@@ -1599,5 +1628,22 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
 			}
 		}
+	}
+}
+
+// DKGMessageFixture creates a single DKG message with random fields
+func DKGMessageFixture() *messages.DKGMessage {
+	return &messages.DKGMessage{
+		Orig:          uint64(rand.Int()),
+		Data:          RandomBytes(10),
+		DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
+	}
+}
+
+// DKGBroadcastMessageFixture creates a single DKG broadcast message with random fields
+func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
+	return &messages.BroadcastDKGMessage{
+		DKGMessage: *DKGMessageFixture(),
+		Signature:  SignatureFixture(),
 	}
 }

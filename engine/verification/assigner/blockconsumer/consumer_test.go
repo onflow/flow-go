@@ -122,7 +122,8 @@ func withConsumer(
 		collector := &metrics.NoopCollector{}
 		tracer := &trace.NoopTracer{}
 		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-		s := testutil.CompleteStateFixture(t, collector, tracer, participants)
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		s := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 		engine := &mockBlockProcessor{
 			process: process,

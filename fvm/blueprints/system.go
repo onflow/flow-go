@@ -9,15 +9,13 @@ import (
 // TODO (Ramtin) after changes to this method are merged into master move them here.
 
 const systemChunkTransactionTemplate = `
-import FlowServiceAccount from 0x%s
+import FlowEpoch from 0x%s
+
 transaction {
   prepare(serviceAccount: AuthAccount) { 
-
-  }
-
-  execute {
-    // TODO: replace with call to service account heartbeat
- 	log("pulse")
+	let heartbeat = serviceAccount.borrow<&FlowEpoch.Heartbeat>(from: FlowEpoch.heartbeatStoragePath)
+      ?? panic("Could not borrow heartbeat from storage path")
+    heartbeat.advanceBlock()
   }
 } 
 `

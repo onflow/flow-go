@@ -2,6 +2,7 @@ package testnet
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -23,13 +24,17 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
+	dkgmod "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/epochs"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -467,6 +472,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
 
+			nodeContainer.addFlag("access-address", "access_1:9000")
+			nodeContainer.addFlag("qc-contract-address", flow.Testnet.Chain().ServiceAddress().String())
+
 		case flow.RoleExecution:
 
 			hostPort := testingdock.RandomPort(t)
@@ -599,7 +607,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticipant := bootstrap.DKGParticipantPriv{
+		privParticipant := dkgmod.DKGParticipantPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
 			GroupIndex:          i,
@@ -612,7 +620,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write private key files for each node
-	for _, nodeConfig := range confs {
+	for i, nodeConfig := range confs {
 		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
 
 		// retrieve private representation of the node
@@ -625,21 +633,38 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
-	}
 
-	// generate the initial execution state
-	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
-	commit, err := run.GenerateExecutionState(
-		trieDir,
-		unittest.ServiceAccountPublicKey,
-		chain,
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-	)
-	if err != nil {
-		return nil, nil, nil, nil, err
+		// We use the network key for the machine account. Normally it would be
+		// a separate key.
+
+		// Accounts are generated in a known order during bootstrapping, and
+		// account addresses are deterministic based on order for a given chain
+		// configuration. During the bootstrapping. We create accounts for the
+		// FungibleToken, FlowToken, and FlowFees smart contracts besides the
+		// service account. The service account has index 0, then these 3
+		// accounts would occupy account indices [1-3], so the node machine
+		// accounts would occupy account indices [4,n+4]. They will be created
+		// in the order defined by the identity list provided to the
+		// BootstrapProcedure, which is the same order as the container configs.
+		accountAddress, err := chainID.Chain().AddressAtIndex(uint64(4 + i))
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+
+		info := bootstrap.NodeMachineAccountInfo{
+			Address:           accountAddress.HexWithPrefix(),
+			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
+			KeyIndex:          0,
+			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
+			HashAlgorithm:     crypto.SHA3_256,
+		}
+
+		infoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeConfig.NodeID))
+
+		err = WriteJSON(infoPath, info)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
 	}
 
 	// define root block parameters
@@ -688,6 +713,40 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
 		DKGGroupKey:        dkg.PubGroupKey,
 		DKGParticipantKeys: dkg.PubKeyShares,
+	}
+
+	// TODO: choose sensible values
+	epochConfig := epochs.EpochConfig{
+		EpochTokenPayout:             cadence.UFix64(0),
+		RewardCut:                    cadence.UFix64(0),
+		CurrentEpochCounter:          cadence.UInt64(epochCounter),
+		NumViewsInEpoch:              cadence.UInt64(epochSetup.FinalView - epochSetup.FirstView - 1),
+		NumViewsInStakingAuction:     cadence.UInt64(100),
+		NumViewsInDKGPhase:           cadence.UInt64(100),
+		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
+		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
+		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
+		CollectorClusters:            clusterAssignments,
+		ClusterQCs:                   clusterQCs,
+		DKGPubKeys:                   dkg.PubKeyShares,
+	}
+
+	// generate the initial execution state
+	trieDir := filepath.Join(bootstrapDir, bootstrap.DirnameExecutionState)
+	commit, err := run.GenerateExecutionState(
+		trieDir,
+		unittest.ServiceAccountPublicKey,
+		chain,
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithRootBlock(root.Header),
+		fvm.WithEpochConfig(epochConfig),
+		fvm.WithIdentities(participants),
+	)
+	if err != nil {
+		return nil, nil, nil, nil, err
 	}
 
 	// generate execution result and block seal
@@ -770,7 +829,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 // and returns all DKG data. This includes the group private key, node indices,
 // and per-node public and private key-shares.
 // Only consensus nodes participate in the DKG.
-func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
+func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 
 	// filter by consensus nodes
 	consensusNodes := bootstrap.FilterByRole(toNodeInfos(confs), flow.RoleConsensus)
@@ -779,17 +838,17 @@ func runDKG(confs []ContainerConfig) (bootstrap.DKGData, error) {
 	// run the core dkg algorithm
 	dkgSeed, err := getSeed()
 	if err != nil {
-		return bootstrap.DKGData{}, err
+		return dkgmod.DKGData{}, err
 	}
 
 	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
-		return bootstrap.DKGData{}, err
+		return dkgmod.DKGData{}, err
 	}
 
 	// sanity check
 	if nConsensusNodes != len(dkg.PrivKeyShares) {
-		return bootstrap.DKGData{}, fmt.Errorf(
+		return dkgmod.DKGData{}, fmt.Errorf(
 			"consensus node count does not match DKG participant count: nodes=%d, participants=%d",
 			nConsensusNodes,
 			len(dkg.PrivKeyShares),

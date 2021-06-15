@@ -3,9 +3,12 @@ package cmd
 import (
 	"fmt"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -87,6 +90,26 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	)
 
 	return nodeInfo
+}
+
+func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress string) model.NodeMachineAccountInfo {
+	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	machineNodeInfo := model.NodeMachineAccountInfo{
+		EncodedPrivateKey: machineKey.Encode(),
+		KeyIndex:          0,
+		SigningAlgorithm:  sdkcrypto.ECDSA_P256,
+		HashAlgorithm:     sdkcrypto.SHA3_256,
+		Address:           accountAddress,
+	}
+	return machineNodeInfo
+}
+
+func assembleNodeMachineAccountKey(machineKey crypto.PrivateKey) model.NodeMachineAccountKey {
+	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	key := model.NodeMachineAccountKey{
+		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
+	}
+	return key
 }
 
 func validateAddressesUnique(ns []model.NodeConfig) {

@@ -27,9 +27,11 @@ var (
 	PathRootCheckpoint        = filepath.Join(DirnameExecutionState, FilenameWALRootCheckpoint) // only available on an execution node
 
 	// private genesis information
-	DirPrivateRoot           = "private-root-information"
-	FilenameRandomBeaconPriv = "random-beacon.priv.json"
-	PathPrivNodeInfoPrefix   = "node-info.priv."
-	PathNodeInfoPriv         = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")    // %v will be replaced by NodeID
-	PathRandomBeaconPriv     = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv) // %v will be replaced by NodeID
+	DirPrivateRoot                   = "private-root-information"
+	FilenameRandomBeaconPriv         = "random-beacon.priv.json"
+	PathPrivNodeInfoPrefix           = "node-info.priv."
+	PathNodeInfoPriv                 = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")                 // %v will be replaced by NodeID
+	PathNodeMachineAccountPrivateKey = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-key.priv.json")  // %v will be replaced by NodeID
+	PathNodeMachineAccountInfoPriv   = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-info.priv.json") // %v will be replaced by NodeID
+	PathRandomBeaconPriv             = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv)              // %v will be replaced by NodeID
 )

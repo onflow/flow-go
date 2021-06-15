@@ -131,7 +131,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
-			errors.New("two timeouts should be set before ending dkg")
+			fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
 	}
 	s.running = false
 	// check if a complaint has remained without an answer

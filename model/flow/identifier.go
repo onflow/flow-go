@@ -39,6 +39,14 @@ func HexStringToIdentifier(hexString string) (Identifier, error) {
 	return identifier, nil
 }
 
+func MustHexStringToIdentifier(hexString string) Identifier {
+	id, err := HexStringToIdentifier(hexString)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // String returns the hex string representation of the identifier.
 func (id Identifier) String() string {
 	return hex.EncodeToString(id[:])

@@ -351,7 +351,7 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 func TestChunkIndexIsSet(t *testing.T) {
 
 	i := mathRand.Int()
-	chunk := generateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
+	chunk := GenerateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
