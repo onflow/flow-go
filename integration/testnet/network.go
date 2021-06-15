@@ -198,16 +198,22 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 
 // NetworkConfig is the config for the network.
 type NetworkConfig struct {
-	Nodes     []NodeConfig
-	Name      string
-	NClusters uint
+	Nodes                 []NodeConfig
+	Name                  string
+	NClusters             uint
+	ViewsInDKGPhase       uint64
+	ViewsInStakingAuction uint64
+	ViewsInEpoch          uint64
 }
 
 func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
 	c := NetworkConfig{
-		Nodes:     nodes,
-		Name:      name,
-		NClusters: 1, // default to 1 cluster
+		Nodes:                 nodes,
+		Name:                  name,
+		NClusters:             1, // default to 1 cluster
+		ViewsInDKGPhase:       100,
+		ViewsInStakingAuction: 5,
+		ViewsInEpoch:          350,
 	}
 
 	for _, apply := range opts {
@@ -657,18 +663,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, err
 	}
 
-	numViewsInDKGPhase := uint64(100)
-	numViewsInStakingAuction := uint64(5)
-	numViewsInEpoch := uint64(350)
-
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
 		FirstView:          root.Header.View,
-		DKGPhase1FinalView: root.Header.View + numViewsInStakingAuction + numViewsInDKGPhase,
-		DKGPhase2FinalView: root.Header.View + numViewsInStakingAuction + numViewsInDKGPhase*2,
-		DKGPhase3FinalView: root.Header.View + numViewsInStakingAuction + numViewsInDKGPhase*3,
-		FinalView:          root.Header.View + numViewsInEpoch - 1,
+		DKGPhase1FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase,
+		DKGPhase2FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase*2,
+		DKGPhase3FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase*3,
+		FinalView:          root.Header.View + networkConf.ViewsInEpoch - 1,
 		Participants:       participants,
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
@@ -686,14 +688,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
-	// TODO: choose sensible values
 	epochConfig := epochs.EpochConfig{
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
 		CurrentEpochCounter:          cadence.UInt64(epochCounter),
-		NumViewsInEpoch:              cadence.UInt64(numViewsInEpoch),
-		NumViewsInStakingAuction:     cadence.UInt64(numViewsInStakingAuction),
-		NumViewsInDKGPhase:           cadence.UInt64(numViewsInDKGPhase),
+		NumViewsInEpoch:              cadence.UInt64(networkConf.ViewsInEpoch),
+		NumViewsInStakingAuction:     cadence.UInt64(networkConf.ViewsInStakingAuction),
+		NumViewsInDKGPhase:           cadence.UInt64(networkConf.ViewsInDKGPhase),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
 		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
