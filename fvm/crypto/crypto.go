@@ -175,41 +175,24 @@ func VerifySignatureFromRuntime(
 // check compatible tags with ECDSA
 //
 // Only tags with a prefix flow.UserTagString and zero paddings are accepted.
-// runtimeUserDomainTag is temporarily accepted too for backwards compatibility
-// TODO : do not accept runtimeUserDomainTag as a valid tag.
 func tagECDSACheck(tag string) bool {
 
-	if len(tag) > flow.DomainTagLength {
+	if len(tag) > flow.DomainTagLength ||
+		!strings.HasPrefix(tag, flow.UserTagString) {
+
 		return false
 	}
 
-	if strings.HasPrefix(tag, flow.UserTagString) {
-		// check the remaining bytes are zeros
-		remaining := tag[len(flow.UserTagString):]
-		for _, b := range []byte(remaining) {
-			if b != 0 {
-				return false
-			}
+	// check the remaining bytes are zeros
+	remaining := tag[len(flow.UserTagString):]
+	for _, b := range []byte(remaining) {
+		if b != 0 {
+			return false
 		}
-		return true
 	}
 
-	// runtimeUserDomainTag is also accepted temporarily for
-	// backward compatibility of the crtypto contract.
-	if strings.HasPrefix(tag, RuntimeUserDomainTag) {
-		remaining := tag[len(RuntimeUserDomainTag):]
-		for _, b := range []byte(remaining) {
-			if b != 0 {
-				return false
-			}
-		}
-		return true
-	}
-	return false
+	return true
 }
-
-// TODO: to delete and only rely on flow.UserDomainTag
-const RuntimeUserDomainTag = "user"
 
 type SignatureVerifier interface {
 	Verify(
