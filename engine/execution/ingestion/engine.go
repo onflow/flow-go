@@ -1070,7 +1070,6 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		// TODO use view.SpockSecret() as an input to spock generator
 		chunk := generateChunk(i, startState, endState, collectionID, blockID)
 		chunks = append(chunks, chunk)
 
