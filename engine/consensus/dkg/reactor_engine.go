@@ -3,6 +3,7 @@ package dkg
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/indices"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -20,9 +21,6 @@ import (
 // DefaultPollStep specifies the default number of views that separate two calls
 // to the DKG smart-contract to read broadcast messages.
 const DefaultPollStep = 10
-
-// TODO what should this be?
-var SeedIndices = []uint32{1, 1, 1}
 
 type epochInfo struct {
 	identities      flow.IdentityList
@@ -178,8 +176,7 @@ func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochIn
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch phase 3 final view: %w", err)
 	}
-	// TODO define / use canonical seed value
-	seed, err := nextEpoch.Seed(SeedIndices...)
+	seed, err := nextEpoch.Seed(indices.ProtocolConsensusDKG...)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch seed: %w", err)
 	}

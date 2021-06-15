@@ -3,6 +3,8 @@ package indices
 var (
 	// ProtocolConsensusLeaderSelection is the indices for consensus leader selection
 	ProtocolConsensusLeaderSelection = []uint32{0, 1, 1}
+	// ProtocolConsensusDKG is the indices for the DKG
+	ProtocolConsensusDKG = []uint32{0, 1, 2}
 	// ProtocolVerificationChunkAssignment is the indices for verification nodes determines chunk assignment
 	ProtocolVerificationChunkAssignment = []uint32{0, 2, 0}
 )
