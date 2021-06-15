@@ -30,7 +30,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 		maxHeight := uint64(0)
 		var sealsAtMaxHeight sealSet
 		for height, seals := range byHeight {
-			if height > maxHeight {
+			if height > maxHeight || (height == 0 && maxHeight == 0) {
 				maxHeight = height
 				sealsAtMaxHeight = seals
 			}
