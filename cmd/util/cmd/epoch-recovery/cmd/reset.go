@@ -46,8 +46,7 @@ func addResetCmdFlags() {
 	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout eg. 10000.0")
 }
 
-// resetRun resets epoch data in the Epoch smart contract with fields generated
-// from the root-protocol-snapshot.json
+// resetRun generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func resetRun(cmd *cobra.Command, args []string) {
 
 	// path to the root protocol snapshot json file
