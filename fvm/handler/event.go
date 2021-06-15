@@ -59,8 +59,7 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 	}
 
 	flowEvent := flow.Event{
-		Type: flow.EventType(event.EventType.QualifiedIdentifier), // XXX is this safe?
-		// Type:             flow.EventType(event.EventType.ID()),
+		Type:             flow.EventType(event.EventType.QualifiedIdentifier),
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       h.eventCollection.eventCounter,
