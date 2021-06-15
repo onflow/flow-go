@@ -155,7 +155,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(currentEpochCounter))
+	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
