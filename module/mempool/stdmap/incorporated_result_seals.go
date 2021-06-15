@@ -102,6 +102,11 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 	return added, err
 }
 
+// Size returns the size of the underlying backing store
+func (ir *IncorporatedResultSeals) Size() uint {
+	return ir.Backend.Size()
+}
+
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	entities := ir.Backend.All()
