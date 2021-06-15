@@ -244,6 +244,27 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
 
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOldFinalizedBlock() {
+	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
+	blockB2 := unittest.BlockHeaderWithParentFixture(&blockB1)
+
+	s.blocks[blockB1.ID()] = &blockB1
+	s.blocks[blockB2.ID()] = &blockB2
+
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
+	// should only call it once
+	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.markFinalized(&blockB1)
+	s.markFinalized(&blockB2)
+
+	// blockB1 becomes finalized
+	err := s.core.ProcessFinalizedBlock(blockB2.ID())
+	require.NoError(s.T(), err)
+
+	err = s.core.ProcessFinalizedBlock(blockB1.ID())
+	require.NoError(s.T(), err)
+}
+
 // TestProcessFinalizedBlock_CollectorsCleanup tests that stale collectorTree are cleaned up for
 // already sealed blocks.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCleanup() {
