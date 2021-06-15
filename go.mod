@@ -38,7 +38,7 @@ require (
 	github.com/marten-seemann/qtls-go1-15 v0.1.4 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.17.1-0.20210615030104-3b679cc11759
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.18.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0

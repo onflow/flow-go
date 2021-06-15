@@ -69,6 +69,10 @@ type ExecutionTree interface {
 	// * The blockFilter suppresses traversal to derived results.
 	// * The receiptFilter does _not_ suppresses traversal to derived results.
 	//   Only individual receipts are dropped.
+	//
+	// Error returns:
+	// * UnknownExecutionResultError (sentinel) if resultID is unknown
+	// * all other error are unexpected and potential indicators of corrupted internal state
 	ReachableReceipts(resultID flow.Identifier, blockFilter BlockFilter, receiptFilter ReceiptFilter) ([]*flow.ExecutionReceipt, error)
 
 	// Size returns the number of receipts stored in the mempool
