@@ -87,10 +87,12 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 // starts a new controller for the epoch and registers the triggers to regularly
 // query the DKG smart-contract and transition between phases at the specified
 // views.
-func (e *ReactorEngine) EpochSetupPhaseStarted(nextEpochCounter uint64, first *flow.Header) {
+func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	firstID := first.ID()
+	nextEpochCounter := currentEpochCounter + 1
+
 	log := e.log.With().
-		Uint64("counter", nextEpochCounter).
+		Uint64("current_epoch", currentEpochCounter).
 		Uint64("view", first.View).
 		Hex("block", firstID[:]).
 		Logger()
@@ -111,7 +113,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(nextEpochCounter uint64, first *f
 		Msg("epoch info")
 
 	controller, err := e.controllerFactory.Create(
-		fmt.Sprintf("dkg-%d", nextEpochCounter),
+		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
 		committee,
 		epochInfo.seed,
 	)
@@ -153,7 +155,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(nextEpochCounter uint64, first *f
 	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
+	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(currentEpochCounter))
 }
 
 func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
