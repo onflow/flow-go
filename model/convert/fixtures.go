@@ -16,7 +16,7 @@ func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	// randomSource is [0,0,...,1,2,3,4]
-	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength, flow.EpochSetupRandomSourceLength)
+	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
 	for i := 0; i < 4; i++ {
 		randomSource[flow.EpochSetupRandomSourceLength-1-i] = uint8(4 - i)
 	}
