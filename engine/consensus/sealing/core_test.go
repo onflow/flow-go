@@ -134,10 +134,8 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		},
 	)
 
-	// for metrics
-	s.sealsPL.On("Size").Return(uint(0)).Maybe()
-
-	var err error
+	s.sealsPL.On("Size").Return(uint(0)).Maybe()                       // for metrics
+	s.sealsPL.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe() // noop on pruning
 
 	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
@@ -149,6 +147,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		ApprovalRequestsThreshold:            2,
 	}
 
+	var err error
 	s.core, err = NewCore(log, tracer, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
 		s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)

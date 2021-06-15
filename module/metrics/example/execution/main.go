@@ -38,7 +38,7 @@ func main() {
 			// adds a random delay for execution duration, between 0 and 2 seconds
 			time.Sleep(time.Duration(rand.Int31n(2000)) * time.Millisecond)
 
-			collector.ExecutionGasUsedPerBlock(uint64(rand.Int63n(1e6)))
+			collector.ExecutionComputationUsedPerBlock(uint64(rand.Int63n(1e6)))
 			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
 
 			diskIncrease := rand.Int63n(1024 ^ 2)

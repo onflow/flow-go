@@ -171,6 +171,18 @@ type mockChunkProcessor struct {
 	process  func(notifier module.ProcessingNotifier, locator *chunks.Locator)
 }
 
+func (e *mockChunkProcessor) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}
+
+func (e *mockChunkProcessor) Done() <-chan struct{} {
+	done := make(chan struct{})
+	close(done)
+	return done
+}
+
 func (e *mockChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {
 	e.process(e.notifier, locator)
 }

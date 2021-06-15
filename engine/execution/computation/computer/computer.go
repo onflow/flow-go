@@ -304,7 +304,8 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	txResult := flow.TransactionResult{
-		TransactionID: tx.ID,
+		TransactionID:   tx.ID,
+		ComputationUsed: tx.ComputationUsed,
 	}
 
 	if tx.Err != nil {
@@ -333,7 +334,7 @@ func (e *blockComputer) executeTransaction(
 	res.AddEvents(tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
-	res.AddGasUsed(tx.GasUsed)
+	res.AddComputationUsed(tx.ComputationUsed)
 
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
