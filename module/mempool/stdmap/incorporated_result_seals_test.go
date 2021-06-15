@@ -6,9 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"pgregory.net/rapid"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"pgregory.net/rapid"
 )
 
 // icrSealsMachine is a description of a state machine for testing IncorporatedresultSeals
