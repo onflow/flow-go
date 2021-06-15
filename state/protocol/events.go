@@ -31,7 +31,7 @@ type Consumer interface {
 	// The block parameter is the first block of the new epoch.
 	//
 	// NOTE: Only called once the transition has been finalized.
-	EpochTransition(newEpoch uint64, first *flow.Header)
+	EpochTransition(newEpochCounter uint64, first *flow.Header)
 
 	// EpochSetupPhaseStarted is called when we begin the epoch setup phase for
 	// the current epoch. This is equivalent to the end of the epoch staking
@@ -48,7 +48,7 @@ type Consumer interface {
 	//                           ^--- block d - finalizes block c, triggers EpochSetupPhaseStarted event
 	//
 	// NOTE: Only called once the phase transition has been finalized.
-	EpochSetupPhaseStarted(epoch uint64, first *flow.Header)
+	EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 
 	// EpochCommittedPhaseStarted is called when we begin the epoch committed phase
 	// for the current epoch. This is equivalent to the end of the epoch setup
@@ -66,5 +66,5 @@ type Consumer interface {
 	///
 	//
 	// NOTE: Only called once the phase transition has been finalized.
-	EpochCommittedPhaseStarted(epoch uint64, first *flow.Header)
+	EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header)
 }
