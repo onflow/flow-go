@@ -460,7 +460,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// expect committed epoch final view metric at bootstrap
 		finalView, err := rootSnapshot.Epochs().Current().FinalView()
 		require.NoError(t, err)
-		metrics.On("CommittedEpochFinalView", finalView)
+		metrics.On("CommittedEpochFinalView", finalView).Once()
 
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
@@ -676,6 +676,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Finalize(block9.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
+
+		metrics.AssertExpectations(t)
 	})
 }
 

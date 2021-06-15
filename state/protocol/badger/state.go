@@ -512,7 +512,6 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 			return fmt.Errorf("could not get current epoch final view from snapshot: %w", err)
 		}
 		state.metrics.CommittedEpochFinalView(finalView)
-		fmt.Println("set committed epoch final view1: ", finalView)
 	case flow.EpochPhaseCommitted:
 
 		// if we are in Committed phase, then set the metric value to the next epoch's final view
@@ -521,7 +520,6 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 			return fmt.Errorf("could not get next epoch final view from snapshot: %w", err)
 		}
 		state.metrics.CommittedEpochFinalView(finalView)
-		fmt.Println("set committed epoch final view2: ", finalView)
 	default:
 		return fmt.Errorf("invalid phase: %s", phase)
 	}
