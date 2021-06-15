@@ -1332,7 +1332,7 @@ func TestSignatureVerification(t *testing.T) {
                               i = i + 1
                           }
 
-                          return keyList.isValid(
+                          return keyList.verify(
                               signatureSet: signatureSet,
                               signedData: message,
                           )
