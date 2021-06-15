@@ -63,7 +63,7 @@ type Core struct {
 	headers                    storage.Headers                    // used to access block headers in storage
 	state                      protocol.State                     // used to access protocol state
 	seals                      storage.Seals                      // used to get last sealed block
-	sealsMempool               mempool.IncorporatedResultSeals    // used by tracker.SealingTracker to log info
+	sealsMempool               mempool.IncorporatedResultSeals    // used by tracker.SealingObservation to log info
 	requestTracker             *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
 	metrics                    module.ConsensusMetrics            // used to track consensus metrics
 	tracer                     module.Tracer                      // used to trace execution

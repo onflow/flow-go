@@ -8,9 +8,11 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // SealingTracker is an auxiliary component for tracking sealing progress.
+// Essentially
 // Its primary purpose is to decide which SealingRecords should be tracked
 // and to store references to them.
 // A SealingTracker is intended to track progress for a _single run_
@@ -18,12 +20,23 @@ import (
 // Not concurrency safe.
 type SealingTracker struct {
 	state      protocol.State
+	receiptsDB storage.ExecutionReceipts // receipts DB to decide if we have multiple receipts for same result
+}
+
+// SealingObservation is an auxiliary component for tracking sealing progress.
+// Its primary purpose is to decide which SealingRecords should be tracked
+// and to store references to them.
+// A SealingObservation is intended to track progress for a _single run_
+// of the sealing algorithm, i.e. Core.CheckSealing().
+// Not concurrency safe.
+type SealingObservation struct {
+	state      protocol.State
 	isRelevant flow.IdentifierFilter
 	records    []*SealingRecord
 }
 
-func NewSealingTracker(state protocol.State) *SealingTracker {
-	return &SealingTracker{
+func NewSealingTracker(state protocol.State) *SealingObservation {
+	return &SealingObservation{
 		state:      state,
 		isRelevant: nextUnsealedFinalizedBlock(state),
 	}
@@ -31,7 +44,7 @@ func NewSealingTracker(state protocol.State) *SealingTracker {
 
 // String converts the most relevant information from the SealingRecords
 // to key-value pairs (in json format).
-func (st *SealingTracker) String() string {
+func (st *SealingObservation) String() string {
 	rcrds := make([]string, 0, len(st.records))
 	for _, r := range st.records {
 		s, err := st.sealingRecord2String(r)
@@ -45,7 +58,7 @@ func (st *SealingTracker) String() string {
 
 // MempoolHasNextSeal returns true iff the seals mempool contains a candidate seal
 // for the next block
-func (st *SealingTracker) MempoolHasNextSeal(seals mempool.IncorporatedResultSeals) bool {
+func (st *SealingObservation) MempoolHasNextSeal(seals mempool.IncorporatedResultSeals) bool {
 	for _, nextUnsealed := range st.records {
 		_, mempoolHasNextSeal := seals.ByID(nextUnsealed.IncorporatedResult.ID())
 		if mempoolHasNextSeal {
@@ -56,8 +69,8 @@ func (st *SealingTracker) MempoolHasNextSeal(seals mempool.IncorporatedResultSea
 }
 
 // Track tracks the given SealingRecord, provided it should be tracked
-// according to the SealingTracker's internal policy.
-func (st *SealingTracker) Track(sealingRecord *SealingRecord) {
+// according to the SealingObservation's internal policy.
+func (st *SealingObservation) Track(sealingRecord *SealingRecord) {
 	executedBlockID := sealingRecord.IncorporatedResult.Result.BlockID
 	if st.isRelevant(executedBlockID) {
 		st.records = append(st.records, sealingRecord)
@@ -65,10 +78,10 @@ func (st *SealingTracker) Track(sealingRecord *SealingRecord) {
 }
 
 // sealingRecord2String generates a string representation of a sealing record.
-// We specifically attach this method to the SealingTracker, as it is the Tracker's
+// We specifically attach this method to the SealingObservation, as it is the Tracker's
 // responsibility to decide what information from the record should be captured
 // and what additional details (like block height), should be added.
-func (st *SealingTracker) sealingRecord2String(record *SealingRecord) (string, error) {
+func (st *SealingObservation) sealingRecord2String(record *SealingRecord) (string, error) {
 	result := record.IncorporatedResult.Result
 	executedBlock, err := st.state.AtBlockID(result.BlockID).Head()
 	if err != nil {

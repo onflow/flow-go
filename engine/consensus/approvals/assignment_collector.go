@@ -312,7 +312,7 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 // RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
 // approvals from verifiers.
 // Returns number of requests made and error in case something goes wrong.
-func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
+func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingObservation, maxHeightForRequesting uint64) (int, error) {
 	requestCount := 0
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {

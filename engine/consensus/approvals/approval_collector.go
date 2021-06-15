@@ -81,6 +81,11 @@ func (c *ApprovalCollector) IncorporatedBlock() *flow.Header {
 	return c.incorporatedBlock
 }
 
+// IncorporatedResult returns the incorporated Result this ApprovalCollector if for
+func (c *ApprovalCollector) IncorporatedResult() *flow.IncorporatedResult {
+	return c.incorporatedResult
+}
+
 func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
 	finalState, err := c.incorporatedResult.Result.FinalStateCommitment()
