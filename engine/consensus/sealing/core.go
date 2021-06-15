@@ -491,6 +491,11 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	c.requestTracker.Remove(pruned...) // remove all pending items that we might have requested
 	updateCollectorTreeSpan.Finish()
 
+	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height)
+	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+		return fmt.Errorf("could not prune seals mempool at block %v, by height: %v: %w", finalizedBlockID, lastSealed.Height, err)
+	}
+
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
 	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)
 	requestPendingApprovalsSpan.Finish()
