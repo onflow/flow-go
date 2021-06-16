@@ -575,7 +575,6 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 	if fnb.RootChainID == flow.Testnet {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithAccountStorageLimit(false), // XXX make this configurable, should be true by default
 			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
