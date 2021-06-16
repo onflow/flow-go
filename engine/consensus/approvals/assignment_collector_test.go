@@ -385,7 +385,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 			requests = append(requests, ar)
 		})
 
-	requestCount, err := s.collector.RequestMissingApprovals(nil, lastHeight)
+	requestCount, err := s.collector.RequestMissingApprovals(&tracker.NoopSealingTracker{}, lastHeight)
 	require.NoError(s.T(), err)
 
 	// first time it goes through, no requests should be made because of the
@@ -397,15 +397,15 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	time.Sleep(3 * time.Second)
 
 	// requesting with immature height will be ignored
-	requestCount, err = s.collector.RequestMissingApprovals(nil, lastHeight-uint64(len(incorporatedBlocks))-1)
+	requestCount, err = s.collector.RequestMissingApprovals(&tracker.NoopSealingTracker{}, lastHeight-uint64(len(incorporatedBlocks))-1)
 	s.Require().NoError(err)
 	require.Len(s.T(), requests, 0)
 	require.Zero(s.T(), requestCount)
 
-	requestCount, err = s.collector.RequestMissingApprovals(nil, lastHeight)
+	requestCount, err = s.collector.RequestMissingApprovals(&tracker.NoopSealingTracker{}, lastHeight)
 	s.Require().NoError(err)
 
-	require.Equal(s.T(), requestCount, s.Chunks.Len()*len(s.collector.collectors))
+	require.Equal(s.T(), int(requestCount), s.Chunks.Len()*len(s.collector.collectors))
 	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
 
 	resultID := s.IncorporatedResult.Result.ID()

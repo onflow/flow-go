@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
@@ -216,6 +217,7 @@ func main() {
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
 			config.EmergencySealingActive = emergencySealing
@@ -227,6 +229,7 @@ func main() {
 				conMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				sealingTracker,
 				node.Network,
 				node.Me,
 				node.Storage.Headers,

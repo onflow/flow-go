@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -148,8 +149,8 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(log, tracer, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
-		s.sealsPL, s.conduit, options)
+	s.core, err = NewCore(log, tracer, metrics, &tracker.NoopSealingTracker{},
+		s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 

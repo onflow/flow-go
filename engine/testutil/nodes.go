@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -267,6 +268,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Metrics,
 		node.Metrics,
+		&tracker.NoopSealingTracker{},
 		node.Net,
 		node.Me,
 		node.Headers,
