@@ -31,7 +31,7 @@ type SealingTracker struct {
 
 func NewSealingTracker(log zerolog.Logger, headersDB storage.Headers, receiptsDB storage.ExecutionReceipts, sealsPl mempool.IncorporatedResultSeals) *SealingTracker {
 	return &SealingTracker{
-		log:        log,
+		log:        log.With().Str("engine", "sealing.SealingTracker").Logger(),
 		headersDB:  headersDB,
 		receiptsDB: receiptsDB,
 		sealsPl:    sealsPl,
