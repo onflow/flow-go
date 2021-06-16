@@ -6,20 +6,20 @@ import (
 	"math/rand"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees/leader"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/epochs"
 )
 
 func constructRootResultAndSeal(
 	rootCommit string,
 	block *flow.Block,
-	participantNodes []bootstrap.NodeInfo,
+	participants flow.IdentityList,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.DKGData,
+	epochConfig epochs.EpochConfig,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
@@ -34,14 +34,17 @@ func constructRootResultAndSeal(
 			Msg("root state commitment has incompatible length")
 	}
 
-	participants := bootstrap.ToIdentityList(participantNodes)
+	firstView := block.Header.View
 	epochSetup := &flow.EpochSetup{
-		Counter:      flagEpochCounter,
-		FirstView:    block.Header.View,
-		FinalView:    block.Header.View + leader.EstimatedSixMonthOfViews,
-		Participants: participants.Sort(order.Canonical),
-		Assignments:  assignments,
-		RandomSource: getRandomSource(block.ID()),
+		Counter:            flagEpochCounter,
+		FirstView:          firstView,
+		FinalView:          firstView + flagNumViewsInEpoch - 1,
+		DKGPhase1FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase - 1,
+		DKGPhase2FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*2 - 1,
+		DKGPhase3FinalView: firstView + flagNumViewsInStakingAuction + flagNumViewsInDKGPhase*3 - 1,
+		Participants:       participants.Sort(order.Canonical),
+		Assignments:        assignments,
+		RandomSource:       getRandomSource(block.ID()),
 	}
 
 	epochCommit := &flow.EpochCommit{
