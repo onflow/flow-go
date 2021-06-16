@@ -159,35 +159,13 @@ type ConsensusMetrics interface {
 }
 
 type VerificationMetrics interface {
-	// TODO: remove this event handlers once we have new architecture in place.
-	// OnExecutionReceiptReceived is called whenever a new execution receipt arrives
-	// at Finder engine. It increments total number of received receipts.
-	OnExecutionReceiptReceived()
-	// OnExecutionResultSent is called whenever a new execution result is sent by
-	// Finder engine to the match engine. It increments total number of sent execution results.
-	OnExecutionResultSent()
-	// OnExecutionResultReceived is called whenever a new execution result is successfully received
-	// by Match engine from Finder engine.
-	// It increments the total number of received execution results.
-	OnExecutionResultReceived()
-	// OnVerifiableChunkSent is called on a successful submission of matched chunk
-	// by Match engine to Verifier engine.
-	// It increments the total number of chunks matched by match engine.
-	OnVerifiableChunkSent()
-	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
-	// It increments the total number of chunk data packs received.
-	OnChunkDataPackReceived()
-	// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
-	// It increments the total number of chunk data packs requested.
-	OnChunkDataPackRequested()
+	// OnExecutionResultReceivedAtAssignerEngine is called whenever a new execution result arrives
+	// at Assigner engine. It increments total number of received execution results.
+	OnExecutionResultReceivedAtAssignerEngine()
 
 	// OnVerifiableChunkReceivedAtVerifierEngine increments a counter that keeps track of number of verifiable chunks received at
 	// verifier engine from fetcher engine.
 	OnVerifiableChunkReceivedAtVerifierEngine()
-
-	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
-	// by verifier engine.
-	OnResultApprovalDispatchedInNetwork()
 
 	// OnFinalizedBlockArrivedAtAssigner sets a gauge that keeps track of number of the latest block height arrives
 	// at assigner engine. Note that it assumes blocks are coming to assigner engine in strictly increasing order of their height.
@@ -230,6 +208,10 @@ type VerificationMetrics interface {
 
 	// OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 	OnVerifiableChunkSentToVerifier()
+
+	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
+	// by verifier engine.
+	OnResultApprovalDispatchedInNetwork()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
