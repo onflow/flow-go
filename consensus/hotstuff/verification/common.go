@@ -4,10 +4,19 @@ import (
 	"fmt"
 	"sync"
 
+	"os"
+	"strconv"
+
+	"github.com/aristanetworks/goarista/monotime"
+
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+var logfile_common *os.File
+
+var once sync.Once
 
 // makeVoteMessage generates the message we have to sign in order to be able
 // to verify signatures without having the full block. To that effect, each data
@@ -15,6 +24,14 @@ import (
 // block ID; this allows us to create the signed message and verify the signed
 // message without having the full block contents.
 func makeVoteMessage(view uint64, blockID flow.Identifier) []byte {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/consensus/hotstuff/verification/commmon.log")
+		logfile_common = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_common.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	msg := flow.MakeID(struct {
 		BlockID flow.Identifier
 		View    uint64

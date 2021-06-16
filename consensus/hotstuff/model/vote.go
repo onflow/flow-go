@@ -1,6 +1,11 @@
 package model
 
 import (
+	"os"
+	"strconv"
+	"sync"
+
+	"github.com/aristanetworks/goarista/monotime"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -13,8 +18,19 @@ type Vote struct {
 	SigData  []byte
 }
 
+var once sync.Once
+var logfile_vote *os.File
+
 // ID returns the identifier for the vote.
 func (uv *Vote) ID() flow.Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/consensus/hotstuff/model/vote.log")
+		logfile_vote = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_vote.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return flow.MakeID(uv)
 }
 

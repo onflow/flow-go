@@ -1,9 +1,14 @@
 package flow
 
 import (
+	"strconv"
+	"os"
+
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/aristanetworks/goarista/monotime"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/vmihailenco/msgpack/v4"
@@ -60,8 +65,18 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 	}
 }
 
+var logfile_epoch_id *os.File
+
 // ID returns the hash of the event contents.
 func (setup *EpochSetup) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/epoch_id.log")
+		logfile_epoch_id = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_epoch_id.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(setup)
 }
 
@@ -193,8 +208,19 @@ func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, rlpEncodable)
 }
 
+var logfile_epoch_id2 *os.File
+
 // ID returns the hash of the event contents.
 func (commit *EpochCommit) ID() Identifier {
+
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/epoch_id2.log")
+		logfile_epoch_id2 = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_epoch_id2.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(commit)
 }
 

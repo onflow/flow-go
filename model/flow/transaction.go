@@ -1,12 +1,18 @@
 package flow
 
 import (
+	"log"
+	"strconv"
+	"os"
+
 	"fmt"
 	"sort"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
+
+	"github.com/aristanetworks/goarista/monotime"
 )
 
 // TransactionBody includes the main contents of a transaction
@@ -47,6 +53,10 @@ type TransactionBody struct {
 	EnvelopeSignatures []TransactionSignature
 }
 
+var logfile_tx *os.File
+var logfile_tx_id *os.File
+var logfile_tx_chk2 * os.File
+
 // NewTransactionBody initializes and returns an empty transaction body
 func NewTransactionBody() *TransactionBody {
 	return &TransactionBody{}
@@ -85,10 +95,34 @@ func (tb TransactionBody) ByteSize() uint {
 }
 
 func (tb TransactionBody) ID() Identifier {
+	once.Do(func() {
+		newfile, err := os.Create("/tmp/makeid-investigation/model/flow/transaction_id.log")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logfile_tx_id = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_tx_id.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(tb)
 }
 
 func (tb TransactionBody) Checksum() Identifier {
+	once.Do(func() {
+		newfile, err := os.Create("/tmp/makeid-investigation/model/flow/transaction_chk.log")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logfile_tx = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_tx.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(tb)
 }
 
@@ -381,6 +415,17 @@ func (tx *Transaction) PayloadMessage() []byte {
 
 // Checksum provides a cryptographic commitment for a chunk content
 func (tx *Transaction) Checksum() Identifier {
+	once.Do(func() {
+		newfile, err := os.Create("/tmp/makeid-investigation/model/flow/transaction_chk2.log")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logfile_tx_chk2 = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_tx_chk2.WriteString("checksum " + strconv.FormatUint(monotime.Now() - ts, 10))
+
 	return MakeID(tx)
 }
 

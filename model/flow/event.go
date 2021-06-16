@@ -3,6 +3,11 @@
 package flow
 
 import (
+	"strconv"
+	"os"
+
+	"github.com/aristanetworks/goarista/monotime"
+
 	"fmt"
 	"time"
 
@@ -40,8 +45,20 @@ func (e Event) String() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.ID())
 }
 
+var logfile_event *os.File
+
 // ID returns a canonical identifier that is guaranteed to be unique.
 func (e Event) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/event.log")
+
+		logfile_event = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_event.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(e.Body())
 }
 

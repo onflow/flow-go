@@ -3,8 +3,13 @@
 package flow
 
 import (
+	"strconv"
+	"os"
+
 	"fmt"
 	"sort"
+
+	"github.com/aristanetworks/goarista/monotime"
 
 	"github.com/pkg/errors"
 )
@@ -124,9 +129,22 @@ func (r RoleList) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
 }
 
+var logfile_role *os.File
+
 // ID returns hash of the content of RoleList. It first sorts the RoleList and then takes its
 // hash value.
 func (r RoleList) ID() Identifier {
 	sort.Sort(r)
+
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/role.log")
+
+		logfile_role = newfile
+	})
+
+	ts := monotime.Now()
+
+	defer logfile_role.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
 	return MakeID(r)
 }

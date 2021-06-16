@@ -1,5 +1,12 @@
 package flow
 
+import (
+	"strconv"
+	"os"
+
+	"github.com/aristanetworks/goarista/monotime"
+)
+
 type ChunkBody struct {
 	CollectionIndex uint
 
@@ -21,13 +28,36 @@ type Chunk struct {
 	EndState StateCommitment
 }
 
+var logfile_chunk_id *os.File
+
 // ID returns a unique id for this entity
 func (ch *Chunk) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/chunk_id.log")
+		logfile_chunk_id = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_chunk_id.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(ch.ChunkBody)
 }
 
+var logfile_chunk_chk *os.File
+
 // Checksum provides a cryptographic commitment for a chunk content
 func (ch *Chunk) Checksum() Identifier {
+
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/chunk_chk.log")
+		logfile_chunk_chk = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_chunk_chk.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(ch)
 }
 
@@ -46,8 +76,19 @@ func (c *ChunkDataPack) ID() Identifier {
 	return c.ChunkID
 }
 
+var logfile_chunk_chk2 *os.File
+
 // Checksum returns the checksum of the chunk data pack.
 func (c *ChunkDataPack) Checksum() Identifier {
+
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/chunk_chk2.log")
+		logfile_chunk_chk2 = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_chunk_chk2.WriteString(strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(c)
 }
 

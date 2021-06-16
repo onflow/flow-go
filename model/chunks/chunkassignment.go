@@ -1,6 +1,11 @@
 package chunks
 
 import (
+	"os"
+	"strconv"
+
+	"github.com/aristanetworks/goarista/monotime"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -90,8 +95,18 @@ func (a *AssignmentDataPack) ID() flow.Identifier {
 	return a.fingerprint
 }
 
+var logfile_chunk_assign *os.File
+
 // Checksum returns the checksum of the assignment data pack
 func (a *AssignmentDataPack) Checksum() flow.Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/chunks/chunkassignment.log")
+		logfile_chunk_assign = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_chunk_assign.WriteString(strconv.FormatUint(monotime.Now(), 10) + "\n" +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return flow.MakeID(a)
 }
 

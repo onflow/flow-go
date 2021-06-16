@@ -1,6 +1,13 @@
 package flow
 
-import "github.com/onflow/flow-go/model/fingerprint"
+import (
+	"strconv"
+	"os"
+
+	"github.com/aristanetworks/goarista/monotime"
+
+	"github.com/onflow/flow-go/model/fingerprint"
+)
 
 // Collection is set of transactions.
 type Collection struct {
@@ -65,11 +72,30 @@ type LightCollection struct {
 	Transactions []Identifier
 }
 
+var logfile_collection_id *os.File
+
 func (lc LightCollection) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/collection_id.log")
+		logfile_collection_id = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_collection_id.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(lc)
 }
 
+var logfile_collection_chk *os.File
 func (lc LightCollection) Checksum() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/collection_chk.log")
+		logfile_collection_chk = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_collection_chk.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(lc)
 }
 

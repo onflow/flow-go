@@ -1,7 +1,13 @@
 package verification
 
 import (
+	"os"
+	"strconv"
+	"sync"
+
 	"context"
+
+	"github.com/aristanetworks/goarista/monotime"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -20,7 +26,19 @@ func (r *ReceiptDataPack) ID() flow.Identifier {
 	return r.Receipt.ID()
 }
 
+var once sync.Once
+var logfile_rcp_data *os.File
+
 // Checksum returns the checksum of the ReceiptDataPack.
 func (r *ReceiptDataPack) Checksum() flow.Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/verification/receiptdatapack.log")
+		logfile_rcp_data = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_rcp_data.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return flow.MakeID(r)
 }

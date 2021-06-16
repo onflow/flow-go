@@ -1,6 +1,11 @@
 package flow
 
 import (
+	"os"
+	"strconv"
+
+	"github.com/aristanetworks/goarista/monotime"
+
 	"errors"
 )
 
@@ -15,13 +20,33 @@ type ExecutionResult struct {
 	ServiceEvents    []ServiceEvent
 }
 
+var logfile_execresult *os.File
+
 // ID returns the hash of the execution result body
 func (er ExecutionResult) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/executionresult_id.log")
+		logfile_execresult = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_execresult.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(er)
 }
 
+var logfile_execresult_chk *os.File
+
 // Checksum ...
 func (er ExecutionResult) Checksum() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/executionresult_chk.log")
+		logfile_execresult_chk = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_execresult_chk.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(er)
 }
 

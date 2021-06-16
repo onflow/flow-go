@@ -6,6 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
+
+	"os"
+	"strconv"
+
+	"github.com/aristanetworks/goarista/monotime"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -39,10 +45,20 @@ func (cl ChannelList) Swap(i, j int) {
 	cl[i], cl[j] = cl[j], cl[i]
 }
 
+var once sync.Once
+var logfile_conduit *os.File
 // ID returns hash of the content of ChannelList. It first sorts the ChannelList and then takes its
 // hash value.
 func (cl ChannelList) ID() flow.Identifier {
 	sort.Sort(cl)
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/network/conduit.log")
+		logfile_conduit = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_conduit.WriteString(strconv.FormatUint(monotime.Now(),10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return flow.MakeID(cl)
 }
 

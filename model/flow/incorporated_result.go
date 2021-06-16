@@ -1,5 +1,12 @@
 package flow
 
+import (
+	"strconv"
+	"os"
+
+	"github.com/aristanetworks/goarista/monotime"
+)
+
 // IncorporatedResult is a wrapper around an ExecutionResult which contains the
 // ID of the first block on its fork in which it was incorporated.
 type IncorporatedResult struct {
@@ -21,15 +28,40 @@ func NewIncorporatedResult(incorporatedBlockID Identifier, result *ExecutionResu
 	}
 }
 
+var logfile_inc_result *os.File
+
 // ID implements flow.Entity.ID for IncorporatedResult to make it capable of
 // being stored directly in mempools and storage.
 func (ir *IncorporatedResult) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/incorporated_result.log")
+
+		logfile_inc_result = newfile
+	})
+
+	ts := monotime.Now()
+
+	defer logfile_inc_result.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID([2]Identifier{ir.IncorporatedBlockID, ir.Result.ID()})
 }
+
+var logfile_inc_result_chk *os.File
 
 // CheckSum implements flow.Entity.CheckSum for IncorporatedResult to make it
 // capable of being stored directly in mempools and storage.
 func (ir *IncorporatedResult) Checksum() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/incorporated_result_chk.log")
+
+		logfile_inc_result_chk = newfile
+	})
+
+	ts := monotime.Now()
+
+	defer logfile_inc_result_chk.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
 	return MakeID(ir)
 }
 

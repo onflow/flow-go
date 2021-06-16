@@ -8,7 +8,10 @@ import (
 	"math/rand"
 	"regexp"
 	"sort"
+	"os"
 	"strconv"
+
+	"github.com/aristanetworks/goarista/monotime"
 
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
@@ -86,8 +89,16 @@ func (iy Identity) ID() Identifier {
 	return iy.NodeID
 }
 
+var logfile_model_identity *os.File
 // Checksum returns a checksum for the identity including mutable attributes.
 func (iy Identity) Checksum() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/identity.log")
+		logfile_model_identity = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_model_identity.WriteString(strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(iy)
 }
 

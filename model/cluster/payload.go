@@ -1,6 +1,12 @@
 package cluster
 
 import (
+	"os"
+	"strconv"
+	"sync"
+
+	"github.com/aristanetworks/goarista/monotime"
+
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -48,8 +54,19 @@ func PayloadFromTransactions(refID flow.Identifier, transactions ...*flow.Transa
 	}
 }
 
+var once sync.Once
+var logfile_payload *os.File
+
 // Hash returns the hash of the payload.
 func (p Payload) Hash() flow.Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/cluster/payload.log")
+		logfile_payload = newfile
+	})
+	ts := monotime.Now()
+	defer logfile_payload.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return flow.MakeID(p)
 }
 

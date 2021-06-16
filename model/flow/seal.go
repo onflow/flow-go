@@ -2,6 +2,14 @@
 
 package flow
 
+
+import (
+	"os"
+	"strconv"
+
+	"github.com/aristanetworks/goarista/monotime"
+)
+
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
 // particular block (referenced by `BlockID`) is committed into the chain.
 // A Seal for a block B can be included in the payload B's descendants. Only
@@ -63,10 +71,31 @@ func (s Seal) Body() interface{} {
 	}
 }
 
+var logfile_seal_id *os.File
+
 func (s Seal) ID() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/seal_id.log")
+		logfile_seal_id = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_seal_id.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(s.Body())
 }
 
+var logfile_seal_chk *os.File
+
 func (s Seal) Checksum() Identifier {
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/seal_chk.log")
+		logfile_seal_chk = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_seal_chk.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
 	return MakeID(s)
 }

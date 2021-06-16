@@ -1,10 +1,17 @@
 package flow
 
 import (
+	"sync"
+	"log"
+	"strconv"
+	"os"
 	"github.com/onflow/flow-go/crypto"
+
+	"github.com/aristanetworks/goarista/monotime"
 )
 
 type Spock []byte
+
 
 // ExecutionReceipt is the full execution receipt, as sent by the Execution Node.
 // Specifically, it contains the detailed execution result.
@@ -15,6 +22,12 @@ type ExecutionReceipt struct {
 	ExecutorSignature crypto.Signature
 }
 
+var once sync.Once
+
+var logfile_ch2 *os.File
+var logfile *os.File
+var logfile_id *os.File
+
 // ID returns the canonical ID of the execution receipt.
 func (er *ExecutionReceipt) ID() Identifier {
 	return er.Meta().ID()
@@ -22,6 +35,17 @@ func (er *ExecutionReceipt) ID() Identifier {
 
 // Checksum returns a checksum for the execution receipt including the signatures.
 func (er *ExecutionReceipt) Checksum() Identifier {
+	once.Do(func() {
+		newfile, err := os.Create("/tmp/makeid-investigation/model/flow/execution_receipt.log")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logfile = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
 	return MakeID(er)
 }
 
@@ -68,11 +92,36 @@ func (er *ExecutionReceiptMeta) ID() Identifier {
 		ResultID:   er.ResultID,
 		Spocks:     er.Spocks,
 	}
+
+	once.Do(func() {
+		newfile, err := os.Create("/tmp/makeid-investigation/model/flow/execution_receipt_id.log")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logfile_id = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_id.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(body)
 }
 
 // Checksum returns a checksum for the execution receipt including the signatures.
 func (er *ExecutionReceiptMeta) Checksum() Identifier {
+	once.Do(func() {
+		newfile, err := os.Create("/tmp/makeid-investigation/model/flow/execution_receipt_meta_chk.log")
+		if err != nil {
+			log.Fatal(err)
+		}
+		logfile_ch2 = newfile
+	})
+	ts := monotime.Now()
+
+	defer logfile_ch2.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(er)
 }
 

@@ -1,6 +1,11 @@
 package flow
 
 import (
+	"strconv"
+	"os"
+
+	"github.com/aristanetworks/goarista/monotime"
+
 	"encoding/json"
 	"time"
 
@@ -55,6 +60,8 @@ func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
+var logfile_hdr *os.File
+
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
@@ -63,11 +70,34 @@ func (h Header) ID() Identifier {
 	if h.Timestamp.Location() != time.UTC {
 		h.Timestamp = h.Timestamp.UTC()
 	}
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/header.log")
+		logfile_hdr = newfile
+	})
+
+	ts := monotime.Now()
+
+	defer logfile_hdr.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(h)
 }
 
+var logfile_hdr_chk *os.File
+
 // Checksum returns the checksum of the header.
 func (h Header) Checksum() Identifier {
+
+	once.Do(func() {
+		newfile, _ := os.Create("/tmp/makeid-investigation/model/flow/header_chk.log")
+		logfile_hdr_chk = newfile
+	})
+
+	ts := monotime.Now()
+
+	defer logfile_hdr_chk.WriteString(strconv.FormatUint(monotime.Now(), 10) + "," +
+		strconv.FormatUint(monotime.Now() - ts, 10) + "\n")
+
 	return MakeID(h)
 }
 

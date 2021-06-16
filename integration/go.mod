@@ -17,8 +17,8 @@ require (
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/rs/zerolog v1.19.0
 	github.com/stretchr/testify v1.7.0
-	google.golang.org/grpc v1.33.2
-	gopkg.in/yaml.v2 v2.3.0
+	google.golang.org/grpc v1.36.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 // temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414
