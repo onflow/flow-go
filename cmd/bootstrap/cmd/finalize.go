@@ -9,15 +9,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -34,9 +36,12 @@ var (
 	flagRootHeight                  uint64
 	flagRootTimestamp               string
 	flagRootCommit                  string
-	flagEpochCounter                uint64
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
+	flagEpochCounter                uint64
+	flagNumViewsInEpoch             uint64
+	flagNumViewsInStakingAuction    uint64
+	flagNumViewsInDKGPhase          uint64
 )
 
 // PartnerStakes ...
@@ -80,6 +85,9 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().StringVar(&flagRootTimestamp, "root-timestamp", time.Now().UTC().Format(time.RFC3339), "timestamp of the root block (RFC3339)")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
+	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
+	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
+	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 
 	_ = finalizeCmd.MarkFlagRequired("root-chain")
 	_ = finalizeCmd.MarkFlagRequired("root-parent")
@@ -120,39 +128,12 @@ func finalize(cmd *cobra.Command, args []string) {
 	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 	log.Info().Msg("")
 
+	// create flow.IdentityList representation of participant set
+	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical)
+
 	log.Info().Msg("running DKG for consensus nodes")
 	dkgData := runDKG(model.FilterByRole(stakingNodes, flow.RoleConsensus))
 	log.Info().Msg("")
-
-	var commit flow.StateCommitment
-	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
-		log.Info().Msg("generating empty execution state")
-
-		var err error
-		serviceAccountPublicKey := flow.AccountPublicKey{}
-		err = serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
-		if err != nil {
-			log.Fatal().Err(err).Msg("unable to parse the service account public key json")
-		}
-		value, err := cadence.NewUFix64(flagGenesisTokenSupply)
-		if err != nil {
-			log.Fatal().Err(err).Msg("invalid genesis token supply")
-		}
-		commit, err = run.GenerateExecutionState(
-			filepath.Join(flagOutdir, model.DirnameExecutionState),
-			serviceAccountPublicKey,
-			parseChainID(flagRootChain).Chain(),
-			fvm.WithInitialTokenSupply(value),
-			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		)
-		if err != nil {
-			log.Fatal().Err(err).Msg("unable to generate execution state")
-		}
-		flagRootCommit = hex.EncodeToString(commit[:])
-		log.Info().Msg("")
-	}
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
@@ -181,12 +162,23 @@ func finalize(cmd *cobra.Command, args []string) {
 	clusterQCs := constructRootQCsForClusters(clusters, internalNodes, clusterBlocks)
 	log.Info().Msg("")
 
+	// if no root commit is specified, bootstrap an empty execution state
+	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
+		generateEmptyExecutionState(
+			getRandomSource(blockID),
+			assignments,
+			clusterQCs,
+			dkgData,
+			participants,
+		)
+	}
+
 	log.Info().Msg("constructing root execution result and block seal")
-	result, seal := constructRootResultAndSeal(flagRootCommit, block, stakingNodes, assignments, clusterQCs, dkgData)
+	result, seal := constructRootResultAndSeal(flagRootCommit, block, participants, assignments, clusterQCs, dkgData)
 	log.Info().Msg("")
 
 	// construct serializable root protocol snapshot
-	log.Info().Msg("constructing root procotol snapshot")
+	log.Info().Msg("constructing root protocol snapshot")
 	snapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, rootQC)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
@@ -453,4 +445,60 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 	}
 
 	return inmem.SnapshotFromEncodable(snapshot), nil
+}
+
+// generateEmptyExecutionState generates a new empty execution state with the
+// given configuration. Sets the flagRootCommit variable for future reads.
+func generateEmptyExecutionState(
+	randomSource []byte,
+	assignments flow.AssignmentList,
+	clusterQCs []*flow.QuorumCertificate,
+	dkg dkg.DKGData,
+	identities flow.IdentityList,
+) (commit flow.StateCommitment) {
+
+	log.Info().Msg("generating empty execution state")
+	var serviceAccountPublicKey flow.AccountPublicKey
+	err := serviceAccountPublicKey.UnmarshalJSON([]byte(flagServiceAccountPublicKeyJSON))
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to parse the service account public key json")
+	}
+
+	value, err := cadence.NewUFix64(flagGenesisTokenSupply)
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid genesis token supply")
+	}
+
+	epochConfig := epochs.EpochConfig{
+		EpochTokenPayout:             cadence.UFix64(0),
+		RewardCut:                    cadence.UFix64(0),
+		CurrentEpochCounter:          cadence.UInt64(flagEpochCounter),
+		NumViewsInEpoch:              cadence.UInt64(flagNumViewsInEpoch),
+		NumViewsInStakingAuction:     cadence.UInt64(flagNumViewsInStakingAuction),
+		NumViewsInDKGPhase:           cadence.UInt64(flagNumViewsInDKGPhase),
+		NumCollectorClusters:         cadence.UInt16(flagCollectionClusters),
+		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
+		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
+		CollectorClusters:            assignments,
+		ClusterQCs:                   clusterQCs,
+		DKGPubKeys:                   dkg.PubKeyShares,
+	}
+
+	commit, err = run.GenerateExecutionState(
+		filepath.Join(flagOutdir, model.DirnameExecutionState),
+		serviceAccountPublicKey,
+		parseChainID(flagRootChain).Chain(),
+		fvm.WithInitialTokenSupply(value),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		fvm.WithEpochConfig(epochConfig),
+		fvm.WithIdentities(identities),
+	)
+	if err != nil {
+		log.Fatal().Err(err).Msg("unable to generate execution state")
+	}
+	flagRootCommit = hex.EncodeToString(commit[:])
+	log.Info().Msg("")
+	return
 }
