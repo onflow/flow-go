@@ -37,13 +37,11 @@ func newReadConnection(ctx context.Context,
 		maxMsgSize = DefaultMaxUnicastMsgSize
 	}
 
-	streamLogger := streamLogger(log, stream)
-
 	c := readConnection{
 		ctx:        ctx,
 		stream:     stream,
 		callback:   callback,
-		log:        streamLogger,
+		log:        log,
 		metrics:    metrics,
 		maxMsgSize: maxMsgSize,
 	}
@@ -79,7 +77,7 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 				rc.closeStream()
 				return
 			}
-			rc.log.Error().Err(err)
+			rc.log.Error().Err(err).Msg("failed to read message")
 			rc.resetStream()
 			return
 		}
@@ -119,13 +117,4 @@ func (rc *readConnection) resetStream() {
 	if err != nil {
 		rc.log.Error().Err(err).Msg("failed to reset stream")
 	}
-}
-
-func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
-	logger := log.With().
-		Str("remote_peer", stream.Conn().RemotePeer().String()).
-		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
-		Str("local_peer", stream.Conn().LocalPeer().String()).
-		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
-	return logger
 }

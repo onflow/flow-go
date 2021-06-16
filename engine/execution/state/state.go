@@ -134,7 +134,7 @@ func NewExecutionState(
 }
 
 func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
-	return ledger.NewQuery(commitment,
+	return ledger.NewQuery(ledger.State(commitment),
 		[]ledger.Key{
 			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
 		})
@@ -147,7 +147,7 @@ func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.
 		keys[i] = RegisterIDToKey(id)
 	}
 
-	return ledger.NewQuery(commitment, keys)
+	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
 func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
@@ -216,21 +216,21 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 	ids, values := ruh.RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
-		baseState,
+		ledger.State(baseState),
 		RegisterIDSToKeys(ids),
 		RegisterValuesToValues(values),
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
 	commit, err := ldg.Set(update)
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, err
 	}
 
-	return commit, nil
+	return flow.StateCommitment(commit), nil
 }
 
 //func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
@@ -466,7 +466,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
 			Block:               block,
-			StartState:          startStateCommitment,
+			StartState:          &startStateCommitment,
 			CompleteCollections: completeCollections,
 		},
 		StateInteractions:  stateInteractions,

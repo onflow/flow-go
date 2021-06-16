@@ -35,7 +35,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	for _, trie := range tries {
-		fmt.Printf("%s\n", trie.StringRootHash())
+		fmt.Printf("%x\n", trie.RootHash())
 	}
 
 	duration := time.Since(startTime)

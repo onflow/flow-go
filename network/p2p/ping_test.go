@@ -29,20 +29,21 @@ func TestPing(t *testing.T) {
 
 	logger := zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
 	protocolID := generatePingProtcolID("1234")
-	version := "version_1"
+	pingInfoProvider, version, height := MockPingInfoProvider()
 
-	ps1 := NewPingService(h1, protocolID, version, logger)
-	ps2 := NewPingService(h2, protocolID, version, logger)
+	ps1 := NewPingService(h1, protocolID, pingInfoProvider, logger)
+	ps2 := NewPingService(h2, protocolID, pingInfoProvider, logger)
 
-	testPing(t, ps1, h2.ID(), version)
-	testPing(t, ps2, h1.ID(), version)
+	testPing(t, ps1, h2.ID(), version, height)
+	testPing(t, ps2, h1.ID(), version, height)
 }
 
-func testPing(t *testing.T, ps *PingService, p peer.ID, expectedVersion string) {
+func testPing(t *testing.T, ps *PingService, p peer.ID, expectedVersion string, expectedHeight uint64) {
 	pctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	resp, rtt, err := ps.Ping(pctx, p)
 	assert.NoError(t, err)
 	assert.NotZero(t, rtt)
 	assert.Equal(t, expectedVersion, resp.Version)
+	assert.Equal(t, expectedHeight, resp.BlockHeight)
 }

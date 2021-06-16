@@ -232,7 +232,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: 0,
-			StartState:      startState,
+			StartState:      flow.StateCommitment(startState),
 			BlockID:         blockID,
 		},
 		Index: 0,
@@ -240,7 +240,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 
 	chunkDataPack := flow.ChunkDataPack{
 		ChunkID:    chunk.ID(),
-		StartState: startState,
+		StartState: flow.StateCommitment(startState),
 		Proof:      proof,
 	}
 
@@ -257,7 +257,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 		Result:        &result,
 		Collection:    &coll,
 		ChunkDataPack: &chunkDataPack,
-		EndState:      endState,
+		EndState:      flow.StateCommitment(endState),
 	}
 
 	return &verifiableChunkData

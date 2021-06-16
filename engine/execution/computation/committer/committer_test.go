@@ -10,6 +10,7 @@ import (
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	led "github.com/onflow/flow-go/ledger"
 	ledgermock "github.com/onflow/flow-go/ledger/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	utils "github.com/onflow/flow-go/utils/unittest"
 )
@@ -21,7 +22,8 @@ func TestLedgerViewCommitter(t *testing.T) {
 		ledger := new(ledgermock.Ledger)
 		com := committer.NewLedgerViewCommitter(ledger, trace.NewNoopTracer())
 
-		expectedStateCommitment := led.State([]byte{1, 2, 3})
+		var expectedStateCommitment led.State
+		copy(expectedStateCommitment[:], []byte{1, 2, 3})
 		ledger.On("Set", mock.Anything).
 			Return(expectedStateCommitment, nil).
 			Once()
@@ -43,7 +45,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 
 		newState, proof, err := com.CommitView(view, utils.StateCommitmentFixture())
 		require.NoError(t, err)
-		require.Equal(t, []uint8(expectedStateCommitment), newState)
+		require.Equal(t, flow.StateCommitment(expectedStateCommitment), newState)
 		require.Equal(t, []uint8(expectedProof), proof)
 	})
 

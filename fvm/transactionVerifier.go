@@ -5,6 +5,7 @@ import (
 
 	"github.com/opentracing/opentracing-go/log"
 
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -20,13 +21,13 @@ const (
 )
 
 type TransactionSignatureVerifier struct {
-	SignatureVerifier  SignatureVerifier
+	SignatureVerifier  crypto.SignatureVerifier
 	KeyWeightThreshold int
 }
 
 func NewTransactionSignatureVerifier(keyWeightThreshold int) *TransactionSignatureVerifier {
 	return &TransactionSignatureVerifier{
-		SignatureVerifier:  DefaultSignatureVerifier{},
+		SignatureVerifier:  crypto.DefaultSignatureVerifier{},
 		KeyWeightThreshold: keyWeightThreshold,
 	}
 }
@@ -178,26 +179,9 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	validWithoutTag, err := v.SignatureVerifier.Verify(
+	valid, err := v.SignatureVerifier.Verify(
 		txSig.Signature,
-		nil,
-		message,
-		accountKey.PublicKey,
-		accountKey.HashAlgo,
-	)
-	if err != nil {
-		if sType == envelopeSignature {
-			return nil, errors.NewInvalidEnvelopeSignatureError(txSig.Address, txSig.KeyIndex, err)
-		}
-		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
-	}
-	if validWithoutTag {
-		return &accountKey, nil
-	}
-
-	validWithTag, err := v.SignatureVerifier.Verify(
-		txSig.Signature,
-		flow.TransactionDomainTag[:],
+		string(flow.TransactionDomainTag[:]),
 		message,
 		accountKey.PublicKey,
 		accountKey.HashAlgo,
@@ -209,7 +193,7 @@ func (v *TransactionSignatureVerifier) verifyAccountSignature(
 		return nil, errors.NewInvalidPayloadSignatureError(txSig.Address, txSig.KeyIndex, err)
 	}
 
-	if validWithTag {
+	if valid {
 		return &accountKey, nil
 	}
 

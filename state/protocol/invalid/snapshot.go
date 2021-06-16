@@ -35,7 +35,7 @@ func (u *Snapshot) Identity(_ flow.Identifier) (*flow.Identity, error) {
 }
 
 func (u *Snapshot) Commit() (flow.StateCommitment, error) {
-	return nil, u.err
+	return flow.DummyStateCommitment, u.err
 }
 
 func (u *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
@@ -46,7 +46,11 @@ func (u *Snapshot) SealingSegment() ([]*flow.Block, error) {
 	return nil, u.err
 }
 
-func (u *Snapshot) Pending() ([]flow.Identifier, error) {
+func (u *Snapshot) Descendants() ([]flow.Identifier, error) {
+	return nil, u.err
+}
+
+func (u *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 	return nil, u.err
 }
 

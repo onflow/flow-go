@@ -10,7 +10,6 @@ import (
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
-	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -30,7 +29,6 @@ import (
 type Config struct {
 	GRPCListenAddr            string        // the GRPC server address as ip:port
 	HTTPListenAddr            string        // the HTTP web proxy address as ip:port
-	ExecutionAddr             string        // the address of the upstream execution node
 	CollectionAddr            string        // the address of the upstream collection node
 	HistoricalAccessAddrs     string        // the list of all access nodes from previous spork
 	MaxMsgSize                int           // GRPC max message size
@@ -56,7 +54,6 @@ type Engine struct {
 func New(log zerolog.Logger,
 	state protocol.State,
 	config Config,
-	executionRPC execproto.ExecutionAPIClient,
 	collectionRPC accessproto.AccessAPIClient,
 	historicalAccessNodes []accessproto.AccessAPIClient,
 	blocks storage.Blocks,
@@ -122,7 +119,6 @@ func New(log zerolog.Logger,
 
 	backend := backend.New(
 		state,
-		executionRPC,
 		collectionRPC,
 		historicalAccessNodes,
 		blocks,

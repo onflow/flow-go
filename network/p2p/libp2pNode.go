@@ -26,7 +26,6 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/cmd/build"
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -36,16 +35,13 @@ import (
 )
 
 const (
-	// A unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
-	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
-	FlowLibP2PProtocolIDPrefix = "/flow/push/"
 
 	// Maximum time to wait for a ping reply from a remote node
 	PingTimeoutSecs = time.Second * 4
-)
 
-// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
-const maxConnectAttempt = 3
+	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
+	maxConnectAttempt = 3
+)
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (*Node, error)
@@ -53,7 +49,7 @@ type LibP2PFactoryFunc func() (*Node, error)
 // DefaultLibP2PNodeFactory is a factory function that receives a middleware instance and generates a libp2p Node by invoking its factory with
 // proper parameters.
 func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
-	maxPubSubMsgSize int, metrics module.NetworkMetrics) (LibP2PFactoryFunc, error) {
+	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider) (LibP2PFactoryFunc, error) {
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
 		// skip message signing
@@ -65,7 +61,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 	}
 
 	return func() (*Node, error) {
-		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, psOptions...)
+		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, pingInfoProvider, psOptions...)
 	}, nil
 }
 
@@ -82,15 +78,17 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	pingService          *PingService
+	connMgr              *ConnManager
 }
 
 func NewLibP2PNode(logger zerolog.Logger,
 	id flow.Identifier,
 	address string,
-	conMgr ConnManager,
+	conMgr *ConnManager,
 	key fcrypto.PrivateKey,
 	allowList bool,
 	rootBlockID string,
+	pingInfoProvider PingInfoProvider,
 	psOption ...pubsub.Option) (*Node, error) {
 
 	libp2pKey, err := privKey(key)
@@ -116,7 +114,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	}
 
 	pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
-	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, build.Semver(), logger)
+	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, pingInfoProvider, logger)
 
 	n := &Node{
 		connGater:            connGater,
@@ -129,6 +127,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		id:                   id,
 		flowLibP2PProtocolID: flowLibP2PProtocolID,
 		pingService:          pingService,
+		connMgr:              conMgr,
 	}
 
 	ip, port, err := n.GetIPPort()
@@ -258,6 +257,12 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 	if err != nil {
 		return nil, fmt.Errorf("could not get peer ID: %w", err)
 	}
+
+	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
+	// connection creation is being attempted
+	n.connMgr.ProtectPeer(peerID)
+	// unprotect it once done
+	defer n.connMgr.UnprotectPeer(peerID)
 
 	var errs error
 	var s libp2pnet.Stream
@@ -415,6 +420,9 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 		return message.PingResponse{}, -1, pingError(err)
 	}
 
+	n.connMgr.ProtectPeer(targetInfo.ID)
+	defer n.connMgr.UnprotectPeer(targetInfo.ID)
+
 	// connect to the target node
 	err = n.host.Connect(ctx, targetInfo)
 	if err != nil {
@@ -479,7 +487,7 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 func bootstrapLibP2PHost(ctx context.Context,
 	logger zerolog.Logger,
 	address string,
-	conMgr ConnManager,
+	conMgr *ConnManager,
 	key crypto.PrivKey,
 	allowList bool,
 	psOption ...pubsub.Option) (host.Host, *connGater, *pubsub.PubSub, error) {

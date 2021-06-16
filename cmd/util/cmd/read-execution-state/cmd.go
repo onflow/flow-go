@@ -61,7 +61,7 @@ func loadExecutionState() *mtrie.Forest {
 		<-w.Done()
 	}()
 
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
+	forest, err := mtrie.NewForest(complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}

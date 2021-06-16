@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/utils"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -124,7 +125,7 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
-	completeRA := utils.LightExecutionResultFixture(1)
+	completeRA := vertestutils.LightExecutionResultFixture(1)
 
 	err := eng.Process(invalidID, &completeRA)
 	assert.Error(suite.T(), err)
@@ -152,9 +153,9 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 
 	// mocks metrics
 	// reception of verifiable chunk
-	suite.metrics.On("OnVerifiableChunkReceived").Return()
+	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
 	// emission of result approval
-	suite.metrics.On("OnResultApproval").Return()
+	suite.metrics.On("OnResultApprovalDispatchedInNetwork").Return()
 
 	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
@@ -194,7 +195,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 
 	// mocks metrics
 	// reception of verifiable chunk
-	suite.metrics.On("OnVerifiableChunkReceived").Return()
+	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
 
 	// we shouldn't receive any result approval
 	suite.pushCon.

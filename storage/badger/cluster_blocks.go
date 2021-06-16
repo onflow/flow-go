@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ClusterBlocks implements a simple block storage around a badger DB.
@@ -29,11 +30,11 @@ func NewClusterBlocks(db *badger.DB, chainID flow.ChainID, headers *Headers, pay
 }
 
 func (b *ClusterBlocks) Store(block *cluster.Block) error {
-	return operation.RetryOnConflict(b.db.Update, b.storeTx(block))
+	return operation.RetryOnConflictTx(b.db, transaction.Update, b.storeTx(block))
 }
 
-func (b *ClusterBlocks) storeTx(block *cluster.Block) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (b *ClusterBlocks) storeTx(block *cluster.Block) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)

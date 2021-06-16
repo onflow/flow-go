@@ -15,11 +15,11 @@ type Commits struct {
 }
 
 // BatchStore provides a mock function with given fields: blockID, commit, batch
-func (_m *Commits) BatchStore(blockID flow.Identifier, commit []byte, batch storage.BatchStorage) error {
+func (_m *Commits) BatchStore(blockID flow.Identifier, commit flow.StateCommitment, batch storage.BatchStorage) error {
 	ret := _m.Called(blockID, commit, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []byte, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.StateCommitment, storage.BatchStorage) error); ok {
 		r0 = rf(blockID, commit, batch)
 	} else {
 		r0 = ret.Error(0)
@@ -29,15 +29,15 @@ func (_m *Commits) BatchStore(blockID flow.Identifier, commit []byte, batch stor
 }
 
 // ByBlockID provides a mock function with given fields: blockID
-func (_m *Commits) ByBlockID(blockID flow.Identifier) ([]byte, error) {
+func (_m *Commits) ByBlockID(blockID flow.Identifier) (flow.StateCommitment, error) {
 	ret := _m.Called(blockID)
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func(flow.Identifier) []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func(flow.Identifier) flow.StateCommitment); ok {
 		r0 = rf(blockID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
 		}
 	}
 
@@ -52,11 +52,11 @@ func (_m *Commits) ByBlockID(blockID flow.Identifier) ([]byte, error) {
 }
 
 // Store provides a mock function with given fields: blockID, commit
-func (_m *Commits) Store(blockID flow.Identifier, commit []byte) error {
+func (_m *Commits) Store(blockID flow.Identifier, commit flow.StateCommitment) error {
 	ret := _m.Called(blockID, commit)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []byte) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.StateCommitment) error); ok {
 		r0 = rf(blockID, commit)
 	} else {
 		r0 = ret.Error(0)

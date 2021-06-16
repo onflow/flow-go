@@ -5,6 +5,7 @@ package badger_test
 import (
 	"errors"
 	"math/rand"
+	"sync"
 	"testing"
 	"time"
 
@@ -28,6 +29,7 @@ import (
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/state/protocol/util"
 	stoerr "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	storeutil "github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -446,7 +448,29 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	consumer.On("BlockFinalized", mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// set up state and mock ComplianceMetrics object
+		metrics := new(mockmodule.ComplianceMetrics)
+		metrics.On("BlockSealed", mock.Anything)
+		metrics.On("SealedHeight", mock.Anything)
+		metrics.On("FinalizedHeight", mock.Anything)
+		metrics.On("BlockFinalized", mock.Anything)
+
+		// expect committed epoch final view metric at bootstrap
+		finalView, err := rootSnapshot.Epochs().Current().FinalView()
+		require.NoError(t, err)
+		metrics.On("CommittedEpochFinalView", finalView).Once()
+
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		require.NoError(t, err)
+		receiptValidator := util.MockReceiptValidator()
+		sealValidator := util.MockSealValidator(seals)
+		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -596,9 +620,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch phase transition once we finalize block 6
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+		// expect committed final view to be updated, since we are committing epoch 2
+		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
 		err = state.Finalize(block6.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 
 		// finalize block 7 so we can finalize subsequent blocks
 		err = state.Finalize(block7.ID())
@@ -649,6 +676,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Finalize(block9.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
+
+		metrics.AssertExpectations(t)
 	})
 }
 
@@ -1034,7 +1063,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
-				commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
+				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
@@ -1425,4 +1454,43 @@ func TestSealed(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, block1.ID(), sealed.ID())
 	})
+}
+
+// Test that when adding a block to database, there are only two cases at any point of time:
+// 1) neither the block header, nor the payload index exist in database
+// 2) both the block header and the payload index can be found in database
+// A non atomic bug would be: header is found in DB, but payload index is not found
+func TestCacheAtomicity(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	util.RunWithFollowerProtocolStateAndHeaders(t, rootSnapshot,
+		func(db *badger.DB, state *protocol.FollowerState, headers storage.Headers, index storage.Index) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+
+			block := unittest.BlockWithParentFixture(head)
+			blockID := block.ID()
+
+			// check 100 times to see if either 1) or 2) satisfies
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func(blockID flow.Identifier) {
+				for i := 0; i < 100; i++ {
+					_, err := headers.ByBlockID(blockID)
+					if errors.Is(err, stoerr.ErrNotFound) {
+						continue
+					}
+					require.NoError(t, err)
+
+					_, err = index.ByBlockID(blockID)
+					require.NoError(t, err, "found block ID, but index is missing, DB updates is non-atomic")
+				}
+				wg.Done()
+			}(blockID)
+
+			// storing the block to database, which supposed to be atomic updates to headers and index,
+			// both to badger database and the cache.
+			err = state.Extend(&block)
+			require.NoError(t, err)
+			wg.Wait()
+		})
 }

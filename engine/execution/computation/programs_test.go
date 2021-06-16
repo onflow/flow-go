@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -92,12 +93,13 @@ func TestPrograms_TestContractUpdates(t *testing.T) {
 				Transactions: transactions,
 			},
 		},
+		StartState: unittest.StateCommitmentPointerFixture(),
 	}
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -164,7 +166,7 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -199,7 +201,8 @@ func TestPrograms_TestBlockForks(t *testing.T) {
 		}
 		block1View = view.NewChild()
 		executableBlock := &entity.ExecutableBlock{
-			Block: block1,
+			Block:      block1,
+			StartState: unittest.StateCommitmentPointerFixture(),
 		}
 		_, err := engine.ComputeBlock(context.Background(), executableBlock, block1View)
 		require.NoError(t, err)
@@ -359,6 +362,7 @@ func createTestBlockAndRun(t *testing.T, engine *Manager, parentBlock *flow.Bloc
 				Transactions: col.Transactions,
 			},
 		},
+		StartState: unittest.StateCommitmentPointerFixture(),
 	}
 	returnedComputationResult, err := engine.ComputeBlock(context.Background(), executableBlock, view)
 	require.NoError(t, err)

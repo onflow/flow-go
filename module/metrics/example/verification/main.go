@@ -10,7 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/messages"
 	vermodel "github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/buffer"
@@ -34,8 +34,7 @@ func main() {
 	}
 }
 
-// happyPathExample captures the metrics on running VerificationHappyPath with
-// a single execution receipt of 10 chunks
+// happyPathExample captures the metrics on running VerificationHappyPath with 10 blocks, each with 10 execution receipts of 10 chunks.
 func happyPathExample() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
 		tracer, err := trace.NewTracer(logger, "verification")
@@ -51,7 +50,23 @@ func happyPathExample() {
 		// starts happy path
 		t := &testing.T{}
 		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
-		test.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
+
+		ops := []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			vertestutils.WithResults(10),
+			vertestutils.WithChunksCount(10),
+			vertestutils.WithCopies(1),
+		}
+		blockCount := 10
+		eventRepetition := 1
+		trials := 1
+		vertestutils.NewVerificationHappyPathTest(t,
+			true,
+			blockCount,
+			eventRepetition,
+			verificationCollector,
+			mempoolCollector,
+			trials,
+			ops...)
 		<-mempoolCollector.Done()
 	})
 }
@@ -151,12 +166,24 @@ func demo() {
 			// assigner
 			tryRandomCall(vc.OnExecutionReceiptReceived)
 			tryRandomCall(func() {
-				vc.OnChunksAssigned(rand.Int() % 10)
+				vc.OnChunksAssignmentDoneAtAssigner(rand.Int() % 10)
 			})
-			tryRandomCall(vc.OnChunkProcessed)
+			tryRandomCall(vc.OnAssignedChunkProcessedAtAssigner)
 			tryRandomCall(func() {
-				vc.OnAssignerProcessFinalizedBlock(uint64(i))
+				vc.OnFinalizedBlockArrivedAtAssigner(uint64(i))
 			})
+
+			// fetcher
+			tryRandomCall(vc.OnAssignedChunkReceivedAtFetcher)
+			tryRandomCall(vc.OnChunkDataPackRequestSentByFetcher)
+			tryRandomCall(vc.OnChunkDataPackArrivedAtFetcher)
+			tryRandomCall(vc.OnVerifiableChunkSentToVerifier)
+
+			// requester
+			tryRandomCall(vc.OnChunkDataPackRequestReceivedByRequester)
+			tryRandomCall(vc.OnChunkDataPackRequestDispatchedInNetwork)
+			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetwork)
+			tryRandomCall(vc.OnChunkDataPackSentToFetcher)
 
 			// finder
 			tryRandomCall(vc.OnExecutionReceiptReceived)
@@ -168,7 +195,7 @@ func demo() {
 			tryRandomCall(vc.OnVerifiableChunkSent)
 
 			// verifier
-			tryRandomCall(vc.OnVerifiableChunkReceived)
+			tryRandomCall(vc.OnVerifiableChunkReceivedAtVerifierEngine)
 
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
@@ -229,7 +256,7 @@ func demo() {
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
 
-			tryRandomCall(vc.OnResultApproval)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetwork)
 		}
 	})
 }

@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -61,7 +60,7 @@ func main() {
 		rpcConf                      rpc.Config
 		rpcEng                       *rpc.Engine
 		collectionRPC                access.AccessAPIClient
-		executionRPC                 execution.ExecutionAPIClient
+		executionNodeAddress         string // deprecated
 		historicalAccessRPCs         []access.AccessAPIClient
 		err                          error
 		conCache                     *buffer.PendingBlocks // pending block cache for follower
@@ -88,7 +87,7 @@ func main() {
 			flags.StringVarP(&rpcConf.GRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
-			flags.StringVarP(&rpcConf.ExecutionAddr, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+			flags.StringVarP(&executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
 			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
 			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
 			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
@@ -141,27 +140,6 @@ func main() {
 				return err
 			}
 			collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
-			return nil
-		}).
-		Module("execution node client", func(node *cmd.FlowNodeBuilder) error {
-			// execution node address is optional (if not specified, execution nodes will be chosen at random based on blockID)
-			if strings.TrimSpace(rpcConf.ExecutionAddr) == "" {
-				node.Logger.Info().Msg("using a dynamic execution node address")
-				return nil
-			}
-			node.Logger.Info().
-				Str("execution_node", rpcConf.ExecutionAddr).
-				Msg("using the static execution node address")
-
-			executionRPCConn, err := grpc.Dial(
-				rpcConf.ExecutionAddr,
-				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(),
-				backend.WithClientUnaryInterceptor(rpcConf.ExecutionClientTimeout))
-			if err != nil {
-				return err
-			}
-			executionRPC = execution.NewExecutionAPIClient(executionRPCConn)
 			return nil
 		}).
 		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
@@ -224,7 +202,6 @@ func main() {
 				node.Logger,
 				node.State,
 				rpcConf,
-				executionRPC,
 				collectionRPC,
 				historicalAccessRPCs,
 				node.Storage.Blocks,

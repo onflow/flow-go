@@ -141,7 +141,7 @@ func WithConsumer(
 	withConsumer func(*chunkconsumer.ChunkConsumer, *storage.ChunksQueue),
 ) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		maxProcessing := int64(3)
+		maxProcessing := uint64(3)
 
 		processedIndex := storage.NewConsumerProgress(db, module.ConsumeProgressVerificationChunkIndex)
 		chunksQueue := storage.NewChunkQueue(db)
@@ -169,6 +169,18 @@ func WithConsumer(
 type mockChunkProcessor struct {
 	notifier module.ProcessingNotifier
 	process  func(notifier module.ProcessingNotifier, locator *chunks.Locator)
+}
+
+func (e *mockChunkProcessor) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}
+
+func (e *mockChunkProcessor) Done() <-chan struct{} {
+	done := make(chan struct{})
+	close(done)
+	return done
 }
 
 func (e *mockChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {
