@@ -22,7 +22,8 @@ import (
 // to the DKG smart-contract to read broadcast messages.
 const DefaultPollStep = 10
 
-type epochInfo struct {
+// dkgInfo consolidates information about
+type dkgInfo struct {
 	identities      flow.IdentityList
 	phase1FinalView uint64
 	phase2FinalView uint64
@@ -96,7 +97,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 		Logger()
 	log.Info().Msg("EpochSetup received")
 
-	epochInfo, err := e.getNextEpochInfo(firstID)
+	epochInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
@@ -156,7 +157,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
 }
 
-func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
+func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
 	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
 
@@ -180,7 +181,7 @@ func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochIn
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch seed: %w", err)
 	}
-	info := &epochInfo{
+	info := &dkgInfo{
 		identities:      identities,
 		phase1FinalView: phase1Final,
 		phase2FinalView: phase2Final,
