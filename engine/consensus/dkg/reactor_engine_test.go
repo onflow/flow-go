@@ -1,13 +1,11 @@
 package dkg
 
 import (
-	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -53,7 +51,9 @@ func TestEpochSetup(t *testing.T) {
 	blocks := make(map[uint64]*flow.Header)
 	var view uint64
 	for view = 100; view <= 250; view += DefaultPollStep {
-		blocks[view] = &flow.Header{View: view}
+		header := unittest.BlockHeaderFixture()
+		header.View = view
+		blocks[view] = &header
 	}
 	firstBlock := blocks[100]
 
@@ -68,16 +68,9 @@ func TestEpochSetup(t *testing.T) {
 	currentEpoch.On("DKGPhase2FinalView").Return(uint64(200), nil)
 	currentEpoch.On("DKGPhase3FinalView").Return(uint64(250), nil)
 
-	// insert epoch setup in mock state
-	epochSetup := flow.EpochSetup{
-		Counter:      nextCounter,
-		Participants: committee,
-		RandomSource: []byte("random bytes"),
-	}
-
 	nextEpoch := new(protocol.Epoch)
-	nextEpoch.On("Counter").Return(epochSetup.Counter, nil)
-	nextEpoch.On("InitialIdentities").Return(epochSetup.Participants, nil)
+	nextEpoch.On("Counter").Return(nextCounter, nil)
+	nextEpoch.On("InitialIdentities").Return(committee, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentCounter)
 	epochQuery.Add(currentEpoch)
@@ -116,13 +109,14 @@ func TestEpochSetup(t *testing.T) {
 
 	factory := new(module.DKGControllerFactory)
 	factory.On("Create",
-		fmt.Sprintf("dkg-%d", epochSetup.Counter),
+		dkgmodule.CanonicalInstanceID(firstBlock.ChainID, nextCounter),
 		committee,
-		epochSetup.RandomSource).Return(controller, nil)
+		mock.Anything,
+	).Return(controller, nil)
 
 	viewEvents := gadgets.NewViews()
 	engine := NewReactorEngine(
-		zerolog.New(ioutil.Discard),
+		unittest.Logger(),
 		me,
 		state,
 		keyStorage,
@@ -130,7 +124,7 @@ func TestEpochSetup(t *testing.T) {
 		viewEvents,
 	)
 
-	engine.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
+	engine.EpochSetupPhaseStarted(currentCounter, firstBlock)
 
 	for view = 100; view <= 250; view += DefaultPollStep {
 		viewEvents.BlockFinalized(blocks[view])
