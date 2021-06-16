@@ -284,7 +284,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Emulator
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -422,7 +422,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Emulator
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))

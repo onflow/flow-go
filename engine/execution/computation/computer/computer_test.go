@@ -264,9 +264,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// all events should have been collected
 		require.Len(t, result.ServiceEvents, 2)
 
-		//events are ordered
-		require.Equal(t, serviceEventA.EventType.QualifiedIdentifier, string(result.ServiceEvents[0].Type))
-		require.Equal(t, serviceEventB.EventType.QualifiedIdentifier, string(result.ServiceEvents[1].Type))
+		// events are ordered
+		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
+		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
