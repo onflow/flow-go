@@ -217,7 +217,7 @@ func main() {
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
-			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Receipts, seals)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
 			config.EmergencySealingActive = emergencySealing

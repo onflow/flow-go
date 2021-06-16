@@ -29,9 +29,10 @@ type SealingTracker struct {
 	sealsPl    mempool.IncorporatedResultSeals
 }
 
-func NewSealingTracker(log zerolog.Logger, receiptsDB storage.ExecutionReceipts, sealsPl mempool.IncorporatedResultSeals) *SealingTracker {
+func NewSealingTracker(log zerolog.Logger, headersDB storage.Headers, receiptsDB storage.ExecutionReceipts, sealsPl mempool.IncorporatedResultSeals) *SealingTracker {
 	return &SealingTracker{
 		log:        log,
+		headersDB:  headersDB,
 		receiptsDB: receiptsDB,
 		sealsPl:    sealsPl,
 	}
