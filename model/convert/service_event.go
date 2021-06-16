@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/encoding/json"
+	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,9 +19,9 @@ import (
 // state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(chain flow.Chain, event flow.Event) (*flow.ServiceEvent, error) {
 
-	fmt.Println(">>> service event: ", string(event.Payload))
+	log.Debug().Msgf(">>> service event: ", string(event.Payload))
 
-	fmt.Println("setup/commit: ", flow.EventEpochSetup(chain), flow.EventEpochCommit(chain))
+	log.Debug().Msgf("setup/commit: ", flow.EventEpochSetup(chain), flow.EventEpochCommit(chain))
 
 	// depending on type of Epoch event construct Go type
 	switch event.Type {

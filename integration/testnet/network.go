@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -688,9 +689,9 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		RandomSource:       randomSource,
 	}
 
-	fmt.Println("testnet participants:")
+	log.Debug().Msg("testnet participants:")
 	for _, part := range participants {
-		fmt.Println(part.String())
+		log.Debug().Msg(part.String())
 	}
 
 	epochCommit := &flow.EpochCommit{
