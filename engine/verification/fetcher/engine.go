@@ -192,6 +192,9 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 	}
 	if sealed {
 		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
+		e.log.Debug().
+			Hex("chunk_id", logging.ID(chunkID)).
+			Msg("chunk consumer notified of sealed chunk")
 		return false, nil
 	}
 

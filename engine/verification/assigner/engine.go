@@ -118,7 +118,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 //
 // Deduplication of chunk locators is delegated to the chunks queue.
 func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("chunk_id", logging.ID(chunk.ID())).
 		Uint64("chunk_index", chunk.Index).Logger()
@@ -134,7 +134,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)
 	}
 	if !ok {
-		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
+		lg.Debug().Msg("could not push duplicate chunk locator to chunks queue")
 		return false, nil
 	}
 
@@ -142,7 +142,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Info().
+	lg.Info().
 		Uint64("index_in_queue", indexInQueue).
 		Msg("chunk locator successfully pushed to chunks queue")
 
