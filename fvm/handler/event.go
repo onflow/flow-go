@@ -59,7 +59,7 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 	}
 
 	flowEvent := flow.Event{
-		Type:             flow.EventType(event.EventType.QualifiedIdentifier),
+		Type:             flow.EventType(event.EventType.ID()),
 		TransactionID:    txID,
 		TransactionIndex: txIndex,
 		EventIndex:       h.eventCollection.eventCounter,
