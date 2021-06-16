@@ -223,6 +223,18 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConf
 	return c
 }
 
+func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.ViewsInStakingAuction = views
+	}
+}
+
+func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.ViewsInEpoch = views
+	}
+}
+
 func WithClusters(n uint) func(*NetworkConfig) {
 	return func(conf *NetworkConfig) {
 		conf.NClusters = n
