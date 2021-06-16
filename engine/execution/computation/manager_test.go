@@ -172,7 +172,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -196,7 +196,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -220,7 +220,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
