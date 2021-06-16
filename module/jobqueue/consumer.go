@@ -264,7 +264,8 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing uint64, processedIndex uint64) ([]*jobAtIndex, uint64,
+func processableJobs(log zerolog.Logger, jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing uint64,
+	processedIndex uint64) ([]*jobAtIndex, uint64,
 	error) {
 	processables := make([]*jobAtIndex, 0)
 
@@ -280,6 +281,12 @@ func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxPro
 		if !ok {
 			// take one job
 			job, err := jobs.AtIndex(i)
+			log.Debug().
+				Err(err).
+				Uint64("processedIndex", processedIndex).
+				Uint64("processing", processing).
+				Uint64("index", i).
+				Msg("retrieving job")
 
 			// if there is no more job at this index, we could stop
 			if errors.Is(err, storage.ErrNotFound) {
