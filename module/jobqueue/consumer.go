@@ -242,6 +242,7 @@ func (c *Consumer) run() (int64, error) {
 
 func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 	processables, processedTo, err := processableJobs(
+		c.log,
 		c.jobs,
 		c.processings,
 		c.maxProcessing,
