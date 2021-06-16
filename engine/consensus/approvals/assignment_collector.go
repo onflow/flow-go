@@ -153,7 +153,12 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 		return fmt.Errorf("failed to retrieve header of incorporated block %s: %w",
 			incorporatedBlockID, err)
 	}
-	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
+	executedBlock, err := ac.headers.ByBlockID(incorporatedResult.Result.BlockID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve header of incorporatedResult %s: %w",
+			incorporatedResult.Result.BlockID, err)
+	}
+	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
 
 	// Now, we add the ApprovalCollector to the AssignmentCollector:
 	// no-op if an ApprovalCollector has already been added by a different routine

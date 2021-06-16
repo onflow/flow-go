@@ -16,9 +16,6 @@ import (
 	"github.com/onflow/flow-go/network/message"
 )
 
-// the Flow Ping protocol prefix
-const FlowLibP2PPingPrefix = "/flow/ping/"
-
 const maxPingMessageSize = 5 * kb
 
 const pingTimeout = time.Second * 60
@@ -70,7 +67,7 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	defer timer.Stop()
 
 	go func() {
-		log := ps.streamLogger(s)
+		log := streamLogger(ps.logger, s)
 		select {
 		case <-timer.C:
 			// if read or write took longer than configured timeout, then reset the stream
@@ -157,7 +154,7 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 
 	// if ping succeeded, close the stream else reset the stream
 	go func() {
-		log := ps.streamLogger(s)
+		log := streamLogger(ps.logger, s)
 		select {
 		case <-timer.C:
 			// time expired without a response, log an error and reset the stream
@@ -214,11 +211,4 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 	ps.host.Peerstore().RecordLatency(p, rtt)
 
 	return *pingResponse, rtt, nil
-}
-
-func (ps *PingService) streamLogger(s network.Stream) zerolog.Logger {
-	return ps.logger.With().
-		Str("remote", s.Conn().RemoteMultiaddr().String()).
-		Str("protocol", string(s.Protocol())).
-		Logger()
 }

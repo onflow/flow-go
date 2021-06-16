@@ -48,6 +48,7 @@ type EngineMetrics interface {
 
 type ComplianceMetrics interface {
 	FinalizedHeight(height uint64)
+	CommittedEpochFinalView(view uint64)
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
@@ -321,8 +322,8 @@ type ExecutionMetrics interface {
 	// from being received for execution to execution being finished
 	FinishBlockReceivedToExecuted(blockID flow.Identifier)
 
-	// ExecutionGasUsedPerBlock reports gas used per block
-	ExecutionGasUsedPerBlock(gas uint64)
+	// ExecutionComputationUsedPerBlock reports computation used per block
+	ExecutionComputationUsedPerBlock(computation uint64)
 
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)

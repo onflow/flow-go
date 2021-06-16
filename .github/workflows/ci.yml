@@ -4,11 +4,13 @@ on:
   push:
     branches:
       - master
+      - auto-cadence-upgrade/*
       - feature/epochs
       - feature/dkg
   pull_request:
     branches:
       - master
+      - auto-cadence-upgrade/*
       - feature/epochs
       - feature/dkg
 jobs:

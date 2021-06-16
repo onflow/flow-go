@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -22,6 +23,7 @@ import (
 	exeUtils "github.com/onflow/flow-go/engine/execution/utils"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
+	crypto2 "github.com/onflow/flow-go/fvm/crypto"
 	errors "github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -1291,12 +1293,11 @@ func TestSignatureVerification(t *testing.T) {
 		},
 	}
 
-	for _, signatureAlgorithm := range signatureAlgorithms {
-		for _, hashAlgorithm := range hashAlgorithms {
+	testForHash := func(signatureAlgorithm signatureAlgorithm, hashAlgorithm hashAlgorithm) {
 
-			code := []byte(
-				fmt.Sprintf(
-					`
+		code := []byte(
+			fmt.Sprintf(
+				`
                       import Crypto
 
                       pub fun main(
@@ -1331,244 +1332,498 @@ func TestSignatureVerification(t *testing.T) {
                               i = i + 1
                           }
 
-                          return keyList.isValid(
+                          return keyList.verify(
                               signatureSet: signatureSet,
                               signedData: message,
                           )
                       }
                     `,
-					signatureAlgorithm.name,
-					hashAlgorithm.name,
-				),
-			)
+				signatureAlgorithm.name,
+				hashAlgorithm.name,
+			),
+		)
 
-			t.Run(fmt.Sprintf("%s %s", signatureAlgorithm.name, hashAlgorithm.name), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s %s", signatureAlgorithm.name, hashAlgorithm.name), func(t *testing.T) {
 
-				createKey := func() (privateKey crypto.PrivateKey, publicKey cadence.Array) {
-					seed := make([]byte, signatureAlgorithm.seedLength)
+			createKey := func() (privateKey crypto.PrivateKey, publicKey cadence.Array) {
+				seed := make([]byte, signatureAlgorithm.seedLength)
 
-					var err error
+				var err error
 
-					_, err = rand.Read(seed)
-					require.NoError(t, err)
+				_, err = rand.Read(seed)
+				require.NoError(t, err)
 
-					privateKey, err = crypto.GeneratePrivateKey(signatureAlgorithm.algorithm, seed)
-					require.NoError(t, err)
+				privateKey, err = crypto.GeneratePrivateKey(signatureAlgorithm.algorithm, seed)
+				require.NoError(t, err)
 
-					publicKey = testutil.BytesToCadenceArray(
-						privateKey.PublicKey().Encode(),
-					)
+				publicKey = testutil.BytesToCadenceArray(
+					privateKey.PublicKey().Encode(),
+				)
 
-					return privateKey, publicKey
-				}
+				return privateKey, publicKey
+			}
 
-				createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
-					signableMessage = []byte(m)
+			createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
+				signableMessage = []byte(m)
 
-					message = testutil.BytesToCadenceArray(signableMessage)
+				message = testutil.BytesToCadenceArray(signableMessage)
 
-					return signableMessage, message
-				}
+				return signableMessage, message
+			}
 
-				signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
-					message := append(
+			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
+				message := m
+				if hashAlgorithm.name != "KMAC128_BLS_BLS12_381" {
+					message = append(
 						flow.UserDomainTag[:],
 						m...,
 					)
-
-					signature, err := privateKey.Sign(message, hashAlgorithm.newHasher())
-					require.NoError(t, err)
-
-					return testutil.BytesToCadenceArray(signature)
 				}
 
-				t.Run("Single key", newVMTest().run(
-					func(
-						t *testing.T,
-						vm *fvm.VirtualMachine,
-						chain flow.Chain,
-						ctx fvm.Context,
-						view state.View,
-						programs *programs.Programs,
-					) {
-						privateKey, publicKey := createKey()
-						signableMessage, message := createMessage("foo")
-						signature := signMessage(privateKey, signableMessage)
-						weight, _ := cadence.NewUFix64("1.0")
+				signature, err := privateKey.Sign(message, hashAlgorithm.newHasher())
+				require.NoError(t, err)
 
-						publicKeys := cadence.NewArray([]cadence.Value{
-							publicKey,
+				return testutil.BytesToCadenceArray(signature)
+			}
+
+			t.Run("Single key", newVMTest().run(
+				func(
+					t *testing.T,
+					vm *fvm.VirtualMachine,
+					chain flow.Chain,
+					ctx fvm.Context,
+					view state.View,
+					programs *programs.Programs,
+				) {
+					privateKey, publicKey := createKey()
+					signableMessage, message := createMessage("foo")
+					signature := signMessage(privateKey, signableMessage)
+					weight, _ := cadence.NewUFix64("1.0")
+
+					publicKeys := cadence.NewArray([]cadence.Value{
+						publicKey,
+					})
+
+					signatures := cadence.NewArray([]cadence.Value{
+						signature,
+					})
+
+					t.Run("Valid", func(t *testing.T) {
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(publicKeys),
+							jsoncdc.MustEncode(message),
+							jsoncdc.MustEncode(signatures),
+							jsoncdc.MustEncode(weight),
+						)
+
+						err := vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
+
+						assert.Equal(t, cadence.NewBool(true), script.Value)
+					})
+
+					t.Run("Invalid message", func(t *testing.T) {
+						_, invalidRawMessage := createMessage("bar")
+
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(publicKeys),
+							jsoncdc.MustEncode(invalidRawMessage),
+							jsoncdc.MustEncode(signatures),
+							jsoncdc.MustEncode(weight),
+						)
+
+						err := vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
+
+						assert.Equal(t, cadence.NewBool(false), script.Value)
+					})
+
+					t.Run("Invalid signature", func(t *testing.T) {
+						invalidPrivateKey, _ := createKey()
+						invalidRawSignature := signMessage(invalidPrivateKey, signableMessage)
+
+						invalidRawSignatures := cadence.NewArray([]cadence.Value{
+							invalidRawSignature,
 						})
 
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(publicKeys),
+							jsoncdc.MustEncode(message),
+							jsoncdc.MustEncode(invalidRawSignatures),
+							jsoncdc.MustEncode(weight),
+						)
+
+						err := vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
+
+						assert.Equal(t, cadence.NewBool(false), script.Value)
+					})
+
+					t.Run("Malformed public key", func(t *testing.T) {
+						invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
+
+						invalidPublicKeys := cadence.NewArray([]cadence.Value{
+							invalidPublicKey,
+						})
+
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(invalidPublicKeys),
+							jsoncdc.MustEncode(message),
+							jsoncdc.MustEncode(signatures),
+							jsoncdc.MustEncode(weight),
+						)
+
+						err := vm.Run(ctx, script, view, programs)
+						require.NoError(t, err)
+						require.Error(t, script.Err)
+					})
+				},
+			))
+
+			t.Run("Multiple keys", newVMTest().run(
+				func(
+					t *testing.T,
+					vm *fvm.VirtualMachine,
+					chain flow.Chain,
+					ctx fvm.Context,
+					view state.View,
+					programs *programs.Programs,
+				) {
+					privateKeyA, publicKeyA := createKey()
+					privateKeyB, publicKeyB := createKey()
+					privateKeyC, publicKeyC := createKey()
+
+					publicKeys := cadence.NewArray([]cadence.Value{
+						publicKeyA,
+						publicKeyB,
+						publicKeyC,
+					})
+
+					signableMessage, message := createMessage("foo")
+
+					signatureA := signMessage(privateKeyA, signableMessage)
+					signatureB := signMessage(privateKeyB, signableMessage)
+					signatureC := signMessage(privateKeyC, signableMessage)
+
+					weight, _ := cadence.NewUFix64("0.5")
+
+					t.Run("3 of 3", func(t *testing.T) {
 						signatures := cadence.NewArray([]cadence.Value{
-							signature,
+							signatureA,
+							signatureB,
+							signatureC,
 						})
 
-						t.Run("Valid", func(t *testing.T) {
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(publicKeys),
-								jsoncdc.MustEncode(message),
-								jsoncdc.MustEncode(signatures),
-								jsoncdc.MustEncode(weight),
-							)
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(publicKeys),
+							jsoncdc.MustEncode(message),
+							jsoncdc.MustEncode(signatures),
+							jsoncdc.MustEncode(weight),
+						)
 
-							err := vm.Run(ctx, script, view, programs)
-							assert.NoError(t, err)
-							assert.NoError(t, script.Err)
+						err := vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
 
-							assert.Equal(t, cadence.NewBool(true), script.Value)
+						assert.Equal(t, cadence.NewBool(true), script.Value)
+					})
+
+					t.Run("2 of 3", func(t *testing.T) {
+						signatures := cadence.NewArray([]cadence.Value{
+							signatureA,
+							signatureB,
 						})
 
-						t.Run("Invalid message", func(t *testing.T) {
-							_, invalidRawMessage := createMessage("bar")
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(publicKeys),
+							jsoncdc.MustEncode(message),
+							jsoncdc.MustEncode(signatures),
+							jsoncdc.MustEncode(weight),
+						)
 
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(publicKeys),
-								jsoncdc.MustEncode(invalidRawMessage),
-								jsoncdc.MustEncode(signatures),
-								jsoncdc.MustEncode(weight),
-							)
+						err := vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
 
-							err := vm.Run(ctx, script, view, programs)
-							assert.NoError(t, err)
-							assert.NoError(t, script.Err)
+						assert.Equal(t, cadence.NewBool(true), script.Value)
+					})
 
-							assert.Equal(t, cadence.NewBool(false), script.Value)
+					t.Run("1 of 3", func(t *testing.T) {
+						signatures := cadence.NewArray([]cadence.Value{
+							signatureA,
 						})
 
-						t.Run("Invalid signature", func(t *testing.T) {
-							invalidPrivateKey, _ := createKey()
-							invalidRawSignature := signMessage(invalidPrivateKey, signableMessage)
+						script := fvm.Script(code).WithArguments(
+							jsoncdc.MustEncode(publicKeys),
+							jsoncdc.MustEncode(message),
+							jsoncdc.MustEncode(signatures),
+							jsoncdc.MustEncode(weight),
+						)
 
-							invalidRawSignatures := cadence.NewArray([]cadence.Value{
-								invalidRawSignature,
-							})
+						err := vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
 
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(publicKeys),
-								jsoncdc.MustEncode(message),
-								jsoncdc.MustEncode(invalidRawSignatures),
-								jsoncdc.MustEncode(weight),
-							)
+						assert.Equal(t, cadence.NewBool(false), script.Value)
+					})
+				},
+			))
+		})
+	}
 
-							err := vm.Run(ctx, script, view, programs)
-							assert.NoError(t, err)
-							assert.NoError(t, script.Err)
-
-							assert.Equal(t, cadence.NewBool(false), script.Value)
-						})
-
-						t.Run("Malformed public key", func(t *testing.T) {
-							invalidPublicKey := testutil.BytesToCadenceArray([]byte{1, 2, 3})
-
-							invalidPublicKeys := cadence.NewArray([]cadence.Value{
-								invalidPublicKey,
-							})
-
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(invalidPublicKeys),
-								jsoncdc.MustEncode(message),
-								jsoncdc.MustEncode(signatures),
-								jsoncdc.MustEncode(weight),
-							)
-
-							err := vm.Run(ctx, script, view, programs)
-							require.NoError(t, err)
-							require.Error(t, script.Err)
-						})
-					},
-				))
-
-				t.Run("Multiple keys", newVMTest().run(
-					func(
-						t *testing.T,
-						vm *fvm.VirtualMachine,
-						chain flow.Chain,
-						ctx fvm.Context,
-						view state.View,
-						programs *programs.Programs,
-					) {
-						privateKeyA, publicKeyA := createKey()
-						privateKeyB, publicKeyB := createKey()
-						privateKeyC, publicKeyC := createKey()
-
-						publicKeys := cadence.NewArray([]cadence.Value{
-							publicKeyA,
-							publicKeyB,
-							publicKeyC,
-						})
-
-						signableMessage, message := createMessage("foo")
-
-						signatureA := signMessage(privateKeyA, signableMessage)
-						signatureB := signMessage(privateKeyB, signableMessage)
-						signatureC := signMessage(privateKeyC, signableMessage)
-
-						weight, _ := cadence.NewUFix64("0.5")
-
-						t.Run("3 of 3", func(t *testing.T) {
-							signatures := cadence.NewArray([]cadence.Value{
-								signatureA,
-								signatureB,
-								signatureC,
-							})
-
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(publicKeys),
-								jsoncdc.MustEncode(message),
-								jsoncdc.MustEncode(signatures),
-								jsoncdc.MustEncode(weight),
-							)
-
-							err := vm.Run(ctx, script, view, programs)
-							assert.NoError(t, err)
-							assert.NoError(t, script.Err)
-
-							assert.Equal(t, cadence.NewBool(true), script.Value)
-						})
-
-						t.Run("2 of 3", func(t *testing.T) {
-							signatures := cadence.NewArray([]cadence.Value{
-								signatureA,
-								signatureB,
-							})
-
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(publicKeys),
-								jsoncdc.MustEncode(message),
-								jsoncdc.MustEncode(signatures),
-								jsoncdc.MustEncode(weight),
-							)
-
-							err := vm.Run(ctx, script, view, programs)
-							assert.NoError(t, err)
-							assert.NoError(t, script.Err)
-
-							assert.Equal(t, cadence.NewBool(true), script.Value)
-						})
-
-						t.Run("1 of 3", func(t *testing.T) {
-							signatures := cadence.NewArray([]cadence.Value{
-								signatureA,
-							})
-
-							script := fvm.Script(code).WithArguments(
-								jsoncdc.MustEncode(publicKeys),
-								jsoncdc.MustEncode(message),
-								jsoncdc.MustEncode(signatures),
-								jsoncdc.MustEncode(weight),
-							)
-
-							err := vm.Run(ctx, script, view, programs)
-							assert.NoError(t, err)
-							assert.NoError(t, script.Err)
-
-							assert.Equal(t, cadence.NewBool(false), script.Value)
-						})
-					},
-				))
-			})
+	for _, signatureAlgorithm := range signatureAlgorithms {
+		for _, hashAlgorithm := range hashAlgorithms {
+			testForHash(signatureAlgorithm, hashAlgorithm)
 		}
+	}
+
+	testForHash(signatureAlgorithm{
+		"BLS_BLS12_381",
+		crypto.KeyGenSeedMinLenBLSBLS12381,
+		crypto.BLSBLS12381,
+	}, hashAlgorithm{
+		"KMAC128_BLS_BLS12_381",
+		func() hash.Hasher {
+			return crypto.NewBLSKMAC(flow.UserTagString)
+		},
+	})
+}
+
+func TestHashing(t *testing.T) {
+
+	t.Parallel()
+
+	rt := fvm.NewInterpreterRuntime()
+
+	chain := flow.Mainnet.Chain()
+
+	vm := fvm.NewVirtualMachine(rt)
+
+	ctx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(chain),
+		fvm.WithCadenceLogging(true),
+	)
+
+	ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+	hashScript := func(hashName string) []byte {
+		return []byte(fmt.Sprintf(
+			`
+				import Crypto
+				
+				pub fun main(data: [UInt8]): [UInt8] {
+					return Crypto.hash(data, algorithm: HashAlgorithm.%s)
+				}
+			`, hashName))
+	}
+	hashWithTagScript := func(hashName string) []byte {
+		return []byte(fmt.Sprintf(
+			`
+				import Crypto
+				
+				pub fun main(data: [UInt8], tag: String): [UInt8] {
+					return Crypto.hashWithTag(data, tag: tag, algorithm: HashAlgorithm.%s)
+				}
+			`, hashName))
+	}
+
+	data := []byte("some random message")
+	encodedBytes := make([]cadence.Value, len(data))
+	for i := range encodedBytes {
+		encodedBytes[i] = cadence.NewUInt8(data[i])
+	}
+	cadenceData := jsoncdc.MustEncode(cadence.NewArray(encodedBytes))
+
+	// ===== Test Cases =====
+	cases := []struct {
+		Algo    runtime.HashAlgorithm
+		WithTag bool
+		Tag     string
+		Check   func(t *testing.T, result string, scriptErr errors.Error, executionErr error)
+	}{
+		{
+			Algo:    runtime.HashAlgorithmSHA2_256,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "68fb87dfba69b956f4ba98b748a75a604f99b38a4f2740290037957f7e830da8", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA2_384,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "a9b3e62ab9b2a33020e015f245b82e063afd1398211326408bc8fc31c2c15859594b0aee263fbb02f6d8b5065ad49df2", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA3_256,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "38effea5ab9082a2cb0dc9adfafaf88523e8f3ce74bfbeac85ffc719cc2c4677", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA3_384,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "f41e8de9af0c1f46fc56d5a776f1bd500530879a85f3b904821810295927e13a54f3e936dddb84669021052eb12966c3", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA2_256,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "4e07609b9a856a5e10703d1dba73be34d9ca0f4e780859d66983f41d746ec8b2", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA2_384,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "f9bd89e15f341a225656944dc8b3c405e66a0f97838ad44c9803164c911e677aea7ad4e24486fba3f803d83ed1ccfce5", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA3_256,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "f59e2ccc9d7f008a96948a31573670d9976a4a161601ab1cd1d2da019779a0f6", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmSHA3_384,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "e7875eafdb53327faeace8478d1650c6547d04fb4fb42f34509ad64bde0267bea7e1b3af8fda3ef9d9c9327dd4e97a96", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+			WithTag: false,
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "627d7e8fe50384601ca550ceecb61c23e9cbde7feb75ae6b53227f128f2dc3b78b543a044058403e4822f88cb7040d90d588c9e8575f0de3012fe7edaf02b9997a8a5fad234d21b2af359ec3abaeaf4a7ef60e5f04623a983bd5e071f4113678710e910d48ac4d1713073a707ab9057867e0ba32aca6b33010b1d20b8006dd25", result)
+			},
+		},
+		{
+			Algo:    runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+			WithTag: true,
+			Tag:     "some_tag",
+			Check: func(t *testing.T, result string, scriptErr errors.Error, executionErr error) {
+				require.NoError(t, scriptErr)
+				require.NoError(t, executionErr)
+				require.Equal(t, "dc6889f9ca46803a9c7759068989dfc3cffe632fd991e25f6589603c73b7891e2f4736eebe5248f211bbddaa3d763b1b9318185eaf3ab3bfd6f159f345c3148795e4ff3ad376c98d5616febebcf4520ca2a83dda4be2f98b1ead9fb5a622355305b156e06db173a9e1d7af973b11acc1e714cd3aa0fb367dfaadc5a957b4742b", result)
+			},
+		},
+	}
+	// ======================
+
+	for i, c := range cases {
+		t.Run(fmt.Sprintf("case %d: %s with tag: %v", i, c.Algo, c.WithTag), func(t *testing.T) {
+			code := hashScript(c.Algo.Name())
+			if c.WithTag {
+				code = hashWithTagScript(c.Algo.Name())
+			}
+
+			script := fvm.Script(code)
+
+			if c.WithTag {
+				script = script.WithArguments(
+					cadenceData,
+					jsoncdc.MustEncode(cadence.String(c.Tag)),
+				)
+			} else {
+				script = script.WithArguments(
+					cadenceData,
+				)
+			}
+
+			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+
+			byteResult := make([]byte, 0)
+			if err == nil && script.Err == nil {
+				cadenceArray := script.Value.(cadence.Array)
+				for _, value := range cadenceArray.Values {
+					byteResult = append(byteResult, value.(cadence.UInt8).ToGoValue().(uint8))
+				}
+			}
+
+			c.Check(t, hex.EncodeToString(byteResult), script.Err, err)
+		})
+	}
+
+	hashAlgos := []runtime.HashAlgorithm{
+		runtime.HashAlgorithmSHA2_256,
+		runtime.HashAlgorithmSHA3_256,
+		runtime.HashAlgorithmSHA2_384,
+		runtime.HashAlgorithmSHA3_384,
+		runtime.HashAlgorithmKMAC128_BLS_BLS12_381,
+	}
+
+	for i, algo := range hashAlgos {
+		t.Run(fmt.Sprintf("compare hash results without tag %v: %v", i, algo), func(t *testing.T) {
+			code := hashWithTagScript(algo.Name())
+			script := fvm.Script(code)
+			script = script.WithArguments(
+				cadenceData,
+				jsoncdc.MustEncode(cadence.String("")),
+			)
+			err := vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.NoError(t, script.Err)
+
+			result1 := make([]byte, 0)
+			cadenceArray := script.Value.(cadence.Array)
+			for _, value := range cadenceArray.Values {
+				result1 = append(result1, value.(cadence.UInt8).ToGoValue().(uint8))
+			}
+
+			code = hashScript(algo.Name())
+			script = fvm.Script(code)
+			script = script.WithArguments(
+				cadenceData,
+			)
+			err = vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+			require.NoError(t, err)
+			require.NoError(t, script.Err)
+
+			result2 := make([]byte, 0)
+			cadenceArray = script.Value.(cadence.Array)
+			for _, value := range cadenceArray.Values {
+				result2 = append(result2, value.(cadence.UInt8).ToGoValue().(uint8))
+			}
+
+			result3, err := crypto2.HashWithTag(crypto2.RuntimeToCryptoHashingAlgorithm(algo), "", data)
+			require.NoError(t, err)
+
+			require.Equal(t, result1, result2)
+			require.Equal(t, result1, result3)
+		})
 	}
 }
 
