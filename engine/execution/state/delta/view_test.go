@@ -574,6 +574,8 @@ func TestView_Reads(t *testing.T) {
 }
 
 func hashIt(spock hash.Hasher, value []byte) {
+	// spock.Write() is not supposed to error, at least in the current implementation.
+	// If it does, the panic below should flag the error.
 	_, err := spock.Write(value)
 	if err != nil {
 		panic(err)
