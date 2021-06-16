@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"

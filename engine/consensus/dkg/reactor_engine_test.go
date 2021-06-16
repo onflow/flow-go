@@ -5,12 +5,12 @@ import (
 	"testing"
 	"time"
 
-	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -20,7 +20,7 @@ import (
 )
 
 // TestEpochSetup ensures that, upon receiving an EpochSetup event, the engine
-// correclty creates a new DKGController and registers phase transitions based
+// correctly creates a new DKGController and registers phase transitions based
 // on the views specified in the current epoch, as well as regular calls to the
 // DKG smart-contract.
 //
