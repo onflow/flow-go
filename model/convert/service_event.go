@@ -16,15 +16,17 @@ import (
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
-func ServiceEvent(event flow.Event) (*flow.ServiceEvent, error) {
+func ServiceEvent(chain flow.Chain, event flow.Event) (*flow.ServiceEvent, error) {
 
 	fmt.Println(">>> service event: ", string(event.Payload))
 
+	fmt.Println("setup/commit: ", flow.EventEpochSetup(chain), flow.EventEpochCommit(chain))
+
 	// depending on type of Epoch event construct Go type
 	switch event.Type {
-	case flow.EventEpochSetup:
+	case flow.EventEpochSetup(chain):
 		return convertServiceEventEpochSetup(event)
-	case flow.EventEpochCommit:
+	case flow.EventEpochCommit(chain):
 		return convertServiceEventEpochCommit(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
