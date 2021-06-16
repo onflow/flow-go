@@ -78,7 +78,6 @@ func TestEpochSetup(t *testing.T) {
 	nextEpoch := new(protocol.Epoch)
 	nextEpoch.On("Counter").Return(epochSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(epochSetup.Participants, nil)
-	nextEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(epochSetup.RandomSource, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentCounter)
 	epochQuery.Add(currentEpoch)
