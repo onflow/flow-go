@@ -19,7 +19,7 @@ import (
 // TODO:
 //   * This value is for the happy path (requires just one approval per chunk).
 //   * Full protocol should be +2/3 of all currently staked verifiers.
-const DefaultRequiredApprovalsForSealValidation = 0
+const DefaultRequiredApprovalsForSealValidation = 3
 
 // sealValidator holds all needed context for checking seal
 // validity against current protocol state.
