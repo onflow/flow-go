@@ -23,7 +23,7 @@ import (
 // to the DKG smart-contract to read broadcast messages.
 const DefaultPollStep = 10
 
-// dkgInfo consolidates information about
+// dkgInfo consolidates information about the current DKG protocol instance.
 type dkgInfo struct {
 	identities      flow.IdentityList
 	phase1FinalView uint64
@@ -98,24 +98,24 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 		Logger()
 	log.Info().Msg("EpochSetup received")
 
-	epochInfo, err := e.getDKGInfo(firstID)
+	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
-	committee := epochInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
+	committee := curDKGInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
 
 	e.log.Info().
-		Uint64("phase1", epochInfo.phase1FinalView).
-		Uint64("phase2", epochInfo.phase2FinalView).
-		Uint64("phase3", epochInfo.phase3FinalView).
+		Uint64("phase1", curDKGInfo.phase1FinalView).
+		Uint64("phase2", curDKGInfo.phase2FinalView).
+		Uint64("phase3", curDKGInfo.phase3FinalView).
 		Interface("members", committee.NodeIDs()).
 		Msg("epoch info")
 
 	controller, err := e.controllerFactory.Create(
 		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
 		committee,
-		epochInfo.seed,
+		curDKGInfo.seed,
 	)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not create DKG controller")
@@ -142,20 +142,20 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 	// specifications and implementations of the DKGBroker and DKGController
 	// interfaces).
 
-	for view := epochInfo.phase1FinalView; view > first.View; view -= e.pollStep {
+	for view := curDKGInfo.phase1FinalView; view > first.View; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase1FinalView, dkgmodule.Phase1, e.controller.EndPhase1)
+	e.registerPhaseTransition(curDKGInfo.phase1FinalView, dkgmodule.Phase1, e.controller.EndPhase1)
 
-	for view := epochInfo.phase2FinalView; view > epochInfo.phase1FinalView; view -= e.pollStep {
+	for view := curDKGInfo.phase2FinalView; view > curDKGInfo.phase1FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase2FinalView, dkgmodule.Phase2, e.controller.EndPhase2)
+	e.registerPhaseTransition(curDKGInfo.phase2FinalView, dkgmodule.Phase2, e.controller.EndPhase2)
 
-	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
+	for view := curDKGInfo.phase3FinalView; view > curDKGInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
+	e.registerPhaseTransition(curDKGInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
 }
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
