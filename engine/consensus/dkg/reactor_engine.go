@@ -1,9 +1,10 @@
 package dkg
 
 import (
+	"crypto/rand"
 	"fmt"
 
-	"github.com/onflow/flow-go/model/indices"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -177,10 +178,12 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch phase 3 final view: %w", err)
 	}
-	seed, err := nextEpoch.Seed(indices.ProtocolConsensusDKG...)
+	seed := make([]byte, crypto.SeedMinLenDKG)
+	_, err = rand.Read(seed)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch seed: %w", err)
+		return nil, fmt.Errorf("could not generate random seed: %w", err)
 	}
+
 	info := &dkgInfo{
 		identities:      identities,
 		phase1FinalView: phase1Final,
