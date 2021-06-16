@@ -214,6 +214,7 @@ func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 // streamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
 func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
 	logger := log.With().
+		Str("protocol", string(stream.Protocol())).
 		Str("remote_peer", stream.Conn().RemotePeer().String()).
 		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
 		Str("local_peer", stream.Conn().LocalPeer().String()).

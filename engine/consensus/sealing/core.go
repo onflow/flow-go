@@ -55,6 +55,7 @@ func DefaultConfig() Config {
 // 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type Core struct {
+	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
 	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
 	counterLastSealedHeight    counters.StrictMonotonousCounter   // monotonous counter for last sealed block height
@@ -65,7 +66,6 @@ type Core struct {
 	sealsMempool               mempool.IncorporatedResultSeals    // used by tracker.SealingObservation to log info
 	requestTracker             *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
 	metrics                    module.ConsensusMetrics            // used to track consensus metrics
-	log                        zerolog.Logger                     // used to log relevant actions with context
 	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
 	config                     Config
@@ -495,8 +495,8 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	c.requestTracker.Remove(pruned...) // remove all pending items that we might have requested
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune mempool with candidate seals
-	if err != nil {
-		return fmt.Errorf("could not prune seals mempool at up to sealed height %d: %w", lastSealed.Height, err)
+	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+		return fmt.Errorf("could not prune seals mempool at block %v, by height: %v: %w", finalizedBlockID, lastSealed.Height, err)
 	}
 	pruningSpan.Finish()
 
