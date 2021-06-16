@@ -2,7 +2,6 @@ package approvals
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"sync"
 
@@ -10,7 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -124,9 +123,12 @@ func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, f
 	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
 
-func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
+// CheckEmergencySealing checks the managed assignments whether their result can be emergency
+// sealed. Seals the results where possible.
+func (ac *AssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
 	for _, collector := range ac.allCollectors() {
 		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
+		observer.QualifiesForEmergencySealing(collector.IncorporatedResult(), sealable)
 		if sealable {
 			err := collector.SealResult()
 			if err != nil {
@@ -312,20 +314,17 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 // RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
 // approvals from verifiers.
 // Returns number of requests made and error in case something goes wrong.
-func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingObservation, maxHeightForRequesting uint64) (int, error) {
-	requestCount := 0
+func (ac *AssignmentCollector) RequestMissingApprovals(observation consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error) {
+	overallRequestCount := uint(0) // number of approval requests for all different assignments for this result
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
 			continue
 		}
 
-		firstChunkWithMissingApproval := uint64(math.MaxUint64)
 		missingChunks := collector.CollectMissingVerifiers()
+		observation.ApprovalsMissing(collector.IncorporatedResult(), missingChunks)
+		requestCount := uint(0)
 		for chunkIndex, verifiers := range missingChunks {
-			if firstChunkWithMissingApproval < chunkIndex {
-				firstChunkWithMissingApproval = chunkIndex
-			}
-
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
@@ -362,13 +361,11 @@ func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.S
 			}
 		}
 
-		if sealingTracker != nil && len(missingChunks) > 0 {
-			sealingRecord := tracker.NewRecordWithInsufficientApprovals(collector.incorporatedResult, firstChunkWithMissingApproval)
-			sealingTracker.Track(sealingRecord)
-		}
-
+		observation.ApprovalsRequested(collector.IncorporatedResult(), requestCount)
+		overallRequestCount += requestCount
 	}
-	return requestCount, nil
+
+	return overallRequestCount, nil
 }
 
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.

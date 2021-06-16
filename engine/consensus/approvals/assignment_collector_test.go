@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -425,7 +426,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 
 	// checking emergency sealing with current height
 	// should early exit without creating any seals
-	err = s.collector.CheckEmergencySealing(s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.sealsPL.On("Add", mock.Anything).Run(
@@ -436,7 +437,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 		},
 	).Return(true, nil).Once()
 
-	err = s.collector.CheckEmergencySealing(DefaultEmergencySealingThreshold + s.IncorporatedBlock.Height)
+	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThreshold+s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
 	s.sealsPL.AssertExpectations(s.T())

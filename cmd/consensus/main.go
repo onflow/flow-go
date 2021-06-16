@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
@@ -191,8 +190,7 @@ func main() {
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
+			resultSeals := stdmap.NewIncorporatedResultSeals(sealLimit)
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
@@ -368,7 +366,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				approvals.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),

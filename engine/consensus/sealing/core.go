@@ -11,8 +11,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
-	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -55,7 +55,6 @@ func DefaultConfig() Config {
 // 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type Core struct {
-	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
 	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
 	counterLastSealedHeight    counters.StrictMonotonousCounter   // monotonous counter for last sealed block height
@@ -66,6 +65,8 @@ type Core struct {
 	sealsMempool               mempool.IncorporatedResultSeals    // used by tracker.SealingObservation to log info
 	requestTracker             *approvals.RequestTracker          // used to keep track of number of approval requests, and blackout periods, by chunk
 	metrics                    module.ConsensusMetrics            // used to track consensus metrics
+	log                        zerolog.Logger                     // used to log relevant actions with context
+	sealingTracker             consensus.SealingTracker           // logic-aware component for tracking sealing progress.
 	tracer                     module.Tracer                      // used to trace execution
 	config                     Config
 }
@@ -391,7 +392,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 	return nil
 }
 
-func (c *Core) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint64) error {
+func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
 	if !c.config.EmergencySealingActive {
 		return nil
 	}
@@ -410,7 +411,7 @@ func (c *Core) checkEmergencySealing(lastSealedHeight, lastFinalizedHeight uint6
 	// collectors tree stores collector by executed block height
 	// we need to select multiple levels to find eligible collectors for emergency sealing
 	for _, collector := range c.collectorTree.GetCollectorsByInterval(lastSealedHeight, lastSealedHeight+delta) {
-		err := collector.CheckEmergencySealing(lastFinalizedHeight)
+		err := collector.CheckEmergencySealing(observer, lastFinalizedHeight)
 		if err != nil {
 			return err
 		}
@@ -437,7 +438,9 @@ func (c *Core) processPendingApprovals(collector *approvals.AssignmentCollector)
 	return nil
 }
 
-// ProcessFinalizedBlock processes finalization events in blocking way. Concurrency safe.
+// ProcessFinalizedBlock processes finalization events in blocking way. The entire business
+// logic in this function can be executed completely concurrently. We only waste some work
+// if multiple goroutines enter the following block.
 // Returns:
 // * exception in case of unexpected error
 // * nil - successfully processed finalized block
@@ -445,16 +448,21 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	processFinalizedBlockSpan := c.tracer.StartSpan(finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
 	defer processFinalizedBlockSpan.Finish()
 
+	// STEP 0: Collect auxiliary information
+	// ------------------------------------------------------------------------
+	// retrieve finalized block's header; update last finalized height and bail
+	// if another goroutine is already ahead with a higher finalized block
 	finalized, err := c.headers.ByBlockID(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve header for finalized block %s", finalizedBlockID)
 	}
-
-	// update last finalized height, counter will return false if there is already a bigger value
 	if !c.counterLastFinalizedHeight.Set(finalized.Height) {
 		return nil
 	}
 
+	// retrieve latest seal in the fork with head finalizedBlock and update last
+	// sealed height; we do _not_ bail, because we want to re-request approvals
+	// especially, when sealing is stuck, i.e. last sealed height does not increase
 	seal, err := c.seals.ByBlockID(finalizedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve seal for finalized block %s", finalizedBlockID)
@@ -463,45 +471,61 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	if err != nil {
 		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
 	}
+	c.counterLastSealedHeight.Set(lastSealed.Height)
 
+	// STEP 1: Pruning
+	// ------------------------------------------------------------------------
 	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
 
-	c.counterLastSealedHeight.Set(lastSealed.Height)
+	pruningSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingPruning)
+	err = c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed) // stop collecting approvals for orphan collectors
+	if err != nil {
+		pruningSpan.Finish()
+		return fmt.Errorf("collectors tree could not finalize fork: %w", err)
+	}
+
+	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height) // prune AssignmentCollectorTree
+	if err != nil {
+		pruningSpan.Finish()
+		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
+	}
+
+	c.requestTracker.Remove(pruned...) // remove all pending items that we might have requested
+
+	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune mempool with candidate seals
+	if err != nil {
+		return fmt.Errorf("could not prune seals mempool at up to sealed height %d: %w", lastSealed.Height, err)
+	}
+	pruningSpan.Finish()
+
+	// STEP 2: Check emergency sealing and re-request missing approvals
+	// ------------------------------------------------------------------------
+	sealingObservation := c.sealingTracker.NewSealingObservation(finalized, seal, lastSealed)
 
 	checkEmergencySealingSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingCheckForEmergencySealableBlocks)
 	// check if there are stale results qualified for emergency sealing
-	err = c.checkEmergencySealing(lastSealed.Height, finalized.Height)
+	err = c.checkEmergencySealing(sealingObservation, lastSealed.Height, finalized.Height)
 	checkEmergencySealingSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not check emergency sealing at block %v", finalizedBlockID)
 	}
 
-	updateCollectorTreeSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingUpdateAssignmentCollectorTree)
-	// finalize forks to stop collecting approvals for orphan collectors
-	err = c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed)
-	if err != nil {
-		updateCollectorTreeSpan.Finish()
-		return fmt.Errorf("collectors tree could not finalize fork: %w", err)
-	}
-
-	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
-	}
-	c.requestTracker.Remove(pruned...) // remove all pending items that we might have requested
-	updateCollectorTreeSpan.Finish()
-
-	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune seals mempool at up to sealed height %d: %w", lastSealed.Height, err)
-	}
-
 	requestPendingApprovalsSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingRequestingPendingApproval)
-	err = c.requestPendingApprovals(lastSealed.Height, finalized.Height)
+	err = c.requestPendingApprovals(sealingObservation, lastSealed.Height, finalized.Height)
 	requestPendingApprovalsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("internal error while requesting pending approvals: %w", err)
 	}
+
+	// While SealingObservation is not intrinsically concurrency safe, running the following operation
+	// asynchronously is still safe for the following reason:
+	// * The `sealingObservation` is thread-local: created and mutated only by this goroutine.
+	// * According to the go spec: the statement that starts a new goroutine happens before the
+	//   goroutine's execution begins. Hence, the goroutine executing the Complete() call
+	//   observes the latest state of `sealingObservation`.
+	// * The `sealingObservation` lives in the scope of this function. Hence, when this goroutine exits
+	//   this function, `sealingObservation` lives solely in the scope of the newly-created goroutine.
+	go sealingObservation.Complete()
 
 	return nil
 }
@@ -517,25 +541,17 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 //                              |                   |
 // ... <-- A <-- A+1 <- ... <-- D <-- D+1 <- ... -- F
 //       sealed       maxHeightForRequesting      final
-func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uint64) error {
-	// skip requesting approvals if they are not required for sealing
-	if c.config.RequiredApprovalsForSealConstruction == 0 {
-		return nil
-	}
-
+func (c *Core) requestPendingApprovals(observation consensus.SealingObservation, lastSealedHeight, lastFinalizedHeight uint64) error {
 	if lastSealedHeight+c.config.ApprovalRequestsThreshold >= lastFinalizedHeight {
 		return nil
 	}
-
-	startTime := time.Now()
-	sealingTracker := tracker.NewSealingTracker(c.state)
 
 	// Reaching the following code implies:
 	// 0 <= sealed.Height < final.Height - ApprovalRequestsThreshold
 	// Hence, the following operation cannot underflow
 	maxHeightForRequesting := lastFinalizedHeight - c.config.ApprovalRequestsThreshold
 
-	pendingApprovalRequests := 0
+	pendingApprovalRequests := uint(0)
 	collectors := c.collectorTree.GetCollectorsByInterval(lastSealedHeight, maxHeightForRequesting)
 	for _, collector := range collectors {
 		// Note:
@@ -547,23 +563,12 @@ func (c *Core) requestPendingApprovals(lastSealedHeight, lastFinalizedHeight uin
 		//   filtering based on the executed block height is a useful pre-filter, but not quite
 		//   precise enough.
 		// * The `AssignmentCollector` will apply the precise filter to avoid unnecessary overhead.
-		requestCount, err := collector.RequestMissingApprovals(sealingTracker, maxHeightForRequesting)
+		requestCount, err := collector.RequestMissingApprovals(observation, maxHeightForRequesting)
 		if err != nil {
 			return err
 		}
 		pendingApprovalRequests += requestCount
 	}
-
-	c.log.Info().
-		Str("next_unsealed_results", sealingTracker.String()).
-		Bool("mempool_has_seal_for_next_height", sealingTracker.MempoolHasNextSeal(c.sealsMempool)).
-		Uint("seals_size", c.sealsMempool.Size()).
-		Uint64("last_sealed_height", lastSealedHeight).
-		Uint64("last_finalized_height", lastFinalizedHeight).
-		Int("pending_collectors", len(collectors)).
-		Int("pending_approval_requests", pendingApprovalRequests).
-		Int64("duration_ms", time.Since(startTime).Milliseconds()).
-		Msg("requested pending approvals successfully")
 
 	return nil
 }

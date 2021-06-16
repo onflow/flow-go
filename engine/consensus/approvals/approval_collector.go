@@ -3,11 +3,12 @@ package approvals
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/rs/zerolog"
 )
 
 // ApprovalCollector is responsible for distributing work to chunk collectorTree,
