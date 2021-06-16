@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/epochs"
 )
 
 func constructRootResultAndSeal(
@@ -19,7 +18,6 @@ func constructRootResultAndSeal(
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
 	dkgData dkg.DKGData,
-	epochConfig epochs.EpochConfig,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
