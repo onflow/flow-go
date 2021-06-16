@@ -24,7 +24,7 @@ const GenesisStateCommitmentHex = "a2066fa3d9202dab99b0c0e3d6479552cbf967d97666a
 var GenesisStateCommitment flow.StateCommitment
 
 var GenesisTokenSupply = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("100000000000.00000000") // 100 billion
+	value, err := cadence.NewUFix64("10000000000.0") // 10 billion
 	if err != nil {
 		panic(fmt.Errorf("invalid genesis token supply: %w", err))
 	}
