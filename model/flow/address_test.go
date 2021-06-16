@@ -191,7 +191,7 @@ func testAddressGeneration(t *testing.T) {
 		check := chain.IsValid(invalidAddress)
 		assert.False(t, check, "account address format should be invalid")
 		r = uint64(rand.Intn(maxIndex - loop))
-		
+
 		state = chain.newAddressGeneratorAtIndex(r)
 		for i := 0; i < loop; i++ {
 			address, err := state.NextAddress()
