@@ -539,7 +539,6 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	}
 
 	e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
-	e.metrics.ExecutionComputationUsedPerBlock(computationResult.ComputationUsed)
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
@@ -591,6 +590,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
+
+	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.ComputationUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
@@ -1019,9 +1020,6 @@ func (e *Engine) handleComputationResult(
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
-
-	// There is one result per transaction
-	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResults))
 
 	receipt, err := e.saveExecutionResults(
 		ctx,
