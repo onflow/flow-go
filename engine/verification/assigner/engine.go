@@ -129,7 +129,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 	}
 
 	// pushes chunk locator to the chunks queue
-	ok, err := e.chunksQueue.StoreChunkLocator(locator)
+	ok, indexInQueue, err := e.chunksQueue.StoreChunkLocator(locator)
 	if err != nil {
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)
 	}
@@ -142,7 +142,9 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Info().Msg("chunk locator successfully pushed to chunks queue")
+	log.Info().
+		Uint64("index_in_queue", indexInQueue).
+		Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }

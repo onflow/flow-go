@@ -48,7 +48,10 @@ func (q *ChunksQueue) Init(defaultIndex uint64) (bool, error) {
 // StoreChunkLocator stores a new chunk locator that assigned to me to the job queue.
 // A true will be returned, if the locator was new.
 // A false will be returned, if the locator was duplicate.
-func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
+func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, uint64, error) {
+	// keeps track of locator index in chunks queue
+	var next uint64
+
 	err := operation.RetryOnConflict(q.db.Update, func(tx *badger.Txn) error {
 		// make sure the chunk locator is unique
 		err := operation.InsertChunkLocator(locator)(tx)
@@ -64,7 +67,7 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 		}
 
 		// insert to the next index
-		next := latest + 1
+		next = latest + 1
 		err = operation.InsertJobAtIndex(JobQueueChunksQueue, next, locator.ID())(tx)
 		if err != nil {
 			return fmt.Errorf("failed to set job index for chunk locator queue at index %v: %w", next, err)
@@ -81,12 +84,12 @@ func (q *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
 
 	// was trying to store a duplicate locator
 	if errors.Is(err, storage.ErrAlreadyExists) {
-		return false, nil
+		return false, 0, nil
 	}
 	if err != nil {
-		return false, fmt.Errorf("failed to store chunk locator: %w", err)
+		return false, 0, fmt.Errorf("failed to store chunk locator: %w", err)
 	}
-	return true, nil
+	return true, next, nil
 }
 
 // LatestIndex returns the index of the latest chunk locator stored in the queue.
