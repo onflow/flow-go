@@ -73,13 +73,8 @@ func (nc *NoopCollector) EmergencySeal()                                        
 func (nc *NoopCollector) OnReceiptProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) OnApprovalProcessingDuration(duration time.Duration)                    {}
 func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)                            {}
-func (nc *NoopCollector) OnExecutionReceiptReceived()                                            {}
-func (nc *NoopCollector) OnExecutionResultSent()                                                 {}
-func (nc *NoopCollector) OnExecutionResultReceived()                                             {}
-func (nc *NoopCollector) OnVerifiableChunkSent()                                                 {}
+func (nc *NoopCollector) OnExecutionResultReceivedAtAssignerEngine()                             {}
 func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()                             {}
-func (nc *NoopCollector) OnChunkDataPackReceived()                                               {}
-func (nc *NoopCollector) OnChunkDataPackRequested()                                              {}
 func (nc *NoopCollector) OnResultApprovalDispatchedInNetwork()                                   {}
 func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                        {}
 func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
@@ -96,7 +91,6 @@ func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)  
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                    {}
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                               {}
-func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                         {}
 func (nc *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)                      {}

@@ -65,7 +65,7 @@ func (_m *VerificationMetrics) OnChunksAssignmentDoneAtAssigner(chunks int) {
 }
 
 // OnExecutionReceiptReceived provides a mock function with given fields:
-func (_m *VerificationMetrics) OnExecutionReceiptReceived() {
+func (_m *VerificationMetrics) OnExecutionResultReceivedAtAssignerEngine() {
 	_m.Called()
 }
 

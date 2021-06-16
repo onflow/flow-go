@@ -138,7 +138,7 @@ func demo() {
 		// for a clear visualization.
 		for i := 0; i < 100; i++ {
 			// assigner
-			tryRandomCall(vc.OnExecutionReceiptReceived)
+			tryRandomCall(vc.OnExecutionResultReceivedAtAssignerEngine)
 			tryRandomCall(func() {
 				vc.OnChunksAssignmentDoneAtAssigner(rand.Int() % 10)
 			})
@@ -146,6 +146,9 @@ func demo() {
 			tryRandomCall(func() {
 				vc.OnFinalizedBlockArrivedAtAssigner(uint64(i))
 			})
+			tryRandomCall(vc.OnExecutionResultReceivedAtAssignerEngine)
+			tryRandomCall(vc.OnChunkDataPackReceived)
+			tryRandomCall(vc.OnVerifiableChunkSent)
 
 			// fetcher
 			tryRandomCall(vc.OnAssignedChunkReceivedAtFetcher)
@@ -159,17 +162,9 @@ func demo() {
 			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetwork)
 			tryRandomCall(vc.OnChunkDataPackSentToFetcher)
 
-			// finder
-			tryRandomCall(vc.OnExecutionReceiptReceived)
-			tryRandomCall(vc.OnExecutionResultSent)
-
-			// match
-			tryRandomCall(vc.OnExecutionResultReceived)
-			tryRandomCall(vc.OnChunkDataPackReceived)
-			tryRandomCall(vc.OnVerifiableChunkSent)
-
 			// verifier
 			tryRandomCall(vc.OnVerifiableChunkReceivedAtVerifierEngine)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetwork)
 
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()

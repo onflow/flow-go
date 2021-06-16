@@ -83,7 +83,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 		Hex("executed_block_id", logging.ID(result.BlockID)).
 		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
 		Logger()
-	e.metrics.OnExecutionReceiptReceived()
+	e.metrics.OnExecutionResultReceivedAtAssignerEngine()
 
 	// verification node should be staked at the reference block id.
 	ok, err := stakedAsVerification(e.state, result.BlockID, e.me.NodeID())
