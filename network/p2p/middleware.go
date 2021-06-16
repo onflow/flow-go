@@ -31,8 +31,8 @@ const (
 )
 
 const (
-	_ = iota
-	_ = 1 << (10 * iota)
+	_  = iota
+	kb = 1 << (10 * iota)
 	mb
 	gb
 )
@@ -60,18 +60,19 @@ const (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx               context.Context
-	cancel            context.CancelFunc
-	log               zerolog.Logger
-	ov                network.Overlay
-	wg                *sync.WaitGroup
-	libP2PNode        *Node
-	libP2PNodeFactory LibP2PFactoryFunc
-	me                flow.Identifier
-	metrics           module.NetworkMetrics
-	rootBlockID       string
-	validators        []network.MessageValidator
-	peerManager       *PeerManager
+	ctx                context.Context
+	cancel             context.CancelFunc
+	log                zerolog.Logger
+	ov                 network.Overlay
+	wg                 *sync.WaitGroup
+	libP2PNode         *Node
+	libP2PNodeFactory  LibP2PFactoryFunc
+	me                 flow.Identifier
+	metrics            module.NetworkMetrics
+	rootBlockID        string
+	validators         []network.MessageValidator
+	peerManager        *PeerManager
+	peerUpdateInterval time.Duration
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -81,6 +82,7 @@ func NewMiddleware(log zerolog.Logger,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
 	rootBlockID string,
+	peerUpdateInterval time.Duration,
 	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
@@ -92,15 +94,16 @@ func NewMiddleware(log zerolog.Logger,
 
 	// create the node entity and inject dependencies & config
 	return &Middleware{
-		ctx:               ctx,
-		cancel:            cancel,
-		log:               log,
-		wg:                &sync.WaitGroup{},
-		me:                flowID,
-		libP2PNodeFactory: libP2PNodeFactory,
-		metrics:           metrics,
-		rootBlockID:       rootBlockID,
-		validators:        validators,
+		ctx:                ctx,
+		cancel:             cancel,
+		log:                log,
+		wg:                 &sync.WaitGroup{},
+		me:                 flowID,
+		libP2PNodeFactory:  libP2PNodeFactory,
+		metrics:            metrics,
+		rootBlockID:        rootBlockID,
+		validators:         validators,
+		peerUpdateInterval: peerUpdateInterval,
 	}
 }
 
@@ -130,7 +133,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
 	m.libP2PNode = libP2PNode
-	m.libP2PNode.SetStreamHandler(m.handleIncomingStream)
+	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
@@ -148,7 +151,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("failed to create libp2pConnector: %w", err)
 	}
 
-	m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector)
+	m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector, WithInterval(m.peerUpdateInterval))
 	select {
 	case <-m.peerManager.Ready():
 		m.log.Debug().Msg("peer manager successfully started")
@@ -277,13 +280,13 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to flush stream for %s: %w", targetIdentity.String(), err)
 	}
 
 	// close the stream immediately
 	err = stream.Close()
 	if err != nil {
-		return fmt.Errorf("failed to close the stream for %s: %w", targetID.String(), err)
+		return fmt.Errorf("failed to close the stream for %s: %w", targetIdentity.String(), err)
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
@@ -327,12 +330,9 @@ func identityList(identityMap map[flow.Identifier]flow.Identity) flow.IdentityLi
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	// qualify the logger with local and remote address
-	log := m.log.With().
-		Str("local_addr", s.Conn().LocalMultiaddr().String()).
-		Str("remote_addr", s.Conn().RemoteMultiaddr().String()).
-		Logger()
+	log := streamLogger(m.log, s)
 
-	log.Info().Msg("incoming connection established")
+	log.Info().Msg("incoming stream received")
 
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
@@ -428,10 +428,10 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 }
 
 // Ping pings the target node and returns the ping RTT or an error
-func (m *Middleware) Ping(targetID flow.Identifier) (time.Duration, error) {
+func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
 	targetIdentity, err := m.identity(targetID)
 	if err != nil {
-		return -1, fmt.Errorf("could not find identity for target id: %w", err)
+		return message.PingResponse{}, -1, fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
 	return m.libP2PNode.Ping(m.ctx, targetIdentity)

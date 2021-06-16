@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -55,7 +56,7 @@ func NewTransactionResults(collector module.CacheMetrics, db *badger.DB, transac
 	}
 	return &TransactionResults{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceTransactionResults,
 			withLimit(transactionResultsCacheSize),
 			withStore(noopStore),
 			withRetrieve(retrieve)),
@@ -77,7 +78,7 @@ func (tr *TransactionResults) BatchStore(blockID flow.Identifier, transactionRes
 		for _, result := range transactionResults {
 			key := KeyFromBlockIDTransactionID(blockID, result.TransactionID)
 			// cache for each transaction, so that it's faster to retrieve
-			tr.cache.Put(key, result)
+			tr.cache.Insert(key, result)
 		}
 	})
 	return nil

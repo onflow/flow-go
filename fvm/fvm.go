@@ -87,7 +87,16 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 //
 // Errors that occur in a meta transaction are propagated as a single error that can be
 // captured by the Cadence runtime and eventually disambiguated by the parent context.
-func (vm *VirtualMachine) invokeMetaTransaction(ctx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
+func (vm *VirtualMachine) invokeMetaTransaction(parentCtx Context, tx *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) (errors.Error, error) {
 	invocator := NewTransactionInvocator(zerolog.Nop())
-	return invocator.Process(vm, &ctx, tx, sth, programs)
+
+	// do not deduct fees or check storage in meta transactions
+	ctx := NewContextFromParent(parentCtx,
+		WithAccountStorageLimit(false),
+		WithTransactionFeesEnabled(false),
+	)
+
+	err := invocator.Process(vm, &ctx, tx, sth, programs)
+	txErr, fatalErr := errors.SplitErrorTypes(err)
+	return txErr, fatalErr
 }

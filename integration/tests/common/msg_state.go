@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bytes"
 	"fmt"
 	"sync"
 	"testing"
@@ -100,5 +99,5 @@ func MsgIsExecutionStateDeltaWithChanges(msg interface{}) bool {
 		return false
 	}
 
-	return bytes.Compare(delta.StartState, delta.EndState) != 0
+	return *delta.StartState != delta.EndState
 }

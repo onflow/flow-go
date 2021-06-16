@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -61,8 +62,8 @@ func NewBlockComputer(
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
+		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
 	)
 
@@ -112,6 +113,11 @@ func (e *blockComputer) executeBlock(
 	programs *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
+	// check the start state is set
+	if !block.HasStartState() {
+		return nil, fmt.Errorf("executable block start state is not set")
+	}
+
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
 	res := &execution.ComputationResult{
@@ -135,7 +141,7 @@ func (e *blockComputer) executeBlock(
 		committer: e.committer,
 		blockSpan: blockSpan,
 		tracer:    e.tracer,
-		state:     block.StartState,
+		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
 		callBack: func(state flow.StateCommitment, proof []byte, err error) {
 			if err != nil {
@@ -199,9 +205,8 @@ func (e *blockComputer) executeSystemCollection(
 	defer colSpan.Finish()
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
-	tx := fvm.SystemChunkTransaction(serviceAddress)
-	txMetrics := fvm.NewMetricsCollector()
-	err := e.executeTransaction(tx, colSpan, txMetrics, collectionView, programs, e.systemChunkCtx, txIndex, res)
+	tx := blueprints.SystemChunkTransaction(serviceAddress)
+	err := e.executeTransaction(tx, colSpan, collectionView, programs, e.systemChunkCtx, txIndex, res)
 	txIndex++
 	if err != nil {
 		return txIndex, err
@@ -236,10 +241,9 @@ func (e *blockComputer) executeCollection(
 		colSpan.Finish()
 	}()
 
-	txMetrics := fvm.NewMetricsCollector()
-	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsCollector(txMetrics), fvm.WithTracer(e.tracer))
+	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, txMetrics, collectionView, programs, txCtx, txIndex, res)
+		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, txIndex, res)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -258,7 +262,6 @@ func (e *blockComputer) executeCollection(
 func (e *blockComputer) executeTransaction(
 	txBody *flow.TransactionBody,
 	colSpan opentracing.Span,
-	txMetrics *fvm.MetricsCollector,
 	collectionView state.View,
 	programs *programs.Programs,
 	ctx fvm.Context,
@@ -297,13 +300,9 @@ func (e *blockComputer) executeTransaction(
 		return fmt.Errorf("failed to execute transaction: %w", err)
 	}
 
-	if e.metrics != nil {
-		e.metrics.TransactionParsed(txMetrics.Parsed())
-		e.metrics.TransactionChecked(txMetrics.Checked())
-		e.metrics.TransactionInterpreted(txMetrics.Interpreted())
-	}
 	txResult := flow.TransactionResult{
-		TransactionID: tx.ID,
+		TransactionID:   tx.ID,
+		ComputationUsed: tx.ComputationUsed,
 	}
 
 	if tx.Err != nil {
@@ -322,17 +321,17 @@ func (e *blockComputer) executeTransaction(
 	mergeSpan := e.tracer.StartSpanFromParent(txSpan, trace.EXEMergeTransactionView)
 	defer mergeSpan.Finish()
 
-	if tx.Err == nil {
-		err := collectionView.MergeView(txView)
-		if err != nil {
-			return err
-		}
+	// always merge the view, fvm take cares of reverting changes
+	// of failed transaction invocation
+	err = collectionView.MergeView(txView)
+	if err != nil {
+		return fmt.Errorf("merging tx view to collection view failed: %w", err)
 	}
 
 	res.AddEvents(tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
-	res.AddGasUsed(tx.GasUsed)
+	res.AddComputationUsed(tx.ComputationUsed)
 
 	e.log.Info().
 		Str("txHash", tx.ID.String()).

@@ -24,7 +24,7 @@ type ExecutionTree interface {
 	// a vertex in the tree without attaching any Execution Receipts to it.
 	AddResult(result *flow.ExecutionResult, block *flow.Header) error
 
-	// Add the given execution receipt to the memory pool. Requires height
+	// AddReceipt adds the given execution receipt to the memory pool. Requires height
 	// of the block the receipt is for. We enforce data consistency on an API
 	// level by using the block header as input.
 	AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error)
@@ -69,6 +69,10 @@ type ExecutionTree interface {
 	// * The blockFilter suppresses traversal to derived results.
 	// * The receiptFilter does _not_ suppresses traversal to derived results.
 	//   Only individual receipts are dropped.
+	//
+	// Error returns:
+	// * UnknownExecutionResultError (sentinel) if resultID is unknown
+	// * all other error are unexpected and potential indicators of corrupted internal state
 	ReachableReceipts(resultID flow.Identifier, blockFilter BlockFilter, receiptFilter ReceiptFilter) ([]*flow.ExecutionReceipt, error)
 
 	// Size returns the number of receipts stored in the mempool

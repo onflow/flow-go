@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -31,8 +32,13 @@ import (
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
+	verificationassigner "github.com/onflow/flow-go/engine/verification/assigner"
+	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
+	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/engine/verification/finder"
 	"github.com/onflow/flow-go/engine/verification/match"
+	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
@@ -231,15 +237,9 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
 
-	results, err := stdmap.NewIncorporatedResults(1000)
-	require.NoError(t, err)
-
 	receipts := consensusMempools.NewExecutionTree()
 
-	approvals, err := stdmap.NewApprovals(1000)
-	require.NoError(t, err)
-
-	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
+	seals := stdmap.NewIncorporatedResultSeals(1000)
 	pendingReceipts := stdmap.NewPendingReceipts(1000)
 
 	// receive collections
@@ -256,41 +256,64 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
 		signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-	approvalValidator := validation.NewApprovalValidator(node.State, signature.NewAggregationVerifier(encoding.ResultApprovalTag))
+
+	approvalVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+
+	sealingConfig := sealing.DefaultConfig()
 
 	sealingEngine, err := sealing.NewEngine(
 		node.Log,
-		node.Metrics,
 		node.Tracer,
 		node.Metrics,
 		node.Metrics,
+		node.Metrics,
 		node.Net,
-		node.State,
 		node.Me,
-		receiptRequester,
-		receiptsDB,
 		node.Headers,
-		node.Index,
-		results,
-		receipts,
-		approvals,
-		seals,
-		pendingReceipts,
+		node.Payloads,
+		node.State,
+		node.Seals,
 		assigner,
+		approvalVerifier,
+		seals,
+		sealingConfig)
+	require.NoError(t, err)
+
+	matchingConfig := matching.DefaultConfig()
+
+	matchingCore := matching.NewCore(
+		node.Log,
+		node.Tracer,
+		node.Metrics,
+		node.Metrics,
+		node.State,
+		node.Headers,
+		receiptsDB,
+		receipts,
+		pendingReceipts,
+		seals,
 		receiptValidator,
-		approvalValidator,
-		validation.DefaultRequiredApprovalsForSealValidation,
-		sealing.DefaultEmergencySealingActive)
-	require.Nil(t, err)
+		receiptRequester,
+		matchingConfig)
+
+	matchingEngine, err := matching.NewEngine(
+		node.Log,
+		node.Net,
+		node.Me,
+		node.Metrics,
+		node.Metrics,
+		matchingCore,
+	)
+	require.NoError(t, err)
 
 	return testmock.ConsensusNode{
 		GenericNode:     node,
 		Guarantees:      guarantees,
-		Approvals:       approvals,
 		Receipts:        receipts,
 		Seals:           seals,
 		IngestionEngine: ingestionEngine,
 		SealingEngine:   sealingEngine,
+		MatchingEngine:  matchingEngine,
 	}
 }
 
@@ -326,7 +349,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
 	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.DB)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
@@ -380,7 +403,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	metrics := metrics.NewNoopCollector()
 	pusherEngine, err := executionprovider.New(
-		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock,
+		node.Log, node.Tracer, node.Net, node.State, node.Me, execState, metrics, checkStakedAtBlock, 10, 10,
 	)
 	require.NoError(t, err)
 
@@ -407,6 +430,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		vmCtx,
 		computation.DefaultProgramsCacheSize,
 		committer,
+		computation.DefaultScriptLogThreshold,
 	)
 	require.NoError(t, err)
 
@@ -581,15 +605,15 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 
 type VerificationOpt func(*testmock.VerificationNode)
 
-func WithVerifierEngine(eng network.Engine) VerificationOpt {
-	return func(node *testmock.VerificationNode) {
-		node.VerifierEngine = eng
-	}
-}
-
 func WithMatchEngine(eng network.Engine) VerificationOpt {
 	return func(node *testmock.VerificationNode) {
 		node.MatchEngine = eng
+	}
+}
+
+func WithChunkConsumer(chunkConsumer *chunkconsumer.ChunkConsumer) VerificationOpt {
+	return func(node *testmock.VerificationNode) {
+		node.ChunkConsumer = chunkConsumer
 	}
 }
 
@@ -599,6 +623,8 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 	}
 }
 
+// TODO: this is fixture for old verification node (i.e., the one currently in place)
+// remove it once we have the new verification node rolled-in.
 func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	identity *flow.Identity,
@@ -787,6 +813,167 @@ func VerificationNode(t testing.TB,
 			node.BlockIDsCache,
 			processInterval)
 		require.Nil(t, err)
+	}
+
+	return node
+}
+
+// NewVerificationNode creates a verification node with all functional engines and actual modules for purpose of
+// (integration) testing.
+//
+// TODO: refactor to VerificationNode once the old constructor is dropped.
+func NewVerificationNode(t testing.TB,
+	hub *stub.Hub,
+	verIdentity *flow.Identity, // identity of this verification node.
+	participants flow.IdentityList, // identity of all nodes in system including this verification node.
+	assigner module.ChunkAssigner,
+	chunksLimit uint,
+	chainID flow.ChainID,
+	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
+	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
+	opts ...VerificationOpt) testmock.VerificationNode {
+
+	var err error
+	var node testmock.VerificationNode
+
+	for _, apply := range opts {
+		apply(&node)
+	}
+
+	if node.GenericNode == nil {
+		gn := GenericNode(t, hub, verIdentity, participants, chainID)
+		node.GenericNode = &gn
+	}
+
+	if node.ChunkStatuses == nil {
+		node.ChunkStatuses = stdmap.NewChunkStatuses(chunksLimit)
+		err = mempoolCollector.Register(metrics.ResourceChunkStatus, node.ChunkStatuses.Size)
+		require.Nil(t, err)
+	}
+
+	if node.ChunkRequests == nil {
+		node.ChunkRequests = stdmap.NewChunkRequests(chunksLimit)
+		err = mempoolCollector.Register(metrics.ResourceChunkRequest, node.ChunkRequests.Size)
+		require.NoError(t, err)
+	}
+
+	if node.Results == nil {
+		results := storage.NewExecutionResults(node.Metrics, node.DB)
+		node.Results = results
+		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	}
+
+	if node.ProcessedChunkIndex == nil {
+		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+	}
+
+	if node.ChunksQueue == nil {
+		node.ChunksQueue = storage.NewChunkQueue(node.DB)
+		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
+		require.NoError(t, err)
+		require.True(t, ok)
+	}
+
+	if node.ProcessedBlockHeight == nil {
+		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+	}
+
+	if node.VerifierEngine == nil {
+		rt := fvm.NewInterpreterRuntime()
+
+		vm := fvm.NewVirtualMachine(rt)
+
+		blockFinder := fvm.NewBlockFinder(node.Headers)
+
+		vmCtx := fvm.NewContext(
+			node.Log,
+			fvm.WithChain(node.ChainID.Chain()),
+			fvm.WithBlocks(blockFinder),
+		)
+
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+
+		node.VerifierEngine, err = verifier.New(node.Log,
+			collector,
+			node.Tracer,
+			node.Net,
+			node.State,
+			node.Me,
+			chunkVerifier,
+			approvalStorage)
+		require.Nil(t, err)
+	}
+
+	if node.RequesterEngine == nil {
+		node.RequesterEngine, err = vereq.New(node.Log,
+			node.State,
+			node.Net,
+			node.Tracer,
+			collector,
+			node.ChunkRequests,
+			vereq.DefaultRequestInterval,
+			// requests are only qualified if their retryAfter is elapsed.
+			vereq.RetryAfterQualifier,
+			// exponential backoff with multiplier of 2, minimum interval of a second, and
+			// maximum interval of an hour.
+			mempool.ExponentialUpdater(
+				vereq.DefaultBackoffMultiplier,
+				vereq.DefaultBackoffMaxInterval,
+				vereq.DefaultBackoffMinInterval),
+			vereq.DefaultRequestTargets)
+
+		require.NoError(t, err)
+	}
+
+	if node.FetcherEngine == nil {
+		node.FetcherEngine = fetcher.New(node.Log,
+			collector,
+			node.Tracer,
+			node.VerifierEngine,
+			node.State,
+			node.ChunkStatuses,
+			node.Headers,
+			node.Blocks,
+			node.Results,
+			node.Receipts,
+			node.RequesterEngine,
+		)
+	}
+
+	if node.ChunkConsumer == nil {
+		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+			node.ProcessedChunkIndex,
+			node.ChunksQueue,
+			node.FetcherEngine,
+			chunkconsumer.DefaultChunkWorkers) // defaults number of workers to 3.
+		err = mempoolCollector.Register(metrics.ResourceChunkConsumer, node.ChunkConsumer.Size)
+		require.NoError(t, err)
+	}
+
+	if node.AssignerEngine == nil {
+		node.AssignerEngine = verificationassigner.New(node.Log,
+			collector,
+			node.Tracer,
+			node.Me,
+			node.State,
+			assigner,
+			node.ChunksQueue,
+			node.ChunkConsumer)
+	}
+
+	if node.BlockConsumer == nil {
+		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
+			node.ProcessedBlockHeight,
+			node.Blocks,
+			node.State,
+			node.AssignerEngine,
+			blockconsumer.DefaultBlockWorkers)
+		require.NoError(t, err)
+
+		err = mempoolCollector.Register(metrics.ResourceBlockConsumer, node.BlockConsumer.Size)
+		require.NoError(t, err)
 	}
 
 	return node

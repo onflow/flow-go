@@ -422,7 +422,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	lg.log.Trace().Msgf("creating transfer script")
 	transferScript, err := TokenTransferScript(
 		lg.fungibleTokenAddress,
-		acc.address,
+		lg.flowTokenAddress,
 		nextAcc.address,
 		tokensPerTransfer)
 	if err != nil {

@@ -26,7 +26,6 @@ const collectionNodesToTry uint = 3
 
 type backendTransactions struct {
 	staticCollectionRPC  accessproto.AccessAPIClient // rpc client tied to a fixed collection node
-	executionRPC         execproto.ExecutionAPIClient
 	transactions         storage.Transactions
 	executionReceipts    storage.ExecutionReceipts
 	collections          storage.Collections
@@ -360,6 +359,7 @@ func (b *backendTransactions) lookupTransactionResult(
 
 	events, txStatus, message, err := b.getTransactionResultFromExecutionNode(ctx, blockID, txID[:])
 	if err != nil {
+		// if either the execution node reported no results or the execution node could not be chosen
 		if status.Code(err) == codes.NotFound {
 			// No result yet, indicate that it has not been executed
 			return false, nil, 0, "", nil
@@ -441,34 +441,21 @@ func (b *backendTransactions) getTransactionResultFromExecutionNode(
 		TransactionId: transactionID,
 	}
 
-	execNodes, err := executionNodesForBlockID(blockID, b.executionReceipts, b.state, b.log)
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
 	if err != nil {
+		// if no execution receipt were found, return a NotFound GRPC error
+		if errors.As(err, &InsufficientExecutionReceipts{}) {
+			return nil, 0, "", status.Errorf(codes.NotFound, err.Error())
+		}
 		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from any execution node: %v", err)
 	}
 
-	var resp *execproto.GetTransactionResultResponse
-	if len(execNodes) == 0 {
-		if b.executionRPC == nil {
-			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node")
+	resp, err := b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
+	if err != nil {
+		if status.Code(err) == codes.NotFound {
+			return nil, 0, "", err
 		}
-
-		// call the execution node gRPC
-		resp, err = b.executionRPC.GetTransactionResult(ctx, &req)
-		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				return nil, 0, "", err
-			}
-			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
-		}
-
-	} else {
-		resp, err = b.getTransactionResultFromAnyExeNode(ctx, execNodes, req)
-		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				return nil, 0, "", err
-			}
-			return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
-		}
+		return nil, 0, "", status.Errorf(codes.Internal, "failed to retrieve result from execution node: %v", err)
 	}
 
 	events := convert.MessagesToEvents(resp.GetEvents())

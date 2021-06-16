@@ -22,3 +22,13 @@ func WriteFile(path string, data []byte) error {
 
 	return nil
 }
+
+// WriteText writes a byte array to the file at the given path.
+func WriteText(path string, data []byte) error {
+	err := ioutil.WriteFile(path, data, 0644)
+	if err != nil {
+		return fmt.Errorf("could not write file: %v", err)
+	}
+
+	return nil
+}

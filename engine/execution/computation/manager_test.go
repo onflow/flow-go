@@ -5,7 +5,9 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+var scriptLogThreshold = 1 * time.Second
+
 func TestComputeBlockWithStorage(t *testing.T) {
 	rt := fvm.NewInterpreterRuntime()
 
@@ -41,6 +45,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
 	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetGasLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
@@ -51,6 +56,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
 	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetGasLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
@@ -85,6 +91,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 				Transactions: transactions,
 			},
 		},
+		StartState: unittest.StateCommitmentPointerFixture(),
 	}
 
 	me := new(module.Local)
@@ -111,6 +118,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
+	assert.True(t, returnedComputationResult.ComputationUsed > 0)
 }
 
 func TestExecuteScript(t *testing.T) {
@@ -141,7 +149,7 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter())
+	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -163,7 +171,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter())
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -173,6 +181,54 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	require.Contains(t, buffer.String(), "Verunsicherung")
 }
 
+func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
+
+	ctx := fvm.NewContext(zerolog.Nop())
+
+	vm := &LongRunningVM{duration: 2 * time.Millisecond}
+
+	buffer := &bytes.Buffer{}
+	log := zerolog.New(buffer)
+
+	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+	header := unittest.BlockHeaderFixture()
+
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond)
+	require.NoError(t, err)
+
+	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+
+	require.NoError(t, err)
+
+	require.Contains(t, buffer.String(), "exceeded threshold")
+}
+
+func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
+
+	ctx := fvm.NewContext(zerolog.Nop())
+
+	vm := &LongRunningVM{duration: 0}
+
+	buffer := &bytes.Buffer{}
+	log := zerolog.New(buffer)
+
+	view := delta.NewView(func(_, _, _ string) (flow.RegisterValue, error) {
+		return nil, nil
+	})
+	header := unittest.BlockHeaderFixture()
+
+	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second)
+	require.NoError(t, err)
+
+	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
+
+	require.NoError(t, err)
+
+	require.NotContains(t, buffer.String(), "exceeded threshold")
+}
+
 type PanickingVM struct{}
 
 func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
@@ -180,5 +236,23 @@ func (p *PanickingVM) Run(f fvm.Context, procedure fvm.Procedure, view state.Vie
 }
 
 func (p *PanickingVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
+	panic("not expected")
+}
+
+type LongRunningVM struct {
+	duration time.Duration
+}
+
+func (l *LongRunningVM) Run(f fvm.Context, procedure fvm.Procedure, view state.View, p2 *programs.Programs) error {
+	time.Sleep(l.duration)
+	// satisfy value marshaller
+	if scriptProcedure, is := procedure.(*fvm.ScriptProcedure); is {
+		scriptProcedure.Value = cadence.NewVoid()
+	}
+
+	return nil
+}
+
+func (l *LongRunningVM) GetAccount(f fvm.Context, address flow.Address, view state.View, p2 *programs.Programs) (*flow.Account, error) {
 	panic("not expected")
 }

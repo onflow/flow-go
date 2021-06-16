@@ -15,15 +15,38 @@ type Snapshot struct {
 }
 
 // Commit provides a mock function with given fields:
-func (_m *Snapshot) Commit() ([]byte, error) {
+func (_m *Snapshot) Commit() (flow.StateCommitment, error) {
 	ret := _m.Called()
 
-	var r0 []byte
-	if rf, ok := ret.Get(0).(func() []byte); ok {
+	var r0 flow.StateCommitment
+	if rf, ok := ret.Get(0).(func() flow.StateCommitment); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]byte)
+			r0 = ret.Get(0).(flow.StateCommitment)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Descendants provides a mock function with given fields:
+func (_m *Snapshot) Descendants() ([]flow.Identifier, error) {
+	ret := _m.Called()
+
+	var r0 []flow.Identifier
+	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.Identifier)
 		}
 	}
 
@@ -115,29 +138,6 @@ func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
 		r1 = rf(nodeID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// Pending provides a mock function with given fields:
-func (_m *Snapshot) Pending() ([]flow.Identifier, error) {
-	ret := _m.Called()
-
-	var r0 []flow.Identifier
-	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]flow.Identifier)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func() error); ok {
-		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -266,6 +266,29 @@ func (_m *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func(...uint32) error); ok {
 		r1 = rf(indices...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// ValidDescendants provides a mock function with given fields:
+func (_m *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
+	ret := _m.Called()
+
+	var r0 []flow.Identifier
+	if rf, ok := ret.Get(0).(func() []flow.Identifier); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]flow.Identifier)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

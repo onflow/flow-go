@@ -13,13 +13,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/verification"
 	realModule "github.com/onflow/flow-go/module"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -116,6 +116,7 @@ func (suite *MatchEngineTestSuite) SetupTest() {
 }
 
 func (suite *MatchEngineTestSuite) ChunkDataPackIsRequestedNTimes(timeout time.Duration,
+	executorID flow.Identifier,
 	n int, f func(*messages.ChunkDataRequest)) <-chan []*messages.ChunkDataRequest {
 	reqs := make([]*messages.ChunkDataRequest, 0)
 	c := make(chan []*messages.ChunkDataRequest, 1)
@@ -128,12 +129,16 @@ func (suite *MatchEngineTestSuite) ChunkDataPackIsRequestedNTimes(timeout time.D
 	// chunk data was requested once, and return the chunk data pack when requested
 	// called with 3 mock.Anything, the first is the request, the second and third are the 2
 	// execution nodes
-	suite.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+	suite.con.On("Publish", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
 		mutex.Lock()
 		defer mutex.Unlock()
 
 		req := args.Get(0).(*messages.ChunkDataRequest)
 		reqs = append(reqs, req)
+
+		// chunk data request should be only dispatched to the executor ID
+		targetID := args.Get(1).(flow.Identifier)
+		require.Equal(suite.T(), targetID, executorID)
 
 		fmt.Printf("con.Submit is called for chunk:%v\n", req.ChunkID)
 
@@ -157,7 +162,7 @@ func (suite *MatchEngineTestSuite) RespondChunkDataPack(engine *match.Engine,
 	en flow.Identifier) func(*messages.ChunkDataRequest) {
 	return func(req *messages.ChunkDataRequest) {
 		resp := &messages.ChunkDataResponse{
-			ChunkDataPack: test.FromChunkID(req.ChunkID),
+			ChunkDataPack: vertestutils.FromChunkID(req.ChunkID),
 			Nonce:         req.Nonce,
 		}
 
@@ -216,10 +221,10 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -233,6 +238,7 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving a chunk data pack
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return().Once()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -256,11 +262,11 @@ func (suite *MatchEngineTestSuite) TestChunkVerified() {
 
 	// create chunk data pack
 	myChunk := result.Chunks[0]
-	chunkDataPack := test.FromChunkID(myChunk.ID())
+	chunkDataPack := vertestutils.FromChunkID(myChunk.ID())
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 1, suite.RespondChunkDataPack(e, en.ID()))
+	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 1, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunksC := suite.VerifierCalledNTimes(5*time.Second, 1)
@@ -299,10 +305,10 @@ func (suite *MatchEngineTestSuite) TestNoAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(flow.Identifier{}),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(flow.Identifier{}),
 		),
 	)
 
@@ -341,12 +347,12 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(flow.Identifier{}), // some other node
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(flow.Identifier{}), // some other node
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -360,6 +366,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Twice()
 	// receiving two chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Twice()
+	suite.metrics.On("OnChunkDataPackRequested").Return().Twice()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -383,7 +390,7 @@ func (suite *MatchEngineTestSuite) TestMultiAssignment() {
 
 	// setup conduit to return requested chunk data packs
 	// return received requests
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 2, suite.RespondChunkDataPack(e, en.ID()))
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 2, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunksC := suite.VerifierCalledNTimes(5*time.Second, 2)
@@ -415,10 +422,10 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -432,6 +439,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving one chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil)
@@ -456,7 +464,7 @@ func (suite *MatchEngineTestSuite) TestDuplication() {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3,
 		func(req *messages.ChunkDataRequest) {
 			called++
 			if called >= 3 {
@@ -495,10 +503,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	e := suite.NewTestMatchEngine(3)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -512,6 +520,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Once()
 	// receiving one chunk data pack
 	suite.metrics.On("OnChunkDataPackReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -536,7 +545,7 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	// setup conduit to return requested chunk data packs
 	// return received requests
 	called := 0
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3,
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3,
 		func(req *messages.ChunkDataRequest) {
 			called++
 			if called >= 3 {
@@ -555,6 +564,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 	<-vchunkC
 
 	<-e.Done()
+
+	// pending chunk should be removed from memory once we have the request received.
+	require.Len(suite.T(), suite.chunks.All(), 0)
+
 	mock.AssertExpectationsForObjects(suite.T(),
 		suite.assigner,
 		suite.con,
@@ -568,10 +581,10 @@ func (suite *MatchEngineTestSuite) TestRetry() {
 func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	e := suite.NewTestMatchEngine(3)
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -581,6 +594,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	// metrics
 	// receiving an execution result
 	suite.metrics.On("OnExecutionResultReceived").Return().Once()
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -600,7 +614,7 @@ func (suite *MatchEngineTestSuite) TestMaxRetry() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	// never returned any chunk data pack
-	reqC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, 3, func(req *messages.ChunkDataRequest) {})
+	reqC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, 3, func(req *messages.ChunkDataRequest) {})
 
 	<-e.Ready()
 
@@ -634,6 +648,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	suite.metrics.On("OnVerifiableChunkSent").Return().Times(count)
 	// receiving `count`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(count)
+	suite.metrics.On("OnChunkDataPackRequested").Return()
 
 	for i := 0; i < count; i++ {
 		header := &flow.Header{
@@ -641,10 +656,10 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 			View:   uint64(i),
 		}
 		// create a execution result that assigns to me
-		result, assignment := test.CreateExecutionResult(
+		result, assignment := vertestutils.CreateExecutionResult(
 			header.ID(),
-			test.WithChunks(
-				test.WithAssignee(suite.myID),
+			vertestutils.WithChunks(
+				vertestutils.WithAssignee(suite.myID),
 			),
 		)
 
@@ -673,7 +688,7 @@ func (suite *MatchEngineTestSuite) TestProcessExecutionResultConcurrently() {
 	// find the execution node id that created the execution result
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
-	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, count, suite.RespondChunkDataPack(e, en.ID()))
+	_ = suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, count, suite.RespondChunkDataPack(e, en.ID()))
 
 	// check verifier's method is called
 	vchunkC := suite.VerifierCalledNTimes(5*time.Second, count)
@@ -706,15 +721,15 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	e := suite.NewTestMatchEngine(1)
 
 	// create a execution result that assigns to me
-	result, assignment := test.CreateExecutionResult(
+	result, assignment := vertestutils.CreateExecutionResult(
 		suite.head.ID(),
-		test.WithChunks(
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
-			test.WithAssignee(suite.myID),
+		vertestutils.WithChunks(
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
+			vertestutils.WithAssignee(suite.myID),
 		),
 	)
 
@@ -728,6 +743,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	sentMetricsC := suite.OnVerifiableChunkSentMetricCalledNTimes(len(result.Chunks))
 	// receiving `len(result.Chunk)`-many chunk data packs
 	suite.metrics.On("OnChunkDataPackReceived").Return().Times(len(result.Chunks))
+	suite.metrics.On("OnChunkDataPackRequested").Return().Times(len(result.Chunks))
 
 	// add assignment to assigner
 	suite.assigner.On("Assign", result, result.BlockID).Return(assignment, nil).Once()
@@ -750,7 +766,7 @@ func (suite *MatchEngineTestSuite) TestProcessChunkDataPackConcurrently() {
 	en := suite.participants.Filter(filter.HasRole(flow.RoleExecution))[0]
 
 	count := len(result.Chunks)
-	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, count, func(*messages.ChunkDataRequest) {})
+	reqsC := suite.ChunkDataPackIsRequestedNTimes(5*time.Second, en.NodeID, count, func(*messages.ChunkDataRequest) {})
 
 	// check verifier's method is called
 	_ = suite.VerifierCalledNTimes(5*time.Second, count)
