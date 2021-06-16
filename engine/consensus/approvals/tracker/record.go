@@ -8,17 +8,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type OptionalBool struct{ value *bool }
-
-func (o *OptionalBool) IsSet() bool { return o.value != nil }
-func (o *OptionalBool) Set(b bool)  { o.value = &b }
-func (o *OptionalBool) Is(b bool) bool {
-	if o.value == nil {
-		return false
-	}
-	return *o.value == b
-}
-
 type Rec map[string]interface{}
 
 // SealingRecord is a record of the sealing status for a specific
@@ -33,40 +22,14 @@ type SealingRecord struct {
 
 	// entries holds the individual entries of the sealing record
 	entries Rec
-
-	// sufficientApprovalsForSealing: indicates whether all chunks have sufficient approvals
-	// Convention: nil if business logic did not collect this data
-	sufficientApprovalsForSealing OptionalBool
-
-	// ChunksWithMissingApprovals: chunk indices that are still lacking approvals.
-	// Convention:
-	// * nil: business logic did not collect this data
-	// * empty (and not nil): all chunks have sufficient approvals
-	// * contains elements: chunks with respective indices have insufficient approvals
-	ChunksWithMissingApprovals []uint64
-
-	// QualifiesForEmergencySealing: indicates whether result qualifies for emergency
-	// Convention: nil if business logic did not collect this data
-	qualifiesForEmergencySealing OptionalBool
-
-	// RequestedApprovalsCount: how many approvals where requested for this incorporated result.
-	// Convention: nil if business logic did not collect this data
-	RequestedApprovalsCount *uint
-
-	// HasMultipleReceipts: True iff there are at least 2 receipts from
-	// _different_ ENs committing to the result. Optional value: only set if
-	// SufficientApprovalsForSealing == True and nil otherwise.
-	HasMultipleReceipts *bool
 }
 
 func (r *SealingRecord) QualifiesForEmergencySealing(emergencySealable bool) {
-	r.qualifiesForEmergencySealing.Set(emergencySealable)
 	r.entries["qualifies_for_emergency_sealing"] = emergencySealable
 }
 
 func (r *SealingRecord) ApprovalsMissing(chunksWithMissingApprovals map[uint64]flow.IdentifierList) {
 	sufficientApprovals := len(chunksWithMissingApprovals) == 0
-	r.sufficientApprovalsForSealing.Set(sufficientApprovals)
 	r.entries["sufficient_approvals_for_sealing"] = sufficientApprovals
 	if !sufficientApprovals {
 		indices := make([]uint64, 0, len(chunksWithMissingApprovals))
@@ -109,6 +72,10 @@ func (r *SealingRecord) Generate() (Rec, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine finalization status of incorporating block %v: %w", r.IncorporatedResult.IncorporatedBlockID, err)
 	}
+	numberReceipts, err := numberExecutionReceipts(r.receiptsDB, resultID, r.IncorporatedResult.Result.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to determine whether result %v has multiple receipt: %w", resultID, err)
+	}
 
 	rec["executed_block_id"] = result.BlockID.String()
 	rec["executed_block_height"] = executedBlock.Height
@@ -117,17 +84,11 @@ func (r *SealingRecord) Generate() (Rec, error) {
 	rec["incorporated_result_id"] = irID.String()
 	rec["result_initial_state"] = hex.EncodeToString(initialState[:])
 	rec["number_chunks"] = len(result.Chunks)
+	rec["number_receipts"] = numberReceipts
+	_, rec["candidate_seal_in_mempool"] = r.sealsPl.ByID(irID)
 
 	if finalizationStatus != nil {
 		rec["incorporating_block"] = *finalizationStatus
-	}
-
-	if r.sufficientApprovalsForSealing.Is(true) || r.qualifiesForEmergencySealing.Is(true) {
-		_, rec["candidate_seal_in_mempool"] = r.sealsPl.ByID(irID)
-		rec["multiple_receipts"], err = resultHasMultipleReceipts(r.receiptsDB, resultID, r.IncorporatedResult.Result.BlockID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to determine whether result %v has multiple receipt: %w", resultID, err)
-		}
 	}
 
 	return rec, nil
@@ -157,17 +118,16 @@ func (r *SealingRecord) assignmentFinalizationStatus(incorporatingBlock *flow.He
 	return &stat, nil
 }
 
-// resultHasMultipleReceipts determines whether there are at AT LEAST 2 RECEIPTS
-// from _different_ ENs committing to this result.
-func resultHasMultipleReceipts(receiptsDB storage.ExecutionReceipts, resultID, executedBlockID flow.Identifier) (bool, error) {
+// numberExecutionReceipts determines how many receipts from _different_ ENs are committing to this result.
+func numberExecutionReceipts(receiptsDB storage.ExecutionReceipts, resultID, executedBlockID flow.Identifier) (int, error) {
 	// get all receipts that are known for the block
 	receipts, err := receiptsDB.ByBlockID(executedBlockID)
 	if err != nil {
-		return false, fmt.Errorf("internal error querying receipts for block %v: %w", executedBlockID, err)
+		return -1, fmt.Errorf("internal error querying receipts for block %v: %w", executedBlockID, err)
 	}
 
 	// Index receipts for given incorporatedResult by their executor. In case
 	// there are multiple receipts from the same executor, we keep the last one.
 	receiptsForIncorporatedResults := receipts.GroupByResultID().GetGroup(resultID)
-	return receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups() >= 2, nil
+	return receiptsForIncorporatedResults.GroupByExecutorID().NumberGroups(), nil
 }
