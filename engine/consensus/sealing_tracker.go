@@ -19,8 +19,8 @@ type SealingTracker interface {
 }
 
 // SealingObservation captures information about the progress of a _single_ go routine.
-// Consequently, it is _not concurrency safe_, as they are supposed to be a
-// thread-local structure.
+// Consequently, it is _not concurrency safe_, as SealingObservation is intended to be
+// a thread-local structure.
 // SealingObservation is supposed to track the status of various (unsealed) incorporated
 // results, which the business logic processes (driven by that single goroutine).
 type SealingObservation interface {

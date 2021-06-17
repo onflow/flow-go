@@ -83,8 +83,9 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not retrieve root block: %w", err)
 	}
 
+	unit := engine.NewUnit()
 	e := &Engine{
-		unit:          engine.NewUnit(),
+		unit:          unit,
 		log:           log.With().Str("engine", "sealing.Engine").Logger(),
 		me:            me,
 		engineMetrics: engineMetrics,
@@ -116,7 +117,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	core, err := NewCore(log, tracer, conMetrics, sealingTracker, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -55,6 +56,7 @@ func DefaultConfig() Config {
 // 	- pre-validating approvals (if they are outdated or non-verifiable)
 // 	- pruning already processed collectorTree
 type Core struct {
+	unit                       *engine.Unit
 	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
 	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
@@ -76,6 +78,7 @@ func NewCore(
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
 	sealingTracker consensus.SealingTracker,
+	unit *engine.Unit,
 	headers storage.Headers,
 	state protocol.State,
 	sealsDB storage.Seals,
@@ -95,6 +98,7 @@ func NewCore(
 		tracer:                     tracer,
 		metrics:                    conMetrics,
 		sealingTracker:             sealingTracker,
+		unit:                       unit,
 		approvalsCache:             approvals.NewApprovalsLRUCache(1000),
 		counterLastSealedHeight:    counters.NewMonotonousCounter(lastSealed.Height),
 		counterLastFinalizedHeight: counters.NewMonotonousCounter(lastSealed.Height),
@@ -471,34 +475,17 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	}
 	lastSealed, err := c.headers.ByBlockID(seal.BlockID)
 	if err != nil {
-		c.log.Fatal().Err(err).Msgf("could not retrieve last sealed block %s", seal.BlockID)
+		return fmt.Errorf("could not retrieve last sealed block %v: %w", seal.BlockID, err)
 	}
 	c.counterLastSealedHeight.Set(lastSealed.Height)
 
 	// STEP 1: Pruning
 	// ------------------------------------------------------------------------
 	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
-
-	pruningSpan := c.tracer.StartSpanFromParent(processFinalizedBlockSpan, trace.CONSealingPruning)
-	err = c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed) // stop collecting approvals for orphan collectors
+	err = c.prune(processFinalizedBlockSpan, finalized, lastSealed)
 	if err != nil {
-		pruningSpan.Finish()
-		return fmt.Errorf("collectors tree could not finalize fork: %w", err)
+		return fmt.Errorf("updating to finalized block %v and seald block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
 	}
-
-	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height) // prune AssignmentCollectorTree
-	if err != nil {
-		pruningSpan.Finish()
-		return fmt.Errorf("could not prune collectorTree tree at block %v", finalizedBlockID)
-	}
-
-	c.requestTracker.Remove(pruned...) // remove all pending items that we might have requested
-
-	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune mempool with candidate seals
-	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
-		return fmt.Errorf("could not prune seals mempool at block %v, by height: %v: %w", finalizedBlockID, lastSealed.Height, err)
-	}
-	pruningSpan.Finish()
 
 	// STEP 2: Check emergency sealing and re-request missing approvals
 	// ------------------------------------------------------------------------
@@ -527,7 +514,33 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	//   observes the latest state of `sealingObservation`.
 	// * The `sealingObservation` lives in the scope of this function. Hence, when this goroutine exits
 	//   this function, `sealingObservation` lives solely in the scope of the newly-created goroutine.
-	e.unit.Launch(sealingObservation.Complete)
+	c.unit.Launch(sealingObservation.Complete)
+
+	return nil
+}
+
+// prune updates the AssignmentCollectorTree's knowledge about sealed and finalized blocks.
+// Furthermore, it  removes obsolete entries from AssignmentCollectorTree, RequestTracker
+// and IncorporatedResultSeals mempool.
+// We do _not_ expect any errors during normal operations.
+func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.Header) error {
+	pruningSpan := c.tracer.StartSpanFromParent(parentSpan, trace.CONSealingPruning)
+	defer pruningSpan.Finish()
+
+	err := c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed) // stop collecting approvals for orphan collectors
+	if err != nil {
+		return fmt.Errorf("AssignmentCollectorTree failed to update its finalization state: %w", err)
+	}
+	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height) // prune AssignmentCollectorTree
+	if err != nil {
+		return fmt.Errorf("could not prune collectorTree up to height %d: %w", lastSealed.Height, err)
+	}
+	c.requestTracker.Remove(pruned...) // drop any approval requests for pruned assignments
+
+	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune candidate seals mempool
+	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+		return fmt.Errorf("could not prune seals mempool at block up to height %d: %w", lastSealed.Height, err)
+	}
 
 	return nil
 }

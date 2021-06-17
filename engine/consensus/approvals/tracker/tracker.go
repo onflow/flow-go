@@ -15,7 +15,7 @@ import (
 )
 
 // SealingTracker is an auxiliary component for tracking sealing progress. It has access to
-// the storage, to collect data that might not be available directly from the business.
+// the storage, to collect data that might not be available directly from the business logic.
 // The SealingTracker is immutable and therefore intrinsically thread safe.
 //
 // The SealingTracker essentially acts as a factory for individual SealingObservations,
@@ -67,9 +67,9 @@ func (st *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, sea
 	}
 }
 
-// SealingObservation captures information about the progress of a _single_ goroutine.
-// Consequently, it is _not concurrency safe_, as they are supposed to be
-// thread-local structure.
+// SealingObservation captures information about the progress of a _single_ go routine.
+// Consequently, it is _not concurrency safe_, as SealingObservation is intended to be
+// a thread-local structure.
 // SealingObservation is supposed to track the status of various (unsealed) incorporated
 // results, which the business logic processes (driven by that single goroutine).
 type SealingObservation struct {

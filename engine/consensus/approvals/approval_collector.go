@@ -105,7 +105,8 @@ func (c *ApprovalCollector) SealResult() error {
 		AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
 	}
 
-	// we don't care if the seal is already in the mempool
+	// Adding a seal that already exists in the mempool is a NoOp. But to reduce log
+	// congestion, we only log when a seal is added that previously did not exist.
 	added, err := c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: c.incorporatedResult,
 		Seal:               seal,
@@ -117,6 +118,7 @@ func (c *ApprovalCollector) SealResult() error {
 	if added {
 		c.log.Info().
 			Str("executed_block_id", seal.BlockID.String()).
+			Uint64("executed_block_height", c.executedBlock.Height).
 			Str("result_id", seal.ResultID.String()).
 			Str("incorporating_block", c.IncorporatedBlockID().String()).
 			Msg("added candidate seal to IncorporatedResultSeals mempool")

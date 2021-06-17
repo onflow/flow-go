@@ -3,11 +3,9 @@ package approvals
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -101,7 +99,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	)
 
 	var err error
-	s.collector, err = NewAssignmentCollector(zerolog.New(os.Stderr), s.IncorporatedResult.Result, s.state, s.headers,
+	s.collector, err = NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
 		s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
@@ -239,7 +237,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector, err := NewAssignmentCollector(zerolog.New(os.Stderr), s.IncorporatedResult.Result, s.state, s.headers,
+		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
 			assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.NoError(s.T(), err)
 
@@ -250,7 +248,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	s.Run("invalid-verifier-identities", func() {
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
-		collector, err := NewAssignmentCollector(zerolog.New(os.Stderr), s.IncorporatedResult.Result, s.state, s.headers,
+		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
 			s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
@@ -276,7 +274,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(zerolog.New(os.Stderr), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
@@ -297,7 +295,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(zerolog.New(os.Stderr), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
@@ -317,7 +315,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(zerolog.New(os.Stderr), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)

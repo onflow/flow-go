@@ -2,11 +2,9 @@ package sealing
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -138,7 +136,6 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.sealsPL.On("Size").Return(uint(0)).Maybe()                       // for metrics
 	s.sealsPL.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe() // noop on pruning
 
-	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
@@ -149,8 +146,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(log, tracer, metrics, &tracker.NoopSealingTracker{},
-		s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
+	s.core, err = NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, nil, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 
