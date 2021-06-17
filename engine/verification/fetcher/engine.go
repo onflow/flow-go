@@ -486,19 +486,26 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 // When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
 // through HandleChunkDataPack).
 func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
+	lg := e.log.With().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Logger()
 	// we need to report that the job has been finished eventually
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
+		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
 		return
 	}
 
+	lg = lg.With().
+		Uint64("block_height", status.BlockHeight).
+		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
 	removed := e.pendingChunks.Rem(chunkID)
 
 	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
-	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
+	lg.Info().
+		Bool("removed", removed).
+		Msg("discards fetching chunk of an already sealed block and notified consumer")
 }
 
 // pushToVerifierWithTracing encapsulates the logic of pushing a verifiable chunk to verifier engine with tracing enabled.
