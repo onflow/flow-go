@@ -202,6 +202,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 	status := &verification.ChunkStatus{
 		ChunkIndex:      chunk.Index,
 		ExecutionResult: result,
+		BlockHeight:     blockHeight,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
@@ -247,6 +248,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	resultID := status.ExecutionResult.ID()
 	lg = lg.With().
 		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).
+		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(resultID)).
 		Uint64("chunk_index", status.ChunkIndex).
 		Logger()
