@@ -140,9 +140,8 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
 	defer c.mu.Unlock()
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
 
-	if c.doneJob(jobID) {
-		c.checkProcessable()
-	}
+	c.doneJob(jobID)
+	c.checkProcessable()
 }
 
 // Check allows the job publisher to notify the consumer that a new job has been added, so that
@@ -283,11 +282,10 @@ func processableJobs(log zerolog.Logger, jobs module.Jobs, processings map[uint6
 			// take one job
 			job, err := jobs.AtIndex(i)
 			log.Debug().
-				Err(err).
 				Uint64("processedIndex", processedIndex).
 				Uint64("processing", processing).
 				Uint64("index", i).
-				Msg("retrieving job")
+				Msgf("retrieving job: %v", err)
 
 			// if there is no more job at this index, we could stop
 			if errors.Is(err, storage.ErrNotFound) {
