@@ -146,7 +146,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, nil, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
+	s.core, err = NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 
