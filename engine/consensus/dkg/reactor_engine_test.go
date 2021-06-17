@@ -26,8 +26,8 @@ import (
 //
 // The EpochSetup event is received at view 100.
 
-// The current epoch is configured with DKG phase transitions are at views 150,
-// 200, and 250. In between phase transitions, the controller calls the DKG
+// The current epoch is configured with DKG phase transitions at views 150, 200,
+// and 250. In between phase transitions, the controller calls the DKG
 // smart-contract every 10 views.
 //
 // VIEWS

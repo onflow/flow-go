@@ -19,9 +19,9 @@ import (
 // state. This acts as the conversion from the Cadence type to the flow-go type.
 func ServiceEvent(chain flow.Chain, event flow.Event) (*flow.ServiceEvent, error) {
 
-	log.Debug().Msgf(">>> service event: ", string(event.Payload))
+	log.Debug().Msgf(">>> service event: %s", string(event.Payload))
 
-	log.Debug().Msgf("setup/commit: ", flow.EventEpochSetup(chain), flow.EventEpochCommit(chain))
+	log.Debug().Msgf("setup/commit: %s/%s", flow.EventEpochSetup(chain), flow.EventEpochCommit(chain))
 
 	// depending on type of Epoch event construct Go type
 	switch event.Type {
