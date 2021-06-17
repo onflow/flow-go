@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-go/engine/execution"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -46,6 +47,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
+			Run(func(args mock.Arguments) {
+				//ctx := args[0].(fvm.Context)
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Events = generateEvents(1, tx.TxIndex)
+			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		committer := new(computermock.ViewCommitter)
@@ -67,6 +74,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
+		assertEventsConsistent(t, result)
 		vm.AssertExpectations(t)
 	})
 
@@ -101,6 +109,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
+		assertEventsConsistent(t, result)
 		vm.AssertExpectations(t)
 	})
 
@@ -185,6 +194,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
 
+		assertEventsConsistent(t, result)
 		vm.AssertExpectations(t)
 	})
 
@@ -278,6 +288,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		//events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+
+		assertEventsConsistent(t, result)
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
@@ -392,6 +404,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
+}
+
+func assertEventsConsistent(t *testing.T, cr *execution.ComputationResult) {
+	n := len(cr.StateSnapshots)
+	require.Len(t, cr.Events, n)
+	require.Len(t, cr.EventsHashes, n)
+
+	for i := 0; i < n; i++ {
+		assertEventsHashed(t, cr.Events[i], cr.EventsHashes[i])
+	}
+}
+
+func assertEventsHashed(t *testing.T, events flow.EventsList, hash flow.Identifier) {
+	computedHash, err := flow.EventsListHash(events)
+	require.NoError(t, err)
+
+	require.Equal(t, hash, computedHash)
 }
 
 type testRuntime struct {

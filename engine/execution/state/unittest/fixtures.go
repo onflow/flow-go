@@ -29,11 +29,13 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 	stateCommitments := make([]flow.StateCommitment, n)
 	proofs := make([][]byte, n)
 	events := make([]flow.EventsList, n)
+	eventsHashes := make([]flow.Identifier, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateInteractionsFixture()
 		stateCommitments[i] = *completeBlock.StartState
 		proofs[i] = unittest.RandomBytes(6)
 		events[i] = make(flow.EventsList, 0)
+		eventsHashes[i] = unittest.IdentifierFixture()
 	}
 	return &execution.ComputationResult{
 		ExecutableBlock:  completeBlock,
@@ -41,5 +43,6 @@ func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *ex
 		StateCommitments: stateCommitments,
 		Proofs:           proofs,
 		Events:           events,
+		EventsHashes:     eventsHashes,
 	}
 }

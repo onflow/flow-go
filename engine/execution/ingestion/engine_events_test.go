@@ -57,13 +57,29 @@ func TestEventsHashesAreIncluded(t *testing.T) {
 			unittest.EventFixture("b.c", 2, 1, unittest.IdentifierFixture(), 3),
 		}
 
+		eventsListsEmpty := flow.EventsList{}
+
+		eventListAHash, err := flow.EventsListHash(eventsListA)
+		require.NoError(t, err)
+		eventListBHash, err := flow.EventsListHash(eventsListB)
+		require.NoError(t, err)
+		eventListCHash, err := flow.EventsListHash(eventsListC)
+		require.NoError(t, err)
+		emptyListHash, err := flow.EventsListHash(eventsListsEmpty)
+		require.NoError(t, err)
+
 		computationResultsA.Events = []flow.EventsList{
 			eventsListA, eventsListB,
 		}
+		computationResultsA.EventsHashes = []flow.Identifier{
+			eventListAHash, eventListBHash,
+		}
 
-		eventsListsEmpty := flow.EventsList{}
 		computationResultsB.Events = []flow.EventsList{
 			eventsListC, eventsListsEmpty,
+		}
+		computationResultsB.EventsHashes = []flow.Identifier{
+			eventListCHash, emptyListHash,
 		}
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
@@ -75,7 +91,7 @@ func TestEventsHashesAreIncluded(t *testing.T) {
 		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, computationResultsB)
 
 		wg.Add(2) // wait for blocks A & B to be executed
-		err := ctx.engine.handleBlock(context.Background(), blockA.Block)
+		err = ctx.engine.handleBlock(context.Background(), blockA.Block)
 		require.NoError(t, err)
 
 		err = ctx.engine.handleBlock(context.Background(), blockB.Block)
@@ -100,15 +116,6 @@ func TestEventsHashesAreIncluded(t *testing.T) {
 
 		require.Len(t, receiptA.ExecutionResult.Chunks, 2)
 		require.Len(t, receiptB.ExecutionResult.Chunks, 2)
-
-		eventListAHash, err := flow.EventsListHash(eventsListA)
-		require.NoError(t, err)
-		eventListBHash, err := flow.EventsListHash(eventsListB)
-		require.NoError(t, err)
-		eventListCHash, err := flow.EventsListHash(eventsListC)
-		require.NoError(t, err)
-		emptyListHash, err := flow.EventsListHash(eventsListsEmpty)
-		require.NoError(t, err)
 
 		require.Equal(t, eventListAHash, receiptA.ExecutionResult.Chunks[0].EventCollection)
 		require.Equal(t, eventListBHash, receiptA.ExecutionResult.Chunks[1].EventCollection)
