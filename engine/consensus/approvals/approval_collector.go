@@ -82,7 +82,7 @@ func (c *ApprovalCollector) IncorporatedBlock() *flow.Header {
 	return c.incorporatedBlock
 }
 
-// IncorporatedResult returns the incorporated Result this ApprovalCollector if for
+// IncorporatedResult returns the incorporated Result this ApprovalCollector is for
 func (c *ApprovalCollector) IncorporatedResult() *flow.IncorporatedResult {
 	return c.incorporatedResult
 }
