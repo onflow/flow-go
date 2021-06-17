@@ -117,33 +117,23 @@ func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
 func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	var err error
 	registerID := flow.NewRegisterID(owner, controller, key)
 
 	value, exists := v.delta.Get(owner, controller, key)
-	if exists {
-		// every time we read a value (order preserving) we update the secret
-		// with the registerID only (value is not required)
-		err := v.updateSpockSecret(registerID.Bytes())
+	if !exists {
+		value, err = v.readFunc(owner, controller, key)
 		if err != nil {
 			return nil, fmt.Errorf("get register failed: %w", err)
 		}
-		return value, nil
+		// capture register touch
+		v.regTouchSet[registerID.String()] = registerID
+		// increase reads
+		v.readsCount++
 	}
-
-	value, err := v.readFunc(owner, controller, key)
-	if err != nil {
-		return nil, fmt.Errorf("get register failed: %w", err)
-	}
-
-	// capture register touch
-	v.regTouchSet[registerID.String()] = registerID
-
-	// increase reads
-	v.readsCount++
-
 	// every time we read a value (order preserving) we update the secret
 	// with the registerID only (value is not required)
-	err = v.updateSpockSecret(registerID.Bytes())
+	_, err = v.spockSecretHasher.Write(registerID.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("get register failed: %w", err)
 	}
@@ -166,12 +156,12 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) erro
 	// every time we write something to delta (order preserving) we update
 	// the spock secret with both the register ID and value.
 
-	err := v.updateSpockSecret(registerID.Bytes())
+	_, err := v.spockSecretHasher.Write(registerID.Bytes())
 	if err != nil {
 		return fmt.Errorf("set register failed: %w", err)
 	}
 
-	err = v.updateSpockSecret(value)
+	_, err = v.spockSecretHasher.Write(value)
 	if err != nil {
 		return fmt.Errorf("set register failed: %w", err)
 	}
@@ -180,14 +170,6 @@ func (v *View) Set(owner, controller, key string, value flow.RegisterValue) erro
 	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
-	return nil
-}
-
-func (v *View) updateSpockSecret(value []byte) error {
-	_, err := v.spockSecretHasher.Write(value)
-	if err != nil {
-		return fmt.Errorf("error updating spock secret: %w", err)
-	}
 	return nil
 }
 
@@ -234,9 +216,9 @@ func (v *View) MergeView(ch state.View) error {
 
 	spockSecret := child.SpockSecret()
 
-	err := v.updateSpockSecret(spockSecret)
+	_, err := v.spockSecretHasher.Write(spockSecret)
 	if err != nil {
-		return fmt.Errorf("can not merge view: %w", err)
+		return fmt.Errorf("merging SPoCK secrets failed: %w", err)
 	}
 	v.delta.MergeWith(child.delta)
 

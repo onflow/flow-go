@@ -120,45 +120,45 @@ func TestViewSet(t *testing.T) {
 		expSpock := hash.NewSHA3_256()
 		err = v.Set(registerID2, "", "", flow.RegisterValue("1"))
 		require.NoError(t, err)
-		hashIt(expSpock, registerID2Bytes)
-		hashIt(expSpock, []byte("1"))
+		hashIt(t, expSpock, registerID2Bytes)
+		hashIt(t, expSpock, []byte("1"))
 
 		err = v.Set(registerID3, "", "", flow.RegisterValue("2"))
 		require.NoError(t, err)
-		hashIt(expSpock, registerID3Bytes)
-		hashIt(expSpock, []byte("2"))
+		hashIt(t, expSpock, registerID3Bytes)
+		hashIt(t, expSpock, []byte("2"))
 
 		err = v.Set(registerID1, "", "", flow.RegisterValue("3"))
 		require.NoError(t, err)
-		hashIt(expSpock, registerID1Bytes)
-		hashIt(expSpock, []byte("3"))
+		hashIt(t, expSpock, registerID1Bytes)
+		hashIt(t, expSpock, []byte("3"))
 
 		_, err := v.Get(registerID1, "", "")
 		require.NoError(t, err)
-		hashIt(expSpock, registerID1Bytes)
+		hashIt(t, expSpock, registerID1Bytes)
 
 		// this part uses the delete functionality
 		// to check that only the register ID is written to the spock secret
 		err = v.Delete(registerID1, "", "")
 		require.NoError(t, err)
-		hashIt(expSpock, registerID1Bytes)
+		hashIt(t, expSpock, registerID1Bytes)
 
 		// this part checks that it always update the
 		// intermediate values and not just the final values
 		err = v.Set(registerID1, "", "", flow.RegisterValue("4"))
 		require.NoError(t, err)
-		hashIt(expSpock, registerID1Bytes)
-		hashIt(expSpock, []byte("4"))
+		hashIt(t, expSpock, registerID1Bytes)
+		hashIt(t, expSpock, []byte("4"))
 
 		err = v.Set(registerID1, "", "", flow.RegisterValue("5"))
 		require.NoError(t, err)
-		hashIt(expSpock, registerID1Bytes)
-		hashIt(expSpock, []byte("5"))
+		hashIt(t, expSpock, registerID1Bytes)
+		hashIt(t, expSpock, []byte("5"))
 
 		err = v.Set(registerID3, "", "", flow.RegisterValue("6"))
 		require.NoError(t, err)
-		hashIt(expSpock, registerID3Bytes)
-		hashIt(expSpock, []byte("6"))
+		hashIt(t, expSpock, registerID3Bytes)
+		hashIt(t, expSpock, []byte("6"))
 
 		s := v.SpockSecret()
 		assert.Equal(t, hash.Hash(s), expSpock.SumHash())
@@ -363,22 +363,22 @@ func TestViewMergeView(t *testing.T) {
 		expSpock1 := hash.NewSHA3_256()
 		err := v.Set(registerID1, "", "", flow.RegisterValue("apple"))
 		require.NoError(t, err)
-		hashIt(expSpock1, registerID1Bytes)
-		hashIt(expSpock1, []byte("apple"))
+		hashIt(t, expSpock1, registerID1Bytes)
+		hashIt(t, expSpock1, []byte("apple"))
 		assert.Equal(t, v.SpockSecret(), []uint8(expSpock1.SumHash()))
 
 		expSpock2 := hash.NewSHA3_256()
 		chView := v.NewChild()
 		err = chView.Set(registerID2, "", "", flow.RegisterValue("carrot"))
 		require.NoError(t, err)
-		hashIt(expSpock2, registerID2Bytes)
-		hashIt(expSpock2, []byte("carrot"))
+		hashIt(t, expSpock2, registerID2Bytes)
+		hashIt(t, expSpock2, []byte("carrot"))
 
 		assert.Equal(t, chView.(*delta.View).SpockSecret(), []uint8(expSpock2.SumHash()))
 
 		err = v.MergeView(chView)
 		assert.NoError(t, err)
-		hashIt(expSpock1, expSpock2.SumHash())
+		hashIt(t, expSpock1, expSpock2.SumHash())
 
 		s := v.SpockSecret()
 		assert.Equal(t, s, []uint8(expSpock1.SumHash()))
@@ -573,11 +573,7 @@ func TestView_Reads(t *testing.T) {
 	})
 }
 
-func hashIt(spock hash.Hasher, value []byte) {
-	// spock.Write() is not supposed to error, at least in the current implementation.
-	// If it does, the panic below should flag the error.
+func hashIt(t *testing.T, spock hash.Hasher, value []byte) {
 	_, err := spock.Write(value)
-	if err != nil {
-		panic(err)
-	}
+	assert.NoError(t, err, "spock write is not supposed to error")
 }

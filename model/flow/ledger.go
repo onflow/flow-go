@@ -19,7 +19,7 @@ func (r *RegisterID) String() string {
 
 // Bytes returns a bytes representation of the RegisterID.
 //
-// the encoding uses the injective fingerprint module.
+// The encoding uses the injective fingerprint module.
 func (r *RegisterID) Bytes() []byte {
 	return fingerprint.Fingerprint(r)
 }
