@@ -117,11 +117,13 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 // (through the chunk assigner), and belong to the execution result.
 //
 // Deduplication of chunk locators is delegated to the chunks queue.
-func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
-	log := e.log.With().
+func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
+	lg := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("chunk_id", logging.ID(chunk.ID())).
-		Uint64("chunk_index", chunk.Index).Logger()
+		Uint64("chunk_index", chunk.Index).
+		Uint64("block_height", blockHeight).
+		Logger()
 
 	locator := &chunks.Locator{
 		ResultID: resultID,
@@ -134,7 +136,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)
 	}
 	if !ok {
-		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
+		lg.Debug().Msg("could not push duplicate chunk locator to chunks queue")
 		return false, nil
 	}
 
@@ -142,7 +144,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Info().Msg("chunk locator successfully pushed to chunks queue")
+	lg.Info().Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }
@@ -204,7 +206,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 		assignedChunksCount += uint64(len(chunkList))
 		for _, chunk := range chunkList {
-			processed, err := e.processChunkWithTracing(ctx, chunk, resultID)
+			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
 			if err != nil {
 				resultLog.Fatal().
 					Err(err).
@@ -301,11 +303,11 @@ func (e *Engine) resultChunkAssignmentWithTracing(
 //
 // Note that the chunk in the input should be legitimately assigned to this verification node
 // (through the chunk assigner), and belong to the same execution result.
-func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
+func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
 	var err error
 	var processed bool
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessChunk, func() {
-		processed, err = e.processChunk(chunk, resultID)
+		processed, err = e.processChunk(chunk, resultID, blockHeight)
 	})
 	return processed, err
 }
