@@ -35,7 +35,7 @@ func (s *ApprovalCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
-	s.collector = NewApprovalCollector(zerolog.New(os.Stderr), s.IncorporatedResult, &s.IncorporatedBlock, &s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
+	s.collector = NewApprovalCollector(unittest.Logger(), s.IncorporatedResult, &s.IncorporatedBlock, &s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
 }
 
 // TestProcessApproval_ValidApproval tests that valid approval is processed without error

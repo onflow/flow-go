@@ -527,7 +527,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	//   observes the latest state of `sealingObservation`.
 	// * The `sealingObservation` lives in the scope of this function. Hence, when this goroutine exits
 	//   this function, `sealingObservation` lives solely in the scope of the newly-created goroutine.
-	go sealingObservation.Complete()
+	e.unit.Launch(sealingObservation.Complete)
 
 	return nil
 }
