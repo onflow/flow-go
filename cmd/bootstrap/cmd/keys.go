@@ -52,16 +52,6 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
-	for _, nodeInfo := range internalNodes {
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not access private key for internal node")
-		}
-
-		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
-	}
-
 	return internalNodes
 }
 
