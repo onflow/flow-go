@@ -57,7 +57,7 @@ func (_m *ChunksQueue) LatestIndex() (uint64, error) {
 }
 
 // StoreChunkLocator provides a mock function with given fields: locator
-func (_m *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) {
+func (_m *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, uint64, error) {
 	ret := _m.Called(locator)
 
 	var r0 bool
@@ -67,12 +67,19 @@ func (_m *ChunksQueue) StoreChunkLocator(locator *chunks.Locator) (bool, error) 
 		r0 = ret.Get(0).(bool)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*chunks.Locator) error); ok {
+	var r1 uint64
+	if rf, ok := ret.Get(1).(func(*chunks.Locator) uint64); ok {
 		r1 = rf(locator)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(uint64)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(*chunks.Locator) error); ok {
+		r2 = rf(locator)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }
