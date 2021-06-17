@@ -265,7 +265,6 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}
-
 		err = e.controller.SubmitResult()
 		if err != nil {
 			return fmt.Errorf("couldn't publish DKG results: %w", err)
