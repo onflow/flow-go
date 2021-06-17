@@ -9,7 +9,7 @@ import (
 type ChunkStatus struct {
 	ChunkIndex      uint64
 	ExecutionResult *flow.ExecutionResult
-	BlockHeight     flow.Identifier
+	BlockHeight     uint64
 }
 
 func (s ChunkStatus) ID() flow.Identifier {
