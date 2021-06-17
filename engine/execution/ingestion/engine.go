@@ -1055,8 +1055,8 @@ func (e *Engine) saveExecutionResults(
 	// no need to persist the state interactions, since they are used only by state
 	// syncing, which is currently disabled
 
-	chunks := make([]*flow.Chunk, len(result.StateCommitments))
-	chdps := make([]*flow.ChunkDataPack, len(result.StateCommitments))
+	chunks := make([]*flow.Chunk, 0, len(result.StateCommitments))
+	chdps := make([]*flow.ChunkDataPack, 0, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
 	var endState flow.StateCommitment = startState
@@ -1077,11 +1077,12 @@ func (e *Engine) saveExecutionResults(
 		}
 
 		chunk := generateChunk(i, startState, endState, collectionID, blockID)
+		chunks = append(chunks, chunk)
 
 		// chunkDataPack
-		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
-		// TODO use view.SpockSecret() as an input to spock generator
-		chunks[i] = chunk
+		chdp := generateChunkDataPack(chunk, collectionID, result.Proofs[i])
+		chdps = append(chdps, chdp)
+
 		startState = endState
 	}
 
@@ -1256,7 +1257,11 @@ func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
 	return res
 }
 
-// generateChunkDataPack creates a chunk data pack
+// generateChunkDataPack creates a chunk data pack from the given inputs.
+//
+// `proof` includes proofs for all registers read to execute the chunck.
+// Register proofs order must not be correlated to the order of register reads during
+// the chunk execution in order to enforce the SPoCK secret high entropy.
 func generateChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
