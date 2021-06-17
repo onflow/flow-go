@@ -50,7 +50,7 @@ const (
 
 	// default maximum time to wait for a default unicast request to complete
 	// assuming at least a 1mb/sec connection
-	DefaultUnicastTimeout = 2 * time.Second
+	DefaultUnicastTimeout = 10 * time.Second
 
 	// maximum time to wait for a unicast request to complete for large message size
 	LargeMsgUnicastTimeout = 1000 * time.Second
@@ -60,19 +60,20 @@ const (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx                context.Context
-	cancel             context.CancelFunc
-	log                zerolog.Logger
-	ov                 network.Overlay
-	wg                 *sync.WaitGroup
-	libP2PNode         *Node
-	libP2PNodeFactory  LibP2PFactoryFunc
-	me                 flow.Identifier
-	metrics            module.NetworkMetrics
-	rootBlockID        string
-	validators         []network.MessageValidator
-	peerManager        *PeerManager
-	peerUpdateInterval time.Duration
+	ctx                   context.Context
+	cancel                context.CancelFunc
+	log                   zerolog.Logger
+	ov                    network.Overlay
+	wg                    *sync.WaitGroup
+	libP2PNode            *Node
+	libP2PNodeFactory     LibP2PFactoryFunc
+	me                    flow.Identifier
+	metrics               module.NetworkMetrics
+	rootBlockID           string
+	validators            []network.MessageValidator
+	peerManager           *PeerManager
+	peerUpdateInterval    time.Duration
+	unicastMessageTimeout time.Duration
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -83,6 +84,7 @@ func NewMiddleware(log zerolog.Logger,
 	metrics module.NetworkMetrics,
 	rootBlockID string,
 	peerUpdateInterval time.Duration,
+	unicastMessageTimeout time.Duration,
 	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
@@ -92,18 +94,23 @@ func NewMiddleware(log zerolog.Logger,
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	if unicastMessageTimeout <= 0 {
+		unicastMessageTimeout = DefaultUnicastTimeout
+	}
+
 	// create the node entity and inject dependencies & config
 	return &Middleware{
-		ctx:                ctx,
-		cancel:             cancel,
-		log:                log,
-		wg:                 &sync.WaitGroup{},
-		me:                 flowID,
-		libP2PNodeFactory:  libP2PNodeFactory,
-		metrics:            metrics,
-		rootBlockID:        rootBlockID,
-		validators:         validators,
-		peerUpdateInterval: peerUpdateInterval,
+		ctx:                   ctx,
+		cancel:                cancel,
+		log:                   log,
+		wg:                    &sync.WaitGroup{},
+		me:                    flowID,
+		libP2PNodeFactory:     libP2PNodeFactory,
+		metrics:               metrics,
+		rootBlockID:           rootBlockID,
+		validators:            validators,
+		peerUpdateInterval:    peerUpdateInterval,
+		unicastMessageTimeout: unicastMessageTimeout,
 	}
 }
 
@@ -254,7 +261,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
 	}
 
-	maxTimeout := unicastMaxMsgDuration(msg)
+	maxTimeout := m.unicastMaxMsgDuration(msg)
 	// pass in a context with timeout to make the unicast call fail fast
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
 	defer cancel()
@@ -474,11 +481,14 @@ func unicastMaxMsgSize(msg *message.Message) int {
 }
 
 // unicastMaxMsgDuration returns the max duration to allow for a unicast send to complete
-func unicastMaxMsgDuration(msg *message.Message) time.Duration {
+func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
 	switch msg.Type {
 	case "messages.ChunkDataResponse":
-		return LargeMsgUnicastTimeout
+		if LargeMsgUnicastTimeout > m.unicastMessageTimeout {
+			return LargeMsgMaxUnicastMsgSize
+		}
+		return m.unicastMessageTimeout
 	default:
-		return DefaultUnicastTimeout
+		return m.unicastMessageTimeout
 	}
 }
