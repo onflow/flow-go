@@ -147,7 +147,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Logger()
 	lg.Debug().Msg("result and chunk for locator retrieved")
 
-	requested, err := e.processAssignedChunkWithTracing(chunk, result)
+	requested, err := e.processAssignedChunkWithTracing(chunk, result, locatorID)
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not process assigned chunk")
 	}
@@ -161,7 +161,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 }
 
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
-func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, error) {
 	chunkID := chunk.ID()
 
 	span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
@@ -175,7 +175,7 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 	var err error
 	var requested bool
 	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleAssignedChunk, func() {
-		requested, err = e.processAssignedChunk(chunk, result)
+		requested, err = e.processAssignedChunk(chunk, result, chunkLocatorID)
 	})
 
 	return requested, err
@@ -183,7 +183,7 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 
 // processAssignedChunk receives an assigned chunk and its result and requests its chunk data pack from requester.
 // Boolean return value determines whether chunk data pack was requested or not.
-func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, error) {
 	// skips processing a chunk if it belongs to a sealed block.
 	chunkID := chunk.ID()
 	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
@@ -191,7 +191,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
-		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
+		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
 		return false, nil
 	}
 
