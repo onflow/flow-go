@@ -2,9 +2,10 @@ package consensus
 
 import "github.com/onflow/flow-go/model/flow"
 
-// SealingTracker is an auxiliary component for tracking sealing progress. It has access to
-// the storage, to collect data that might not be available directly from the business logic.
-// The SealingTracker is immutable and therefore intrinsically thread safe.
+// SealingTracker is an auxiliary component for tracking progress of the sealing
+// logic (specifically sealing.Core). It has access to the storage, to collect data
+// that is not be available directly from sealing.Core. The SealingTracker is immutable
+// and therefore intrinsically thread safe.
 //
 // The SealingTracker essentially acts as a factory for individual SealingObservations,
 // which capture information about the progress of a _single_ go routine. Consequently,
@@ -22,14 +23,14 @@ type SealingTracker interface {
 // Consequently, it is _not concurrency safe_, as SealingObservation is intended to be
 // a thread-local structure.
 // SealingObservation is supposed to track the status of various (unsealed) incorporated
-// results, which the business logic processes (driven by that single goroutine).
+// results, which sealing.Core processes (driven by that single goroutine).
 type SealingObservation interface {
 
-	// QualifiesForEmergencySealing captures whether the business logic has
+	// QualifiesForEmergencySealing captures whether sealing.Core has
 	// determined that the incorporated result qualifies for emergency sealing.
 	QualifiesForEmergencySealing(ir *flow.IncorporatedResult, emergencySealable bool)
 
-	// ApprovalsMissing captures whether the business logic has determined that
+	// ApprovalsMissing captures whether sealing.Core has determined that
 	// some approvals are still missing for the incorporated result. Calling this
 	// method with empty `chunksWithMissingApprovals` indicates that all chunks
 	// have sufficient approvals.

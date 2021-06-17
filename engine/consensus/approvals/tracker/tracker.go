@@ -14,9 +14,10 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// SealingTracker is an auxiliary component for tracking sealing progress. It has access to
-// the storage, to collect data that might not be available directly from the business logic.
-// The SealingTracker is immutable and therefore intrinsically thread safe.
+// SealingTracker is an auxiliary component for tracking progress of the sealing
+// logic (specifically sealing.Core). It has access to the storage, to collect data
+// that is not be available directly from sealing.Core. The SealingTracker is immutable
+// and therefore intrinsically thread safe.
 //
 // The SealingTracker essentially acts as a factory for individual SealingObservations,
 // which capture information about the progress of a _single_ go routine. Consequently,
@@ -71,7 +72,7 @@ func (st *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, sea
 // Consequently, it is _not concurrency safe_, as SealingObservation is intended to be
 // a thread-local structure.
 // SealingObservation is supposed to track the status of various (unsealed) incorporated
-// results, which the business logic processes (driven by that single goroutine).
+// results, which sealing.Core processes (driven by that single goroutine).
 type SealingObservation struct {
 	*SealingTracker
 
@@ -84,7 +85,7 @@ type SealingObservation struct {
 	records    map[flow.Identifier]*SealingRecord // each record is for one (unsealed) incorporated result
 }
 
-// QualifiesForEmergencySealing captures whether the business logic has
+// QualifiesForEmergencySealing captures whether sealing.Core has
 // determined that the incorporated result qualifies for emergency sealing.
 func (st *SealingObservation) QualifiesForEmergencySealing(ir *flow.IncorporatedResult, emergencySealable bool) {
 	if !st.isRelevant(ir.Result.BlockID) {
@@ -93,7 +94,7 @@ func (st *SealingObservation) QualifiesForEmergencySealing(ir *flow.Incorporated
 	st.getOrCreateRecord(ir).QualifiesForEmergencySealing(emergencySealable)
 }
 
-// ApprovalsMissing captures whether the business logic has determined that
+// ApprovalsMissing captures whether sealing.Core has determined that
 // some approvals are still missing for the incorporated result. Calling this
 // method with empty `chunksWithMissingApprovals` indicates that all chunks
 // have sufficient approvals.
