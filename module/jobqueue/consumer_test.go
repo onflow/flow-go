@@ -26,7 +26,7 @@ func TestProcessableJobs(t *testing.T) {
 		processings := map[uint64]*jobStatus{}
 		processedIndex := uint64(0)
 
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(unittest.Logger(), jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(0), processedTo)
@@ -48,7 +48,7 @@ func TestProcessableJobs(t *testing.T) {
 		}
 
 		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(unittest.Logger(), jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), processedTo)
@@ -72,7 +72,7 @@ func TestProcessableJobs(t *testing.T) {
 			processings[i] = &jobStatus{jobID: JobIDAtIndex(i), done: done}
 		}
 		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(unittest.Logger(), jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), processedTo)
@@ -95,7 +95,7 @@ func TestProcessableJobs(t *testing.T) {
 		}
 
 		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(unittest.Logger(), jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), processedTo)
@@ -117,7 +117,7 @@ func TestProcessableJobs(t *testing.T) {
 		}
 
 		processedIndex := uint64(2)
-		jobsToRun, processedTo, err := processableJobs(jobs, processings, maxProcessing, processedIndex)
+		jobsToRun, processedTo, err := processableJobs(unittest.Logger(), jobs, processings, maxProcessing, processedIndex)
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), processedTo)
