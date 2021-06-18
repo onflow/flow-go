@@ -92,6 +92,8 @@ func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()            
 func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
 func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
 func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                          {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                          {}
 func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}

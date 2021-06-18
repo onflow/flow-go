@@ -160,6 +160,14 @@ type ConsensusMetrics interface {
 }
 
 type VerificationMetrics interface {
+	// OnBlockConsumerJobDone is invoked by block consumer whenever it is notified a job is done by a worker. It
+	// sets the last processed block index job.
+	OnBlockConsumerJobDone(uint64)
+
+	// OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
+	// sets the last processed chunk index job.
+	OnChunkConsumerJobDone(uint64)
+
 	// TODO: remove this event handlers once we have new architecture in place.
 	// OnExecutionReceiptReceived is called whenever a new execution receipt arrives
 	// at Finder engine. It increments total number of received receipts.
