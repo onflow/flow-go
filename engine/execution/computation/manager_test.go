@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -45,6 +46,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx1 := testutil.DeployCounterContractTransaction(accounts[0], chain)
 	tx1.SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetGasLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx1, accounts[0], privateKeys[0])
@@ -55,6 +57,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 
 	tx2 := testutil.CreateCounterTransaction(accounts[0], accounts[1])
 	tx2.SetProposalKey(chain.ServiceAddress(), 0, 0).
+		SetGasLimit(1000).
 		SetPayer(chain.ServiceAddress())
 
 	err = testutil.SignPayload(tx2, accounts[1], privateKeys[1])
@@ -95,7 +98,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)
 
-	blockComputer, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
+	blockComputer, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 	require.NoError(t, err)
 
 	programsCache, err := NewProgramsCache(10)
@@ -116,6 +119,7 @@ func TestComputeBlockWithStorage(t *testing.T) {
 	require.NotEmpty(t, blockView.(*delta.View).Delta())
 	require.Len(t, returnedComputationResult.StateSnapshots, 1+1) // 1 coll + 1 system chunk
 	assert.NotEmpty(t, returnedComputationResult.StateSnapshots[0].Delta)
+	assert.True(t, returnedComputationResult.ComputationUsed > 0)
 }
 
 func TestExecuteScript(t *testing.T) {
@@ -146,7 +150,7 @@ func TestExecuteScript(t *testing.T) {
 		fvm.FungibleTokenAddress(execCtx.Chain).HexWithPrefix(),
 	))
 
-	engine, err := New(logger, nil, nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
+	engine, err := New(logger, metrics.NewNoopCollector(), nil, me, nil, vm, execCtx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
 	require.NoError(t, err)
 
 	header := unittest.BlockHeaderFixture()
@@ -168,7 +172,7 @@ func TestExecuteScripPanicsAreHandled(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), scriptLogThreshold)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -192,7 +196,7 @@ func TestExecuteScript_LongScriptsAreLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Millisecond)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)
@@ -216,7 +220,7 @@ func TestExecuteScript_ShortScriptsAreNotLogged(t *testing.T) {
 	})
 	header := unittest.BlockHeaderFixture()
 
-	manager, err := New(log, nil, nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second)
+	manager, err := New(log, metrics.NewNoopCollector(), nil, nil, nil, vm, ctx, DefaultProgramsCacheSize, committer.NewNoopViewCommitter(), 1*time.Second)
 	require.NoError(t, err)
 
 	_, err = manager.ExecuteScript([]byte("whatever"), nil, &header, view)

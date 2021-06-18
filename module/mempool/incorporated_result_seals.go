@@ -32,4 +32,8 @@ type IncorporatedResultSeals interface {
 
 	// Clear removes all entities from the pool.
 	Clear()
+
+	// PruneUpToHeight remove all seals for blocks whose height is strictly
+	// smaller that height. Note: seals for blocks at height are retained.
+	PruneUpToHeight(height uint64) error
 }

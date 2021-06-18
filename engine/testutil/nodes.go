@@ -239,7 +239,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	receipts := consensusMempools.NewExecutionTree()
 
-	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(1000))
+	seals := stdmap.NewIncorporatedResultSeals(1000)
 	pendingReceipts := stdmap.NewPendingReceipts(1000)
 
 	// receive collections
@@ -469,6 +469,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		syncThreshold,
 		false,
 		checkStakedAtBlock,
+		false,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
