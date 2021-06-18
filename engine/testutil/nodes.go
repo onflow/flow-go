@@ -945,7 +945,7 @@ func NewVerificationNode(t testing.TB,
 
 	if node.ChunkConsumer == nil {
 		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
-			node.Metrics,
+			collector,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
