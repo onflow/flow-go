@@ -161,11 +161,11 @@ type ConsensusMetrics interface {
 
 type VerificationMetrics interface {
 	// OnBlockConsumerJobDone is invoked by block consumer whenever it is notified a job is done by a worker. It
-	// sets the last processed block index job.
+	// sets the last processed block job index.
 	OnBlockConsumerJobDone(uint64)
 
 	// OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
-	// sets the last processed chunk index job.
+	// sets the last processed chunk job index.
 	OnChunkConsumerJobDone(uint64)
 
 	// TODO: remove this event handlers once we have new architecture in place.

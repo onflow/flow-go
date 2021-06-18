@@ -377,13 +377,13 @@ func (vc *VerificationCollector) OnVerifiableChunkSentToVerifier() {
 }
 
 // OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
-// sets the last processed chunk index job.
+// sets the last processed chunk job index.
 func (vc *VerificationCollector) OnChunkConsumerJobDone(processedIndex uint64) {
 	vc.lastProcessedChunkJobIndexChunkConsumer.Set(float64(processedIndex))
 }
 
 // OnBlockConsumerJobDone is invoked by block consumer whenever it is notified a job is done by a worker. It
-// sets the last processed block index job.
+// sets the last processed block job index.
 func (vc *VerificationCollector) OnBlockConsumerJobDone(processedIndex uint64) {
 	vc.lastProcessedBlockJobIndexBlockConsumer.Set(float64(processedIndex))
 }
