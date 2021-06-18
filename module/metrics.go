@@ -48,6 +48,7 @@ type EngineMetrics interface {
 
 type ComplianceMetrics interface {
 	FinalizedHeight(height uint64)
+	CommittedEpochFinalView(view uint64)
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
@@ -292,13 +293,16 @@ type WALMetrics interface {
 
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
-	TransactionParsed(dur time.Duration)
+	RuntimeTransactionParsed(dur time.Duration)
 
 	// TransactionChecked reports the time spent checking a single transaction
-	TransactionChecked(dur time.Duration)
+	RuntimeTransactionChecked(dur time.Duration)
 
 	// TransactionInterpreted reports the time spent interpreting a single transaction
-	TransactionInterpreted(dur time.Duration)
+	RuntimeTransactionInterpreted(dur time.Duration)
+
+	// RuntimeSetNumberOfAccounts Sets the total number of accounts on the network
+	RuntimeSetNumberOfAccounts(count uint64)
 }
 
 type ProviderMetrics interface {
@@ -321,9 +325,6 @@ type ExecutionMetrics interface {
 	// from being received for execution to execution being finished
 	FinishBlockReceivedToExecuted(blockID flow.Identifier)
 
-	// ExecutionComputationUsedPerBlock reports computation used per block
-	ExecutionComputationUsedPerBlock(computation uint64)
-
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
@@ -333,8 +334,17 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
-	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
-	ExecutionTotalExecutedTransactions(numExecuted int)
+	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
+	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
+
+	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
+	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
+
+	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool)
+
+	// ExecutionScriptExecuted reports the time spent on executing an script
+	ExecutionScriptExecuted(dur time.Duration, compUsed uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()
