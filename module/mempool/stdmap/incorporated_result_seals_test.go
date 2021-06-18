@@ -28,10 +28,10 @@ func (m *icrSealsMachine) Init(t *rapid.T) {
 
 // Add is a conditional action which adds an item to the icrSeals.
 func (m *icrSealsMachine) Add(t *rapid.T) {
-	i := rapid.Int().Draw(t, "i").(int)
+	i := rapid.Uint64().Draw(t, "i").(uint64)
 
 	seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
-		s.Header.Height = uint64(i)
+		s.Header.Height = i
 	})
 
 	_, err := m.icrs.Add(seal)
@@ -74,7 +74,7 @@ func (m *icrSealsMachine) Add(t *rapid.T) {
 
 // Prune is a Conditional action that removes elements of height strictly lower than its argument
 func (m *icrSealsMachine) PruneUpToHeight(t *rapid.T) {
-	h := uint64(rapid.Int().Draw(t, "h").(int))
+	h := rapid.Uint64().Draw(t, "h").(uint64)
 	err := m.icrs.PruneUpToHeight(h)
 	if h >= m.icrs.lowestHeight {
 		require.NoError(t, err)
