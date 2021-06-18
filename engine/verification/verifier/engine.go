@@ -195,22 +195,28 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 
 	// if any fault found with the chunk
+	sendApproval := true
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
 			e.log.Error().Msg(chFault.String())
+			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
+			sendApproval = false
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
+			sendApproval = false
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
 				chFault, chFault.String())
 		}
-		// don't do anything else, but skip generating result approvals
-		return nil
+		if !sendApproval {
+			// don't do anything else, but skip generating result approvals
+			return nil
+		}
 	}
 
 	// Generate result approval
