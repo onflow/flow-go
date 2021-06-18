@@ -199,7 +199,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 
 	if systemChunk {
 
-		computedServiceEvents := make(flow.ServiceEventsList, len(result.ServiceEvents))
+		computedServiceEvents := make(flow.ServiceEventList, len(result.ServiceEvents))
 
 		for i, serviceEvent := range serviceEvents {
 			realServiceEvent, err := convert.ServiceEvent(serviceEvent)

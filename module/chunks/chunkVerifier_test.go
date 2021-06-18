@@ -166,17 +166,17 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 // TestServiceEventsMismatch tests verification behavior in case
 // of emitted service events not matching chunks'
 func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
-	vch := GetBaselineVerifiableChunk(s.T(), "serviceEventsMismatch", true)
+	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	assert.NotNil(s.T(), vch)
 	_, chFault, err := s.systemBadVerifier.SystemChunkVerify(vch)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFault)
-	assert.IsType(s.T(), &chunksmodels.CFInvalidSystemEventsEmitted{}, chFault)
+	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, chFault)
 }
 
 // TestServiceEventsAreChecked ensures that service events are in fact checked
 func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
-	vch := GetBaselineVerifiableChunk(s.T(), "serviceEventsMismatch", true)
+	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	assert.NotNil(s.T(), vch)
 	_, chFault, err := s.systemOkVerifier.SystemChunkVerify(vch)
 	assert.Nil(s.T(), err)
@@ -407,6 +407,7 @@ func (vm *vmSystemOkMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vie
 
 	tx.ServiceEvents = []flow.Event{epochSetupEvent}
 
+	// add "default" interaction expected in tests
 	_, _ = led.Get("00", "", "")
 	_, _ = led.Get("05", "", "")
 	_ = led.Set("05", "", "", []byte{'B'})
@@ -422,7 +423,7 @@ func (vm *vmSystemBadMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.Vi
 	if !ok {
 		return fmt.Errorf("invokable is not a transaction")
 	}
-
+	// EpochSetup event is expected, but we emit EpochCommit here resulting in a chunk fault
 	tx.ServiceEvents = []flow.Event{epochCommitEvent}
 
 	return nil
