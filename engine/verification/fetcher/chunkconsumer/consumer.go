@@ -23,16 +23,16 @@ const (
 type ChunkConsumer struct {
 	consumer       module.JobConsumer
 	chunkProcessor fetcher.AssignedChunkProcessor
-	metrics        module.VerificationMetrics,
+	metrics        module.VerificationMetrics
 }
 
 func NewChunkConsumer(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
-	processedIndex storage.ConsumerProgress,       // to persist the processed index
-	chunksQueue storage.ChunksQueue,               // to read jobs (chunks) from
+	processedIndex storage.ConsumerProgress, // to persist the processed index
+	chunksQueue storage.ChunksQueue, // to read jobs (chunks) from
 	chunkProcessor fetcher.AssignedChunkProcessor, // to process jobs (chunks)
-	maxProcessing uint64,                          // max number of jobs to be processed in parallel
+	maxProcessing uint64, // max number of jobs to be processed in parallel
 ) *ChunkConsumer {
 	worker := NewWorker(chunkProcessor)
 	chunkProcessor.WithChunkConsumerNotifier(worker)
