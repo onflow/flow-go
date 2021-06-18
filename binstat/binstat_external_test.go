@@ -59,7 +59,7 @@ func f6(outerFuncName string, f func(string) time.Duration, loop int, try int, i
 }
 
 func run(loop int, try int, gomaxprocs int) error {
-	pprofFileName := fmt.Sprintf("binstat_external_test.loop-%d.try-%d.gomaxprocs-%d.pprof", loop, try, gomaxprocs)
+	pprofFileName := fmt.Sprintf("binstat_external_test.loop-%d.try-%d.gomaxprocs-%d.pprof.txt", loop, try, gomaxprocs)
 	timerFile, err := os.Create(pprofFileName)
 	if err != nil {
 		return err
@@ -85,12 +85,12 @@ func run(loop int, try int, gomaxprocs int) error {
 
 	runtime.GOMAXPROCS(gomaxprocs)
 	wg.Add(6)
-	go f1("f-via-f1", f, loop, try, 0)
-	go f2("f-via-f2", f, loop, try, 1)
-	go f3("f-via-f3", f, loop, try, 2)
-	go f4("f-via-f4", f, loop, try, 3)
-	go f5("f-via-f5", f, loop, try, 4)
-	go f6("f-via-f6", f, loop, try, 5)
+	go f1("~1f-via-f1", f, loop, try, 0)
+	go f2("~1f-via-f2", f, loop, try, 1)
+	go f3("~1f-via-f3", f, loop, try, 2)
+	go f4("~1f-via-f4", f, loop, try, 3)
+	go f5("~1f-via-f5", f, loop, try, 4)
+	go f6("~1f-via-f6", f, loop, try, 5)
 
 	wg.Wait()
 	pprof.StopCPUProfile()
@@ -98,7 +98,7 @@ func run(loop int, try int, gomaxprocs int) error {
 
 	// run pprof and capture its output
 	/*
-		e.g. $ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof 2>&1 | egrep '(binstat_test.f|cum)'
+		e.g. $ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof.txt 2>&1 | egrep '(binstat_test.f|cum)'
 		e.g.      flat  flat%   sum%        cum   cum%
 		e.g.         0     0%   100%      0.07s 19.44%  github.com/onflow/flow-go/binstat_test.f1
 		e.g.         0     0%   100%      0.02s  5.56%  github.com/onflow/flow-go/binstat_test.f2
@@ -108,7 +108,7 @@ func run(loop int, try int, gomaxprocs int) error {
 		e.g.         0     0%   100%      0.03s  8.33%  github.com/onflow/flow-go/binstat_test.f6
 
 		$ # todo: consider workaround: have seen pprof fail on macOS extremely infrequently, e.g. below .f5 completely missing?! how?!
-		$ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof
+		$ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof.txt
 		Type: cpu
 		Time: Jun 14, 2021 at 7:37pm (PDT)
 		Duration: 200.55ms, Total samples = 0.36s (179.51%)
@@ -148,10 +148,11 @@ func run(loop int, try int, gomaxprocs int) error {
 func TestWithPprof(t *testing.T) {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
+	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
 
 	// delete any files hanging around from previous test run
 	{
-		command := fmt.Sprintf("ls -al ./binstat.test.pid-*.txt ./*gomaxprocs*.pprof ; rm -f ./binstat.test.pid-*.txt ./*gomaxprocs*.pprof")
+		command := fmt.Sprintf("ls -al ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt")
 		out, err := exec.Command("bash", "-c", command).Output()
 		if err != nil {
 			log.Fatal(err)
@@ -223,7 +224,7 @@ func TestWithPprof(t *testing.T) {
 
 	// cat and sort binstat stats file
 	{
-		command := fmt.Sprintf("ls -al ./binstat.test.pid-*.txt ; cat ./binstat.test.pid-*.txt | sort")
+		command := fmt.Sprintf("ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort")
 		out, err := exec.Command("bash", "-c", command).Output()
 		if err != nil {
 			log.Fatal(err)

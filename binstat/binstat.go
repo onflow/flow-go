@@ -55,11 +55,12 @@ type BinStatGlobal struct {
 	second           uint64
 	startTime        time.Time
 	startTimeMono    time.Duration
+	lenWhat          string // e.g. "~Code=99;~X=99"
+	what2len         map[string]int // e.g. Code -> 99, X -> 99
 }
 
 type BinStat struct {
-	what string
-	//	enterTime      time.Time
+	what           string
 	enterTime      time.Duration
 	callerFunc     string
 	callerLine     int
@@ -81,6 +82,7 @@ const (
 	BinStatInternalPnt
 	BinStatInternalRng
 	BinStatInternalDbg
+	BinStatInternalGC
 )
 
 const BinStatMaxDigitsUint64 = 20
@@ -95,6 +97,11 @@ func runtimeNanoAsTimeDuration() time.Duration {
 	return time.Duration(runtimeNano())
 }
 
+func atoi(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
+}
+
 func ini() {
 	binStatGlobalRWMutex.Lock() // lock for single writer
 	if false == binStatGlobal.initialized {
@@ -106,6 +113,24 @@ func ini() {
 		binStatGlobal.cutPath, _ = os.LookupEnv("BINSTAT_CUT_PATH")
 		if binStatGlobal.cutPath == "" {
 			binStatGlobal.cutPath = "github.com/onflow/flow-go/"
+		}
+		binStatGlobal.what2len = make(map[string]int)
+		binStatGlobal.lenWhat, _ = os.LookupEnv("BINSTAT_LEN_WHAT")
+		if len(binStatGlobal.lenWhat) > 0 {
+			parts := strings.Split(binStatGlobal.lenWhat, ";")
+			for n, part := range parts { // e.g. "~Code=99"
+				subParts := strings.Split(part, "=")
+				if (len(subParts) != 2) || (subParts[0][0:1] != "~") || (0 == len(subParts[0][1:])) || (0 == atoi(subParts[1])) {
+					panic(fmt.Sprintf("ERROR: BINSTAT_LEN_WHAT=%s <-- cannot parse <-- format should be ~<what prefix>=<max len>[;...], e.g. ~Code=99;~X=99\n", binStatGlobal.lenWhat))
+				}
+				k := subParts[0][1:]
+				v := atoi(subParts[1])
+				binStatGlobal.what2len[k] = v
+				if binStatGlobal.verbose {
+					elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - binStatGlobal.startTimeMono).Seconds()
+					fmt.Printf("%f %d=pid %d=tid ini() // .lenWhat=%s; extracted #%d k=%s v=%d\n", elapsedThisProc, os.Getpid(), int64(C.gettid()), binStatGlobal.lenWhat, n, k, v)
+				}
+			}
 		}
 		binStatGlobal.processBaseName = filepath.Base(os.Args[0])
 		binStatGlobal.processPid = os.Getpid()
@@ -126,6 +151,7 @@ func ini() {
 		appendInternalKey(BinStatInternalPnt, "/internal/binstat.Pnt")
 		appendInternalKey(BinStatInternalRng, "/internal/binstat.rng")
 		appendInternalKey(BinStatInternalDbg, "/internal/binstat.Dbg")
+		appendInternalKey(BinStatInternalGC, "/internal/GCStats")
 
 		binStatGlobal.index = len(binStatGlobal.keysArray)
 		binStatGlobal.indexInternalMax = len(binStatGlobal.keysArray)
@@ -134,7 +160,7 @@ func ini() {
 
 		if binStatGlobal.verbose {
 			elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - binStatGlobal.startTimeMono).Seconds()
-			fmt.Printf("%f %d=pid %d=tid ini() // .enable=%t .verbose=%t .cutPath=%s\n", elapsedThisProc, os.Getpid(), int64(C.gettid()), binStatGlobal.enable, binStatGlobal.verbose, binStatGlobal.cutPath)
+			fmt.Printf("%f %d=pid %d=tid ini() // .enable=%t .verbose=%t .cutPath=%s .lenWhat=%s\n", elapsedThisProc, os.Getpid(), int64(C.gettid()), binStatGlobal.enable, binStatGlobal.verbose, binStatGlobal.cutPath, binStatGlobal.lenWhat)
 		}
 
 	}
@@ -147,8 +173,6 @@ func Fin() {
 }
 
 func newGeneric(what string, callerParams string, callerTime bool, callerSize int64, callerSizeWhen int, verbose bool) *BinStat {
-	t := runtimeNanoAsTimeDuration()
-
 	if false == binStatGlobal.initialized {
 		ini()
 	}
@@ -157,13 +181,29 @@ func newGeneric(what string, callerParams string, callerTime bool, callerSize in
 		return nil
 	}
 
+	t := runtimeNanoAsTimeDuration()
+
 	// todo: is there a way to speed up runtime.Caller() and/or runtime.FuncForPC() somehow? cache pc value or something like that?
-	pc, _, fileLine, _ := runtime.Caller(2) // 2 assumes binStat.NewGeneric() called indirectly
+	pc, _, fileLine, _ := runtime.Caller(2) // 2 assumes private binStat.newGeneric() called indirectly via public stub function; please see eof
 	fn := runtime.FuncForPC(pc)
 	funcName := fn.Name()
 	funcName = strings.ReplaceAll(funcName, binStatGlobal.cutPath, "")
 
-	p := BinStat{what, t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
+	whatLen := len(what)
+	if (what[0:1] == "~") && (len(what) >= 3) {
+		// come here if what is "~<default len><what>", meaning that BINSTAT_LEN_WHAT may override <default len>
+		whatLenDefault := atoi(what[1:2])
+		whatLen = whatLenDefault + 2
+		if whatLenOverride, keyExists := binStatGlobal.what2len[what[2:2 + whatLenDefault]]; keyExists {
+			whatLen = whatLenOverride + 2
+		}
+		if whatLen > len(what) {
+			whatLen = len(what)
+		}
+		//debug fmt.Printf("debug: detected ~%d%s in %s; using ~%d..\n", whatLenDefault, what[2:2 + whatLenDefault], what, whatLen)
+	}
+
+	p := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
 
 	t2 := runtimeNanoAsTimeDuration()
 	if t2 <= t {
@@ -185,11 +225,11 @@ func newGeneric(what string, callerParams string, callerTime bool, callerSize in
 }
 
 func pntGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen int, verbose bool) time.Duration {
-	t := runtimeNanoAsTimeDuration()
-
 	if false == binStatGlobal.enable {
-		return t - t
+		return time.Duration(0)
 	}
+
+	t := runtimeNanoAsTimeDuration()
 
 	elapsedNanoAsTimeDuration := t - p.enterTime
 	if BinStatSizeAtLeave == callerSizeWhen {
@@ -215,13 +255,11 @@ func pntGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen
 		pointType = "pnt"
 		keySizeRange = fmt.Sprintf("/size[pnt:%s]", pointUnique)
 	}
-	goGC := debug.SetGCPercent(0)
-	debug.SetGCPercent(goGC)
 	if p.callerTime {
 		elapsedSeconds := elapsedNanoAsTimeDuration.Seconds()
 		keyTimeRange = fmt.Sprintf("/time[%s]", rng(elapsedSeconds, false))
 	}
-	key := fmt.Sprintf("/CPUS=%d,GOMAXPROCS=%d,GC=%d/what[%s]/file[%s:%d]%s%s", runtime.NumCPU(), runtime.GOMAXPROCS(0), goGC, p.what, p.callerFunc, p.callerLine, keyTimeRange, keySizeRange)
+	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]/file[%s:%d]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), p.what, p.callerFunc, p.callerLine, keySizeRange, keyTimeRange)
 
 TRY_AGAIN_RACE_CONDITION:
 	var frequency uint64
@@ -360,16 +398,23 @@ func tck(t time.Duration) {
 	for range time.Tick(t) {
 		p := newInternal("internal-NumG")
 		endValInternal(p, int64(runtime.NumGoroutine()))
-		// todo: consider reporting on debug.ReadGCStats() ?
 	}
 }
 
 // todo: would a different format, like CSV or JSON, be useful and how would it be used?
 // todo: consider env var for path to bin dump file (instead of just current folder)?
 // todo: if bin dump file path is /dev/shm, add paranoid checking around filling up /dev/shm?
+// todo: consider reporting on num active go-routines [1] and/or SchedStats API [2] if/when available.
+// [1] https://github.com/golang/go/issues/17089 "runtime: expose number of running/runnable goroutines #17089"
+// [2] https://github.com/golang/go/issues/15490 "proposal: runtime: add SchedStats API #15490"
 func dmp() {
 	p := newTimeInternal("internal-dump")
 	defer endInternal(p)
+
+	var gcStats debug.GCStats
+	debug.ReadGCStats(&gcStats)
+	binStatGlobal.frequencyShadow[BinStatInternalGC] = uint64(gcStats.NumGC)
+	binStatGlobal.accumMonoShadow[BinStatInternalGC] = uint64(gcStats.PauseTotal)
 
 	binStatGlobalRWMutex.RLock() // lock for many readers v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 
@@ -388,8 +433,8 @@ func dmp() {
 		atomic.StoreUint64(&binStatGlobal.accumMono[i], v2)
 	}
 
-	fileTmp := fmt.Sprintf("./%s.pid-%06d.txt.tmp", binStatGlobal.processBaseName, binStatGlobal.processPid)
-	fileNew := fmt.Sprintf("./%s.pid-%06d.txt", binStatGlobal.processBaseName, binStatGlobal.processPid)
+	fileTmp := fmt.Sprintf("./%s.pid-%06d.binstat.txt.tmp", binStatGlobal.processBaseName, binStatGlobal.processPid)
+	fileNew := fmt.Sprintf("./%s.pid-%06d.binstat.txt", binStatGlobal.processBaseName, binStatGlobal.processPid)
 	f, err := os.Create(fileTmp)
 	if err != nil {
 		panic(err)

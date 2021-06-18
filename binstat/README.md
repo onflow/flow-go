@@ -15,7 +15,7 @@
 
 ## How `binstat` works?
 
-* Sprinkle `binstat.New*()` and `binstat.End*()` into Golang source code, e.g.:
+* Sprinkle `binstat.New*(<what>)` and `binstat.End*()` into Golang source code, e.g.:
 
 ```
 	for loop := 0; loop < 2; loop++ {
@@ -39,6 +39,11 @@ $ #                                               total seconds for all incremen
 ```
 
 * If `myFunc()` is identical, why different results? E.g. launches 3 go-routines executing slower if `GOMAXPROCS=1`.
+
+### How 'collapsable' `<what>` works?
+
+* If `<what>` has the format `~<default len><what>`, then `~4RootL1L2` only uses `~4Root` in the bin name, unless env var `BINSTAT_LEN_WHAT="~Root=6"` in which case the bin name uses `~4RootL1`.
+* In this way, the bin quantity for a particular `<what>` defaults to fewer bins, but may be enlarged using the env var.
 
 ## What makes `binstat` efficient?
 
@@ -94,55 +99,68 @@ $ pushd binstat ; GO111MODULE=on go test -v ./... ; popd
   * Note: The `binstat.dmp` bins show how long opportunistically saving the `binstat` file took.
 
 ```
-- debug: output of command: ls -al ./binstat.test.pid-*.txt ; cat ./binstat.test.pid-*.txt | sort
--rw-r--r-- 1 simon_hardy_francis_dapperlabs_c simon_hardy_francis_dapperlabs_c 2723 Jun 15 18:51 ./binstat.test.pid-023263.txt
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f1]/file[binstat_test.run.func1:72]/time[0.800000-0.899999]=3 2.467652
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f2]/file[binstat_test.run.func1:72]/time[0.800000-0.899999]=3 2.414340
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f3]/file[binstat_test.run.func1:72]/time[0.700000-0.799999]=3 2.240119
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f4]/file[binstat_test.run.func1:72]/time[0.700000-0.799999]=3 2.322448
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f5]/file[binstat_test.run.func1:72]/time[0.700000-0.799999]=3 2.209643
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f6]/file[binstat_test.run.func1:72]/time[0.700000-0.799999]=1 0.767226
-/CPUS=16,GOMAXPROCS=1,GC=100/what[f-via-f6]/file[binstat_test.run.func1:72]/time[0.800000-0.899999]=2 1.674665
-/CPUS=16,GOMAXPROCS=1,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:10-19]=23 0.000164
-/CPUS=16,GOMAXPROCS=1,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:4]=5 0.000089
-/CPUS=16,GOMAXPROCS=1,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:8]=1 0.000006
-/CPUS=16,GOMAXPROCS=1,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:9]=1 0.000004
-/CPUS=16,GOMAXPROCS=1,GC=100/what[internal-dump]/file[binstat.dmp:380]/time[0.000100-0.000199]=2 0.000335
-/CPUS=16,GOMAXPROCS=1,GC=100/what[internal-dump]/file[binstat.dmp:380]/time[0.000200-0.000299]=1 0.000214
-/CPUS=16,GOMAXPROCS=1,GC=100/what[loop-0]/file[binstat_test.TestWithPprof:161]/time[3.000000-3.999999]=1 3.044985
+- debug: output of command: ls -al ./binstat.test.pid-*.txt ; cat ./binstat.test.pid-*.txt | sort --version-sort
+-rw-r--r--  1 simonhardy-francis  staff  3779 18 Jun 15:31 ./binstat.test.pid-023913.binstat.txt
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f1]/file[binstat_test.run.func1:74]/time[0.200000-0.299999]=2 0.577273
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f1]/file[binstat_test.run.func1:74]/time[0.300000-0.399999]=1 0.375265
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f2]/file[binstat_test.run.func1:74]/time[0.200000-0.299999]=1 0.284086
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f2]/file[binstat_test.run.func1:74]/time[0.300000-0.399999]=2 0.701519
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:74]/time[0.200000-0.299999]=2 0.556883
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:74]/time[0.300000-0.399999]=1 0.340072
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f4]/file[binstat_test.run.func1:74]/time[0.300000-0.399999]=3 0.941300
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:74]/time[0.200000-0.299999]=3 0.829652
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:74]/time[0.300000-0.399999]=3 1.163841
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:4]=5 0.000056
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:5]=1 0.000017
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:6]=1 0.000006
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:9]=1 0.000008
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:10-19]=10 0.000138
+/GOMAXPROCS=1,CPUS=8/what[internal-dump]/file[binstat.dmp:411]/time[0.080000-0.089999]=1 0.081061
+/GOMAXPROCS=1,CPUS=8/what[loop-0]/file[binstat_test.TestWithPprof:169]/time[1.000000-1.999999]=1 1.882274
 ```
 
 * This part is when `GOMAXPROCS=8`.
   * Note: The `f1` - `f6` functions executed in parallel without pre-emption & therefore quicker.
 
 ```
-/CPUS=16,GOMAXPROCS=8,GC=100/what[f-via-f1]/file[binstat_test.run.func1:72]/time[0.100000-0.199999]=3 0.444851
-/CPUS=16,GOMAXPROCS=8,GC=100/what[f-via-f2]/file[binstat_test.run.func1:72]/time[0.100000-0.199999]=3 0.428401
-/CPUS=16,GOMAXPROCS=8,GC=100/what[f-via-f3]/file[binstat_test.run.func1:72]/time[0.100000-0.199999]=3 0.432500
-/CPUS=16,GOMAXPROCS=8,GC=100/what[f-via-f4]/file[binstat_test.run.func1:72]/time[0.100000-0.199999]=3 0.425010
-/CPUS=16,GOMAXPROCS=8,GC=100/what[f-via-f5]/file[binstat_test.run.func1:72]/time[0.100000-0.199999]=3 0.434849
-/CPUS=16,GOMAXPROCS=8,GC=100/what[f-via-f6]/file[binstat_test.run.func1:72]/time[0.100000-0.199999]=3 0.436037
-/CPUS=16,GOMAXPROCS=8,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:10-19]=4 0.000073
-/CPUS=16,GOMAXPROCS=8,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:4]=4 0.000064
-/CPUS=16,GOMAXPROCS=8,GC=100/what[internal-NumG]/file[binstat.tck:370]/size[end:8]=1 0.000008
-/CPUS=16,GOMAXPROCS=8,GC=100/what[loop-1]/file[binstat_test.TestWithPprof:161]/time[0.900000-0.999999]=1 0.940341
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f1]/file[binstat_test.run.func1:74]/time[0.060000-0.069999]=3 0.208766
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f2]/file[binstat_test.run.func1:74]/time[0.060000-0.069999]=2 0.138321
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f2]/file[binstat_test.run.func1:74]/time[0.070000-0.079999]=1 0.070255
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:74]/time[0.060000-0.069999]=2 0.139178
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:74]/time[0.070000-0.079999]=1 0.070239
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f4]/file[binstat_test.run.func1:74]/time[0.060000-0.069999]=3 0.208381
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:74]/time[0.060000-0.069999]=2 0.137084
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:74]/time[0.070000-0.079999]=1 0.070042
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:74]/time[0.060000-0.069999]=3 0.208238
+/GOMAXPROCS=8,CPUS=8/what[~2egNewTimeVal]/file[binstat.TestRng:18]/size[end:100-199]/time[0.000020-0.000029]=1 0.000023
+/GOMAXPROCS=8,CPUS=8/what[~2egNewTimeVal]/file[binstat.TestRng:18]/size[pnt:myPnt]/time[0.000010-0.000019]=1 0.000010
+/GOMAXPROCS=8,CPUS=8/what[~2egNew]/file[binstat.TestRng:15]/size[end:100-199]=1 0.000028
+/GOMAXPROCS=8,CPUS=8/what[~2egnewTimeValInternal]/file[binstat.TestRng:22]/size[new:100-199]/time[0.000009-0.000009]=1 0.000010
+/GOMAXPROCS=8,CPUS=8/what[~2egnewTimeValInternal]/file[binstat.TestRng:22]/size[pnt:myPnt]/time[0.000004-0.000004]=1 0.000005
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:4]=4 0.000120
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:5]=3 0.000085
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:399]/size[end:10-19]=2 0.000030
+/GOMAXPROCS=8,CPUS=8/what[internal-dump]/file[binstat.dmp:411]/time[0.001000-0.001999]=1 0.001428
+/GOMAXPROCS=8,CPUS=8/what[loop-1]/file[binstat_test.TestWithPprof:169]/time[0.700000-0.799999]=1 0.799061
 ```
 
 * This part shows internal timings, as well as the Unix time, & elapsed seconds since process start.
 
 ```
-/internal/binstat.Dbg=36 0.000003
-/internal/binstat.New=81 0.004901
-/internal/binstat.Pnt=80 0.001128
-/internal/binstat.rng=80 0.000665
-/internal/second=1623783112 3.985671
+/internal/GCStats=5 0.001110
+/internal/binstat.Dbg=36 0.000004
+/internal/binstat.New=71 0.006490
+/internal/binstat.Pnt=72 0.151686
+/internal/binstat.rng=112 0.000480
+/internal/second=1624055476 2.787199
 ```
 
 ## Environment variables
 
-* If `BINSTAT_ENABLE` exists, `binstat` is enabled. Default: disabled.
-* If `BINSTAT_VERBOSE` exists, `binstat` outputs debug info. Default: disabled.
-* if `BINSTAT_CUT_PATH` exists, cut the function name path with this. Default: `github.com/onflow/flow-go/`.
+* If `BINSTAT_ENABLE` exists, `binstat` is enabled. Default: Disabled.
+* If `BINSTAT_VERBOSE` exists, `binstat` outputs debug info. Default: Disabled.
+* If `BINSTAT_CUT_PATH` exists, cut function name path with this. Default: `=github.com/onflow/flow-go/`.
+* If `BINSTAT_LEN_WHAT` exists, truncate `<what>` to `<len>` from `~<what>=<len>`, e.g. `~f=99;~2eg=99`.
 
 ## Todo
 

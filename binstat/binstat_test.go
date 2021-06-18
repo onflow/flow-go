@@ -10,15 +10,16 @@ import (
 func TestRng(t *testing.T) {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
+	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
 
-	p1 := New("egNew", "")
+	p1 := New("~2egNew", "")
 	EndVal(p1, 123)
 
-	p2 := NewTimeVal("egNewTimeVal", "", 123)
+	p2 := NewTimeVal("~2egNewTimeVal", "", 123)
 	Pnt(p2, "myPnt")
 	EndVal(p2, 123)
 
-	p3 := newTimeValInternal("egnewTimeValInternal", 123)
+	p3 := newTimeValInternal("~2egnewTimeValInternal", 123)
 	pntInternal(p3, "myPnt")
 	endInternal(p3)
 
