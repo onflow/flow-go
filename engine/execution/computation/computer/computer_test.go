@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -53,7 +54,16 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Return(nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		metrics := new(modulemock.ExecutionMetrics)
+		metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Times(2) // 1 collection + system collection
+
+		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Times(2 + 1) // 2 txs in collection + system chunk tx
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -447,6 +457,10 @@ func (r *RandomAddressGenerator) Bytes() []byte {
 	panic("not implemented")
 }
 
+func (r *RandomAddressGenerator) AddressCount() uint64 {
+	panic("not implemented")
+}
+
 type FixedAddressGenerator struct {
 	Address flow.Address
 }
@@ -460,6 +474,10 @@ func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
 }
 
 func (f *FixedAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
@@ -529,7 +547,16 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 		Return(nil, nil, nil).
 		Times(1) // only system chunk
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	metrics := new(modulemock.ExecutionMetrics)
+	metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Times(1) // system collection
+
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Times(1) // system chunk tx
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing

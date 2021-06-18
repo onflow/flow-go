@@ -1,7 +1,6 @@
 package stdmap
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -148,18 +147,6 @@ func TestPendingReceipts(t *testing.T) {
 		require.Equal(t, 60, total)
 	})
 
-	concurrently := func(n int, f func(int)) {
-		var wg sync.WaitGroup
-		for i := 0; i < n; i++ {
-			wg.Add(1)
-			go func(i int) {
-				f(i)
-				wg.Done()
-			}(i)
-		}
-		wg.Wait()
-	}
-
 	t.Run("concurrent adding and removing", func(t *testing.T) {
 		pool := NewPendingReceipts(100)
 
@@ -168,25 +155,25 @@ func TestPendingReceipts(t *testing.T) {
 			rs[i] = unittest.ExecutionReceiptFixture()
 		}
 
-		concurrently(100, func(i int) {
+		unittest.Concurrently(100, func(i int) {
 			r := rs[i]
 			ok := pool.Add(r)
 			require.True(t, ok)
 		})
 
-		concurrently(100, func(i int) {
+		unittest.Concurrently(100, func(i int) {
 			r := rs[i]
 			actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 			require.Equal(t, []*flow.ExecutionReceipt{r}, actual)
 		})
 
-		concurrently(100, func(i int) {
+		unittest.Concurrently(100, func(i int) {
 			r := rs[i]
 			ok := pool.Rem(r.ID())
 			require.True(t, ok)
 		})
 
-		concurrently(100, func(i int) {
+		unittest.Concurrently(100, func(i int) {
 			r := rs[i]
 			actual := pool.ByPreviousResultID(r.ExecutionResult.PreviousResultID)
 			require.Equal(t, empty, actual)
