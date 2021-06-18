@@ -61,6 +61,8 @@ const (
 	subsystemFetcherEngine   = "fetcher"
 	subsystemRequesterEngine = "requester"
 	subsystemVerifierEngine  = "verifier"
+	subsystemBlockConsumer   = "block_consumer"
+	subsystemChunkConsumer   = "chunk_consumer"
 )
 
 // METRIC NAMING GUIDELINES
