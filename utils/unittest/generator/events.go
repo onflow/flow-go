@@ -42,10 +42,14 @@ func (g *Events) New() flow.Event {
 		},
 	}
 
+	fooStr, err := cadence.NewString("foo")
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error while encoding events: %s", err))
+	}
 	testEvent := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewInt(int(g.count)),
-			cadence.NewString("foo"),
+			fooStr,
 		}).WithType(testEventType)
 
 	payload, err := encoding.Encode(testEvent)
