@@ -54,8 +54,8 @@ func NewChunkConsumer(
 }
 
 func (c *ChunkConsumer) NotifyJobIsDone(jobID module.JobID) {
-	c.consumer.NotifyJobIsDone(jobID)
-	c.metrics.OnChunkConsumerJobDone(c.consumer.ProcessedIndex())
+	processedIndex := c.consumer.NotifyJobIsDone(jobID)
+	c.metrics.OnChunkConsumerJobDone(processedIndex)
 }
 
 // Size returns number of in-memory chunk jobs that chunk consumer is processing.

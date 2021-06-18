@@ -79,8 +79,8 @@ func NewBlockConsumer(log zerolog.Logger,
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
 // processing a (block) job.
 func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
-	c.consumer.NotifyJobIsDone(jobID)
-	c.metrics.OnBlockConsumerJobDone(c.consumer.ProcessedIndex())
+	processedIndex := c.consumer.NotifyJobIsDone(jobID)
+	c.metrics.OnBlockConsumerJobDone(processedIndex)
 }
 
 // Size returns number of in-memory block jobs that block consumer is processing.
