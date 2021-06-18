@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
@@ -597,15 +598,21 @@ func (e *Engine) matchChunk(
 		return fmt.Errorf("could not find block header: %w", err)
 	}
 
+	transactionOffset, err := fetcher.TransactionOffsetForChunk(result.Chunks, chunk.Index)
+	if err != nil {
+		return fmt.Errorf("cannot compute transaction offset for chunk: %w", err)
+	}
+
 	// creates a verifiable chunk for assigned chunk
 	vchunk := &verification.VerifiableChunkData{
-		IsSystemChunk: isSystemChunk,
-		Chunk:         chunk,
-		Header:        header,
-		Result:        result,
-		Collection:    collection,
-		ChunkDataPack: chunkDataPack,
-		EndState:      endState,
+		IsSystemChunk:     isSystemChunk,
+		Chunk:             chunk,
+		Header:            header,
+		Result:            result,
+		Collection:        collection,
+		ChunkDataPack:     chunkDataPack,
+		EndState:          endState,
+		TransactionOffset: transactionOffset,
 	}
 
 	err = e.verifier.ProcessLocal(vchunk)

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -55,7 +56,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
 	for i, txBody := range vc.Collection.Transactions {
-		tx := fvm.Transaction(txBody, uint32(i))
+		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
 
@@ -161,8 +162,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
 
-		// tx := fvm.Transaction(txBody, uint32(i))
-
 		err := fcv.vm.Run(context, tx, txView, programs)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
@@ -179,6 +178,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 	}
+
+	spew.Config.DisableMethods = true
+	spew.Dump(events)
 
 	// check read access to unknown registers
 	if len(unknownRegTouch) > 0 {

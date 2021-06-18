@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/engine/execution"
 
 	"github.com/onflow/flow-go/crypto"
 	engineCommon "github.com/onflow/flow-go/engine"
@@ -356,10 +355,18 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 func TestChunkIndexIsSet(t *testing.T) {
 
 	i := mathRand.Int()
-	chunk := execution.GenerateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
+	chunk := execution.GenerateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), 21)
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
+}
+
+func TestChunkNumberOfTxsIsSet(t *testing.T) {
+
+	i := uint16(mathRand.Uint32())
+	chunk := execution.GenerateChunk(3, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), i)
+
+	assert.Equal(t, i, chunk.NumberOfTransactions)
 }
 
 func TestExecuteOneBlock(t *testing.T) {
@@ -713,19 +720,35 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	execState := new(state.ExecutionState)
 
-	e := Engine{
-		execState: execState,
-	}
+	ctrl := gomock.NewController(t)
+	me := module.NewMockLocal(ctrl)
 
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
 	startState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
 
+	// mock execution state conversion and signing of
+
+	me.EXPECT().SignFunc(gomock.Any(), gomock.Any(), gomock.Any())
+	me.EXPECT().NodeID()
+	me.EXPECT().Sign(gomock.Any(), gomock.Any())
+
 	execState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
 
+	execState.
+		On("PersistExecutionState", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	e := Engine{
+		execState: execState,
+		tracer:    trace.NewNoopTracer(),
+		me:        me,
+	}
+
 	cr := executionUnittest.ComputationResultFixture(nil)
+	cr.ExecutableBlock = executableBlock
 
 	er, err := e.saveExecutionResults(context.Background(), cr, startState)
 	assert.NoError(t, err)

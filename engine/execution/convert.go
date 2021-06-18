@@ -34,17 +34,20 @@ func BuildChunkDataPack(
 		endState = result.StateCommitments[i]
 		var collectionID flow.Identifier
 
+		txNumber := 1 //default for system chunk
+
 		// account for system chunk being last
 		if i < len(result.StateCommitments)-1 {
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collectionID = completeCollection.Collection().ID()
+			txNumber = len(completeCollection.Transactions)
 		} else {
 			collectionID = flow.ZeroID
 		}
 
 		eventsHash := result.EventsHashes[i]
-		chunk := GenerateChunk(i, startState, endState, collectionID, blockID, eventsHash)
+		chunk := GenerateChunk(i, startState, endState, collectionID, blockID, eventsHash, uint16(txNumber))
 
 		// chunkDataPack
 		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
@@ -94,7 +97,7 @@ func GenerateExecutionResultForBlock(
 // GenerateChunk creates a chunk from the provided computation data.
 func GenerateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
+	colID, blockID, eventsCollection flow.Identifier, txNumber uint16) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
@@ -103,8 +106,7 @@ func GenerateChunk(colIndex int,
 			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
+			NumberOfTransactions: txNumber,
 		},
 		Index:    uint64(colIndex),
 		EndState: endState,

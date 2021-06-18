@@ -12,6 +12,7 @@ import (
 	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -25,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -196,14 +198,18 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 		if !isSystemChunk {
 			collection = executableBlock.CompleteCollections[chdps[i].CollectionID].Collection()
 		}
+		offsetForChunk, err := fetcher.TransactionOffsetForChunk(er.Chunks, chunk.Index)
+		require.NoError(t, err)
+
 		vcds[i] = &verification.VerifiableChunkData{
-			IsSystemChunk: isSystemChunk,
-			Chunk:         chunk,
-			Header:        executableBlock.Block.Header,
-			Result:        er,
-			Collection:    &collection,
-			ChunkDataPack: chdps[i],
-			EndState:      chunk.EndState,
+			IsSystemChunk:     isSystemChunk,
+			Chunk:             chunk,
+			Header:            executableBlock.Block.Header,
+			Result:            er,
+			Collection:        &collection,
+			ChunkDataPack:     chdps[i],
+			EndState:          chunk.EndState,
+			TransactionOffset: offsetForChunk,
 		}
 	}
 
@@ -216,8 +222,8 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 		} else {
 			_, fault, err = verifier.Verify(vcd)
 		}
-		require.NoError(t, err)
-		require.Nil(t, fault)
+		assert.NoError(t, err)
+		assert.Nil(t, fault)
 	}
 
 	return computationResult
