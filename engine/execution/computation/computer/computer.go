@@ -260,6 +260,7 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
+	computationUsedUpToNow := res.ComputationUsed
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
 		colSpan.SetTag("collection.txCount", len(collection.Transactions))
@@ -283,6 +284,8 @@ func (e *blockComputer) executeCollection(
 		Int("numberOfTransactions", len(collection.Transactions)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
+
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), res.ComputationUsed-computationUsedUpToNow, len(collection.Transactions))
 
 	return txIndex, nil
 }
@@ -367,6 +370,8 @@ func (e *blockComputer) executeTransaction(
 		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
+
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
 	return nil
 }
 

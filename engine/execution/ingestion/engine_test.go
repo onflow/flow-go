@@ -170,6 +170,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 		10,
 		false,
 		checkStakedAtBlock,
+		false,
 	)
 	require.NoError(t, err)
 
@@ -1013,6 +1014,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		10,
 		false,
 		checkStakedAtBlock,
+		false,
 	)
 
 	require.NoError(t, err)
