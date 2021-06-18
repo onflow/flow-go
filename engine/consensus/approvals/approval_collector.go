@@ -3,6 +3,8 @@ package approvals
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,6 +15,7 @@ import (
 // collecting aggregated signatures for chunks that reached seal construction threshold,
 // creating and submitting seal candidates once signatures for every chunk are aggregated.
 type ApprovalCollector struct {
+	log                  zerolog.Logger
 	incorporatedBlock    *flow.Header                    // block that incorporates execution result
 	executedBlock        *flow.Header                    // block that was executed
 	incorporatedResult   *flow.IncorporatedResult        // incorporated result that is being sealed
@@ -22,7 +25,15 @@ type ApprovalCollector struct {
 	numberOfChunks       uint64                          // number of chunks for execution result, remains constant
 }
 
-func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *flow.Header, executedBlock *flow.Header, assignment *chunks.Assignment, seals mempool.IncorporatedResultSeals, requiredApprovalsForSealConstruction uint) *ApprovalCollector {
+func NewApprovalCollector(
+	log zerolog.Logger,
+	result *flow.IncorporatedResult,
+	incorporatedBlock *flow.Header,
+	executedBlock *flow.Header,
+	assignment *chunks.Assignment,
+	seals mempool.IncorporatedResultSeals,
+	requiredApprovalsForSealConstruction uint,
+) *ApprovalCollector {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := assignment.Verifiers(chunk).Lookup()
@@ -32,6 +43,7 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 
 	numberOfChunks := uint64(result.Result.Chunks.Len())
 	collector := ApprovalCollector{
+		log:                  log,
 		incorporatedResult:   result,
 		incorporatedBlock:    incorporatedBlock,
 		executedBlock:        executedBlock,
@@ -44,6 +56,12 @@ func NewApprovalCollector(result *flow.IncorporatedResult, incorporatedBlock *fl
 	// The following code implements a TEMPORARY SHORTCUT: In case no approvals are required
 	// to seal an incorporated result, we seal right away when creating the ApprovalCollector.
 	if requiredApprovalsForSealConstruction == 0 {
+		// The high-level logic is: as soon as we have collected enough approvals, we aggregate
+		// them and store them in collector.aggregatedSignatures. If we don't require any signatures,
+		// this condition is satisfied right away. Hence, we add aggregated signature for each chunk.
+		for i := uint64(0); i < numberOfChunks; i++ {
+			collector.aggregatedSignatures.PutSignature(i, flow.AggregatedSignature{})
+		}
 		err := collector.SealResult()
 		if err != nil {
 			err = fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
@@ -64,6 +82,11 @@ func (c *ApprovalCollector) IncorporatedBlock() *flow.Header {
 	return c.incorporatedBlock
 }
 
+// IncorporatedResult returns the incorporated Result this ApprovalCollector is for
+func (c *ApprovalCollector) IncorporatedResult() *flow.IncorporatedResult {
+	return c.incorporatedResult
+}
+
 func (c *ApprovalCollector) SealResult() error {
 	// get final state of execution result
 	finalState, err := c.incorporatedResult.Result.FinalStateCommitment()
@@ -82,8 +105,9 @@ func (c *ApprovalCollector) SealResult() error {
 		AggregatedApprovalSigs: c.aggregatedSignatures.Collect(),
 	}
 
-	// we don't care if the seal is already in the mempool
-	_, err = c.seals.Add(&flow.IncorporatedResultSeal{
+	// Adding a seal that already exists in the mempool is a NoOp. But to reduce log
+	// congestion, we only log when a seal is added that previously did not exist.
+	added, err := c.seals.Add(&flow.IncorporatedResultSeal{
 		IncorporatedResult: c.incorporatedResult,
 		Seal:               seal,
 		Header:             c.executedBlock,
@@ -91,7 +115,14 @@ func (c *ApprovalCollector) SealResult() error {
 	if err != nil {
 		return fmt.Errorf("failed to store IncorporatedResultSeal in mempool: %w", err)
 	}
-
+	if added {
+		c.log.Info().
+			Str("executed_block_id", seal.BlockID.String()).
+			Uint64("executed_block_height", c.executedBlock.Height).
+			Str("result_id", seal.ResultID.String()).
+			Str("incorporating_block", c.IncorporatedBlockID().String()).
+			Msg("added candidate seal to IncorporatedResultSeals mempool")
+	}
 	return nil
 }
 
