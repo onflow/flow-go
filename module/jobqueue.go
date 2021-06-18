@@ -38,6 +38,9 @@ type JobConsumer interface {
 
 	// Size returns the number of processing jobs in consumer.
 	Size() uint
+
+	// ProcessedIndex returns the last processed job index by the consumer.
+	ProcessedIndex() uint64
 }
 
 type Job interface {

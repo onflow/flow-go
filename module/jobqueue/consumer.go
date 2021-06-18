@@ -165,6 +165,11 @@ func (c *Consumer) Check() {
 	c.isChecking.Store(false)
 }
 
+// ProcessedIndex returns the last processed job index by the consumer.
+func (c *Consumer) ProcessedIndex() uint64 {
+	return c.processedIndex
+}
+
 // checkProcessable is a wrap of the `run` function with logging
 func (c *Consumer) checkProcessable() {
 	c.log.Debug().Msg("checking processable jobs")
