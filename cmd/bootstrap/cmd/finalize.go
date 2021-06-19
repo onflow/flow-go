@@ -106,7 +106,7 @@ func addFinalizeCmdFlags() {
 
 func finalize(cmd *cobra.Command, args []string) {
 
-	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("bootstrap random seed")
+	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
 	log.Info().Msg("")
 
 	log.Info().Msg("collecting partner network and staking keys")
