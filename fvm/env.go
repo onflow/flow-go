@@ -1060,6 +1060,7 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 		}
 	}
 
+	e.ctx.Metrics.RuntimeSetNumberOfAccounts(e.addressGenerator.AddressCount())
 	return runtime.Address(flowAddress), nil
 }
 

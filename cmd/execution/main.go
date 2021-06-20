@@ -88,6 +88,7 @@ func main() {
 		syncFast                    bool
 		syncThreshold               int
 		extensiveLog                bool
+		pauseExecution              bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 		diskWAL                     *wal.DiskWAL
 		scriptLogThreshold          time.Duration
@@ -119,6 +120,7 @@ func main() {
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
 			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
+			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -337,6 +339,7 @@ func main() {
 				syncThreshold,
 				syncFast,
 				checkStakedAtBlock,
+				pauseExecution,
 			)
 
 			// TODO: we should solve these mutual dependencies better
