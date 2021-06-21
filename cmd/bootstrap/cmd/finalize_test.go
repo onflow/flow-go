@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"os"
+	"regexp"
 
 	"path/filepath"
 	"strings"
@@ -12,17 +12,52 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TODO: defina happy path logs
-const finalizeHappyPathLogs = "^"
+const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
+	"collecting partner network and staking keys" +
+	`read \d+ partner node configuration files` +
+	`read \d+ stakes for partner nodes` +
+	"generating internal private networking and staking keys" +
+	`read \d+ internal private node-info files` +
+	`read internal node configurations` +
+	`read \d+ stakes for internal nodes` +
+	`checking constraints on consensus/cluster nodes` +
+	`assembling network and staking keys` +
+	`wrote file \S+/node-infos.pub.json` +
+	`running DKG for consensus nodes` +
+	`read \d+ node infos for DKG` +
+	`will run DKG` +
+	`finished running DKG` +
+	`wrote file \S+/random-beacon.priv.json` +
+	`wrote file \S+/random-beacon.priv.json` +
+	`wrote file \S+/random-beacon.priv.json` +
+	`wrote file \S+/random-beacon.priv.json` +
+	`constructing root block` +
+	`constructing root QC` +
+	`computing collection node clusters` +
+	`constructing root blocks for collection node clusters` +
+	`constructing root QCs for collection node clusters` +
+	`constructing root execution result and block seal` +
+	`constructing root procotol snapshot` +
+	`wrote file \S+/root-protocol-state-snapshot.json` +
+	`saved result and seal are matching` +
+	`attempting to copy private key files` +
+	`copying internal private keys to output folder` +
+	`created keys for \d+ collection nodes` +
+	`created keys for \d+ consensus nodes` +
+	`created keys for \d+ execution nodes` +
+	`created keys for \d+ verification nodes` +
+	`created keys for \d+ access nodes` +
+	"🌊 🏄 🤙 Done – ready to flow!"
+
+var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
 func TestFinalize_HappyPath(t *testing.T) {
 	deterministicSeed := generateRandomSeed()
@@ -54,19 +89,25 @@ func TestFinalize_HappyPath(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
-		// TODO: verify happy path logs
+		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
+
+		// check if root protocol snapshot exists
+		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
+		assert.FileExists(t, snapshotPath)
 	})
 }
 
 func TestFinalize_Deterministic(t *testing.T) {
-
 	deterministicSeed := generateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
+
+	var firstSnapshot *inmem.Snapshot
+	var secondSnapshot *inmem.Snapshot
 
 	RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
 
@@ -90,7 +131,6 @@ func TestFinalize_Deterministic(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
-		// TODO: verify happy path logs
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
@@ -98,36 +138,44 @@ func TestFinalize_Deterministic(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		firstSnapshot := readRootProtocolSnapshot(t, bootDir)
-
-		// delete snapshot file and generate again
-		err := os.Remove(snapshotPath)
-		require.NoError(t, err)
-
-		// run finalize again
-		finalize(nil, nil)
-		// TODO: verify happy path logs
-		hook.logs.Reset()
-
-		// read second snapshot
-		secondSnapshot := readRootProtocolSnapshot(t, bootDir)
-
-		assert.Equal(t, firstSnapshot, secondSnapshot)
+		firstSnapshot = readRootProtocolSnapshot(t, bootDir)
 	})
 
-}
+	RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
 
-func readRootProtocolSnapshot(t *testing.T, bootDir string) *inmem.Snapshot {
+		flagConfig = configPath
+		flagPartnerNodeInfoDir = partnerDir
+		flagPartnerStakes = partnerStakes
+		flagInternalNodePrivInfoDir = internalPrivDir
 
-	snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
+		flagFastKG = true
 
-	bz, err := io.ReadFile(snapshotPath)
-	require.NoError(t, err)
+		flagRootCommit = hex.EncodeToString(rootCommit[:])
+		flagRootParent = hex.EncodeToString(rootParent[:])
+		flagRootChain = chainName
+		flagRootHeight = rootHeight
+		flagEpochCounter = epochCounter
 
-	snapshot, err := convert.BytesToInmemSnapshot(bz)
-	require.NoError(t, err)
+		// set deterministic bootstrapping seed
+		flagBootstrapRandomSeed = deterministicSeed
 
-	return snapshot
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
+
+		finalize(nil, nil)
+		hook.logs.Reset()
+
+		// check if root protocol snapshot exists
+		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
+		assert.FileExists(t, snapshotPath)
+
+		// read snapshot
+		secondSnapshot = readRootProtocolSnapshot(t, bootDir)
+	})
+
+	require.NotNil(t, firstSnapshot)
+	require.NotNil(t, secondSnapshot)
+	assert.Equal(t, firstSnapshot, secondSnapshot)
 }
 
 func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string)) {
@@ -136,174 +184,24 @@ func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerS
 
 	flagOutdir = dir
 
-	partnerDir, partnerStakesPath := writePartnerNodesAndStakes(t, dir)
-	internalPrivDir, configPath := writeInternalNodesAndConfig(t, dir)
+	// make sure contraints are satisfied, 2/3's of con and col nodes are internal
+	internalNodes := utils.GenerateNodeInfos(3, 6, 2, 1, 1)
+	partnerNodes := utils.GenerateNodeInfos(1, 1, 1, 1, 1)
+
+	partnerDir, partnerStakesPath, err := utils.WritePartnerFiles(partnerNodes, dir)
+	require.NoError(t, err)
+
+	internalPrivDir, configPath, err := utils.WriteInternalFiles(internalNodes, dir)
+	require.NoError(t, err)
 
 	f(dir, partnerDir, partnerStakesPath, internalPrivDir, configPath)
 }
 
-func writePartnerNodesAndStakes(t testing.TB, bootDir string) (string, string) {
-	nodeInfos := generatePartnerNodeInfos()
-
-	// convert to public nodeInfos
-	nodePubInfos := make([]model.NodeInfoPub, len(nodeInfos))
-	for i, info := range nodeInfos {
-		nodePubInfos[i] = info.Public()
-	}
-
-	// create a staking map
-	stakes := make(map[flow.Identifier]uint64)
-	for _, node := range nodeInfos {
-		stakes[node.NodeID] = node.Stake
-	}
-
-	// write node public infos to partner dir
-	partnersDir := "partners"
-	err := os.MkdirAll(filepath.Join(bootDir, partnersDir), os.ModePerm)
+func readRootProtocolSnapshot(t *testing.T, bootDir string) *inmem.Snapshot {
+	snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
+	bz, err := io.ReadFile(snapshotPath)
 	require.NoError(t, err)
-
-	for _, node := range nodePubInfos {
-		fileName := fmt.Sprintf(model.PathNodeInfoPub, node.NodeID.String())
-		nodePubInfosPath := filepath.Join(partnersDir, fileName)
-		writeJSON(nodePubInfosPath, node)
-	}
-
-	// write partner stakes
-	stakesPath := "partner-stakes.json"
-	writeJSON(stakesPath, stakes)
-
-	return filepath.Join(bootDir, partnersDir, model.DirnamePublicBootstrap), filepath.Join(bootDir, stakesPath)
-}
-
-func writeInternalNodesAndConfig(t testing.TB, bootDir string) (string, string) {
-	nodeInfos := generateInternalNodeInfos()
-
-	// convert to private nodeInfos
-	nodePrivInfos := make([]model.NodeInfoPriv, len(nodeInfos))
-	for i, node := range nodeInfos {
-
-		netPriv, err := unittest.NetworkingKey()
-		require.NoError(t, err)
-
-		stakePriv, err := unittest.StakingKey()
-		require.NoError(t, err)
-
-		nodePrivInfos[i] = model.NodeInfoPriv{
-			Role:    node.Role,
-			Address: node.Address,
-			NodeID:  node.NodeID,
-			NetworkPrivKey: encodable.NetworkPrivKey{
-				PrivateKey: netPriv,
-			},
-			StakingPrivKey: encodable.StakingPrivKey{
-				PrivateKey: stakePriv,
-			},
-		}
-	}
-
-	// create internal node config
-	configs := make([]model.NodeConfig, len(nodeInfos))
-	for index, node := range nodeInfos {
-		configs[index] = model.NodeConfig{
-			Role:    node.Role,
-			Address: node.Address,
-			Stake:   node.Stake,
-		}
-	}
-
-	// write config
-	configPath := "node-internal-infos.pub.json"
-	writeJSON(configPath, configs)
-
-	// write node private infos to internal priv dir
-	for _, node := range nodePrivInfos {
-		internalPrivPath := fmt.Sprintf(model.PathNodeInfoPriv, node.NodeID)
-		writeJSON(internalPrivPath, node)
-	}
-
-	return filepath.Join(bootDir, model.DirPrivateRoot), filepath.Join(bootDir, configPath)
-}
-
-func generateInternalNodeInfos() []model.NodeInfo {
-
-	internalNodes := make([]model.NodeInfo, 0)
-
-	// CONSENSUS = 3
-	consensusNodes := unittest.NodeInfosFixture(3,
-		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
-	)
-	internalNodes = append(internalNodes, consensusNodes...)
-
-	// COLLECTION = 6
-	collectionNodes := unittest.NodeInfosFixture(6,
-		unittest.WithRole(flow.RoleCollection),
-		unittest.WithStake(1000),
-	)
-	internalNodes = append(internalNodes, collectionNodes...)
-
-	// EXECUTION = 2
-	executionNodes := unittest.NodeInfosFixture(2,
-		unittest.WithRole(flow.RoleExecution),
-		unittest.WithStake(1000),
-	)
-	internalNodes = append(internalNodes, executionNodes...)
-
-	// VERIFICATION = 1
-	verificationNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleVerification),
-		unittest.WithStake(1000),
-	)
-	internalNodes = append(internalNodes, verificationNodes...)
-
-	// ACCESS = 1
-	accessNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleAccess),
-		unittest.WithStake(1000),
-	)
-	internalNodes = append(internalNodes, accessNodes...)
-
-	return internalNodes
-}
-
-func generatePartnerNodeInfos() []model.NodeInfo {
-
-	partnerNodes := make([]model.NodeInfo, 0)
-
-	// CONSENSUS = 3
-	consensusNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
-	)
-	partnerNodes = append(partnerNodes, consensusNodes...)
-
-	// COLLECTION = 6
-	collectionNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleCollection),
-		unittest.WithStake(1000),
-	)
-	partnerNodes = append(partnerNodes, collectionNodes...)
-
-	// EXECUTION = 2
-	executionNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleExecution),
-		unittest.WithStake(1000),
-	)
-	partnerNodes = append(partnerNodes, executionNodes...)
-
-	// VERIFICATION = 1
-	verificationNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleVerification),
-		unittest.WithStake(1000),
-	)
-	partnerNodes = append(partnerNodes, verificationNodes...)
-
-	// ACCESS = 1
-	accessNodes := unittest.NodeInfosFixture(1,
-		unittest.WithRole(flow.RoleAccess),
-		unittest.WithStake(1000),
-	)
-	partnerNodes = append(partnerNodes, accessNodes...)
-
-	return partnerNodes
+	snapshot, err := convert.BytesToInmemSnapshot(bz)
+	require.NoError(t, err)
+	return snapshot
 }

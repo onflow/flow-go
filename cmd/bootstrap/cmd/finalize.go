@@ -196,6 +196,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
+
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
@@ -237,7 +238,6 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Info().Msg("skipping copy of private keys to output dir")
 	}
 	log.Info().Msg("")
-
 	// print count of all nodes
 	roleCounts := nodeCountByRole(stakingNodes)
 	for role, count := range roleCounts {
@@ -373,7 +373,7 @@ func internalStakesByAddress() map[string]uint64 {
 	// read json
 	var configs []model.NodeConfig
 	readJSON(flagConfig, &configs)
-	log.Info().Msgf("read internal %v node configurations", configs)
+	log.Info().Interface("config", configs).Msgf("read internal node configurations")
 
 	stakes := make(map[string]uint64)
 	for _, config := range configs {

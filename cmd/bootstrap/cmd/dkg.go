@@ -30,7 +30,7 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	for i, privKey := range dkgData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
 
-		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
+		// log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
 		privParticpant := dkg.DKGParticipantPriv{
