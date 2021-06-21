@@ -58,6 +58,9 @@ type Epoch interface {
 	// DKGPhase3FinalView returns the final view of DKG phase 3
 	DKGPhase3FinalView() (uint64, error)
 
+	// DKGFinalViews returns the final views of each DKG phase
+	DKGFinalViews() (uint64, uint64, uint64, error)
+
 	// FinalView returns the largest view number which still belongs to this epoch.
 	FinalView() (uint64, error)
 

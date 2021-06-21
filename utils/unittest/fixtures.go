@@ -1424,6 +1424,9 @@ func WithFirstView(view uint64) func(*flow.EpochSetup) {
 	}
 }
 
+// EpochSetupFixture creates a valid EpochSetup with default properties for
+// testing. The default properties can be overwritten with optional parameter
+// functions.
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
 	setup := &flow.EpochSetup{
