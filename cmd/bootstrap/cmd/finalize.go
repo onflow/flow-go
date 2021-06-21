@@ -196,7 +196,6 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
-
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
@@ -238,11 +237,14 @@ func finalize(cmd *cobra.Command, args []string) {
 		log.Info().Msg("skipping copy of private keys to output dir")
 	}
 	log.Info().Msg("")
+
 	// print count of all nodes
 	roleCounts := nodeCountByRole(stakingNodes)
-	for role, count := range roleCounts {
-		log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
-	}
+	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleConsensus], flow.RoleConsensus.String()))
+	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleCollection], flow.RoleCollection.String()))
+	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleVerification], flow.RoleVerification.String()))
+	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleExecution], flow.RoleExecution.String()))
+	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleAccess], flow.RoleAccess.String()))
 
 	log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
 }

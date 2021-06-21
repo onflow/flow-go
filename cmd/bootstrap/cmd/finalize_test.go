@@ -35,10 +35,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`read \d+ node infos for DKG` +
 	`will run DKG` +
 	`finished running DKG` +
-	`wrote file \S+/random-beacon.priv.json` +
-	`wrote file \S+/random-beacon.priv.json` +
-	`wrote file \S+/random-beacon.priv.json` +
-	`wrote file \S+/random-beacon.priv.json` +
+	`.+/random-beacon.priv.json` +
 	`constructing root block` +
 	`constructing root QC` +
 	`computing collection node clusters` +
@@ -50,10 +47,10 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`saved result and seal are matching` +
 	`attempting to copy private key files` +
 	`skipping copy of private keys to output dir` +
-	`created keys for \d+ collection nodes` +
 	`created keys for \d+ consensus nodes` +
-	`created keys for \d+ execution nodes` +
+	`created keys for \d+ collection nodes` +
 	`created keys for \d+ verification nodes` +
+	`created keys for \d+ execution nodes` +
 	`created keys for \d+ access nodes` +
 	"🌊 🏄 🤙 Done – ready to flow!"
 
@@ -128,6 +125,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
+		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
@@ -142,6 +140,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 		require.NoError(t, err)
 
 		finalize(nil, nil)
+		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
@@ -152,7 +151,6 @@ func TestFinalize_Deterministic(t *testing.T) {
 
 		assert.Equal(t, firstSnapshot, secondSnapshot)
 	})
-
 }
 
 func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string)) {
