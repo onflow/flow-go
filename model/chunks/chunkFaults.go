@@ -20,6 +20,7 @@ type CFMissingRegisterTouch struct {
 	regsterIDs []string
 	chunkIndex uint64
 	execResID  flow.Identifier
+	txID       flow.Identifier // very first transaction inside the chunk that required this register
 }
 
 func (cf CFMissingRegisterTouch) String() string {
@@ -28,7 +29,7 @@ func (cf CFMissingRegisterTouch) String() string {
 		hexStrings[i] = hex.EncodeToString([]byte(s))
 	}
 
-	return fmt.Sprint("at least one register touch was missing inside the chunk data package that was needed while running transactions (hex-encoded): ", hexStrings)
+	return fmt.Sprintf("at least one register touch was missing inside the chunk data package that was needed while running transactions of chunk %d of result %s (tx hash of one of them: %s), hex-encoded register ids: %s", cf.chunkIndex, cf.execResID.String(), cf.txID.String(), hexStrings)
 }
 
 // ChunkIndex returns chunk index of the faulty chunk
@@ -42,10 +43,11 @@ func (cf CFMissingRegisterTouch) ExecutionResultID() flow.Identifier {
 }
 
 // NewCFMissingRegisterTouch creates a new instance of Chunk Fault (MissingRegisterTouch)
-func NewCFMissingRegisterTouch(regsterIDs []string, chInx uint64, execResID flow.Identifier) *CFMissingRegisterTouch {
+func NewCFMissingRegisterTouch(regsterIDs []string, chInx uint64, execResID flow.Identifier, txID flow.Identifier) *CFMissingRegisterTouch {
 	return &CFMissingRegisterTouch{regsterIDs: regsterIDs,
 		chunkIndex: chInx,
-		execResID:  execResID}
+		execResID:  execResID,
+		txID:       txID}
 }
 
 // CFNonMatchingFinalState is returned when the computed final state commitment
