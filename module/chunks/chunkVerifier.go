@@ -167,7 +167,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		}
 
 		if len(unknownRegTouch) > 0 {
-			problematicTx = tx.ID()
+			problematicTx = tx.ID
 		}
 
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
@@ -209,9 +209,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			for i, key := range keys {
 				stringKeys[i] = key.String()
 			}
-			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID), nil
+			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
