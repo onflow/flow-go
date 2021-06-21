@@ -7,7 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	sealing "github.com/onflow/flow-go/engine/consensus"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
@@ -44,7 +44,7 @@ type (
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	unit                       *engine.Unit
-	core                       sealing.SealingCore
+	core                       consensus.SealingCore
 	log                        zerolog.Logger
 	me                         module.Local
 	headers                    storage.Headers
@@ -66,6 +66,7 @@ func NewEngine(log zerolog.Logger,
 	conMetrics module.ConsensusMetrics,
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
+	sealingTracker consensus.SealingTracker,
 	net module.Network,
 	me module.Local,
 	headers storage.Headers,
@@ -82,8 +83,9 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not retrieve root block: %w", err)
 	}
 
+	unit := engine.NewUnit()
 	e := &Engine{
-		unit:          engine.NewUnit(),
+		unit:          unit,
 		log:           log.With().Str("engine", "sealing.Engine").Logger(),
 		me:            me,
 		engineMetrics: engineMetrics,
@@ -115,7 +117,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	core, err := NewCore(log, tracer, conMetrics, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -240,9 +242,10 @@ func (e *Engine) processAvailableMessages() error {
 
 		event, ok := e.pendingFinalizationEvents.Pop()
 		if ok {
-			err := e.core.ProcessFinalizedBlock(event.(flow.Identifier))
+			finalizedBlockID := event.(flow.Identifier)
+			err := e.core.ProcessFinalizedBlock(finalizedBlockID)
 			if err != nil {
-				return fmt.Errorf("could not process finalized block: %w", err)
+				return fmt.Errorf("could not process finalized block %v: %w", finalizedBlockID, err)
 			}
 			continue
 		}

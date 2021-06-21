@@ -2,10 +2,8 @@ package matching
 
 import (
 	"fmt"
-	"os"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
@@ -36,7 +34,6 @@ func (ms *MatchingSuite) SetupTest() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	ms.SetupChain()
 
-	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
@@ -50,7 +47,7 @@ func (ms *MatchingSuite) SetupTest() {
 	}
 
 	ms.core = NewCore(
-		log,
+		unittest.Logger(),
 		tracer,
 		metrics,
 		metrics,
