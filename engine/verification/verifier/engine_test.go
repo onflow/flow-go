@@ -237,7 +237,8 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte,
 		return nil, chmodel.NewCFMissingRegisterTouch(
 			[]string{"test missing register touch"},
 			vc.Chunk.Index,
-			vc.Result.ID()), nil
+			vc.Result.ID(),
+			unittest.TransactionFixture().ID()), nil
 
 	case 2:
 		return nil, chmodel.NewCFInvalidVerifiableChunk(
