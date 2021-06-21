@@ -85,8 +85,8 @@ func (et *ExecutionTree) getEquivalenceClass(result *flow.ExecutionResult, block
 }
 
 // AddReceipt adds the given execution receipt to the memory pool. Requires
-// height of the block the receipt is for. We enforce data consistency on an
-// API level by using the block header as input.
+// height of the block the receipt is for. We enforce data consistency on
+// an API level by using the block header as input.
 func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.Header) (bool, error) {
 	et.Lock()
 	defer et.Unlock()
@@ -136,13 +136,17 @@ func (et *ExecutionTree) AddReceipt(receipt *flow.ExecutionReceipt, block *flow.
 // the receipt committing to the derived result.
 // The algorithm only traverses to results, for which there exists a
 // sequence of interim result in the mempool without any gaps.
+//
+// Error returns:
+// * UnknownExecutionResultError (sentinel) if resultID is unknown
+// * all other error are unexpected and potential indicators of corrupted internal state
 func (et *ExecutionTree) ReachableReceipts(resultID flow.Identifier, blockFilter mempool.BlockFilter, receiptFilter mempool.ReceiptFilter) ([]*flow.ExecutionReceipt, error) {
 	et.RLock()
 	defer et.RUnlock()
 
 	vertex, found := et.forest.GetVertex(resultID)
 	if !found {
-		return nil, fmt.Errorf("unknown result id %x", resultID)
+		return nil, mempool.NewUnknownExecutionResultErrorf("unknown result id %x", resultID)
 	}
 
 	receipts := make([]*flow.ExecutionReceipt, 0, 10) // we expect just below 10 execution Receipts per call

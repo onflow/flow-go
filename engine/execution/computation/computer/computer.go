@@ -62,7 +62,6 @@ func NewBlockComputer(
 
 	systemChunkCtx := fvm.NewContextFromParent(
 		vmCtx,
-		fvm.WithRestrictedAccountCreation(false),
 		fvm.WithRestrictedDeployment(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
@@ -233,6 +232,7 @@ func (e *blockComputer) executeCollection(
 
 	// call tracing
 	startedAt := time.Now()
+	computationUsedUpToNow := res.ComputationUsed
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeCollection)
 	defer func() {
 		colSpan.SetTag("collection.txCount", len(collection.Transactions))
@@ -256,6 +256,8 @@ func (e *blockComputer) executeCollection(
 		Int("numberOfTransactions", len(collection.Transactions)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
+
+	e.metrics.ExecutionCollectionExecuted(time.Since(startedAt), res.ComputationUsed-computationUsedUpToNow, len(collection.Transactions))
 
 	return txIndex, nil
 }
@@ -302,7 +304,8 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	txResult := flow.TransactionResult{
-		TransactionID: tx.ID,
+		TransactionID:   tx.ID,
+		ComputationUsed: tx.ComputationUsed,
 	}
 
 	if tx.Err != nil {
@@ -331,13 +334,15 @@ func (e *blockComputer) executeTransaction(
 	res.AddEvents(tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
-	res.AddGasUsed(tx.GasUsed)
+	res.AddComputationUsed(tx.ComputationUsed)
 
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
 		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
+
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
 	return nil
 }
 

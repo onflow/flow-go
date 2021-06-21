@@ -11,6 +11,8 @@ type TransactionResult struct {
 	TransactionID Identifier
 	// ErrorMessage contains the error message of any error that may have occurred when the transaction was executed
 	ErrorMessage string
+	// Computation used
+	ComputationUsed uint64
 }
 
 // String returns the string representation of this error.

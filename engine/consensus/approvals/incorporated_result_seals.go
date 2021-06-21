@@ -11,19 +11,20 @@ import (
 
 // IncorporatedResultSeals implements the incorporated result seals memory pool
 // of the consensus nodes.
-// ATTENTION: this is a temporary wrapper for `mempool.IncorporatedResultSeals` to support
-// a condition that there must be at least 2 receipts from _different_ ENs
+// ATTENTION: this is a temporary wrapper for `mempool.IncorporatedResultSeals`
+// to enforce that there are at least 2 receipts from _different_ ENs
 // committing to the same incorporated result.
-// This wrapper should only be used with `approvalProcessingCore`.
+// This wrapper should only be used with `Core`.
 type IncorporatedResultSeals struct {
 	seals      mempool.IncorporatedResultSeals // seals mempool that wrapped
 	receiptsDB storage.ExecutionReceipts       // receipts DB to decide if we have multiple receipts for same result
 }
 
-// NewIncorporatedResults creates a mempool for the incorporated result seals
-func NewIncorporatedResultSeals(mempool mempool.IncorporatedResultSeals) *IncorporatedResultSeals {
+// NewIncorporatedResultSeals creates a mempool for the incorporated result seals
+func NewIncorporatedResultSeals(mempool mempool.IncorporatedResultSeals, receiptsDB storage.ExecutionReceipts) *IncorporatedResultSeals {
 	return &IncorporatedResultSeals{
-		seals: mempool,
+		seals:      mempool,
+		receiptsDB: receiptsDB,
 	}
 }
 
@@ -74,9 +75,19 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 	return seal, true
 }
 
+// Limit returns the size limit of the mempool
+func (ir *IncorporatedResultSeals) Limit() uint {
+	return ir.seals.Limit()
+}
+
 // Rem removes an IncorporatedResultSeal from the mempool
 func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 	return ir.seals.Rem(id)
+}
+
+// Size returns the number of items in the mempool
+func (ir *IncorporatedResultSeals) Size() uint {
+	return ir.seals.Size()
 }
 
 // Clear removes all entities from the pool.
@@ -87,4 +98,10 @@ func (ir *IncorporatedResultSeals) Clear() {
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
 func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 	ir.seals.RegisterEjectionCallbacks(callbacks...)
+}
+
+// PruneUpToHeight remove all seals for blocks whose height is strictly
+// smaller that height. Note: seals for blocks at height are retained.
+func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
+	return ir.seals.PruneUpToHeight(height)
 }
