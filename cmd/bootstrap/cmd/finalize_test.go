@@ -49,7 +49,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`wrote file \S+/root-protocol-state-snapshot.json` +
 	`saved result and seal are matching` +
 	`attempting to copy private key files` +
-	`copying internal private keys to output folder` +
+	`skipping copy of private keys to output dir` +
 	`created keys for \d+ collection nodes` +
 	`created keys for \d+ consensus nodes` +
 	`created keys for \d+ execution nodes` +
@@ -106,9 +106,6 @@ func TestFinalize_Deterministic(t *testing.T) {
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	var firstSnapshot *inmem.Snapshot
-	var secondSnapshot *inmem.Snapshot
-
 	RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
 
 		flagConfig = configPath
@@ -138,44 +135,24 @@ func TestFinalize_Deterministic(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		firstSnapshot = readRootProtocolSnapshot(t, bootDir)
-	})
+		firstSnapshot := readRootProtocolSnapshot(t, bootDir)
 
-	RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
-
-		flagConfig = configPath
-		flagPartnerNodeInfoDir = partnerDir
-		flagPartnerStakes = partnerStakes
-		flagInternalNodePrivInfoDir = internalPrivDir
-
-		flagFastKG = true
-
-		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
-		flagEpochCounter = epochCounter
-
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
-
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
+		// delete snapshot file
+		err := os.Remove(snapshotPath)
+		require.NoError(t, err)
 
 		finalize(nil, nil)
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
-		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		secondSnapshot = readRootProtocolSnapshot(t, bootDir)
+		secondSnapshot := readRootProtocolSnapshot(t, bootDir)
+
+		assert.Equal(t, firstSnapshot, secondSnapshot)
 	})
 
-	require.NotNil(t, firstSnapshot)
-	require.NotNil(t, secondSnapshot)
-	assert.Equal(t, firstSnapshot, secondSnapshot)
 }
 
 func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string)) {

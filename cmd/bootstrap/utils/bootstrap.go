@@ -105,7 +105,7 @@ func WriteInternalFiles(nodeInfos []model.NodeInfo, bootDir string) (string, str
 		}
 	}
 
-	return filepath.Join(bootDir, model.DirPrivateRoot), configPath, nil
+	return bootDir, configPath, nil
 }
 
 func GenerateNodeInfos(consensus, collection, execution, verification, access int) []model.NodeInfo {
