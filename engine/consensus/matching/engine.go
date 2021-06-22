@@ -27,6 +27,7 @@ type Engine struct {
 	log                       zerolog.Logger
 	me                        module.Local
 	core                      sealing.MatchingCore
+	results                   storage.ExecutionResults
 	payloads                  storage.Payloads
 	metrics                   module.EngineMetrics
 	notifier                  engine.Notifier
@@ -41,6 +42,7 @@ func NewEngine(
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
 	payloads storage.Payloads,
+	results storage.ExecutionResults,
 	core sealing.MatchingCore) (*Engine, error) {
 
 	// FIFO queue for execution receipts
@@ -66,6 +68,7 @@ func NewEngine(
 		me:                        me,
 		core:                      core,
 		payloads:                  payloads,
+		results:                   results,
 		metrics:                   engineMetrics,
 		notifier:                  engine.NewNotifier(),
 		pendingReceipts:           receiptsQueue,
@@ -157,7 +160,21 @@ func (e *Engine) processFinalizedReceipts(finalizedBlockID flow.Identifier) {
 		if err != nil {
 			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
 		}
-		for _, receipt := range payload.Receipts {
+		resultsById := payload.Results.Lookup()
+		for _, meta := range payload.Receipts {
+			// Generally speaking we are interested in receipts that were included in block together with execution results
+			// but since we require two receipts from different ENs before sealing we need to add every receipt included in block.
+			result, ok := resultsById[meta.ResultID]
+			if !ok {
+				result, err = e.results.ByID(meta.ResultID)
+				// error at this point means that we have corrupted state or serious bug which allows including
+				// invalid receipts into finalized blocks
+				if err != nil {
+					e.log.Fatal().Err(err).Msgf("could not retrieve result %v", meta.ResultID)
+				}
+			}
+
+			receipt := flow.ExecutionReceiptFromMeta(*meta, *result)
 			added := e.pendingReceipts.Push(receipt)
 			if !added {
 				// Not being able to queue an execution receipt is a fatal edge case. It might happen, if the

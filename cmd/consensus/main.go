@@ -288,6 +288,7 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.Storage.Payloads,
+				node.Storage.Results,
 				core,
 			)
 			if err != nil {

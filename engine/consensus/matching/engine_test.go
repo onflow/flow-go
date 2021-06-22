@@ -26,6 +26,7 @@ type MatchingEngineSuite struct {
 	suite.Suite
 
 	payloads *mockstorage.Payloads
+	results  *mockstorage.ExecutionResults
 	core     *mockconsensus.MatchingCore
 
 	// Matching Engine
@@ -38,6 +39,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	net := &mockmodule.Network{}
 	s.core = &mockconsensus.MatchingCore{}
 	s.payloads = &mockstorage.Payloads{}
+	s.results = &mockstorage.ExecutionResults{}
 
 	ourNodeID := unittest.IdentifierFixture()
 	me.On("NodeID").Return(ourNodeID)
@@ -46,7 +48,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil).Once()
 
 	var err error
-	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.payloads, s.core)
+	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.payloads, s.results, s.core)
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -61,7 +63,9 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
 	s.payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil)
 
-	for _, receipt := range payload.Receipts {
+	resultsById := payload.Results.Lookup()
+	for _, meta := range payload.Receipts {
+		receipt := flow.ExecutionReceiptFromMeta(*meta, *resultsById[meta.ResultID])
 		s.core.On("ProcessReceipt", receipt).Return(nil).Once()
 	}
 

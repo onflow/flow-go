@@ -305,6 +305,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Metrics,
 		node.Payloads,
+		resultsDB,
 		matchingCore,
 	)
 	require.NoError(t, err)
