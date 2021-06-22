@@ -29,6 +29,7 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -677,6 +678,28 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 	return fnb
 }
 
+func UnstakedFlowNode(role string) *FlowNodeBuilder {
+	builder := &FlowNodeBuilder{
+		BaseConfig: BaseConfig{
+			nodeRole: role,
+		},
+		Logger: zerolog.New(os.Stderr),
+		flags:  pflag.CommandLine,
+	}
+
+	builder.baseFlags()
+
+	builder.enqueueNetworkInit()
+
+	builder.enqueueMetricsServerInit()
+
+	builder.registerBadgerMetrics()
+
+	builder.enqueueTracer()
+
+	return builder
+}
+
 // FlowNode creates a new Flow node builder with the given name.
 func FlowNode(role string) *FlowNodeBuilder {
 
@@ -689,6 +712,12 @@ func FlowNode(role string) *FlowNodeBuilder {
 	}
 
 	builder.baseFlags()
+
+	builder.MsgValidators = []network.MessageValidator{
+		// filter out messages sent by this node itself
+		validator.NewSenderValidator(builder.Me.NodeID()),
+		// but retain all the 1-k messages even if they are not intended for this node
+	}
 
 	builder.enqueueNetworkInit()
 

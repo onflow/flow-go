@@ -249,6 +249,7 @@ type NodeConfig struct {
 	Ghost           bool
 	AdditionalFlags []string
 	Debug           bool
+	Unstaked        bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -583,34 +584,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
-	// run DKG for all consensus nodes
-	dkg, err := runDKG(confs)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
-	}
-
-	// sort node infos to the canonical ordering
-	// IMPORTANT: we must use this ordering when writing the DKG keys as
-	// this ordering defines the DKG participant's indices
-	nodeInfos := bootstrap.Sort(toNodeInfos(confs), order.Canonical)
-
-	// write private key files for each DKG participant
-	consensusNodes := bootstrap.FilterByRole(nodeInfos, flow.RoleConsensus)
-	for i, sk := range dkg.PrivKeyShares {
-		nodeID := consensusNodes[i].NodeID
-		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticipant := bootstrap.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encodableSk,
-			GroupIndex:          i,
-		}
-		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticipant)
-		if err != nil {
-			return nil, nil, nil, nil, err
-		}
-	}
-
 	// write private key files for each node
 	for _, nodeConfig := range confs {
 		path := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, nodeConfig.NodeID))
@@ -622,6 +595,42 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		}
 
 		err = WriteJSON(path, private)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+	}
+
+	stakedConfs := make([]ContainerConfig, 0, len(confs))
+	for _, c := range confs {
+		if c.Unstaked {
+			continue
+		}
+		stakedConfs = append(stakedConfs, c)
+	}
+
+	// run DKG for all consensus nodes
+	dkg, err := runDKG(stakedConfs)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
+	}
+
+	// sort node infos to the canonical ordering
+	// IMPORTANT: we must use this ordering when writing the DKG keys as
+	// this ordering defines the DKG participant's indices
+	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
+
+	// write private key files for each DKG participant
+	consensusNodes := bootstrap.FilterByRole(stakedNodeInfos, flow.RoleConsensus)
+	for i, sk := range dkg.PrivKeyShares {
+		nodeID := consensusNodes[i].NodeID
+		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
+		privParticipant := bootstrap.DKGParticipantPriv{
+			NodeID:              nodeID,
+			RandomBeaconPrivKey: encodableSk,
+			GroupIndex:          i,
+		}
+		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
+		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticipant)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -647,7 +656,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	height := uint64(0)
 	timestamp := time.Now().UTC()
 	epochCounter := uint64(0)
-	participants := bootstrap.ToIdentityList(nodeInfos)
+	participants := bootstrap.ToIdentityList(stakedNodeInfos)
 
 	// generate root block
 	root := run.GenerateRootBlock(chainID, parentID, height, timestamp)
@@ -663,7 +672,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// generate root blocks for each collector cluster
-	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, confs)
+	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
@@ -758,6 +767,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			Ghost:           conf.Ghost,
 			AdditionalFlags: conf.AdditionalFlags,
 			Debug:           conf.Debug,
+			Unstaked:        conf.Unstaked,
 		}
 
 		confs = append(confs, containerConf)
