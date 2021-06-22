@@ -470,7 +470,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
 	// side.
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(statuses))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
 	e.ProcessAssignedChunk(locators[0])
 

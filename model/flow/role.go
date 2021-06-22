@@ -21,6 +21,10 @@ const (
 	RoleAccess       Role = 5
 )
 
+func (r Role) Valid() bool {
+	return r >= 1 && r <= 5
+}
+
 // String returns a string version of role.
 func (r Role) String() string {
 	switch r {

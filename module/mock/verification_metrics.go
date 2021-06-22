@@ -19,6 +19,16 @@ func (_m *VerificationMetrics) OnAssignedChunkReceivedAtFetcher() {
 	_m.Called()
 }
 
+// OnBlockConsumerJobDone provides a mock function with given fields: _a0
+func (_m *VerificationMetrics) OnBlockConsumerJobDone(_a0 uint64) {
+	_m.Called(_a0)
+}
+
+// OnChunkConsumerJobDone provides a mock function with given fields: _a0
+func (_m *VerificationMetrics) OnChunkConsumerJobDone(_a0 uint64) {
+	_m.Called(_a0)
+}
+
 // OnChunkDataPackArrivedAtFetcher provides a mock function with given fields:
 func (_m *VerificationMetrics) OnChunkDataPackArrivedAtFetcher() {
 	_m.Called()

@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
@@ -264,6 +265,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Metrics,
 		node.Metrics,
 		node.Metrics,
+		&tracker.NoopSealingTracker{},
 		node.Net,
 		node.Me,
 		node.Headers,
@@ -466,6 +468,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		syncThreshold,
 		false,
 		checkStakedAtBlock,
+		false,
 	)
 	require.NoError(t, err)
 	requestEngine.WithHandle(ingestionEngine.OnCollection)
@@ -740,6 +743,7 @@ func NewVerificationNode(t testing.TB,
 
 	if node.ChunkConsumer == nil {
 		node.ChunkConsumer = chunkconsumer.NewChunkConsumer(node.Log,
+			collector,
 			node.ProcessedChunkIndex,
 			node.ChunksQueue,
 			node.FetcherEngine,
@@ -761,6 +765,7 @@ func NewVerificationNode(t testing.TB,
 
 	if node.BlockConsumer == nil {
 		node.BlockConsumer, _, err = blockconsumer.NewBlockConsumer(node.Log,
+			collector,
 			node.ProcessedBlockHeight,
 			node.Blocks,
 			node.State,

@@ -9,6 +9,10 @@ import (
 type VerificationCollector struct {
 	tracer module.Tracer
 
+	// Job Consumers
+	lastProcessedBlockJobIndexBlockConsumer prometheus.Gauge
+	lastProcessedChunkJobIndexChunkConsumer prometheus.Gauge
+
 	// Assigner Engine
 	receivedFinalizedHeightAssigner prometheus.Gauge   // the last finalized height received by assigner engine
 	assignedChunkTotalAssigner      prometheus.Counter // total chunks assigned to this verification node
@@ -39,6 +43,21 @@ type VerificationCollector struct {
 }
 
 func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Registerer) *VerificationCollector {
+	// Job Consumers
+	lastProcessedBlockJobIndexBlockConsumer := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:      "last_processed_block_job_index",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemBlockConsumer,
+		Help:      "the last block job index processed by block consumer",
+	})
+
+	lastProcessedChunkJobIndexChunkConsumer := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:      "last_processed_chunk_job_index",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemChunkConsumer,
+		Help:      "the last chunk job index processed by chunk consumer",
+	})
+
 	// Assigner Engine
 	receivedFinalizedHeight := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "finalized_height",
@@ -136,6 +155,10 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 
 	// registers all metrics and panics if any fails.
 	registerer.MustRegister(
+		// job consumers
+		lastProcessedBlockJobIndexBlockConsumer,
+		lastProcessedChunkJobIndexChunkConsumer,
+
 		// assigner
 		receivedFinalizedHeight,
 		assignedChunksTotal,
@@ -158,6 +181,10 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 
 	vc := &VerificationCollector{
 		tracer: tracer,
+
+		// job consumers
+		lastProcessedChunkJobIndexChunkConsumer: lastProcessedChunkJobIndexChunkConsumer,
+		lastProcessedBlockJobIndexBlockConsumer: lastProcessedBlockJobIndexBlockConsumer,
 
 		// assigner
 		receivedFinalizedHeightAssigner: receivedFinalizedHeight,
@@ -267,4 +294,16 @@ func (vc *VerificationCollector) OnChunkDataPackArrivedAtFetcher() {
 // OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 func (vc *VerificationCollector) OnVerifiableChunkSentToVerifier() {
 	vc.sentVerifiableChunksByFetcherTotal.Inc()
+}
+
+// OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
+// sets the last processed chunk job index.
+func (vc *VerificationCollector) OnChunkConsumerJobDone(processedIndex uint64) {
+	vc.lastProcessedChunkJobIndexChunkConsumer.Set(float64(processedIndex))
+}
+
+// OnBlockConsumerJobDone is invoked by block consumer whenever it is notified a job is done by a worker. It
+// sets the last processed block job index.
+func (vc *VerificationCollector) OnBlockConsumerJobDone(processedIndex uint64) {
+	vc.lastProcessedBlockJobIndexBlockConsumer.Set(float64(processedIndex))
 }
