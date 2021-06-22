@@ -48,7 +48,7 @@ func (r ContractReporter) Report(payload []ledger.Payload) error {
 		}
 	}()
 
-	l := newView(payload)
+	l := NewView(payload)
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)

@@ -52,7 +52,7 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 		}
 	}()
 
-	l := newView(payload)
+	l := NewView(payload)
 	st := state.NewState(l)
 
 	for _, p := range payload {

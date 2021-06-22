@@ -3,6 +3,8 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime/interpreter"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,10 +17,15 @@ func AccountCreationMigration(payloads []ledger.Payload) ([]ledger.Payload, erro
 	sth := state.NewStateHolder(st)
 	a := state.NewAccounts(sth)
 
-	err = migrateContractForAccount(a, "e467b9dd11fa00df")
+	address := "e467b9dd11fa00df"
+	err := migrateContractForAccount(a, address)
 	if err != nil {
 		return nil, err
 	}
+
+	key := "/storage/isAccountCreationRestricted"
+	v := GetSetBooleanPayload(address, "", key)
+	l.Set(address, "", key, v.Value)
 
 	return l.Payloads(), nil
 }
@@ -211,4 +218,15 @@ func AccountCreationContractContent() []byte {
 		}
 	}
 	`)
+}
+
+func GetSetBooleanPayload(owner, controller, key string) *ledger.Payload {
+	value := interpreter.BoolValue(true)
+
+	v := interpreter.PrependMagic(
+		value,
+		interpreter.CurrentEncodingVersion,
+	)
+	k := registerIDToKey(flow.RegisterID{Owner: owner, Controller: controller, Key: key})
+	return ledger.NewPayload(k, v)
 }
