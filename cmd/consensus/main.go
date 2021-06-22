@@ -287,6 +287,7 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.Storage.Payloads,
 				core,
 			)
 			if err != nil {

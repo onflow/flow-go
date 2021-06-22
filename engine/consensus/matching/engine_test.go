@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,7 +25,8 @@ func TestMatchingEngineContext(t *testing.T) {
 type MatchingEngineSuite struct {
 	suite.Suite
 
-	core *mockconsensus.MatchingCore
+	payloads *mockstorage.Payloads
+	core     *mockconsensus.MatchingCore
 
 	// Matching Engine
 	engine *Engine
@@ -35,6 +37,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	me := &mockmodule.Local{}
 	net := &mockmodule.Network{}
 	s.core = &mockconsensus.MatchingCore{}
+	s.payloads = &mockstorage.Payloads{}
 
 	ourNodeID := unittest.IdentifierFixture()
 	me.On("NodeID").Return(ourNodeID)
@@ -43,7 +46,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil).Once()
 
 	var err error
-	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.core)
+	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.payloads, s.core)
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -54,6 +57,14 @@ func (s *MatchingEngineSuite) SetupTest() {
 func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 
 	finalizedBlockID := unittest.IdentifierFixture()
+
+	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
+	s.payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil)
+
+	for _, receipt := range payload.Receipts {
+		s.core.On("ProcessReceipt", receipt).Return(nil).Once()
+	}
+
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
 	s.engine.OnFinalizedBlock(finalizedBlockID)
 

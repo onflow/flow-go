@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 )
 
 // defaultReceiptQueueCapacity maximum capacity of receipts queue
@@ -26,9 +27,10 @@ type Engine struct {
 	log                       zerolog.Logger
 	me                        module.Local
 	core                      sealing.MatchingCore
+	payloads                  storage.Payloads
 	metrics                   module.EngineMetrics
 	notifier                  engine.Notifier
-	pendingReceipts           engine.MessageStore
+	pendingReceipts           *fifoqueue.FifoQueue
 	pendingFinalizationEvents *fifoqueue.FifoQueue
 }
 
@@ -38,6 +40,7 @@ func NewEngine(
 	me module.Local,
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
+	payloads storage.Payloads,
 	core sealing.MatchingCore) (*Engine, error) {
 
 	// FIFO queue for execution receipts
@@ -47,9 +50,6 @@ func NewEngine(
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
-	}
-	pendingReceipts := &engine.FifoMessageStore{
-		FifoQueue: receiptsQueue,
 	}
 
 	// FIFO queue for finalization events
@@ -65,9 +65,10 @@ func NewEngine(
 		unit:                      engine.NewUnit(),
 		me:                        me,
 		core:                      core,
+		payloads:                  payloads,
 		metrics:                   engineMetrics,
 		notifier:                  engine.NewNotifier(),
-		pendingReceipts:           pendingReceipts,
+		pendingReceipts:           receiptsQueue,
 		pendingFinalizationEvents: pendingFinalizationEvents,
 	}
 
@@ -122,7 +123,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 		return fmt.Errorf("input message of incompatible type: %T, origin: %x", event, originID[:])
 	}
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-	e.pendingReceipts.Put(&engine.Message{OriginID: originID, Payload: receipt})
+	e.pendingReceipts.Push(receipt)
 	e.notifier.Notify()
 	return nil
 }
@@ -131,7 +132,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-	e.pendingReceipts.Put(&engine.Message{OriginID: originID, Payload: receipt})
+	e.pendingReceipts.Push(receipt)
 	e.notifier.Notify()
 }
 
@@ -141,6 +142,32 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 	e.pendingFinalizationEvents.Push(finalizedBlockID)
 	e.notifier.Notify()
+	e.processFinalizedReceipts(finalizedBlockID)
+}
+
+// processFinalizedReceipts selects receipts that were included into finalized block and submits them
+// for further processing by matching core.
+// Without the logic below, the sealing engine would produce IncorporatedResults
+// only from receipts received directly from ENs. sealing Core would not know about
+// Receipts that are incorporated by other nodes in their blocks blocks (but never
+// received directly from the EN).
+func (e *Engine) processFinalizedReceipts(finalizedBlockID flow.Identifier) {
+	e.unit.Launch(func() {
+		payload, err := e.payloads.ByBlockID(finalizedBlockID)
+		if err != nil {
+			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
+		}
+		for _, receipt := range payload.Receipts {
+			added := e.pendingReceipts.Push(receipt)
+			if !added {
+				// Not being able to queue an execution receipt is a fatal edge case. It might happen, if the
+				// queue capacity is depleted. However, we cannot dropped the execution receipt, because there
+				// is no way that an execution receipt can be re-added later once dropped.
+				e.log.Fatal().Msg("failed to queue execution receipt")
+			}
+		}
+		e.notifier.Notify()
+	})
 }
 
 func (e *Engine) loop() {
@@ -177,9 +204,9 @@ func (e *Engine) processAvailableEvents() error {
 			continue
 		}
 
-		msg, ok := e.pendingReceipts.Get()
+		msg, ok := e.pendingReceipts.Pop()
 		if ok {
-			err := e.core.ProcessReceipt(msg.Payload.(*flow.ExecutionReceipt))
+			err := e.core.ProcessReceipt(msg.(*flow.ExecutionReceipt))
 			if err != nil {
 				return fmt.Errorf("could not handle execution receipt: %w", err)
 			}
