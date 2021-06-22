@@ -235,7 +235,7 @@ func (vc *VerificationCollector) OnVerifiableChunkReceivedAtVerifierEngine() {
 
 // OnResultApprovalDispatchedInNetwork is called whenever a result approval for is emitted to consensus nodes.
 // It increases the total number of result approvals.
-func (vc *VerificationCollector) OnResultApprovalDispatchedInNetwork() {
+func (vc *VerificationCollector) OnResultApprovalDispatchedInNetworkByVerifier() {
 	// increases the counter of disseminated result approvals
 	// fo by one. Each result approval corresponds to a single chunk of the block
 	// the approvals disseminated by verifier engine

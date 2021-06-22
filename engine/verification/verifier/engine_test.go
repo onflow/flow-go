@@ -155,7 +155,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	// reception of verifiable chunk
 	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
 	// emission of result approval
-	suite.metrics.On("OnResultApprovalDispatchedInNetwork").Return()
+	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
 
 	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).

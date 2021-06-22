@@ -218,7 +218,7 @@ type VerificationMetrics interface {
 
 	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
 	// by verifier engine.
-	OnResultApprovalDispatchedInNetwork()
+	OnResultApprovalDispatchedInNetworkByVerifier()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.

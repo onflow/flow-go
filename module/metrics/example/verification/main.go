@@ -169,7 +169,7 @@ func demo() {
 
 			// verifier
 			tryRandomCall(vc.OnVerifiableChunkReceivedAtVerifierEngine)
-			tryRandomCall(vc.OnResultApprovalDispatchedInNetwork)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetworkByVerifier)
 
 			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
@@ -206,7 +206,7 @@ func demo() {
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
 
-			tryRandomCall(vc.OnResultApprovalDispatchedInNetwork)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetworkByVerifier)
 		}
 	})
 }

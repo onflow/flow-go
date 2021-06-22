@@ -95,7 +95,7 @@ func (_m *VerificationMetrics) OnFinalizedBlockArrivedAtAssigner(height uint64) 
 }
 
 // OnResultApprovalDispatchedInNetwork provides a mock function with given fields:
-func (_m *VerificationMetrics) OnResultApprovalDispatchedInNetwork() {
+func (_m *VerificationMetrics) OnResultApprovalDispatchedInNetworkByVerifier() {
 	_m.Called()
 }
 

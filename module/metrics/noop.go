@@ -76,7 +76,7 @@ func (nc *NoopCollector) OnApprovalProcessingDuration(duration time.Duration)   
 func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)                            {}
 func (nc *NoopCollector) OnExecutionResultReceivedAtAssignerEngine()                             {}
 func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()                             {}
-func (nc *NoopCollector) OnResultApprovalDispatchedInNetwork()                                   {}
+func (nc *NoopCollector) OnResultApprovalDispatchedInNetworkByVerifier()                         {}
 func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                        {}
 func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
 func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
