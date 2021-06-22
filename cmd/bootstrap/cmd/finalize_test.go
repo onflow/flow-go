@@ -13,10 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -61,10 +58,12 @@ func TestFinalize_HappyPath(t *testing.T) {
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
-	rootHeight := uint64(1000)
-	epochCounter := uint64(0)
+	rootHeight := uint64(12332)
+	epochCounter := uint64(2)
 
-	RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+
+		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
@@ -103,7 +102,9 @@ func TestFinalize_Deterministic(t *testing.T) {
 	rootHeight := uint64(1000)
 	epochCounter := uint64(0)
 
-	RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+
+		flagOutdir = bootDir
 
 		flagConfig = configPath
 		flagPartnerNodeInfoDir = partnerDir
@@ -133,10 +134,11 @@ func TestFinalize_Deterministic(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		firstSnapshot := readRootProtocolSnapshot(t, bootDir)
+		firstSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		require.NoError(t, err)
 
 		// delete snapshot file
-		err := os.Remove(snapshotPath)
+		err = os.Remove(snapshotPath)
 		require.NoError(t, err)
 
 		finalize(nil, nil)
@@ -147,36 +149,106 @@ func TestFinalize_Deterministic(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		secondSnapshot := readRootProtocolSnapshot(t, bootDir)
+		secondSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		require.NoError(t, err)
 
 		assert.Equal(t, firstSnapshot, secondSnapshot)
 	})
 }
 
-func RunWithSporkBootstrapDir(t testing.TB, f func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string)) {
-	dir := unittest.TempDir(t)
-	defer os.RemoveAll(dir)
+func TestFinalize_SameSeedDifferentInputs(t *testing.T) {
+	deterministicSeed := generateRandomSeed()
+	rootCommit := unittest.StateCommitmentFixture()
+	rootParent := unittest.StateCommitmentFixture()
+	chainName := "main"
+	rootHeight := uint64(1000)
+	epochCounter := uint64(0)
 
-	flagOutdir = dir
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
 
-	// make sure contraints are satisfied, 2/3's of con and col nodes are internal
-	internalNodes := utils.GenerateNodeInfos(3, 6, 2, 1, 1)
-	partnerNodes := utils.GenerateNodeInfos(1, 1, 1, 1, 1)
+		flagOutdir = bootDir
 
-	partnerDir, partnerStakesPath, err := utils.WritePartnerFiles(partnerNodes, dir)
-	require.NoError(t, err)
+		flagConfig = configPath
+		flagPartnerNodeInfoDir = partnerDir
+		flagPartnerStakes = partnerStakes
+		flagInternalNodePrivInfoDir = internalPrivDir
 
-	internalPrivDir, configPath, err := utils.WriteInternalFiles(internalNodes, dir)
-	require.NoError(t, err)
+		flagFastKG = true
 
-	f(dir, partnerDir, partnerStakesPath, internalPrivDir, configPath)
-}
+		flagRootCommit = hex.EncodeToString(rootCommit[:])
+		flagRootParent = hex.EncodeToString(rootParent[:])
+		flagRootChain = chainName
+		flagRootHeight = rootHeight
+		flagEpochCounter = epochCounter
 
-func readRootProtocolSnapshot(t *testing.T, bootDir string) *inmem.Snapshot {
-	snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
-	bz, err := io.ReadFile(snapshotPath)
-	require.NoError(t, err)
-	snapshot, err := convert.BytesToInmemSnapshot(bz)
-	require.NoError(t, err)
-	return snapshot
+		// set deterministic bootstrapping seed
+		flagBootstrapRandomSeed = deterministicSeed
+
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
+
+		finalize(nil, nil)
+		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
+		hook.logs.Reset()
+
+		// check if root protocol snapshot exists
+		snapshotPath := filepath.Join(bootDir, model.PathRootProtocolStateSnapshot)
+		assert.FileExists(t, snapshotPath)
+
+		// read snapshot
+		firstSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		require.NoError(t, err)
+
+		// delete snapshot file
+		err = os.Remove(snapshotPath)
+		require.NoError(t, err)
+
+		// change input state commitments
+		rootCommit = unittest.StateCommitmentFixture()
+		rootParent = unittest.StateCommitmentFixture()
+
+		finalize(nil, nil)
+		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
+		hook.logs.Reset()
+
+		// check if root protocol snapshot exists
+		assert.FileExists(t, snapshotPath)
+
+		// read snapshot
+		secondSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		require.NoError(t, err)
+
+		// current epochs
+		firstCurrentEpoch := firstSnapshot.Epochs().Current()
+		secondCurrentEpoch := secondSnapshot.Epochs().Current()
+
+		// check qc
+		firstQC, err := firstSnapshot.QuorumCertificate()
+		require.NoError(t, err)
+		secondQC, err := secondSnapshot.QuorumCertificate()
+		require.NoError(t, err)
+		assert.Equal(t, firstQC, secondQC)
+
+		// check dkg
+		firstDKG, err := firstCurrentEpoch.DKG()
+		require.NoError(t, err)
+		secondDKG, err := secondCurrentEpoch.DKG()
+		require.NoError(t, err)
+		assert.Equal(t, firstDKG, secondDKG)
+
+		// check clustering
+		firstClustering, err := firstCurrentEpoch.Clustering()
+		require.NoError(t, err)
+		secondClustering, err := secondCurrentEpoch.Clustering()
+		require.NoError(t, err)
+		assert.Equal(t, firstClustering, secondClustering)
+
+		// verify random sources are same
+		firstRandomSource, err := firstCurrentEpoch.RandomSource()
+		require.NoError(t, err)
+		secondRandomSource, err := secondCurrentEpoch.RandomSource()
+		require.NoError(t, err)
+		assert.Equal(t, firstRandomSource, secondRandomSource)
+		assert.Equal(t, firstRandomSource, getRandomSource(deterministicSeed))
+	})
 }
