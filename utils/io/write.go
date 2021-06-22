@@ -34,7 +34,7 @@ func WriteText(path string, data []byte) error {
 	return nil
 }
 
-// WriteJSON writes an interface to the file at the given path as JSON
+// WriteJSON marshals the given interface into JSON and writes it to the given path
 func WriteJSON(path string, data interface{}) error {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
