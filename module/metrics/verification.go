@@ -32,7 +32,7 @@ type VerificationCollector struct {
 	// total number of chunk data request messages dispatched in the network by requester engine.
 	sentChunkDataRequestMessagesTotalRequester prometheus.Counter
 	// total number of chunk data response messages received by requester from network.
-	receivedChunkDataResponseMessageByRequesterTotal prometheus.Counter
+	receivedChunkDataResponseMessageTotalRequester prometheus.Counter
 	// total number of chunk data pack sent by requester to fetcher engine.
 	sentChunkDataPackByRequesterTotal prometheus.Counter
 
@@ -212,10 +212,10 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		receivedVerifiableChunkTotalVerifier: receivedVerifiableChunksTotalVerifier,
 
 		// requester
-		receivedChunkDataPackRequestsTotalRequester:      receivedChunkDataPackRequestsTotalRequester,
-		sentChunkDataRequestMessagesTotalRequester:       sentChunkDataRequestMessagesTotalRequester,
-		receivedChunkDataResponseMessageByRequesterTotal: receivedChunkDataResponseMessagesTotalRequester,
-		sentChunkDataPackByRequesterTotal:                sentChunkDataPackByRequesterTotal,
+		receivedChunkDataPackRequestsTotalRequester:    receivedChunkDataPackRequestsTotalRequester,
+		sentChunkDataRequestMessagesTotalRequester:     sentChunkDataRequestMessagesTotalRequester,
+		receivedChunkDataResponseMessageTotalRequester: receivedChunkDataResponseMessagesTotalRequester,
+		sentChunkDataPackByRequesterTotal:              sentChunkDataPackByRequesterTotal,
 	}
 
 	return vc
@@ -286,7 +286,7 @@ func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetworkByRequ
 // OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
 func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester() {
-	vc.receivedChunkDataResponseMessageByRequesterTotal.Inc()
+	vc.receivedChunkDataResponseMessageTotalRequester.Inc()
 }
 
 // OnChunkDataPackSentToFetcher increases a counter that keeps track of number of chunk data packs sent to the fetcher engine from
