@@ -156,7 +156,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 	})
 }
 
-func TestFinalize_SameSeedDifferentInputs(t *testing.T) {
+func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 	deterministicSeed := generateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
@@ -204,8 +204,10 @@ func TestFinalize_SameSeedDifferentInputs(t *testing.T) {
 		require.NoError(t, err)
 
 		// change input state commitments
-		rootCommit = unittest.StateCommitmentFixture()
-		rootParent = unittest.StateCommitmentFixture()
+		rootCommit2 := unittest.StateCommitmentFixture()
+		rootParent2 := unittest.StateCommitmentFixture()
+		flagRootCommit = hex.EncodeToString(rootCommit2[:])
+		flagRootParent = hex.EncodeToString(rootParent2[:])
 
 		finalize(nil, nil)
 		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
@@ -222,19 +224,12 @@ func TestFinalize_SameSeedDifferentInputs(t *testing.T) {
 		currentEpoch1 := snapshot1.Epochs().Current()
 		currentEpoch2 := snapshot2.Epochs().Current()
 
-		// check qc
-		firstQC, err := snapshot1.QuorumCertificate()
-		require.NoError(t, err)
-		secondQC, err := snapshot2.QuorumCertificate()
-		require.NoError(t, err)
-		assert.Equal(t, firstQC, secondQC)
-
 		// check dkg
-		firstDKG, err := currentEpoch1.DKG()
+		dkg1, err := currentEpoch1.DKG()
 		require.NoError(t, err)
-		secondDKG, err := currentEpoch2.DKG()
+		dkg2, err := currentEpoch2.DKG()
 		require.NoError(t, err)
-		assert.Equal(t, firstDKG, secondDKG)
+		assert.Equal(t, dkg1, dkg2)
 
 		// check clustering
 		clustering1, err := currentEpoch1.Clustering()
