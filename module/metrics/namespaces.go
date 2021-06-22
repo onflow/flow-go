@@ -40,8 +40,9 @@ const (
 
 // Consensus subsystems represent the different components of the consensus algorithm.
 const (
-	subsystemCompliance = "compliance"
-	subsystemHotstuff   = "hotstuff"
+	subsystemCompliance  = "compliance"
+	subsystemHotstuff    = "hotstuff"
+	subsystemMatchEngine = "match"
 )
 
 // Execution Subsystems
