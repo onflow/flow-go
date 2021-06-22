@@ -24,7 +24,11 @@ func AccountCreationMigration(payloads []ledger.Payload) ([]ledger.Payload, erro
 	}
 
 	key := "/storage/isAccountCreationRestricted"
-	v := GetSetBooleanPayload(address, "", key)
+	v, err := GetSetBooleanPayload(address, "", key)
+	if err != nil {
+		return nil, err
+	}
+
 	l.Set(address, "", key, v.Value)
 
 	return l.Payloads(), nil
@@ -220,13 +224,20 @@ func AccountCreationContractContent() []byte {
 	`)
 }
 
-func GetSetBooleanPayload(owner, controller, key string) *ledger.Payload {
-	value := interpreter.BoolValue(true)
+func GetSetBooleanPayload(owner, controller, key string) (*ledger.Payload, error) {
+	boolValue := interpreter.BoolValue(true)
+
+	value, _, err := interpreter.EncodeValue(boolValue, []string{key}, true, nil)
+
+	if err != nil {
+		return nil, err
+	}
 
 	v := interpreter.PrependMagic(
 		value,
 		interpreter.CurrentEncodingVersion,
 	)
+
 	k := registerIDToKey(flow.RegisterID{Owner: owner, Controller: controller, Key: key})
-	return ledger.NewPayload(k, v)
+	return ledger.NewPayload(k, v), nil
 }
