@@ -204,8 +204,12 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		Run(func(args testifymock.Arguments) {
 			// TODO change this to check challeneges
 			_, ok := args[0].(*flow.ResultApproval)
-			suite.Assert().False(ok)
+			// TODO change this to false when missing register is rolled back
+			suite.Assert().True(ok)
 		})
+
+	// emission of result approval
+	suite.metrics.On("OnResultApprovalDispatchedInNetwork").Return()
 
 	var tests = []struct {
 		vc          *verification.VerifiableChunkData
