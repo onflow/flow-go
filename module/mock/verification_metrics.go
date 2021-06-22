@@ -40,7 +40,7 @@ func (_m *VerificationMetrics) OnChunkDataPackReceived() {
 }
 
 // OnChunkDataPackRequestDispatchedInNetwork provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunkDataPackRequestDispatchedInNetwork() {
+func (_m *VerificationMetrics) OnChunkDataPackRequestDispatchedInNetworkByRequester() {
 	_m.Called()
 }
 
@@ -60,7 +60,7 @@ func (_m *VerificationMetrics) OnChunkDataPackRequested() {
 }
 
 // OnChunkDataPackResponseReceivedFromNetwork provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunkDataPackResponseReceivedFromNetwork() {
+func (_m *VerificationMetrics) OnChunkDataPackResponseReceivedFromNetworkByRequester() {
 	_m.Called()
 }
 

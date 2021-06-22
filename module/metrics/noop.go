@@ -81,7 +81,7 @@ func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)       
 func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
 func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
 func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}
-func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetwork()                             {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                  {}
 func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                   {}
 func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                             {}
 func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
@@ -89,7 +89,7 @@ func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                         
 func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
 func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                          {}
 func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                          {}
-func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()                 {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                    {}

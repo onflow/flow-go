@@ -199,11 +199,11 @@ type VerificationMetrics interface {
 
 	// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 	// requester engine dispatches in the network (to the execution nodes).
-	OnChunkDataPackRequestDispatchedInNetwork()
+	OnChunkDataPackRequestDispatchedInNetworkByRequester()
 
 	// OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 	// requester engine receives from execution nodes (through network).
-	OnChunkDataPackResponseReceivedFromNetwork()
+	OnChunkDataPackResponseReceivedFromNetworkByRequester()
 
 	// OnChunkDataPackSentToFetcher increments a counter that keeps track of number of chunk data packs sent to the fetcher engine from
 	// requester engine.

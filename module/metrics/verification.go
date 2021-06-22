@@ -279,13 +279,13 @@ func (vc *VerificationCollector) OnChunkDataPackRequestReceivedByRequester() {
 
 // OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
-func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetwork() {
+func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester() {
 	vc.sentChunkDataRequestMessagesTotalRequester.Inc()
 }
 
 // OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
-func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetwork() {
+func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester() {
 	vc.receivedChunkDataResponseMessageByRequesterTotal.Inc()
 }
 

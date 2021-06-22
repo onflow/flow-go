@@ -163,8 +163,8 @@ func demo() {
 
 			// requester
 			tryRandomCall(vc.OnChunkDataPackRequestReceivedByRequester)
-			tryRandomCall(vc.OnChunkDataPackRequestDispatchedInNetwork)
-			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetwork)
+			tryRandomCall(vc.OnChunkDataPackRequestDispatchedInNetworkByRequester)
+			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetworkByRequester)
 			tryRandomCall(vc.OnChunkDataPackSentToFetcher)
 
 			// verifier
