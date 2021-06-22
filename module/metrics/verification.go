@@ -17,20 +17,20 @@ type VerificationCollector struct {
 	receivedFinalizedHeightAssigner prometheus.Gauge   // the last finalized height received by assigner engine
 	assignedChunkTotalAssigner      prometheus.Counter // total chunks assigned to this verification node
 	processedChunkTotalAssigner     prometheus.Counter // total chunks sent by assigner engine to chunk consumer (i.e., fetcher input)
-	receivedResultsByAssignerTotal  prometheus.Counter // total execution results arrived at assigner
+	receivedResultsTotalAssigner    prometheus.Counter // total execution results arrived at assigner
 
 	// Fetcher Engine
-	receivedAssignedChunkByFetcherTotal  prometheus.Counter // total assigned chunks received by fetcher engine from assigner engine.
-	sentVerifiableChunksByFetcherTotal   prometheus.Counter // total verifiable chunk sent by fetcher engine and sent to verifier engine.
-	receivedChunkDataPackByFetcherTotal  prometheus.Counter // total chunk data packs received by fetcher engine
-	requestedChunkDataPackByFetcherTotal prometheus.Counter // total number of chunk data packs requested by fetcher engine
+	receivedAssignedChunkTotalFetcher  prometheus.Counter // total assigned chunks received by fetcher engine from assigner engine.
+	sentVerifiableChunksTotalFetcher   prometheus.Counter // total verifiable chunk sent by fetcher engine and sent to verifier engine.
+	receivedChunkDataPackTotalFetcher  prometheus.Counter // total chunk data packs received by fetcher engine
+	requestedChunkDataPackTotalFetcher prometheus.Counter // total number of chunk data packs requested by fetcher engine
 
 	// Requester Engine
 	//
 	// total number of chunk data pack requests received by requester engine from fetcher engine.
-	receivedChunkDataPackRequestByRequesterTotal prometheus.Counter
+	receivedChunkDataPackRequestsTotalRequester prometheus.Counter
 	// total number of chunk data request messages dispatched in the network by requester engine.
-	sentChunkDataRequestMessageByRequesterTotal prometheus.Counter
+	sentChunkDataRequestMessagesTotalRequester prometheus.Counter
 	// total number of chunk data response messages received by requester from network.
 	receivedChunkDataResponseMessageByRequesterTotal prometheus.Counter
 	// total number of chunk data pack sent by requester to fetcher engine.
@@ -59,21 +59,28 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	})
 
 	// Assigner Engine
-	receivedFinalizedHeight := prometheus.NewGauge(prometheus.GaugeOpts{
+	receivedFinalizedHeightAssigner := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:      "finalized_height",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "the last finalized height received by assigner engine",
 	})
 
-	assignedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedResultsTotalAssigner := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:      "received_result_total",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemAssignerEngine,
+		Help:      "total number of execution results received by assigner engine",
+	})
+
+	assignedChunksTotalAssigner := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_assigned_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
 		Help:      "total number of chunks assigned to verification node",
 	})
 
-	sentChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	sentChunksTotalAssigner := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "processed_chunk_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemAssignerEngine,
@@ -81,7 +88,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	})
 
 	// Fetcher Engine
-	receivedAssignedChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedAssignedChunksTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "assigned_chunk_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFetcherEngine,
@@ -89,21 +96,21 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	})
 
 	// Requester Engine
-	receivedChunkDataPackRequestsByRequesterTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedChunkDataPackRequestsTotalRequester := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_request_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemRequesterEngine,
 		Help:      "total number of chunk data pack requests received by requester engine from fetcher engine",
 	})
 
-	sentChunkDataRequestMessagesByRequesterTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	sentChunkDataRequestMessagesTotalRequester := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_request_message_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemRequesterEngine,
 		Help:      "total number of chunk data pack request messages sent in the network by requester engine",
 	})
 
-	receivedChunkDataResponseMessagesByRequesterTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedChunkDataResponseMessagesTotalRequester := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_response_message_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemRequesterEngine,
@@ -117,21 +124,21 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		Help:      "total number of chunk data packs sent by requester engine to fetcher engine",
 	})
 
-	sentVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	sentVerifiableChunksTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_sent_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFetcherEngine,
 		Help:      "total number of verifiable chunks sent by fetcher engine to verifier engine",
 	})
 
-	receivedChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedChunkDataPackTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFetcherEngine,
 		Help:      "total number of chunk data packs received by fetcher engine",
 	})
 
-	requestedChunkDataPackTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	requestedChunkDataPackTotalFetcher := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "chunk_data_pack_requested_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemFetcherEngine,
@@ -139,14 +146,14 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	})
 
 	// Verifier Engine
-	receivedVerifiableChunksTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	receivedVerifiableChunksTotalVerifier := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
 		Help:      "total number verifiable chunks received by verifier engine from fetcher engine",
 	})
 
-	sentResultApprovalTotal := prometheus.NewCounter(prometheus.CounterOpts{
+	sentResultApprovalTotalVerifier := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "result_approvals_total",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemVerifierEngine,
@@ -160,24 +167,26 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		lastProcessedChunkJobIndexChunkConsumer,
 
 		// assigner
-		receivedFinalizedHeight,
-		assignedChunksTotal,
-		sentChunksTotal,
+		receivedFinalizedHeightAssigner,
+		assignedChunksTotalAssigner,
+		sentChunksTotalAssigner,
+		receivedResultsTotalAssigner,
 
 		// fetcher engine
-		receivedAssignedChunksTotal,
+		receivedAssignedChunksTotalFetcher,
+		sentVerifiableChunksTotalFetcher,
+		receivedChunkDataPackTotalFetcher,
+		requestedChunkDataPackTotalFetcher,
 
 		// requester engine
-		receivedChunkDataPackRequestsByRequesterTotal,
-		sentChunkDataRequestMessagesByRequesterTotal,
-		receivedChunkDataResponseMessagesByRequesterTotal,
+		receivedChunkDataPackRequestsTotalRequester,
+		sentChunkDataRequestMessagesTotalRequester,
+		receivedChunkDataResponseMessagesTotalRequester,
 		sentChunkDataPackByRequesterTotal,
 
-		sentVerifiableChunksTotal,
-		receivedChunkDataPackTotal,
-		requestedChunkDataPackTotal,
-		receivedVerifiableChunksTotal,
-		sentResultApprovalTotal)
+		// verifier engine
+		receivedVerifiableChunksTotalVerifier,
+		sentResultApprovalTotalVerifier)
 
 	vc := &VerificationCollector{
 		tracer: tracer,
@@ -187,24 +196,25 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		lastProcessedBlockJobIndexBlockConsumer: lastProcessedBlockJobIndexBlockConsumer,
 
 		// assigner
-		receivedFinalizedHeightAssigner: receivedFinalizedHeight,
-		assignedChunkTotalAssigner:      assignedChunksTotal,
-		processedChunkTotalAssigner:     sentChunksTotal,
+		receivedFinalizedHeightAssigner: receivedFinalizedHeightAssigner,
+		assignedChunkTotalAssigner:      assignedChunksTotalAssigner,
+		processedChunkTotalAssigner:     sentChunksTotalAssigner,
+		receivedResultsTotalAssigner:    receivedResultsTotalAssigner,
 
 		// fetcher
-		receivedAssignedChunkByFetcherTotal:  receivedAssignedChunksTotal,
-		receivedChunkDataPackByFetcherTotal:  receivedChunkDataPackTotal,
-		requestedChunkDataPackByFetcherTotal: requestedChunkDataPackTotal,
-		sentVerifiableChunksByFetcherTotal:   sentVerifiableChunksTotal,
+		receivedAssignedChunkTotalFetcher:  receivedAssignedChunksTotalFetcher,
+		receivedChunkDataPackTotalFetcher:  receivedChunkDataPackTotalFetcher,
+		requestedChunkDataPackTotalFetcher: requestedChunkDataPackTotalFetcher,
+		sentVerifiableChunksTotalFetcher:   sentVerifiableChunksTotalFetcher,
 
 		// verifier
-		sentResultApprovalTotalVerifier:      sentResultApprovalTotal,
-		receivedVerifiableChunkTotalVerifier: receivedVerifiableChunksTotal,
+		sentResultApprovalTotalVerifier:      sentResultApprovalTotalVerifier,
+		receivedVerifiableChunkTotalVerifier: receivedVerifiableChunksTotalVerifier,
 
 		// requester
-		receivedChunkDataPackRequestByRequesterTotal:     receivedChunkDataPackRequestsByRequesterTotal,
-		sentChunkDataRequestMessageByRequesterTotal:      sentChunkDataRequestMessagesByRequesterTotal,
-		receivedChunkDataResponseMessageByRequesterTotal: receivedChunkDataResponseMessagesByRequesterTotal,
+		receivedChunkDataPackRequestsTotalRequester:      receivedChunkDataPackRequestsTotalRequester,
+		sentChunkDataRequestMessagesTotalRequester:       sentChunkDataRequestMessagesTotalRequester,
+		receivedChunkDataResponseMessageByRequesterTotal: receivedChunkDataResponseMessagesTotalRequester,
 		sentChunkDataPackByRequesterTotal:                sentChunkDataPackByRequesterTotal,
 	}
 
@@ -214,7 +224,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 // OnExecutionResultReceivedAtAssignerEngine is called whenever a new execution result arrives
 // at Assigner engine. It increments total number of received results.
 func (vc *VerificationCollector) OnExecutionResultReceivedAtAssignerEngine() {
-	vc.receivedResultsByAssignerTotal.Inc()
+	vc.receivedResultsTotalAssigner.Inc()
 }
 
 // OnVerifiableChunkReceivedAtVerifierEngine is called whenever a verifiable chunk is received by Verifier engine
@@ -252,25 +262,25 @@ func (vc *VerificationCollector) OnAssignedChunkProcessedAtAssigner() {
 
 // OnAssignedChunkReceivedAtFetcher increments a counter that keeps track of number of assigned chunks arrive at fetcher engine.
 func (vc *VerificationCollector) OnAssignedChunkReceivedAtFetcher() {
-	vc.receivedAssignedChunkByFetcherTotal.Inc()
+	vc.receivedAssignedChunkTotalFetcher.Inc()
 }
 
 // OnChunkDataPackRequestSentByFetcher increments a counter that keeps track of number of chunk data pack requests that fetcher engine
 // sends to requester engine.
 func (vc *VerificationCollector) OnChunkDataPackRequestSentByFetcher() {
-	vc.requestedChunkDataPackByFetcherTotal.Inc()
+	vc.requestedChunkDataPackTotalFetcher.Inc()
 }
 
 // OnChunkDataPackRequestReceivedByRequester increments a counter that keeps track of number of chunk data pack requests
 // arrive at the requester engine from the fetcher engine.
 func (vc *VerificationCollector) OnChunkDataPackRequestReceivedByRequester() {
-	vc.receivedChunkDataPackRequestByRequesterTotal.Inc()
+	vc.receivedChunkDataPackRequestsTotalRequester.Inc()
 }
 
 // OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
 func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetwork() {
-	vc.sentChunkDataRequestMessageByRequesterTotal.Inc()
+	vc.sentChunkDataRequestMessagesTotalRequester.Inc()
 }
 
 // OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
@@ -288,12 +298,12 @@ func (vc *VerificationCollector) OnChunkDataPackSentToFetcher() {
 // OnChunkDataPackArrivedAtFetcher increments a counter that keeps track of number of chunk data packs arrived at fetcher engine from
 // requester engine.
 func (vc *VerificationCollector) OnChunkDataPackArrivedAtFetcher() {
-	vc.receivedChunkDataPackByFetcherTotal.Inc()
+	vc.receivedChunkDataPackTotalFetcher.Inc()
 }
 
 // OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 func (vc *VerificationCollector) OnVerifiableChunkSentToVerifier() {
-	vc.sentVerifiableChunksByFetcherTotal.Inc()
+	vc.sentVerifiableChunksTotalFetcher.Inc()
 }
 
 // OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
