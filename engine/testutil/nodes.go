@@ -241,7 +241,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receipts := consensusMempools.NewExecutionTree()
 
 	seals := stdmap.NewIncorporatedResultSeals(1000)
-	pendingReceipts := stdmap.NewPendingReceipts(1000)
+	pendingReceipts := stdmap.NewPendingReceipts(node.Headers, 1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,

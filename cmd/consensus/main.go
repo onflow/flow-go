@@ -199,7 +199,7 @@ func main() {
 			return nil
 		}).
 		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts = stdmap.NewPendingReceipts(pendngReceiptsLimit)
+			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendngReceiptsLimit)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {

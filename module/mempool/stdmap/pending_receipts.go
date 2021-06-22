@@ -2,10 +2,10 @@ package stdmap
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/storage"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/storage"
 )
 
 type receiptsSet map[flow.Identifier]struct{}
@@ -15,7 +15,7 @@ type receiptsSet map[flow.Identifier]struct{}
 // in order to allow to find receipts by the previous result id.
 type PendingReceipts struct {
 	*Backend
-	headers storage.Headers
+	headers storage.Headers // used to query headers of executed blocks
 	// secondary index by parent result id, since multiple receipts could
 	// have the same parent result, (even if they have different result)
 	byPreviousResultID map[flow.Identifier][]flow.Identifier
@@ -39,11 +39,13 @@ func (r *PendingReceipts) indexByHeight(receipt *flow.ExecutionReceipt) (uint64,
 }
 
 // NewPendingReceipts creates a new memory pool for execution receipts.
-func NewPendingReceipts(limit uint) *PendingReceipts {
+func NewPendingReceipts(headers storage.Headers, limit uint) *PendingReceipts {
 	// create the receipts memory pool with the lookup maps
 	r := &PendingReceipts{
 		Backend:            NewBackend(WithLimit(limit)),
+		headers:            headers,
 		byPreviousResultID: make(map[flow.Identifier][]flow.Identifier),
+		byHeight:           make(map[uint64]receiptsSet),
 	}
 	// TODO: there is smarter eject exists. For instance:
 	// if the mempool fills up, we want to eject the receipts for the highest blocks
@@ -204,12 +206,12 @@ func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
 		if uint64(len(r.byHeight)) < height-r.lowestHeight {
 			for h := range r.byHeight {
 				if h < height {
-					r.removeByHeight(h)
+					r.removeByHeight(h, entities)
 				}
 			}
 		} else {
 			for h := r.lowestHeight; h < height; h++ {
-				r.removeByHeight(h)
+				r.removeByHeight(h, entities)
 			}
 		}
 		r.lowestHeight = height
@@ -217,9 +219,12 @@ func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
 	})
 }
 
-func (r *PendingReceipts) removeByHeight(height uint64) {
+func (r *PendingReceipts) removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity) {
 	for receiptID := range r.byHeight[height] {
-		r.Rem(receiptID)
+		entity, ok := entities[receiptID]
+		if ok {
+			removeReceipt(entity.(*flow.ExecutionReceipt), entities, r.byPreviousResultID)
+		}
 	}
 	delete(r.byHeight, height)
 }

@@ -372,6 +372,12 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 			lastSealed.ID(), lastSealed.Height, err)
 	}
 
+	err = c.pendingReceipts.PruneUpToHeight(lastSealed.Height)
+	if err != nil {
+		return fmt.Errorf("failed to prune pending receipts mempool up to latest sealed and finalized block %v, height: %v: %w",
+			lastSealed.ID(), lastSealed.Height, err)
+	}
+
 	c.log.Info().
 		Hex("finalized_block_id", finalizedBlockID[:]).
 		Uint64("first_height_missing_result", firstMissingHeight).
