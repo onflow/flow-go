@@ -66,6 +66,11 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
 
+	err = v.checkSignatureDuplications(tx)
+	if err != nil {
+		return fmt.Errorf("transaction verification failed: %w", err)
+	}
+
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.aggregateAccountSignatures(
 		accounts,
 		tx.PayloadSignatures,
@@ -216,4 +221,26 @@ func (v *TransactionSignatureVerifier) sigIsForProposalKey(
 	proposalKey flow.ProposalKey,
 ) bool {
 	return txSig.Address == proposalKey.Address && txSig.KeyIndex == proposalKey.KeyIndex
+}
+
+func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
+	observedSigs := make(map[string]bool)
+	for _, sig := range tx.PayloadSignatures {
+		keyStr := fmt.Sprintf("%s-%d", sig.Address.String(), sig.KeyIndex)
+		if _, ok := observedSigs[keyStr]; ok {
+			err := fmt.Errorf("double signatures are provided for the same key")
+			return errors.NewInvalidPayloadSignatureError(sig.Address, sig.KeyIndex, err)
+		}
+		observedSigs[keyStr] = true
+	}
+
+	for _, sig := range tx.EnvelopeSignatures {
+		keyStr := fmt.Sprintf("%s-%d", sig.Address.String(), sig.KeyIndex)
+		if _, ok := observedSigs[keyStr]; ok {
+			err := fmt.Errorf("double signatures are provided for the same key")
+			return errors.NewInvalidEnvelopeSignatureError(sig.Address, sig.KeyIndex, err)
+		}
+		observedSigs[keyStr] = true
+	}
+	return nil
 }

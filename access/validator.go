@@ -264,7 +264,7 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 	return nil
 }
 
-// Every key (account, key index combination) can only be used once for signing
+// every key (account, key index combination) can only be used once for signing
 func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBody) error {
 	observedSigs := make(map[string]bool)
 	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
