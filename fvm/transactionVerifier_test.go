@@ -50,7 +50,7 @@ func TestTransactionVerification(t *testing.T) {
 		txVerifier := fvm.NewTransactionSignatureVerifier(1000)
 		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "double signatures are provided for the same key"))
+		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
 	t.Run("duplicated authorization and envelope signatures", func(t *testing.T) {
 		tx := flow.TransactionBody{}
@@ -64,6 +64,6 @@ func TestTransactionVerification(t *testing.T) {
 		txVerifier := fvm.NewTransactionSignatureVerifier(1000)
 		err = txVerifier.Process(nil, &fvm.Context{}, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
-		require.True(t, strings.Contains(err.Error(), "double signatures are provided for the same key"))
+		require.True(t, strings.Contains(err.Error(), "duplicate signatures are provided for the same key"))
 	})
 }

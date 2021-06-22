@@ -269,7 +269,7 @@ func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBo
 	observedSigs := make(map[string]bool)
 	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
 		keyStr := fmt.Sprintf("%s-%d", sig.Address.String(), sig.KeyIndex)
-		if _, ok := observedSigs[keyStr]; ok {
+		if observedSigs[keyStr] {
 			return DuplicatedSignatureError{Address: sig.Address, KeyIndex: sig.KeyIndex}
 		}
 		observedSigs[keyStr] = true

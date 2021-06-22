@@ -227,8 +227,8 @@ func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.Trans
 	observedSigs := make(map[string]bool)
 	for _, sig := range tx.PayloadSignatures {
 		keyStr := fmt.Sprintf("%s-%d", sig.Address.String(), sig.KeyIndex)
-		if _, ok := observedSigs[keyStr]; ok {
-			err := fmt.Errorf("double signatures are provided for the same key")
+		if observedSigs[keyStr] {
+			err := fmt.Errorf("duplicate signatures are provided for the same key")
 			return errors.NewInvalidPayloadSignatureError(sig.Address, sig.KeyIndex, err)
 		}
 		observedSigs[keyStr] = true
@@ -236,8 +236,8 @@ func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.Trans
 
 	for _, sig := range tx.EnvelopeSignatures {
 		keyStr := fmt.Sprintf("%s-%d", sig.Address.String(), sig.KeyIndex)
-		if _, ok := observedSigs[keyStr]; ok {
-			err := fmt.Errorf("double signatures are provided for the same key")
+		if observedSigs[keyStr] {
+			err := fmt.Errorf("duplicate signatures are provided for the same key")
 			return errors.NewInvalidEnvelopeSignatureError(sig.Address, sig.KeyIndex, err)
 		}
 		observedSigs[keyStr] = true
