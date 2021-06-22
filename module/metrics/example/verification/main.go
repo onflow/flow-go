@@ -147,8 +147,6 @@ func demo() {
 				vc.OnFinalizedBlockArrivedAtAssigner(uint64(i))
 			})
 			tryRandomCall(vc.OnExecutionResultReceivedAtAssignerEngine)
-			tryRandomCall(vc.OnChunkDataPackReceived)
-			tryRandomCall(vc.OnVerifiableChunkSent)
 
 			// fetcher
 			tryRandomCall(vc.OnAssignedChunkReceivedAtFetcher)
