@@ -85,7 +85,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		log = log.Hook(hook)
 
 		finalize(nil, nil)
-		require.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
+		assert.Regexp(t, finalizeHappyPathRegex, hook.logs.String())
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
@@ -196,7 +196,7 @@ func TestFinalize_SameSeedDifferentInputs(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		firstSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		snapshot1, err := utils.ReadRootProtocolSnapshot(bootDir)
 		require.NoError(t, err)
 
 		// delete snapshot file
@@ -215,40 +215,40 @@ func TestFinalize_SameSeedDifferentInputs(t *testing.T) {
 		assert.FileExists(t, snapshotPath)
 
 		// read snapshot
-		secondSnapshot, err := utils.ReadRootProtocolSnapshot(bootDir)
+		snapshot2, err := utils.ReadRootProtocolSnapshot(bootDir)
 		require.NoError(t, err)
 
 		// current epochs
-		firstCurrentEpoch := firstSnapshot.Epochs().Current()
-		secondCurrentEpoch := secondSnapshot.Epochs().Current()
+		currentEpoch1 := snapshot1.Epochs().Current()
+		currentEpoch2 := snapshot2.Epochs().Current()
 
 		// check qc
-		firstQC, err := firstSnapshot.QuorumCertificate()
+		firstQC, err := snapshot1.QuorumCertificate()
 		require.NoError(t, err)
-		secondQC, err := secondSnapshot.QuorumCertificate()
+		secondQC, err := snapshot2.QuorumCertificate()
 		require.NoError(t, err)
 		assert.Equal(t, firstQC, secondQC)
 
 		// check dkg
-		firstDKG, err := firstCurrentEpoch.DKG()
+		firstDKG, err := currentEpoch1.DKG()
 		require.NoError(t, err)
-		secondDKG, err := secondCurrentEpoch.DKG()
+		secondDKG, err := currentEpoch2.DKG()
 		require.NoError(t, err)
 		assert.Equal(t, firstDKG, secondDKG)
 
 		// check clustering
-		firstClustering, err := firstCurrentEpoch.Clustering()
+		clustering1, err := currentEpoch1.Clustering()
 		require.NoError(t, err)
-		secondClustering, err := secondCurrentEpoch.Clustering()
+		clustering2, err := currentEpoch2.Clustering()
 		require.NoError(t, err)
-		assert.Equal(t, firstClustering, secondClustering)
+		assert.Equal(t, clustering1, clustering2)
 
 		// verify random sources are same
-		firstRandomSource, err := firstCurrentEpoch.RandomSource()
+		randomSource1, err := currentEpoch1.RandomSource()
 		require.NoError(t, err)
-		secondRandomSource, err := secondCurrentEpoch.RandomSource()
+		randomSource2, err := currentEpoch2.RandomSource()
 		require.NoError(t, err)
-		assert.Equal(t, firstRandomSource, secondRandomSource)
-		assert.Equal(t, firstRandomSource, getRandomSource(deterministicSeed))
+		assert.Equal(t, randomSource1, randomSource2)
+		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
 	})
 }
