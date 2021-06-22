@@ -64,8 +64,18 @@ unittest:
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
+.PHONY: unittest-arm
+unittest:
+	# test all packages with Relic library enabled
+	CC=arm-linux-gnueabi-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	$(MAKE) -C crypto test
+	$(MAKE) -C integration test
+
 .PHONY: test
 test: generate-mocks unittest
+
+.PHONY: test-arm
+test: generate-mocks unittest-arm
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -147,6 +157,10 @@ lint:
 # Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci
 ci: install-tools tidy test # lint coverage
+
+# Runs unit tests, SKIP FOR NOW linter, coverage
+.PHONY: ci-arm
+ci: install-tools tidy test-arm # lint coverage
 
 # Runs integration tests
 .PHONY: ci-integration
