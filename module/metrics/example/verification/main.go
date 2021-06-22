@@ -137,22 +137,29 @@ func demo() {
 		// This is done to stretch metrics and scatter their pattern
 		// for a clear visualization.
 		for i := 0; i < 100; i++ {
+			// consumer
+			tryRandomCall(func() {
+				vc.OnBlockConsumerJobDone(rand.Uint64() % 10000)
+			})
+			tryRandomCall(func() {
+				vc.OnChunkConsumerJobDone(rand.Uint64() % 10000)
+			})
+
 			// assigner
-			tryRandomCall(vc.OnExecutionResultReceivedAtAssignerEngine)
+			tryRandomCall(func() {
+				vc.OnFinalizedBlockArrivedAtAssigner(uint64(i))
+			})
 			tryRandomCall(func() {
 				vc.OnChunksAssignmentDoneAtAssigner(rand.Int() % 10)
 			})
 			tryRandomCall(vc.OnAssignedChunkProcessedAtAssigner)
-			tryRandomCall(func() {
-				vc.OnFinalizedBlockArrivedAtAssigner(uint64(i))
-			})
 			tryRandomCall(vc.OnExecutionResultReceivedAtAssignerEngine)
 
 			// fetcher
 			tryRandomCall(vc.OnAssignedChunkReceivedAtFetcher)
-			tryRandomCall(vc.OnChunkDataPackRequestSentByFetcher)
-			tryRandomCall(vc.OnChunkDataPackArrivedAtFetcher)
 			tryRandomCall(vc.OnVerifiableChunkSentToVerifier)
+			tryRandomCall(vc.OnChunkDataPackArrivedAtFetcher)
+			tryRandomCall(vc.OnChunkDataPackRequestSentByFetcher)
 
 			// requester
 			tryRandomCall(vc.OnChunkDataPackRequestReceivedByRequester)
