@@ -37,6 +37,7 @@ func (m *icrSealsMachine) Add(t *rapid.T) {
 	_, err := m.icrs.Add(seal)
 	require.NoError(t, err)
 
+	// we do not re-add already present seals
 	unmet := true
 	for _, v := range m.state {
 		if v.ID() == seal.ID() {
@@ -48,19 +49,20 @@ func (m *icrSealsMachine) Add(t *rapid.T) {
 		m.state = append(m.state, seal)
 		if len(m.state) > int(m.limit) {
 			// we remove one of the max height elements if we're beyond the mempool limit
-			max_height := m.icrs.lowestHeight
+			maxHeight := m.icrs.lowestHeight
 			for _, v := range m.state {
-				if v.Header.Height > max_height {
-					max_height = v.Header.Height
+				if v.Header.Height > maxHeight {
+					maxHeight = v.Header.Height
 				}
 			}
 			filtered_state := make([]*flow.IncorporatedResultSeal, 0)
 			for _, v := range m.state {
-				if v.Header.Height < max_height {
+				if v.Header.Height < maxHeight {
+					// only max height elements are ejected, others should be kept
 					filtered_state = append(filtered_state, v)
 				} else {
 					// the actual removed elements are chosen at random by the backend,
-					// so we probe for all that verify the height constraint
+					// so we probe among all that verify the height constraint
 					_, still_there := m.icrs.ByID(v.ID())
 					if still_there {
 						filtered_state = append(filtered_state, v)
@@ -94,14 +96,16 @@ func (m *icrSealsMachine) PruneUpToHeight(t *rapid.T) {
 func (m *icrSealsMachine) Get(t *rapid.T) {
 	n := len(m.state)
 	// skip if the store is empty
-	if n > 0 {
-		i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
-
-		s := m.state[i]
-		actual, ok := m.icrs.ByID(s.ID())
-		require.True(t, ok)
-		require.Equal(t, s, actual)
+	if n == 0 {
+		return
 	}
+	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+
+	s := m.state[i]
+	actual, ok := m.icrs.ByID(s.ID())
+	require.True(t, ok)
+	require.Equal(t, s, actual)
+
 }
 
 // GetUnknown is an action that removes an unknown element from the icrSeals
@@ -109,43 +113,47 @@ func (m *icrSealsMachine) Get(t *rapid.T) {
 func (m *icrSealsMachine) GetUnknown(t *rapid.T) {
 	n := len(m.state)
 	// skip if the store is empty
-	if n > 0 {
-		i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
-		seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
-			s.Header.Height = uint64(i)
-		})
-
-		// check seal is unknown
-		unknown := true
-		for _, v := range m.state {
-			if v.ID() == seal.ID() {
-				unknown = false
-			}
-		}
-
-		if unknown {
-			_, found := m.icrs.ByID(seal.ID())
-			require.False(t, found)
-		}
-		// no modification of state
+	if n == 0 {
+		return
 	}
+	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+	seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
+		s.Header.Height = uint64(i)
+	})
+
+	// check seal is unknown
+	unknown := true
+	for _, v := range m.state {
+		if v.ID() == seal.ID() {
+			unknown = false
+		}
+	}
+
+	if unknown {
+		_, found := m.icrs.ByID(seal.ID())
+		require.False(t, found)
+	}
+	// no modification of state
+
 }
 
 // Rem is a conditional action that removes a known element from the icrSeals
 func (m *icrSealsMachine) Rem(t *rapid.T) {
 	n := len(m.state)
 	// skip if the store is empty
-	if n > 0 {
-		i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
-
-		s := m.state[i]
-		ok := m.icrs.Rem(s.ID())
-		require.True(t, ok)
-
-		// remove m[i], we don't care about ordering here
-		m.state[n-1], m.state[i] = m.state[i], m.state[n-1]
-		m.state = m.state[:n-1]
+	if n == 0 {
+		return
 	}
+	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+
+	s := m.state[i]
+	ok := m.icrs.Rem(s.ID())
+	require.True(t, ok)
+
+	// remove m[i], we don't care about ordering here
+	m.state[n-1], m.state[i] = m.state[i], m.state[n-1]
+	m.state = m.state[:n-1]
+
 }
 
 // RemUnknown is an action that removes an unknown element from the icrSeals
@@ -153,26 +161,28 @@ func (m *icrSealsMachine) Rem(t *rapid.T) {
 func (m *icrSealsMachine) RemUnknown(t *rapid.T) {
 	n := len(m.state)
 	// skip if the store is empty
-	if n > 0 {
-		i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
-		seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
-			s.Header.Height = uint64(i)
-		})
-
-		// check seal is unknown
-		unknown := true
-		for _, v := range m.state {
-			if v.ID() == seal.ID() {
-				unknown = false
-			}
-		}
-
-		if unknown {
-			removed := m.icrs.Rem(seal.ID())
-			require.False(t, removed)
-		}
-		// no modification of state
+	if n == 0 {
+		return
 	}
+	i := rapid.IntRange(0, n-1).Draw(t, "i").(int)
+	seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
+		s.Header.Height = uint64(i)
+	})
+
+	// check seal is unknown
+	unknown := true
+	for _, v := range m.state {
+		if v.ID() == seal.ID() {
+			unknown = false
+		}
+	}
+
+	if unknown {
+		removed := m.icrs.Rem(seal.ID())
+		require.False(t, removed)
+	}
+	// no modification of state
+
 }
 
 // Check runs after every action and verifies that all required invariants hold.
