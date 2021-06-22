@@ -28,7 +28,7 @@ import (
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
 // for subsequent inclusion in block.
-const DefaultRequiredApprovalsForSealConstruction = 0
+const DefaultRequiredApprovalsForSealConstruction = 1
 
 // DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
 // to make fire fighting easier while seal & verification is under development.

@@ -22,7 +22,7 @@ import (
 
 // DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
 // sealing.
-const DefaultEmergencySealingThreshold = 400
+const DefaultEmergencySealingThreshold = 50
 
 // helper functor that can be used to retrieve cached block height
 type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
