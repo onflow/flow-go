@@ -117,6 +117,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]*ledger.Key)
+	var problematicTx flow.Identifier
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
 		registerID := flow.NewRegisterID(owner, controller, key)
@@ -166,6 +167,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 
+		if len(unknownRegTouch) > 0 {
+			problematicTx = tx.ID
+		}
+
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
 		err = chunkView.MergeView(txView)
 		if err != nil {
@@ -179,7 +184,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		for _, key := range unknownRegTouch {
 			missingRegs = append(missingRegs, key.String())
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx), nil
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
@@ -205,9 +210,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			for i, key := range keys {
 				stringKeys[i] = key.String()
 			}
-			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID), nil
+			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
