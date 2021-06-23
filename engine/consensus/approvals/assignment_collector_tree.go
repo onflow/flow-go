@@ -279,6 +279,7 @@ func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) error {
 			iterator := t.forest.GetVerticesAtLevel(l)
 			for iterator.HasNext() {
 				elementsPruned++
+				iterator.NextVertex()
 			}
 		}
 	}
