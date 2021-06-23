@@ -22,7 +22,7 @@ EnvironmentFile=-/etc/flow/conf.d/*.env
 ExecStartPre=docker pull gcr.io/flow-container-registry/execution:${FLOW_GO_NODE_VERSION}
 ExecStart=docker run --rm \
 	-v /var/flow/bootstrap:/bootstrap:ro \
-	-v /var/flow/data:/data:rw \
+	--mount src="/data",target=/var/flow/data,type=bind \
 	--rm \
 	--name flow-go \
 	--network host \
