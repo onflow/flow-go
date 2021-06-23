@@ -22,6 +22,7 @@ type Suite struct {
 	net         *testnet.FlowNetwork
 	nodeConfigs []testnet.NodeConfig
 	ghostID     flow.Identifier
+	client      *testnet.Client
 }
 
 func (s *Suite) SetupTest() {
@@ -46,7 +47,7 @@ func (s *Suite) SetupTest() {
 	// a ghost node masquerading as a consensus node
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConNode := testnet.NewNodeConfig(
-		flow.RoleVerification,
+		flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost())
@@ -76,6 +77,13 @@ func (s *Suite) SetupTest() {
 
 	// start tracking blocks
 	s.Track(s.T(), ctx, s.Ghost())
+
+	client, err := testnet.NewClient(
+		fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]),
+		s.net.Root().Header.ChainID.Chain())
+	require.NoError(s.T(), err)
+
+	s.client = client
 }
 
 func (s *Suite) Ghost() *client.GhostClient {

@@ -173,9 +173,8 @@ func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.Blo
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
 		},
-		blockStateTimeout,
+		10*blockStateTimeout,
 		100*time.Millisecond,
 		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, blockStateTimeout))
-
 	return bs.highestSealed
 }
