@@ -530,7 +530,7 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 		fvm.WithCadenceLogging(true),
 	)
 
-	fooStr, _ := cadence.NewString("foo")
+	fooStr, _ := cadence.String("foo")
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
 	arg2, _ := jsoncdc.Encode(fooStr)
 

@@ -42,7 +42,7 @@ func (g *Events) New() flow.Event {
 		},
 	}
 
-	fooStr, err := cadence.NewString("foo")
+	fooStr, err := cadence.String("foo")
 	if err != nil {
 		panic(fmt.Sprintf("unexpected error while encoding events: %s", err))
 	}
