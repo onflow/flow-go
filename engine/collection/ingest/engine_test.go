@@ -187,6 +187,37 @@ func (suite *Suite) TestInvalidTransaction() {
 			suite.Assert().Error(err)
 			suite.Assert().True(errors.As(err, &access.InvalidSignatureError{}))
 		})
+
+		suite.Run("duplicated signature (envelope only)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.EnvelopeSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture(), unittest.TransactionSignatureFixture()}
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+		})
+
+		suite.Run("duplicated signature (payload only)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture(), unittest.TransactionSignatureFixture()}
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+		})
+
+		suite.Run("duplicated signature (cross case)", func() {
+			tx := unittest.TransactionBodyFixture()
+			tx.ReferenceBlockID = suite.root.ID()
+			tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+			tx.EnvelopeSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()}
+
+			err := suite.engine.ProcessLocal(&tx)
+			suite.Assert().Error(err)
+			suite.Assert().True(errors.As(err, &access.DuplicatedSignatureError{}))
+		})
 	})
 
 	suite.Run("invalid signature", func() {
