@@ -542,7 +542,7 @@ func (m *MockEvents) EXPECT() *MockEventsMockRecorder {
 }
 
 // BatchStore mocks base method
-func (m *MockEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.Event, arg2 storage.BatchStorage) error {
+func (m *MockEvents) BatchStore(arg0 flow.Identifier, arg1 []flow.EventsList, arg2 storage.BatchStorage) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "BatchStore", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)

@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
+
 	"github.com/onflow/flow-go/crypto"
 	engineCommon "github.com/onflow/flow-go/engine"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
@@ -200,8 +202,11 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	previousExecutionResultID flow.Identifier,
 	expectBroadcast bool,
 	newStateCommitment flow.StateCommitment,
-) {
-	computationResult := executionUnittest.ComputationResultForBlockFixture(executableBlock)
+	computationResult *execution.ComputationResult) {
+
+	if computationResult == nil {
+		computationResult = executionUnittest.ComputationResultForBlockFixture(executableBlock)
+	}
 
 	if len(computationResult.StateCommitments) > 0 {
 		computationResult.StateCommitments[len(computationResult.StateCommitments)-1] = newStateCommitment
@@ -352,7 +357,7 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 func TestChunkIndexIsSet(t *testing.T) {
 
 	i := mathRand.Int()
-	chunk := generateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
+	chunk := generateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
@@ -380,7 +385,7 @@ func TestExecuteOneBlock(t *testing.T) {
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState)
+		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
 
 		wg.Add(1) // wait for block B to be executed
 		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
@@ -441,12 +446,12 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 			wg.Done()
 
 			wasBExecuted = true
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState)
+		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
 			require.True(t, wasBExecuted)
-		}, blockC, unittest.IdentifierFixture(), true, *blockB.StartState)
+		}, blockC, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
 
 		// make sure collection requests are sent
 		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
@@ -550,16 +555,16 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wgB.Wait()
 			wg.Done()
-		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState)
+		}, blockB, unittest.IdentifierFixture(), true, *blockB.StartState, nil)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wgC.Wait()
 			wg.Done()
-		}, blockC, unittest.IdentifierFixture(), true, *blockC.StartState)
+		}, blockC, unittest.IdentifierFixture(), true, *blockC.StartState, nil)
 
 		ctx.assertSuccessfulBlockComputation(commits, func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
-		}, blockD, unittest.IdentifierFixture(), true, *blockD.StartState)
+		}, blockD, unittest.IdentifierFixture(), true, *blockD.StartState, nil)
 
 		// make sure collection requests are sent
 		// first, the collection should not be found, so the request will be sent. Next, it will be queried again, and this time
@@ -666,10 +671,10 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		onPersisted := func(blockID flow.Identifier, commit flow.StateCommitment) {
 			wg.Done()
 		}
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], blockAExecutionResultID, true, *blocks["B"].StartState)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], blockAExecutionResultID, true, *blocks["C"].StartState)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), true, *blocks["D"].StartState)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], blockAExecutionResultID, true, *blocks["B"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], blockAExecutionResultID, true, *blocks["C"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), true, *blocks["D"].StartState, nil)
 
 		wg.Add(1)
 		err := ctx.engine.handleBlock(context.Background(), blocks["A"].Block)
@@ -850,10 +855,10 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 
 		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
 
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false, *blocks["B"].StartState)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], unittest.IdentifierFixture(), true, *blocks["C"].StartState)
-		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), false, *blocks["D"].StartState)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["A"], unittest.IdentifierFixture(), true, *blocks["A"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["B"], unittest.IdentifierFixture(), false, *blocks["B"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["C"], unittest.IdentifierFixture(), true, *blocks["C"].StartState, nil)
+		ctx.assertSuccessfulBlockComputation(commits, onPersisted, blocks["D"], unittest.IdentifierFixture(), false, *blocks["D"].StartState, nil)
 
 		wg.Add(1)
 		ctx.mockStakedAtBlockID(blocks["A"].ID(), true)
@@ -949,6 +954,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 	blocks := storage.NewMockBlocks(ctrl)
 	collections := storage.NewMockCollections(ctrl)
 	events := storage.NewMockEvents(ctrl)
+	serviceEvents := storage.NewMockServiceEvents(ctrl)
 	txResults := storage.NewMockTransactionResults(ctrl)
 
 	computationManager := new(computation.ComputationManager)
@@ -970,7 +976,7 @@ func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.Executi
 		blocks,
 		collections,
 		events,
-		events,
+		serviceEvents,
 		txResults,
 		computationManager,
 		providerEngine,
@@ -1234,7 +1240,7 @@ func TestChunkifyEvents(t *testing.T) {
 	// generate events
 	var events []flow.Event
 	for j := 0; j < 10; j++ {
-		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture()))
+		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0))
 	}
 
 	// chunk size be 0
