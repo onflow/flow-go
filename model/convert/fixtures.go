@@ -12,7 +12,7 @@ import (
 // EpochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
 func EpochSetupFixture() (flow.Event, *flow.EpochSetup) {
-	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture(), 0)
+	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture(), 2)
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	expected := &flow.EpochSetup{

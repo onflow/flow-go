@@ -22,6 +22,20 @@ func (_m *JobConsumer) NotifyJobIsDone(_a0 module.JobID) {
 	_m.Called(_a0)
 }
 
+// ProcessedIndex provides a mock function with given fields:
+func (_m *JobConsumer) ProcessedIndex() uint64 {
+	ret := _m.Called()
+
+	var r0 uint64
+	if rf, ok := ret.Get(0).(func() uint64); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(uint64)
+	}
+
+	return r0
+}
+
 // Size provides a mock function with given fields:
 func (_m *JobConsumer) Size() uint {
 	ret := _m.Called()
