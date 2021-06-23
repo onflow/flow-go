@@ -181,7 +181,7 @@ func (suite *Suite) TestInvalidTransaction() {
 			invalidSig := unittest.InvalidFormatSignature()
 			tx := unittest.TransactionBodyFixture()
 			tx.ReferenceBlockID = suite.root.ID()
-			tx.PayloadSignatures[0] = invalidSig
+			tx.PayloadSignatures = []flow.TransactionSignature{invalidSig}
 
 			err := suite.engine.ProcessLocal(&tx)
 			suite.Assert().Error(err)
