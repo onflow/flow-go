@@ -108,16 +108,16 @@ func (c *CFInvalidEventsCollection) String() string {
 	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
 }
 
-// CFInvalidSystemEventsEmitted is returned when service events are different from the chunk's one
-type CFInvalidSystemEventsEmitted struct {
-	expected   flow.ServiceEventsList
-	computed   flow.ServiceEventsList
+// CFInvalidServiceEventsEmitted is returned when service events are different from the chunk's one
+type CFInvalidServiceEventsEmitted struct {
+	expected   flow.ServiceEventList
+	computed   flow.ServiceEventList
 	chunkIndex uint64
 	resultID   flow.Identifier
 }
 
-func CFInvalidServiceSystemEventsEmitted(expected flow.ServiceEventsList, computed flow.ServiceEventsList, chInx uint64, execResID flow.Identifier) *CFInvalidSystemEventsEmitted {
-	return &CFInvalidSystemEventsEmitted{
+func CFInvalidServiceSystemEventsEmitted(expected flow.ServiceEventList, computed flow.ServiceEventList, chInx uint64, execResID flow.Identifier) *CFInvalidServiceEventsEmitted {
+	return &CFInvalidServiceEventsEmitted{
 		expected:   expected,
 		computed:   computed,
 		chunkIndex: chInx,
@@ -125,15 +125,15 @@ func CFInvalidServiceSystemEventsEmitted(expected flow.ServiceEventsList, comput
 	}
 }
 
-func (c *CFInvalidSystemEventsEmitted) ChunkIndex() uint64 {
+func (c *CFInvalidServiceEventsEmitted) ChunkIndex() uint64 {
 	return c.chunkIndex
 }
 
-func (c *CFInvalidSystemEventsEmitted) ExecutionResultID() flow.Identifier {
+func (c *CFInvalidServiceEventsEmitted) ExecutionResultID() flow.Identifier {
 	return c.resultID
 }
 
-func (c *CFInvalidSystemEventsEmitted) String() string {
+func (c *CFInvalidServiceEventsEmitted) String() string {
 	return fmt.Sprintf("service events differs, got [%s] expected [%s] for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
 }
 

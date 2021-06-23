@@ -32,9 +32,9 @@ type JobConsumer interface {
 	// It blocks until the existing worker finish processing the job
 	Stop()
 
-	// NotifyJobIsDone let the workers notify consumer that a job has been finished, so that the consumer
-	// can check if there is new job could be read from storage and give to a worker for processing
-	NotifyJobIsDone(JobID)
+	// NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
+	// the next job from the job queue if there are workers available. It returns the last processed job index.
+	NotifyJobIsDone(JobID) uint64
 
 	// Size returns the number of processing jobs in consumer.
 	Size() uint

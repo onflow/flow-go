@@ -24,10 +24,10 @@ type ServiceEvent struct {
 	Event interface{}
 }
 
-// ServiceEventsList is a handy container to enable comparisons
-type ServiceEventsList []ServiceEvent
+// ServiceEventList is a handy container to enable comparisons
+type ServiceEventList []ServiceEvent
 
-func (sel ServiceEventsList) EqualTo(other ServiceEventsList) (bool, error) {
+func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
 	if len(sel) != len(other) {
 		return false, nil
 	}
