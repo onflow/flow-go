@@ -160,15 +160,17 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 
 // PruneUpToHeight remove all seals for blocks whose height is strictly
 // smaller that height. Note: seals for blocks at height are retained.
-// After pruned, seals below the height will never be added
+// After pruning, seals below for blocks below the given height are dropped.
+//
+// Monotonicity Requirement:
+// The pruned height cannot decrease, as we cannot recover already pruned elements.
+// If `height` is smaller than the previous value, the previous value is kept
+// and the sentinel empool.NewDecreasingPruningHeightError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {
-			// when it was called concurrently with different heights, the caller can't ensure the strict
-			// order of heights passed, in that case, we will just ignore the height instead
-			// of returning an error.
 			return mempool.NewDecreasingPruningHeightErrorf(
-				"pruning height: %v, existing height: %v", height, ir.lowestHeight)
+				"pruning height: %d, existing height: %d", height, ir.lowestHeight)
 		}
 
 		if len(entities) == 0 {
