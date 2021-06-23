@@ -126,8 +126,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		collectionCount := 2
 		transactionsPerCollection := 2
 		eventsPerTransaction := 2
+		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
-		totalEventCount := eventsPerTransaction * totalTransactionCount
+		//totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
@@ -159,13 +160,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
 
 		// all events should have been collected
-		assert.Len(t, result.Events, totalEventCount)
+		assert.Len(t, result.Events, collectionCount+1)
+
+		for i := 0; i < collectionCount; i++ {
+			assert.Len(t, result.Events[i], eventsPerCollection)
+		}
+
+		assert.Len(t, result.Events[len(result.Events)-1], eventsPerTransaction)
 
 		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
-				e := result.Events[k]
+
+				chunkIndex := k / eventsPerCollection
+				eventIndex := k % eventsPerCollection
+
+				e := result.Events[chunkIndex][eventIndex]
 				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
 				k++
