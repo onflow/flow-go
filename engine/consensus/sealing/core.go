@@ -146,12 +146,6 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSealedBlockID, err)
 	}
 
-	// usually we start with empty collectors tree, prune it to minimum height
-	err = c.collectorTree.PruneUpToHeight(latestSealedBlock.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealedBlock.Height, err)
-	}
-
 	blocksProcessed := uint64(0)
 	totalBlocks := finalized.Height - latestSealedBlock.Height
 
@@ -530,10 +524,6 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 	err := c.collectorTree.FinalizeForkAtLevel(finalized, lastSealed) // stop collecting approvals for orphan collectors
 	if err != nil {
 		return fmt.Errorf("AssignmentCollectorTree failed to update its finalization state: %w", err)
-	}
-	err = c.collectorTree.PruneUpToHeight(lastSealed.Height) // prune AssignmentCollectorTree
-	if err != nil {
-		return fmt.Errorf("could not prune collectorTree up to height %d: %w", lastSealed.Height, err)
 	}
 
 	err = c.requestTracker.PruneUpToHeight(lastSealed.Height)

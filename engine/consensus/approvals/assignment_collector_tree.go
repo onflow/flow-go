@@ -131,6 +131,11 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 		t.lastSealedHeight = sealed.Height
 	}
 
+	err := t.pruneUpToHeight(sealed.Height) // prune AssignmentCollectorTree
+	if err != nil {
+		return fmt.Errorf("could not prune collectors tree up to height %d: %w", sealed.Height, err)
+	}
+
 	return nil
 }
 
@@ -261,13 +266,11 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	}, nil
 }
 
-// PruneUpToHeight prunes all results for all assignment collectors with height up to but
+// pruneUpToHeight prunes all results for all assignment collectors with height up to but
 // NOT INCLUDING `limit`. Noop, if limit is lower than the previous value (caution:
-// this is different than the levelled forest's convention).
-func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) error {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+// this is different than the levelled forest's convention). This function is not concurrency safe
+// it has to run in context of some other function which holds the lock.
+func (t *AssignmentCollectorTree) pruneUpToHeight(limit uint64) error {
 	if t.forest.LowestLevel >= limit {
 		return nil
 	}
