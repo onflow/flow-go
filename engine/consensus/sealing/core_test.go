@@ -2,17 +2,16 @@ package sealing
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
@@ -137,7 +136,6 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.sealsPL.On("Size").Return(uint(0)).Maybe()                       // for metrics
 	s.sealsPL.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe() // noop on pruning
 
-	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
@@ -148,8 +146,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(log, tracer, metrics, s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier,
-		s.sealsPL, s.conduit, options)
+	s.core, err = NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -242,6 +239,27 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOrphanIncor
 	err = s.core.processIncorporatedResult(IR2)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsOutdatedInputError(err))
+}
+
+func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_RejectOldFinalizedBlock() {
+	blockB1 := unittest.BlockHeaderWithParentFixture(&s.Block)
+	blockB2 := unittest.BlockHeaderWithParentFixture(&blockB1)
+
+	s.blocks[blockB1.ID()] = &blockB1
+	s.blocks[blockB2.ID()] = &blockB2
+
+	seal := unittest.Seal.Fixture(unittest.Seal.WithBlock(&s.Block))
+	// should only call it once
+	s.sealsDB.On("ByBlockID", mock.Anything).Return(seal, nil).Once()
+	s.markFinalized(&blockB1)
+	s.markFinalized(&blockB2)
+
+	// blockB1 becomes finalized
+	err := s.core.ProcessFinalizedBlock(blockB2.ID())
+	require.NoError(s.T(), err)
+
+	err = s.core.ProcessFinalizedBlock(blockB1.ID())
+	require.NoError(s.T(), err)
 }
 
 // TestProcessFinalizedBlock_CollectorsCleanup tests that stale collectorTree are cleaned up for

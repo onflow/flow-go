@@ -3,7 +3,8 @@ package flow
 import (
 	"fmt"
 
-	ledgerHash "github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 type RegisterID struct {
@@ -14,6 +15,13 @@ type RegisterID struct {
 
 func (r *RegisterID) String() string {
 	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
+}
+
+// Bytes returns a bytes representation of the RegisterID.
+//
+// The encoding uses the injective fingerprint module.
+func (r *RegisterID) Bytes() []byte {
+	return fingerprint.Fingerprint(r)
 }
 
 func NewRegisterID(owner, controller, key string) RegisterID {
@@ -73,11 +81,11 @@ type StorageProof = []byte
 
 // StateCommitment holds the root hash of the tree (Snapshot)
 // TODO: solve the circular dependency and define StateCommitment as ledger.State
-type StateCommitment ledgerHash.Hash
+type StateCommitment hash.Hash
 
 // DummyStateCommitment is an arbitrary value used in function failure cases,
 // although it can represent a valid state commitment.
-var DummyStateCommitment = StateCommitment(ledgerHash.DummyHash)
+var DummyStateCommitment = StateCommitment(hash.DummyHash)
 
 // ToStateCommitment converts a byte slice into a StateComitment.
 // It returns an error if the slice has an invalid length.

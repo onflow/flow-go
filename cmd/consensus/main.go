@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
@@ -189,6 +189,8 @@ func main() {
 			return nil
 		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
+			// use a custom ejector so we don't eject seals that would break
+			// the chain of seals
 			resultSeals := stdmap.NewIncorporatedResultSeals(sealLimit)
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
 			if err != nil {
@@ -215,6 +217,7 @@ func main() {
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
 			config.EmergencySealingActive = emergencySealing
@@ -226,6 +229,7 @@ func main() {
 				conMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				sealingTracker,
 				node.Network,
 				node.Me,
 				node.Storage.Headers,
@@ -365,7 +369,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				approvals.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),

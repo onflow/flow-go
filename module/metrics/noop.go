@@ -44,6 +44,7 @@ func (nc *NoopCollector) BlockProposed(*flow.Block)                             
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                             {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                                {}
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)                           {}
+func (nc *NoopCollector) CommittedEpochFinalView(view uint64)                                    {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                             {}
 func (nc *NoopCollector) CacheHit(resource string)                                               {}
 func (nc *NoopCollector) CacheNotFound(resource string)                                          {}
@@ -91,6 +92,8 @@ func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()            
 func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
 func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
 func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                          {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                          {}
 func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
@@ -99,7 +102,10 @@ func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)              
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                         {}
-func (nc *NoopCollector) ExecutionTotalExecutedTransactions(numberOfTx int)                      {}
+func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ uint64, _ int, _ int)         {}
+func (nc *NoopCollector) ExecutionCollectionExecuted(_ time.Duration, _ uint64, _ int)           {}
+func (nc *NoopCollector) ExecutionTransactionExecuted(_ time.Duration, _ uint64, _ int, _ bool)  {}
+func (nc *NoopCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uint64)             {}
 func (nc *NoopCollector) ForestApproxMemorySize(bytes uint64)                                    {}
 func (nc *NoopCollector) ForestNumberOfTrees(number uint64)                                      {}
 func (nc *NoopCollector) LatestTrieRegCount(number uint64)                                       {}
@@ -118,9 +124,10 @@ func (nc *NoopCollector) ReadDuration(duration time.Duration)                   
 func (nc *NoopCollector) ReadDurationPerItem(duration time.Duration)                             {}
 func (nc *NoopCollector) ExecutionCollectionRequestSent()                                        {}
 func (nc *NoopCollector) ExecutionCollectionRequestRetried()                                     {}
-func (nc *NoopCollector) TransactionParsed(dur time.Duration)                                    {}
-func (nc *NoopCollector) TransactionChecked(dur time.Duration)                                   {}
-func (nc *NoopCollector) TransactionInterpreted(dur time.Duration)                               {}
+func (nc *NoopCollector) RuntimeTransactionParsed(dur time.Duration)                             {}
+func (nc *NoopCollector) RuntimeTransactionChecked(dur time.Duration)                            {}
+func (nc *NoopCollector) RuntimeTransactionInterpreted(dur time.Duration)                        {}
+func (nc *NoopCollector) RuntimeSetNumberOfAccounts(count uint64)                                {}
 func (nc *NoopCollector) TransactionReceived(txID flow.Identifier, when time.Time)               {}
 func (nc *NoopCollector) TransactionFinalized(txID flow.Identifier, when time.Time)              {}
 func (nc *NoopCollector) TransactionExecuted(txID flow.Identifier, when time.Time)               {}

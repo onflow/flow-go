@@ -1,8 +1,6 @@
 package stdmap
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -32,7 +30,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 		maxHeight := uint64(0)
 		var sealsAtMaxHeight sealSet
 		for height, seals := range byHeight {
-			if height > maxHeight {
+			if height > maxHeight || (height == 0 && maxHeight == 0) {
 				maxHeight = height
 				sealsAtMaxHeight = seals
 			}
@@ -104,6 +102,11 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 	return added, err
 }
 
+// Size returns the size of the underlying backing store
+func (ir *IncorporatedResultSeals) Size() uint {
+	return ir.Backend.Size()
+}
+
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
 	entities := ir.Backend.All()
@@ -162,11 +165,17 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 
 // PruneUpToHeight remove all seals for blocks whose height is strictly
 // smaller that height. Note: seals for blocks at height are retained.
-// After pruned, seals below the height will never be added
+// After pruning, seals below for blocks below the given height are dropped.
+//
+// Monotonicity Requirement:
+// The pruned height cannot decrease, as we cannot recover already pruned elements.
+// If `height` is smaller than the previous value, the previous value is kept
+// and the sentinel empool.NewDecreasingPruningHeightError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {
-			return fmt.Errorf("new pruning height %v cannot be smaller than previous pruned height:%v", height, ir.lowestHeight)
+			return mempool.NewDecreasingPruningHeightErrorf(
+				"pruning height: %d, existing height: %d", height, ir.lowestHeight)
 		}
 
 		if len(entities) == 0 {
