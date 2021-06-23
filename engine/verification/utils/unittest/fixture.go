@@ -185,10 +185,12 @@ func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain,
 // for that result.
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
+
 	// setups up the first collection of block consists of three transactions
 	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
+
 	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
@@ -311,6 +313,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				collectionID = flow.ZeroID
 			}
 
+			eventsHash, err := computationResult.Events[i].Hash()
+			require.NoError(t, err)
+
 			chunk := &flow.Chunk{
 				ChunkBody: flow.ChunkBody{
 					CollectionIndex: uint(i),
@@ -318,7 +323,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 					// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
 					// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
 					// startState stays the same if blocks are empty
-					EventCollection: collectionID,
+					EventCollection: eventsHash,
 					BlockID:         executableBlock.ID(),
 					// TODO: record gas used
 					TotalComputationUsed: 0,
