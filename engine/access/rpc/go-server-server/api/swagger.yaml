@@ -1,0 +1,1029 @@
+---
+swagger: "2.0"
+info:
+  version: "version not set"
+  title: "flow/access/access.proto"
+tags:
+- name: "AccessAPI"
+consumes:
+- "application/json"
+produces:
+- "application/json"
+paths:
+  /v1/accounts/{address}:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetAccountAtBlockHeight gets an account by address at the given block\n\
+        height"
+      operationId: "AccessAPI_GetAccountAtBlockHeight"
+      parameters:
+      - name: "address"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "Address"
+      - name: "blockHeight"
+        in: "query"
+        required: false
+        type: "string"
+        format: "uint64"
+        x-exportParamName: "BlockHeight"
+        x-optionalDataType: "String"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessAccountResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/block-headers:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetBlockHeaderByHeight gets a block header by height."
+      operationId: "AccessAPI_GetBlockHeaderByHeight"
+      parameters:
+      - name: "height"
+        in: "query"
+        required: false
+        type: "string"
+        format: "uint64"
+        x-exportParamName: "Height"
+        x-optionalDataType: "String"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessBlockHeaderResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/block-headers/{id}:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetBlockHeaderByID gets a block header by ID."
+      operationId: "AccessAPI_GetBlockHeaderByID"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "Id"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessBlockHeaderResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/blocks:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetBlockByHeight gets a full block by height."
+      operationId: "AccessAPI_GetBlockByHeight"
+      parameters:
+      - name: "height"
+        in: "query"
+        required: false
+        type: "string"
+        format: "uint64"
+        x-exportParamName: "Height"
+        x-optionalDataType: "String"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessBlockResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/blocks/latest/scripts:
+    post:
+      tags:
+      - "AccessAPI"
+      summary: "ExecuteScriptAtLatestBlock executes a read-only Cadence script against\
+        \ the\nlatest sealed execution state."
+      operationId: "AccessAPI_ExecuteScriptAtLatestBlock"
+      parameters:
+      - in: "body"
+        name: "body"
+        required: true
+        schema:
+          $ref: "#/definitions/accessExecuteScriptAtLatestBlockRequest"
+        x-exportParamName: "Body"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessExecuteScriptResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/blocks/{blockId}/scripts:
+    post:
+      tags:
+      - "AccessAPI"
+      summary: "ExecuteScriptAtBlockID executes a ready-only Cadence script against\
+        \ the\nexecution state at the block with the given ID."
+      operationId: "AccessAPI_ExecuteScriptAtBlockID"
+      parameters:
+      - name: "blockId"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "BlockId"
+      - in: "body"
+        name: "body"
+        required: true
+        schema:
+          type: "object"
+          properties:
+            script:
+              type: "string"
+              format: "byte"
+              pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            arguments:
+              type: "array"
+              items:
+                type: "string"
+                format: "byte"
+                pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        x-exportParamName: "Body"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessExecuteScriptResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/blocks/{id}:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetBlockByID gets a full block by ID."
+      operationId: "AccessAPI_GetBlockByID"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "Id"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessBlockResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/collections/{id}:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetCollectionByID gets a collection by ID."
+      operationId: "AccessAPI_GetCollectionByID"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "Id"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessCollectionResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/events:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetEventsForBlockIDs retrieves events for the specified block IDs\
+        \ and event\ntype."
+      operationId: "AccessAPI_GetEventsForBlockIDs"
+      parameters:
+      - name: "type"
+        in: "query"
+        required: false
+        type: "string"
+        x-exportParamName: "Type_"
+        x-optionalDataType: "String"
+      - name: "blockIds"
+        in: "query"
+        required: false
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+        collectionFormat: "multi"
+        x-exportParamName: "BlockIds"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessEventsResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/network-parameters:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetNetworkParameters retrieves the Flow network details"
+      operationId: "AccessAPI_GetNetworkParameters"
+      parameters: []
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessGetNetworkParametersResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/protocol-state/latest:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetLatestProtocolStateSnapshot retrieves the latest sealed protocol\
+        \ state\nsnapshot. Used by Flow nodes joining the network to bootstrap a\n\
+        space-efficient local state."
+      operationId: "AccessAPI_GetLatestProtocolStateSnapshot"
+      parameters: []
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessProtocolStateSnapshotResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/transactions:
+    post:
+      tags:
+      - "AccessAPI"
+      summary: "SendTransaction submits a transaction to the network."
+      operationId: "AccessAPI_SendTransaction"
+      parameters:
+      - in: "body"
+        name: "body"
+        required: true
+        schema:
+          $ref: "#/definitions/accessSendTransactionRequest"
+        x-exportParamName: "Body"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessSendTransactionResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/transactions/{id}:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetTransaction gets a transaction by ID."
+      operationId: "AccessAPI_GetTransaction"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "Id"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessTransactionResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+  /v1/transactions/{id}/result:
+    get:
+      tags:
+      - "AccessAPI"
+      summary: "GetTransactionResult gets the result of a transaction."
+      operationId: "AccessAPI_GetTransactionResult"
+      parameters:
+      - name: "id"
+        in: "path"
+        required: true
+        type: "string"
+        format: "byte"
+        x-exportParamName: "Id"
+      responses:
+        "200":
+          description: "A successful response."
+          schema:
+            $ref: "#/definitions/accessTransactionResultResponse"
+        default:
+          description: "An unexpected error response."
+          schema:
+            $ref: "#/definitions/rpcStatus"
+definitions:
+  EventsResponseResult:
+    type: "object"
+    properties:
+      blockId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      blockHeight:
+        type: "string"
+        format: "uint64"
+      events:
+        type: "array"
+        items:
+          $ref: "#/definitions/entitiesEvent"
+      blockTimestamp:
+        type: "string"
+        format: "date-time"
+    example:
+      blockId: "blockId"
+      blockHeight: "blockHeight"
+      blockTimestamp: "2000-01-23T04:56:07.000+00:00"
+      events:
+      - payload: "payload"
+        transactionIndex: 0
+        eventIndex: 6
+        type: "type"
+        transactionId: "transactionId"
+      - payload: "payload"
+        transactionIndex: 0
+        eventIndex: 6
+        type: "type"
+        transactionId: "transactionId"
+  TransactionProposalKey:
+    type: "object"
+    properties:
+      address:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      keyId:
+        type: "integer"
+        format: "int64"
+      sequenceNumber:
+        type: "string"
+        format: "uint64"
+    example:
+      sequenceNumber: "sequenceNumber"
+      address: "address"
+      keyId: 0
+  TransactionSignature:
+    type: "object"
+    properties:
+      address:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      keyId:
+        type: "integer"
+        format: "int64"
+      signature:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      address: "address"
+      signature: "signature"
+      keyId: 6
+  accessAccountResponse:
+    type: "object"
+    properties:
+      account:
+        $ref: "#/definitions/entitiesAccount"
+    example:
+      account:
+        address: "address"
+        code: "code"
+        balance: "balance"
+        keys:
+        - sequenceNumber: 5
+          signAlgo: 6
+          index: 0
+          weight: 5
+          publicKey: "publicKey"
+          revoked: true
+          hashAlgo: 1
+        - sequenceNumber: 5
+          signAlgo: 6
+          index: 0
+          weight: 5
+          publicKey: "publicKey"
+          revoked: true
+          hashAlgo: 1
+        contracts:
+          key: "contracts"
+  accessBlockHeaderResponse:
+    type: "object"
+    properties:
+      block:
+        $ref: "#/definitions/entitiesBlockHeader"
+    example:
+      block:
+        id: "id"
+        parentId: "parentId"
+        height: "height"
+        timestamp: "2000-01-23T04:56:07.000+00:00"
+  accessBlockResponse:
+    type: "object"
+    properties:
+      block:
+        $ref: "#/definitions/entitiesBlock"
+    example:
+      block:
+        blockSeals:
+        - blockId: "blockId"
+          executionReceiptSignatures:
+          - "executionReceiptSignatures"
+          - "executionReceiptSignatures"
+          resultApprovalSignatures:
+          - "resultApprovalSignatures"
+          - "resultApprovalSignatures"
+          executionReceiptId: "executionReceiptId"
+        - blockId: "blockId"
+          executionReceiptSignatures:
+          - "executionReceiptSignatures"
+          - "executionReceiptSignatures"
+          resultApprovalSignatures:
+          - "resultApprovalSignatures"
+          - "resultApprovalSignatures"
+          executionReceiptId: "executionReceiptId"
+        id: "id"
+        collectionGuarantees:
+        - collectionId: "collectionId"
+          signatures:
+          - "signatures"
+          - "signatures"
+        - collectionId: "collectionId"
+          signatures:
+          - "signatures"
+          - "signatures"
+        parentId: "parentId"
+        signatures:
+        - "signatures"
+        - "signatures"
+        height: "height"
+        timestamp: "2000-01-23T04:56:07.000+00:00"
+  accessCollectionResponse:
+    type: "object"
+    properties:
+      collection:
+        $ref: "#/definitions/entitiesCollection"
+    example:
+      collection:
+        transactionIds:
+        - "transactionIds"
+        - "transactionIds"
+        id: "id"
+  accessEventsResponse:
+    type: "object"
+    properties:
+      results:
+        type: "array"
+        items:
+          $ref: "#/definitions/EventsResponseResult"
+    example:
+      results:
+      - blockId: "blockId"
+        blockHeight: "blockHeight"
+        blockTimestamp: "2000-01-23T04:56:07.000+00:00"
+        events:
+        - payload: "payload"
+          transactionIndex: 0
+          eventIndex: 6
+          type: "type"
+          transactionId: "transactionId"
+        - payload: "payload"
+          transactionIndex: 0
+          eventIndex: 6
+          type: "type"
+          transactionId: "transactionId"
+      - blockId: "blockId"
+        blockHeight: "blockHeight"
+        blockTimestamp: "2000-01-23T04:56:07.000+00:00"
+        events:
+        - payload: "payload"
+          transactionIndex: 0
+          eventIndex: 6
+          type: "type"
+          transactionId: "transactionId"
+        - payload: "payload"
+          transactionIndex: 0
+          eventIndex: 6
+          type: "type"
+          transactionId: "transactionId"
+  accessExecuteScriptAtLatestBlockRequest:
+    type: "object"
+    properties:
+      script:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      arguments:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+  accessExecuteScriptResponse:
+    type: "object"
+    properties:
+      value:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      value: "value"
+  accessGetAccountResponse:
+    type: "object"
+    properties:
+      account:
+        $ref: "#/definitions/entitiesAccount"
+  accessGetNetworkParametersResponse:
+    type: "object"
+    properties:
+      chainId:
+        type: "string"
+    example:
+      chainId: "chainId"
+  accessPingResponse:
+    type: "object"
+  accessProtocolStateSnapshotResponse:
+    type: "object"
+    properties:
+      serializedSnapshot:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      serializedSnapshot: "serializedSnapshot"
+  accessSendTransactionRequest:
+    type: "object"
+    properties:
+      transaction:
+        $ref: "#/definitions/entitiesTransaction"
+  accessSendTransactionResponse:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      id: "id"
+  accessTransactionResponse:
+    type: "object"
+    properties:
+      transaction:
+        $ref: "#/definitions/entitiesTransaction"
+    example:
+      transaction:
+        payloadSignatures:
+        - address: "address"
+          signature: "signature"
+          keyId: 6
+        - address: "address"
+          signature: "signature"
+          keyId: 6
+        gasLimit: "gasLimit"
+        proposalKey:
+          sequenceNumber: "sequenceNumber"
+          address: "address"
+          keyId: 0
+        referenceBlockId: "referenceBlockId"
+        envelopeSignatures:
+        - address: "address"
+          signature: "signature"
+          keyId: 6
+        - address: "address"
+          signature: "signature"
+          keyId: 6
+        arguments:
+        - "arguments"
+        - "arguments"
+        authorizers:
+        - "authorizers"
+        - "authorizers"
+        payer: "payer"
+        script: "script"
+  accessTransactionResultResponse:
+    type: "object"
+    properties:
+      status:
+        $ref: "#/definitions/entitiesTransactionStatus"
+      statusCode:
+        type: "integer"
+        format: "int64"
+      errorMessage:
+        type: "string"
+      events:
+        type: "array"
+        items:
+          $ref: "#/definitions/entitiesEvent"
+      blockId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      blockId: "blockId"
+      errorMessage: "errorMessage"
+      events:
+      - payload: "payload"
+        transactionIndex: 0
+        eventIndex: 6
+        type: "type"
+        transactionId: "transactionId"
+      - payload: "payload"
+        transactionIndex: 0
+        eventIndex: 6
+        type: "type"
+        transactionId: "transactionId"
+      status: {}
+      statusCode: 0
+  entitiesAccount:
+    type: "object"
+    properties:
+      address:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      balance:
+        type: "string"
+        format: "uint64"
+      code:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      keys:
+        type: "array"
+        items:
+          $ref: "#/definitions/entitiesAccountKey"
+      contracts:
+        type: "object"
+        additionalProperties:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      address: "address"
+      code: "code"
+      balance: "balance"
+      keys:
+      - sequenceNumber: 5
+        signAlgo: 6
+        index: 0
+        weight: 5
+        publicKey: "publicKey"
+        revoked: true
+        hashAlgo: 1
+      - sequenceNumber: 5
+        signAlgo: 6
+        index: 0
+        weight: 5
+        publicKey: "publicKey"
+        revoked: true
+        hashAlgo: 1
+      contracts:
+        key: "contracts"
+  entitiesAccountKey:
+    type: "object"
+    properties:
+      index:
+        type: "integer"
+        format: "int64"
+      publicKey:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      signAlgo:
+        type: "integer"
+        format: "int64"
+      hashAlgo:
+        type: "integer"
+        format: "int64"
+      weight:
+        type: "integer"
+        format: "int64"
+      sequenceNumber:
+        type: "integer"
+        format: "int64"
+      revoked:
+        type: "boolean"
+    example:
+      sequenceNumber: 5
+      signAlgo: 6
+      index: 0
+      weight: 5
+      publicKey: "publicKey"
+      revoked: true
+      hashAlgo: 1
+  entitiesBlock:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      parentId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      height:
+        type: "string"
+        format: "uint64"
+      timestamp:
+        type: "string"
+        format: "date-time"
+      collectionGuarantees:
+        type: "array"
+        items:
+          $ref: "#/definitions/entitiesCollectionGuarantee"
+      blockSeals:
+        type: "array"
+        items:
+          $ref: "#/definitions/entitiesBlockSeal"
+      signatures:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      blockSeals:
+      - blockId: "blockId"
+        executionReceiptSignatures:
+        - "executionReceiptSignatures"
+        - "executionReceiptSignatures"
+        resultApprovalSignatures:
+        - "resultApprovalSignatures"
+        - "resultApprovalSignatures"
+        executionReceiptId: "executionReceiptId"
+      - blockId: "blockId"
+        executionReceiptSignatures:
+        - "executionReceiptSignatures"
+        - "executionReceiptSignatures"
+        resultApprovalSignatures:
+        - "resultApprovalSignatures"
+        - "resultApprovalSignatures"
+        executionReceiptId: "executionReceiptId"
+      id: "id"
+      collectionGuarantees:
+      - collectionId: "collectionId"
+        signatures:
+        - "signatures"
+        - "signatures"
+      - collectionId: "collectionId"
+        signatures:
+        - "signatures"
+        - "signatures"
+      parentId: "parentId"
+      signatures:
+      - "signatures"
+      - "signatures"
+      height: "height"
+      timestamp: "2000-01-23T04:56:07.000+00:00"
+  entitiesBlockHeader:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      parentId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      height:
+        type: "string"
+        format: "uint64"
+      timestamp:
+        type: "string"
+        format: "date-time"
+    example:
+      id: "id"
+      parentId: "parentId"
+      height: "height"
+      timestamp: "2000-01-23T04:56:07.000+00:00"
+  entitiesBlockSeal:
+    type: "object"
+    properties:
+      blockId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      executionReceiptId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      executionReceiptSignatures:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      resultApprovalSignatures:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      blockId: "blockId"
+      executionReceiptSignatures:
+      - "executionReceiptSignatures"
+      - "executionReceiptSignatures"
+      resultApprovalSignatures:
+      - "resultApprovalSignatures"
+      - "resultApprovalSignatures"
+      executionReceiptId: "executionReceiptId"
+  entitiesCollection:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      transactionIds:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      transactionIds:
+      - "transactionIds"
+      - "transactionIds"
+      id: "id"
+  entitiesCollectionGuarantee:
+    type: "object"
+    properties:
+      collectionId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      signatures:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      collectionId: "collectionId"
+      signatures:
+      - "signatures"
+      - "signatures"
+  entitiesEvent:
+    type: "object"
+    properties:
+      type:
+        type: "string"
+      transactionId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      transactionIndex:
+        type: "integer"
+        format: "int64"
+      eventIndex:
+        type: "integer"
+        format: "int64"
+      payload:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+    example:
+      payload: "payload"
+      transactionIndex: 0
+      eventIndex: 6
+      type: "type"
+      transactionId: "transactionId"
+  entitiesTransaction:
+    type: "object"
+    properties:
+      script:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      arguments:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      referenceBlockId:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      gasLimit:
+        type: "string"
+        format: "uint64"
+      proposalKey:
+        $ref: "#/definitions/TransactionProposalKey"
+      payer:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      authorizers:
+        type: "array"
+        items:
+          type: "string"
+          format: "byte"
+          pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      payloadSignatures:
+        type: "array"
+        items:
+          $ref: "#/definitions/TransactionSignature"
+      envelopeSignatures:
+        type: "array"
+        items:
+          $ref: "#/definitions/TransactionSignature"
+    example:
+      payloadSignatures:
+      - address: "address"
+        signature: "signature"
+        keyId: 6
+      - address: "address"
+        signature: "signature"
+        keyId: 6
+      gasLimit: "gasLimit"
+      proposalKey:
+        sequenceNumber: "sequenceNumber"
+        address: "address"
+        keyId: 0
+      referenceBlockId: "referenceBlockId"
+      envelopeSignatures:
+      - address: "address"
+        signature: "signature"
+        keyId: 6
+      - address: "address"
+        signature: "signature"
+        keyId: 6
+      arguments:
+      - "arguments"
+      - "arguments"
+      authorizers:
+      - "authorizers"
+      - "authorizers"
+      payer: "payer"
+      script: "script"
+  entitiesTransactionStatus:
+    type: "string"
+    enum:
+    - "UNKNOWN"
+    - "PENDING"
+    - "FINALIZED"
+    - "EXECUTED"
+    - "SEALED"
+    - "EXPIRED"
+    default: "UNKNOWN"
+  protobufAny:
+    type: "object"
+    properties:
+      typeUrl:
+        type: "string"
+      value:
+        type: "string"
+        format: "byte"
+        pattern: "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+  rpcStatus:
+    type: "object"
+    properties:
+      code:
+        type: "integer"
+        format: "int32"
+      message:
+        type: "string"
+      details:
+        type: "array"
+        items:
+          $ref: "#/definitions/protobufAny"
