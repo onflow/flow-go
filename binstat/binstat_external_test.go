@@ -2,7 +2,6 @@ package binstat_test
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"regexp"
@@ -12,11 +11,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/binstat"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/binstat"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // go fmt binstat/*.go ; pushd binstat ; GO111MODULE=on go test -v -coverprofile=coverage.txt -covermode=atomic --tags relic ./... ; go tool cover -func=coverage.txt ; popd
+// go fmt binstat/*.go ; pushd binstat ; GO111MODULE=on go test -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~gs; print;' ; go tool cover -func=coverage.txt ; popd
 
 /*
  * NOTE: The code below is inspired by the goroutine.go here [1] [2].
@@ -31,6 +34,7 @@ const mechs = 2
 
 var wg sync.WaitGroup
 var el [loops][tries][mechs][funcs]string
+var zlog zerolog.Logger
 
 // each function f1-f6 runs the same function f and adds its wall-clock execution time to a table of elapsed times
 func f1(outerFuncName string, f func(string) time.Duration, loop int, try int, i int) {
@@ -58,16 +62,12 @@ func f6(outerFuncName string, f func(string) time.Duration, loop int, try int, i
 	el[loop][try][0][i] = fmt.Sprintf("%.02f", f(outerFuncName).Seconds())
 }
 
-func run(loop int, try int, gomaxprocs int) error {
+func run(t *testing.T, loop int, try int, gomaxprocs int) {
 	pprofFileName := fmt.Sprintf("binstat_external_test.loop-%d.try-%d.gomaxprocs-%d.pprof.txt", loop, try, gomaxprocs)
 	timerFile, err := os.Create(pprofFileName)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 
-	if err := pprof.StartCPUProfile(timerFile); err != nil {
-		return err
-	}
+	require.NoError(t, pprof.StartCPUProfile(timerFile))
 
 	// this function is purely for chewing CPU
 	f := func(outerFuncName string) time.Duration {
@@ -94,7 +94,7 @@ func run(loop int, try int, gomaxprocs int) error {
 
 	wg.Wait()
 	pprof.StopCPUProfile()
-	timerFile.Close()
+	require.NoError(t, timerFile.Close())
 
 	// run pprof and capture its output
 	/*
@@ -123,41 +123,39 @@ func run(loop int, try int, gomaxprocs int) error {
 	*/
 	command := fmt.Sprintf("go tool pprof -top -unit seconds %s 2>&1 | egrep '(binstat_test.f|cum)'", pprofFileName)
 	out, err := exec.Command("bash", "-c", command).Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	//debug fmt.Printf("debug: output of command: %s\n%s\n", command, out)
+	require.NoError(t, err)
+	//debug zlog.Debug().Msg(fmt.Printf("debug: output of command: %s\n%s", command, out))
 
 	// regex out the (cum)ulative column in pprof output
 	r, _ := regexp.Compile(` ([0-9.]+)s`)
 	matches := r.FindAllStringSubmatch(string(out), -1)
-	//debug fmt.Printf("debug: matches=%#v\n", matches) // e.g. debug: matches=[][]string{[]string{" 0.04s", "0.04"}, []string{" 0.06s", "0.06"}, []string{" 0.08s", "0.08"}, []string{" 0.04s", "0.04"}, []string{" 0.09s", "0.09"}, []string{" 0.05s", "0.05"}}
-	if len(matches) != funcs {
-		panic(fmt.Sprintf("ERROR: INTERNAL: len(matches)=%d but should be %d; out=\n%s\n", len(matches), funcs, out))
-	}
+	//debug zlog.Debug().Msg(fmt.Printf("debug: matches=%#v", matches)) // e.g. debug: matches=[][]string{[]string{" 0.04s", "0.04"}, []string{" 0.06s", "0.06"}, []string{" 0.08s", "0.08"}, []string{" 0.04s", "0.04"}, []string{" 0.09s", "0.09"}, []string{" 0.05s", "0.05"}}
+	expected := funcs
+	actual := len(matches)
+	require.Equal(t, expected, actual)
 
 	// add the regex matches to a table of elapsed times
 	for i := 0; i < funcs; i++ {
-		//debug fmt.Printf("debug: matches[%d][1]=%s\n", i, matches[i][1])
+		//debug zlog.Debug().Msg(fmt.Printf("debug: matches[%d][1]=%s", i, matches[i][1]))
 		el[loop][try][1][i] = matches[i][1]
 	}
-
-	return nil
 }
 
-func TestWithPprof(t *testing.T) {
+func init() {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
 	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
+}
+
+func TestWithPprof(t *testing.T) {
+	zlog = unittest.Logger()
 
 	// delete any files hanging around from previous test run
 	{
-		command := fmt.Sprintf("ls -al ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt")
+		command := "ls -al ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt"
 		out, err := exec.Command("bash", "-c", command).Output()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("- debug: output of command: %s\n%s\n", command, out)
+		require.NoError(t, err)
+		zlog.Debug().Msg(fmt.Sprintf("debug: output of command: %s\n%s", command, out))
 	}
 
 	// run the test; loops of several tries running groups of go-routines
@@ -168,10 +166,8 @@ func TestWithPprof(t *testing.T) {
 		}
 		p := binstat.NewTime(fmt.Sprintf("loop-%d", loop), "")
 		for try := 0; try < tries; try++ {
-			fmt.Printf("- debug: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d\n", loop, try+1, gomaxprocs)
-			if err := run(loop, try, gomaxprocs); err != nil {
-				log.Fatal(err)
-			}
+			zlog.Debug().Msg(fmt.Sprintf("debug: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs))
+			run(t, loop, try, gomaxprocs)
 		}
 		binstat.End(p)
 	}
@@ -196,26 +192,27 @@ func TestWithPprof(t *testing.T) {
 		- 0.07 0.07 0.07 0.04 0.10 0.03 // f6() seconds; loop=1 gomaxprocs=8
 	*/
 	for loop := 0; loop < loops; loop++ {
-		fmt.Printf("- binstat------- pprof---------\n")
-		fmt.Printf("-")
+		zlog.Debug().Msg(fmt.Sprintf("- binstat------- pprof---------"))
+		l1 := "-"
 		for r := 0; r < 2; r++ {
 			for try := 0; try < tries; try++ {
-				fmt.Printf(" try%d", try+1)
+				l1 = l1 + fmt.Sprintf(" try%d", try+1)
 			}
 		}
-		fmt.Printf("\n")
+		zlog.Debug().Msg(l1)
 		gomaxprocs := 8
 		if 0 == loop {
 			gomaxprocs = 1
 		}
 		for i := 0; i < funcs; i++ {
-			fmt.Printf("-")
+			l2 := "-"
 			for mech := 0; mech < mechs; mech++ {
 				for try := 0; try < tries; try++ {
-					fmt.Printf(" %s", el[loop][try][mech][i])
+					l2 = l2 + fmt.Sprintf(" %s", el[loop][try][mech][i])
 				}
 			}
-			fmt.Printf(" // f%d() seconds; loop=%d gomaxprocs=%d\n", i+1, loop, gomaxprocs)
+			l2 = l2 + fmt.Sprintf(" // f%d() seconds; loop=%d gomaxprocs=%d", i+1, loop, gomaxprocs)
+			zlog.Debug().Msg(l2)
 		}
 	}
 
@@ -224,17 +221,15 @@ func TestWithPprof(t *testing.T) {
 
 	// cat and sort binstat stats file
 	{
-		command := fmt.Sprintf("ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort")
+		command := "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort"
 		out, err := exec.Command("bash", "-c", command).Output()
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Printf("- debug: output of command: %s\n%s\n", command, out)
+		require.NoError(t, err)
+		zlog.Debug().Msg(fmt.Sprintf("- debug: output of command: %s\n%s", command, out))
 	}
 
 	// todo: add more tests? which tests?
 
-	// if we get here then no panic() or log.Fatal() calls happened :-)
+	// if we get here then no require.NoError() calls kicked in :-)
 	expected := 1
 	actual := 1
 	require.Equal(t, expected, actual)

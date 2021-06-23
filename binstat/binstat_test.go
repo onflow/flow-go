@@ -7,11 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRng(t *testing.T) {
+func init() {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
 	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
+}
 
+func TestBinstatInternal(t *testing.T) {
 	p1 := New("~2egNew", "")
 	EndVal(p1, 123)
 
