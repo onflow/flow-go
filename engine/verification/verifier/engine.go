@@ -205,6 +205,9 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
+		case *chmodels.CFInvalidEventsCollection:
+			// TODO raise challenge
+			e.log.Error().Msg(chFault.String())
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
 				chFault, chFault.String())

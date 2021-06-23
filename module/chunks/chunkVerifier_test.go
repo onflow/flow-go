@@ -27,6 +27,23 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+var eventsList = flow.EventsList{
+	{
+		Type:             "event.someType",
+		TransactionID:    flow.Identifier{2, 3, 2, 3},
+		TransactionIndex: 1,
+		EventIndex:       2,
+		Payload:          []byte{7, 3, 1, 2},
+	},
+	{
+		Type:             "event.otherType",
+		TransactionID:    flow.Identifier{3, 3, 3},
+		TransactionIndex: 4,
+		EventIndex:       4,
+		Payload:          []byte{7, 3, 1, 2},
+	},
+}
+
 type ChunkVerifierTestSuite struct {
 	suite.Suite
 	verifier *chunks.ChunkVerifier
@@ -51,7 +68,7 @@ func TestChunkVerifier(t *testing.T) {
 
 // TestHappyPath tests verification of the baseline verifiable chunk
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
+	vch := GetBaselineVerifiableChunk(s.T(), "")
 	assert.NotNil(s.T(), vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -63,7 +80,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	s.T().Skip("Check new partial ledger for missing keys")
 
-	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
+	vch := GetBaselineVerifiableChunk(s.T(), "")
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
@@ -78,7 +95,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	s.T().Skip("Check new partial ledger for missing keys")
-	vch := GetBaselineVerifiableChunk(s.T(), []byte(""))
+	vch := GetBaselineVerifiableChunk(s.T(), "")
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
@@ -94,7 +111,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 // the state commitment computed after updating the partial trie
 // doesn't match the one provided by the chunks
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte("wrongEndState"))
+	vch := GetBaselineVerifiableChunk(s.T(), "wrongEndState")
 	assert.NotNil(s.T(), vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -108,12 +125,23 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 // of failed transaction. if a transaction fails, it should
 // still change the state commitment.
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte("failedTx"))
+	vch := GetBaselineVerifiableChunk(s.T(), "failedTx")
 	assert.NotNil(s.T(), vch)
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
+}
+
+// TestEventsMismatch tests verification behavior in case
+// of emitted events not matching chunks
+func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
+	vch := GetBaselineVerifiableChunk(s.T(), "eventsMismatch")
+	assert.NotNil(s.T(), vch)
+	_, chFault, err := s.verifier.Verify(vch)
+	assert.Nil(s.T(), err)
+	assert.NotNil(s.T(), chFault)
+	assert.IsType(s.T(), &chunksmodels.CFInvalidEventsCollection{}, chFault)
 }
 
 // TestVerifyWrongChunkType evaluates that following invocations return an error:
@@ -140,11 +168,13 @@ func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
 // TestEmptyCollection tests verification behaviour if a
 // collection doesn't have any transaction.
 func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
-	vch := GetBaselineVerifiableChunk(s.T(), []byte{})
+	vch := GetBaselineVerifiableChunk(s.T(), "")
 	assert.NotNil(s.T(), vch)
 	col := unittest.CollectionFixture(0)
 	vch.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
+	emptyListHash, _ := flow.EventsList{}.Hash()
+	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
@@ -154,12 +184,14 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 // GetBaselineVerifiableChunk returns a verifiable chunk and sets the script
 // of a transaction in the middle of the collection to some value to signal the
 // mocked vm on what to return as tx exec outcome.
-func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.VerifiableChunkData {
+func GetBaselineVerifiableChunk(t *testing.T, script string) *verification.VerifiableChunkData {
 
 	// Collection setup
 
-	coll := unittest.CollectionFixture(5)
-	coll.Transactions[3] = &flow.TransactionBody{Script: script}
+	collectionSize := 5
+	magicTxIndex := 3
+	coll := unittest.CollectionFixture(collectionSize)
+	coll.Transactions[magicTxIndex] = &flow.TransactionBody{Script: []byte(script)}
 
 	guarantee := coll.Guarantee()
 
@@ -228,12 +260,27 @@ func GetBaselineVerifiableChunk(t *testing.T, script []byte) *verification.Verif
 	endState, err := f.Set(update)
 	require.NoError(t, err)
 
+	// events
+	chunkEvents := make(flow.EventsList, 0)
+	for i := 0; i < collectionSize; i++ {
+		if i == magicTxIndex {
+			switch script {
+			case "failedTx":
+				continue
+			}
+		}
+		chunkEvents = append(chunkEvents, eventsList...)
+	}
+	eventsListHash, err := chunkEvents.Hash()
+	require.NoError(t, err)
+
 	// Chunk setup
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: 0,
 			StartState:      flow.StateCommitment(startState),
 			BlockID:         blockID,
+			EventCollection: eventsListHash,
 		},
 		Index: 0,
 	}
@@ -276,15 +323,25 @@ func (vm *vmMock) Run(ctx fvm.Context, proc fvm.Procedure, led state.View, progr
 		// add updates to the ledger
 		_ = led.Set("00", "", "", []byte{'F'})
 		tx.Logs = []string{"log1", "log2"}
+		tx.Events = eventsList
 	case "failedTx":
 		// add updates to the ledger
 		_ = led.Set("05", "", "", []byte{'B'})
 		tx.Err = &fvmErrors.CadenceRuntimeError{} // inside the runtime (e.g. div by zero, access account)
+	case "eventsMismatch":
+		tx.Events = append(eventsList, flow.Event{
+			Type:             "event.Extra",
+			TransactionID:    flow.Identifier{2, 3},
+			TransactionIndex: 0,
+			EventIndex:       0,
+			Payload:          []byte{88},
+		})
 	default:
 		_, _ = led.Get("00", "", "")
 		_, _ = led.Get("05", "", "")
 		_ = led.Set("05", "", "", []byte{'B'})
 		tx.Logs = []string{"log1", "log2"}
+		tx.Events = eventsList
 	}
 
 	return nil
