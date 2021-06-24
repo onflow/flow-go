@@ -260,6 +260,17 @@ func NodeInfoFromIdentity(identity *flow.Identity) NodeInfo {
 		identity.StakingPubKey)
 }
 
+func PrivateNodeInfoFromIdentity(identity *flow.Identity, networkKey, stakingKey crypto.PrivateKey) NodeInfo {
+	return NewPrivateNodeInfo(
+		identity.NodeID,
+		identity.Role,
+		identity.Address,
+		identity.Stake,
+		networkKey,
+		stakingKey,
+	)
+}
+
 func FilterByRole(nodes []NodeInfo, role flow.Role) []NodeInfo {
 	var filtered []NodeInfo
 	for _, node := range nodes {

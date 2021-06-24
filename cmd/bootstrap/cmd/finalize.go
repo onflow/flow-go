@@ -94,6 +94,9 @@ func addFinalizeCmdFlags() {
 	_ = finalizeCmd.MarkFlagRequired("root-height")
 	_ = finalizeCmd.MarkFlagRequired("root-commit")
 	_ = finalizeCmd.MarkFlagRequired("epoch-counter")
+	_ = finalizeCmd.MarkFlagRequired("epoch-length")
+	_ = finalizeCmd.MarkFlagRequired("epoch-staking-phase-length")
+	_ = finalizeCmd.MarkFlagRequired("epoch-dkg-phase-length")
 
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,

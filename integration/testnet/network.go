@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -643,9 +642,16 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write staking and machine account private key files
-	err = writePrivateKeyFiles(bootstrapDir, chainID, nodeInfos)
+	writeFile := func(relativePath string, val interface{}) error {
+		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
+	}
+	err = run.WriteStakingNetworkingKeyFiles(nodeInfos, writeFile)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
+	}
+	err = run.WriteMachineAccountFiles(chainID, nodeInfos, writeFile)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}
 
 	// define root block parameters
@@ -680,22 +686,19 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, err
 	}
 
+	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
 		FirstView:          root.Header.View,
-		DKGPhase1FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase - 1,
-		DKGPhase2FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase*2 - 1,
-		DKGPhase3FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase*3 - 1,
+		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
+		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
+		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
 		FinalView:          root.Header.View + networkConf.ViewsInEpoch - 1,
 		Participants:       participants,
 		Assignments:        clusterAssignments,
 		RandomSource:       randomSource,
-	}
-
-	log.Debug().Msg("testnet participants:")
-	for _, part := range participants {
-		log.Debug().Msg(part.String())
 	}
 
 	epochCommit := &flow.EpochCommit{

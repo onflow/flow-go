@@ -1189,6 +1189,15 @@ func (e *Engine) generateExecutionResultForBlock(
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
 		convertedServiceEvents = append(convertedServiceEvents, *converted)
+
+		// log the service event in full - service events happen very infrequently
+		e.log.Info().
+			Hex("block_id", logging.ID(block.ID())).
+			Uint64("block_height", block.Header.Height).
+			Uint64("block_view", block.Header.View).
+			Str("event_payload", string(event.Payload)).
+			Str("event_type", string(event.Type)).
+			Msg("received service event")
 	}
 
 	er := &flow.ExecutionResult{

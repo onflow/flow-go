@@ -788,6 +788,16 @@ func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo 
 	return nodeInfos
 }
 
+func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+	il := IdentityListFixture(n, opts...)
+	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	for _, identity := range il {
+		nodeInfo := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		nodeInfos = append(nodeInfos, nodeInfo)
+	}
+	return nodeInfos
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
@@ -1424,6 +1434,9 @@ func WithFirstView(view uint64) func(*flow.EpochSetup) {
 	}
 }
 
+// EpochSetupFixture creates a valid EpochSetup with default properties for
+// testing. The default properties can be overwritten with optional parameter
+// functions.
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
 	setup := &flow.EpochSetup{

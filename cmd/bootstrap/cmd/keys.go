@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
@@ -12,6 +10,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// genNetworkAndStakingKeys generates network and staking keys for all nodes
+// specified in the config and returns a list of NodeInfo objects containing
+// these private keys.
 func genNetworkAndStakingKeys() []model.NodeInfo {
 
 	var nodeConfigs []model.NodeConfig
@@ -39,17 +40,8 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	internalNodes := make([]model.NodeInfo, 0, len(nodeConfigs))
 	for i, nodeConfig := range nodeConfigs {
 		log.Debug().Int("i", i).Str("address", nodeConfig.Address).Msg("assembling node information")
-
 		nodeInfo := assembleNodeInfo(nodeConfig, networkKeys[i], stakingKeys[i])
 		internalNodes = append(internalNodes, nodeInfo)
-
-		// retrieve private representation of the node
-		private, err := nodeInfo.Private()
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not access private key for internal node")
-		}
-
-		writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	}
 
 	return internalNodes

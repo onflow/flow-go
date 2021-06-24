@@ -36,6 +36,7 @@ func (s *DKGSuite) TestHappyPath() {
 	// Phase3Final: 250
 	// final
 
+	// we arbitrarily use 999 as the current epoch counter
 	currentCounter := uint64(999)
 
 	currentEpochSetup := flow.EpochSetup{
