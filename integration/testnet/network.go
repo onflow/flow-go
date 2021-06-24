@@ -682,13 +682,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, err
 	}
 
+	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
+
 	// generate epoch service events
 	epochSetup := &flow.EpochSetup{
 		Counter:            epochCounter,
 		FirstView:          root.Header.View,
-		DKGPhase1FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase - 1,
-		DKGPhase2FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase*2 - 1,
-		DKGPhase3FinalView: root.Header.View + networkConf.ViewsInStakingAuction + networkConf.ViewsInDKGPhase*3 - 1,
+		DKGPhase1FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase,
+		DKGPhase2FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*2,
+		DKGPhase3FinalView: dkgOffsetView + networkConf.ViewsInDKGPhase*3,
 		FinalView:          root.Header.View + networkConf.ViewsInEpoch - 1,
 		Participants:       participants,
 		Assignments:        clusterAssignments,

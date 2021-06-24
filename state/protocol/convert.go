@@ -23,17 +23,9 @@ func ToEpochSetup(epoch Epoch) (*flow.EpochSetup, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch final view: %w", err)
 	}
-	dkgPhase1FinalView, err := epoch.DKGPhase1FinalView()
+	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := DKGPhaseViews(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not get dkg phase 1 final view: %w", err)
-	}
-	dkgPhase2FinalView, err := epoch.DKGPhase2FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get dkg phase 2 final view: %w", err)
-	}
-	dkgPhase3FinalView, err := epoch.DKGPhase3FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not get dkg phase 3 final view: %w", err)
+		return nil, fmt.Errorf("could not get epoch dkg final views: %w", err)
 	}
 	participants, err := epoch.InitialIdentities()
 	if err != nil {
@@ -152,4 +144,21 @@ func ToDKGParticipantLookup(dkg DKG, participants flow.IdentityList) (map[flow.I
 	}
 
 	return lookup, nil
+}
+
+// DKGPhaseViews returns the DKG final phase views for an epoch.
+func DKGPhaseViews(epoch Epoch) (phase1FinalView uint64, phase2FinalView uint64, phase3FinalView uint64, err error) {
+	phase1FinalView, err = epoch.DKGPhase1FinalView()
+	if err != nil {
+		return
+	}
+	phase2FinalView, err = epoch.DKGPhase2FinalView()
+	if err != nil {
+		return
+	}
+	phase3FinalView, err = epoch.DKGPhase3FinalView()
+	if err != nil {
+		return
+	}
+	return
 }

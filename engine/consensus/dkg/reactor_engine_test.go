@@ -67,7 +67,6 @@ func TestEpochSetup(t *testing.T) {
 	currentEpoch.On("DKGPhase1FinalView").Return(uint64(150), nil)
 	currentEpoch.On("DKGPhase2FinalView").Return(uint64(200), nil)
 	currentEpoch.On("DKGPhase3FinalView").Return(uint64(250), nil)
-
 	nextEpoch := new(protocol.Epoch)
 	nextEpoch.On("Counter").Return(nextCounter, nil)
 	nextEpoch.On("InitialIdentities").Return(committee, nil)
