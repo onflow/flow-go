@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// go fmt binstat/*.go ; pushd binstat ; GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
+// pushd binstat ; go fmt ./*.go ; golangci-lint run && GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
 
 /*
  * NOTE: The code below is inspired by the goroutine.go here [1] [2].
@@ -191,7 +191,7 @@ func TestWithPprof(t *testing.T) {
 		- 0.07 0.07 0.07 0.04 0.10 0.03 // f6() seconds; loop=1 gomaxprocs=8
 	*/
 	for loop := 0; loop < loops; loop++ {
-		zlog.Debug().Msg(fmt.Sprintf("test: binstat------- pprof---------"))
+		zlog.Debug().Msg("test: binstat------- pprof---------")
 		l1 := "test:"
 		for r := 0; r < 2; r++ {
 			for try := 0; try < tries; try++ {
