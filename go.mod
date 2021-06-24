@@ -8,6 +8,7 @@ require (
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
@@ -37,7 +38,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/marten-seemann/qtls-go1-15 v0.1.4 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.17.1-0.20210615183152-e12b4add8263
+	github.com/onflow/cadence v0.18.0
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.18.0
@@ -64,6 +65,7 @@ require (
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
+	pgregory.net/rapid v0.4.6
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
