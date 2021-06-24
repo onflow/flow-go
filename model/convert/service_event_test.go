@@ -13,7 +13,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch setup", func(t *testing.T) {
 
-		fixture, expected := epochSetupFixture()
+		fixture, expected := EpochSetupFixture()
 
 		// convert Cadence types to Go types
 		event, err := ServiceEvent(fixture)
@@ -30,7 +30,7 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch commit", func(t *testing.T) {
 
-		fixture, expected := epochCommitFixture()
+		fixture, expected := EpochCommitFixture()
 
 		// convert Cadence types to Go types
 		event, err := ServiceEvent(fixture)
