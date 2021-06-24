@@ -140,7 +140,8 @@ func (e *EventCollection) TotalByteSize() uint64 {
 // TODO refactor this
 // Keep serviceEventWhitelist module-only to prevent accidental modifications
 var serviceEventWhitelist = map[string]struct{}{
-	"EpochManager.EpochSetup": {},
+	"FlowEpoch.EpochSetup":     {},
+	"FlowEpoch.EpochCommitted": {},
 }
 
 var serviceEventWhitelistFlat []string

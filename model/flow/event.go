@@ -14,9 +14,20 @@ import (
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
-	EventEpochSetup     EventType = "flow.EpochSetup"
-	EventEpochCommit    EventType = "flow.EpochCommit"
+
+	eventEpochSetupFormat  = "A.%s.FlowEpoch.EpochSetup"
+	eventEpochCommitFormat = "A.%s.FlowEpoch.EpochCommitted"
 )
+
+// TODO update in https://github.com/dapperlabs/flow-go/issues/5588
+func EventEpochSetup(chain Chain) EventType {
+	return EventType(fmt.Sprintf(eventEpochSetupFormat, chain.ServiceAddress().Hex()))
+}
+
+// TODO update in https://github.com/dapperlabs/flow-go/issues/5588
+func EventEpochCommit(chain Chain) EventType {
+	return EventType(fmt.Sprintf(eventEpochCommitFormat, chain.ServiceAddress().Hex()))
+}
 
 type EventType string
 

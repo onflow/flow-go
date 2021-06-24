@@ -22,7 +22,7 @@ func Test_IsServiceEvent(t *testing.T) {
 					Location: common.AddressLocation{
 						Address: common.BytesToAddress(chain.ServiceAddress().Bytes()),
 					},
-					QualifiedIdentifier: "EpochManager.EpochSetup",
+					QualifiedIdentifier: "FlowEpoch.EpochSetup",
 				},
 			}, chain),
 		)

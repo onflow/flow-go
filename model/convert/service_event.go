@@ -16,13 +16,13 @@ import (
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
-func ServiceEvent(event flow.Event) (*flow.ServiceEvent, error) {
+func ServiceEvent(chain flow.Chain, event flow.Event) (*flow.ServiceEvent, error) {
 
 	// depending on type of Epoch event construct Go type
 	switch event.Type {
-	case flow.EventEpochSetup:
+	case flow.EventEpochSetup(chain):
 		return convertServiceEventEpochSetup(event)
-	case flow.EventEpochCommit:
+	case flow.EventEpochCommit(chain):
 		return convertServiceEventEpochCommit(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
@@ -72,10 +72,14 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	if !ok {
 		return nil, invalidCadenceTypeError("randomSource", cdcEvent.Fields[5], cadence.String(""))
 	}
-	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
+	// Cadence's unsafeRandom().toString() produces a string of variable length.
+	// Here we pad it with enough 0s to meet the required length.
+	paddedRandomSrcHex := fmt.Sprintf("%0*s", 2*flow.EpochSetupRandomSourceLength, string(randomSrcHex))
+	setup.RandomSource, err = hex.DecodeString(paddedRandomSrcHex)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode random source hex: %w", err)
+		return nil, fmt.Errorf("could not decode random source hex (%v): %w", paddedRandomSrcHex, err)
 	}
+
 	dkgPhase1FinalView, ok := cdcEvent.Fields[6].(cadence.UInt64)
 	if !ok {
 		return nil, invalidCadenceTypeError("dkgPhase1FinalView", cdcEvent.Fields[6], cadence.UInt64(0))

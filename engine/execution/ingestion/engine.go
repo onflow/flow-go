@@ -1184,11 +1184,20 @@ func (e *Engine) generateExecutionResultForBlock(
 	// convert Cadence service event representation to flow-go representation
 	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
 	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(event)
+		converted, err := convert.ServiceEvent(block.Header.ChainID.Chain(), event)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
 		convertedServiceEvents = append(convertedServiceEvents, *converted)
+
+		// log the service event in full - service events happen very infrequently
+		e.log.Info().
+			Hex("block_id", logging.ID(block.ID())).
+			Uint64("block_height", block.Header.Height).
+			Uint64("block_view", block.Header.View).
+			Str("event_payload", string(event.Payload)).
+			Str("event_type", string(event.Type)).
+			Msg("received service event")
 	}
 
 	er := &flow.ExecutionResult{

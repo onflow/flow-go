@@ -17,6 +17,10 @@ type Epoch struct {
 	enc EncodableEpoch
 }
 
+func (e Epoch) Encodable() EncodableEpoch {
+	return e.enc
+}
+
 func (e Epoch) Counter() (uint64, error)            { return e.enc.Counter, nil }
 func (e Epoch) FirstView() (uint64, error)          { return e.enc.FirstView, nil }
 func (e Epoch) DKGPhase1FinalView() (uint64, error) { return e.enc.DKGPhase1FinalView, nil }

@@ -1,18 +1,16 @@
 package dkg
 
 import (
-	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -22,13 +20,15 @@ import (
 )
 
 // TestEpochSetup ensures that, upon receiving an EpochSetup event, the engine
-// correclty creates a new DKGController and registers phase transitions based
-// on the views specified in the event, as well as regular calls to the DKG
-// smart-contract.
+// correctly creates a new DKGController and registers phase transitions based
+// on the views specified in the current epoch, as well as regular calls to the
+// DKG smart-contract.
 //
-// The EpochSetup event is received at view 100. The phase transitions are at
-// views 150, 200, and 250. In between phase transitions, the controller calls
-// the DKG smart-contract every 10 views.
+// The EpochSetup event is received at view 100.
+
+// The current epoch is configured with DKG phase transitions at views 150, 200,
+// and 250. In between phase transitions, the controller calls the DKG
+// smart-contract every 10 views.
 //
 // VIEWS
 // setup      : 100
@@ -38,7 +38,6 @@ import (
 // Phase2Final: 200
 // polling    : 210 220 230 240 250
 // Phase3Final: 250
-// final      : 300
 func TestEpochSetup(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	currentCounter := rand.Uint64()
@@ -52,7 +51,9 @@ func TestEpochSetup(t *testing.T) {
 	blocks := make(map[uint64]*flow.Header)
 	var view uint64
 	for view = 100; view <= 250; view += DefaultPollStep {
-		blocks[view] = &flow.Header{View: view}
+		header := unittest.BlockHeaderFixture()
+		header.View = view
+		blocks[view] = &header
 	}
 	firstBlock := blocks[100]
 
@@ -61,25 +62,18 @@ func TestEpochSetup(t *testing.T) {
 	// against the value that gets inserted in the DB at the end.
 	expectedPrivKey, _ := unittest.NetworkingKey()
 
-	// insert epoch setup in mock state
-	epochSetup := flow.EpochSetup{
-		Counter:            nextCounter,
-		DKGPhase1FinalView: 150,
-		DKGPhase2FinalView: 200,
-		DKGPhase3FinalView: 250,
-		FinalView:          300,
-		Participants:       committee,
-		RandomSource:       []byte("random bytes"),
-	}
-	epoch := new(protocol.Epoch)
-	epoch.On("Counter").Return(epochSetup.Counter, nil)
-	epoch.On("InitialIdentities").Return(epochSetup.Participants, nil)
-	epoch.On("DKGPhase1FinalView").Return(epochSetup.DKGPhase1FinalView, nil)
-	epoch.On("DKGPhase2FinalView").Return(epochSetup.DKGPhase2FinalView, nil)
-	epoch.On("DKGPhase3FinalView").Return(epochSetup.DKGPhase3FinalView, nil)
-	epoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(epochSetup.RandomSource, nil)
+	currentEpoch := new(protocol.Epoch)
+	currentEpoch.On("Counter").Return(currentCounter, nil)
+	currentEpoch.On("DKGPhase1FinalView").Return(uint64(150), nil)
+	currentEpoch.On("DKGPhase2FinalView").Return(uint64(200), nil)
+	currentEpoch.On("DKGPhase3FinalView").Return(uint64(250), nil)
+	nextEpoch := new(protocol.Epoch)
+	nextEpoch.On("Counter").Return(nextCounter, nil)
+	nextEpoch.On("InitialIdentities").Return(committee, nil)
+
 	epochQuery := mocks.NewEpochQuery(t, currentCounter)
-	epochQuery.Add(epoch)
+	epochQuery.Add(currentEpoch)
+	epochQuery.Add(nextEpoch)
 	snapshot := new(protocol.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
 	state := new(protocol.State)
@@ -114,13 +108,14 @@ func TestEpochSetup(t *testing.T) {
 
 	factory := new(module.DKGControllerFactory)
 	factory.On("Create",
-		fmt.Sprintf("dkg-%d", epochSetup.Counter),
+		dkgmodule.CanonicalInstanceID(firstBlock.ChainID, nextCounter),
 		committee,
-		epochSetup.RandomSource).Return(controller, nil)
+		mock.Anything,
+	).Return(controller, nil)
 
 	viewEvents := gadgets.NewViews()
 	engine := NewReactorEngine(
-		zerolog.New(ioutil.Discard),
+		unittest.Logger(),
 		me,
 		state,
 		keyStorage,
@@ -128,7 +123,7 @@ func TestEpochSetup(t *testing.T) {
 		viewEvents,
 	)
 
-	engine.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
+	engine.EpochSetupPhaseStarted(currentCounter, firstBlock)
 
 	for view = 100; view <= 250; view += DefaultPollStep {
 		viewEvents.BlockFinalized(blocks[view])

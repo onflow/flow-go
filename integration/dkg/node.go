@@ -49,18 +49,26 @@ func (n *node) Done() {
 	<-n.reactorEngine.Done()
 }
 
-func (n *node) setEpochSetup(t *testing.T, epochSetup flow.EpochSetup, firstBlock *flow.Header) {
-	// configure the state snapthost at firstBlock to return the desired
-	// EpochSetup
-	epoch := new(protocolmock.Epoch)
-	epoch.On("Counter").Return(epochSetup.Counter, nil)
-	epoch.On("InitialIdentities").Return(epochSetup.Participants, nil)
-	epoch.On("DKGPhase1FinalView").Return(epochSetup.DKGPhase1FinalView, nil)
-	epoch.On("DKGPhase2FinalView").Return(epochSetup.DKGPhase2FinalView, nil)
-	epoch.On("DKGPhase3FinalView").Return(epochSetup.DKGPhase3FinalView, nil)
-	epoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(epochSetup.RandomSource, nil)
-	epochQuery := mocks.NewEpochQuery(t, epochSetup.Counter-1)
-	epochQuery.Add(epoch)
+// setEpochs configures the mock state snapthost at firstBlock to return the
+// desired current and next epochs
+func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup flow.EpochSetup, firstBlock *flow.Header) {
+
+	currentEpoch := new(protocolmock.Epoch)
+	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
+	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
+	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
+	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
+	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
+	currentEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+
+	nextEpoch := new(protocolmock.Epoch)
+	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
+	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
+	nextEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+
+	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
+	epochQuery.Add(currentEpoch)
+	epochQuery.Add(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
 	state := new(protocolmock.MutableState)
