@@ -26,22 +26,7 @@ func (e Epoch) FirstView() (uint64, error)          { return e.enc.FirstView, ni
 func (e Epoch) DKGPhase1FinalView() (uint64, error) { return e.enc.DKGPhase1FinalView, nil }
 func (e Epoch) DKGPhase2FinalView() (uint64, error) { return e.enc.DKGPhase2FinalView, nil }
 func (e Epoch) DKGPhase3FinalView() (uint64, error) { return e.enc.DKGPhase3FinalView, nil }
-func (e Epoch) DKGFinalViews() (uint64, uint64, uint64, error) {
-	dkgPhase1FinalView, err := e.DKGPhase1FinalView()
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("could not get dkg phase 1 final view: %w", err)
-	}
-	dkgPhase2FinalView, err := e.DKGPhase2FinalView()
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("could not get dkg phase 2 final view: %w", err)
-	}
-	dkgPhase3FinalView, err := e.DKGPhase3FinalView()
-	if err != nil {
-		return 0, 0, 0, fmt.Errorf("could not get dkg phase 3 final view: %w", err)
-	}
-	return dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, nil
-}
-func (e Epoch) FinalView() (uint64, error) { return e.enc.FinalView, nil }
+func (e Epoch) FinalView() (uint64, error)          { return e.enc.FinalView, nil }
 func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return e.enc.InitialIdentities, nil
 }

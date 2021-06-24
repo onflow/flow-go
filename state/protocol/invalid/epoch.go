@@ -34,10 +34,6 @@ func (u *Epoch) DKGPhase3FinalView() (uint64, error) {
 	return 0, u.err
 }
 
-func (u *Epoch) DKGFinalViews() (uint64, uint64, uint64, error) {
-	return 0, 0, 0, u.err
-}
-
 func (u *Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return nil, u.err
 }

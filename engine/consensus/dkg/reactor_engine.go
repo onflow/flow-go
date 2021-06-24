@@ -166,7 +166,7 @@ func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, erro
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
 	}
-	phase1Final, phase2Final, phase3Final, err := currEpoch.DKGFinalViews()
+	phase1Final, phase2Final, phase3Final, err := protocol.DKGPhaseViews(currEpoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch dkg final views: %w", err)
 	}
