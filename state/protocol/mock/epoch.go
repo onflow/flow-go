@@ -104,41 +104,6 @@ func (_m *Epoch) DKG() (protocol.DKG, error) {
 	return r0, r1
 }
 
-// DKGFinalViews provides a mock function with given fields:
-func (_m *Epoch) DKGFinalViews() (uint64, uint64, uint64, error) {
-	ret := _m.Called()
-
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func() uint64); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Get(0).(uint64)
-	}
-
-	var r1 uint64
-	if rf, ok := ret.Get(1).(func() uint64); ok {
-		r1 = rf()
-	} else {
-		r1 = ret.Get(1).(uint64)
-	}
-
-	var r2 uint64
-	if rf, ok := ret.Get(2).(func() uint64); ok {
-		r2 = rf()
-	} else {
-		r2 = ret.Get(2).(uint64)
-	}
-
-	var r3 error
-	if rf, ok := ret.Get(3).(func() error); ok {
-		r3 = rf()
-	} else {
-		r3 = ret.Error(3)
-	}
-
-	return r0, r1, r2, r3
-}
-
 // DKGPhase1FinalView provides a mock function with given fields:
 func (_m *Epoch) DKGPhase1FinalView() (uint64, error) {
 	ret := _m.Called()
