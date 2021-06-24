@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

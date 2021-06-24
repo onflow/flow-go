@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
