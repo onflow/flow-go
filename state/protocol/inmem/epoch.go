@@ -104,10 +104,6 @@ func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
 	return es.setupEvent.DKGPhase3FinalView, nil
 }
 
-func (es *setupEpoch) DKGFinalViews() (uint64, uint64, uint64, error) {
-	return es.setupEvent.DKGPhase1FinalView, es.setupEvent.DKGPhase2FinalView, es.setupEvent.DKGPhase3FinalView, nil
-}
-
 func (es *setupEpoch) FinalView() (uint64, error) {
 	return es.setupEvent.FinalView, nil
 }
