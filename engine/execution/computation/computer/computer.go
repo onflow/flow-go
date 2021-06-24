@@ -120,10 +120,13 @@ func (e *blockComputer) executeBlock(
 
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
 	collections := block.Collections()
+
+	chunksSize := len(collections) + 1 // + 1 system chunk
+
 	res := &execution.ComputationResult{
 		ExecutableBlock:    block,
-		Events:             make([]flow.Event, 0),
-		ServiceEvents:      make([]flow.Event, 0),
+		Events:             make([]flow.EventsList, chunksSize),
+		ServiceEvents:      make(flow.EventsList, 0),
 		TransactionResults: make([]flow.TransactionResult, 0),
 		StateCommitments:   make([]flow.StateCommitment, 0),
 		Proofs:             make([][]byte, 0),
@@ -157,9 +160,11 @@ func (e *blockComputer) executeBlock(
 		wg.Done()
 	}()
 
+	collectionIndex := 0
+
 	for _, collection := range collections {
 		colView := stateView.NewChild()
-		txIndex, err = e.executeCollection(blockSpan, txIndex, blockCtx, colView, programs, collection, res)
+		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, programs, collection, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
@@ -168,12 +173,13 @@ func (e *blockComputer) executeBlock(
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
 		}
+		collectionIndex++
 	}
 
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
-	_, err = e.executeSystemCollection(blockSpan, txIndex, colView, programs, res)
+	_, err = e.executeSystemCollection(blockSpan, collectionIndex, txIndex, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -195,6 +201,7 @@ func (e *blockComputer) executeBlock(
 
 func (e *blockComputer) executeSystemCollection(
 	blockSpan opentracing.Span,
+	collectionIndex int,
 	txIndex uint32,
 	collectionView state.View,
 	programs *programs.Programs,
@@ -206,7 +213,7 @@ func (e *blockComputer) executeSystemCollection(
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 	tx := blueprints.SystemChunkTransaction(serviceAddress)
-	err := e.executeTransaction(tx, colSpan, collectionView, programs, e.systemChunkCtx, txIndex, res)
+	err := e.executeTransaction(tx, colSpan, collectionView, programs, e.systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
 	if err != nil {
 		return txIndex, err
@@ -217,6 +224,7 @@ func (e *blockComputer) executeSystemCollection(
 
 func (e *blockComputer) executeCollection(
 	blockSpan opentracing.Span,
+	collectionIndex int,
 	txIndex uint32,
 	blockCtx fvm.Context,
 	collectionView state.View,
@@ -244,7 +252,7 @@ func (e *blockComputer) executeCollection(
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, txIndex, res)
+		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -268,6 +276,7 @@ func (e *blockComputer) executeTransaction(
 	collectionView state.View,
 	programs *programs.Programs,
 	ctx fvm.Context,
+	collectionIndex int,
 	txIndex uint32,
 	res *execution.ComputationResult,
 ) error {
@@ -331,7 +340,7 @@ func (e *blockComputer) executeTransaction(
 		return fmt.Errorf("merging tx view to collection view failed: %w", err)
 	}
 
-	res.AddEvents(tx.Events)
+	res.AddEvents(collectionIndex, tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
 	res.AddComputationUsed(tx.ComputationUsed)

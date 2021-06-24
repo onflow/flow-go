@@ -8,6 +8,7 @@ require (
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/codahale/hdrhistogram v0.9.0 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
@@ -64,6 +65,7 @@ require (
 	google.golang.org/grpc v1.33.2
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
+	pgregory.net/rapid v0.4.6
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

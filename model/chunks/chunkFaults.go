@@ -79,6 +79,64 @@ func NewCFNonMatchingFinalState(expected flow.StateCommitment, computed flow.Sta
 		execResID:  execResID}
 }
 
+// CFInvalidEventsCollection is returned when computed events collection hash is different from the chunk's one
+type CFInvalidEventsCollection struct {
+	expected   flow.Identifier
+	computed   flow.Identifier
+	chunkIndex uint64
+	resultID   flow.Identifier
+}
+
+func NewCFInvalidEventsCollection(expected flow.Identifier, computed flow.Identifier, chInx uint64, execResID flow.Identifier) *CFInvalidEventsCollection {
+	return &CFInvalidEventsCollection{
+		expected:   expected,
+		computed:   computed,
+		chunkIndex: chInx,
+		resultID:   execResID,
+	}
+}
+
+func (c *CFInvalidEventsCollection) ChunkIndex() uint64 {
+	return c.chunkIndex
+}
+
+func (c *CFInvalidEventsCollection) ExecutionResultID() flow.Identifier {
+	return c.resultID
+}
+
+func (c *CFInvalidEventsCollection) String() string {
+	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
+}
+
+// CFInvalidServiceEventsEmitted is returned when service events are different from the chunk's one
+type CFInvalidServiceEventsEmitted struct {
+	expected   flow.ServiceEventList
+	computed   flow.ServiceEventList
+	chunkIndex uint64
+	resultID   flow.Identifier
+}
+
+func CFInvalidServiceSystemEventsEmitted(expected flow.ServiceEventList, computed flow.ServiceEventList, chInx uint64, execResID flow.Identifier) *CFInvalidServiceEventsEmitted {
+	return &CFInvalidServiceEventsEmitted{
+		expected:   expected,
+		computed:   computed,
+		chunkIndex: chInx,
+		resultID:   execResID,
+	}
+}
+
+func (c *CFInvalidServiceEventsEmitted) ChunkIndex() uint64 {
+	return c.chunkIndex
+}
+
+func (c *CFInvalidServiceEventsEmitted) ExecutionResultID() flow.Identifier {
+	return c.resultID
+}
+
+func (c *CFInvalidServiceEventsEmitted) String() string {
+	return fmt.Sprintf("service events differs, got [%s] expected [%s] for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
+}
+
 // CFInvalidVerifiableChunk is returned when a verifiable chunk is invalid
 // this includes cases that code fails to construct a partial trie,
 // collection hashes doesn't match
