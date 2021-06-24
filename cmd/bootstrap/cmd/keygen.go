@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"crypto"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/bootstrap"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -151,7 +151,7 @@ func genDefaultMachineAccountKeys(nodes []model.NodeInfo) {
 			EncodedPrivateKey: private.NetworkPrivKey.Encode(),
 			KeyIndex:          0,
 			SigningAlgorithm:  private.NetworkPrivKey.Algorithm(),
-			HashAlgorithm:     crypto.SHA3_256,
+			HashAlgorithm:     hash.SHA3_256,
 		}
 
 		writeJSON(fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeInfo.NodeID), info)

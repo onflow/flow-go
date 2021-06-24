@@ -14,20 +14,27 @@ func TestEpochs(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
+// TestViewsProgress asserts epoch state transitions over two full epochs
+// without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-
-	type testView struct {
+	// testCase is a utility struct that defines what epoch and phase is
+	// expected at a certain view. We will populate a list of testCases for a
+	// selection of views within two epochs.
+	type testCase struct {
 		view  uint64
 		epoch uint64
 		phase flow.EpochPhase
 	}
 
-	for counter := 0; counter < 1; counter++ {
+	// iterate through two epochs
+	for counter := 0; counter < 2; counter++ {
+
+		// Get the current epoch to populate a list of test cases
+		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+		require.NoError(s.T(), err)
 		epoch := snapshot.Epochs().Current()
 
 		epochCounter, err := epoch.Counter()
@@ -44,7 +51,7 @@ func (s *Suite) TestViewsProgress() {
 		epochFinal, err := epoch.FinalView()
 		require.NoError(s.T(), err)
 
-		expectedViews := []testView{
+		expectedViews := []testCase{
 			{epoch: epochCounter, view: epochFirstView, phase: flow.EpochPhaseStaking},
 			{epoch: epochCounter, view: epochDKGPhase1Final, phase: flow.EpochPhaseSetup},
 			{epoch: epochCounter, view: epochDKGPhase2Final, phase: flow.EpochPhaseSetup},
