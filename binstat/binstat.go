@@ -31,6 +31,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // todo: consider using something faster than runtime.nano(), eg. https://github.com/templexxx/tsc/issues/8 <-- but maybe not safe with multiple CPUs? https://stackoverflow.com/questions/3388134/rdtsc-accuracy-across-cpu-cores
@@ -38,6 +40,8 @@ import (
 
 type globalStruct struct {
 	dumps            uint64
+	dmpName          string
+	dmpPath          string
 	cutPath          string
 	processBaseName  string
 	processPid       int
@@ -88,6 +92,7 @@ const maxDigitsUint64 = 20
 
 var globalRWMutex = sync.RWMutex{}
 var global = globalStruct{}
+var globalLog zerolog.Logger
 
 //go:linkname runtimeNano runtime.nanotime
 func runtimeNano() int64
@@ -105,11 +110,25 @@ func init() {
 	globalRWMutex.Lock() // lock for single writer <-- harmless but probably unnecessary since init() gets executed before other package functions
 	defer globalRWMutex.Unlock()
 
+	// inspired by https://github.com/onflow/flow-go/blob/master/utils/unittest/logging.go
+	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
+	globalLog = zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+
 	global.dumps = 0
 	global.startTime = time.Now()
 	global.startTimeMono = runtimeNanoAsTimeDuration()
+	global.processBaseName = filepath.Base(os.Args[0])
+	global.processPid = os.Getpid()
 	_, global.verbose = os.LookupEnv("BINSTAT_VERBOSE")
 	_, global.enable = os.LookupEnv("BINSTAT_ENABLE")
+	global.dmpName, _ = os.LookupEnv("BINSTAT_DMP_NAME")
+	if global.dmpName == "" {
+		global.dmpName = fmt.Sprintf("%s.pid-%06d.binstat.txt", global.processBaseName, global.processPid)
+	}
+	global.dmpPath, _ = os.LookupEnv("BINSTAT_DMP_PATH")
+	if global.dmpPath == "" {
+		global.dmpPath = "."
+	}
 	global.cutPath, _ = os.LookupEnv("BINSTAT_CUT_PATH")
 	if global.cutPath == "" {
 		global.cutPath = "github.com/onflow/flow-go/"
@@ -121,24 +140,22 @@ func init() {
 		for n, part := range parts { // e.g. "~Code=99"
 			subParts := strings.Split(part, "=")
 			if (len(subParts) != 2) || (subParts[0][0:1] != "~") || (0 == len(subParts[0][1:])) || (0 == atoi(subParts[1])) {
-				panic(fmt.Sprintf("ERROR: BINSTAT_LEN_WHAT=%s <-- cannot parse <-- format should be ~<what prefix>=<max len>[;...], e.g. ~Code=99;~X=99\n", global.lenWhat))
+				panic(fmt.Sprintf("ERROR: BINSTAT: BINSTAT_LEN_WHAT=%s <-- cannot parse <-- format should be ~<what prefix>=<max len>[;...], e.g. ~Code=99;~X=99\n", global.lenWhat))
 			}
 			k := subParts[0][1:]
 			v := atoi(subParts[1])
 			global.what2len[k] = v
 			if global.verbose {
 				elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - global.startTimeMono).Seconds()
-				fmt.Printf("%f %d=pid %d=tid init() // parsing .lenWhat=%s; extracted #%d k=%s v=%d\n", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.lenWhat, n, k, v)
+				globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid init() // parsing .lenWhat=%s; extracted #%d k=%s v=%d", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.lenWhat, n, k, v))
 			}
 		}
 	}
-	global.processBaseName = filepath.Base(os.Args[0])
-	global.processPid = os.Getpid()
 	global.key2index = make(map[string]int)
 
 	appendInternalKey := func(keyIotaIndex int, name string) {
 		if keyIotaIndex != len(global.keysArray) {
-			panic(fmt.Sprintf("ERROR: INTERNAL: %s", name))
+			panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: %s", name))
 		}
 		global.keysArray = append(global.keysArray, name)
 		global.frequency = append(global.frequency, 0)
@@ -159,7 +176,8 @@ func init() {
 
 	if global.verbose {
 		elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - global.startTimeMono).Seconds()
-		fmt.Printf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .cutPath=%s .lenWhat=%s\n", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.enable, global.verbose, global.cutPath, global.lenWhat)
+		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .dmpPath=%s .dmpName=%s .cutPath=%s .lenWhat=%s",
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), global.enable, global.verbose, global.dmpPath, global.dmpName, global.cutPath, global.lenWhat))
 	}
 }
 
@@ -199,14 +217,14 @@ func newGeneric(what string, callerParams string, callerTime bool, callerSize in
 
 	t2 := runtimeNanoAsTimeDuration()
 	if t2 <= t {
-		panic(fmt.Sprintf("ERROR: INTERNAL: t=%d but t3=%d\n", t, t2))
+		panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: t=%d but t3=%d\n", t, t2))
 	}
 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedThisFunc := time.Duration(t2 - t).Seconds()
-		fmt.Printf("%f %d=pid %d=tid %s:%d(%s) // new in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d\n",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine())
+		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid %s:%d(%s) // new in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d",
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine()))
 	}
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
@@ -300,8 +318,8 @@ tryAgainRaceCondition:
 		}
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedSinceNew := elapsedNanoAsTimeDuration.Seconds()
-		fmt.Printf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s\n",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint)
+		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s",
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint))
 	}
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
@@ -368,7 +386,7 @@ func dbgGeneric(p *BinStat, debugText string, verbose bool) {
 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t - global.startTimeMono).Seconds()
-		fmt.Printf("%f %d=pid %d=tid %s:%d(%s) // dbg %s\n", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText)
+		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid %s:%d(%s) // dbg %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText))
 	}
 
 	t2 := runtimeNanoAsTimeDuration()
@@ -423,27 +441,29 @@ func dmp() {
 		atomic.StoreUint64(&global.accumMono[i], v2)
 	}
 
-	fileTmp := fmt.Sprintf("./%s.pid-%06d.binstat.txt.tmp", global.processBaseName, global.processPid)
-	fileNew := fmt.Sprintf("./%s.pid-%06d.binstat.txt", global.processBaseName, global.processPid)
+	fileTmp := fmt.Sprintf("%s/%s.tmp", global.dmpPath, global.dmpName)
+	fileNew := fmt.Sprintf("%s/%s", global.dmpPath, global.dmpName)
 	f, err := os.Create(fileTmp)
 	if err != nil {
-		panic(err)
+		globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .Create(%s)=%s", fileTmp, err))
+		panic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
 	}
 	for i := range global.keysArray {
 		_, err := f.WriteString(fmt.Sprintf("%s=%d %f\n", global.keysArray[i], global.frequency[i], time.Duration(global.accumMono[i]).Seconds()))
 		if err != nil {
-			panic(err)
+			globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .WriteString()=%s", err))
+			panic(fmt.Sprintf("ERROR: BINSTAT: .WriteString()=%s", err))
 		}
 	}
 	err = f.Close()
 	if err != nil {
-		fmt.Printf("ERROR: .Close()=%s\n", err)
-		panic(err)
+		globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .Close()=%s", err))
+		panic(fmt.Sprintf("ERROR: BINSTAT: .Close()=%s", err))
 	}
 	err = os.Rename(fileTmp, fileNew) // atomically rename / move on Linux :-)
 	if err != nil {
-		fmt.Printf("ERROR: .Rename()=%s\n", err)
-		panic(err)
+		globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err))
+		panic(fmt.Sprintf("ERROR: BINSTAT: .Rename(%s, %s)=%s", fileTmp, fileNew, err))
 	}
 }
 

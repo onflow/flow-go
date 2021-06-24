@@ -18,8 +18,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// go fmt binstat/*.go ; pushd binstat ; GO111MODULE=on go test -v -coverprofile=coverage.txt -covermode=atomic --tags relic ./... ; go tool cover -func=coverage.txt ; popd
-// go fmt binstat/*.go ; pushd binstat ; GO111MODULE=on go test -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~gs; print;' ; go tool cover -func=coverage.txt ; popd
+// go fmt binstat/*.go ; pushd binstat ; GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
 
 /*
  * NOTE: The code below is inspired by the goroutine.go here [1] [2].
@@ -124,19 +123,19 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 	command := fmt.Sprintf("go tool pprof -top -unit seconds %s 2>&1 | egrep '(binstat_test.f|cum)'", pprofFileName)
 	out, err := exec.Command("bash", "-c", command).Output()
 	require.NoError(t, err)
-	//debug zlog.Debug().Msg(fmt.Printf("debug: output of command: %s\n%s", command, out))
+	//debug zlog.Debug().Msg(fmt.Printf("test: output of command: %s\n%s", command, out))
 
 	// regex out the (cum)ulative column in pprof output
 	r, _ := regexp.Compile(` ([0-9.]+)s`)
 	matches := r.FindAllStringSubmatch(string(out), -1)
-	//debug zlog.Debug().Msg(fmt.Printf("debug: matches=%#v", matches)) // e.g. debug: matches=[][]string{[]string{" 0.04s", "0.04"}, []string{" 0.06s", "0.06"}, []string{" 0.08s", "0.08"}, []string{" 0.04s", "0.04"}, []string{" 0.09s", "0.09"}, []string{" 0.05s", "0.05"}}
+	//debug zlog.Debug().Msg(fmt.Printf("test: matches=%#v", matches)) // e.g. debug: matches=[][]string{[]string{" 0.04s", "0.04"}, []string{" 0.06s", "0.06"}, []string{" 0.08s", "0.08"}, []string{" 0.04s", "0.04"}, []string{" 0.09s", "0.09"}, []string{" 0.05s", "0.05"}}
 	expected := funcs
 	actual := len(matches)
 	require.Equal(t, expected, actual)
 
 	// add the regex matches to a table of elapsed times
 	for i := 0; i < funcs; i++ {
-		//debug zlog.Debug().Msg(fmt.Printf("debug: matches[%d][1]=%s", i, matches[i][1]))
+		//debug zlog.Debug().Msg(fmt.Printf("test: matches[%d][1]=%s", i, matches[i][1]))
 		el[loop][try][1][i] = matches[i][1]
 	}
 }
@@ -155,7 +154,7 @@ func TestWithPprof(t *testing.T) {
 		command := "ls -al ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt"
 		out, err := exec.Command("bash", "-c", command).Output()
 		require.NoError(t, err)
-		zlog.Debug().Msg(fmt.Sprintf("debug: output of command: %s\n%s", command, out))
+		zlog.Debug().Msg(fmt.Sprintf("test: output of command: %s\n%s", command, out))
 	}
 
 	// run the test; loops of several tries running groups of go-routines
@@ -166,7 +165,7 @@ func TestWithPprof(t *testing.T) {
 		}
 		p := binstat.NewTime(fmt.Sprintf("loop-%d", loop), "")
 		for try := 0; try < tries; try++ {
-			zlog.Debug().Msg(fmt.Sprintf("debug: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs))
+			zlog.Debug().Msg(fmt.Sprintf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs))
 			run(t, loop, try, gomaxprocs)
 		}
 		binstat.End(p)
@@ -192,8 +191,8 @@ func TestWithPprof(t *testing.T) {
 		- 0.07 0.07 0.07 0.04 0.10 0.03 // f6() seconds; loop=1 gomaxprocs=8
 	*/
 	for loop := 0; loop < loops; loop++ {
-		zlog.Debug().Msg(fmt.Sprintf("- binstat------- pprof---------"))
-		l1 := "-"
+		zlog.Debug().Msg(fmt.Sprintf("test: binstat------- pprof---------"))
+		l1 := "test:"
 		for r := 0; r < 2; r++ {
 			for try := 0; try < tries; try++ {
 				l1 = l1 + fmt.Sprintf(" try%d", try+1)
@@ -205,7 +204,7 @@ func TestWithPprof(t *testing.T) {
 			gomaxprocs = 1
 		}
 		for i := 0; i < funcs; i++ {
-			l2 := "-"
+			l2 := "test:"
 			for mech := 0; mech < mechs; mech++ {
 				for try := 0; try < tries; try++ {
 					l2 = l2 + fmt.Sprintf(" %s", el[loop][try][mech][i])
@@ -224,7 +223,7 @@ func TestWithPprof(t *testing.T) {
 		command := "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort"
 		out, err := exec.Command("bash", "-c", command).Output()
 		require.NoError(t, err)
-		zlog.Debug().Msg(fmt.Sprintf("- debug: output of command: %s\n%s", command, out))
+		zlog.Debug().Msg(fmt.Sprintf("test: output of command: %s\n%s", command, out))
 	}
 
 	// todo: add more tests? which tests?
