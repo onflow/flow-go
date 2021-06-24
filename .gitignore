@@ -49,3 +49,6 @@ read-badger
 read-protocol-state
 remove-execution-fork
 bootstrap
+
+# Dependency directories
+vendor/
