@@ -273,7 +273,7 @@ func (c *accessAPIClient) GetLatestProtocolStateSnapshot(ctx context.Context, in
 }
 
 // AccessAPIServer is the server API for AccessAPI service.
-// All implementations must embed UnimplementedAccessAPIServer
+// All implementations should embed UnimplementedAccessAPIServer
 // for forward compatibility
 type AccessAPIServer interface {
 	// Ping is used to check if the access node is alive and healthy.
@@ -331,10 +331,9 @@ type AccessAPIServer interface {
 	// snapshot. Used by Flow nodes joining the network to bootstrap a
 	// space-efficient local state.
 	GetLatestProtocolStateSnapshot(context.Context, *GetLatestProtocolStateSnapshotRequest) (*ProtocolStateSnapshotResponse, error)
-	mustEmbedUnimplementedAccessAPIServer()
 }
 
-// UnimplementedAccessAPIServer must be embedded to have forward compatible implementations.
+// UnimplementedAccessAPIServer should be embedded to have forward compatible implementations.
 type UnimplementedAccessAPIServer struct {
 }
 
@@ -401,7 +400,6 @@ func (UnimplementedAccessAPIServer) GetNetworkParameters(context.Context, *GetNe
 func (UnimplementedAccessAPIServer) GetLatestProtocolStateSnapshot(context.Context, *GetLatestProtocolStateSnapshotRequest) (*ProtocolStateSnapshotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetLatestProtocolStateSnapshot not implemented")
 }
-func (UnimplementedAccessAPIServer) mustEmbedUnimplementedAccessAPIServer() {}
 
 // UnsafeAccessAPIServer may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to AccessAPIServer will

@@ -86,7 +86,7 @@ func (c *executionAPIClient) GetTransactionResult(ctx context.Context, in *GetTr
 }
 
 // ExecutionAPIServer is the server API for ExecutionAPI service.
-// All implementations must embed UnimplementedExecutionAPIServer
+// All implementations should embed UnimplementedExecutionAPIServer
 // for forward compatibility
 type ExecutionAPIServer interface {
 	// Ping is used to check if the access node is alive and healthy.
@@ -101,10 +101,9 @@ type ExecutionAPIServer interface {
 	GetEventsForBlockIDs(context.Context, *GetEventsForBlockIDsRequest) (*GetEventsForBlockIDsResponse, error)
 	// GetTransactionResult gets the result of a transaction.
 	GetTransactionResult(context.Context, *GetTransactionResultRequest) (*GetTransactionResultResponse, error)
-	mustEmbedUnimplementedExecutionAPIServer()
 }
 
-// UnimplementedExecutionAPIServer must be embedded to have forward compatible implementations.
+// UnimplementedExecutionAPIServer should be embedded to have forward compatible implementations.
 type UnimplementedExecutionAPIServer struct {
 }
 
@@ -123,7 +122,6 @@ func (UnimplementedExecutionAPIServer) GetEventsForBlockIDs(context.Context, *Ge
 func (UnimplementedExecutionAPIServer) GetTransactionResult(context.Context, *GetTransactionResultRequest) (*GetTransactionResultResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetTransactionResult not implemented")
 }
-func (UnimplementedExecutionAPIServer) mustEmbedUnimplementedExecutionAPIServer() {}
 
 // UnsafeExecutionAPIServer may be embedded to opt out of forward compatibility for this service.
 // Use of this interface is not recommended, as added methods to ExecutionAPIServer will
