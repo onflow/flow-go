@@ -95,11 +95,6 @@ func (ir *IncorporatedResultSeals) Clear() {
 	ir.seals.Clear()
 }
 
-// RegisterEjectionCallbacks adds the provided OnEjection callbacks
-func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
-	ir.seals.RegisterEjectionCallbacks(callbacks...)
-}
-
 // PruneUpToHeight remove all seals for blocks whose height is strictly
 // smaller that height. Note: seals for blocks at height are retained.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {

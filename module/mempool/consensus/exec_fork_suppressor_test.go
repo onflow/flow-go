@@ -231,7 +231,6 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 
 		// initialize ExecForkSuppressor
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
-		wrappedMempool.On("RegisterEjectionCallbacks", mock.Anything).Return()
 		execForkActor := &actormock.ExecForkActorMock{}
 		wrapper, _ := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 
@@ -255,7 +254,6 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 		db.Close()
 		db2 := unittest.BadgerDB(t, dir)
 		wrappedMempool2 := &poolmock.IncorporatedResultSeals{}
-		wrappedMempool2.On("RegisterEjectionCallbacks", mock.Anything).Return()
 		execForkActor2 := &actormock.ExecForkActorMock{}
 		execForkActor2.On("OnExecFork", mock.Anything).
 			Run(func(args mock.Arguments) {
@@ -281,33 +279,6 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 	})
 }
 
-// Test_EjectorRemovesNewSeal covers the following edge case:
-//   * upon adding a seal, the ejector of the wrapped mempool decides to eject the element which was just added
-// We verify this by inspecting the internal data structure of ExecForkSuppressor
-func Test_EjectorRemovesNewSeal(t *testing.T) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		wrappedMempool := &poolmock.IncorporatedResultSeals{}
-		var ejectionCallback mempool.OnEjection
-		wrappedMempool.On("RegisterEjectionCallbacks", mock.Anything).
-			Run(func(args mock.Arguments) { ejectionCallback = args[0].(mempool.OnEjection) }).
-			Return()
-		execForkActor := &actormock.ExecForkActorMock{}
-		wrapper, _ := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
-
-		// as soon as a seal is added, the underlying mempool ejects it right away again
-		seal := unittest.IncorporatedResultSeal.Fixture()
-		wrappedMempool.On("Add", seal).
-			Run(func(args mock.Arguments) { ejectionCallback(seal) }).
-			Return(true, nil)
-		wrappedMempool.On("ByID", seal.ID()).Return(nil, false)
-
-		added, err := wrapper.Add(seal)
-		require.NoError(t, err)
-		assert.True(t, added)
-		assert.Equal(t, 0, len(wrapper.sealsForBlock))
-	})
-}
-
 // Test_AddRem_SmokeTest tests a real system of stdmap.IncorporatedResultSeals mempool
 // which is wrapped in an ExecForkSuppressor.
 // We add and remove lots of different seals.
@@ -316,50 +287,30 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 		assert.Fail(t, "no call to onExecFork expected ")
 	}
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		wrappedMempool := stdmap.NewIncorporatedResultSeals(3)
+		wrappedMempool := stdmap.NewIncorporatedResultSeals(10)
 		wrapper, err := NewExecStateForkSuppressor(onExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
-
-		// add custom ejector to wrapped mempool to track ejected elements
-		var ejected map[flow.Identifier]struct{}
-		wrapper.RegisterEjectionCallbacks(
-			func(entity flow.Entity) {
-				ejected[entity.ID()] = struct{}{}
-			})
 
 		// Run 100 experiments of the following kind:
 		//  * add 10 seals to mempool, which should eject 7 seals
 		//  * test that ejected seals are not in mempool anymore
 		//  * remove remaining seals
-		for i := 100; i > 0; i-- {
-			ejected = make(map[flow.Identifier]struct{})
+		for i := 0; i < 100; i++ {
 			seals := unittest.IncorporatedResultSeal.Fixtures(10)
-			for _, s := range seals {
+			for j, s := range seals {
+				// fix height for each seal
+				s.Header.Height = uint64(i*100 + j)
 				added, err := wrapper.Add(s)
 				require.NoError(t, err)
 				require.True(t, added)
 			}
 
-			require.Equal(t, 7, len(ejected))
-			require.Equal(t, uint(3), wrappedMempool.Size())
-			require.Equal(t, uint(3), wrapper.Size())
-			for _, s := range seals {
-				id := s.ID()
-				if _, wasEjected := ejected[id]; wasEjected {
-					_, found := wrapper.ByID(id)
-					require.False(t, found)
-				} else {
-					_, found := wrapper.ByID(id)
-					require.True(t, found)
-					wrapper.Rem(id)
+			require.Equal(t, uint(10), wrappedMempool.Size())
+			require.Equal(t, uint(10), wrapper.Size())
 
-					_, found = wrapper.ByID(id)
-					require.False(t, found)
-					_, found = wrappedMempool.ByID(id)
-					require.False(t, found)
-				}
-			}
+			err := wrapper.PruneUpToHeight(uint64((i + 1) * 100))
+			require.NoError(t, err)
 
 			require.Equal(t, uint(0), wrappedMempool.Size())
 			require.Equal(t, uint(0), wrapper.Size())
@@ -377,7 +328,6 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
-		wrappedMempool.On("RegisterEjectionCallbacks", mock.Anything).Return()
 
 		execForkActor := &actormock.ExecForkActorMock{}
 		wrapper, err := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
