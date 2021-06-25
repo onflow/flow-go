@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
@@ -77,6 +78,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
+		assertEventHashesMatch(t, 1+1, result)
+
 		vm.AssertExpectations(t)
 	})
 
@@ -110,6 +113,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResults, 1)
+
+		assertEventHashesMatch(t, 1, result)
 
 		vm.AssertExpectations(t)
 	})
@@ -195,6 +200,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
 
+		assertEventHashesMatch(t, collectionCount+1, result)
+
 		vm.AssertExpectations(t)
 	})
 
@@ -261,19 +268,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
-
-		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-		//	Run(func(args mock.Arguments) {
-		//
-		//		tx := args[1].(*fvm.TransactionProcedure)
-		//
-		//
-		//		tx.Err = &fvm.MissingPayerError{}
-		//		tx.Events = events[txCount]
-		//		txCount++
-		//	}).
-		//	Return(nil).
-		//	Times(totalTransactionCount)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -402,6 +396,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
+}
+
+func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
+
+	require.Len(t, result.Events, expectedNoOfChunks)
+	require.Len(t, result.EventsHashes, expectedNoOfChunks)
+
+	for i := 0; i < expectedNoOfChunks; i++ {
+		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		require.NoError(t, err)
+
+		require.Equal(t, calculatedHash, result.EventsHashes[i])
+	}
 }
 
 type testRuntime struct {
