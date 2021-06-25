@@ -36,10 +36,14 @@ crypto/relic:
 
 .PHONY: crypto/relic/build
 crypto/relic/build: crypto/relic
-	./crypto/relic_build.sh
+	./crypto/relic_build.sh aarch64-linux-gnu-gcc
 
 crypto/relic/update:
 	git submodule update --recursive
+
+.PHONY: crypto/relic/build-arm
+crypto/relic/build-arm: crypto/relic
+	./crypto/relic_build.sh 
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -67,7 +71,7 @@ unittest:
 .PHONY: unittest-arm
 unittest-arm:
 	# test all packages with Relic library enabled
-	CC=arm-linux-gnueabi-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 

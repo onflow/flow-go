@@ -52,9 +52,9 @@ jobs:
       run: |
         sudo apt update
         sudo apt install qemu-user-static
-    - name: Install gcc-arm-linux-gnueabi
+    - name: Install gcc-aarch64-linux-gnu
       run: |
-        sudo apt install gcc-arm-linux-gnueabi
+        sudo apt install gcc-aarch64-linux-gnu
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
