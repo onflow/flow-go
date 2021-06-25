@@ -490,7 +490,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[ColNodeAPIPort] = hostPort
 
 			nodeContainer.addFlag("access-address", "access_1:9000")
-			nodeContainer.addFlag("qc-contract-address", flow.Testnet.Chain().ServiceAddress().String())
 
 		case flow.RoleExecution:
 
