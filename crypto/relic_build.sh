@@ -28,15 +28,14 @@ if [[ $# -eq 0 ]]; then
     cmake .. > ${CMAKE_TEMP}
     CC_VAL="$(tail -n 5 "$CMAKE_TEMP" | grep -oE -m 1 'CC=.*$')"
     CC_VAL="${CC_VAL:3}"
+    # de-mangle the CMakeLists file, using a temporary file for BSD compatibility
+    sed '$d' ../CMakeLists.txt > $CMAKE_TEMP
+    mv $CMAKE_TEMP ../CMakeLists.txt
 else
     # set cmake compiler to input
     COMPILER="-DCMAKE_C_COMPILER=$1"
     CC_VAL="$1"
 fi
-
-# de-mangle the CMakeLists file, using a temporary file for BSD compatibility
-sed '$d' ../CMakeLists.txt > $CMAKE_TEMP
-mv $CMAKE_TEMP ../CMakeLists.txt
 
 # default to which
 CC_VAL=${CC_VAL:-"$(which cc)"}
