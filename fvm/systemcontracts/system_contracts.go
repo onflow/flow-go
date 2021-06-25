@@ -21,6 +21,17 @@ const (
 	DKG       systemContract = "FlowDKG"
 )
 
+// Address returns the canonical address of this system contract on the given chain.
+func (sc systemContract) Address(chainID flow.ChainID) (flow.Address, error) {
+	return systemContractAddressByChain(chainID, sc)
+}
+
+// String returns the string representation of the contract, which is also
+// the name of the contract.
+func (sc systemContract) String() string {
+	return string(sc)
+}
+
 // systemContractsByChainID stores the default system smart contract
 // addresses for each chain.
 var systemContractsByChainID map[flow.ChainID]map[systemContract]flow.Address
@@ -54,11 +65,6 @@ func init() {
 	systemContractsByChainID[flow.Emulator] = transient
 	systemContractsByChainID[flow.Localnet] = transient
 	systemContractsByChainID[flow.Benchnet] = transient
-}
-
-// Address returns the canonical address of this system contract on the given chain.
-func (sc systemContract) Address(chainID flow.ChainID) (flow.Address, error) {
-	return systemContractAddressByChain(chainID, sc)
 }
 
 func systemContractAddressByChain(chainID flow.ChainID, contract systemContract) (flow.Address, error) {
