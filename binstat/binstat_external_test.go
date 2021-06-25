@@ -18,7 +18,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// pushd binstat ; go fmt ./*.go ; golangci-lint run && GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
+/*
+ * NOTE: This command line can be used during binstat development to:
+ * 1. Run go fmt on the binstat .go files, and
+ * 2. Run the linter on the binstat .go files, and
+ * 3. Run the binstat tests with the full amount of logging (-v -vv), and
+ * 4. Turn JSON log line output with embedded \n into real new lines, and
+ * 5. Strip "time" field from JSON log line output for shorter read, and
+ * 6. Show the amount of code coverage from the tests.
+ *
+ * pushd binstat ; go fmt ./*.go ; golangci-lint run && GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
+ */
 
 /*
  * NOTE: The code below is inspired by the goroutine.go here [1] [2].
@@ -70,7 +80,7 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 
 	// this function is purely for chewing CPU
 	f := func(outerFuncName string) time.Duration {
-		p := binstat.NewTime(outerFuncName, "")
+		p := binstat.EnterTime(outerFuncName, "")
 		var sum int
 		for i := 0; i < 10000000; i++ {
 			sum -= i / 2
@@ -78,8 +88,8 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 			sum /= i/3 + 1
 			sum -= i / 4
 		}
-		binstat.Dbg(p, fmt.Sprintf("%s() = %d", outerFuncName, sum))
-		return binstat.End(p)
+		binstat.Debug(p, fmt.Sprintf("%s() = %d", outerFuncName, sum))
+		return binstat.Leave(p)
 	}
 
 	runtime.GOMAXPROCS(gomaxprocs)
@@ -154,7 +164,7 @@ func TestWithPprof(t *testing.T) {
 		command := "ls -al ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt"
 		out, err := exec.Command("bash", "-c", command).Output()
 		require.NoError(t, err)
-		zlog.Debug().Msg(fmt.Sprintf("test: output of command: %s\n%s", command, out))
+		zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
 	}
 
 	// run the test; loops of several tries running groups of go-routines
@@ -163,12 +173,12 @@ func TestWithPprof(t *testing.T) {
 		if 0 == loop {
 			gomaxprocs = 1
 		}
-		p := binstat.NewTime(fmt.Sprintf("loop-%d", loop), "")
+		p := binstat.EnterTime(fmt.Sprintf("loop-%d", loop), "")
 		for try := 0; try < tries; try++ {
-			zlog.Debug().Msg(fmt.Sprintf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs))
+			zlog.Debug().Msgf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs)
 			run(t, loop, try, gomaxprocs)
 		}
-		binstat.End(p)
+		binstat.Leave(p)
 	}
 
 	// output a table of results similar to this
@@ -223,13 +233,10 @@ func TestWithPprof(t *testing.T) {
 		command := "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort"
 		out, err := exec.Command("bash", "-c", command).Output()
 		require.NoError(t, err)
-		zlog.Debug().Msg(fmt.Sprintf("test: output of command: %s\n%s", command, out))
+		zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
 	}
 
 	// todo: add more tests? which tests?
 
 	// if we get here then no require.NoError() calls kicked in :-)
-	expected := 1
-	actual := 1
-	require.Equal(t, expected, actual)
 }

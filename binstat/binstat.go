@@ -81,10 +81,10 @@ const (
 
 const (
 	internalSec = iota
-	internalNew
-	internalPnt
-	internalRng
-	internalDbg
+	internalEnter
+	internalPoint
+	internalx_2_y
+	internalDebug
 	internalGC
 )
 
@@ -147,7 +147,7 @@ func init() {
 			global.what2len[k] = v
 			if global.verbose {
 				elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - global.startTimeMono).Seconds()
-				globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid init() // parsing .lenWhat=%s; extracted #%d k=%s v=%d", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.lenWhat, n, k, v))
+				globalLog.Debug().Msgf("%f %d=pid %d=tid init() // parsing .lenWhat=%s; extracted #%d k=%s v=%d", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.lenWhat, n, k, v)
 			}
 		}
 	}
@@ -164,29 +164,29 @@ func init() {
 		global.accumMonoShadow = append(global.accumMonoShadow, 0)
 	}
 	appendInternalKey(internalSec, "/internal/second")
-	appendInternalKey(internalNew, "/internal/binstat.New")
-	appendInternalKey(internalPnt, "/internal/binstat.Pnt")
-	appendInternalKey(internalRng, "/internal/binstat.rng")
-	appendInternalKey(internalDbg, "/internal/binstat.Dbg")
+	appendInternalKey(internalEnter, "/internal/binstat.enter")
+	appendInternalKey(internalPoint, "/internal/binstat.point")
+	appendInternalKey(internalx_2_y, "/internal/binstat.x_2_y")
+	appendInternalKey(internalDebug, "/internal/binstat.debug")
 	appendInternalKey(internalGC, "/internal/GCStats")
 
 	global.index = len(global.keysArray)
 	global.indexInternalMax = len(global.keysArray)
-	go tck(100 * time.Millisecond) // every 0.1 seconds
+	go tick(100 * time.Millisecond) // every 0.1 seconds
 
 	if global.verbose {
 		elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - global.startTimeMono).Seconds()
-		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .dmpPath=%s .dmpName=%s .cutPath=%s .lenWhat=%s",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), global.enable, global.verbose, global.dmpPath, global.dmpName, global.cutPath, global.lenWhat))
+		globalLog.Debug().Msgf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .dmpPath=%s .dmpName=%s .cutPath=%s .lenWhat=%s",
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), global.enable, global.verbose, global.dmpPath, global.dmpName, global.cutPath, global.lenWhat)
 	}
 }
 
 func Fin() {
-	dmp()
+	dump()
 	// todo: consider closing down more somehow?
 }
 
-func newGeneric(what string, callerParams string, callerTime bool, callerSize int64, callerSizeWhen int, verbose bool) *BinStat {
+func enterGeneric(what string, callerParams string, callerTime bool, callerSize int64, callerSizeWhen int, verbose bool) *BinStat {
 	if !global.enable {
 		return nil
 	}
@@ -223,18 +223,18 @@ func newGeneric(what string, callerParams string, callerTime bool, callerSize in
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedThisFunc := time.Duration(t2 - t).Seconds()
-		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid %s:%d(%s) // new in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine()))
+		globalLog.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // enter in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d",
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine())
 	}
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
-	atomic.AddUint64(&global.frequencyShadow[internalNew], 1)
-	atomic.AddUint64(&global.accumMonoShadow[internalNew], uint64(t2-t))
+	atomic.AddUint64(&global.frequencyShadow[internalEnter], 1)
+	atomic.AddUint64(&global.accumMonoShadow[internalEnter], uint64(t2-t))
 
 	return &p
 }
 
-func pntGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen int, verbose bool) time.Duration {
+func pointGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen int, verbose bool) time.Duration {
 	if !global.enable {
 		return time.Duration(0)
 	}
@@ -246,28 +246,28 @@ func pntGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen
 		p.callerSizeWhen = callerSizeWhen
 		p.callerSize = callerSize
 	}
-	var keySizeRange string = ""
-	var keyTimeRange string = ""
-	var pointType string = ""
+	var keySizeRange string
+	var keyTimeRange string
+	var pointType string
 	switch pointUnique {
 	case "Leave":
-		pointType = "end"
+		pointType = "leave"
 		switch p.callerSizeWhen {
 		case sizeAtEnter:
-			keySizeRange = fmt.Sprintf("/size[new:%s]", rng(float64(p.callerSize), true))
+			keySizeRange = fmt.Sprintf("/size[enter:%s]", x_2_y(float64(p.callerSize), true))
 		case sizeNotUsed:
 			keySizeRange = ""
 		case sizeAtLeave:
-			keySizeRange = fmt.Sprintf("/size[end:%s]", rng(float64(p.callerSize), true))
+			keySizeRange = fmt.Sprintf("/size[leave:%s]", x_2_y(float64(p.callerSize), true))
 		}
 	case "":
 	default:
-		pointType = "pnt"
-		keySizeRange = fmt.Sprintf("/size[pnt:%s]", pointUnique)
+		pointType = "point"
+		keySizeRange = fmt.Sprintf("/size[point:%s]", pointUnique)
 	}
 	if p.callerTime {
 		elapsedSeconds := elapsedNanoAsTimeDuration.Seconds()
-		keyTimeRange = fmt.Sprintf("/time[%s]", rng(elapsedSeconds, false))
+		keyTimeRange = fmt.Sprintf("/time[%s]", x_2_y(elapsedSeconds, false))
 	}
 	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]/file[%s:%d]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), p.what, p.callerFunc, p.callerLine, keySizeRange, keyTimeRange)
 
@@ -318,17 +318,17 @@ tryAgainRaceCondition:
 		}
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedSinceNew := elapsedNanoAsTimeDuration.Seconds()
-		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint))
+		globalLog.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s",
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint)
 	}
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
-	atomic.AddUint64(&global.frequencyShadow[internalPnt], 1)
-	atomic.AddUint64(&global.accumMonoShadow[internalPnt], uint64(t2-t))
+	atomic.AddUint64(&global.frequencyShadow[internalPoint], 1)
+	atomic.AddUint64(&global.accumMonoShadow[internalPoint], uint64(t2-t))
 
 	if tNew > tOld {
 		// come here if won lottery to save binStats this second
-		dmp()
+		dump()
 	}
 
 	return elapsedNanoAsTimeDuration
@@ -337,18 +337,18 @@ tryAgainRaceCondition:
 // todo: there must be a better / faster way to do all the operations below :-)
 // todo: allow configuration for more granular ranges, e.g. 1.100000-1.199999, or bigger ranges e.g. 0.200000-0.399999 ?
 // todo: consider outputting int range in hex for 16 bins instead of 10 bins (at a particular magnitude)?
-func rng(v float64, isInt bool) string { // e.g. 1.234567
+func x_2_y(v float64, isInt bool) string { // e.g. 1.234567
 	t := runtimeNanoAsTimeDuration()
 
 	vInt64 := int64(v * 1000000)         // e.g.  1234567
 	vString := fmt.Sprintf("%d", vInt64) // e.g. "1234567"
 	var vaBytes [maxDigitsUint64]byte
 	var vbBytes [maxDigitsUint64]byte
-	copy(vaBytes[:], []byte(vString)) // e.g. [49 50 51 52 53 54 55]
-	copy(vbBytes[:], []byte(vString)) // e.g. [49 50 51 52 53 54 55]
+	copy(vaBytes[:], []byte(vString)) // e.g. ['1' '2' '3' '4' '5' '6']
+	copy(vbBytes[:], []byte(vString)) // e.g. ['1' '2' '3' '4' '5' '6']
 	for i := 1; i < len(vString); i++ {
-		vaBytes[i] = 48 // AKA '0'                     // e.g. [49 48 48 48 48 48 48]
-		vbBytes[i] = 57 // AKA '9'                     // e.g. [49 57 57 57 57 57 57]
+		vaBytes[i] = '0' // e.g. ['1' '0' '0' '0' '0' '0']
+		vbBytes[i] = '9' // e.g. ['1' '9' '9' '9' '9' '9']
 	}
 	vaString := string(vaBytes[0:len(vString)])      // e.g. "1000000"
 	vbString := string(vbBytes[0:len(vString)])      // e.g. "1999999"
@@ -371,13 +371,13 @@ func rng(v float64, isInt bool) string { // e.g. 1.234567
 	t2 := runtimeNanoAsTimeDuration()
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
-	atomic.AddUint64(&global.frequencyShadow[internalRng], 1)
-	atomic.AddUint64(&global.accumMonoShadow[internalRng], uint64(t2-t))
+	atomic.AddUint64(&global.frequencyShadow[internalx_2_y], 1)
+	atomic.AddUint64(&global.accumMonoShadow[internalx_2_y], uint64(t2-t))
 
 	return returnString
 }
 
-func dbgGeneric(p *BinStat, debugText string, verbose bool) {
+func debugGeneric(p *BinStat, debugText string, verbose bool) {
 	if !global.enable {
 		return
 	}
@@ -386,25 +386,25 @@ func dbgGeneric(p *BinStat, debugText string, verbose bool) {
 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t - global.startTimeMono).Seconds()
-		globalLog.Debug().Msg(fmt.Sprintf("%f %d=pid %d=tid %s:%d(%s) // dbg %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText))
+		globalLog.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // debug %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText)
 	}
 
 	t2 := runtimeNanoAsTimeDuration()
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
-	atomic.AddUint64(&global.frequencyShadow[internalDbg], 1)
-	atomic.AddUint64(&global.accumMonoShadow[internalDbg], uint64(t2-t))
+	atomic.AddUint64(&global.frequencyShadow[internalDebug], 1)
+	atomic.AddUint64(&global.accumMonoShadow[internalDebug], uint64(t2-t))
 }
 
-func tck(t time.Duration) {
+func tick(t time.Duration) {
 	if !global.enable {
 		return
 	}
 
 	ticker := time.NewTicker(t)
 	for range ticker.C {
-		p := newInternal("internal-NumG")
-		endValInternal(p, int64(runtime.NumGoroutine()))
+		p := enterInternal("internal-NumG")
+		leaveValInternal(p, int64(runtime.NumGoroutine()))
 	}
 }
 
@@ -414,9 +414,9 @@ func tck(t time.Duration) {
 // todo: consider reporting on num active go-routines [1] and/or SchedStats API [2] if/when available.
 // [1] https://github.com/golang/go/issues/17089 "runtime: expose number of running/runnable goroutines #17089"
 // [2] https://github.com/golang/go/issues/15490 "proposal: runtime: add SchedStats API #15490"
-func dmp() {
-	p := newTimeInternal("internal-dump")
-	defer endInternal(p)
+func dump() {
+	p := enterTimeInternal("internal-dump")
+	defer leaveInternal(p)
 
 	var gcStats debug.GCStats
 	debug.ReadGCStats(&gcStats)
@@ -445,24 +445,24 @@ func dmp() {
 	fileNew := fmt.Sprintf("%s/%s", global.dmpPath, global.dmpName)
 	f, err := os.Create(fileTmp)
 	if err != nil {
-		globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .Create(%s)=%s", fileTmp, err))
+		globalLog.Fatal().Msgf("ERROR: .Create(%s)=%s", fileTmp, err)
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
 	}
 	for i := range global.keysArray {
-		_, err := f.WriteString(fmt.Sprintf("%s=%d %f\n", global.keysArray[i], global.frequency[i], time.Duration(global.accumMono[i]).Seconds()))
+		_, err := fmt.Fprintf(f, "%s=%d %f\n", global.keysArray[i], global.frequency[i], time.Duration(global.accumMono[i]).Seconds())
 		if err != nil {
-			globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .WriteString()=%s", err))
-			panic(fmt.Sprintf("ERROR: BINSTAT: .WriteString()=%s", err))
+			globalLog.Fatal().Msgf("ERROR: .Fprintf()=%s", err)
+			panic(fmt.Sprintf("ERROR: BINSTAT: .Fprintf()=%s", err))
 		}
 	}
 	err = f.Close()
 	if err != nil {
-		globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .Close()=%s", err))
+		globalLog.Fatal().Msgf("ERROR: .Close()=%s", err)
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Close()=%s", err))
 	}
 	err = os.Rename(fileTmp, fileNew) // atomically rename / move on Linux :-)
 	if err != nil {
-		globalLog.Fatal().Msg(fmt.Sprintf("ERROR: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err))
+		globalLog.Fatal().Msgf("ERROR: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err)
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Rename(%s, %s)=%s", fileTmp, fileNew, err))
 	}
 }
@@ -470,61 +470,57 @@ func dmp() {
 // functions BEFORE go fmt v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 
 /*
-func New               (what string, callerParams string                  ) *BinStat      { return newGeneric(what, callerParams, false, 0         , sizeNotUsed, true ) }
-func newInternal       (what string                                       ) *BinStat      { return newGeneric(what, ""          , false, 0         , sizeNotUsed, false) }
-func NewTime           (what string, callerParams string                  ) *BinStat      { return newGeneric(what, callerParams, true , 0         , sizeNotUsed, true ) }
-func newTimeInternal   (what string                                       ) *BinStat      { return newGeneric(what, ""          , true , 0         , sizeNotUsed, false) }
-func NewTimeVal        (what string, callerParams string, callerSize int64) *BinStat      { return newGeneric(what, callerParams, true , callerSize, sizeAtEnter, true ) }
-func newTimeValInternal(what string,                      callerSize int64) *BinStat      { return newGeneric(what, ""          , true , callerSize, sizeAtEnter, false) }
+func Enter               (what string, callerParams string                  ) *BinStat      { return enterGeneric(what, callerParams, false, 0         , sizeNotUsed, true ) }
+func enterInternal       (what string                                       ) *BinStat      { return enterGeneric(what, ""          , false, 0         , sizeNotUsed, false) }
+func EnterTime           (what string, callerParams string                  ) *BinStat      { return enterGeneric(what, callerParams, true , 0         , sizeNotUsed, true ) }
+func enterTimeInternal   (what string                                       ) *BinStat      { return enterGeneric(what, ""          , true , 0         , sizeNotUsed, false) }
+func EnterTimeVal        (what string, callerParams string, callerSize int64) *BinStat      { return enterGeneric(what, callerParams, true , callerSize, sizeAtEnter, true ) }
+func enterTimeValInternal(what string,                      callerSize int64) *BinStat      { return enterGeneric(what, ""          , true , callerSize, sizeAtEnter, false) }
 
-func Pnt               (p  *BinStat, pointUnique  string                  ) time.Duration { return pntGeneric(p   , pointUnique        , 0         , sizeNotUsed, true ) }
-func pntInternal       (p  *BinStat, pointUnique  string                  ) time.Duration { return pntGeneric(p   , pointUnique        , 0         , sizeNotUsed, false) }
-func End               (p  *BinStat                                       ) time.Duration { return pntGeneric(p   , "Leave"            , 0         , sizeNotUsed, true ) }
-func endInternal       (p  *BinStat                                       ) time.Duration { return pntGeneric(p   , "Leave"            , 0         , sizeNotUsed, false) }
-func EndVal            (p  *BinStat,                      callerSize int64) time.Duration { return pntGeneric(p   , "Leave"            , callerSize, sizeAtLeave, true ) }
-func endValInternal    (p  *BinStat,                      callerSize int64) time.Duration { return pntGeneric(p   , "Leave"            , callerSize, sizeAtLeave, false) }
+func Point               (p  *BinStat, pointUnique  string                  ) time.Duration { return pointGeneric(p   , pointUnique        , 0         , sizeNotUsed, true ) }
+func pointInternal       (p  *BinStat, pointUnique  string                  ) time.Duration { return pointGeneric(p   , pointUnique        , 0         , sizeNotUsed, false) }
+func Leave               (p  *BinStat                                       ) time.Duration { return pointGeneric(p   , "Leave"            , 0         , sizeNotUsed, true ) }
+func leaveInternal       (p  *BinStat                                       ) time.Duration { return pointGeneric(p   , "Leave"            , 0         , sizeNotUsed, false) }
+func LeaveVal            (p  *BinStat,                      callerSize int64) time.Duration { return pointGeneric(p   , "Leave"            , callerSize, sizeAtLeave, true ) }
+func leaveValInternal    (p  *BinStat,                      callerSize int64) time.Duration { return pointGeneric(p   , "Leave"            , callerSize, sizeAtLeave, false) }
 
-func Dbg               (p  *BinStat, debugText    string                  )               {        dbgGeneric(p   , debugText                                   , true ) }
+func Debug               (p  *BinStat, debugText    string                  )               {        debugGeneric(p   , debugText                                   , true ) }
 */
 
 // functions W/&W/O go fmt ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
-func New(what string, callerParams string) *BinStat {
-	return newGeneric(what, callerParams, false, 0, sizeNotUsed, true)
+func Enter(what string, callerParams string) *BinStat {
+	return enterGeneric(what, callerParams, false, 0, sizeNotUsed, true)
 }
-func newInternal(what string) *BinStat {
-	return newGeneric(what, "", false, 0, sizeNotUsed, false)
+func enterInternal(what string) *BinStat { return enterGeneric(what, "", false, 0, sizeNotUsed, false) }
+func EnterTime(what string, callerParams string) *BinStat {
+	return enterGeneric(what, callerParams, true, 0, sizeNotUsed, true)
 }
-func NewTime(what string, callerParams string) *BinStat {
-	return newGeneric(what, callerParams, true, 0, sizeNotUsed, true)
+func enterTimeInternal(what string) *BinStat {
+	return enterGeneric(what, "", true, 0, sizeNotUsed, false)
 }
-func newTimeInternal(what string) *BinStat {
-	return newGeneric(what, "", true, 0, sizeNotUsed, false)
+func EnterTimeVal(what string, callerParams string, callerSize int64) *BinStat {
+	return enterGeneric(what, callerParams, true, callerSize, sizeAtEnter, true)
 }
-func NewTimeVal(what string, callerParams string, callerSize int64) *BinStat {
-	return newGeneric(what, callerParams, true, callerSize, sizeAtEnter, true)
-}
-func newTimeValInternal(what string, callerSize int64) *BinStat {
-	return newGeneric(what, "", true, callerSize, sizeAtEnter, false)
+func enterTimeValInternal(what string, callerSize int64) *BinStat {
+	return enterGeneric(what, "", true, callerSize, sizeAtEnter, false)
 }
 
-func Pnt(p *BinStat, pointUnique string) time.Duration {
-	return pntGeneric(p, pointUnique, 0, sizeNotUsed, true)
+func Point(p *BinStat, pointUnique string) time.Duration {
+	return pointGeneric(p, pointUnique, 0, sizeNotUsed, true)
 }
-func pntInternal(p *BinStat, pointUnique string) time.Duration {
-	return pntGeneric(p, pointUnique, 0, sizeNotUsed, false)
+func pointInternal(p *BinStat, pointUnique string) time.Duration {
+	return pointGeneric(p, pointUnique, 0, sizeNotUsed, false)
 }
-func End(p *BinStat) time.Duration { return pntGeneric(p, "Leave", 0, sizeNotUsed, true) }
-func endInternal(p *BinStat) time.Duration {
-	return pntGeneric(p, "Leave", 0, sizeNotUsed, false)
+func Leave(p *BinStat) time.Duration         { return pointGeneric(p, "Leave", 0, sizeNotUsed, true) }
+func leaveInternal(p *BinStat) time.Duration { return pointGeneric(p, "Leave", 0, sizeNotUsed, false) }
+func LeaveVal(p *BinStat, callerSize int64) time.Duration {
+	return pointGeneric(p, "Leave", callerSize, sizeAtLeave, true)
 }
-func EndVal(p *BinStat, callerSize int64) time.Duration {
-	return pntGeneric(p, "Leave", callerSize, sizeAtLeave, true)
-}
-func endValInternal(p *BinStat, callerSize int64) time.Duration {
-	return pntGeneric(p, "Leave", callerSize, sizeAtLeave, false)
+func leaveValInternal(p *BinStat, callerSize int64) time.Duration {
+	return pointGeneric(p, "Leave", callerSize, sizeAtLeave, false)
 }
 
-func Dbg(p *BinStat, debugText string) { dbgGeneric(p, debugText, true) }
+func Debug(p *BinStat, debugText string) { debugGeneric(p, debugText, true) }
 
 // functions AFTER  go fmt ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^

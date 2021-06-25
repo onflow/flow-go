@@ -15,13 +15,13 @@
 
 ## How `binstat` works?
 
-* Sprinkle `binstat.New*(<what>)` and `binstat.End*()` into Golang source code, e.g.:
+* Sprinkle `binstat.Enter*(<what>)` and `binstat.Leave*()` into Golang source code, e.g.:
 
 ```
 	for loop := 0; loop < 2; loop++ {
-		p := binstat.NewTime(fmt.Sprintf("loop-%d", loop), "")
+		p := binstat.EnterTime(fmt.Sprintf("loop-%d", loop), "")
 		myFunc()
-		binstat.End(p)
+		binstat.Leave(p)
 	}
 ```
 
@@ -116,12 +116,12 @@ $ pushd binstat ; GO111MODULE=on go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\
 /GOMAXPROCS=1,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=1 0.337427
 /GOMAXPROCS=1,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=1 0.357828
 /GOMAXPROCS=1,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:73]/time[0.400000-0.499999]=2 0.807230
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:4]=4 0.000063
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:5]=3 0.000088
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:8]=1 0.000012
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:9]=1 0.000013
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:10-19]=10 0.000146
-/GOMAXPROCS=1,CPUS=8/what[internal-dump]/file[binstat.dmp:407]/time[0.000900-0.000999]=1 0.000955
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:4]=4 0.000063
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:5]=3 0.000088
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:8]=1 0.000012
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:9]=1 0.000013
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:10-19]=10 0.000146
+/GOMAXPROCS=1,CPUS=8/what[internal-dump]/file[binstat.dump:407]/time[0.000900-0.000999]=1 0.000955
 /GOMAXPROCS=1,CPUS=8/what[loop-0]/file[binstat_test.TestWithPprof:166]/time[1.000000-1.999999]=1 1.842978
 ```
 
@@ -135,16 +135,16 @@ $ pushd binstat ; GO111MODULE=on go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\
 /GOMAXPROCS=8,CPUS=8/what[~1f-via-f4]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.218523
 /GOMAXPROCS=8,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.223819
 /GOMAXPROCS=8,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.223709
-/GOMAXPROCS=8,CPUS=8/what[~2egNewTimeVal]/file[binstat.TestBinstatInternal:20]/size[end:100-199]/time[0.000020-0.000029]=1 0.000025
-/GOMAXPROCS=8,CPUS=8/what[~2egNewTimeVal]/file[binstat.TestBinstatInternal:20]/size[pnt:myPnt]/time[0.000007-0.000007]=1 0.000007
-/GOMAXPROCS=8,CPUS=8/what[~2egNew]/file[binstat.TestBinstatInternal:17]/size[end:100-199]=1 0.000061
-/GOMAXPROCS=8,CPUS=8/what[~2egnewTimeValInternal]/file[binstat.TestBinstatInternal:24]/size[new:100-199]/time[0.000006-0.000006]=1 0.000006
-/GOMAXPROCS=8,CPUS=8/what[~2egnewTimeValInternal]/file[binstat.TestBinstatInternal:24]/size[pnt:myPnt]/time[0.000002-0.000002]=1 0.000003
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:4]=4 0.000078
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:5]=1 0.000084
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:6]=1 0.000009
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tck:395]/size[end:10-19]=1 0.000273
-/GOMAXPROCS=8,CPUS=8/what[internal-dump]/file[binstat.dmp:407]/time[0.000900-0.000999]=1 0.000961
+/GOMAXPROCS=8,CPUS=8/what[~2egEnterTimeVal]/file[binstat.TestBinstatInternal:20]/size[leave:100-199]/time[0.000020-0.000029]=1 0.000025
+/GOMAXPROCS=8,CPUS=8/what[~2egEnterTimeVal]/file[binstat.TestBinstatInternal:20]/size[point:myPoint]/time[0.000007-0.000007]=1 0.000007
+/GOMAXPROCS=8,CPUS=8/what[~2egEnter]/file[binstat.TestBinstatInternal:17]/size[leave:100-199]=1 0.000061
+/GOMAXPROCS=8,CPUS=8/what[~2egenterTimeValInternal]/file[binstat.TestBinstatInternal:24]/size[enter:100-199]/time[0.000006-0.000006]=1 0.000006
+/GOMAXPROCS=8,CPUS=8/what[~2egenterTimeValInternal]/file[binstat.TestBinstatInternal:24]/size[point:myPoint]/time[0.000002-0.000002]=1 0.000003
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:4]=4 0.000078
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:5]=1 0.000084
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:6]=1 0.000009
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:10-19]=1 0.000273
+/GOMAXPROCS=8,CPUS=8/what[internal-dump]/file[binstat.dump:407]/time[0.000900-0.000999]=1 0.000961
 /GOMAXPROCS=8,CPUS=8/what[loop-1]/file[binstat_test.TestWithPprof:166]/time[0.700000-0.799999]=1 0.752880
 ```
 
@@ -152,10 +152,10 @@ $ pushd binstat ; GO111MODULE=on go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\
 
 ```
 /internal/GCStats=9 0.001566
-/internal/binstat.Dbg=36 0.001022
-/internal/binstat.New=70 0.001932
-/internal/binstat.Pnt=71 0.000882
-/internal/binstat.rng=111 0.000383
+/internal/binstat.debug=36 0.001022
+/internal/binstat.enter=70 0.001932
+/internal/binstat.point=71 0.000882
+/internal/binstat.x_2_y=111 0.000383
 /internal/second=1624493407 2.665259
 "}
 ```
