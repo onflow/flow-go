@@ -78,7 +78,7 @@ The following table lists all work streams and links to their home directory and
     ```
 - Then, run the following command:
 
-    ```bask
+    ```bash
     make install-tools
     ```
 
