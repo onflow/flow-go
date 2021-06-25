@@ -113,6 +113,12 @@ func (v *TransactionValidator) Validate(tx *flow.TransactionBody) (err error) {
 	if err != nil {
 		return err
 	}
+
+	err = v.checkSignatureDuplications(tx)
+	if err != nil {
+		return err
+	}
+
 	// TODO replace checkSignatureFormat by verifying the account/payer signatures
 
 	return nil
@@ -256,6 +262,19 @@ func (v *TransactionValidator) checkAddresses(tx *flow.TransactionBody) error {
 		}
 	}
 
+	return nil
+}
+
+// every key (account, key index combination) can only be used once for signing
+func (v *TransactionValidator) checkSignatureDuplications(tx *flow.TransactionBody) error {
+	observedSigs := make(map[string]bool)
+	for _, sig := range append(tx.PayloadSignatures, tx.EnvelopeSignatures...) {
+		keyStr := sig.UniqueKeyString()
+		if observedSigs[keyStr] {
+			return DuplicatedSignatureError{Address: sig.Address, KeyIndex: sig.KeyIndex}
+		}
+		observedSigs[keyStr] = true
+	}
 	return nil
 }
 
