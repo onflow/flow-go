@@ -48,7 +48,7 @@ func (as *AggregatedSignatures) Collect() []flow.AggregatedSignature {
 	as.lock.RLock()
 	defer as.lock.RUnlock()
 
-	// if there is not a signature for each chunk we can't collect signatures
+	// if there aren't signatures for each chunk we can't collect signatures
 	if uint64(len(as.signatures)) < as.numberOfChunks {
 		return nil
 	}
