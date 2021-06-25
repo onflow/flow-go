@@ -13,17 +13,29 @@ import (
 // Chain IDs are used used to prevent replay attacks and to support network-specific address generation.
 type ChainID string
 
-// Mainnet is the chain ID for the mainnet node chain.
-const Mainnet ChainID = "flow-mainnet"
+const (
+	// Mainnet is the chain ID for the mainnet chain.
+	Mainnet ChainID = "flow-mainnet"
 
-// Testnet is the chain ID for the testnet node chain.
-const Testnet ChainID = "flow-testnet"
+	// Long-lived test networks
 
-// Emulator is the chain ID for the emulated node chain.
-const Emulator ChainID = "flow-emulator"
+	// Testnet is the chain ID for the testnet chain.
+	Testnet ChainID = "flow-testnet"
+	// Canary is the chain ID for internal canary chain.
+	Canary ChainID = "flow-canary"
 
-// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
-const MonotonicEmulator ChainID = "flow-emulator-monotonic"
+	// Transient test networks
+
+	// Benchnet is the chain ID for the transient benchmarking chain.
+	Benchnet ChainID = "flow-benchnet"
+	// Localnet is the chain ID for the local development chain.
+	Localnet ChainID = "flow-localnet"
+	// Emulator is the chain ID for the emulated chain.
+	Emulator ChainID = "flow-emulator"
+
+	// MonotonicEmulator is the chain ID for the emulated node chain with monotonic address generation.
+	MonotonicEmulator ChainID = "flow-emulator-monotonic"
+)
 
 // getChainCodeWord derives the network type used for address generation from the globally
 // configured chain ID.
@@ -31,10 +43,10 @@ func (c ChainID) getChainCodeWord() uint64 {
 	switch c {
 	case Mainnet:
 		return 0
-	case Testnet:
+	case Testnet, Canary:
 		return invalidCodeTestnet
-	case Emulator:
-		return invalidCodeEmulator
+	case Emulator, Localnet, Benchnet:
+		return invalidCodeTransientNetwork
 	default:
 		panic(fmt.Sprintf("chain ID [%s] is invalid or does not support linear code address generation", c))
 	}
@@ -148,6 +160,24 @@ var testnet = &addressedChain{
 	},
 }
 
+var canary = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Canary,
+	},
+}
+
+var benchnet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Benchnet,
+	},
+}
+
+var localnet = &addressedChain{
+	chainImpl: &linearCodeImpl{
+		chainID: Localnet,
+	},
+}
+
 var emulator = &addressedChain{
 	chainImpl: &linearCodeImpl{
 		chainID: Emulator,
@@ -165,6 +195,12 @@ func (c ChainID) Chain() Chain {
 		return mainnet
 	case Testnet:
 		return testnet
+	case Canary:
+		return canary
+	case Benchnet:
+		return benchnet
+	case Localnet:
+		return localnet
 	case Emulator:
 		return emulator
 	case MonotonicEmulator:
