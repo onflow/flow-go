@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -45,12 +46,15 @@ const EpochSetupRandomSourceLength = crypto.SignatureLenBLSBLS12381
 // for the upcoming epoch. It contains the participants in the epoch, the
 // length, the cluster assignment, and the seed for leader selection.
 type EpochSetup struct {
-	Counter      uint64         // the number of the epoch
-	FirstView    uint64         // the first view of the epoch
-	FinalView    uint64         // the final view of the epoch
-	Participants IdentityList   // all participants of the epoch
-	Assignments  AssignmentList // cluster assignment for the epoch
-	RandomSource []byte         // source of randomness for epoch-specific setup tasks
+	Counter            uint64         // the number of the epoch
+	FirstView          uint64         // the first view of the epoch
+	DKGPhase1FinalView uint64         // the final view of DKG phase 1
+	DKGPhase2FinalView uint64         // the final view of DKG phase 2
+	DKGPhase3FinalView uint64         // the final view of DKG phase 3
+	FinalView          uint64         // the final view of the epoch
+	Participants       IdentityList   // all participants of the epoch
+	Assignments        AssignmentList // cluster assignment for the epoch
+	RandomSource       []byte         // source of randomness for epoch-specific setup tasks
 }
 
 func (setup *EpochSetup) ServiceEvent() ServiceEvent {
@@ -63,6 +67,34 @@ func (setup *EpochSetup) ServiceEvent() ServiceEvent {
 // ID returns the hash of the event contents.
 func (setup *EpochSetup) ID() Identifier {
 	return MakeID(setup)
+}
+
+func (setup *EpochSetup) EqualTo(other *EpochSetup) bool {
+	if setup.Counter != other.Counter {
+		return false
+	}
+	if setup.FirstView != other.FirstView {
+		return false
+	}
+	if setup.DKGPhase1FinalView != other.DKGPhase1FinalView {
+		return false
+	}
+	if setup.DKGPhase2FinalView != other.DKGPhase2FinalView {
+		return false
+	}
+	if setup.DKGPhase3FinalView != other.DKGPhase3FinalView {
+		return false
+	}
+	if setup.FinalView != other.FinalView {
+		return false
+	}
+	if !setup.Participants.EqualTo(other.Participants) {
+		return false
+	}
+	if !setup.Assignments.EqualTo(other.Assignments) {
+		return false
+	}
+	return bytes.Equal(setup.RandomSource, other.RandomSource)
 }
 
 // EpochCommit is a service event emitted when epoch setup has been completed.
@@ -81,6 +113,21 @@ type EpochCommit struct {
 type ClusterQCVoteData struct {
 	SigData  crypto.Signature // the aggregated signature over all the votes
 	VoterIDs []Identifier     // the set of voters that contributed to the qc
+}
+
+func (c *ClusterQCVoteData) EqualTo(other *ClusterQCVoteData) bool {
+	if len(c.VoterIDs) != len(other.VoterIDs) {
+		return false
+	}
+	if !bytes.Equal(c.SigData, other.SigData) {
+		return false
+	}
+	for i, v := range c.VoterIDs {
+		if v != other.VoterIDs[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // ClusterQCVoteDataFromQC converts a quorum certificate to the representation
@@ -196,6 +243,38 @@ func (commit *EpochCommit) EncodeRLP(w io.Writer) error {
 // ID returns the hash of the event contents.
 func (commit *EpochCommit) ID() Identifier {
 	return MakeID(commit)
+}
+
+func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
+	if commit.Counter != other.Counter {
+		return false
+	}
+	if len(commit.ClusterQCs) != len(other.ClusterQCs) {
+		return false
+	}
+	for i, qc := range commit.ClusterQCs {
+		if !qc.EqualTo(&other.ClusterQCs[i]) {
+			return false
+		}
+	}
+	if (commit.DKGGroupKey == nil && other.DKGGroupKey != nil) ||
+		(commit.DKGGroupKey != nil && other.DKGGroupKey == nil) {
+		return false
+	}
+	if commit.DKGGroupKey != nil && other.DKGGroupKey != nil && !commit.DKGGroupKey.Equals(other.DKGGroupKey) {
+		return false
+	}
+	if len(commit.DKGParticipantKeys) != len(other.DKGParticipantKeys) {
+		return false
+	}
+
+	for i, key := range commit.DKGParticipantKeys {
+		if !key.Equals(other.DKGParticipantKeys[i]) {
+			return false
+		}
+	}
+
+	return true
 }
 
 // ToDKGParticipantLookup constructs a DKG participant lookup from an identity
