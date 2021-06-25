@@ -121,6 +121,13 @@ func createNode(
 	)
 	require.NoError(t, err)
 
+	var hook zerolog.HookFunc = func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			t.Fatal(message)
+		}
+	}
+	controllerFactoryLogger := core.Log.Hook(hook)
+
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -129,7 +136,7 @@ func createNode(
 		core.State,
 		dkgKeys,
 		dkg.NewControllerFactory(
-			core.Log,
+			controllerFactoryLogger,
 			core.Me,
 			NewWhiteboardClient(id.NodeID, whiteboard),
 			brokerTunnel,
