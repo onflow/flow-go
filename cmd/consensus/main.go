@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 
@@ -647,11 +648,15 @@ func main() {
 				return nil, fmt.Errorf("could not initialise sdk client: %w", err)
 			}
 
+			dkgContractAddr, err := systemcontracts.DKG.Address(node.RootChainID)
+			if err != nil {
+				return nil, fmt.Errorf("unknown dkg contract address: %w", err)
+			}
 			dkgContractClient := dkgmodule.NewClient(
 				node.Logger,
 				sdkClient,
 				machineAccountSigner,
-				node.RootChainID.Chain().ServiceAddress().HexWithPrefix(),
+				dkgContractAddr.HexWithPrefix(),
 				machineAccountInfo.Address,
 				machineAccountInfo.KeyIndex,
 			)
