@@ -590,8 +590,7 @@ func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 }
 
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
-	// Setup as Testnet
-	chainID := flow.Testnet
+	chainID := flow.Localnet
 	chain := chainID.Chain()
 
 	// number of nodes
