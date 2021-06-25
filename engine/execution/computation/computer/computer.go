@@ -135,7 +135,7 @@ func (e *blockComputer) executeBlock(
 	var txIndex uint32
 	var err error
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2) // block commiter and event hasher
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
@@ -155,20 +155,38 @@ func (e *blockComputer) executeBlock(
 		},
 	}
 
+	eh := eventHasher{
+		tracer:    e.tracer,
+		data:      make(chan flow.EventsList, len(collections)+1),
+		blockSpan: blockSpan,
+		callBack: func(hash flow.Identifier, err error) {
+			if err != nil {
+				panic(err)
+			}
+			res.EventsHashes = append(res.EventsHashes, hash)
+		},
+	}
+
 	go func() {
 		bc.Run()
 		wg.Done()
 	}()
 
+	go func() {
+		eh.Run()
+		wg.Done()
+	}()
+
 	collectionIndex := 0
 
-	for _, collection := range collections {
+	for i, collection := range collections {
 		colView := stateView.NewChild()
 		txIndex, err = e.executeCollection(blockSpan, collectionIndex, txIndex, blockCtx, colView, programs, collection, res)
 		if err != nil {
 			return nil, fmt.Errorf("failed to execute collection: %w", err)
 		}
 		bc.Commit(colView)
+		eh.Hash(res.Events[i])
 		err = stateView.MergeView(colView)
 		if err != nil {
 			return nil, fmt.Errorf("cannot merge view: %w", err)
@@ -184,6 +202,7 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
 	bc.Commit(colView)
+	eh.Hash(res.Events[len(res.Events)-1])
 	err = stateView.MergeView(colView)
 	if err != nil {
 		return nil, fmt.Errorf("cannot merge view: %w", err)
@@ -191,6 +210,7 @@ func (e *blockComputer) executeBlock(
 
 	// close the views and wait for all views to be committed
 	close(bc.views)
+	close(eh.data)
 	wg.Wait()
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
@@ -376,4 +396,24 @@ func (bc *blockCommitter) Run() {
 
 func (bc *blockCommitter) Commit(view state.View) {
 	bc.views <- view
+}
+
+type eventHasher struct {
+	tracer    module.Tracer
+	callBack  func(hash flow.Identifier, err error)
+	data      chan flow.EventsList
+	blockSpan opentracing.Span
+}
+
+func (eh *eventHasher) Run() {
+	for data := range eh.data {
+		span := eh.tracer.StartSpanFromParent(eh.blockSpan, trace.EXEHashEvents)
+		data, err := flow.EventsListHash(data)
+		eh.callBack(data, err)
+		span.Finish()
+	}
+}
+
+func (eh *eventHasher) Hash(events flow.EventsList) {
+	eh.data <- events
 }
