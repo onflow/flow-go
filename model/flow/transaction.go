@@ -446,7 +446,7 @@ type TransactionSignature struct {
 	Address     Address
 	SignerIndex int
 	KeyIndex    uint64
-	Signature   []byte
+	Signature   crypto.Signature
 }
 
 // String returns the string representation of a transaction signature.

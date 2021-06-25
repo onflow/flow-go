@@ -98,6 +98,7 @@ func AccessAPIGetTransactionResult(w http.ResponseWriter, r *http.Request) {
 	// fmt.Printf("% x", data)
 
 	// Assume we have a client to the gRPC server
+	// TODO: actually, we should use the handler directly
 	transactionResponse, err := client.GetTransactionResult(context.Background(), &accessproto.GetTransactionRequest{txIdBytes})
 	if err != nil {
 		// TODO: propagate error message to user?
