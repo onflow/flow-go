@@ -44,7 +44,7 @@ func (c ChainID) getChainCodeWord() uint64 {
 	case Mainnet:
 		return 0
 	case Testnet, Canary:
-		return invalidCodeTestnet
+		return invalidCodeTestNetwork
 	case Emulator, Localnet, Benchnet:
 		return invalidCodeTransientNetwork
 	default:
