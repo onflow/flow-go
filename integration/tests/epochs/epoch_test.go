@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
@@ -64,6 +65,13 @@ func (s *Suite) TestViewsProgress() {
 
 			snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 			require.NoError(s.T(), err)
+
+			// BlockState and s.client are not necessarily in sync
+			head, err := snapshot.Head()
+			require.NoError(s.T(), err)
+			if expectedView.view != head.View {
+				log.Debug().Msgf(">>> BlockState (view: %d) and ghost client (view: %d) not synchronized", expectedView.view, head.View)
+			}
 
 			epoch := snapshot.Epochs().Current()
 
