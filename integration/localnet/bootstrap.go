@@ -271,6 +271,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
 			"JAEGER_AGENT_PORT=6831",
+			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
+			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+			"BINSTAT_ENABLE",
+			"BINSTAT_LEN_WHAT",
+			"BINSTAT_DMP_NAME",
+			"BINSTAT_DMP_PATH",
 		},
 	}
 
