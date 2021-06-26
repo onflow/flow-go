@@ -155,7 +155,7 @@ func (e *blockComputer) executeBlock(
 		},
 	}
 
-	eh := evensHasher{
+	eh := eventHasher{
 		tracer:    e.tracer,
 		data:      make(chan flow.EventsList, len(collections)+1),
 		blockSpan: blockSpan,
@@ -398,14 +398,14 @@ func (bc *blockCommitter) Commit(view state.View) {
 	bc.views <- view
 }
 
-type evensHasher struct {
+type eventHasher struct {
 	tracer    module.Tracer
 	callBack  func(hash flow.Identifier, err error)
 	data      chan flow.EventsList
 	blockSpan opentracing.Span
 }
 
-func (eh *evensHasher) Run() {
+func (eh *eventHasher) Run() {
 	for data := range eh.data {
 		span := eh.tracer.StartSpanFromParent(eh.blockSpan, trace.EXEHashEvents)
 		data, err := flow.EventsListHash(data)
@@ -414,6 +414,6 @@ func (eh *evensHasher) Run() {
 	}
 }
 
-func (eh *evensHasher) Hash(events flow.EventsList) {
+func (eh *eventHasher) Hash(events flow.EventsList) {
 	eh.data <- events
 }

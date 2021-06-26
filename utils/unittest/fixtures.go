@@ -1044,7 +1044,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 		ProposalKey:        ProposalKeyFixture(),
 		Payer:              AddressFixture(),
 		Authorizers:        []flow.Address{AddressFixture()},
-		PayloadSignatures:  []flow.TransactionSignature{TransactionSignatureFixture()},
 		EnvelopeSignatures: []flow.TransactionSignature{TransactionSignatureFixture()},
 	}
 

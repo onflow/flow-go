@@ -257,16 +257,23 @@ func (commit *EpochCommit) EqualTo(other *EpochCommit) bool {
 			return false
 		}
 	}
-	if !commit.DKGGroupKey.Equals(other.DKGGroupKey) {
+	if (commit.DKGGroupKey == nil && other.DKGGroupKey != nil) ||
+		(commit.DKGGroupKey != nil && other.DKGGroupKey == nil) {
+		return false
+	}
+	if commit.DKGGroupKey != nil && other.DKGGroupKey != nil && !commit.DKGGroupKey.Equals(other.DKGGroupKey) {
 		return false
 	}
 	if len(commit.DKGParticipantKeys) != len(other.DKGParticipantKeys) {
-		for i, key := range commit.DKGParticipantKeys {
-			if !key.Equals(other.DKGParticipantKeys[i]) {
-				return false
-			}
+		return false
+	}
+
+	for i, key := range commit.DKGParticipantKeys {
+		if !key.Equals(other.DKGParticipantKeys[i]) {
+			return false
 		}
 	}
+
 	return true
 }
 
