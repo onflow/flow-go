@@ -7,11 +7,11 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"

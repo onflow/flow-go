@@ -1071,6 +1071,9 @@ func (e *Engine) saveExecutionResults(
 	}
 
 	endState, chdps, executionResult, err := execution.BuildChunkDataPack(previousErID, startState, result)
+	if err != nil {
+		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
+	}
 
 	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
 	if err != nil {

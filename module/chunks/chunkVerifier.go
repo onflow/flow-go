@@ -4,14 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/davecgh/go-spew/spew"
-	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/ledger"
@@ -183,9 +182,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
 	}
-
-	spew.Config.DisableMethods = true
-	spew.Dump(events)
 
 	// check read access to unknown registers
 	if len(unknownRegTouch) > 0 {

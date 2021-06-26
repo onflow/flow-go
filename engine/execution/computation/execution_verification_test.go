@@ -25,6 +25,7 @@ import (
 	metrics2 "github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -182,6 +183,7 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 	executableBlock.StartState = &initialCommit
 
 	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
+	require.NoError(t, err)
 
 	prevErID := unittest.IdentifierFixture()
 
