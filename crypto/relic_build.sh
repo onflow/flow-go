@@ -72,7 +72,7 @@ EP_METH=(-DEP_MIXED=ON -DEP_PLAIN=OFF -DEP_SUPER=OFF -DEP_DEPTH=4 -DEP_WIDTH=2 \
 PP_METH=(-DPP_METHD="LAZYR;OATEP")
 
 # run cmake
-cmake "${COMPILER[@]}" "${COMP[@]}" "${GENERAL[@]}" \
+cmake "${COMPILER[@]}" "${COMP[@]}" "${GENERAL[@]}" -DARCH="ARM"\
         "${LIBS[@]}" "${RAND[@]}" \
         "${BN_REP[@]}" "${ARITH[@]}" \
         "${PRIME[@]}" "${PRIMES[@]}" \
