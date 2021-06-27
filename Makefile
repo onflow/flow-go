@@ -74,7 +74,7 @@ unittest-arm:
 	#CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	#$(MAKE) -C crypto test
 	#$(MAKE) -C integration test
-	cd crypto && CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test tags=relic && cd ..
+	cd crypto && CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -tags=relic && cd ..
 
 
 .PHONY: test
