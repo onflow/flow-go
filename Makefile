@@ -71,15 +71,18 @@ unittest:
 .PHONY: unittest-arm
 unittest-arm:
 	# test all packages with Relic library enabled
-	CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
-	$(MAKE) -C crypto test
-	$(MAKE) -C integration test
+	#CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	#$(MAKE) -C crypto test
+	#$(MAKE) -C integration test
+	cd crypto && CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test tags=relic && cd ..
+
 
 .PHONY: test
 test: generate-mocks unittest
 
 .PHONY: test-arm
-test-arm: generate-mocks unittest-arm
+test-arm: unittest-arm
+#test-arm: generate-mocks unittest-arm
 
 .PHONY: integration-test
 integration-test: docker-build-flow
