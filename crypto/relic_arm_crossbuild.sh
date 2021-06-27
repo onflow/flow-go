@@ -13,40 +13,13 @@ mkdir -p "$DIR/relic/build"
 pushd "$DIR/relic/build"
 
 
-# make cmake print its CC interpretation
-CMAKE_FILE="${DIR}/relic/CMakeLists.txt"
-# parameter expansion is not suitable here
-# shellcheck disable=SC2089
-CMAKE_PRINT_CC="message ( STATUS \"CC=\$ENV{CC}\" )"
-# Make the cmake run print its interpretation of CC
-echo "$CMAKE_PRINT_CC" >> "${CMAKE_FILE}"
-
-# Probe cmake's MakeFile generation and extract the CC version
-CMAKE_TEMP=$(mktemp)
-cmake .. > "$CMAKE_TEMP"
-CC_VAL="$(tail -n 5 "$CMAKE_TEMP" | grep -oE -m 1 'CC=.*$')"
-CC_VAL="${CC_VAL:3}"
-
-# de-mangle the CMakeLists file, using a temporary file for BSD compatibility
-sed '$d' ../CMakeLists.txt > "$CMAKE_TEMP"
-mv "$CMAKE_TEMP" ../CMakeLists.txt
-
-# default to which
-CC_VAL=${CC_VAL:-"$(which cc)"}
-CC_VERSION_STR="$($CC_VAL --version)"
-
-# we use uname to record which arch we are running on
-ARCH=$(uname -m 2>/dev/null ||true)
-
-if [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]; then
-    #  the "-march=native" option is not supported with clang on ARM
-    MARCH=""
-else
-    MARCH="-march=native"
-fi
+# set compiler settings
+CC="aarch64-linux-gnu-gcc"
+COMPILER=(-DCMAKE_C_COMPILER="${CC}")
+ARCH=(-DARCH=ARM)
+COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer")
 
 # Set RELIC config for Flow
-COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} -mtune=native")
 GENERAL=(-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF)
 LIBS=(-DSHLIB=OFF -DSTLIB=ON)
 RAND=(-DRAND=HASHD -DSEED=)
@@ -66,7 +39,7 @@ EP_METH=(-DEP_MIXED=ON -DEP_PLAIN=OFF -DEP_SUPER=OFF -DEP_DEPTH=4 -DEP_WIDTH=2 \
 PP_METH=(-DPP_METHD="LAZYR;OATEP")
 
 # run cmake
-cmake "${COMP[@]}" "${GENERAL[@]}" \
+cmake "${COMPILER[@]}" "${ARCH[@]}" "${COMP[@]}" "${GENERAL[@]}" \
         "${LIBS[@]}" "${RAND[@]}" \
         "${BN_REP[@]}" "${ARITH[@]}" \
         "${PRIME[@]}" "${PRIMES[@]}" \
@@ -84,3 +57,4 @@ rm -f CMakeCache.txt
 
 popd
 popd
+ 

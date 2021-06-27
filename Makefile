@@ -41,9 +41,9 @@ crypto/relic/build: crypto/relic
 crypto/relic/update:
 	git submodule update --recursive
 
-.PHONY: crypto/relic/build-arm
+.PHONY: crypto/relic/build-arm-crosscompile
 crypto/relic/build-arm: crypto/relic
-	./crypto/relic_build.sh 
+	./crypto/relic_arm_crossbuild.sh
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
