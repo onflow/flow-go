@@ -437,52 +437,59 @@ func main() {
 
 func handleQCMachineAccount(node *cmd.FlowNodeBuilder, accessAddress, qcContractAddress string) (module.QCContractClient, error) {
 
-	var qcContractClient module.QCContractClient
+	// we instantiate a mock qc client object for the default client
+	var qcContractClient module.QCContractClient = epochs.NewQCContractClientMock(node.Logger)
 
-	// attempt to read file, it should be ok if does not exist
-	bz, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+	// check if node machine account info file exists
+	machineAccountInfoPath := filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID()))
+	exists := io.FileExists(machineAccountInfoPath)
+
+	if accessAddress == "" || qcContractAddress == "" || !exists {
+		// log warning as one or more of the required components are missing
+		node.Logger.Warn().Msg("node machine account info file was not configured properly")
+		return qcContractClient, nil
+	}
+
+	// attempt to read NodeMachineAccountInfo
+	info, err := loadNodeMachineAccountInfoFile(node)
 	if err != nil {
-
-		// if reading failed (likely due to missing file), we instantiate a mock qc client object
-		qcContractClient = epochs.NewQCContractClientMock(node.Logger)
+		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
 	}
 
-	// if reading was successful attempt to marshal and set up QCContractClient
-	if qcContractClient == nil {
+	// construct signer from private key
+	sk, err := sdkcrypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
+	}
+	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
 
-		// unmashal machine account info
-		var machineAccountInfo bootstrap.NodeMachineAccountInfo
-		err = json.Unmarshal(bz, &machineAccountInfo)
-		if err != nil {
-			return nil, fmt.Errorf("could not unmarshal machine account info: %w", err)
-		}
-
-		// check if both flags provided are valid
-		if accessAddress != "" && qcContractAddress != "" {
-
-			// construct signer from private key
-			sk, err := sdkcrypto.DecodePrivateKey(machineAccountInfo.SigningAlgorithm, machineAccountInfo.EncodedPrivateKey)
-			if err != nil {
-				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
-			}
-			txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
-
-			// create QC vote client
-			flowClient, err := client.New(accessAddress, grpc.WithInsecure())
-			if err != nil {
-				return nil, err
-			}
-
-			qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
-				machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
-		}
+	// create QC vote client
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
 	}
 
-	// if we enter this if statement, means that machine account info was read in correctly
-	// but the required flags were not present
-	if qcContractClient == nil {
-		qcContractClient = epochs.NewQCContractClientMock(node.Logger)
-	}
+	// contract actual qc contract client, all flags and machine account info file found
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), info.Address, info.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
+}
+
+func loadNodeMachineAccountInfoFile(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
+
+	// attempt to read file
+	machineAccountInfoPath := filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID()))
+	bz, err := io.ReadFile(machineAccountInfoPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read machine account info: %w", err)
+	}
+
+	// unmashal machine account info
+	var machineAccountInfo bootstrap.NodeMachineAccountInfo
+	err = json.Unmarshal(bz, &machineAccountInfo)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal machine account info: %w", err)
+	}
+
+	return &machineAccountInfo, nil
 }
