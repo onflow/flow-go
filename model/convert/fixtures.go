@@ -2,6 +2,7 @@ package convert
 
 import (
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -11,8 +12,13 @@ import (
 
 // epochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
-func epochSetupFixture(chain flow.Chain) (flow.Event, *flow.EpochSetup) {
-	event := unittest.EventFixture(flow.EventEpochSetup(chain), 1, 1, unittest.IdentifierFixture())
+func epochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := unittest.EventFixture(events.EpochSetup.QualifiedType, 1, 1, unittest.IdentifierFixture())
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	// randomSource is [0,0,...,1,2,3,4]
@@ -104,8 +110,14 @@ func epochSetupFixture(chain flow.Chain) (flow.Event, *flow.EpochSetup) {
 
 // epochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func epochCommitFixture(chain flow.Chain) (flow.Event, *flow.EpochCommit) {
-	event := unittest.EventFixture(flow.EventEpochCommit(chain), 1, 1, unittest.IdentifierFixture())
+func epochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := unittest.EventFixture(events.EpochCommit.QualifiedType, 1, 1, unittest.IdentifierFixture())
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{

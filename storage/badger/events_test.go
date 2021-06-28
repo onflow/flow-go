@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -58,7 +59,10 @@ func TestEventStoreRetrieve(t *testing.T) {
 		require.Len(t, actual, 1)
 		require.Contains(t, actual, evt3)
 
-		actual, err = store.ByBlockIDEventType(blockID, flow.EventEpochSetup(flow.Emulator.Chain()))
+		events, err := systemcontracts.ServiceEventsForChain(flow.Emulator)
+		require.NoError(t, err)
+
+		actual, err = store.ByBlockIDEventType(blockID, events.EpochSetup.QualifiedType)
 		require.NoError(t, err)
 		require.Len(t, actual, 0)
 

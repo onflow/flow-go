@@ -1,5 +1,12 @@
 // Package systemcontracts stores canonical address locations for all system
-// smart contracts.
+// smart contracts and service events.
+//
+// System contracts are special smart contracts controlled by the service account,
+// a Flow account with special privileges to administer the network.
+//
+// Service events are special events defined within system contracts which
+// are included within execution receipts and processed by the consensus committee
+// to enable message-passing to the protocol state.
 //
 // For transient networks, all system contracts can be deployed to the service
 // account. For long-lived networks, system contracts are spread across several
@@ -12,71 +19,130 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// systemContract represents a system smart contract owned by the service account.
-type systemContract string
-
 const (
-	Epoch     systemContract = "FlowEpoch"
-	ClusterQC systemContract = "FlowEpochClusterQC"
-	DKG       systemContract = "FlowDKG"
+
+	// Unqualified names of system smart contracts (not including address prefix)
+
+	ContractNameEpoch     = "FlowEpoch"
+	ContractNameClusterQC = "FlowClusterQC"
+	ContractNameDKG       = "FlowDKG"
+
+	// Unqualified names of service events (not including address prefix)
+
+	EventNameEpochSetup  = "EpochSetup"
+	EventNameEpochCommit = "EpochCommitted"
+
+	// Format strings for qualified service event names (including address prefix)
+
+	eventEpochSetupFormat  = "A.%s." + ContractNameEpoch + "." + EventNameEpochSetup
+	eventEpochCommitFormat = "A.%s." + ContractNameEpoch + "." + EventNameEpochCommit
 )
 
-// Address returns the canonical address of this system contract on the given chain.
-func (sc systemContract) Address(chainID flow.ChainID) (flow.Address, error) {
-	return systemContractAddressByChain(chainID, sc)
+// SystemContract represents a system contract on a particular chain.
+type SystemContract struct {
+	Address flow.Address
+	Name    string
 }
 
-// String returns the string representation of the contract, which is also
-// the name of the contract.
-func (sc systemContract) String() string {
-	return string(sc)
+// ServiceEvent represents a service event on a particular chain.
+type ServiceEvent struct {
+	Name          string
+	QualifiedType flow.EventType
 }
 
-// systemContractsByChainID stores the default system smart contract
+// SystemContracts is a container for all system contracts on a particular chain.
+type SystemContracts struct {
+	Epoch     SystemContract
+	ClusterQC SystemContract
+	DKG       SystemContract
+}
+
+// ServiceEvents is a container for all service events on a particular chain.
+type ServiceEvents struct {
+	EpochSetup  ServiceEvent
+	EpochCommit ServiceEvent
+}
+
+// SystemContractsForChain returns the system contract configuration for the given chain.
+func SystemContractsForChain(chainID flow.ChainID) (*SystemContracts, error) {
+	addresses, ok := contractAddressesByChainID[chainID]
+	if !ok {
+		return nil, fmt.Errorf("unknown chain id (%s)", chainID.String())
+	}
+
+	contracts := &SystemContracts{
+		Epoch: SystemContract{
+			Address: addresses[ContractNameEpoch],
+			Name:    ContractNameEpoch,
+		},
+		ClusterQC: SystemContract{
+			Address: addresses[ContractNameClusterQC],
+			Name:    ContractNameClusterQC,
+		},
+		DKG: SystemContract{
+			Address: addresses[ContractNameDKG],
+			Name:    ContractNameDKG,
+		},
+	}
+
+	return contracts, nil
+}
+
+// ServiceEventsForChain returns the service event confirmation for the given chain.
+func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
+	addresses, ok := contractAddressesByChainID[chainID]
+	if !ok {
+		return nil, fmt.Errorf("unknown chain id (%s)", chainID.String())
+	}
+
+	events := &ServiceEvents{
+		EpochSetup: ServiceEvent{
+			Name:          EventNameEpochSetup,
+			QualifiedType: flow.EventType(fmt.Sprintf(eventEpochSetupFormat, addresses[ContractNameEpoch])),
+		},
+		EpochCommit: ServiceEvent{
+			Name:          EventNameEpochCommit,
+			QualifiedType: flow.EventType(fmt.Sprintf(eventEpochCommitFormat, addresses[ContractNameEpoch])),
+		},
+	}
+
+	return events, nil
+}
+
+// contractAddressesByChainID stores the default system smart contract
 // addresses for each chain.
-var systemContractsByChainID map[flow.ChainID]map[systemContract]flow.Address
+var contractAddressesByChainID map[flow.ChainID]map[string]flow.Address
 
 func init() {
-	systemContractsByChainID = make(map[flow.ChainID]map[systemContract]flow.Address)
+	contractAddressesByChainID = make(map[flow.ChainID]map[string]flow.Address)
 
 	// Main Flow network
-	mainnet := map[systemContract]flow.Address{
-		Epoch:     flow.EmptyAddress,
-		ClusterQC: flow.EmptyAddress,
-		DKG:       flow.EmptyAddress,
+	// TODO need these address values
+	mainnet := map[string]flow.Address{
+		ContractNameEpoch:     flow.EmptyAddress,
+		ContractNameClusterQC: flow.EmptyAddress,
+		ContractNameDKG:       flow.EmptyAddress,
 	}
-	systemContractsByChainID[flow.Mainnet] = mainnet
+	contractAddressesByChainID[flow.Mainnet] = mainnet
 
 	// Long-lived test networks
-	testnet := map[systemContract]flow.Address{
-		Epoch:     flow.EmptyAddress,
-		ClusterQC: flow.EmptyAddress,
-		DKG:       flow.EmptyAddress,
+	// TODO need these address values
+	testnet := map[string]flow.Address{
+		ContractNameEpoch:     flow.EmptyAddress,
+		ContractNameClusterQC: flow.EmptyAddress,
+		ContractNameDKG:       flow.EmptyAddress,
 	}
-	systemContractsByChainID[flow.Testnet] = testnet
-	systemContractsByChainID[flow.Canary] = testnet
+	contractAddressesByChainID[flow.Testnet] = testnet
+	contractAddressesByChainID[flow.Canary] = testnet
 
 	// Transient test networks
-	transient := map[systemContract]flow.Address{
-		Epoch:     flow.Emulator.Chain().ServiceAddress(),
-		ClusterQC: flow.Emulator.Chain().ServiceAddress(),
-		DKG:       flow.Emulator.Chain().ServiceAddress(),
+	// All system contracts are deployed to the service account
+	transient := map[string]flow.Address{
+		ContractNameEpoch:     flow.Emulator.Chain().ServiceAddress(),
+		ContractNameClusterQC: flow.Emulator.Chain().ServiceAddress(),
+		ContractNameDKG:       flow.Emulator.Chain().ServiceAddress(),
 	}
-	systemContractsByChainID[flow.Emulator] = transient
-	systemContractsByChainID[flow.Localnet] = transient
-	systemContractsByChainID[flow.Benchnet] = transient
-}
-
-func systemContractAddressByChain(chainID flow.ChainID, contract systemContract) (flow.Address, error) {
-	addresses, ok := systemContractsByChainID[chainID]
-	if !ok {
-		return flow.EmptyAddress, fmt.Errorf("unknown chain ID (%s)", chainID)
-	}
-
-	address, ok := addresses[contract]
-	if !ok {
-		return flow.EmptyAddress, fmt.Errorf("unknown contract (%s) for chain (%s)", contract, chainID)
-	}
-
-	return address, nil
+	contractAddressesByChainID[flow.Emulator] = transient
+	contractAddressesByChainID[flow.Localnet] = transient
+	contractAddressesByChainID[flow.Benchnet] = transient
 }
