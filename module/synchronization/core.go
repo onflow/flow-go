@@ -45,8 +45,7 @@ func DefaultConfig() Config {
 // Core should be wrapped by a type-aware engine that manages the specifics of
 // each chain. Example: https://github.com/onflow/flow-go/blob/master/engine/common/synchronization/engine.go
 //
-// Core is NOT safe for concurrent use by multiple goroutines. Wrapping engines
-// are responsible for avoid concurrent access.
+// Core is safe for concurrent use by multiple goroutines.
 type Core struct {
 	log      zerolog.Logger
 	Config   Config
