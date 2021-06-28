@@ -35,9 +35,13 @@ type Engine struct {
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
-	pollInterval time.Duration
-	scanInterval time.Duration
-	core         module.SyncCore
+	pollInterval              time.Duration
+	scanInterval              time.Duration
+	core                      module.SyncCore
+	notifier                  engine.Notifier
+	pendingSyncRequestsQueue  *RequestQueue
+	pendingBatchRequestsQueue *RequestQueue
+	pendingRangeRequestsQueue *RequestQueue
 }
 
 // New creates a new main chain synchronization engine.
@@ -90,6 +94,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		panic("must initialize synchronization engine with comp engine")
 	}
 	e.unit.Launch(e.checkLoop)
+	e.unit.Launch(e.loop)
 	return e.unit.Ready()
 }
 
@@ -129,25 +134,98 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	})
 }
 
+func (e *Engine) loop() {
+	notifier := e.notifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-notifier:
+			err := e.processAvailableMessages()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+			}
+		}
+	}
+}
+
+func (e *Engine) processSyncRequest(originID flow.Identifier, request *messages.SyncRequest) error {
+	e.before(metrics.MessageSyncRequest)
+	defer e.after(metrics.MessageSyncRequest)
+	return e.onSyncRequest(originID, request)
+}
+
+func (e *Engine) processBatchRequest(originID flow.Identifier, request *messages.BatchRequest) error {
+	e.before(metrics.MessageBatchRequest)
+	defer e.after(metrics.MessageBatchRequest)
+	return e.onBatchRequest(originID, request)
+}
+
+func (e *Engine) processRangeRequest(originID flow.Identifier, request *messages.RangeRequest) error {
+	e.before(metrics.MessageRangeRequest)
+	defer e.after(metrics.MessageRangeRequest)
+	return e.onRangeRequest(originID, request)
+}
+
+// processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
+// Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
+func (e *Engine) processAvailableMessages() error {
+
+	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
+
+		originID, event, ok := e.pendingSyncRequestsQueue.Pop()
+		if ok {
+			err := e.processSyncRequest(originID, event.(*messages.SyncRequest))
+			if err != nil {
+				return fmt.Errorf("could not process sync request")
+			}
+			continue
+		}
+
+		originID, event, ok = e.pendingRangeRequestsQueue.Pop()
+		if ok {
+			err := e.processRangeRequest(originID, event.(*messages.RangeRequest))
+			if err != nil {
+				return fmt.Errorf("could not process range request")
+			}
+			continue
+		}
+
+		originID, event, ok = e.pendingBatchRequestsQueue.Pop()
+		if ok {
+			err := e.processBatchRequest(originID, event.(*messages.BatchRequest))
+			if err != nil {
+				return fmt.Errorf("could not process batch request")
+			}
+			continue
+		}
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
+}
+
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 	switch ev := event.(type) {
 	case *messages.SyncRequest:
-		e.before(metrics.MessageSyncRequest)
-		defer e.after(metrics.MessageSyncRequest)
+
 		return e.onSyncRequest(originID, ev)
 	case *messages.SyncResponse:
 		e.before(metrics.MessageSyncResponse)
 		defer e.after(metrics.MessageSyncResponse)
 		return e.onSyncResponse(originID, ev)
 	case *messages.RangeRequest:
-		e.before(metrics.MessageRangeRequest)
-		defer e.after(metrics.MessageRangeRequest)
-		return e.onRangeRequest(originID, ev)
+
 	case *messages.BatchRequest:
-		e.before(metrics.MessageBatchRequest)
-		defer e.after(metrics.MessageBatchRequest)
+
 		return e.onBatchRequest(originID, ev)
 	case *messages.BlockResponse:
 		e.before(metrics.MessageBlockResponse)
