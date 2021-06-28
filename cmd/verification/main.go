@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -60,14 +61,15 @@ func main() {
 		processedBlockHeight *storage.ConsumerProgress // used in block consumer
 		chunkQueue           *storage.ChunksQueue      // used in chunk consumer
 
-		syncCore        *synchronization.Core // used in follower engine
-		pendingBlocks   *buffer.PendingBlocks // used in follower engine
-		assignerEngine  *assigner.Engine      // the assigner engine
-		fetcherEngine   *fetcher.Engine       // the fetcher engine
-		requesterEngine *vereq.Engine         // the requester engine
-		verifierEng     *verifier.Engine      // the verifier engine
-		chunkConsumer   *chunkconsumer.ChunkConsumer
-		blockConsumer   *blockconsumer.BlockConsumer
+		syncCore                *synchronization.Core // used in follower engine
+		pendingBlocks           *buffer.PendingBlocks // used in follower engine
+		assignerEngine          *assigner.Engine      // the assigner engine
+		fetcherEngine           *fetcher.Engine       // the fetcher engine
+		requesterEngine         *vereq.Engine         // the requester engine
+		verifierEng             *verifier.Engine      // the verifier engine
+		chunkConsumer           *chunkconsumer.ChunkConsumer
+		blockConsumer           *blockconsumer.BlockConsumer
+		finalizationDistributor *pubsub.FinalizationDistributor
 
 		followerEng *followereng.Engine        // the follower engine
 		collector   module.VerificationMetrics // used to collect metrics of all engines
@@ -297,9 +299,12 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(blockConsumer)
+
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, blockConsumer, node.RootBlock.Header,
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header,
 				node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
@@ -339,6 +344,9 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+
 			return sync, nil
 		}).
 		Run()

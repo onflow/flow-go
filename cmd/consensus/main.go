@@ -490,6 +490,8 @@ func main() {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
 
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+
 			return sync, nil
 		}).
 		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -66,6 +67,7 @@ func main() {
 
 		pools          *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer *buffer.PendingBlocks       // pending block cache for follower
+		finalizationDistributor *pubsub.FinalizationDistributor
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -184,8 +186,7 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(mainConsensusCommittee, staking, beacon, merger)
 
-			// use proper engine for notifier to follower
-			notifier := notifications.NewNoopConsumer()
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
 
 			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
@@ -199,7 +200,7 @@ func main() {
 				node.Storage.Headers,
 				finalizer,
 				verifier,
-				notifier,
+				finalizationDistributor,
 				node.RootBlock.Header,
 				node.RootQC,
 				finalized,
@@ -245,6 +246,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		}).

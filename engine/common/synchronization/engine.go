@@ -471,7 +471,6 @@ func (e *Engine) processAvailableRequests() error {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-
 	final := e.finalSnapshot().head
 
 	// queue any missing heights as needed
