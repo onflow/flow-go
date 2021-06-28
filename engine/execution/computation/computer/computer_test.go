@@ -203,7 +203,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochSetup.Address.Bytes()),
 				},
 				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
@@ -211,7 +211,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochCommit.Address.Bytes()),
 				},
 				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
