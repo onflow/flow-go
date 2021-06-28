@@ -388,35 +388,10 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
-			// check if required fields are left empty
-			if accessAddress == "" {
-				return nil, fmt.Errorf("flag `access-address` required")
-			}
-			if qcContractAddress == "" {
-				return nil, fmt.Errorf("flag `qc-contract-address` required")
-			}
-
-			// loads the private account info for this node from disk for use in the QCContractClient.
-			accountInfo, err := loadEpochQCPrivateData(node)
+			qcContractClient, err := handleQCMachineAccount(node, accessAddress, qcContractAddress)
 			if err != nil {
 				return nil, err
 			}
-
-			// construct signer from private key
-			sk, err := sdkcrypto.DecodePrivateKey(accountInfo.SigningAlgorithm, accountInfo.EncodedPrivateKey)
-			if err != nil {
-				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
-			}
-			txSigner := sdkcrypto.NewInMemorySigner(sk, accountInfo.HashAlgorithm)
-
-			// create QC vote client
-			flowClient, err := client.New(accessAddress, grpc.WithInsecure())
-			if err != nil {
-				return nil, err
-			}
-
-			qcContractClient := epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
-				accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
@@ -460,12 +435,54 @@ func main() {
 		Run()
 }
 
-func loadEpochQCPrivateData(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
-	data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+func handleQCMachineAccount(node *cmd.FlowNodeBuilder, accessAddress, qcContractAddress string) (module.QCContractClient, error) {
+
+	var qcContractClient module.QCContractClient
+
+	// attempt to read file, it should be ok if does not exist
+	bz, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
 	if err != nil {
-		return nil, err
+
+		// if reading failed (likely due to missing file), we instantiate a mock qc client object
+		qcContractClient = epochs.NewQCContractClientMock(node.Logger)
 	}
-	var info bootstrap.NodeMachineAccountInfo
-	err = json.Unmarshal(data, &info)
-	return &info, err
+
+	// if reading was successful attempt to marshal and set up QCContractClient
+	if qcContractClient == nil {
+
+		// unmashal machine account info
+		var machineAccountInfo bootstrap.NodeMachineAccountInfo
+		err = json.Unmarshal(bz, &machineAccountInfo)
+		if err != nil {
+			return nil, fmt.Errorf("could not unmarshal machine account info: %w", err)
+		}
+
+		// check if both flags provided are valid
+		if accessAddress != "" && qcContractAddress != "" {
+
+			// construct signer from private key
+			sk, err := sdkcrypto.DecodePrivateKey(machineAccountInfo.SigningAlgorithm, machineAccountInfo.EncodedPrivateKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
+			}
+			txSigner := sdkcrypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
+
+			// create QC vote client
+			flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+			if err != nil {
+				return nil, err
+			}
+
+			qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
+				machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
+		}
+	}
+
+	// if we enter this if statement, means that machine account info was read in correctly
+	// but the required flags were not present
+	if qcContractClient == nil {
+		qcContractClient = epochs.NewQCContractClientMock(node.Logger)
+	}
+
+	return qcContractClient, nil
 }
