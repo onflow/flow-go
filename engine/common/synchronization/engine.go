@@ -38,10 +38,13 @@ type Engine struct {
 	pollInterval              time.Duration
 	scanInterval              time.Duration
 	core                      module.SyncCore
-	notifier                  engine.Notifier
+	requestsNotifier          engine.Notifier
 	pendingSyncRequestsQueue  *RequestQueue
 	pendingBatchRequestsQueue *RequestQueue
 	pendingRangeRequestsQueue *RequestQueue
+	pendingSyncResponses      engine.MessageStore    // message store for *message.SyncResponse
+	pendingBlockResponses     engine.MessageStore    // message store for *message.BlockResponse
+	messageHandler            *engine.MessageHandler // message handler that takes care of responses processing
 }
 
 // New creates a new main chain synchronization engine.
@@ -94,7 +97,8 @@ func (e *Engine) Ready() <-chan struct{} {
 		panic("must initialize synchronization engine with comp engine")
 	}
 	e.unit.Launch(e.checkLoop)
-	e.unit.Launch(e.loop)
+	e.unit.Launch(e.requestProcessingLoop)
+	e.unit.Launch(e.responseProcessingLoop)
 	return e.unit.Ready()
 }
 
@@ -113,12 +117,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
-	e.unit.Launch(func() {
-		err := e.Process(originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
-		}
-	})
+	err := e.Process(originID, event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
 }
 
 // ProcessLocal processes an event originating on the local node.
@@ -129,19 +131,44 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	return e.unit.Do(func() error {
-		return e.process(originID, event)
-	})
+	switch _ := event.(type) {
+	case *messages.SyncRequest:
+		e.pendingSyncRequestsQueue.Push(originID, event)
+	case *messages.RangeRequest:
+		e.pendingRangeRequestsQueue.Push(originID, event)
+	case *messages.BatchRequest:
+		e.pendingBatchRequestsQueue.Push(originID, event)
+	case *messages.SyncResponse, *messages.BlockResponse:
+		return e.messageHandler.Process(originID, event)
+	default:
+		return fmt.Errorf("invalid event type (%T)", event)
+	}
+	return nil
 }
 
-func (e *Engine) loop() {
-	notifier := e.notifier.Channel()
+func (e *Engine) requestProcessingLoop() {
+	notifier := e.requestsNotifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
 		case <-notifier:
-			err := e.processAvailableMessages()
+			err := e.processAvailableRequests()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+			}
+		}
+	}
+}
+
+func (e *Engine) responseProcessingLoop() {
+	notifier := e.messageHandler.GetNotifier()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-notifier:
+			err := e.processAvailableResponses()
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("internal error processing queued message")
 			}
@@ -167,9 +194,53 @@ func (e *Engine) processRangeRequest(originID flow.Identifier, request *messages
 	return e.onRangeRequest(originID, request)
 }
 
-// processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
+func (e *Engine) processSyncResponse(originID flow.Identifier, response *messages.SyncResponse) error {
+	e.before(metrics.MessageSyncResponse)
+	defer e.after(metrics.MessageSyncResponse)
+	return e.onSyncResponse(originID, response)
+}
+
+func (e *Engine) processBlockResponse(originID flow.Identifier, response *messages.BlockResponse) error {
+	e.before(metrics.MessageBlockResponse)
+	defer e.after(metrics.MessageBlockResponse)
+	return e.onBlockResponse(originID, response)
+}
+
+func (e *Engine) processAvailableResponses() error {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
+
+		msg, ok := e.pendingSyncResponses.Get()
+		if ok {
+			err := e.processSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			if err != nil {
+				return fmt.Errorf("could not process sync response")
+			}
+			continue
+		}
+
+		msg, ok = e.pendingBlockResponses.Get()
+		if ok {
+			err := e.processBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
+			if err != nil {
+				return fmt.Errorf("could not process block response")
+			}
+			continue
+		}
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
+}
+
+// processAvailableRequests is processor of pending events which drives events from networking layer to business logic in `Core`.
 // Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
-func (e *Engine) processAvailableMessages() error {
+func (e *Engine) processAvailableRequests() error {
 
 	for {
 		select {
@@ -208,31 +279,6 @@ func (e *Engine) processAvailableMessages() error {
 		// when there is no more messages in the queue, back to the loop to wait
 		// for the next incoming message to arrive.
 		return nil
-	}
-}
-
-// process processes events for the propagation engine on the consensus node.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-
-	switch ev := event.(type) {
-	case *messages.SyncRequest:
-
-		return e.onSyncRequest(originID, ev)
-	case *messages.SyncResponse:
-		e.before(metrics.MessageSyncResponse)
-		defer e.after(metrics.MessageSyncResponse)
-		return e.onSyncResponse(originID, ev)
-	case *messages.RangeRequest:
-
-	case *messages.BatchRequest:
-
-		return e.onBatchRequest(originID, ev)
-	case *messages.BlockResponse:
-		e.before(metrics.MessageBlockResponse)
-		defer e.after(metrics.MessageBlockResponse)
-		return e.onBlockResponse(originID, ev)
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
 	}
 }
 
