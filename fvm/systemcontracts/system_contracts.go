@@ -98,15 +98,21 @@ func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
 	events := &ServiceEvents{
 		EpochSetup: ServiceEvent{
 			Name:          EventNameEpochSetup,
-			QualifiedType: flow.EventType(fmt.Sprintf(eventEpochSetupFormat, addresses[ContractNameEpoch])),
+			QualifiedType: serviceEventQualifiedType(eventEpochSetupFormat, addresses[ContractNameEpoch]),
 		},
 		EpochCommit: ServiceEvent{
 			Name:          EventNameEpochCommit,
-			QualifiedType: flow.EventType(fmt.Sprintf(eventEpochCommitFormat, addresses[ContractNameEpoch])),
+			QualifiedType: serviceEventQualifiedType(eventEpochCommitFormat, addresses[ContractNameEpoch]),
 		},
 	}
 
 	return events, nil
+}
+
+// serviceEventQualifiedType returns the qualified event type for the
+// given service event format string and address location.
+func serviceEventQualifiedType(format string, addr flow.Address) flow.EventType {
+	return flow.EventType(fmt.Sprintf(format, addr))
 }
 
 // contractAddressesByChainID stores the default system smart contract
