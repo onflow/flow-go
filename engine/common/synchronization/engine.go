@@ -5,6 +5,7 @@ package synchronization
 import (
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"math/rand"
 	"time"
 
@@ -24,6 +25,21 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
+const defaultSyncRequestQueueCapacity = 10000
+
+// defaultSyncRequestQueueCapacity maximum capacity of range requests queue
+const defaultRangeRequestQueueCapacity = 10000
+
+// defaultSyncRequestQueueCapacity maximum capacity of batch requests queue
+const defaultBatchRequestQueueCapacity = 10000
+
+// defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
+const defaultSyncResponseQueueCapacity = 10000
+
+// defaultBlockResponseQueueCapacity maximum capacity of block responses queue
+const defaultBlockResponseQueueCapacity = 10000
+
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
 	unit    *engine.Unit
@@ -35,16 +51,18 @@ type Engine struct {
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
-	pollInterval              time.Duration
-	scanInterval              time.Duration
-	core                      module.SyncCore
-	requestsNotifier          engine.Notifier
-	pendingSyncRequestsQueue  *RequestQueue
-	pendingBatchRequestsQueue *RequestQueue
-	pendingRangeRequestsQueue *RequestQueue
-	pendingSyncResponses      engine.MessageStore    // message store for *message.SyncResponse
-	pendingBlockResponses     engine.MessageStore    // message store for *message.BlockResponse
-	messageHandler            *engine.MessageHandler // message handler that takes care of responses processing
+	pollInterval time.Duration
+	scanInterval time.Duration
+	core         module.SyncCore
+
+	pendingSyncRequests   engine.MessageStore
+	pendingBatchRequests  engine.MessageStore
+	pendingRangeRequests  engine.MessageStore
+	requestMessageHandler *engine.MessageHandler
+
+	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
+	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
+	responseMessageHandler *engine.MessageHandler // message handler that takes care of responses processing
 }
 
 // New creates a new main chain synchronization engine.
@@ -79,6 +97,13 @@ func New(
 		scanInterval: opt.scanInterval,
 	}
 
+	err := e.setupResponseMessageHandler()
+	if err != nil {
+		return nil, fmt.Errorf("could not setup message handler")
+	}
+
+	e.setupRequestMessageHandler()
+
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.SyncCommittee, e)
 	if err != nil {
@@ -87,6 +112,100 @@ func New(
 	e.con = con
 
 	return e, nil
+}
+
+// setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
+func (e *Engine) setupRequestMessageHandler() {
+	e.pendingSyncRequests = NewRequestQueue(defaultSyncRequestQueueCapacity)
+	e.pendingRangeRequests = NewRequestQueue(defaultRangeRequestQueueCapacity)
+	e.pendingBatchRequests = NewRequestQueue(defaultBatchRequestQueueCapacity)
+
+	// define message queueing behaviour
+	e.requestMessageHandler = engine.NewMessageHandler(
+		e.log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.SyncRequest)
+				if ok {
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+				}
+				return ok
+			},
+			Store: e.pendingSyncRequests,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.RangeRequest)
+				if ok {
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+				}
+				return ok
+			},
+			Store: e.pendingRangeRequests,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.BatchRequest)
+				if ok {
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+				}
+				return ok
+			},
+			Store: e.pendingBatchRequests,
+		},
+	)
+}
+
+// setupResponseMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED responses.
+func (e *Engine) setupResponseMessageHandler() error {
+	syncResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultSyncResponseQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for sync responses: %w", err)
+	}
+
+	e.pendingSyncResponses = &engine.FifoMessageStore{
+		FifoQueue: syncResponseQueue,
+	}
+
+	blockResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for block responses: %w", err)
+	}
+
+	e.pendingBlockResponses = &engine.FifoMessageStore{
+		FifoQueue: blockResponseQueue,
+	}
+
+	// define message queueing behaviour
+	e.responseMessageHandler = engine.NewMessageHandler(
+		e.log,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.SyncResponse)
+				if ok {
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+				}
+				return ok
+			},
+			Store: e.pendingSyncResponses,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.BlockResponse)
+				if ok {
+					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+				}
+				return ok
+			},
+			Store: e.pendingBlockResponses,
+		},
+	)
+
+	return nil
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -132,22 +251,17 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	switch _ := event.(type) {
-	case *messages.SyncRequest:
-		e.pendingSyncRequestsQueue.Push(originID, event)
-	case *messages.RangeRequest:
-		e.pendingRangeRequestsQueue.Push(originID, event)
-	case *messages.BatchRequest:
-		e.pendingBatchRequestsQueue.Push(originID, event)
+	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
+		return e.requestMessageHandler.Process(originID, event)
 	case *messages.SyncResponse, *messages.BlockResponse:
-		return e.messageHandler.Process(originID, event)
+		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
-	return nil
 }
 
 func (e *Engine) requestProcessingLoop() {
-	notifier := e.requestsNotifier.Channel()
+	notifier := e.requestMessageHandler.GetNotifier()
 	for {
 		select {
 		case <-e.unit.Quit():
@@ -162,7 +276,7 @@ func (e *Engine) requestProcessingLoop() {
 }
 
 func (e *Engine) responseProcessingLoop() {
-	notifier := e.messageHandler.GetNotifier()
+	notifier := e.responseMessageHandler.GetNotifier()
 	for {
 		select {
 		case <-e.unit.Quit():
@@ -176,36 +290,6 @@ func (e *Engine) responseProcessingLoop() {
 	}
 }
 
-func (e *Engine) processSyncRequest(originID flow.Identifier, request *messages.SyncRequest) error {
-	e.before(metrics.MessageSyncRequest)
-	defer e.after(metrics.MessageSyncRequest)
-	return e.onSyncRequest(originID, request)
-}
-
-func (e *Engine) processBatchRequest(originID flow.Identifier, request *messages.BatchRequest) error {
-	e.before(metrics.MessageBatchRequest)
-	defer e.after(metrics.MessageBatchRequest)
-	return e.onBatchRequest(originID, request)
-}
-
-func (e *Engine) processRangeRequest(originID flow.Identifier, request *messages.RangeRequest) error {
-	e.before(metrics.MessageRangeRequest)
-	defer e.after(metrics.MessageRangeRequest)
-	return e.onRangeRequest(originID, request)
-}
-
-func (e *Engine) processSyncResponse(originID flow.Identifier, response *messages.SyncResponse) error {
-	e.before(metrics.MessageSyncResponse)
-	defer e.after(metrics.MessageSyncResponse)
-	return e.onSyncResponse(originID, response)
-}
-
-func (e *Engine) processBlockResponse(originID flow.Identifier, response *messages.BlockResponse) error {
-	e.before(metrics.MessageBlockResponse)
-	defer e.after(metrics.MessageBlockResponse)
-	return e.onBlockResponse(originID, response)
-}
-
 func (e *Engine) processAvailableResponses() error {
 	for {
 		select {
@@ -216,7 +300,8 @@ func (e *Engine) processAvailableResponses() error {
 
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
-			err := e.processSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			err := e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 			if err != nil {
 				return fmt.Errorf("could not process sync response")
 			}
@@ -225,7 +310,8 @@ func (e *Engine) processAvailableResponses() error {
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			err := e.processBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
+			err := e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
+			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			if err != nil {
 				return fmt.Errorf("could not process block response")
 			}
@@ -249,27 +335,27 @@ func (e *Engine) processAvailableRequests() error {
 		default:
 		}
 
-		originID, event, ok := e.pendingSyncRequestsQueue.Pop()
+		msg, ok := e.pendingSyncRequests.Get()
 		if ok {
-			err := e.processSyncRequest(originID, event.(*messages.SyncRequest))
+			err := e.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
 			if err != nil {
 				return fmt.Errorf("could not process sync request")
 			}
 			continue
 		}
 
-		originID, event, ok = e.pendingRangeRequestsQueue.Pop()
+		msg, ok = e.pendingRangeRequests.Get()
 		if ok {
-			err := e.processRangeRequest(originID, event.(*messages.RangeRequest))
+			err := e.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
 			if err != nil {
 				return fmt.Errorf("could not process range request")
 			}
 			continue
 		}
 
-		originID, event, ok = e.pendingBatchRequestsQueue.Pop()
+		msg, ok = e.pendingBatchRequests.Get()
 		if ok {
-			err := e.processBatchRequest(originID, event.(*messages.BatchRequest))
+			err := e.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
 			if err != nil {
 				return fmt.Errorf("could not process batch request")
 			}
@@ -280,16 +366,6 @@ func (e *Engine) processAvailableRequests() error {
 		// for the next incoming message to arrive.
 		return nil
 	}
-}
-
-func (e *Engine) before(msg string) {
-	e.metrics.MessageReceived(metrics.EngineSynchronization, msg)
-	e.unit.Lock()
-}
-
-func (e *Engine) after(msg string) {
-	e.unit.Unlock()
-	e.metrics.MessageHandled(metrics.EngineSynchronization, msg)
 }
 
 // onSyncRequest processes an outgoing handshake; if we have a higher height, we

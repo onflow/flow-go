@@ -1,6 +1,7 @@
 package synchronization
 
 import (
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"sync"
 )
@@ -8,40 +9,42 @@ import (
 type RequestQueue struct {
 	lock     sync.Mutex
 	limit    uint
-	requests map[flow.Identifier]interface{}
+	requests map[flow.Identifier]*engine.Message
 }
 
 func NewRequestQueue(limit uint) *RequestQueue {
 	return &RequestQueue{
 		limit:    limit,
-		requests: make(map[flow.Identifier]interface{}),
+		requests: make(map[flow.Identifier]*engine.Message),
 	}
 }
 
-func (q *RequestQueue) Push(originID flow.Identifier, req interface{}) {
+func (q *RequestQueue) Put(message *engine.Message) bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	q.requests[originID] = req
+	q.requests[message.OriginID] = message
 	q.reduce()
 }
 
-func (q *RequestQueue) Pop() (flow.Identifier, interface{}, bool) {
+func (q *RequestQueue) Get() (*engine.Message, bool) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
 	var originID flow.Identifier
-	var req interface{}
+	var msg *engine.Message
 
 	if len(q.requests) == 0 {
-		return originID, req, false
+		return nil, false
 	}
 
 	// pick first element using go map randomness property
-	for originID, req = range q.requests {
+	for originID, msg = range q.requests {
 		break
 	}
 
-	return originID, req, true
+	delete(q.requests, originID)
+
+	return msg, true
 }
 
 // reduce will reduce the size of the kept entities until we are within the
