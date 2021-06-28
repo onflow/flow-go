@@ -22,7 +22,8 @@ type FailingTxRevertedSuite struct {
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
-	chain := s.net.Root().Header.ChainID.Chain()
+	chainID := s.net.Root().Header.ChainID
+	chain := chainID.Chain()
 	serviceAddress := chain.ServiceAddress()
 
 	// wait for first finalized block, called blockA
@@ -45,9 +46,9 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	tx := common.SDKTransactionFixture(
 		common.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
 		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
-		common.WithPayer(serviceAddress),
-		common.WithAuthorizers(serviceAddress),
+		common.WithChainID(chainID),
 	)
+
 	err = s.AccessClient().SendTransaction(context.Background(), &tx)
 	require.NoError(s.T(), err, "could not send tx to create counter that should panic")
 
@@ -55,8 +56,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	tx = common.SDKTransactionFixture(
 		common.WithTransactionDSL(common.CreateCounterTx(sdk.Address(serviceAddress))),
 		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
-		common.WithPayer(serviceAddress),
-		common.WithAuthorizers(serviceAddress),
+		common.WithChainID(chainID),
 	)
 	tx.PayloadSignatures = nil
 	tx.EnvelopeSignatures = nil

@@ -202,17 +202,22 @@ func WithReferenceBlock(id sdk.Identifier) func(tx *sdk.Transaction) {
 	}
 }
 
-func WithPayer(payer flow.Address) func(tx *sdk.Transaction) {
+// WithChainID modifies the default fixture to use addresses consistent with the
+// given chain ID.
+func WithChainID(chainID flow.ChainID) func(tx *sdk.Transaction) {
+	service := convert.ToSDKAddress(chainID.Chain().ServiceAddress())
 	return func(tx *sdk.Transaction) {
-		tx.Payer = sdk.Address(payer)
-	}
-}
+		tx.Payer = service
+		tx.Authorizers = []sdk.Address{service}
 
-func WithAuthorizers(authorizers ...flow.Address) func(tx *sdk.Transaction) {
-	return func(tx *sdk.Transaction) {
-		tx.Authorizers = make([]sdk.Address, 0, len(authorizers))
-		for _, authorizer := range authorizers {
-			tx.Authorizers = append(tx.Authorizers, sdk.Address(authorizer))
+		tx.ProposalKey.Address = service
+		for i, sig := range tx.PayloadSignatures {
+			sig.Address = service
+			tx.PayloadSignatures[i] = sig
+		}
+		for i, sig := range tx.EnvelopeSignatures {
+			sig.Address = service
+			tx.EnvelopeSignatures[i] = sig
 		}
 	}
 }
