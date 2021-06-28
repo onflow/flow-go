@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/cadence/runtime/stdlib"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
@@ -197,13 +197,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := handler.GetServiceEventWhitelist()
+		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+		require.NoError(t, err)
+
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
 					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
 		}
 		serviceEventB := cadence.Event{
@@ -211,7 +213,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 				Location: common.AddressLocation{
 					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
 		}
 

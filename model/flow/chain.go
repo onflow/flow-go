@@ -223,6 +223,7 @@ type Chain interface {
 	IsValid(Address) bool
 	IndexFromAddress(address Address) (uint64, error)
 	String() string
+	ChainID() ChainID
 	// required for tests
 	zeroAddress() Address
 	newAddressGeneratorAtIndex(index uint64) AddressGenerator
@@ -262,6 +263,11 @@ func (id *addressedChain) BytesToAddressGenerator(b []byte) AddressGenerator {
 
 	index := uint48(bytes[:])
 	return id.newAddressGeneratorAtIndex(index)
+}
+
+// ChainID returns the chain ID of the chain.
+func (id *addressedChain) ChainID() ChainID {
+	return id.chain()
 }
 
 func (id *addressedChain) String() string {

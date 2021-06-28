@@ -18,7 +18,7 @@ func epochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 		panic(err)
 	}
 
-	event := unittest.EventFixture(events.EpochSetup.QualifiedType, 1, 1, unittest.IdentifierFixture())
+	event := unittest.EventFixture(events.EpochSetup.EventType(), 1, 1, unittest.IdentifierFixture())
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	// randomSource is [0,0,...,1,2,3,4]
@@ -117,7 +117,7 @@ func epochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 		panic(err)
 	}
 
-	event := unittest.EventFixture(events.EpochCommit.QualifiedType, 1, 1, unittest.IdentifierFixture())
+	event := unittest.EventFixture(events.EpochCommit.EventType(), 1, 1, unittest.IdentifierFixture())
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{

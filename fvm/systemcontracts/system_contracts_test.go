@@ -1,6 +1,7 @@
 package systemcontracts
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -38,6 +39,22 @@ func TestServiceEvents(t *testing.T) {
 		_, err := ServiceEventsForChain(chain)
 		checkServiceEvents(t, chain)
 		require.NoError(t, err)
+	}
+}
+
+// TestServiceEventLookup_Consistency sanity checks consistency of the lookup
+// method, in case an update to ServiceEvents forgets to update the lookup.
+func TestServiceEventAll_Consistency(t *testing.T) {
+	chains := []flow.ChainID{flow.Mainnet, flow.Testnet, flow.Canary, flow.Benchnet, flow.Localnet, flow.Emulator}
+
+	fields := reflect.TypeOf(ServiceEvents{}).NumField()
+	for _, chain := range chains {
+		events, err := ServiceEventsForChain(chain)
+		require.NoError(t, err)
+
+		// ensure all events are returns
+		all := events.All()
+		assert.Equal(t, fields, len(all))
 	}
 }
 
@@ -79,7 +96,7 @@ func checkServiceEvents(t *testing.T, chainID flow.ChainID) {
 	// entries may not be empty
 	assert.NotEqual(t, flow.EmptyAddress, epochContractAddr)
 
-	// entries should match expected format
-	assert.Equal(t, serviceEventQualifiedType(eventEpochSetupFormat, epochContractAddr), events.EpochSetup.QualifiedType)
-	assert.Equal(t, serviceEventQualifiedType(eventEpochCommitFormat, epochContractAddr), events.EpochCommit.QualifiedType)
+	// entries must match internal mapping
+	assert.Equal(t, epochContractAddr, events.EpochSetup.Address)
+	assert.Equal(t, epochContractAddr, events.EpochCommit.Address)
 }

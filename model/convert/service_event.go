@@ -26,9 +26,9 @@ func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, e
 
 	// depending on type of service event construct Go type
 	switch event.Type {
-	case events.EpochSetup.QualifiedType:
+	case events.EpochSetup.EventType():
 		return convertServiceEventEpochSetup(event)
-	case events.EpochCommit.QualifiedType:
+	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)

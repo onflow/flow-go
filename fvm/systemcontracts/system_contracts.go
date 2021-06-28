@@ -27,15 +27,14 @@ const (
 	ContractNameClusterQC = "FlowClusterQC"
 	ContractNameDKG       = "FlowDKG"
 
-	// Unqualified names of service events (not including address prefix)
+	// Unqualified names of service events (not including address prefix or contract name)
 
 	EventNameEpochSetup  = "EpochSetup"
 	EventNameEpochCommit = "EpochCommitted"
 
 	// Format strings for qualified service event names (including address prefix)
 
-	eventEpochSetupFormat  = "A.%s." + ContractNameEpoch + "." + EventNameEpochSetup
-	eventEpochCommitFormat = "A.%s." + ContractNameEpoch + "." + EventNameEpochCommit
+	serviceEventTypeIDFormat = "A.%s.%s.%s"
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -46,8 +45,22 @@ type SystemContract struct {
 
 // ServiceEvent represents a service event on a particular chain.
 type ServiceEvent struct {
+	Address       flow.Address
+	ContractName  string
 	Name          string
 	QualifiedType flow.EventType
+}
+
+// QualifiedIdentifier returns the Cadence qualified identifier of the service
+// event, which includes the contract name and the event type name.
+func (se ServiceEvent) QualifiedIdentifier() string {
+	return fmt.Sprintf("%s.%s", se.ContractName, se.Name)
+}
+
+// EventType returns the full event type identifier, including the address, the
+// contract name, and the event type name.
+func (se ServiceEvent) EventType() flow.EventType {
+	return flow.EventType(fmt.Sprintf("A.%s.%s.%s", se.Address, se.ContractName, se.Name))
 }
 
 // SystemContracts is a container for all system contracts on a particular chain.
@@ -61,6 +74,14 @@ type SystemContracts struct {
 type ServiceEvents struct {
 	EpochSetup  ServiceEvent
 	EpochCommit ServiceEvent
+}
+
+// All returns all service events as a slice.
+func (se ServiceEvents) All() []ServiceEvent {
+	return []ServiceEvent{
+		se.EpochSetup,
+		se.EpochCommit,
+	}
 }
 
 // SystemContractsForChain returns the system contract configuration for the given chain.
@@ -97,12 +118,14 @@ func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
 
 	events := &ServiceEvents{
 		EpochSetup: ServiceEvent{
-			Name:          EventNameEpochSetup,
-			QualifiedType: serviceEventQualifiedType(eventEpochSetupFormat, addresses[ContractNameEpoch]),
+			Address:      addresses[ContractNameEpoch],
+			ContractName: ContractNameEpoch,
+			Name:         EventNameEpochSetup,
 		},
 		EpochCommit: ServiceEvent{
-			Name:          EventNameEpochCommit,
-			QualifiedType: serviceEventQualifiedType(eventEpochCommitFormat, addresses[ContractNameEpoch]),
+			Address:      addresses[ContractNameEpoch],
+			ContractName: ContractNameEpoch,
+			Name:         EventNameEpochCommit,
 		},
 	}
 
