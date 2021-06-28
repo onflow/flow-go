@@ -6,6 +6,7 @@ import (
 	"math/rand"
 
 	"github.com/onflow/cadence"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -198,5 +199,20 @@ func WithTransactionDSL(txDSL dsl.Transaction) func(tx *sdk.Transaction) {
 func WithReferenceBlock(id sdk.Identifier) func(tx *sdk.Transaction) {
 	return func(tx *sdk.Transaction) {
 		tx.ReferenceBlockID = id
+	}
+}
+
+func WithPayer(payer flow.Address) func(tx *sdk.Transaction) {
+	return func(tx *sdk.Transaction) {
+		tx.Payer = sdk.Address(payer)
+	}
+}
+
+func WithAuthorizers(authorizers ...flow.Address) func(tx *sdk.Transaction) {
+	return func(tx *sdk.Transaction) {
+		tx.Authorizers = make([]sdk.Address, 0, len(authorizers))
+		for _, authorizer := range authorizers {
+			tx.Authorizers = append(tx.Authorizers, sdk.Address(authorizer))
+		}
 	}
 }
