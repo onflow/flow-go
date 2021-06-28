@@ -40,6 +40,16 @@ const defaultSyncResponseQueueCapacity = 10000
 // defaultBlockResponseQueueCapacity maximum capacity of block responses queue
 const defaultBlockResponseQueueCapacity = 10000
 
+// defaultFinalizationEventsQueueCapacity maximum capacity of finalization events
+const defaultFinalizationEventsQueueCapacity = 1000
+
+// finalSnapshot is a helper structure which contains latest finalized header and participants list
+// for consensus nodes, it is used in Engine to access latest valid data
+type finalizedSnapshot struct {
+	head         *flow.Header
+	participants flow.IdentityList
+}
+
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
 	unit    *engine.Unit
@@ -51,18 +61,21 @@ type Engine struct {
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
-	pollInterval time.Duration
-	scanInterval time.Duration
-	core         module.SyncCore
+	pollInterval          time.Duration
+	scanInterval          time.Duration
+	core                  module.SyncCore
+	lastFinalizedSnapshot *finalizedSnapshot // last finalized snapshot of header and consensus participants
 
-	pendingSyncRequests   engine.MessageStore
-	pendingBatchRequests  engine.MessageStore
-	pendingRangeRequests  engine.MessageStore
-	requestMessageHandler *engine.MessageHandler
+	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
+	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
+	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
+	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
 
-	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
-	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
-	responseMessageHandler *engine.MessageHandler // message handler that takes care of responses processing
+	pendingFinalizationEvents *fifoqueue.FifoQueue // queue for finalization events
+	responseNotifier          engine.Notifier
+	pendingSyncResponses      engine.MessageStore    // message store for *message.SyncResponse
+	pendingBlockResponses     engine.MessageStore    // message store for *message.BlockResponse
+	responseMessageHandler    *engine.MessageHandler // message handler responsible for response processing
 }
 
 // New creates a new main chain synchronization engine.
@@ -83,6 +96,11 @@ func New(
 		f(opt)
 	}
 
+	lastFinal, err := state.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve last final block: %w", err)
+	}
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:         engine.NewUnit(),
@@ -97,7 +115,12 @@ func New(
 		scanInterval: opt.scanInterval,
 	}
 
-	err := e.setupResponseMessageHandler()
+	err := e.setupTrustedInboundQueues()
+	if err != nil {
+		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
+	}
+
+	err = e.setupResponseMessageHandler()
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
@@ -111,7 +134,60 @@ func New(
 	}
 	e.con = con
 
+	err = e.onFinalizedBlock(lastFinal.ID())
+	if err != nil {
+		return nil, fmt.Errorf("could not apply last finalized state")
+	}
+
 	return e, nil
+}
+
+// setupTrustedInboundQueues initializes inbound queues for TRUSTED INPUTS (from other components within the
+// consensus node). We deliberately separate the queues for trusted inputs from the MessageHandler, which
+// handles external, untrusted inputs. This reduces the attack surface, as it makes it impossible for an external
+// attacker to feed values into the inbound channels for trusted inputs, even in the presence of bugs in
+// the networking layer or message handler
+func (e *Engine) setupTrustedInboundQueues() error {
+	var err error
+	e.pendingFinalizationEvents, err = fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultFinalizationEventsQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for finalization events: %w", err)
+	}
+	return nil
+}
+
+// finalSnapshot returns last locally stored snapshot which contains final header
+// and list of consensus participants
+func (e *Engine) finalSnapshot() *finalizedSnapshot {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+	return e.lastFinalizedSnapshot
+}
+
+// onFinalizedBlock updates latest locally cached finalized snapshot
+func (e *Engine) onFinalizedBlock(finalizedBlockID flow.Identifier) error {
+	e.unit.Lock()
+	defer e.unit.Unlock()
+	finalSnapshot := e.state.AtBlockID(finalizedBlockID)
+	head, err := finalSnapshot.Head()
+	if err != nil {
+		return fmt.Errorf("could not get last finalized header: %w", err)
+	}
+
+	// get all of the consensus nodes from the state
+	participants, err := finalSnapshot.Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		return fmt.Errorf("could not send get consensus participants: %w", err)
+	}
+
+	e.lastFinalizedSnapshot = &finalizedSnapshot{
+		head:         head,
+		participants: participants,
+	}
+	return nil
 }
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
@@ -179,10 +255,12 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: blockResponseQueue,
 	}
 
+	e.responseNotifier = engine.NewNotifier()
+
 	// define message queueing behaviour
 	e.responseMessageHandler = engine.NewMessageHandler(
 		e.log,
-		engine.NewNotifier(),
+		e.responseNotifier,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.SyncResponse)
@@ -260,6 +338,15 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+//  (1) Updates local state of last finalized snapshot.
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
+	e.pendingFinalizationEvents.Push(finalizedBlockID)
+	e.responseNotifier.Notify()
+}
+
 // requestProcessingLoop is a separate goroutine that performs processing of queued requests
 func (e *Engine) requestProcessingLoop() {
 	notifier := e.requestMessageHandler.GetNotifier()
@@ -278,7 +365,7 @@ func (e *Engine) requestProcessingLoop() {
 
 // responseProcessingLoop is a separate goroutine that performs processing of queued responses
 func (e *Engine) responseProcessingLoop() {
-	notifier := e.responseMessageHandler.GetNotifier()
+	notifier := e.responseNotifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
@@ -299,6 +386,16 @@ func (e *Engine) processAvailableResponses() error {
 		case <-e.unit.Quit():
 			return nil
 		default:
+		}
+
+		event, ok := e.pendingFinalizationEvents.Pop()
+		if ok {
+			finalizedID := event.(flow.Identifier)
+			err := e.onFinalizedBlock(finalizedID)
+			if err != nil {
+				return fmt.Errorf("could not process finalized block %v: %w", finalizedID, err)
+			}
+			continue
 		}
 
 		msg, ok := e.pendingSyncResponses.Get()
@@ -375,10 +472,7 @@ func (e *Engine) processAvailableRequests() error {
 // we have a lower height, we add the difference to our own download queue.
 func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
 
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get finalized height: %w", err)
-	}
+	final := e.finalSnapshot().head
 
 	// queue any missing heights as needed
 	e.core.HandleHeight(final, req.Height)
@@ -394,7 +488,7 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 		Height: final.Height,
 		Nonce:  req.Nonce,
 	}
-	err = e.con.Unicast(res, originID)
+	err := e.con.Unicast(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send sync response: %w", err)
 	}
@@ -407,11 +501,7 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) error {
 
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get finalized height: %w", err)
-	}
-
+	final := e.finalSnapshot().head
 	e.core.HandleHeight(final, res.Height)
 	return nil
 }
@@ -420,10 +510,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
 
 	// get the latest final state to know if we can fulfill the request
-	head, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get finalized head: %w", err)
-	}
+	head := e.finalSnapshot().head
 
 	// if we don't have anything to send, we can bail right away
 	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
@@ -455,7 +542,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
-	err = e.con.Unicast(res, originID)
+	err := e.con.Unicast(res, originID)
 	if err != nil {
 		return fmt.Errorf("could not send range response: %w", err)
 	}
@@ -571,19 +658,12 @@ CheckLoop:
 			}
 
 		case <-scan.C:
-			final, err := e.state.Final().Head()
-			if err != nil {
-				e.log.Error().Err(err).Msg("could not get final height")
-				continue
-			}
-
-			e.unit.Lock()
-			ranges, batches := e.core.ScanPending(final)
-			err = e.sendRequests(ranges, batches)
+			snapshot := e.finalSnapshot()
+			ranges, batches := e.core.ScanPending(snapshot.head)
+			err := e.sendRequests(snapshot.participants, ranges, batches)
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not send requests")
 			}
-			e.unit.Unlock()
 		}
 	}
 
@@ -594,28 +674,14 @@ CheckLoop:
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() error {
 
-	// get the last finalized header
-	final, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not get last finalized header: %w", err)
-	}
-
-	// get all of the consensus nodes from the state
-	participants, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-
-	if err != nil {
-		return fmt.Errorf("could not send get consensus identities: %w", err)
-	}
+	snapshot := e.finalSnapshot()
 
 	// send the request for synchronization
 	req := &messages.SyncRequest{
 		Nonce:  rand.Uint64(),
-		Height: final.Height,
+		Height: snapshot.head.Height,
 	}
-	err = e.con.Multicast(req, synccore.DefaultPollNodes, participants.NodeIDs()...)
+	err := e.con.Multicast(req, synccore.DefaultPollNodes, snapshot.participants.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not send sync request: %w", err)
 	}
@@ -625,16 +691,8 @@ func (e *Engine) pollHeight() error {
 	return err
 }
 
-// sendRequests sends a request for each range and batch.
-func (e *Engine) sendRequests(ranges []flow.Range, batches []flow.Batch) error {
-
-	participants, err := e.state.Final().Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get participants: %w", err)
-	}
+// sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
+func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Range, batches []flow.Batch) error {
 
 	var errs error
 	for _, ran := range ranges {
