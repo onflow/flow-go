@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -329,4 +330,34 @@ func TestPoll(t *testing.T) {
 
 	// check that the message offset has been incremented
 	require.Equal(t, uint(len(bcastMsgs)), sender.messageOffset)
+}
+
+// TestLogHook checks that the Disqualify and FlagMisbehaviour functions call a
+// Warn log, and that we can hook a logger to react to such logs.
+func TestLogHook(t *testing.T) {
+	committee, locals := initCommittee(2)
+
+	hookCalls := 0
+
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			hookCalls++
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	// sender
+	sender := NewBroker(
+		logger,
+		dkgInstanceID,
+		committee,
+		locals[orig],
+		orig,
+		&mock.DKGContractClient{},
+		NewBrokerTunnel(),
+	)
+
+	sender.Disqualify(1, "testing")
+	sender.FlagMisbehavior(1, "test")
+	require.Equal(t, 2, hookCalls)
 }

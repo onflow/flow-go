@@ -72,7 +72,7 @@ func createNode(
 	firstBlock flow.Identifier) *node {
 
 	core := testutil.GenericNodeFromParticipants(t, hub, id, ids, chainID)
-	core.Log = zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
+	core.Log = zerolog.New(os.Stdout).Level(zerolog.WarnLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to when
 	// blocks are finalized that are in a new view
@@ -121,12 +121,14 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	var hook zerolog.HookFunc = func(e *zerolog.Event, level zerolog.Level, message string) {
+	// We add a hook to the logger such that the test fails if the broker writes
+	// a Warn log, which happens when it flags or disqualifies a node
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.WarnLevel {
-			t.Fatal(message)
+			t.Fatal("DKG flagging misbehaviour")
 		}
-	}
-	controllerFactoryLogger := core.Log.Hook(hook)
+	})
+	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
 
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
