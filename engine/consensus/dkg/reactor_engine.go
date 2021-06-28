@@ -1,10 +1,12 @@
 package dkg
 
 import (
+	"crypto/rand"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
@@ -21,10 +23,8 @@ import (
 // to the DKG smart-contract to read broadcast messages.
 const DefaultPollStep = 10
 
-// ATTENTION what should this be?
-var SeedIndices = []uint32{1, 1, 1}
-
-type epochInfo struct {
+// dkgInfo consolidates information about the current DKG protocol instance.
+type dkgInfo struct {
 	identities      flow.IdentityList
 	phase1FinalView uint64
 	phase2FinalView uint64
@@ -60,7 +60,7 @@ func NewReactorEngine(
 
 	return &ReactorEngine{
 		unit:              engine.NewUnit(),
-		log:               log,
+		log:               log.With().Str("engine", "dkg_reactor").Logger(),
 		me:                me,
 		State:             state,
 		keyStorage:        keyStorage,
@@ -87,26 +87,35 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 // starts a new controller for the epoch and registers the triggers to regularly
 // query the DKG smart-contract and transition between phases at the specified
 // views.
-func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Header) {
+func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	firstID := first.ID()
+	nextEpochCounter := currentEpochCounter + 1
+
 	log := e.log.With().
-		Uint64("counter", counter).
+		Uint64("current_epoch", currentEpochCounter).
 		Uint64("view", first.View).
 		Hex("block", firstID[:]).
 		Logger()
 	log.Info().Msg("EpochSetup received")
 
-	epochInfo, err := e.getNextEpochInfo(firstID)
+	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
-	committee := epochInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
+	committee := curDKGInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
+
+	e.log.Info().
+		Uint64("phase1", curDKGInfo.phase1FinalView).
+		Uint64("phase2", curDKGInfo.phase2FinalView).
+		Uint64("phase3", curDKGInfo.phase3FinalView).
+		Interface("members", committee.NodeIDs()).
+		Msg("epoch info")
 
 	controller, err := e.controllerFactory.Create(
-		fmt.Sprintf("dkg-%d", counter),
+		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
 		committee,
-		epochInfo.seed,
+		curDKGInfo.seed,
 	)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not create DKG controller")
@@ -133,45 +142,41 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(counter uint64, first *flow.Heade
 	// specifications and implementations of the DKGBroker and DKGController
 	// interfaces).
 
-	for view := epochInfo.phase1FinalView; view > first.View; view -= e.pollStep {
+	for view := curDKGInfo.phase1FinalView; view > first.View; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase1FinalView, dkgmodule.Phase1, e.controller.EndPhase1)
+	e.registerPhaseTransition(curDKGInfo.phase1FinalView, dkgmodule.Phase1, e.controller.EndPhase1)
 
-	for view := epochInfo.phase2FinalView; view > epochInfo.phase1FinalView; view -= e.pollStep {
+	for view := curDKGInfo.phase2FinalView; view > curDKGInfo.phase1FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase2FinalView, dkgmodule.Phase2, e.controller.EndPhase2)
+	e.registerPhaseTransition(curDKGInfo.phase2FinalView, dkgmodule.Phase2, e.controller.EndPhase2)
 
-	for view := epochInfo.phase3FinalView; view > epochInfo.phase2FinalView; view -= e.pollStep {
+	for view := curDKGInfo.phase3FinalView; view > curDKGInfo.phase2FinalView; view -= e.pollStep {
 		e.registerPoll(view)
 	}
-	e.registerPhaseTransition(epochInfo.phase3FinalView, dkgmodule.Phase3, e.end(counter))
+	e.registerPhaseTransition(curDKGInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
 }
 
-func (e *ReactorEngine) getNextEpochInfo(firstBlockID flow.Identifier) (*epochInfo, error) {
-	epoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
-	identities, err := epoch.InitialIdentities()
+func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
+	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
+	nextEpoch := e.State.AtBlockID(firstBlockID).Epochs().Next()
+
+	identities, err := nextEpoch.InitialIdentities()
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve epoch identities: %w", err)
 	}
-	phase1Final, err := epoch.DKGPhase1FinalView()
+	phase1Final, phase2Final, phase3Final, err := protocol.DKGPhaseViews(currEpoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch phase 1 final view: %w", err)
+		return nil, fmt.Errorf("could not retrieve epoch dkg final views: %w", err)
 	}
-	phase2Final, err := epoch.DKGPhase2FinalView()
+	seed := make([]byte, crypto.SeedMinLenDKG)
+	_, err = rand.Read(seed)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch phase 2 final view: %w", err)
+		return nil, fmt.Errorf("could not generate random seed: %w", err)
 	}
-	phase3Final, err := epoch.DKGPhase3FinalView()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch phase 3 final view: %w", err)
-	}
-	seed, err := epoch.Seed(SeedIndices...)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve epoch seed: %w", err)
-	}
-	info := &epochInfo{
+
+	info := &dkgInfo{
 		identities:      identities,
 		phase1FinalView: phase1Final,
 		phase2FinalView: phase2Final,
@@ -252,7 +257,6 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}
-
 		err = e.controller.SubmitResult()
 		if err != nil {
 			return fmt.Errorf("couldn't publish DKG results: %w", err)

@@ -57,7 +57,7 @@ func TestForwardOutgoingMessages(t *testing.T) {
 	// override the conduit to check that the Unicast call matches the expected
 	// message and destination ID
 	conduit := &mocknetwork.Conduit{}
-	conduit.On("Unicast", expectedMsg, destinationID).
+	conduit.On("Unicast", &expectedMsg, destinationID).
 		Return(nil).
 		Once()
 	engine.conduit = conduit
@@ -93,7 +93,7 @@ func TestForwardIncomingMessages(t *testing.T) {
 		close(doneCh)
 	}()
 
-	err := engine.Process(originID, expectedMsg.DKGMessage)
+	err := engine.Process(originID, &expectedMsg.DKGMessage)
 	require.NoError(t, err)
 
 	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")

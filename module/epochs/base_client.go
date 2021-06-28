@@ -95,7 +95,7 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 
 		// if the transaction has expired we skip waiting for seal
 		if result.Status == sdk.TransactionStatusExpired {
-			return fmt.Errorf("broadcast dkg message transaction has expired")
+			return fmt.Errorf("transaction has expired")
 		}
 
 		if result.Status == sdk.TransactionStatusSealed {

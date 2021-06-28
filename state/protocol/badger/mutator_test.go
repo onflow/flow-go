@@ -433,11 +433,11 @@ func TestExtendReceiptsValid(t *testing.T) {
 //
 // B4 contains a QC for B3, which seals B1, in which EpochSetup is emitted.
 // * we can query the EpochSetup beginning with B4
-// * EpochSetupPhaseStarted triggered when B3 is finalized
+// * EpochSetupPhaseStarted triggered when B4 is finalized
 //
 // B7 contains a QC for B6, which seals B2, in which EpochCommitted is emitted.
 // * we can query the EpochCommit beginning with B7
-// * EpochSetupPhaseStarted triggered when B6 is finalized
+// * EpochSetupPhaseStarted triggered when B7 is finalized
 //
 // B8 is the final block of the epoch.
 // B9 is the first block of the NEXT epoch.
@@ -558,6 +558,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		_, err = state.AtBlockID(block4.ID()).Epochs().Next().DKG()
 		require.Error(t, err)
 
+		// finalize block 3 so we can finalize subsequent blocks
 		// ensure an epoch phase transition when we finalize block 3
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup)
@@ -567,8 +568,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
 
 		// finalize block 4 so we can finalize subsequent blocks
+		// ensure an epoch phase transition when we finalize block 4
+		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header).Once()
 		err = state.Finalize(block4.ID())
 		require.NoError(t, err)
+		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header)
+
+		// now that the setup event has been emitted, we should be in the setup phase
+		phase, err = state.AtBlockID(block4.ID()).Phase()
+		assert.NoError(t, err)
+		require.Equal(t, flow.EpochPhaseSetup, phase)
 
 		epoch2Commit := unittest.EpochCommitFixture(
 			unittest.CommitWithCounter(epoch2Setup.Counter),
@@ -634,9 +643,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
 
-		// finalize block 7 so we can finalize subsequent blocks
+		// expect epoch phase transition once we finalize block 7
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
+		// expect committed final view to be updated, since we are committing epoch 2
+		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
 		err = state.Finalize(block7.ID())
 		require.NoError(t, err)
+		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
+		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()

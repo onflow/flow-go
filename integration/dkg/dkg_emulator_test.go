@@ -21,9 +21,10 @@ func TestWithEmulator(t *testing.T) {
 
 func (s *DKGSuite) TestHappyPath() {
 
-	// The EpochSetup event is received at view 100. The phase transitions are
-	// at views 150, 200, and 250. In between phase transitions, the controller
-	// calls the DKG smart-contract every 10 views.
+	// The EpochSetup event is received at view 100.  The current epoch is
+	// configured with phase transitions at views 150, 200, and 250. In between
+	// phase transitions, the controller calls the DKG smart-contract every 10
+	// views.
 	//
 	// VIEWS
 	// setup      : 100
@@ -35,10 +36,11 @@ func (s *DKGSuite) TestHappyPath() {
 	// Phase3Final: 250
 	// final
 
-	// create the EpochSetup that will trigger the next DKG run with all the
-	// desired parameters
-	epochSetup := flow.EpochSetup{
-		Counter:            999,
+	// we arbitrarily use 999 as the current epoch counter
+	currentCounter := uint64(999)
+
+	currentEpochSetup := flow.EpochSetup{
+		Counter:            currentCounter,
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
@@ -46,10 +48,19 @@ func (s *DKGSuite) TestHappyPath() {
 		Participants:       s.netIDs,
 		RandomSource:       []byte("random bytes for seed"),
 	}
+
+	// create the EpochSetup that will trigger the next DKG run with all the
+	// desired parameters
+	nextEpochSetup := flow.EpochSetup{
+		Counter:      currentCounter + 1,
+		Participants: s.netIDs,
+		RandomSource: []byte("random bytes for seed"),
+	}
+
 	firstBlock := &flow.Header{View: 100}
 
 	for _, node := range s.nodes {
-		node.setEpochSetup(s.T(), epochSetup, firstBlock)
+		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)
 	}
 
 	for _, n := range s.nodes {
@@ -59,7 +70,7 @@ func (s *DKGSuite) TestHappyPath() {
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
 	for _, n := range s.nodes {
-		n.ProtocolEvents.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
+		n.ProtocolEvents.EpochSetupPhaseStarted(currentCounter, firstBlock)
 	}
 
 	// submit a lot of dummy transactions to force the creation of blocks and
@@ -115,7 +126,7 @@ func (s *DKGSuite) TestHappyPath() {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range s.nodes {
-		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(epochSetup.Counter)
+		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
 
 		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)

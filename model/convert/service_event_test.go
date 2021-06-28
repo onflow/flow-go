@@ -11,12 +11,14 @@ import (
 
 func TestEventConversion(t *testing.T) {
 
+	chain := flow.Emulator.Chain()
+
 	t.Run("epoch setup", func(t *testing.T) {
 
-		fixture, expected := epochSetupFixture()
+		fixture, expected := epochSetupFixture(chain)
 
 		// convert Cadence types to Go types
-		event, err := ServiceEvent(fixture)
+		event, err := ServiceEvent(chain, fixture)
 		require.NoError(t, err)
 		require.NotNil(t, event)
 
@@ -30,10 +32,10 @@ func TestEventConversion(t *testing.T) {
 
 	t.Run("epoch commit", func(t *testing.T) {
 
-		fixture, expected := epochCommitFixture()
+		fixture, expected := epochCommitFixture(chain)
 
 		// convert Cadence types to Go types
-		event, err := ServiceEvent(fixture)
+		event, err := ServiceEvent(chain, fixture)
 		require.NoError(t, err)
 		require.NotNil(t, event)
 

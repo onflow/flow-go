@@ -222,6 +222,23 @@ func (priv *RandomBeaconPrivKey) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+func (priv RandomBeaconPrivKey) MarshalMsgpack() ([]byte, error) {
+	if priv.PrivateKey == nil {
+		return nil, fmt.Errorf("empty private key")
+	}
+	return msgpack.Marshal(toHex(priv.PrivateKey.Encode()))
+}
+
+func (priv *RandomBeaconPrivKey) UnmarshalMsgpack(b []byte) error {
+	bz, err := fromMsgPackHex(b)
+	if err != nil {
+		return err
+	}
+
+	priv.PrivateKey, err = crypto.DecodePrivateKey(crypto.BLSBLS12381, bz)
+	return err
+}
+
 // MachineAccountPrivKey wraps a private key and allows it to be JSON encoded and decoded. It is not defined in the
 // crypto package since the crypto package should not know about the different key types. More importantly, private
 // keys should not be automatically encodable/serializable to prevent accidental secret sharing. The bootstrapping
