@@ -6,6 +6,10 @@ import (
 	"sync"
 )
 
+// RequestQueue is a special queue that implements engine.MessageStore interface and
+// indexes requests by originator. If request will be sent by same originator then it will replace the old one.
+// Comparing to default FIFO queue this one can contain MAX one request for origin ID.
+// Getting value from queue as well as ejecting is pseudo-random.
 type RequestQueue struct {
 	lock     sync.Mutex
 	limit    uint
@@ -19,13 +23,20 @@ func NewRequestQueue(limit uint) *RequestQueue {
 	}
 }
 
+// Put stores message into requests map using OriginID as key.
+// Returns always true
 func (q *RequestQueue) Put(message *engine.Message) bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-	q.requests[message.OriginID] = message
+	// first try to eject if we are at max capacity, we need to do this way
+	// to prevent a situation where just inserted item gets ejected
 	q.reduce()
+	// at this point we can be sure that there is at least one slot
+	q.requests[message.OriginID] = message
+	return true
 }
 
+// Get returns pseudo-random element from request storage using go map properties.
 func (q *RequestQueue) Get() (*engine.Message, bool) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
@@ -48,11 +59,11 @@ func (q *RequestQueue) Get() (*engine.Message, bool) {
 }
 
 // reduce will reduce the size of the kept entities until we are within the
-// configured memory pool size limit.
+// configured memory pool size limit. If called on max capacity will eject at least one element.
 func (q *RequestQueue) reduce() {
 
 	// we keep reducing the cache size until we are at limit again
-	for len(q.requests) > int(q.limit) {
+	for len(q.requests) >= int(q.limit) {
 
 		// eject first element using go map properties
 		var key flow.Identifier

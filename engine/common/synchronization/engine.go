@@ -260,6 +260,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
+// requestProcessingLoop is a separate goroutine that performs processing of queued requests
 func (e *Engine) requestProcessingLoop() {
 	notifier := e.requestMessageHandler.GetNotifier()
 	for {
@@ -275,6 +276,7 @@ func (e *Engine) requestProcessingLoop() {
 	}
 }
 
+// responseProcessingLoop is a separate goroutine that performs processing of queued responses
 func (e *Engine) responseProcessingLoop() {
 	notifier := e.responseMessageHandler.GetNotifier()
 	for {
@@ -290,6 +292,7 @@ func (e *Engine) responseProcessingLoop() {
 	}
 }
 
+// processAvailableResponses is processor of pending events which drives events from networking layer to business logic.
 func (e *Engine) processAvailableResponses() error {
 	for {
 		select {
@@ -324,8 +327,7 @@ func (e *Engine) processAvailableResponses() error {
 	}
 }
 
-// processAvailableRequests is processor of pending events which drives events from networking layer to business logic in `Core`.
-// Effectively consumes messages from networking layer and dispatches them into corresponding sinks which are connected with `Core`.
+// processAvailableRequests is processor of pending events which drives events from networking layer to business logic.
 func (e *Engine) processAvailableRequests() error {
 
 	for {
