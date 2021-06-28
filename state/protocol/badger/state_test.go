@@ -35,10 +35,18 @@ func TestBootstrapAndOpen(t *testing.T) {
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 
 		// expect the final view metric to be set to current epoch's final view
-		finalView, err := rootSnapshot.Epochs().Current().FinalView()
+		epoch := rootSnapshot.Epochs().Current()
+		finalView, err := epoch.FinalView()
 		require.NoError(t, err)
+		counter, err := epoch.Counter()
+		require.NoError(t, err)
+		phase, err := rootSnapshot.Phase()
+		require.NoError(t, err)
+
 		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -46,7 +54,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
 		require.NoError(t, err)
 
-		// assert update final view was called
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())

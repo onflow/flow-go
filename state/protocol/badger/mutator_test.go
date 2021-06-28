@@ -512,10 +512,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// add a second block with the receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup)
 		err = state.Extend(&block2)
 		require.NoError(t, err)
 		err = state.Finalize(block2.ID())
 		require.NoError(t, err)
+		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
 
 		// block 3 contains the seal for block 1
 		block3 := unittest.BlockWithParentFixture(block2.Header)
@@ -557,9 +560,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// ensure an epoch phase transition when we finalize block 3
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header).Once()
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup)
 		err = state.Finalize(block3.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block3.Header)
+		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
 
 		// finalize block 4 so we can finalize subsequent blocks
 		err = state.Finalize(block4.ID())
@@ -622,10 +627,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
 		// expect committed final view to be updated, since we are committing epoch 2
 		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted)
 		err = state.Finalize(block6.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
 		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
+		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
 
 		// finalize block 7 so we can finalize subsequent blocks
 		err = state.Finalize(block7.ID())

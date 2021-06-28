@@ -394,8 +394,22 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	finalSnapshot := state.Final()
+
+	// update current epoch phase metric
+	err = state.updateCurrentEpochPhase(finalSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update current epoch phase: %w", err)
+	}
+
+	// update current epoch counter metric
+	err = state.updateCurrentEpochCounter(finalSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update current epoch counter: %w", err)
+	}
+
 	// update committed final view metric
-	err = state.updateCommittedEpochFinalView(state.Final())
+	err = state.updateCommittedEpochFinalView(finalSnapshot)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update committed epoch final view: %w", err)
 	}
@@ -524,5 +538,27 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 		return fmt.Errorf("invalid phase: %s", phase)
 	}
 
+	return nil
+}
+
+// updateCurrentEpochCounter updates the `consensus_compliance_current_epoch_counter` metric
+// based on the current epoch's counter
+func (state *State) updateCurrentEpochCounter(snap protocol.Snapshot) error {
+	counter, err := snap.Epochs().Current().Counter()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+	state.metrics.CurrentEpochCounter(counter)
+	return nil
+}
+
+// updateCurrentEpochPhase updates the `consensus_compliance_current_epoch_phase` metric
+// based on the current epoch's phase
+func (state *State) updateCurrentEpochPhase(snap protocol.Snapshot) error {
+	phase, err := snap.Phase()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+	state.metrics.CurrentEpochPhase(phase)
 	return nil
 }

@@ -32,14 +32,14 @@ func NewComplianceCollector() *ComplianceCollector {
 			Name:      "consensus_compliance_current_epoch_counter",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
-			Help:      "the current epoch counter",
+			Help:      "the current epoch's counter",
 		}),
 
 		currentEpochPhase: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "consensus_compliance_current_epoch_phase",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
-			Help:      "the current epoch phase",
+			Help:      "the current epoch's phase",
 		}),
 
 		committedEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
@@ -155,4 +155,12 @@ func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
 
 func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
 	cc.committedEpochFinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {
+	cc.currentEpochCounter.Set(float64(counter))
+}
+
+func (cc *ComplianceCollector) CurrentEpochPhase(phase flow.EpochPhase) {
+	cc.currentEpochCounter.Set(float64(phase))
 }
