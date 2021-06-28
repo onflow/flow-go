@@ -131,24 +131,36 @@ func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
 // addresses for each chain.
 var contractAddressesByChainID map[flow.ChainID]map[string]flow.Address
 
+// Well-known addresses for system contracts on long-running networks.
+// For now, all system contracts tracked by this package are deployed to the same
+// address (per chain) as the staking contract.
+//
+// Ref: https://docs.onflow.org/core-contracts/staking-contract-reference/
+var (
+	// stakingContractAddressMainnet is the address of the FlowIDTableStaking contract on Mainnet
+	stakingContractAddressMainnet = flow.HexToAddress("8624b52f9ddcd04a")
+	// stakingContractAddressTestnet is the address of the FlowIDTableStaking contract on Testnet and Canary
+	stakingContractAddressTestnet = flow.HexToAddress("9eca2b38b18b5dfe")
+)
+
 func init() {
 	contractAddressesByChainID = make(map[flow.ChainID]map[string]flow.Address)
 
 	// Main Flow network
-	// TODO need these address values
+	// All system contracts are deployed to the account of the staking contract
 	mainnet := map[string]flow.Address{
-		ContractNameEpoch:     flow.EmptyAddress,
-		ContractNameClusterQC: flow.EmptyAddress,
-		ContractNameDKG:       flow.EmptyAddress,
+		ContractNameEpoch:     stakingContractAddressMainnet,
+		ContractNameClusterQC: stakingContractAddressMainnet,
+		ContractNameDKG:       stakingContractAddressMainnet,
 	}
 	contractAddressesByChainID[flow.Mainnet] = mainnet
 
 	// Long-lived test networks
-	// TODO need these address values
+	// All system contracts are deployed to the account of the staking contract
 	testnet := map[string]flow.Address{
-		ContractNameEpoch:     flow.EmptyAddress,
-		ContractNameClusterQC: flow.EmptyAddress,
-		ContractNameDKG:       flow.EmptyAddress,
+		ContractNameEpoch:     stakingContractAddressTestnet,
+		ContractNameClusterQC: stakingContractAddressTestnet,
+		ContractNameDKG:       stakingContractAddressTestnet,
 	}
 	contractAddressesByChainID[flow.Testnet] = testnet
 	contractAddressesByChainID[flow.Canary] = testnet
