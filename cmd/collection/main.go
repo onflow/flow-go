@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"google.golang.org/grpc"
@@ -27,7 +25,6 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -48,7 +45,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 func main() {
@@ -388,9 +384,9 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
-			qcContractClient, err := handleQCMachineAccount(node, accessAddress, qcContractAddress)
+			qcContractClient, err := createQCContractClient(node, accessAddress, qcContractAddress)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not create qc contract client %w", err)
 			}
 
 			rootQCVoter := epochs.NewRootQCVoter(
@@ -435,23 +431,17 @@ func main() {
 		Run()
 }
 
-func handleQCMachineAccount(node *cmd.FlowNodeBuilder, accessAddress, qcContractAddress string) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.FlowNodeBuilder, accessAddress, qcContractAddress string) (module.QCContractClient, error) {
 
-	// we instantiate a mock qc client object for the default client
-	var qcContractClient module.QCContractClient = epochs.NewQCContractClientMock(node.Logger)
+	var qcContractClient module.QCContractClient
 
-	// check if node machine account info file exists
-	machineAccountInfoPath := filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID()))
-	exists := io.FileExists(machineAccountInfoPath)
-
-	if accessAddress == "" || qcContractAddress == "" || !exists {
-		// log warning as one or more of the required components are missing
-		node.Logger.Warn().Msg("node machine account info file was not configured properly")
-		return qcContractClient, nil
+	// if not valid return a mock qc contract client
+	if valid := cmd.IsValidMachineAccountConfig(node, accessAddress, qcContractAddress); !valid {
+		return epochs.NewMockQCContractClient(node.Logger), nil
 	}
 
 	// attempt to read NodeMachineAccountInfo
-	info, err := loadNodeMachineAccountInfoFile(node)
+	info, err := cmd.LoadNodeMachineAccountInfoFile(node)
 	if err != nil {
 		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
 	}
@@ -463,33 +453,14 @@ func handleQCMachineAccount(node *cmd.FlowNodeBuilder, accessAddress, qcContract
 	}
 	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
 
-	// create QC vote client
+	// create flow client
 	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
 
-	// contract actual qc contract client, all flags and machine account info file found
+	// create actual qc contract client, all flags and machine account info file found
 	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), info.Address, info.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
-}
-
-func loadNodeMachineAccountInfoFile(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
-
-	// attempt to read file
-	machineAccountInfoPath := filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID()))
-	bz, err := io.ReadFile(machineAccountInfoPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read machine account info: %w", err)
-	}
-
-	// unmashal machine account info
-	var machineAccountInfo bootstrap.NodeMachineAccountInfo
-	err = json.Unmarshal(bz, &machineAccountInfo)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal machine account info: %w", err)
-	}
-
-	return &machineAccountInfo, nil
 }

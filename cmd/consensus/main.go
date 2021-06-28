@@ -624,37 +624,10 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
-			machineAccountInfo, err := loadMachineAccountPrivateData(node)
+			dkgContractClient, err := createDKGContractClient(node, accessAddress)
 			if err != nil {
-				return nil, fmt.Errorf("could't load machine account info: %w", err)
+				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
-			decodedPrivateKey, err := crypto.DecodePrivateKey(
-				machineAccountInfo.SigningAlgorithm,
-				machineAccountInfo.EncodedPrivateKey,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not decode machine account private key: %w", err)
-			}
-			machineAccountSigner := crypto.NewInMemorySigner(
-				decodedPrivateKey,
-				machineAccountInfo.HashAlgorithm,
-			)
-
-			sdkClient, err := client.New(
-				accessAddress,
-				grpc.WithInsecure())
-			if err != nil {
-				return nil, fmt.Errorf("could not initialise sdk client: %w", err)
-			}
-
-			dkgContractClient := dkgmodule.NewClient(
-				node.Logger,
-				sdkClient,
-				machineAccountSigner,
-				node.RootChainID.Chain().ServiceAddress().HexWithPrefix(),
-				machineAccountInfo.Address,
-				machineAccountInfo.KeyIndex,
-			)
 
 			// the reactor engine reacts to new views being finalized and drives the
 			// DKG protocol
@@ -695,12 +668,45 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 	return &priv, nil
 }
 
-func loadMachineAccountPrivateData(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
-	data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+func createDKGContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (module.DKGContractClient, error) {
+
+	var dkgClient module.DKGContractClient
+
+	dkgContractAddress := node.RootChainID.Chain().ServiceAddress().HexWithPrefix()
+
+	// if not valid return a mock dkg contract client
+	if valid := cmd.IsValidMachineAccountConfig(node, accessAddress, dkgContractAddress); !valid {
+		return dkgmodule.NewMockClient(node.Logger), nil
+	}
+
+	// attempt to read NodeMachineAccountInfo
+	info, err := cmd.LoadNodeMachineAccountInfoFile(node)
+	if err != nil {
+		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
+	}
+
+	// construct signer from private key
+	sk, err := crypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
+	}
+	txSigner := crypto.NewInMemorySigner(sk, info.HashAlgorithm)
+
+	// create flow client
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
-	var info bootstrap.NodeMachineAccountInfo
-	err = json.Unmarshal(data, &info)
-	return &info, err
+
+	// create actual dkg contract client, all flags and machine account info file found
+	dkgClient = dkgmodule.NewClient(
+		node.Logger,
+		flowClient,
+		txSigner,
+		dkgContractAddress,
+		info.Address,
+		info.KeyIndex,
+	)
+
+	return dkgClient, nil
 }

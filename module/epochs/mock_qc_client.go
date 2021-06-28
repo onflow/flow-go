@@ -8,22 +8,22 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-type QCContractClientMock struct {
+type MockQCContractClient struct {
 	log zerolog.Logger
 }
 
-func NewQCContractClientMock(log zerolog.Logger) *QCContractClientMock {
+func NewMockQCContractClient(log zerolog.Logger) *MockQCContractClient {
 
 	log = log.With().Str("component", "qc_contract_client_mock").Logger()
-	return &QCContractClientMock{log: log}
+	return &MockQCContractClient{log: log}
 }
 
-func (c *QCContractClientMock) SubmitVote(ctx context.Context, vote *model.Vote) error {
+func (c *MockQCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
 	c.log.Fatal().Msg("NodeMachineAccountInfo file was not configured properly")
 	return nil
 }
 
-func (c *QCContractClientMock) Voted(ctx context.Context) (bool, error) {
+func (c *MockQCContractClient) Voted(ctx context.Context) (bool, error) {
 	c.log.Fatal().Msg("NodeMachineAccountInfo file was not configured properly")
 	return false, nil
 }
