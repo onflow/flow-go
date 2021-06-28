@@ -31,10 +31,6 @@ const (
 
 	EventNameEpochSetup  = "EpochSetup"
 	EventNameEpochCommit = "EpochCommitted"
-
-	// Format strings for qualified service event names (including address prefix)
-
-	serviceEventTypeIDFormat = "A.%s.%s.%s"
 )
 
 // SystemContract represents a system contract on a particular chain.
@@ -45,10 +41,9 @@ type SystemContract struct {
 
 // ServiceEvent represents a service event on a particular chain.
 type ServiceEvent struct {
-	Address       flow.Address
-	ContractName  string
-	Name          string
-	QualifiedType flow.EventType
+	Address      flow.Address
+	ContractName string
+	Name         string
 }
 
 // QualifiedIdentifier returns the Cadence qualified identifier of the service
@@ -130,12 +125,6 @@ func ServiceEventsForChain(chainID flow.ChainID) (*ServiceEvents, error) {
 	}
 
 	return events, nil
-}
-
-// serviceEventQualifiedType returns the qualified event type for the
-// given service event format string and address location.
-func serviceEventQualifiedType(format string, addr flow.Address) flow.EventType {
-	return flow.EventType(fmt.Sprintf(format, addr))
 }
 
 // contractAddressesByChainID stores the default system smart contract
