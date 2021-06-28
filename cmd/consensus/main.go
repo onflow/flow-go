@@ -648,7 +648,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialise sdk client: %w", err)
 			}
 
-			dkgContractAddr, err := systemcontracts.DKG.Address(node.RootChainID)
+			contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
 			if err != nil {
 				return nil, fmt.Errorf("unknown dkg contract address: %w", err)
 			}
@@ -656,7 +656,7 @@ func main() {
 				node.Logger,
 				sdkClient,
 				machineAccountSigner,
-				dkgContractAddr.HexWithPrefix(),
+				contracts.DKG.Address.HexWithPrefix(),
 				machineAccountInfo.Address,
 				machineAccountInfo.KeyIndex,
 			)

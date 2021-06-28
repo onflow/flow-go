@@ -411,7 +411,7 @@ func main() {
 				return nil, err
 			}
 
-			qcContractAddress, err := systemcontracts.ClusterQC.Address(node.RootChainID)
+			contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
 			if err != nil {
 				return nil, err
 			}
@@ -421,7 +421,7 @@ func main() {
 				node.Me.NodeID(),
 				accountInfo.Address,
 				accountInfo.KeyIndex,
-				qcContractAddress.HexWithPrefix(),
+				contracts.ClusterQC.Address.HexWithPrefix(),
 				txSigner,
 			)
 
