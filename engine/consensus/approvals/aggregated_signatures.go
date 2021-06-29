@@ -27,8 +27,10 @@ func NewAggregatedSignatures(chunks uint64) *AggregatedSignatures {
 func (as *AggregatedSignatures) PutSignature(chunkIndex uint64, aggregatedSignature flow.AggregatedSignature) uint64 {
 	as.lock.Lock()
 	defer as.lock.Unlock()
-	if _, found := as.signatures[chunkIndex]; !found {
-		as.signatures[chunkIndex] = aggregatedSignature
+	if chunkIndex < as.numberOfChunks {
+		if _, found := as.signatures[chunkIndex]; !found {
+			as.signatures[chunkIndex] = aggregatedSignature
+		}
 	}
 	return uint64(len(as.signatures))
 }
@@ -43,10 +45,15 @@ func (as *AggregatedSignatures) HasSignature(chunkIndex uint64) bool {
 
 // Collect returns array with aggregated signature for each chunk
 func (as *AggregatedSignatures) Collect() []flow.AggregatedSignature {
-	aggregatedSigs := make([]flow.AggregatedSignature, len(as.signatures))
-
 	as.lock.RLock()
 	defer as.lock.RUnlock()
+
+	// if there aren't signatures for each chunk we can't collect signatures
+	if uint64(len(as.signatures)) < as.numberOfChunks {
+		return nil
+	}
+
+	aggregatedSigs := make([]flow.AggregatedSignature, as.numberOfChunks)
 	for chunkIndex, sig := range as.signatures {
 		aggregatedSigs[chunkIndex] = sig
 	}
