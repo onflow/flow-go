@@ -684,7 +684,7 @@ func createDKGContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (m
 	}
 
 	// attempt to read NodeMachineAccountInfo
-	info, err := cmd.LoadNodeMachineAccountInfoFile(node)
+	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.NodeID.String())
 	if err != nil {
 		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
 	}

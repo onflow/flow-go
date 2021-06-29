@@ -11,10 +11,10 @@ import (
 
 // LoadNodeMachineAccountInfoFile loads machine account info from the default location within the
 // bootstrap directory - Currently being used by Collection and Consensus nodes
-func LoadNodeMachineAccountInfoFile(node *FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
+func LoadNodeMachineAccountInfoFile(bootstrapDir, nodeID string) (*bootstrap.NodeMachineAccountInfo, error) {
 
 	// attempt to read file
-	machineAccountInfoPath := filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID()))
+	machineAccountInfoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID))
 	bz, err := io.ReadFile(machineAccountInfoPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not read machine account info: %w", err)
