@@ -19,7 +19,9 @@ func TestWithEmulator(t *testing.T) {
 	suite.Run(t, new(DKGSuite))
 }
 
-func (s *DKGSuite) TestHappyPath() {
+func (s *DKGSuite) runTest(goodNodes int) {
+
+	nodes := s.nodes[:goodNodes]
 
 	// The EpochSetup event is received at view 100.  The current epoch is
 	// configured with phase transitions at views 150, 200, and 250. In between
@@ -59,17 +61,17 @@ func (s *DKGSuite) TestHappyPath() {
 
 	firstBlock := &flow.Header{View: 100}
 
-	for _, node := range s.nodes {
+	for _, node := range nodes {
 		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)
 	}
 
-	for _, n := range s.nodes {
+	for _, n := range nodes {
 		n.Ready()
 	}
 
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
-	for _, n := range s.nodes {
+	for _, n := range nodes {
 		n.ProtocolEvents.EpochSetupPhaseStarted(currentCounter, firstBlock)
 	}
 
@@ -86,14 +88,14 @@ func (s *DKGSuite) TestHappyPath() {
 		block, err := s.sendDummyTx()
 
 		if err == nil {
-			for _, node := range s.nodes {
+			for _, node := range nodes {
 				node.ProtocolEvents.BlockFinalized(block.Header)
 			}
 			view = int(block.Header.View)
 		}
 	}
 
-	for _, n := range s.nodes {
+	for _, n := range nodes {
 		n.Done()
 	}
 
@@ -122,10 +124,10 @@ func (s *DKGSuite) TestHappyPath() {
 
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := make([]*signature.ThresholdProvider, 0, len(s.nodes))
+	signers := make([]*signature.ThresholdProvider, 0, len(nodes))
 	signatures := []crypto.Signature{}
 	indices := []uint{}
-	for i, n := range s.nodes {
+	for i, n := range nodes {
 		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
 
@@ -152,10 +154,19 @@ func (s *DKGSuite) TestHappyPath() {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	groupSignature, err := signature.CombineThresholdShares(uint(len(s.nodes)), signatures, indices)
+	groupSignature, err := signature.CombineThresholdShares(uint(len(nodes)), signatures, indices)
 	require.NoError(s.T(), err)
 
 	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)
 	require.NoError(s.T(), err)
 	assert.True(s.T(), ok, "failed to verify threshold signature")
+}
+
+func (s *DKGSuite) TestHappyPath() {
+	s.T().Skip()
+	s.runTest(numberOfNodes)
+}
+
+func (s *DKGSuite) TestNodesDown() {
+	s.runTest(8)
 }
