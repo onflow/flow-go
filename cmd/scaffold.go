@@ -29,6 +29,7 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -203,6 +204,16 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			pingProvider)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
+		}
+
+		if fnb.unstaked {
+			fnb.MsgValidators = []network.MessageValidator{
+				// filter out messages sent by this node itself
+				validator.NewSenderValidator(fnb.Me.NodeID()),
+				// but retain all the 1-k messages even if they are not intended for this node
+			}
+		} else {
+			fnb.MsgValidators = p2p.DefaultValidators(fnb.Logger, fnb.Me.NodeID())
 		}
 
 		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
