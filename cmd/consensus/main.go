@@ -668,8 +668,8 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 	return &priv, nil
 }
 
-// TEMPORARY: The functionality to allow starting up a node without a properly configured
-// machine account is very much intended to be temporary.
+// TEMPORARY: The functionality to allow starting up a node without a properly
+// configured machine account is very much intended to be temporary.
 // Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
 // Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
 func createDKGContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (module.DKGContractClient, error) {
