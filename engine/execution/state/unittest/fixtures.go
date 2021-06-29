@@ -24,13 +24,25 @@ func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *executi
 }
 
 func ComputationResultForBlockFixture(completeBlock *entity.ExecutableBlock) *execution.ComputationResult {
-	n := len(completeBlock.CompleteCollections)
+	n := len(completeBlock.CompleteCollections) + 1
 	stateViews := make([]*delta.SpockSnapshot, n)
+	stateCommitments := make([]flow.StateCommitment, n)
+	proofs := make([][]byte, n)
+	events := make([]flow.EventsList, n)
+	eventHashes := make([]flow.Identifier, n)
 	for i := 0; i < n; i++ {
 		stateViews[i] = StateInteractionsFixture()
+		stateCommitments[i] = *completeBlock.StartState
+		proofs[i] = unittest.RandomBytes(6)
+		events[i] = make(flow.EventsList, 0)
+		eventHashes[i] = unittest.IdentifierFixture()
 	}
 	return &execution.ComputationResult{
-		ExecutableBlock: completeBlock,
-		StateSnapshots:  stateViews,
+		ExecutableBlock:  completeBlock,
+		StateSnapshots:   stateViews,
+		StateCommitments: stateCommitments,
+		Proofs:           proofs,
+		Events:           events,
+		EventsHashes:     eventHashes,
 	}
 }

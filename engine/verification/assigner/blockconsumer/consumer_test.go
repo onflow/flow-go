@@ -128,7 +128,9 @@ func withConsumer(
 			process: process,
 		}
 
-		consumer, _, err := blockconsumer.NewBlockConsumer(unittest.Logger(),
+		consumer, _, err := blockconsumer.NewBlockConsumer(
+			unittest.Logger(),
+			collector,
 			processedHeight,
 			s.Storage.Blocks,
 			s.State,
