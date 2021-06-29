@@ -1089,10 +1089,7 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		eventsHash, err := result.Events[i].Hash()
-		if err != nil {
-			return nil, fmt.Errorf("error while calculating events collection hash: %w", err)
-		}
+		eventsHash := result.EventsHashes[i]
 		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
 
 		// chunkDataPack
