@@ -114,6 +114,61 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm.AssertExpectations(t)
 	})
 
+	t.Run("system chunk transaction should not fail", func(t *testing.T) {
+
+		// include all fees. System chunk should ignore them
+		contextOptions := []fvm.Option{
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+		}
+		bootstrapOptions := []fvm.BootstrapProcedureOption{
+			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		}
+
+		rt := fvm.NewInterpreterRuntime()
+		chain := flow.Testnet.Chain()
+		vm := fvm.NewVirtualMachine(rt)
+		baseOpts := []fvm.Option{
+			fvm.WithChain(chain),
+		}
+
+		opts := append(baseOpts, contextOptions...)
+		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		}
+		progs := programs.NewEmptyPrograms()
+		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
+		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, progs)
+		require.NoError(t, err)
+
+		comm := new(computermock.ViewCommitter)
+
+		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm)
+		require.NoError(t, err)
+
+		// create an empty block
+		block := generateBlock(0, 0, rag)
+
+		comm.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Once() // just system chunk
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TransactionResults, 1)
+
+		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
+	})
+
 	t.Run("multiple collections", func(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop())
 
