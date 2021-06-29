@@ -209,7 +209,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		})
 
 	// emission of result approval
-	suite.metrics.On("OnResultApprovalDispatchedInNetwork").Return()
+	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
 
 	var tests = []struct {
 		vc          *verification.VerifiableChunkData
