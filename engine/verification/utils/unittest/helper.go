@@ -510,7 +510,7 @@ func withConsumers(t *testing.T,
 		chainID,
 		assignedChunkIDs)
 
-	verNode := testutil.NewVerificationNode(t,
+	verNode := testutil.VerificationNode(t,
 		hub,
 		verID,
 		participants,

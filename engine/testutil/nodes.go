@@ -617,11 +617,9 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 	}
 }
 
-// NewVerificationNode creates a verification node with all functional engines and actual modules for purpose of
+// VerificationNode creates a verification node with all functional engines and actual modules for purpose of
 // (integration) testing.
-//
-// TODO: refactor to VerificationNode once the old constructor is dropped.
-func NewVerificationNode(t testing.TB,
+func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	verIdentity *flow.Identity, // identity of this verification node.
 	participants flow.IdentityList, // identity of all nodes in system including this verification node.
