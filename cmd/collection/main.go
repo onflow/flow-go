@@ -431,12 +431,16 @@ func main() {
 		Run()
 }
 
+// TEMPORARY: The functionality to allow starting up a node without a properly configured
+// machine account is very much intended to be temporary.
+// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
+// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
 func createQCContractClient(node *cmd.FlowNodeBuilder, accessAddress, qcContractAddress string) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
 	// if not valid return a mock qc contract client
-	if valid := cmd.IsValidMachineAccountConfig(node, accessAddress, qcContractAddress); !valid {
+	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
 		return epochs.NewMockQCContractClient(node.Logger), nil
 	}
 
