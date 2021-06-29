@@ -65,9 +65,9 @@ func TestAggregatedSignatures_Repeated_PutSignature(t *testing.T) {
 	aggSigs := sigs.Collect()
 	for idx, s := range aggSigs {
 		if idx == 3 {
-			require.Equal(t, s.NumberSigners(), 22)
+			require.Equal(t, s.CardinalitySignerSet(), 22)
 		} else {
-			require.Equal(t, s.NumberSigners(), 0)
+			require.Equal(t, s.CardinalitySignerSet(), 0)
 		}
 	}
 }
