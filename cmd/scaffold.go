@@ -29,7 +29,6 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -136,6 +135,7 @@ type FlowNodeBuilder struct {
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
+	unstaked          bool
 
 	// root state information
 	RootBlock   *flow.Block
@@ -166,7 +166,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
 		"whether to enable tracer")
-
+	fnb.flags.BoolVar(&fnb.unstaked, "unstaked", false, "whether this node is an unstaked access node")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -305,8 +305,13 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 	}
 
 	fnb.NodeID = nodeID
-	fnb.stakingKey = info.StakingPrivKey.PrivateKey
 	fnb.networkKey = info.NetworkPrivKey.PrivateKey
+
+	if fnb.unstaked {
+		// skip reading staking key for an unstaked access node
+		return
+	}
+	fnb.stakingKey = info.StakingPrivKey.PrivateKey
 }
 
 func (fnb *FlowNodeBuilder) initLogger() {
@@ -527,8 +532,20 @@ func (fnb *FlowNodeBuilder) initState() {
 	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
-	self, err := fnb.State.Final().Identity(myID)
-	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
+
+	var self *flow.Identity
+	if fnb.unstaked {
+		self = &flow.Identity{
+			NodeID:        myID,
+			NetworkPubKey: fnb.networkKey.PublicKey(),
+			StakingPubKey: nil,             // no staking key needed for the unstaked node
+			Role:          flow.RoleAccess, // unstaked node can only run as an access node
+			Address:       fnb.BaseConfig.bindAddr,
+		}
+	} else {
+		self, err = fnb.State.Final().Identity(myID)
+		fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
+	}
 
 	// Verify that my role (as given in the configuration) is consistent with the protocol state.
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
@@ -547,12 +564,14 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 	}
 
-	// ensure that the configured staking/network keys are consistent with the protocol state
-	if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
-		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
-	}
-	if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
-		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
+	if !fnb.unstaked {
+		// ensure that the configured staking/network keys are consistent with the protocol state
+		if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
+			fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
+		}
+		if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
+			fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
+		}
 	}
 
 	fnb.Me, err = local.New(self, fnb.stakingKey)
@@ -678,28 +697,6 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 	return fnb
 }
 
-func UnstakedFlowNode(role string) *FlowNodeBuilder {
-	builder := &FlowNodeBuilder{
-		BaseConfig: BaseConfig{
-			nodeRole: role,
-		},
-		Logger: zerolog.New(os.Stderr),
-		flags:  pflag.CommandLine,
-	}
-
-	builder.baseFlags()
-
-	builder.enqueueNetworkInit()
-
-	builder.enqueueMetricsServerInit()
-
-	builder.registerBadgerMetrics()
-
-	builder.enqueueTracer()
-
-	return builder
-}
-
 // FlowNode creates a new Flow node builder with the given name.
 func FlowNode(role string) *FlowNodeBuilder {
 
@@ -712,12 +709,6 @@ func FlowNode(role string) *FlowNodeBuilder {
 	}
 
 	builder.baseFlags()
-
-	builder.MsgValidators = []network.MessageValidator{
-		// filter out messages sent by this node itself
-		validator.NewSenderValidator(builder.Me.NodeID()),
-		// but retain all the 1-k messages even if they are not intended for this node
-	}
 
 	builder.enqueueNetworkInit()
 

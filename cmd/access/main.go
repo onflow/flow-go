@@ -75,7 +75,6 @@ func main() {
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
 		rpcMetricsEnabled            bool
-		unstaked bool
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -104,7 +103,6 @@ func main() {
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-			flags.BoolVar(&unstaked, "unstaked", false, "whether this access node is an unstaked access node")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
