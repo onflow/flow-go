@@ -5,7 +5,6 @@ package synchronization
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"math/rand"
 	"time"
 
@@ -13,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -115,7 +115,7 @@ func New(
 		scanInterval: opt.scanInterval,
 	}
 
-	err := e.setupTrustedInboundQueues()
+	err = e.setupTrustedInboundQueues()
 	if err != nil {
 		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
 	}
@@ -328,7 +328,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
-	switch _ := event.(type) {
+	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
 		return e.requestMessageHandler.Process(originID, event)
 	case *messages.SyncResponse, *messages.BlockResponse:

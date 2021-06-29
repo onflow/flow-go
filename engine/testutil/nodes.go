@@ -3,7 +3,6 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"testing"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"

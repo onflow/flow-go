@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -10,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
@@ -65,8 +64,8 @@ func main() {
 		ingestConf    ingest.Config
 		ingressConf   ingress.Config
 
-		pools          *epochpool.TransactionPools // epoch-scoped transaction pools
-		followerBuffer *buffer.PendingBlocks       // pending block cache for follower
+		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
+		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
 		finalizationDistributor *pubsub.FinalizationDistributor
 
 		push              *pusher.Engine

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"

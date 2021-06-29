@@ -1,9 +1,10 @@
 package synchronization
 
 import (
+	"sync"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"sync"
 )
 
 // RequestQueue is a special queue that implements engine.MessageStore interface and

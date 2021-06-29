@@ -93,6 +93,15 @@ func (ss *SyncSuite) SetupTest() {
 			return ss.snapshot
 		},
 	)
+	ss.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) protocolint.Snapshot {
+			if ss.head.ID() == blockID {
+				return ss.snapshot
+			} else {
+				return unittest.StateSnapshotForUnknownBlock()
+			}
+		},
+	).Maybe()
 
 	// set up the snapshot mock
 	ss.snapshot = &protocol.Snapshot{}
@@ -402,7 +411,8 @@ func (ss *SyncSuite) TestSendRequests() {
 	)
 	ss.core.On("BatchRequested", batches[0])
 
-	err := ss.e.sendRequests(ranges, batches)
+	// exclude my node ID
+	err := ss.e.sendRequests(ss.participants[1:], ranges, batches)
 	ss.Assert().Nil(err)
 	ss.con.AssertExpectations(ss.T())
 }
