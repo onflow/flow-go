@@ -40,9 +40,6 @@ const defaultSyncResponseQueueCapacity = 10000
 // defaultBlockResponseQueueCapacity maximum capacity of block responses queue
 const defaultBlockResponseQueueCapacity = 10000
 
-// defaultFinalizationEventsQueueCapacity maximum capacity of finalization events
-const defaultFinalizationEventsQueueCapacity = 1000
-
 // finalSnapshot is a helper structure which contains latest finalized header and participants list
 // for consensus nodes, it is used in Engine to access latest valid data
 type finalizedSnapshot struct {
@@ -71,11 +68,11 @@ type Engine struct {
 	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
 
-	pendingFinalizationEvents *fifoqueue.FifoQueue // queue for finalization events
-	responseNotifier          engine.Notifier
-	pendingSyncResponses      engine.MessageStore    // message store for *message.SyncResponse
-	pendingBlockResponses     engine.MessageStore    // message store for *message.BlockResponse
-	responseMessageHandler    *engine.MessageHandler // message handler responsible for response processing
+	finalizationEventNotifier engine.Notifier // notifier for finalization events
+
+	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
+	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
+	responseMessageHandler *engine.MessageHandler // message handler responsible for response processing
 }
 
 // New creates a new main chain synchronization engine.
@@ -96,31 +93,22 @@ func New(
 		f(opt)
 	}
 
-	lastFinal, err := state.Final().Head()
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve last final block: %w", err)
-	}
-
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:         engine.NewUnit(),
-		log:          log.With().Str("engine", "synchronization").Logger(),
-		metrics:      metrics,
-		me:           me,
-		state:        state,
-		blocks:       blocks,
-		comp:         comp,
-		core:         core,
-		pollInterval: opt.pollInterval,
-		scanInterval: opt.scanInterval,
+		unit:                      engine.NewUnit(),
+		log:                       log.With().Str("engine", "synchronization").Logger(),
+		metrics:                   metrics,
+		me:                        me,
+		state:                     state,
+		blocks:                    blocks,
+		comp:                      comp,
+		core:                      core,
+		pollInterval:              opt.pollInterval,
+		scanInterval:              opt.scanInterval,
+		finalizationEventNotifier: engine.NewNotifier(),
 	}
 
-	err = e.setupTrustedInboundQueues()
-	if err != nil {
-		return nil, fmt.Errorf("initialization of inbound queues for trusted inputs failed: %w", err)
-	}
-
-	err = e.setupResponseMessageHandler()
+	err := e.setupResponseMessageHandler()
 	if err != nil {
 		return nil, fmt.Errorf("could not setup message handler")
 	}
@@ -134,26 +122,12 @@ func New(
 	}
 	e.con = con
 
-	err = e.onFinalizedBlock(lastFinal.ID())
+	err = e.onFinalizedBlock()
 	if err != nil {
 		return nil, fmt.Errorf("could not apply last finalized state")
 	}
 
 	return e, nil
-}
-
-// setupTrustedInboundQueues initializes inbound queues for TRUSTED INPUTS (from other components within the
-// consensus node). We deliberately separate the queues for trusted inputs from the MessageHandler, which
-// handles external, untrusted inputs. This reduces the attack surface, as it makes it impossible for an external
-// attacker to feed values into the inbound channels for trusted inputs, even in the presence of bugs in
-// the networking layer or message handler
-func (e *Engine) setupTrustedInboundQueues() error {
-	var err error
-	e.pendingFinalizationEvents, err = fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultFinalizationEventsQueueCapacity))
-	if err != nil {
-		return fmt.Errorf("failed to create queue for finalization events: %w", err)
-	}
-	return nil
 }
 
 // finalSnapshot returns last locally stored snapshot which contains final header
@@ -165,10 +139,10 @@ func (e *Engine) finalSnapshot() *finalizedSnapshot {
 }
 
 // onFinalizedBlock updates latest locally cached finalized snapshot
-func (e *Engine) onFinalizedBlock(finalizedBlockID flow.Identifier) error {
+func (e *Engine) onFinalizedBlock() error {
 	e.unit.Lock()
 	defer e.unit.Unlock()
-	finalSnapshot := e.state.AtBlockID(finalizedBlockID)
+	finalSnapshot := e.state.Final()
 	head, err := finalSnapshot.Head()
 	if err != nil {
 		return fmt.Errorf("could not get last finalized header: %w", err)
@@ -255,12 +229,10 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: blockResponseQueue,
 	}
 
-	e.responseNotifier = engine.NewNotifier()
-
 	// define message queueing behaviour
 	e.responseMessageHandler = engine.NewMessageHandler(
 		e.log,
-		e.responseNotifier,
+		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.SyncResponse)
@@ -342,9 +314,9 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 //  (1) Updates local state of last finalized snapshot.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	e.pendingFinalizationEvents.Push(finalizedBlockID)
-	e.responseNotifier.Notify()
+func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+	// notify that there is new finalized block
+	e.finalizationEventNotifier.Notify()
 }
 
 // requestProcessingLoop is a separate goroutine that performs processing of queued requests
@@ -365,11 +337,16 @@ func (e *Engine) requestProcessingLoop() {
 
 // responseProcessingLoop is a separate goroutine that performs processing of queued responses
 func (e *Engine) responseProcessingLoop() {
-	notifier := e.responseNotifier.Channel()
+	notifier := e.responseMessageHandler.GetNotifier()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
+		case <-e.finalizationEventNotifier.Channel():
+			err := e.onFinalizedBlock()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("could not process latest finalized block")
+			}
 		case <-notifier:
 			err := e.processAvailableResponses()
 			if err != nil {
@@ -386,16 +363,6 @@ func (e *Engine) processAvailableResponses() error {
 		case <-e.unit.Quit():
 			return nil
 		default:
-		}
-
-		event, ok := e.pendingFinalizationEvents.Pop()
-		if ok {
-			finalizedID := event.(flow.Identifier)
-			err := e.onFinalizedBlock(finalizedID)
-			if err != nil {
-				return fmt.Errorf("could not process finalized block %v: %w", finalizedID, err)
-			}
-			continue
 		}
 
 		msg, ok := e.pendingSyncResponses.Get()

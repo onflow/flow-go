@@ -467,7 +467,7 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	// change head
 	ss.head = &finalizedBlock
 
-	err := ss.e.onFinalizedBlock(finalizedBlock.ID())
+	err := ss.e.onFinalizedBlock()
 	require.NoError(ss.T(), err)
 	actualSnapshot := ss.e.finalSnapshot()
 	require.ElementsMatch(ss.T(), actualSnapshot.participants, ss.participants[1:])
