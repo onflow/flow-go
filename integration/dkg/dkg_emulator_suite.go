@@ -398,6 +398,15 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	)
 	require.NoError(s.T(), err)
 
+	// We add a hook to the logger such that the test fails if the broker writes
+	// a Warn log, which happens when it flags or disqualifies a node
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			s.T().Fatal("DKG flagging misbehaviour")
+		}
+	})
+	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
+
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -406,7 +415,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		core.State,
 		dkgKeys,
 		dkg.NewControllerFactory(
-			core.Log,
+			controllerFactoryLogger,
 			core.Me,
 			node.dkgContractClient,
 			brokerTunnel,
