@@ -75,10 +75,11 @@ func main() {
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
 		rpcMetricsEnabled            bool
+		stakedAccessNodeAddress      string
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
-		ExtraFlags(func(flags *pflag.FlagSet) {
+		ExtraFlagsWithFnb(func(flags *pflag.FlagSet, fnb *cmd.FlowNodeBuilder) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
 			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
@@ -103,6 +104,8 @@ func main() {
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
+			flags.BoolVar(&fnb.Unstaked, "unstaked", false, "whether this node is an unstaked access node")
+			flags.StringVar(&stakedAccessNodeAddress, "staked-access-node-addr", "", "the address of the upstream staked access node if this is an unstaked access node")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.

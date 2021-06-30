@@ -136,7 +136,7 @@ type FlowNodeBuilder struct {
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
-	unstaked          bool
+	Unstaked          bool
 
 	// root state information
 	RootBlock   *flow.Block
@@ -167,7 +167,6 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
 		"whether to enable tracer")
-	fnb.flags.BoolVar(&fnb.unstaked, "unstaked", false, "whether this node is an unstaked access node")
 }
 
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
@@ -206,7 +205,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		if fnb.unstaked {
+		if fnb.Unstaked {
 			fnb.MsgValidators = []network.MessageValidator{
 				// filter out messages sent by this node itself
 				validator.NewSenderValidator(fnb.Me.NodeID()),
@@ -318,7 +317,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 	fnb.NodeID = nodeID
 	fnb.networkKey = info.NetworkPrivKey.PrivateKey
 
-	if fnb.unstaked {
+	if fnb.Unstaked {
 		// skip reading staking key for an unstaked access node
 		return
 	}
@@ -545,7 +544,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
 	var self *flow.Identity
-	if fnb.unstaked {
+	if fnb.Unstaked {
 		self = &flow.Identity{
 			NodeID:        myID,
 			NetworkPubKey: fnb.networkKey.PublicKey(),
@@ -575,7 +574,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 	}
 
-	if !fnb.unstaked {
+	if !fnb.Unstaked {
 		// ensure that the configured staking/network keys are consistent with the protocol state
 		if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
 			fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
@@ -665,6 +664,12 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
 func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) *FlowNodeBuilder {
 	f(fnb.flags)
+	return fnb
+}
+
+// ExtraFlagsWithFnb is similar to ExtraFlags but allows manipulating fnb state when parsing flags
+func (fnb *FlowNodeBuilder) ExtraFlagsWithFnb(f func(flags *pflag.FlagSet, fnb *FlowNodeBuilder)) *FlowNodeBuilder {
+	f(fnb.flags, fnb)
 	return fnb
 }
 
