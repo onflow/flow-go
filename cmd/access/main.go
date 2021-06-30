@@ -79,7 +79,7 @@ func main() {
 		retryEnabled                 bool
 		rpcMetricsEnabled            bool
 		staked                       bool
-		stakedAccessNodeAddress      string
+		stakedAccessNodeIDHex        string
 	)
 
 	cmd.FlowNode(flow.RoleAccess.String()).
@@ -109,7 +109,15 @@ func main() {
 			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 			flags.BoolVar(&staked, "staked", true, "whether this node is a staked access node or not")
-			flags.StringVar(&stakedAccessNodeAddress, "staked-access-node-addr", "", "the address of the upstream staked access node if this is an unstaked access node")
+			flags.StringVar(&stakedAccessNodeIDHex, "staked-access-node-addr", "", "the node ID of the upstream staked access node if this is an unstaked access node")
+		}).
+		PreInit(func(node *cmd.FlowNodeBuilder) {
+			if staked {
+				return
+			}
+			if strings.TrimSpace(stakedAccessNodeIDHex) == "" {
+				node.Logger.Fatal().Msg("staked access node ID not specified")
+			}
 		}).
 		PreInit(func(node *cmd.FlowNodeBuilder) {
 			if staked {
