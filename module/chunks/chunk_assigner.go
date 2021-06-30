@@ -104,7 +104,7 @@ func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Ra
 		return nil, err
 	}
 
-	rng, err := random.NewRand(seed)
+	rng, err := random.NewRand(seed, []byte("chunk_assign"))
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random generator: %w", err)
 	}
