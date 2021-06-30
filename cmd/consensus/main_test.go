@@ -24,7 +24,7 @@ import (
 func TestCreateDKGContractClient(t *testing.T) {
 	cmd := cmd.FlowNode(flow.RoleConsensus.String())
 
-	// collection local
+	// consensus local
 	identity := unittest.IdentityFixture()
 	stakingKey, err := unittest.StakingKey()
 	require.NoError(t, err)
@@ -36,7 +36,7 @@ func TestCreateDKGContractClient(t *testing.T) {
 	cmd.Me = local
 	cmd.RootChainID = flow.Testnet
 
-	machineAccountFileName := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, local.NodeID())
+	machineAccountFileName := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, local.NodeID().String())
 
 	t.Run("should return mock contract client with no NodeMachineAccountInfo file and invalid --access-address flag", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {

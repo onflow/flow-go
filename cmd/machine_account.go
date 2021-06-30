@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/io"
 )
 
 // LoadNodeMachineAccountInfoFile loads machine account info from the default location within the
 // bootstrap directory - Currently being used by Collection and Consensus nodes
-func LoadNodeMachineAccountInfoFile(bootstrapDir, nodeID string) (*bootstrap.NodeMachineAccountInfo, error) {
+func LoadNodeMachineAccountInfoFile(bootstrapDir string, nodeID flow.Identifier) (*bootstrap.NodeMachineAccountInfo, error) {
 
 	// attempt to read file
 	machineAccountInfoPath := filepath.Join(bootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, nodeID))

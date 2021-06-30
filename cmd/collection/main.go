@@ -445,7 +445,7 @@ func createQCContractClient(node *cmd.FlowNodeBuilder, accessAddress, qcContract
 	}
 
 	// attempt to read NodeMachineAccountInfo
-	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.NodeID.String())
+	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.NodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
 	}
