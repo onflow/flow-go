@@ -108,7 +108,7 @@ func main() {
 			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
 			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-			flags.BoolVar(&staked, "staked", false, "whether this node is a staked access node or not")
+			flags.BoolVar(&staked, "staked", true, "whether this node is a staked access node or not")
 			flags.StringVar(&stakedAccessNodeAddress, "staked-access-node-addr", "", "the address of the upstream staked access node if this is an unstaked access node")
 		}).
 		PreInit(func(node *cmd.FlowNodeBuilder) {
