@@ -36,6 +36,6 @@ type Rand interface {
 
 	// State returns the internal state of the random generator.
 	// The internal state can be used as a seed input for the function
-	// NewRand to restore an identical PRG (with the same internal state)
+	// Restore to restore an identical PRG (with the same internal state)
 	State() []byte
 }
