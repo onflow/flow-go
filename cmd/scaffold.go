@@ -29,7 +29,6 @@ import (
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -49,7 +48,7 @@ const notSet = "not set"
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
 	nodeIDHex             string
-	bindAddr              string
+	BindAddr              string
 	nodeRole              string
 	timeout               time.Duration
 	datadir               string
@@ -133,10 +132,10 @@ type FlowNodeBuilder struct {
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
 	sig               chan os.Signal
+	preInitFns        []func(*FlowNodeBuilder)
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
-	networkKey        crypto.PrivateKey
-	Unstaked          bool
+	NetworkKey        crypto.PrivateKey
 
 	// root state information
 	RootBlock   *flow.Block
@@ -151,7 +150,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
+	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", notSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
@@ -175,8 +174,8 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		codec := jsoncodec.NewCodec()
 
 		myAddr := fnb.Me.Address()
-		if fnb.BaseConfig.bindAddr != notSet {
-			myAddr = fnb.BaseConfig.bindAddr
+		if fnb.BaseConfig.BindAddr != notSet {
+			myAddr = fnb.BaseConfig.BindAddr
 		}
 
 		// setup the Ping provider to return the software version and the finalized block height
@@ -196,23 +195,13 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
-			fnb.networkKey,
+			fnb.NetworkKey,
 			fnb.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-		}
-
-		if fnb.Unstaked {
-			fnb.MsgValidators = []network.MessageValidator{
-				// filter out messages sent by this node itself
-				validator.NewSenderValidator(fnb.Me.NodeID()),
-				// but retain all the 1-k messages even if they are not intended for this node
-			}
-		} else {
-			fnb.MsgValidators = p2p.DefaultValidators(fnb.Logger, fnb.Me.NodeID())
 		}
 
 		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
@@ -315,12 +304,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 	}
 
 	fnb.NodeID = nodeID
-	fnb.networkKey = info.NetworkPrivKey.PrivateKey
-
-	if fnb.Unstaked {
-		// skip reading staking key for an unstaked access node
-		return
-	}
+	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
 	fnb.stakingKey = info.StakingPrivKey.PrivateKey
 }
 
@@ -536,6 +520,20 @@ func (fnb *FlowNodeBuilder) initState() {
 			Msg("genesis state bootstrapped")
 	}
 
+	// if the fnb.Me has already been initialized by a pre-init function, then skip re-initialization
+	if fnb.Me == nil {
+		fnb.initLocal()
+	}
+
+	lastFinalized, err := fnb.State.Final().Head()
+	fnb.MustNot(err).Msg("could not get last finalized block header")
+	fnb.Logger.Info().
+		Hex("block_id", logging.Entity(lastFinalized)).
+		Uint64("height", lastFinalized.Height).
+		Msg("last finalized block")
+}
+
+func (fnb *FlowNodeBuilder) initLocal() {
 	// Verify that my ID (as given in the configuration) is known to the network
 	// (i.e. protocol state). There are two cases that will cause the following error:
 	// 1) used the wrong node id, which is not part of the identity list of the finalized state
@@ -543,19 +541,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	fnb.MustNot(err).Msg("could not parse node identifier")
 
-	var self *flow.Identity
-	if fnb.Unstaked {
-		self = &flow.Identity{
-			NodeID:        myID,
-			NetworkPubKey: fnb.networkKey.PublicKey(),
-			StakingPubKey: nil,             // no staking key needed for the unstaked node
-			Role:          flow.RoleAccess, // unstaked node can only run as an access node
-			Address:       fnb.BaseConfig.bindAddr,
-		}
-	} else {
-		self, err = fnb.State.Final().Identity(myID)
-		fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
-	}
+	self, err := fnb.State.Final().Identity(myID)
+	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
 
 	// Verify that my role (as given in the configuration) is consistent with the protocol state.
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
@@ -574,25 +561,16 @@ func (fnb *FlowNodeBuilder) initState() {
 		}
 	}
 
-	if !fnb.Unstaked {
-		// ensure that the configured staking/network keys are consistent with the protocol state
-		if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
-			fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
-		}
-		if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
-			fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
-		}
+	// ensure that the configured staking/network keys are consistent with the protocol state
+	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
+	}
+	if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
 	}
 
 	fnb.Me, err = local.New(self, fnb.stakingKey)
 	fnb.MustNot(err).Msg("could not initialize local")
-
-	lastFinalized, err := fnb.State.Final().Head()
-	fnb.MustNot(err).Msg("could not get last finalized block header")
-	fnb.Logger.Info().
-		Hex("block_id", logging.Entity(lastFinalized)).
-		Uint64("height", lastFinalized.Height).
-		Msg("last finalized block")
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
@@ -707,6 +685,11 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 	return fnb
 }
 
+func (fnb *FlowNodeBuilder) PreInit(f func(node *FlowNodeBuilder)) *FlowNodeBuilder {
+	fnb.preInitFns = append(fnb.preInitFns, f)
+	return fnb
+}
+
 // FlowNode creates a new Flow node builder with the given name.
 func FlowNode(role string) *FlowNodeBuilder {
 
@@ -759,6 +742,10 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.initStorage()
 
+	for _, f := range fnb.preInitFns {
+		fnb.handlePreInit(f)
+	}
+
 	fnb.initState()
 
 	fnb.initFvmOptions()
@@ -797,6 +784,10 @@ func (fnb *FlowNodeBuilder) Run() {
 }
 
 func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {
+	f(fnb)
+}
+
+func (fnb *FlowNodeBuilder) handlePreInit(f func(node *FlowNodeBuilder)) {
 	f(fnb)
 }
 
