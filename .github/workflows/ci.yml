@@ -69,6 +69,9 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
+    - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
         
 
   integration-test:
