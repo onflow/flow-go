@@ -9,10 +9,10 @@ import (
 // This file contains service event fixtures for testing purposes.
 // The Cadence form is represented by JSON-CDC-encoded string variables.
 
-// epochSetupFixture returns an EpochSetup service event as a Cadence event
+// EpochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
-func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
-	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture())
+func EpochSetupFixture() (flow.Event, *flow.EpochSetup) {
+	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture(), 2)
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	expected := &flow.EpochSetup{
@@ -96,10 +96,10 @@ func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
 	return event, expected
 }
 
-// epochCommitFixture returns an EpochCommit service event as a Cadence event
+// EpochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func epochCommitFixture() (flow.Event, *flow.EpochCommit) {
-	event := unittest.EventFixture(flow.EventEpochCommit, 1, 1, unittest.IdentifierFixture())
+func EpochCommitFixture() (flow.Event, *flow.EpochCommit) {
+	event := unittest.EventFixture(flow.EventEpochCommit, 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{

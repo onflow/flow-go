@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
@@ -77,6 +78,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
 
+		assertEventHashesMatch(t, 1+1, result)
+
 		vm.AssertExpectations(t)
 	})
 
@@ -111,6 +114,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
+		assertEventHashesMatch(t, 1, result)
+
 		vm.AssertExpectations(t)
 	})
 
@@ -126,8 +131,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		collectionCount := 2
 		transactionsPerCollection := 2
 		eventsPerTransaction := 2
+		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
-		totalEventCount := eventsPerTransaction * totalTransactionCount
+		//totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
@@ -159,13 +165,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
 
 		// all events should have been collected
-		assert.Len(t, result.Events, totalEventCount)
+		assert.Len(t, result.Events, collectionCount+1)
+
+		for i := 0; i < collectionCount; i++ {
+			assert.Len(t, result.Events[i], eventsPerCollection)
+		}
+
+		assert.Len(t, result.Events[len(result.Events)-1], eventsPerTransaction)
 
 		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
-				e := result.Events[k]
+
+				chunkIndex := k / eventsPerCollection
+				eventIndex := k % eventsPerCollection
+
+				e := result.Events[chunkIndex][eventIndex]
 				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
 				k++
@@ -183,6 +199,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
+
+		assertEventHashesMatch(t, collectionCount+1, result)
 
 		vm.AssertExpectations(t)
 	})
@@ -250,19 +268,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
-
-		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-		//	Run(func(args mock.Arguments) {
-		//
-		//		tx := args[1].(*fvm.TransactionProcedure)
-		//
-		//
-		//		tx.Err = &fvm.MissingPayerError{}
-		//		tx.Events = events[txCount]
-		//		txCount++
-		//	}).
-		//	Return(nil).
-		//	Times(totalTransactionCount)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
@@ -391,6 +396,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
+}
+
+func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
+
+	require.Len(t, result.Events, expectedNoOfChunks)
+	require.Len(t, result.EventsHashes, expectedNoOfChunks)
+
+	for i := 0; i < expectedNoOfChunks; i++ {
+		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		require.NoError(t, err)
+
+		require.Equal(t, calculatedHash, result.EventsHashes[i])
+	}
 }
 
 type testRuntime struct {
