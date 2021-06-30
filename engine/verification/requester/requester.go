@@ -188,7 +188,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 	lg.Debug().Msg("chunk data pack received")
 
-	e.metrics.OnChunkDataPackResponseReceivedFromNetwork()
+	e.metrics.OnChunkDataPackResponseReceivedFromNetworkByRequester()
 
 	// makes sure we still need this chunk, and we will not process duplicate chunk data packs.
 	removed := e.pendingRequests.Rem(chunkID)
@@ -340,6 +340,6 @@ func (e *Engine) canDispatchRequest(chunkID flow.Identifier) bool {
 
 // onRequestDispatched encapsulates the logic of updating the chunk data request post a successful dispatch.
 func (e *Engine) onRequestDispatched(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
-	e.metrics.OnChunkDataPackRequestDispatchedInNetwork()
+	e.metrics.OnChunkDataPackRequestDispatchedInNetworkByRequester()
 	return e.pendingRequests.UpdateRequestHistory(chunkID, e.reqUpdaterFunc)
 }

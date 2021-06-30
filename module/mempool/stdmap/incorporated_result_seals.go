@@ -30,7 +30,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 		maxHeight := uint64(0)
 		var sealsAtMaxHeight sealSet
 		for height, seals := range byHeight {
-			if height > maxHeight {
+			if height > maxHeight || (height == 0 && maxHeight == 0) {
 				maxHeight = height
 				sealsAtMaxHeight = seals
 			}
@@ -100,6 +100,11 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 	})
 
 	return added, err
+}
+
+// Size returns the size of the underlying backing store
+func (ir *IncorporatedResultSeals) Size() uint {
+	return ir.Backend.Size()
 }
 
 // All returns all the items in the mempool
