@@ -28,9 +28,6 @@ const defaultApprovalQueueCapacity = 10000
 // defaultApprovalResponseQueueCapacity maximum capacity of approval requests queue
 const defaultApprovalResponseQueueCapacity = 10000
 
-// defaultFinalizationEventsQueueCapacity maximum capacity of finalization events
-const defaultFinalizationEventsQueueCapacity = 1000
-
 // defaultSealingEngineWorkers number of workers to dispatch events for sealing core
 const defaultSealingEngineWorkers = 8
 
@@ -49,13 +46,14 @@ type Engine struct {
 	me                         module.Local
 	headers                    storage.Headers
 	payloads                   storage.Payloads
+	state                      protocol.State
 	cacheMetrics               module.MempoolMetrics
 	engineMetrics              module.EngineMetrics
 	pendingApprovals           engine.MessageStore
 	pendingRequestedApprovals  engine.MessageStore
-	pendingFinalizationEvents  *fifoqueue.FifoQueue
 	pendingIncorporatedResults *fifoqueue.FifoQueue
 	notifier                   engine.Notifier
+	finalizationEventsNotifier engine.Notifier
 	messageHandler             *engine.MessageHandler
 	rootHeader                 *flow.Header
 }
@@ -137,11 +135,8 @@ func NewEngine(log zerolog.Logger,
 // attacker to feed values into the inbound channels for trusted inputs, even in the presence of bugs in
 // the networking layer or message handler
 func (e *Engine) setupTrustedInboundQueues() error {
+	e.finalizationEventsNotifier = engine.NewNotifier()
 	var err error
-	e.pendingFinalizationEvents, err = fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultFinalizationEventsQueueCapacity))
-	if err != nil {
-		return fmt.Errorf("failed to create queue for finalization events: %w", err)
-	}
 	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
 		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
@@ -240,17 +235,7 @@ func (e *Engine) processAvailableMessages() error {
 		default:
 		}
 
-		event, ok := e.pendingFinalizationEvents.Pop()
-		if ok {
-			finalizedBlockID := event.(flow.Identifier)
-			err := e.core.ProcessFinalizedBlock(finalizedBlockID)
-			if err != nil {
-				return fmt.Errorf("could not process finalized block %v: %w", finalizedBlockID, err)
-			}
-			continue
-		}
-
-		event, ok = e.pendingIncorporatedResults.Pop()
+		event, ok := e.pendingIncorporatedResults.Pop()
 		if ok {
 			err := e.processIncorporatedResult(event.(*flow.ExecutionResult))
 			if err != nil {
@@ -281,10 +266,16 @@ func (e *Engine) processAvailableMessages() error {
 
 func (e *Engine) loop() {
 	notifier := e.notifier.Channel()
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
+		case <-finalizationNotifier:
+			err := e.processFinalizationEvent()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("could not process finalized block")
+			}
 		case <-notifier:
 			err := e.processAvailableMessages()
 			if err != nil {
@@ -292,6 +283,18 @@ func (e *Engine) loop() {
 			}
 		}
 	}
+}
+
+func (e *Engine) processFinalizationEvent() error {
+	finalized, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not retrieve last finalized block: %w", err)
+	}
+	err = e.core.ProcessFinalizedBlock(finalized.ID())
+	if err != nil {
+		return fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err)
+	}
+	return nil
 }
 
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
@@ -359,9 +362,8 @@ func (e *Engine) Done() <-chan struct{} {
 //  (1) Informs sealing.Core about finalization of respective block.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	e.pendingFinalizationEvents.Push(finalizedBlockID)
-	e.notifier.Notify()
+func (e *Engine) OnFinalizedBlock(flow.Identifier) {
+	e.finalizationEventsNotifier.Notify()
 }
 
 // OnBlockIncorporated implements `OnBlockIncorporated` from the `hotstuff.FinalizationConsumer`

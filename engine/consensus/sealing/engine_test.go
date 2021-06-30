@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,7 +28,8 @@ func TestSealingEngineContext(t *testing.T) {
 type SealingEngineSuite struct {
 	suite.Suite
 
-	core *mockconsensus.SealingCore
+	core  *mockconsensus.SealingCore
+	state *mockprotocol.State
 
 	// Sealing Engine
 	engine *Engine
@@ -37,6 +39,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
 	s.core = &mockconsensus.SealingCore{}
+	s.state = &mockprotocol.State{}
 
 	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
 	require.NoError(s.T(), err)
@@ -49,6 +52,7 @@ func (s *SealingEngineSuite) SetupTest() {
 		engineMetrics: metrics,
 		cacheMetrics:  metrics,
 		rootHeader:    rootHeader,
+		state:         s.state,
 	}
 
 	// setup inbound queues for trusted inputs and message handler for untrusted inputs
@@ -63,12 +67,15 @@ func (s *SealingEngineSuite) SetupTest() {
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnFinalizedBlock() {
-	finalizedBlockID := unittest.IdentifierFixture()
+	finalizedBlock := unittest.BlockHeaderFixture()
+	finalizedBlockID := finalizedBlock.ID()
 	// setup payload fixture
 	payloads := &mockstorage.Payloads{}
 	payload := unittest.PayloadFixture()
 	payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil).Once()
 	s.engine.payloads = payloads
+
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
 
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
 	s.engine.OnFinalizedBlock(finalizedBlockID)
