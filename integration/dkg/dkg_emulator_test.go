@@ -168,5 +168,5 @@ func (s *DKGSuite) TestHappyPath() {
 }
 
 func (s *DKGSuite) TestNodesDown() {
-	s.runTest(8)
+	s.runTest(numberOfNodes - 2)
 }

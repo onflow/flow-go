@@ -46,7 +46,7 @@ type DKGSuite struct {
 	dkgAddress             sdk.Address
 	dkgAccountKey          *sdk.AccountKey
 	dkgSigner              sdkcrypto.Signer
-	checkDKGUnhappy        bool
+	checkDKGUnhappy        bool // activate log hook for DKGBroker to check if the DKG core is flagging misbehaviours
 
 	netIDs       flow.IdentityList
 	nodeAccounts []*nodeAccount
