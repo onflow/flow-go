@@ -130,7 +130,7 @@ func main() {
 
 	fmt.Println("Node bootstrapping data generated...")
 	for i, c := range containers {
-		fmt.Printf("%d: %s", i, c.Identity().String())
+		fmt.Printf("%d: %s", i+1, c.Identity().String())
 		if c.Unstaked {
 			fmt.Printf(" (unstaked)")
 		}
