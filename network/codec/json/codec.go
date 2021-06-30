@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -36,13 +37,15 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	env, err := encode(v)
+	env, err := v2envEncode(v, "~3net:wire<1")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
 	// encode the envelope
+	p := binstat.EnterTime("~3net:wire<2envelope2payload", "")
 	data, err := json.Marshal(env)
+	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not encode value: %w", err)
 	}
@@ -55,13 +58,15 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
 	var env Envelope
+	p := binstat.EnterTime("~3net:wire>3payload2envelope", "")
 	err := json.Unmarshal(data, &env)
+	binstat.LeaveVal(p, int64(len(env.Data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}
 
 	// decode the value
-	v, err := decode(env)
+	v, err := env2vDecode(env, "~3net:wire>4")
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}

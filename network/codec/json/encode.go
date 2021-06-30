@@ -101,71 +101,71 @@ func switchv2what(v interface{}) (string, error) {
 
 	// consensus
 	case *messages.BlockProposal:
-		what = "~4CodeBlockProposal"
+		what = "CodeBlockProposal"
 	case *messages.BlockVote:
-		what = "~4CodeBlockVote"
+		what = "CodeBlockVote"
 
 	// protocol state sync
 	case *messages.SyncRequest:
-		what = "~4CodeSyncRequest"
+		what = "CodeSyncRequest"
 	case *messages.SyncResponse:
-		what = "~4CodeSyncResponse"
+		what = "CodeSyncResponse"
 	case *messages.RangeRequest:
-		what = "~4CodeRangeRequest"
+		what = "CodeRangeRequest"
 	case *messages.BatchRequest:
-		what = "~4CodeBatchRequest"
+		what = "CodeBatchRequest"
 	case *messages.BlockResponse:
-		what = "~4CodeBatchRequest"
+		what = "CodeBatchRequest"
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
-		what = "~4CodeClusterBlockProposal"
+		what = "CodeClusterBlockProposal"
 	case *messages.ClusterBlockVote:
-		what = "~4CodeClusterBlockVote"
+		what = "CodeClusterBlockVote"
 	case *messages.ClusterBlockResponse:
-		what = "~4CodeClusterBlockResponse"
+		what = "CodeClusterBlockResponse"
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
-		what = "~4CodeCollectionGuarantee"
+		what = "CodeCollectionGuarantee"
 	case *flow.TransactionBody:
-		what = "~4CodeTransactionBody"
+		what = "CodeTransactionBody"
 	case *flow.Transaction:
-		what = "~4CodeTransaction"
+		what = "CodeTransaction"
 
 	// core messages for execution & verification
 	case *flow.ExecutionReceipt:
-		what = "~4CodeExecutionReceipt"
+		what = "CodeExecutionReceipt"
 	case *flow.ResultApproval:
-		what = "~4CodeResultApproval"
+		what = "CodeResultApproval"
 
 	// execution state synchronization
 	case *messages.ExecutionStateSyncRequest:
-		what = "~4CodeExecutionStateSyncRequest"
+		what = "CodeExecutionStateSyncRequest"
 	case *messages.ExecutionStateDelta:
-		what = "~4CodeExecutionStateDelta"
+		what = "CodeExecutionStateDelta"
 
 	// data exchange for execution of blocks
 	case *messages.ChunkDataRequest:
-		what = "~4CodeChunkDataRequest"
+		what = "CodeChunkDataRequest"
 	case *messages.ChunkDataResponse:
-		what = "~4CodeChunkDataResponse"
+		what = "CodeChunkDataResponse"
 
 	// result approvals
 	case *messages.ApprovalRequest:
-		what = "~4CodeApprovalRequest"
+		what = "CodeApprovalRequest"
 	case *messages.ApprovalResponse:
-		what = "~4CodeApprovalResponse"
+		what = "CodeApprovalResponse"
 
 	// generic entity exchange engines
 	case *messages.EntityRequest:
-		what = "~4CodeEntityRequest"
+		what = "CodeEntityRequest"
 	case *messages.EntityResponse:
-		what = "~4CodeEntityResponse"
+		what = "CodeEntityResponse"
 
 	// testing
 	case *message.TestMessage:
-		what = "~4CodeEcho"
+		what = "CodeEcho"
 
 	default:
 		return "", errors.Errorf("invalid encode type (%T)", v)
@@ -174,7 +174,7 @@ func switchv2what(v interface{}) (string, error) {
 	return what, nil
 }
 
-func encode(v interface{}) (*Envelope, error) {
+func v2envEncode(v interface{}, via string) (*Envelope, error) {
 
 	// determine the message type
 	code, err1 := switchv2code(v)
@@ -189,7 +189,7 @@ func encode(v interface{}) (*Envelope, error) {
 	}
 
 	// encode the payload
-	p := binstat.EnterTime(fmt.Sprintf("%s:%d", what, code), "")
+	p := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code), "")
 	data, err := json.Marshal(v)
 	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {

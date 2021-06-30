@@ -100,70 +100,70 @@ func switchenv2what(env Envelope) (string, error) {
 
 	// consensus
 	case CodeBlockProposal:
-		what = "~4CodeBlockProposal"
+		what = "CodeBlockProposal"
 	case CodeBlockVote:
-		what = "~4CodeBlockVote"
+		what = "CodeBlockVote"
 
 	// cluster consensus
 	case CodeClusterBlockProposal:
-		what = "~4CodeClusterBlockProposal"
+		what = "CodeClusterBlockProposal"
 	case CodeClusterBlockVote:
-		what = "~4CodeClusterBlockVote"
+		what = "CodeClusterBlockVote"
 	case CodeClusterBlockResponse:
-		what = "~4CodeClusterBlockResponse"
+		what = "CodeClusterBlockResponse"
 
 	// protocol state sync
 	case CodeSyncRequest:
-		what = "~4CodeSyncRequest"
+		what = "CodeSyncRequest"
 	case CodeSyncResponse:
-		what = "~4CodeSyncResponse"
+		what = "CodeSyncResponse"
 	case CodeRangeRequest:
-		what = "~4CodeRangeRequest"
+		what = "CodeRangeRequest"
 	case CodeBatchRequest:
-		what = "~4CodeBatchRequest"
+		what = "CodeBatchRequest"
 	case CodeBlockResponse:
-		what = "~4CodeBlockResponse"
+		what = "CodeBlockResponse"
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
-		what = "~4CodeCollectionGuarantee"
+		what = "CodeCollectionGuarantee"
 	case CodeTransactionBody:
-		what = "~4CodeTransactionBody"
+		what = "CodeTransactionBody"
 	case CodeTransaction:
-		what = "~4CodeTransaction"
+		what = "CodeTransaction"
 
 	// core messages for execution & verification
 	case CodeExecutionReceipt:
-		what = "~4CodeExecutionReceipt"
+		what = "CodeExecutionReceipt"
 	case CodeResultApproval:
-		what = "~4CodeResultApproval"
+		what = "CodeResultApproval"
 
 	// execution state synchronization
 	case CodeExecutionStateSyncRequest:
-		what = "~4CodeExecutionStateSyncRequest"
+		what = "CodeExecutionStateSyncRequest"
 	case CodeExecutionStateDelta:
-		what = "~4CodeExecutionStateDelta"
+		what = "CodeExecutionStateDelta"
 
 	// data exchange for execution of blocks
 	case CodeChunkDataRequest:
-		what = "~4CodeChunkDataRequest"
+		what = "CodeChunkDataRequest"
 	case CodeChunkDataResponse:
-		what = "~4CodeChunkDataResponse"
+		what = "CodeChunkDataResponse"
 
 	case CodeApprovalRequest:
-		what = "~4CodeApprovalRequest"
+		what = "CodeApprovalRequest"
 	case CodeApprovalResponse:
-		what = "~4CodeApprovalResponse"
+		what = "CodeApprovalResponse"
 
 	// generic entity exchange engines
 	case CodeEntityRequest:
-		what = "~4CodeEntityRequest"
+		what = "CodeEntityRequest"
 	case CodeEntityResponse:
-		what = "~4CodeEntityResponse"
+		what = "CodeEntityResponse"
 
 	// testing
 	case CodeEcho:
-		what = "~4CodeEcho"
+		what = "CodeEcho"
 
 	default:
 		return "", errors.Errorf("invalid message code (%d)", env.Code)
@@ -173,7 +173,7 @@ func switchenv2what(env Envelope) (string, error) {
 }
 
 // decode will decode the envelope into an entity.
-func decode(env Envelope) (interface{}, error) {
+func env2vDecode(env Envelope, via string) (interface{}, error) {
 
 	// create the desired message
 	v, err1 := switchenv2v(env)
@@ -188,7 +188,7 @@ func decode(env Envelope) (interface{}, error) {
 	}
 
 	// unmarshal the payload
-	p := binstat.EnterTimeVal(fmt.Sprintf("%s:%d", what, env.Code), "", int64(len(env.Data)))
+	p := binstat.EnterTimeVal(fmt.Sprintf("%s%s:%d", via, what, env.Code), "", int64(len(env.Data)))
 	err := json.Unmarshal(env.Data, v)
 	binstat.Leave(p)
 	if err != nil {

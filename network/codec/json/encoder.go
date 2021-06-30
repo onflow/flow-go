@@ -5,6 +5,8 @@ package json
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/onflow/flow-go/binstat"
 )
 
 // Encoder is an encoder to write serialized JSON to a writer.
@@ -17,13 +19,15 @@ type Encoder struct {
 func (e *Encoder) Encode(v interface{}) error {
 
 	// encode the value
-	env, err := encode(v)
+	env, err := v2envEncode(v, "~3net:strm<1")
 	if err != nil {
 		return fmt.Errorf("could not encode value: %w", err)
 	}
 
 	// write the envelope to network
+	p := binstat.EnterTimeVal("~3net:strm<2", "", int64(len(env.Data)))
 	err = e.enc.Encode(env)
+	binstat.Leave(p)
 	if err != nil {
 		return fmt.Errorf("could not encode envelope: %w", err)
 	}
