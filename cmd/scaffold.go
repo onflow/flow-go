@@ -667,12 +667,6 @@ func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) *FlowNodeBuilder 
 	return fnb
 }
 
-// ExtraFlagsWithFnb is similar to ExtraFlags but allows manipulating fnb state when parsing flags
-func (fnb *FlowNodeBuilder) ExtraFlagsWithFnb(f func(flags *pflag.FlagSet, fnb *FlowNodeBuilder)) *FlowNodeBuilder {
-	f(fnb.flags, fnb)
-	return fnb
-}
-
 // Module enables setting up dependencies of the engine with the builder context.
 func (fnb *FlowNodeBuilder) Module(name string, f func(builder *FlowNodeBuilder) error) *FlowNodeBuilder {
 	fnb.modules = append(fnb.modules, namedModuleFunc{
