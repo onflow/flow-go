@@ -287,6 +287,7 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.State,
 				node.Storage.Payloads,
 				node.Storage.Results,
 				core,

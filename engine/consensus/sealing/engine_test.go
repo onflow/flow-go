@@ -67,6 +67,7 @@ func (s *SealingEngineSuite) SetupTest() {
 // TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
 func (s *SealingEngineSuite) TestOnFinalizedBlock() {
+
 	finalizedBlock := unittest.BlockHeaderFixture()
 	finalizedBlockID := finalizedBlock.ID()
 	// setup payload fixture

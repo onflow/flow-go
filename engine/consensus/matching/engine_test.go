@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -28,6 +29,7 @@ type MatchingEngineSuite struct {
 	payloads *mockstorage.Payloads
 	results  *mockstorage.ExecutionResults
 	core     *mockconsensus.MatchingCore
+	state    *mockprotocol.State
 
 	// Matching Engine
 	engine *Engine
@@ -40,6 +42,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	s.core = &mockconsensus.MatchingCore{}
 	s.payloads = &mockstorage.Payloads{}
 	s.results = &mockstorage.ExecutionResults{}
+	s.state = &mockprotocol.State{}
 
 	ourNodeID := unittest.IdentifierFixture()
 	me.On("NodeID").Return(ourNodeID)
@@ -48,7 +51,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil).Once()
 
 	var err error
-	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.payloads, s.results, s.core)
+	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.payloads, s.results, s.core)
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -58,7 +61,8 @@ func (s *MatchingEngineSuite) SetupTest() {
 // Tests the whole processing pipeline.
 func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 
-	finalizedBlockID := unittest.IdentifierFixture()
+	finalizedBlock := unittest.BlockHeaderFixture()
+	finalizedBlockID := finalizedBlock.ID()
 
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
 	s.payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil)
@@ -68,6 +72,8 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 		receipt := flow.ExecutionReceiptFromMeta(*meta, *resultsById[meta.ResultID])
 		s.core.On("ProcessReceipt", receipt).Return(nil).Once()
 	}
+
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
 
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
 	s.engine.OnFinalizedBlock(finalizedBlockID)
