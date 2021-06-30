@@ -74,7 +74,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 
 	// ensure the chain ID is for a transient chain, where it is possible to
 	// infer machine account addresses this way
-	if chainID != flow.Emulator && chainID != flow.Localnet && chainID != flow.Benchnet {
+	if !chainID.Transient() {
 		return fmt.Errorf("cannot write default machine account files for non-transient network")
 	}
 

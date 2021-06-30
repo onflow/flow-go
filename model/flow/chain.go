@@ -37,6 +37,11 @@ const (
 	MonotonicEmulator ChainID = "flow-emulator-monotonic"
 )
 
+// Transient returns whether the chain ID is for a transient network.
+func (c ChainID) Transient() bool {
+	return c == Emulator || c == Localnet || c == Benchnet
+}
+
 // getChainCodeWord derives the network type used for address generation from the globally
 // configured chain ID.
 func (c ChainID) getChainCodeWord() uint64 {
