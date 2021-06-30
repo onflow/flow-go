@@ -1011,7 +1011,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 		ProposalKey:        ProposalKeyFixture(),
 		Payer:              AddressFixture(),
 		Authorizers:        []flow.Address{AddressFixture()},
-		PayloadSignatures:  []flow.TransactionSignature{TransactionSignatureFixture()},
 		EnvelopeSignatures: []flow.TransactionSignature{TransactionSignatureFixture()},
 	}
 
@@ -1251,7 +1250,7 @@ func SeedFixtures(m int, n int) [][]byte {
 }
 
 // EventFixture returns an event
-func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier) flow.Event {
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, payloadSize int) flow.Event {
 	return flow.Event{
 		Type:             eType,
 		TransactionIndex: transactionIndex,

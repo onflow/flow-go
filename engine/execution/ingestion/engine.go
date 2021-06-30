@@ -1068,8 +1068,8 @@ func (e *Engine) saveExecutionResults(
 	// no need to persist the state interactions, since they are used only by state
 	// syncing, which is currently disabled
 
-	chunks := make([]*flow.Chunk, 0, len(result.StateCommitments))
-	chdps := make([]*flow.ChunkDataPack, 0, len(result.StateCommitments))
+	chunks := make([]*flow.Chunk, len(result.StateCommitments))
+	chdps := make([]*flow.ChunkDataPack, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
 	var endState flow.StateCommitment = startState
@@ -1089,13 +1089,13 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID, blockID)
-		chunks = append(chunks, chunk)
+		eventsHash := result.EventsHashes[i]
+		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
 
 		// chunkDataPack
-		chdp := generateChunkDataPack(chunk, collectionID, result.Proofs[i])
-		chdps = append(chdps, chdp)
-
+		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
+		// TODO use view.SpockSecret() as an input to spock generator
+		chunks[i] = chunk
 		startState = endState
 	}
 
@@ -1156,15 +1156,12 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 // generateChunk creates a chunk from the provided computation data.
 func generateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	colID, blockID flow.Identifier) *flow.Chunk {
+	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
 			StartState:      startState,
-			// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
-			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
-			// startState stays the same if blocks are empty
-			EventCollection: colID,
+			EventCollection: eventsCollection,
 			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,

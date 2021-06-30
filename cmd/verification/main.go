@@ -207,10 +207,16 @@ func main() {
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
 				node.Logger,
+				collector,
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
 				chunkWorkers)
+
+			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
+			if err != nil {
+				return nil, fmt.Errorf("could not register backend metric: %w", err)
+			}
 
 			return chunkConsumer, nil
 		}).
@@ -238,6 +244,7 @@ func main() {
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
 				node.Logger,
+				collector,
 				processedBlockHeight,
 				node.Storage.Blocks,
 				node.State,
@@ -246,6 +253,11 @@ func main() {
 
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
+			}
+
+			err = node.Metrics.Mempool.Register(metrics.ResourceBlockConsumer, blockConsumer.Size)
+			if err != nil {
+				return nil, fmt.Errorf("could not register backend metric: %w", err)
 			}
 
 			node.Logger.Info().

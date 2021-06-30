@@ -134,8 +134,8 @@ func (c *Consumer) Size() uint {
 }
 
 // NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
-// the next job from the job queue if there are workers available
-func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
+// the next job from the job queue if there are workers available. It returns the last processed job index.
+func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
@@ -143,6 +143,8 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
 	if c.doneJob(jobID) {
 		c.checkProcessable()
 	}
+
+	return c.processedIndex
 }
 
 // Check allows the job publisher to notify the consumer that a new job has been added, so that

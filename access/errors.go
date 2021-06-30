@@ -61,6 +61,16 @@ func (e InvalidAddressError) Error() string {
 	return fmt.Sprintf("invalid address: %s", e.Address)
 }
 
+// DuplicatedSignatureError indicates that two signatures havs been provided for a key (combination of account and key index)
+type DuplicatedSignatureError struct {
+	Address  flow.Address
+	KeyIndex uint64
+}
+
+func (e DuplicatedSignatureError) Error() string {
+	return fmt.Sprintf("duplicated signature for key (address: %s, index: %d)", e.Address.String(), e.KeyIndex)
+}
+
 // InvalidSignatureError indicates that a transaction contains a signature
 // with a wrong format.
 type InvalidSignatureError struct {

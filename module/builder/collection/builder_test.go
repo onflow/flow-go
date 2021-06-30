@@ -465,8 +465,8 @@ func (suite *BuilderSuite) TestBuildOn_MaxCollectionSize() {
 }
 
 func (suite *BuilderSuite) TestBuildOn_MaxCollectionByteSize() {
-	// set the max collection byte size to 600 (each tx is about 273 bytes)
-	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(600))
+	// set the max collection byte size to 400 (each tx is about 150 bytes)
+	suite.builder = builder.NewBuilder(suite.db, trace.NewNoopTracer(), suite.headers, suite.headers, suite.payloads, suite.pool, builder.WithMaxCollectionByteSize(400))
 
 	// build a block
 	header, err := suite.builder.BuildOn(suite.genesis.ID(), noopSetter)
