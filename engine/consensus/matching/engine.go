@@ -11,28 +11,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
 // defaultReceiptQueueCapacity maximum capacity of receipts queue
 const defaultReceiptQueueCapacity = 10000
 
-// defaultFinalizationQueueCapacity maximum capacity of finalization queue
-const defaultFinalizationQueueCapacity = 100
-
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
-	unit                      *engine.Unit
-	log                       zerolog.Logger
-	me                        module.Local
-	core                      sealing.MatchingCore
-	results                   storage.ExecutionResults
-	payloads                  storage.Payloads
-	metrics                   module.EngineMetrics
-	notifier                  engine.Notifier
-	pendingReceipts           *fifoqueue.FifoQueue
-	pendingFinalizationEvents *fifoqueue.FifoQueue
+	unit                       *engine.Unit
+	log                        zerolog.Logger
+	me                         module.Local
+	core                       sealing.MatchingCore
+	state                      protocol.State
+	results                    storage.ExecutionResults
+	payloads                   storage.Payloads
+	metrics                    module.EngineMetrics
+	notifier                   engine.Notifier
+	pendingReceipts            *fifoqueue.FifoQueue
+	finalizationEventsNotifier engine.Notifier
 }
 
 func NewEngine(
@@ -41,6 +40,7 @@ func NewEngine(
 	me module.Local,
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
+	state protocol.State,
 	payloads storage.Payloads,
 	results storage.ExecutionResults,
 	core sealing.MatchingCore) (*Engine, error) {
@@ -54,25 +54,18 @@ func NewEngine(
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
-	// FIFO queue for finalization events
-	pendingFinalizationEvents, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultFinalizationQueueCapacity),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queue for inbound finalization events: %w", err)
-	}
-
 	e := &Engine{
-		log:                       log.With().Str("engine", "matching.Engine").Logger(),
-		unit:                      engine.NewUnit(),
-		me:                        me,
-		core:                      core,
-		payloads:                  payloads,
-		results:                   results,
-		metrics:                   engineMetrics,
-		notifier:                  engine.NewNotifier(),
-		pendingReceipts:           receiptsQueue,
-		pendingFinalizationEvents: pendingFinalizationEvents,
+		log:                        log.With().Str("engine", "matching.Engine").Logger(),
+		unit:                       engine.NewUnit(),
+		me:                         me,
+		core:                       core,
+		state:                      state,
+		payloads:                   payloads,
+		results:                    results,
+		metrics:                    engineMetrics,
+		notifier:                   engine.NewNotifier(),
+		finalizationEventsNotifier: engine.NewNotifier(),
+		pendingReceipts:            receiptsQueue,
 	}
 
 	// register engine with the receipt provider
@@ -143,8 +136,7 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
-	e.pendingFinalizationEvents.Push(finalizedBlockID)
-	e.notifier.Notify()
+	e.finalizationEventsNotifier.Notify()
 	e.processFinalizedReceipts(finalizedBlockID)
 }
 
@@ -189,10 +181,16 @@ func (e *Engine) processFinalizedReceipts(finalizedBlockID flow.Identifier) {
 
 func (e *Engine) loop() {
 	c := e.notifier.Channel()
+	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
+		case <-finalizationNotifier:
+			err := e.processFinalizationEvent()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("could not process finalized block")
+			}
 		case <-c:
 			err := e.processAvailableEvents()
 			if err != nil {
@@ -200,6 +198,18 @@ func (e *Engine) loop() {
 			}
 		}
 	}
+}
+
+func (e *Engine) processFinalizationEvent() error {
+	finalized, err := e.state.Final().Head()
+	if err != nil {
+		return fmt.Errorf("could not retrieve last finalized block: %w", err)
+	}
+	err = e.core.ProcessFinalizedBlock(finalized.ID())
+	if err != nil {
+		return fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err)
+	}
+	return nil
 }
 
 // processAvailableEvents processes _all_ available events (untrusted messages
@@ -210,15 +220,6 @@ func (e *Engine) processAvailableEvents() error {
 		case <-e.unit.Quit():
 			return nil
 		default:
-		}
-
-		finalizedBlockID, ok := e.pendingFinalizationEvents.Pop()
-		if ok {
-			err := e.core.ProcessFinalizedBlock(finalizedBlockID.(flow.Identifier))
-			if err != nil {
-				return fmt.Errorf("could not process finalized block: %w", err)
-			}
-			continue
 		}
 
 		msg, ok := e.pendingReceipts.Pop()
