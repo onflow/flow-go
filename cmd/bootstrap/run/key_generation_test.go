@@ -38,7 +38,7 @@ func TestWriteMachineAccountFiles(t *testing.T) {
 		unittest.PrivateNodeInfosFixture(5, unittest.WithRole(flow.RoleCollection))...,
 	)
 
-	chainID := flow.Testnet
+	chainID := flow.Localnet
 	chain := chainID.Chain()
 
 	nodeIDLookup := make(map[string]flow.Identifier)

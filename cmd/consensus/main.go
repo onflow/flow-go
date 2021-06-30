@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -34,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
@@ -647,11 +649,15 @@ func main() {
 				return nil, fmt.Errorf("could not initialise sdk client: %w", err)
 			}
 
+			contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
+			if err != nil {
+				return nil, fmt.Errorf("unknown dkg contract address: %w", err)
+			}
 			dkgContractClient := dkgmodule.NewClient(
 				node.Logger,
 				sdkClient,
 				machineAccountSigner,
-				node.RootChainID.Chain().ServiceAddress().HexWithPrefix(),
+				contracts.DKG.Address.HexWithPrefix(),
 				machineAccountInfo.Address,
 				machineAccountInfo.KeyIndex,
 			)

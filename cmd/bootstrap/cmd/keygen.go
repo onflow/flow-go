@@ -90,7 +90,7 @@ func init() {
 
 	// optional parameters, used for generating machine account files
 	keygenCmd.Flags().BoolVar(&flagDefaultMachineAccount, "machine-account", false, "whether or not to generate a default (same as networking key) machine account key file")
-	keygenCmd.Flags().StringVar(&flagRootChain, "root-chain", "emulator", "chain ID for the root block (can be \"main\", \"test\" or \"emulator\"")
+	keygenCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'canary', 'bench', or 'local'")
 }
 
 // isEmptyDir returns True if the directory contains children
