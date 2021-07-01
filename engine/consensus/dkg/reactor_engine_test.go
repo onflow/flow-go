@@ -1,12 +1,12 @@
 package dkg
 
 import (
-	"github.com/rs/zerolog"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 

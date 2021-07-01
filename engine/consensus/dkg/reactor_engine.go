@@ -170,7 +170,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter+1)
+	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("could not retrieve DKG private info")
 	}
@@ -186,7 +186,6 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		e.log.Warn().Msg("locally computed dkg public key does not match dkg public key for next epoch")
 	}
 }
-
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
 	currEpoch := e.State.AtBlockID(firstBlockID).Epochs().Current()
