@@ -39,6 +39,7 @@ type Broker struct {
 	broadcastMsgCh    chan messages.DKGMessage // channel to forward incoming broadcast messages to consumers
 	messageOffset     uint                     // offset for next broadcast messages to fetch
 	shutdownCh        chan struct{}            // channel to stop the broker from listening
+	broadcasts        uint                     // broadcasts counts the number of successful broadcasts
 }
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
@@ -95,6 +96,11 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
+	if b.broadcasts > 0 {
+		// The Warn log is used by the integration tests to check if this method
+		// is called more than once within one epoch.
+		b.log.Warn().Msgf("DKG broadcast number %d", b.broadcasts+1)
+	}
 	bcastMsg, err := b.prepareBroadcastMessage(data)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
@@ -111,15 +117,20 @@ func (b *Broker) Broadcast(data []byte) {
 		return
 	}
 	b.log.Debug().Msg("dkg message broadcast")
+	b.broadcasts++
 }
 
 // Disqualify flags that a node is misbehaving and got disqualified
 func (b *Broker) Disqualify(node int, log string) {
+	// The Warn log is used by the integration tests to check if this method is
+	// called.
 	b.log.Warn().Msgf("participant %d is disqualifying participant %d because: %s", b.myIndex, node, log)
 }
 
 // FlagMisbehavior warns that a node is misbehaving.
 func (b *Broker) FlagMisbehavior(node int, log string) {
+	// The Warn log is used by the integration tests to check if this method is
+	// called.
 	b.log.Warn().Msgf("participant %d is flagging participant %d because: %s", b.myIndex, node, log)
 }
 
