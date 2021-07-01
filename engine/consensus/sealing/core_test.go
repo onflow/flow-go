@@ -771,15 +771,6 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			)
 			result.BlockID = block.Header.ParentID
 
-			// TODO: change this test for phase 3, assigner should expect incorporated block ID, not executed
-			if blockIndex < len(fork)-1 {
-				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
-				assigner.On("Assign", result, blockID).Return(s.ChunksAssignment, nil)
-			} else {
-				assigner.On("Assign", result, blockID).Return(nil, fmt.Errorf("no assignment for block without valid child")).Maybe()
-				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
-			}
-
 			// update caches
 			s.blocks[blockID] = block.Header
 			s.identitiesCache[blockID] = s.AuthorizedVerifiers
@@ -788,7 +779,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			IR := unittest.IncorporatedResult.Fixture(
 				unittest.IncorporatedResult.WithResult(result),
 				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
-			expectedResults = append(expectedResults, IR)
+
+			// TODO: change this test for phase 3, assigner should expect incorporated block ID, not executed
+			if blockIndex < len(fork)-1 {
+				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
+				assigner.On("Assign", result, blockID).Return(s.ChunksAssignment, nil)
+				expectedResults = append(expectedResults, IR)
+			} else {
+				assigner.On("Assign", result, blockID).Return(nil, fmt.Errorf("no assignment for block without valid child")).Maybe()
+				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
+			}
 
 			payload := unittest.PayloadFixture()
 			payload.Results = append(payload.Results, result)
