@@ -62,7 +62,7 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Setup tmate session
-      uses: mxschmitt/action-tmate@v3
+      uses: lhotari/action-upterm@v1
     - name: Run tests
       run: make ci-arm
     - name: Upload coverage report
@@ -71,9 +71,6 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
-    - name: Setup tmate session
-        if: ${{ failure() }}
-        uses: mxschmitt/action-tmate@v3
   integration-test:
     name: Integration Tests
     runs-on: ubuntu-latest
