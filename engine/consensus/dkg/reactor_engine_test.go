@@ -1,7 +1,9 @@
 package dkg
 
 import (
+	"github.com/rs/zerolog"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -133,4 +135,69 @@ func TestEpochSetup(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	controller.AssertExpectations(t)
 	keyStorage.AssertExpectations(t)
+}
+
+// TestReactorEngine_EpochCommittedPhaseStarted ensures that we are logging
+// a warning message whenever we have a mismatch between the locally produced DKG keys
+// and the keys produced by the DKG smart contract.
+func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
+	rand.Seed(time.Now().UnixNano())
+	currentCounter := rand.Uint64()
+	nextCounter := currentCounter + 1
+	me := new(module.Local)
+
+	privKey, _ := unittest.NetworkingKey()
+
+	dkgParticipantPrivInfo := unittest.DKGParticipantPriv()
+
+	keyStorage := new(storage.DKGKeys)
+	keyStorage.On("RetrieveMyDKGPrivateInfo", currentCounter+1).Return(dkgParticipantPrivInfo, nil)
+	factory := new(module.DKGControllerFactory)
+
+	nextDKG := new(protocol.DKG)
+	nextDKG.On("KeyShare", dkgParticipantPrivInfo.NodeID).Return(privKey.PublicKey(), nil)
+
+	currentEpoch := new(protocol.Epoch)
+	currentEpoch.On("Counter").Return(currentCounter, nil)
+
+	nextEpoch := new(protocol.Epoch)
+	nextEpoch.On("Counter").Return(nextCounter, nil)
+	nextEpoch.On("DKG").Return(nextDKG, nil)
+
+	epochQuery := mocks.NewEpochQuery(t, currentCounter)
+	epochQuery.Add(currentEpoch)
+	epochQuery.Add(nextEpoch)
+
+	firstBlock := unittest.BlockHeaderFixture()
+	firstBlock.View = 100
+
+	snapshot := new(protocol.Snapshot)
+	snapshot.On("Epochs").Return(epochQuery)
+
+	state := new(protocol.State)
+	state.On("Final").Return(snapshot)
+
+	viewEvents := gadgets.NewViews()
+
+	hookCalls := 0
+
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			hookCalls++
+		}
+	})
+	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+
+	engine := NewReactorEngine(
+		logger,
+		me,
+		state,
+		keyStorage,
+		factory,
+		viewEvents,
+	)
+
+	engine.EpochCommittedPhaseStarted(currentCounter, &firstBlock)
+
+	require.Equal(t, 1, hookCalls)
 }
