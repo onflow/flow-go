@@ -42,7 +42,7 @@ crypto/relic/update:
 	git submodule update --recursive
 
 .PHONY: crypto/relic/build-arm-crosscompile
-crypto/relic/build-arm: crypto/relic
+crypto/relic/build-arm-crosscompile: crypto/relic
 	./crypto/relic_arm_crossbuild.sh
 
 cmd/collection/collection:
