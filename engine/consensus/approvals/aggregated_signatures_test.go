@@ -3,9 +3,9 @@ package approvals
 import (
 	"testing"
 
+	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -46,8 +46,8 @@ func TestAggregatedSignatures_Repeated_PutSignature(t *testing.T) {
 
 	// add signature for chunk with index 3
 	as1 := flow.AggregatedSignature{
-		VerifierSignatures: make([]crypto.Signature, 22),
-		SignerIDs:          make([]flow.Identifier, 22),
+		VerifierSignatures: unittest.SignaturesFixture(22),
+		SignerIDs:          unittest.IdentifierListFixture(22),
 	}
 	n, err := sigs.PutSignature(3, as1)
 	require.NoError(t, err)
@@ -55,8 +55,8 @@ func TestAggregatedSignatures_Repeated_PutSignature(t *testing.T) {
 
 	// add _different_ sig for chunk index 3 (should be no-op)
 	as2 := flow.AggregatedSignature{
-		VerifierSignatures: make([]crypto.Signature, 2),
-		SignerIDs:          make([]flow.Identifier, 2),
+		VerifierSignatures: unittest.SignaturesFixture(2),
+		SignerIDs:          unittest.IdentifierListFixture(2),
 	}
 	n, err = sigs.PutSignature(3, as2)
 	require.NoError(t, err)
@@ -65,9 +65,45 @@ func TestAggregatedSignatures_Repeated_PutSignature(t *testing.T) {
 	aggSigs := sigs.Collect()
 	for idx, s := range aggSigs {
 		if idx == 3 {
-			require.Equal(t, s.CardinalitySignerSet(), 22)
+			require.Equal(t, 22, s.CardinalitySignerSet())
 		} else {
-			require.Equal(t, s.CardinalitySignerSet(), 0)
+			require.Equal(t, 0, s.CardinalitySignerSet())
+		}
+	}
+}
+
+// TestAggregatedSignatures_Repeated_Signer tests that repeated calls to
+// PutSignature for the same chunk index are no-ops except for the first one.
+func TestAggregatedSignatures_Repeated_Signer(t *testing.T) {
+	// create NewAggregatedSignatures for block with chunk indices 0, 1, ... , 9
+	sigs, err := NewAggregatedSignatures(10)
+	require.NoError(t, err)
+	require.Empty(t, sigs.signatures)
+
+	// add signature for chunk with index 3
+	as1 := flow.AggregatedSignature{
+		VerifierSignatures: unittest.SignaturesFixture(22),
+		SignerIDs:          unittest.IdentifierListFixture(22),
+	}
+	n, err := sigs.PutSignature(3, as1)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), n)
+
+	// add _different_ sig for chunk index 3 (should be no-op)
+	as2 := flow.AggregatedSignature{
+		VerifierSignatures: unittest.SignaturesFixture(2),
+		SignerIDs:          unittest.IdentifierListFixture(2),
+	}
+	n, err = sigs.PutSignature(3, as2)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), n)
+
+	aggSigs := sigs.Collect()
+	for idx, s := range aggSigs {
+		if idx == 3 {
+			require.Equal(t, 22, s.CardinalitySignerSet())
+		} else {
+			require.Equal(t, 0, s.CardinalitySignerSet())
 		}
 	}
 }
