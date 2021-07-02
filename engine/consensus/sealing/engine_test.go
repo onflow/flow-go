@@ -98,7 +98,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	s.engine.headers = headers
 
 	for _, result := range payload.Results {
-		IR := flow.NewIncorporatedResult(result.BlockID, result)
+		IR := flow.NewIncorporatedResult(parentBlock.ID(), result)
 		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
 	}
 

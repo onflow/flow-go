@@ -164,9 +164,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		}
 
 		for _, result := range payload.Results {
-			// TODO: change this when migrating to sealing & verification phase 3.
-			// Incorporated result is created this way only for phase 2.
-			incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
 				return fmt.Errorf("could not process incorporated result for block %s: %w", blockID, err)
