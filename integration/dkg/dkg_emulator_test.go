@@ -154,7 +154,9 @@ func (s *DKGSuite) runTest(goodNodes int) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	groupSignature, err := signature.CombineThresholdShares(uint(len(nodes)), signatures, indices)
+	// combining the threshold signature needs to be called with the total
+	// number of nodes
+	groupSignature, err := signature.CombineThresholdShares(uint(len(s.nodes)), signatures, indices)
 	require.NoError(s.T(), err)
 
 	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)
@@ -162,11 +164,13 @@ func (s *DKGSuite) runTest(goodNodes int) {
 	assert.True(s.T(), ok, "failed to verify threshold signature")
 }
 
+// TestHappyPath checks that DKG works when all nodes are good
 func (s *DKGSuite) TestHappyPath() {
-	s.T().Skip()
 	s.runTest(numberOfNodes)
 }
 
+// TestNodesDown checks that DKG still works with the maximum number of bad
+// nodes (n/2)
 func (s *DKGSuite) TestNodesDown() {
-	s.runTest(numberOfNodes - 2)
+	s.runTest(numberOfNodes/2 + 1)
 }
