@@ -39,7 +39,7 @@ type Broker struct {
 	broadcastMsgCh    chan messages.DKGMessage // channel to forward incoming broadcast messages to consumers
 	messageOffset     uint                     // offset for next broadcast messages to fetch
 	shutdownCh        chan struct{}            // channel to stop the broker from listening
-	broadcasts        uint                     // broadcasts counts the number of succesful broadcasts
+	broadcasts        uint                     // broadcasts counts the number of successful broadcasts
 }
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating

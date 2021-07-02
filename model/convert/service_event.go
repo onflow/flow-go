@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
@@ -16,13 +17,18 @@ import (
 // ServiceEvent converts a service event encoded as the generic flow.Event
 // type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
-func ServiceEvent(chain flow.Chain, event flow.Event) (*flow.ServiceEvent, error) {
+func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
 
-	// depending on type of Epoch event construct Go type
+	events, err := systemcontracts.ServiceEventsForChain(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get service event info: %w", err)
+	}
+
+	// depending on type of service event construct Go type
 	switch event.Type {
-	case flow.EventEpochSetup(chain):
+	case events.EpochSetup.EventType():
 		return convertServiceEventEpochSetup(event)
-	case flow.EventEpochCommit(chain):
+	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
