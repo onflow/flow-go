@@ -163,40 +163,16 @@ type VerificationMetrics interface {
 	// OnBlockConsumerJobDone is invoked by block consumer whenever it is notified a job is done by a worker. It
 	// sets the last processed block job index.
 	OnBlockConsumerJobDone(uint64)
-
 	// OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
 	// sets the last processed chunk job index.
 	OnChunkConsumerJobDone(uint64)
-
-	// TODO: remove this event handlers once we have new architecture in place.
-	// OnExecutionReceiptReceived is called whenever a new execution receipt arrives
-	// at Finder engine. It increments total number of received receipts.
-	OnExecutionReceiptReceived()
-	// OnExecutionResultSent is called whenever a new execution result is sent by
-	// Finder engine to the match engine. It increments total number of sent execution results.
-	OnExecutionResultSent()
-	// OnExecutionResultReceived is called whenever a new execution result is successfully received
-	// by Match engine from Finder engine.
-	// It increments the total number of received execution results.
-	OnExecutionResultReceived()
-	// OnVerifiableChunkSent is called on a successful submission of matched chunk
-	// by Match engine to Verifier engine.
-	// It increments the total number of chunks matched by match engine.
-	OnVerifiableChunkSent()
-	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
-	// It increments the total number of chunk data packs received.
-	OnChunkDataPackReceived()
-	// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
-	// It increments the total number of chunk data packs requested.
-	OnChunkDataPackRequested()
+	// OnExecutionResultReceivedAtAssignerEngine is called whenever a new execution result arrives
+	// at Assigner engine. It increments total number of received execution results.
+	OnExecutionResultReceivedAtAssignerEngine()
 
 	// OnVerifiableChunkReceivedAtVerifierEngine increments a counter that keeps track of number of verifiable chunks received at
 	// verifier engine from fetcher engine.
 	OnVerifiableChunkReceivedAtVerifierEngine()
-
-	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
-	// by verifier engine.
-	OnResultApprovalDispatchedInNetwork()
 
 	// OnFinalizedBlockArrivedAtAssigner sets a gauge that keeps track of number of the latest block height arrives
 	// at assigner engine. Note that it assumes blocks are coming to assigner engine in strictly increasing order of their height.
@@ -223,11 +199,11 @@ type VerificationMetrics interface {
 
 	// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 	// requester engine dispatches in the network (to the execution nodes).
-	OnChunkDataPackRequestDispatchedInNetwork()
+	OnChunkDataPackRequestDispatchedInNetworkByRequester()
 
 	// OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 	// requester engine receives from execution nodes (through network).
-	OnChunkDataPackResponseReceivedFromNetwork()
+	OnChunkDataPackResponseReceivedFromNetworkByRequester()
 
 	// OnChunkDataPackSentToFetcher increments a counter that keeps track of number of chunk data packs sent to the fetcher engine from
 	// requester engine.
@@ -239,6 +215,10 @@ type VerificationMetrics interface {
 
 	// OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 	OnVerifiableChunkSentToVerifier()
+
+	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
+	// by verifier engine.
+	OnResultApprovalDispatchedInNetworkByVerifier()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
