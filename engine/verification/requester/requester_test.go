@@ -105,7 +105,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &response.ChunkDataPack, &response.Collection).Return().Once()
-	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Once()
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
 	err := e.Process(originID, response)
@@ -132,7 +132,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	mockPendingRequestsRem(t, s.pendingRequests, chunkIDs)
 	// we pass each chunk data pack and its collection to chunk data pack handler
 	mockChunkDataPackHandler(t, s.handler, chunkCollectionIdMap)
-	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Times(len(responses))
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(responses))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
 	for _, response := range responses {
@@ -158,7 +158,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
-	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Once()
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
 	err := e.Process(originID, response)
 	require.Nil(t, err)
@@ -225,8 +225,8 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	// makes all chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
-	s.metrics.On("OnChunkDataPackResponseReceivedFromNetwork").Return().Times(len(requests))
-	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(requests))
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(requests))
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(requests))
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
@@ -273,7 +273,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// makes all (unsealed) chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
-	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(unsealedRequests))
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(unsealedRequests))
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -324,7 +324,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
-	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(count * attempts)
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(count * attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -387,7 +387,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	// mocks only instantly qualified requests are dispatched in the network.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
-	s.metrics.On("OnChunkDataPackRequestDispatchedInNetwork").Return().Times(len(instantQualifiedRequests) * attempts)
+	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(instantQualifiedRequests) * attempts)
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not check chunk requests qualification on time")
