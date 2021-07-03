@@ -326,6 +326,9 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 		isRoot := rootBlock.ID() == last.ID()
 		if !isRoot {
 			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, lastExecutedID)
+			if err != nil {
+				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
+			}
 			if !executed {
 				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
 				if err != nil {
