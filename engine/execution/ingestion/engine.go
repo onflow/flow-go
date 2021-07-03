@@ -489,15 +489,6 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		return nil
 	}
 
-	// if newly enqueued block is inside any existing queue, we should skip now and wait
-	// for parent to finish execution
-	if !head {
-		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
-			Int("block_height", int(executableBlock.Height())).
-			Msg("block already exists in the execution queue")
-		return nil
-	}
-
 	firstUnexecutedHeight := queue.Head.Item.Height()
 	// disable state syncing for now
 	// if checkStateSync {
@@ -541,15 +532,20 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		return fmt.Errorf("cannot send collection requests: %w", err)
 	}
 
-	// execute the block if the block is ready to be executed
-	completed := e.executeBlockIfComplete(executableBlock)
+	// if newly enqueued block is inside any existing queue, we should skip now and wait
+	// for parent to finish execution
+	if head {
+		// execute the block if the block is ready to be executed
+		completed := e.executeBlockIfComplete(executableBlock)
 
-	lg.Info().
-		// if the execution is halt, but the queue keeps growing, we could check which block
-		// hasn't been executed.
-		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
-		Bool("completed", completed).
-		Msg("block is enqueued")
+		lg.Info().
+			// if the execution is halt, but the queue keeps growing, we could check which block
+			// hasn't been executed.
+			Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
+			Bool("completed", completed).
+			Bool("head_of_queue", head).
+			Msg("block is enqueued")
+	}
 
 	return nil
 }
