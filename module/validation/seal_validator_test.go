@@ -9,8 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
-	mock2 "github.com/onflow/flow-go/module/mock"
+	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -22,14 +21,27 @@ type SealValidationSuite struct {
 	unittest.BaseChainSuite
 
 	sealValidator *sealValidator
-	verifier      *mock2.Verifier
+	metrics       *module.ConsensusMetrics
+	verifier      *module.Verifier
 }
 
 func (s *SealValidationSuite) SetupTest() {
 	s.SetupChain()
-	s.verifier = &mock2.Verifier{}
-	s.sealValidator = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, s.verifier, 1, metrics.NewNoopCollector())
+	s.verifier = &module.Verifier{}
+	s.metrics = &module.ConsensusMetrics{}
+
+	var err error
+	s.sealValidator, err = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, s.verifier, 2, 2, s.metrics)
+	s.Require().NoError(err)
+}
+
+// TestConsistencyCheckOnApprovals verifies that SealValidator instantiation fails if
+// required number of approvals for seal construction is smaller than for seal verification
+func (s *SealValidationSuite) TestConsistencyCheckOnApprovals() {
+	_, err := NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
+		s.Assigner, s.verifier, 2, 3, s.metrics)
+	s.Require().Error(err)
 }
 
 // TestSealValid tests submitting of valid seal
@@ -115,14 +127,11 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	})
 
 	// we want to make sure that the emergency-seal metric is not called because
-	// requiredApprovalsForSealing is > 0. We don't mock the EmergencySeal
-	// method of the compliance collector, such that the test will fail if the
-	// method is called.
-	mockMetrics := &mock2.ConsensusMetrics{}
-	s.sealValidator.metrics = mockMetrics
-
+	// requiredApprovalsForSealVerification is > 0.
+	s.metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
+		s.T().Errorf("should not count as emmergency sealed, because seal has fewer approvals than required for Seal Verification")
+	}).Return()
 	_, err := s.sealValidator.Validate(&block)
-
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -146,25 +155,73 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-
 	s.Extend(&blockParent)
 
-	block := unittest.BlockWithParentFixture(blockParent.Header)
-	seal := s.validSealForResult(&receipt.ExecutionResult)
-	seal.AggregatedApprovalSigs = seal.AggregatedApprovalSigs[1:]
-	block.SetPayload(flow.Payload{
-		Seals: []*flow.Seal{seal},
-	})
-
-	s.sealValidator.requiredApprovalsForSealVerification = 0
-	mockMetrics := &mock2.ConsensusMetrics{}
-	mockMetrics.On("EmergencySeal").Once()
-	s.sealValidator.metrics = mockMetrics
-
-	_, err := s.sealValidator.Validate(&block)
+	// requiredApprovalsForSealConstruction = 2
+	// receive seal with 2 approvals => _not_ emergency sealed
+	block := s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 2)
+	metrics := &module.ConsensusMetrics{}
+	metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
+		s.T().Errorf("happy path sealing should not be counted as emmergency sealed")
+	}).Return()
+	s.sealValidator.metrics = metrics
+	//
+	_, err := s.sealValidator.Validate(block)
 	s.Require().NoError(err)
 
-	mockMetrics.AssertExpectations(s.T())
+	// requiredApprovalsForSealConstruction = 2
+	// requiredApprovalsForSealVerification = 1
+	// receive seal with 1 approval => emergency sealed
+	s.sealValidator.requiredApprovalsForSealVerification = 1
+	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 1)
+	metrics = &module.ConsensusMetrics{}
+	metrics.On("EmergencySeal").Once()
+	s.sealValidator.metrics = metrics
+	//
+	_, err = s.sealValidator.Validate(block)
+	s.Require().NoError(err)
+	metrics.AssertExpectations(s.T())
+
+	// requiredApprovalsForSealConstruction = 2
+	// requiredApprovalsForSealVerification = 1
+	// receive seal with 0 approval => invalid
+	s.sealValidator.requiredApprovalsForSealVerification = 1
+	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 0)
+	metrics = &module.ConsensusMetrics{}
+	metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
+		s.T().Errorf("invaid seal should not be counted as emmergency sealed")
+	}).Return()
+	s.sealValidator.metrics = metrics
+	//
+	_, err = s.sealValidator.Validate(block)
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
+
+	// requiredApprovalsForSealConstruction = 2
+	// requiredApprovalsForSealVerification = 0
+	// receive seal with 1 approval => emergency sealed
+	s.sealValidator.requiredApprovalsForSealVerification = 0
+	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 1)
+	metrics = &module.ConsensusMetrics{}
+	metrics.On("EmergencySeal").Once()
+	s.sealValidator.metrics = metrics
+	//
+	_, err = s.sealValidator.Validate(block)
+	s.Require().NoError(err)
+	metrics.AssertExpectations(s.T())
+
+	// requiredApprovalsForSealConstruction = 2
+	// requiredApprovalsForSealVerification = 0
+	// receive seal with 0 approval => emergency sealed
+	s.sealValidator.requiredApprovalsForSealVerification = 0
+	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 0)
+	metrics = &module.ConsensusMetrics{}
+	metrics.On("EmergencySeal").Once()
+	s.sealValidator.metrics = metrics
+	//
+	_, err = s.sealValidator.Validate(block)
+	s.Require().NoError(err)
+	metrics.AssertExpectations(s.T())
 }
 
 // TestSealInvalidChunkSignersCount tests that we reject seal with invalid approval signatures for
@@ -219,6 +276,37 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 
 	_, err := s.sealValidator.Validate(&block)
 
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err))
+}
+
+// TestSealDuplicatedApproval verifies that the seal validator rejects an invalid
+// seal where approvals are repeated. Otherwise, this would open up an attack vector,
+// where the seal contains insufficient approvals when duplicating.
+func (s *SealValidationSuite) TestSealDuplicatedApproval() {
+	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
+	blockParent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+	})
+	s.Extend(&blockParent)
+
+	block := unittest.BlockWithParentFixture(blockParent.Header)
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	seal.AggregatedApprovalSigs[0].VerifierSignatures[1] = seal.AggregatedApprovalSigs[0].VerifierSignatures[0]
+	seal.AggregatedApprovalSigs[0].SignerIDs[1] = seal.AggregatedApprovalSigs[0].SignerIDs[0]
+	block.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&block)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -648,8 +736,26 @@ func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *
 			s.verifier.On("Verify",
 				payload[:],
 				aggregatedSig,
-				s.Identities[aggregatedSigs.SignerIDs[i]].StakingPubKey).Return(true, nil).Once()
+				s.Identities[aggregatedSigs.SignerIDs[i]].StakingPubKey).Return(true, nil).Maybe()
 		}
 	}
 	return seal
+}
+
+// makeBlockSealingResult constructs a child block of `parentBlock`, whose payload includes
+// a seal for `sealedResult`. For each chunk, the seal has aggregated approval signatures from
+// `numberApprovals` assigned verification Nodes.
+// Note: numberApprovals cannot be larger than the number of assigned verification nodes.
+func (s *SealValidationSuite) makeBlockSealingResult(parentBlock *flow.Header, sealedResult *flow.ExecutionResult, numberApprovals int) *flow.Block {
+	seal := s.validSealForResult(sealedResult)
+	for chunkIndex := 0; chunkIndex < len(seal.AggregatedApprovalSigs); chunkIndex++ {
+		seal.AggregatedApprovalSigs[chunkIndex].SignerIDs = seal.AggregatedApprovalSigs[chunkIndex].SignerIDs[:numberApprovals]
+		seal.AggregatedApprovalSigs[chunkIndex].VerifierSignatures = seal.AggregatedApprovalSigs[chunkIndex].VerifierSignatures[:numberApprovals]
+	}
+
+	sealingBlock := unittest.BlockWithParentFixture(parentBlock)
+	sealingBlock.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+	return &sealingBlock
 }
