@@ -36,7 +36,7 @@ crypto/relic:
 
 .PHONY: crypto/relic/build
 crypto/relic/build: crypto/relic
-	./crypto/relic_build.sh aarch64-linux-gnu-gcc
+	./crypto/relic_build.sh
 
 crypto/relic/update:
 	git submodule update --recursive
@@ -53,6 +53,16 @@ cmd/util/util:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.29.0; \
+	cd ${GOPATH}; \
+	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
+	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
+
+.PHONY: install-tools-arm
+install-tools: crypto/relic/build-arm-crosscompile check-go-version
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.29.0; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -81,8 +91,7 @@ unittest-arm:
 test: generate-mocks unittest
 
 .PHONY: test-arm
-test-arm: unittest-arm
-#test-arm: generate-mocks unittest-arm
+test-arm: generate-mocks unittest-arm
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -172,7 +181,7 @@ ci: install-tools tidy test # lint coverage
 
 # Runs unit tests using an ARM compiler
 .PHONY: ci-arm
-ci-arm: install-tools tidy test-arm 
+ci-arm: install-tools-arm tidy test-arm 
 
 # Runs integration tests
 .PHONY: ci-integration
