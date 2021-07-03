@@ -6,6 +6,7 @@ import (
 	"math"
 	"sync"
 
+	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -122,7 +123,11 @@ func NewBackend(options ...OptionFunc) *Backend {
 
 // Has checks if we already contain the item with the given hash.
 func (b *Backend) Has(entityID flow.Identifier) bool {
+	p1 := binstat.EnterTime("~4lock:r:Backend.Has", "")
 	b.RLock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Has", "")
+	defer binstat.Leave(p2)
 	defer b.RUnlock()
 	has := b.Backdata.Has(entityID)
 	return has
@@ -130,7 +135,11 @@ func (b *Backend) Has(entityID flow.Identifier) bool {
 
 // Add adds the given item to the pool.
 func (b *Backend) Add(entity flow.Entity) bool {
+	p1 := binstat.EnterTime("~4lock:w:Backend.Add", "")
 	b.Lock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Add", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 	added := b.Backdata.Add(entity)
 	b.reduce()
@@ -139,7 +148,11 @@ func (b *Backend) Add(entity flow.Entity) bool {
 
 // Rem will remove the item with the given hash.
 func (b *Backend) Rem(entityID flow.Identifier) bool {
+	p1 := binstat.EnterTime("~4lock:w:Backend.Rem", "")
 	b.Lock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Rem", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 	_, removed := b.Backdata.Rem(entityID)
 	return removed
@@ -148,14 +161,22 @@ func (b *Backend) Rem(entityID flow.Identifier) bool {
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated.
 func (b *Backend) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+	p1 := binstat.EnterTime("~4lock:w:Backend.Adjust", "")
 	b.Lock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Adjust", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 	return b.Backdata.Adjust(entityID, f)
 }
 
 // ByID returns the given item from the pool.
 func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
+	p1 := binstat.EnterTime("~4lock:r:Backend.ByID", "")
 	b.RLock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.ByID", "")
+	defer binstat.Leave(p2)
 	defer b.RUnlock()
 	entity, exists := b.Backdata.ByID(entityID)
 	return entity, exists
@@ -163,7 +184,11 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 
 // Run executes a function giving it exclusive access to the backdata
 func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) error {
+	p1 := binstat.EnterTime("~4lock:w:Backend.Run", "")
 	b.Lock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Run", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 	err := f(b.Backdata.entities)
 	b.reduce()
@@ -172,7 +197,11 @@ func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) er
 
 // Size will return the size of the backend.
 func (b *Backend) Size() uint {
+	p1 := binstat.EnterTime("~4lock:r:Backend.Size", "")
 	b.RLock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Size", "")
+	defer binstat.Leave(p2)
 	defer b.RUnlock()
 	return b.Backdata.Size()
 }
@@ -184,28 +213,42 @@ func (b *Backend) Limit() uint {
 
 // All returns all entities from the pool.
 func (b *Backend) All() []flow.Entity {
+	p1 := binstat.EnterTime("~4lock:r:Backend.All", "")
 	b.RLock()
+	binstat.Leave(p1)
 	defer b.RUnlock()
 	return b.Backdata.All()
 }
 
 // Clear removes all entities from the pool.
 func (b *Backend) Clear() {
+	p := binstat.EnterTime("~4lock:w:Backend.Clear", "")
 	b.Lock()
+	binstat.Leave(p)
+	p2 := binstat.EnterTime("~7Backend.Clear", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 	b.Backdata.Clear()
 }
 
 // Hash will use a merkle root hash to hash all items.
 func (b *Backend) Hash() flow.Identifier {
+	p1 := binstat.EnterTime("~4lock:r:Backend.Hash", "")
 	b.RLock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Hash", "")
+	defer binstat.Leave(p2)
 	defer b.RUnlock()
 	return b.Backdata.Hash()
 }
 
 // RegisterEjectionCallbacks adds the provided OnEjection callbacks
 func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
+	p1 := binstat.EnterTime("~4lock:w:Backend.RegisterEjectionCallbacks", "")
 	b.Lock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.RegisterEjectionCallbacks", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 	b.ejectionCallbacks = append(b.ejectionCallbacks, callbacks...)
 }
@@ -213,6 +256,8 @@ func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit.
 func (b *Backend) reduce() {
+	p := binstat.EnterTime("~7Backend.reduce", "")
+	defer binstat.Leave(p)
 
 	// we keep reducing the cache size until we are at limit again
 	for len(b.entities) > int(b.limit) {

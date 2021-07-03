@@ -3,6 +3,7 @@ package stdmap
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/queue"
 )
@@ -53,7 +54,11 @@ func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {
+	p1 := binstat.EnterTime("~4lock:w:Backend.Run(Queues)", "")
 	b.Lock()
+	binstat.Leave(p1)
+	p2 := binstat.EnterTime("~7Backend.Run(Queues)", "")
+	defer binstat.Leave(p2)
 	defer b.Unlock()
 
 	err := f(&QueuesBackdata{&b.Backdata})
