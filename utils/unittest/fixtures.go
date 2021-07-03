@@ -532,13 +532,13 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	return executableBlock
 }
 
-func ExecutableBlockFromTransactions(txs [][]*flow.TransactionBody) *entity.ExecutableBlock {
+func ExecutableBlockFromTransactions(txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
 
-	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txs))
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txss))
 	block := BlockFixture()
 	block.Payload.Guarantees = nil
 
-	for _, txs := range txs {
+	for _, txs := range txss {
 		cc := CompleteCollectionFromTransactions(txs)
 		block.Payload.Guarantees = append(block.Payload.Guarantees, cc.Guarantee)
 		completeCollections[cc.Guarantee.CollectionID] = cc

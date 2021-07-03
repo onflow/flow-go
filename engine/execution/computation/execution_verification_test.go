@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/chunks"
-	metrics2 "github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 
@@ -150,12 +150,12 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 		fvm.WithAccountStorageLimit(true),
 	)
 
-	metrics := metrics2.NewNoopCollector()
+	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
 
 	wal := &fixtures.NoopWAL{}
 
-	ledger, err := completeLedger.NewLedger(wal, 100, metrics, logger, completeLedger.DefaultPathFinderVersion)
+	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
 	bootstrapper := bootstrapexec.NewBootstrapper(logger)
@@ -174,7 +174,7 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 
 	ledgerCommiter := committer.NewLedgerViewCommitter(ledger, tracer)
 
-	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, metrics, tracer, logger, ledgerCommiter)
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommiter)
 	require.NoError(t, err)
 
 	view := delta.NewView(state.LedgerGetRegister(ledger, initialCommit))
@@ -185,9 +185,9 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 	computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
 	require.NoError(t, err)
 
-	prevErID := unittest.IdentifierFixture()
+	prevResultId := unittest.IdentifierFixture()
 
-	_, chdps, er, err := execution.BuildChunkDataPack(prevErID, initialCommit, computationResult)
+	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
 
 	verifier := chunks.NewChunkVerifier(vm, fvmContext)

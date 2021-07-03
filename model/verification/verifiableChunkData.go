@@ -14,5 +14,5 @@ type VerifiableChunkData struct {
 	Collection        *flow.Collection      // collection corresponding to the chunk
 	ChunkDataPack     *flow.ChunkDataPack   // chunk data package needed to verify this chunk
 	EndState          flow.StateCommitment  // state commitment at the end of this chunk
-	TransactionOffset uint32                // number of the first transaction in a chunk within a block
+	TransactionOffset uint32                // index of the first transaction in a chunk within a block
 }

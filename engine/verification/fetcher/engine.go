@@ -685,8 +685,8 @@ func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemC
 	return endState, nil
 }
 
-//TransactionOffsetForChunk calculates transaction offset for a given chunk - first transaction
-// position in whole block
+//TransactionOffsetForChunk calculates transaction offset for a given chunk which is the index of the first
+// transaction of this chunk within the whole block
 func TransactionOffsetForChunk(chunks flow.ChunkList, chunkIndex uint64) (uint32, error) {
 	if int(chunkIndex) > len(chunks)-1 {
 		return 0, fmt.Errorf("chunk list out of bounds, len %d asked for chunk %d", len(chunks), chunkIndex)

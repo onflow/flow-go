@@ -23,7 +23,7 @@ func Test_BuildChunkDataPack(t *testing.T) {
 			{flow.ZeroID},
 		})
 
-		_, _, result, err := execution.BuildChunkDataPack(unittest.IdentifierFixture(), unittest.StateCommitmentFixture(), cr)
+		_, _, result, err := execution.GenerateExecutionResultAndChunkDataPacks(unittest.IdentifierFixture(), unittest.StateCommitmentFixture(), cr)
 		assert.NoError(t, err)
 
 		require.Len(t, result.Chunks, 4) // +1 for system chunk

@@ -7,8 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func BuildChunkDataPack(
-	previousErId flow.Identifier,
+func GenerateExecutionResultAndChunkDataPacks(
+	prevResultId flow.Identifier,
 	startState flow.StateCommitment,
 	result *ComputationResult) (
 	endState flow.StateCommitment,
@@ -56,7 +56,7 @@ func BuildChunkDataPack(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(previousErId, block, chunks, endState, result.ServiceEvents)
+	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -70,7 +70,6 @@ func GenerateExecutionResultForBlock(
 	previousErID flow.Identifier,
 	block *flow.Block,
 	chunks []*flow.Chunk,
-	endState flow.StateCommitment,
 	serviceEvents []flow.Event,
 ) (*flow.ExecutionResult, error) {
 

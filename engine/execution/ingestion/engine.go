@@ -1070,7 +1070,7 @@ func (e *Engine) saveExecutionResults(
 			block.Header.ParentID, err)
 	}
 
-	endState, chdps, executionResult, err := execution.BuildChunkDataPack(previousErID, startState, result)
+	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(previousErID, startState, result)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
 	}
