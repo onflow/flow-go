@@ -111,7 +111,7 @@ func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
 		Backdata:          NewBackdata(),
 		limit:             uint(math.MaxUint32),
-		eject:             EjectTrueRandom,
+		eject:             EjectFakeRandom,
 		ejectionCallbacks: nil,
 	}
 	for _, option := range options {

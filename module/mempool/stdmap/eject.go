@@ -115,7 +115,7 @@ func (q *LRUEjector) Eject(entities map[flow.Identifier]flow.Entity) (flow.Ident
 	oldestEntity, ok := entities[oldestID]
 
 	if !ok {
-		oldestID, oldestEntity = EjectTrueRandom(entities)
+		oldestID, oldestEntity = EjectFakeRandom(entities)
 	}
 
 	// untracks the oldest id as it is supposed to be ejected
