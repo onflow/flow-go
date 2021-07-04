@@ -26,8 +26,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -67,15 +65,24 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load private key: %v", err)
 	}
+
 	fmt.Println(nodeInfo.NetworkPrivKey.Algorithm())
-	fmt.Println(strings.Trim(nodeInfo.NetworkPrivKey.String(), "0x"))
-	priv, err := crypto.HexToECDSA(strings.Trim(nodeInfo.NetworkPrivKey.String(), "0x"))
+
+
+
+	keyHex := strings.Trim(nodeInfo.NetworkPrivKey.String(), "0x")
+	fmt.Println(keyHex)
+	//priv, err := crypto.HexToECDSA(strings.Trim(nodeInfo.NetworkPrivKey.String(), "0x"))
+	//if err != nil {
+	//	log.Fatalf("Failed to convert hex to private key: %v", err)
+	//}
+	//priv.PublicKey.Curve = elliptic.P256()
+	//priv.Curve =  elliptic.P256()
+
+	priv, err := toECDSAFromHex(keyHex)
 	if err != nil {
 		log.Fatalf("Failed to convert hex to private key: %v", err)
 	}
-	priv.PublicKey.Curve = elliptic.P256()
-	priv.Curve =  elliptic.P256()
-
 
 	// ECDSA, ED25519 and RSA subject keys should have the DigitalSignature
 	// KeyUsage bits set in the x509.Certificate template
@@ -176,4 +183,11 @@ func loadPrivateNodeInfo(privNodeInfo string) (*bootstrap.NodeInfoPriv, error) {
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
+}
+func toECDSAFromHex(hexString string) (*ecdsa.PrivateKey, error) {
+	pk := new(ecdsa.PrivateKey)
+	pk.D, _ = new(big.Int).SetString(hexString, 16)
+	pk.PublicKey.Curve = elliptic.P256()
+	pk.PublicKey.X, pk.PublicKey.Y = pk.PublicKey.Curve.ScalarBaseMult(pk.D.Bytes())
+	return pk, nil
 }
