@@ -59,7 +59,7 @@ func storageFormatV5MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 	error
 }) {
 	for payload := range jobs {
-		migratedPayload, err := rencodePayloadV5(payload)
+		migratedPayload, err := reencodePayloadV5(payload)
 		result := struct {
 			key string
 			ledger.Payload
@@ -92,7 +92,7 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	return decMode
 }()
 
-func rencodePayloadV5(payload ledger.Payload) (ledger.Payload, error) {
+func reencodePayloadV5(payload ledger.Payload) (ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
 
@@ -130,7 +130,7 @@ func rencodePayloadV5(payload ledger.Payload) (ledger.Payload, error) {
 
 	owner := common.BytesToAddress(rawOwner)
 
-	newValue, err := rencodeValueV5(value, owner, string(rawKey), version)
+	newValue, err := reencodeValueV5(value, owner, string(rawKey), version)
 	if err != nil {
 		return ledger.Payload{},
 			fmt.Errorf(
@@ -147,7 +147,7 @@ func rencodePayloadV5(payload ledger.Payload) (ledger.Payload, error) {
 	return payload, nil
 }
 
-func rencodeValueV5(data []byte, owner common.Address, key string, version uint16) ([]byte, error) {
+func reencodeValueV5(data []byte, owner common.Address, key string, version uint16) ([]byte, error) {
 
 	// Decode the value
 
