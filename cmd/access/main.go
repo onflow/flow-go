@@ -1,12 +1,15 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"strings"
 	"time"
 
+	libp2ptls "github.com/libp2p/go-libp2p-tls"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
@@ -34,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -198,6 +202,29 @@ func main() {
 			return nil
 		}).
 		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+
+			fmt.Printf("\n\nServer public networking key: %s\n\n", node.NetworkKey.PublicKey().String())
+
+			flowNetorkingKey := node.NetworkKey
+			libP2PKey, err := p2p.PrivKey(flowNetorkingKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not convert Flow key to libp2p key: %w", err)
+			}
+
+			// create a libp2p Identity from the libp2p Private key
+			id, err := libp2ptls.NewIdentity(libP2PKey)
+			if err != nil {
+				return nil, fmt.Errorf("could not generate identity: %w", err)
+			}
+			// extract the TLSConfig from it which will have the generated X509 certificate
+			libp2pTlsConfig, _ := id.ConfigForAny()
+			tlsConfig := &tls.Config{
+				Certificates: libp2pTlsConfig.Certificates,
+				ClientAuth:   tls.NoClientCert,
+			}
+			// pass that certificate to the RPC engine which will serve it from GRPC server
+			rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+
 			rpcEng = rpc.New(
 				node.Logger,
 				node.State,
