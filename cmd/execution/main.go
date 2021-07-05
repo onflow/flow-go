@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -70,6 +71,7 @@ func main() {
 		computationManager          *computation.Manager
 		collectionRequester         *requester.Engine
 		ingestionEng                *ingestion.Engine
+		finalizationDistributor     *pubsub.FinalizationDistributor
 		rpcConf                     rpc.Config
 		err                         error
 		executionState              state.ExecutionState
@@ -380,9 +382,12 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(checkerEng)
+
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, checkerEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -427,7 +432,7 @@ func main() {
 			)
 			return eng, err
 		}).
-		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("synchronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
 				node.Logger,
@@ -442,6 +447,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 			return syncEngine, nil
 		}).
