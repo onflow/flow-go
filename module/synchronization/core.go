@@ -96,9 +96,6 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 // If the height difference between local and the reported height, we do nothing.
 // Otherwise, we queue each missing height.
 func (c *Core) HandleHeight(final *flow.Header, height uint64) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// don't bother queueing anything if we're within tolerance
 	if c.WithinTolerance(final, height) {
 		return
@@ -106,6 +103,8 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 
 	// if we are sufficiently behind, we want to sync the missing blocks
 	if height > final.Height {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		for h := final.Height + 1; h <= height; h++ {
 			c.queueByHeight(h)
 		}

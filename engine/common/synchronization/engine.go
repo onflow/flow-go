@@ -569,30 +569,18 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
-
 	// process the blocks one by one
 	for _, block := range res.Blocks {
-		e.processIncomingBlock(originID, block)
+		if !e.core.HandleBlock(block.Header) {
+			continue
+		}
+		synced := &events.SyncedBlock{
+			OriginID: originID,
+			Block:    block,
+		}
+		e.comp.SubmitLocal(synced)
 	}
-
 	return nil
-}
-
-// processIncoming processes an incoming block, so we can take into account the
-// overlap between block IDs and heights.
-func (e *Engine) processIncomingBlock(originID flow.Identifier, block *flow.Block) {
-
-	shouldProcess := e.core.HandleBlock(block.Header)
-	if !shouldProcess {
-		return
-	}
-
-	synced := &events.SyncedBlock{
-		OriginID: originID,
-		Block:    block,
-	}
-
-	e.comp.SubmitLocal(synced)
 }
 
 // checkLoop will regularly scan for items that need requesting.
