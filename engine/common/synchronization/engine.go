@@ -176,9 +176,10 @@ func (e *Engine) onFinalizedBlock() error {
 
 // setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
 func (e *Engine) setupRequestMessageHandler() {
-	e.pendingSyncRequests = NewRequestQueue(defaultSyncRequestQueueCapacity)
-	e.pendingRangeRequests = NewRequestQueue(defaultRangeRequestQueueCapacity)
-	e.pendingBatchRequests = NewRequestQueue(defaultBatchRequestQueueCapacity)
+	// RequestHeap deduplicates requests by keeping only one sync request for each requester.
+	e.pendingSyncRequests = NewRequestHeap(defaultSyncRequestQueueCapacity)
+	e.pendingRangeRequests = NewRequestHeap(defaultRangeRequestQueueCapacity)
+	e.pendingBatchRequests = NewRequestHeap(defaultBatchRequestQueueCapacity)
 
 	// define message queueing behaviour
 	e.requestMessageHandler = engine.NewMessageHandler(

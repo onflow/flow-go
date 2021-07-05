@@ -12,7 +12,7 @@ import (
 
 // TestRequestQueue_Get tests that after pushing multiple items we can drain the queue using Get method
 func TestRequestQueue_Get(t *testing.T) {
-	q := NewRequestQueue(100)
+	q := NewRequestHeap(100)
 	items := 20
 	messages := make(map[flow.Identifier]*engine.Message)
 	for i := 0; i < items; i++ {
@@ -39,7 +39,7 @@ func TestRequestQueue_Get(t *testing.T) {
 
 // TestRequestQueue_Put tests that putting an item into queue overwrites previous one
 func TestRequestQueue_Put(t *testing.T) {
-	q := NewRequestQueue(100)
+	q := NewRequestHeap(100)
 	msg := &engine.Message{
 		OriginID: unittest.IdentifierFixture(),
 		Payload:  unittest.IdentifierFixture(),
@@ -60,7 +60,7 @@ func TestRequestQueue_Put(t *testing.T) {
 // TestRequestQueue_PutAtMaxCapacity tests that putting an item over max capacity results in successful eject and put
 func TestRequestQueue_PutAtMaxCapacity(t *testing.T) {
 	limit := uint(10)
-	q := NewRequestQueue(limit)
+	q := NewRequestHeap(limit)
 	messages := make(map[flow.Identifier]*engine.Message)
 	for i := uint(0); i < limit; i++ {
 		msg := &engine.Message{

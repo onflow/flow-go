@@ -17,7 +17,7 @@ type RequestHeap struct {
 	requests map[flow.Identifier]*engine.Message
 }
 
-func NewRequestQueue(limit uint) *RequestHeap {
+func NewRequestHeap(limit uint) *RequestHeap {
 	return &RequestHeap{
 		limit:    limit,
 		requests: make(map[flow.Identifier]*engine.Message),
@@ -31,7 +31,10 @@ func (q *RequestHeap) Put(message *engine.Message) bool {
 	defer q.lock.Unlock()
 	// first try to eject if we are at max capacity, we need to do this way
 	// to prevent a situation where just inserted item gets ejected
-	q.reduce()
+	if _, found := q.requests[message.OriginID]; !found {
+		// if no message from the origin is stored, make sure we have room to store the new message:
+		q.reduce()
+	}
 	// at this point we can be sure that there is at least one slot
 	q.requests[message.OriginID] = message
 	return true
@@ -62,17 +65,9 @@ func (q *RequestHeap) Get() (*engine.Message, bool) {
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit. If called on max capacity will eject at least one element.
 func (q *RequestHeap) reduce() {
-
-	// we keep reducing the cache size until we are at limit again
-	for len(q.requests) >= int(q.limit) {
-
-		// eject first element using go map properties
-		var key flow.Identifier
+	for overCapacity := len(q.requests) - int(q.limit); overCapacity >= 0; overCapacity-- {
 		for originID := range q.requests {
-			key = originID
-			break
+			delete(q.requests, originID)
 		}
-
-		delete(q.requests, key)
 	}
 }
