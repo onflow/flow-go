@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -804,12 +805,16 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 			collMap[chunkID] = &flow.Collection{Transactions: nil}
 		}
 
+		offsetForChunk, err := fetcher.TransactionOffsetForChunk(chunks, chunk.Index)
+		require.NoError(t, err)
+
 		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
-			Chunk:         chunk,
-			Header:        block.Header,
-			Result:        result,
-			Collection:    collMap[chunkID],
-			ChunkDataPack: chunkDataPack,
+			Chunk:             chunk,
+			Header:            block.Header,
+			Result:            result,
+			Collection:        collMap[chunkID],
+			ChunkDataPack:     chunkDataPack,
+			TransactionOffset: offsetForChunk,
 		}
 	}
 
@@ -868,4 +873,62 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 	}
 
 	return block, result, statuses, locators, collMap
+}
+
+func TestTransactionOffsetForChunk(t *testing.T) {
+	t.Run("first chunk index always returns zero offset", func(t *testing.T) {
+		offsetForChunk, err := fetcher.TransactionOffsetForChunk([]*flow.Chunk{nil}, 0)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), offsetForChunk)
+	})
+
+	t.Run("offset is calculated", func(t *testing.T) {
+
+		chunksList := []*flow.Chunk{
+			{
+				ChunkBody: flow.ChunkBody{
+					NumberOfTransactions: 1,
+				},
+			},
+			{
+				ChunkBody: flow.ChunkBody{
+					NumberOfTransactions: 2,
+				},
+			},
+			{
+				ChunkBody: flow.ChunkBody{
+					NumberOfTransactions: 3,
+				},
+			},
+			{
+				ChunkBody: flow.ChunkBody{
+					NumberOfTransactions: 5,
+				},
+			},
+		}
+
+		offsetForChunk, err := fetcher.TransactionOffsetForChunk(chunksList, 0)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), offsetForChunk)
+
+		offsetForChunk, err = fetcher.TransactionOffsetForChunk(chunksList, 1)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(1), offsetForChunk)
+
+		offsetForChunk, err = fetcher.TransactionOffsetForChunk(chunksList, 2)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(3), offsetForChunk)
+
+		offsetForChunk, err = fetcher.TransactionOffsetForChunk(chunksList, 3)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(6), offsetForChunk)
+	})
+
+	t.Run("requesting index beyond length triggers error", func(t *testing.T) {
+
+		chunksList := make([]*flow.Chunk, 2)
+
+		_, err := fetcher.TransactionOffsetForChunk(chunksList, 2)
+		require.Error(t, err)
+	})
 }
