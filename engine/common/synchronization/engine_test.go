@@ -463,7 +463,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 // TestOnFinalizedBlock tests that when new finalized block is discovered engine updates cached variables
 // to latest state
 func (ss *SyncSuite) TestOnFinalizedBlock() {
-	finalizedBlock := unittest.BlockHeaderFixture()
+	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
 	// change head
 	ss.head = &finalizedBlock
 
