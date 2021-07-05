@@ -93,7 +93,14 @@ func run(*cobra.Command, []string) {
 
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
 
-	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, !flagNoMigration, !flagNoReport)
+	err := extractExecutionState(
+		flagExecutionStateDir,
+		stateCommitment,
+		flagOutputDir,
+		log.Logger,
+		!flagNoMigration,
+		!flagNoReport,
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

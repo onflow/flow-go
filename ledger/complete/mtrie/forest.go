@@ -243,7 +243,7 @@ func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 		}
 		return trie, nil
 	}
-	return nil, fmt.Errorf("trie with the given rootHash [%x] not found", rootHash)
+	return nil, fmt.Errorf("trie with the given rootHash %s not found", rootHash)
 }
 
 // GetTries returns list of currently cached tree root hashes

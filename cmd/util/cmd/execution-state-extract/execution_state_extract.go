@@ -20,12 +20,14 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 	return commits.ByBlockID(blockHash)
 }
 
-func extractExecutionState(dir string,
+func extractExecutionState(
+	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
 	migrate bool,
-	report bool) error {
+	report bool,
+) error {
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
@@ -58,6 +60,7 @@ func extractExecutionState(dir string,
 	if migrate {
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
+			mgr.StorageFormatV5Migration,
 		}
 	}
 	if report {
