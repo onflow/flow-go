@@ -253,7 +253,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 	log.Info().Msg("result approval submitted")
 	// increases number of sent result approvals for sake of metrics
-	e.metrics.OnResultApprovalDispatchedInNetwork()
+	e.metrics.OnResultApprovalDispatchedInNetworkByVerifier()
 
 	return nil
 }
