@@ -13,13 +13,22 @@ func StateInteractionsFixture() *delta.SpockSnapshot {
 }
 
 func ComputationResultFixture(collectionsSignerIDs [][]flow.Identifier) *execution.ComputationResult {
-	stateViews := make([]*delta.SpockSnapshot, len(collectionsSignerIDs))
-	for i := 0; i < len(collectionsSignerIDs); i++ {
+	stateViews := make([]*delta.SpockSnapshot, len(collectionsSignerIDs)+1) //+1 for system chunk
+	stateCommitments := make([]flow.StateCommitment, len(collectionsSignerIDs)+1)
+	eventHashes := make([]flow.Identifier, len(collectionsSignerIDs)+1)
+	proofs := make([][]byte, len(collectionsSignerIDs)+1)
+	for i := 0; i < len(collectionsSignerIDs)+1; i++ {
 		stateViews[i] = StateInteractionsFixture()
+		stateCommitments[i] = unittest.StateCommitmentFixture()
+		eventHashes[i] = unittest.IdentifierFixture()
+		proofs[i] = unittest.RandomBytes(2)
 	}
 	return &execution.ComputationResult{
-		ExecutableBlock: unittest.ExecutableBlockFixture(collectionsSignerIDs),
-		StateSnapshots:  stateViews,
+		ExecutableBlock:  unittest.ExecutableBlockFixture(collectionsSignerIDs),
+		StateSnapshots:   stateViews,
+		StateCommitments: stateCommitments,
+		EventsHashes:     eventHashes,
+		Proofs:           proofs,
 	}
 }
 
