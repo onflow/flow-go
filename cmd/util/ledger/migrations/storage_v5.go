@@ -162,6 +162,21 @@ func reencodeValueV5(data []byte, owner common.Address, key string, version uint
 			)
 	}
 
+	interpreter.InspectValue(
+		value,
+		func(value interpreter.Value) bool {
+			switch value := value.(type) {
+			case *interpreter.CompositeValue:
+				_ = value.Fields()
+			case *interpreter.ArrayValue:
+				_ = value.Elements()
+			case *interpreter.DictionaryValue:
+				_ = value.Entries()
+			}
+			return true
+		},
+	)
+
 	// Encode the value using the new encoder
 
 	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
