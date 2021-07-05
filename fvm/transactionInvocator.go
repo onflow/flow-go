@@ -87,6 +87,7 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
+		fmt.Printf("<=== %p <- %p \n", parentState.View(), childState.View())
 		if mergeError := parentState.MergeState(childState); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}

@@ -163,7 +163,9 @@ func (s *State) Touch(owner, controller, key string) error {
 
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
-	return NewState(s.view.NewChild(),
+	child := s.view.NewChild()
+	fmt.Printf("===> %p -> %p \n", s.view, child)
+	return NewState(child,
 		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
 		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
 		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),

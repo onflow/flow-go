@@ -2030,6 +2030,69 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 		}),
 	)
 
+	t.Run("transaction fails because of storage 2", newVMTest().withBootstrapProcedureOptions(
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	).run(
+		func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+			ctx.LimitAccountStorage = true // this test requires storage limits to be enforced
+
+			// Create an account private key.
+			privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
+			require.NoError(t, err)
+
+			// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+			accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+			require.NoError(t, err)
+
+			authorizer := accounts[0]
+			payer := accounts[1]
+
+			balanceBefore := getBalance(vm, chain, ctx, view, authorizer)
+
+			txBody := transferTokensTx(chain).
+				AddAuthorizer(authorizer).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+			txBody.SetProposalKey(authorizer, 0, 0)
+			txBody.SetPayer(payer)
+
+			err = testutil.SignPayload(txBody, authorizer, privateKeys[0])
+			require.NoError(t, err)
+
+			err = testutil.SignEnvelope(txBody, payer, privateKeys[1])
+			require.NoError(t, err)
+
+			tx := fvm.Transaction(txBody, 0)
+
+			err = vm.Run(ctx, tx, view, programs)
+			require.NoError(t, err)
+
+			fmt.Println(tx.Err)
+			require.Equal(t, (&errors.StorageCapacityExceededError{}).Code(), tx.Err.Code())
+
+			authRegTouchFound := false
+			payerRegTouchFound := false
+			for _, reg := range view.AllRegisters() {
+				if reg.Owner == string(authorizer[:]) && reg.Key == "exists" {
+					authRegTouchFound = true
+				}
+				if reg.Owner == string(payer[:]) && reg.Key == "exists" {
+					payerRegTouchFound = true
+				}
+				// fmt.Println(">>>", reg.HumanReadableString())
+			}
+
+			require.True(t, authRegTouchFound)
+			require.True(t, payerRegTouchFound)
+
+			balanceAfter := getBalance(vm, chain, ctx, view, payer)
+			require.Equal(t, balanceAfter, balanceBefore)
+		}),
+	)
+
 	t.Run("Transaction sequence number check fails and sequence number is not incremented", newVMTest().withBootstrapProcedureOptions(
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),

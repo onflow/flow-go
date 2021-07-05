@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -15,6 +16,10 @@ type RegisterID struct {
 
 func (r *RegisterID) String() string {
 	return fmt.Sprintf("%x/%x/%x", r.Owner, r.Controller, r.Key)
+}
+
+func (r *RegisterID) HumanReadableString() string {
+	return fmt.Sprintf("regID: %s/%s (has_cont: %v)", hex.EncodeToString([]byte(r.Owner)), r.Key, len(r.Controller) > 0)
 }
 
 // Bytes returns a bytes representation of the RegisterID.
