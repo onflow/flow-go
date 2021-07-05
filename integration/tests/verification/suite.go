@@ -75,6 +75,8 @@ func (s *Suite) SetupTest() {
 			testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+			//testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
+			//testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
 			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
