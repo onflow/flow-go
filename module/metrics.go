@@ -48,6 +48,7 @@ type EngineMetrics interface {
 
 type ComplianceMetrics interface {
 	FinalizedHeight(height uint64)
+	CommittedEpochFinalView(view uint64)
 	SealedHeight(height uint64)
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
@@ -159,35 +160,19 @@ type ConsensusMetrics interface {
 }
 
 type VerificationMetrics interface {
-	// TODO: remove this event handlers once we have new architecture in place.
-	// OnExecutionReceiptReceived is called whenever a new execution receipt arrives
-	// at Finder engine. It increments total number of received receipts.
-	OnExecutionReceiptReceived()
-	// OnExecutionResultSent is called whenever a new execution result is sent by
-	// Finder engine to the match engine. It increments total number of sent execution results.
-	OnExecutionResultSent()
-	// OnExecutionResultReceived is called whenever a new execution result is successfully received
-	// by Match engine from Finder engine.
-	// It increments the total number of received execution results.
-	OnExecutionResultReceived()
-	// OnVerifiableChunkSent is called on a successful submission of matched chunk
-	// by Match engine to Verifier engine.
-	// It increments the total number of chunks matched by match engine.
-	OnVerifiableChunkSent()
-	// OnChunkDataPackReceived is called on a receiving a chunk data pack by Match engine
-	// It increments the total number of chunk data packs received.
-	OnChunkDataPackReceived()
-	// OnChunkDataPackRequested is called on requesting a chunk data pack by Match engine
-	// It increments the total number of chunk data packs requested.
-	OnChunkDataPackRequested()
+	// OnBlockConsumerJobDone is invoked by block consumer whenever it is notified a job is done by a worker. It
+	// sets the last processed block job index.
+	OnBlockConsumerJobDone(uint64)
+	// OnChunkConsumerJobDone is invoked by chunk consumer whenever it is notified a job is done by a worker. It
+	// sets the last processed chunk job index.
+	OnChunkConsumerJobDone(uint64)
+	// OnExecutionResultReceivedAtAssignerEngine is called whenever a new execution result arrives
+	// at Assigner engine. It increments total number of received execution results.
+	OnExecutionResultReceivedAtAssignerEngine()
 
 	// OnVerifiableChunkReceivedAtVerifierEngine increments a counter that keeps track of number of verifiable chunks received at
 	// verifier engine from fetcher engine.
 	OnVerifiableChunkReceivedAtVerifierEngine()
-
-	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
-	// by verifier engine.
-	OnResultApprovalDispatchedInNetwork()
 
 	// OnFinalizedBlockArrivedAtAssigner sets a gauge that keeps track of number of the latest block height arrives
 	// at assigner engine. Note that it assumes blocks are coming to assigner engine in strictly increasing order of their height.
@@ -214,11 +199,11 @@ type VerificationMetrics interface {
 
 	// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
 	// requester engine dispatches in the network (to the execution nodes).
-	OnChunkDataPackRequestDispatchedInNetwork()
+	OnChunkDataPackRequestDispatchedInNetworkByRequester()
 
 	// OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
 	// requester engine receives from execution nodes (through network).
-	OnChunkDataPackResponseReceivedFromNetwork()
+	OnChunkDataPackResponseReceivedFromNetworkByRequester()
 
 	// OnChunkDataPackSentToFetcher increments a counter that keeps track of number of chunk data packs sent to the fetcher engine from
 	// requester engine.
@@ -230,6 +215,10 @@ type VerificationMetrics interface {
 
 	// OnVerifiableChunkSentToVerifier increments a counter that keeps track of number of verifiable chunks fetcher engine sent to verifier engine.
 	OnVerifiableChunkSentToVerifier()
+
+	// OnResultApprovalDispatchedInNetwork increments a counter that keeps track of number of result approvals dispatched in the network
+	// by verifier engine.
+	OnResultApprovalDispatchedInNetworkByVerifier()
 }
 
 // LedgerMetrics provides an interface to record Ledger Storage metrics.
@@ -292,13 +281,16 @@ type WALMetrics interface {
 
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
-	TransactionParsed(dur time.Duration)
+	RuntimeTransactionParsed(dur time.Duration)
 
 	// TransactionChecked reports the time spent checking a single transaction
-	TransactionChecked(dur time.Duration)
+	RuntimeTransactionChecked(dur time.Duration)
 
 	// TransactionInterpreted reports the time spent interpreting a single transaction
-	TransactionInterpreted(dur time.Duration)
+	RuntimeTransactionInterpreted(dur time.Duration)
+
+	// RuntimeSetNumberOfAccounts Sets the total number of accounts on the network
+	RuntimeSetNumberOfAccounts(count uint64)
 }
 
 type ProviderMetrics interface {
@@ -321,9 +313,6 @@ type ExecutionMetrics interface {
 	// from being received for execution to execution being finished
 	FinishBlockReceivedToExecuted(blockID flow.Identifier)
 
-	// ExecutionGasUsedPerBlock reports gas used per block
-	ExecutionGasUsedPerBlock(gas uint64)
-
 	// ExecutionStateReadsPerBlock reports number of state access/read operations per block
 	ExecutionStateReadsPerBlock(reads uint64)
 
@@ -333,8 +322,17 @@ type ExecutionMetrics interface {
 	// ExecutionLastExecutedBlockHeight reports last executed block height
 	ExecutionLastExecutedBlockHeight(height uint64)
 
-	// ExecutionTotalExecutedTransactions adds num to the total number of executed transactions
-	ExecutionTotalExecutedTransactions(numExecuted int)
+	// ExecutionBlockExecuted reports the total time and computation spent on executing a block
+	ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int)
+
+	// ExecutionCollectionExecuted reports the total time and computation spent on executing a collection
+	ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int)
+
+	// ExecutionTransactionExecuted reports the total time and computation spent on executing a single transaction
+	ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool)
+
+	// ExecutionScriptExecuted reports the time spent on executing an script
+	ExecutionScriptExecuted(dur time.Duration, compUsed uint64)
 
 	// ExecutionCollectionRequestSent reports when a request for a collection is sent to a collection node
 	ExecutionCollectionRequestSent()

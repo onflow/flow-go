@@ -4,7 +4,7 @@ SHORT_COMMIT := $(shell git rev-parse --short HEAD)
 # The Git commit hash
 COMMIT := $(shell git rev-parse HEAD)
 # The tag of the current commit, otherwise empty
-VERSION := $(shell git describe --tags --abbrev=0 --exact-match 2>/dev/null)
+VERSION := $(shell git describe --tags --abbrev=2 --match "v*" 2>/dev/null)
 
 # Image tag: if image tag is not set, set it with version (or short commit if empty)
 ifeq (${IMAGE_TAG},)
@@ -143,6 +143,11 @@ tidy:
 lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
+
+.PHONY: fix-lint
+fix-lint:
+	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	golangci-lint run -v --build-tags relic --fix ./...
 
 # Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci

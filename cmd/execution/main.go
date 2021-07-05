@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -70,6 +71,7 @@ func main() {
 		computationManager          *computation.Manager
 		collectionRequester         *requester.Engine
 		ingestionEng                *ingestion.Engine
+		finalizationDistributor     *pubsub.FinalizationDistributor
 		rpcConf                     rpc.Config
 		err                         error
 		executionState              state.ExecutionState
@@ -88,9 +90,12 @@ func main() {
 		syncFast                    bool
 		syncThreshold               int
 		extensiveLog                bool
+		pauseExecution              bool
 		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
 		diskWAL                     *wal.DiskWAL
 		scriptLogThreshold          time.Duration
+		chdpQueryTimeout            uint
+		chdpDeliveryTimeout         uint
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -115,6 +120,9 @@ func main() {
 			flags.BoolVar(&syncFast, "sync-fast", false, "fast sync allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up")
 			flags.IntVar(&syncThreshold, "sync-threshold", 100, "the maximum number of sealed and unexecuted blocks before triggering state syncing")
 			flags.BoolVar(&extensiveLog, "extensive-logging", false, "extensive logging logs tx contents and block headers")
+			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
+			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
+			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -278,6 +286,8 @@ func main() {
 				executionState,
 				collector,
 				checkStakedAtBlock,
+				chdpQueryTimeout,
+				chdpDeliveryTimeout,
 			)
 
 			return providerEngine, err
@@ -331,6 +341,7 @@ func main() {
 				syncThreshold,
 				syncFast,
 				checkStakedAtBlock,
+				pauseExecution,
 			)
 
 			// TODO: we should solve these mutual dependencies better
@@ -371,9 +382,12 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(checkerEng)
+
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, checkerEng, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
@@ -418,7 +432,7 @@ func main() {
 			)
 			return eng, err
 		}).
-		Component("sychronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("synchronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
 				node.Logger,
@@ -433,6 +447,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 			return syncEngine, nil
 		}).

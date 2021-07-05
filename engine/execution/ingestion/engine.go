@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -64,6 +65,7 @@ type Engine struct {
 	syncDeltas         mempool.Deltas      // storing the synced state deltas
 	syncFast           bool                // sync fast allows execution node to skip fetching collection during state syncing, and rely on state syncing to catch up
 	checkStakedAtBlock func(blockID flow.Identifier) (bool, error)
+	pauseExecution     bool
 }
 
 func New(
@@ -88,6 +90,7 @@ func New(
 	syncThreshold int,
 	syncFast bool,
 	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
+	pauseExecution bool,
 ) (*Engine, error) {
 	log := logger.With().Str("engine", "ingestion").Logger()
 
@@ -118,6 +121,7 @@ func New(
 		syncDeltas:         syncDeltas,
 		syncFast:           syncFast,
 		checkStakedAtBlock: checkStakedAtBlock,
+		pauseExecution:     pauseExecution,
 	}
 
 	// move to state syncing engine
@@ -134,9 +138,11 @@ func New(
 // Ready returns a channel that will close when the engine has
 // successfully started.
 func (e *Engine) Ready() <-chan struct{} {
-	err := e.reloadUnexecutedBlocks()
-	if err != nil {
-		e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
+	if !e.pauseExecution {
+		err := e.reloadUnexecutedBlocks()
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("failed to load all unexecuted blocks")
+		}
 	}
 
 	return e.unit.Ready()
@@ -379,6 +385,13 @@ func (e *Engine) reloadBlock(
 // have passed consensus validation) received from the consensus nodes
 // Note: BlockProcessable might be called multiple times for the same block.
 func (e *Engine) BlockProcessable(b *flow.Header) {
+
+	// when the flag is on, no block will be executed. Useful for EN to serve
+	// execution state queries
+	if e.pauseExecution {
+		return
+	}
+
 	blockID := b.ID()
 	newBlock, err := e.blocks.ByID(blockID)
 	if err != nil {
@@ -539,7 +552,6 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 	}
 
 	e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
-	e.metrics.ExecutionGasUsedPerBlock(computationResult.GasUsed)
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
@@ -591,6 +603,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		Bool("broadcasted", broadcasted).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("block executed")
+
+	e.metrics.ExecutionBlockExecuted(time.Since(startedAt), computationResult.ComputationUsed, len(computationResult.TransactionResults), len(computationResult.ExecutableBlock.CompleteCollections))
 
 	err = e.onBlockExecuted(executableBlock, finalState)
 	if err != nil {
@@ -1020,9 +1034,6 @@ func (e *Engine) handleComputationResult(
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
 
-	// There is one result per transaction
-	e.metrics.ExecutionTotalExecutedTransactions(len(result.TransactionResults))
-
 	receipt, err := e.saveExecutionResults(
 		ctx,
 		result,
@@ -1078,7 +1089,8 @@ func (e *Engine) saveExecutionResults(
 			collectionID = flow.ZeroID
 		}
 
-		chunk := generateChunk(i, startState, endState, collectionID, blockID)
+		eventsHash := result.EventsHashes[i]
+		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
 
 		// chunkDataPack
 		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
@@ -1144,15 +1156,12 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 // generateChunk creates a chunk from the provided computation data.
 func generateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	colID, blockID flow.Identifier) *flow.Chunk {
+	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
 			StartState:      startState,
-			// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
-			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
-			// startState stays the same if blocks are empty
-			EventCollection: colID,
+			EventCollection: eventsCollection,
 			BlockID:         blockID,
 			// TODO: record gas used
 			TotalComputationUsed: 0,
@@ -1183,7 +1192,7 @@ func (e *Engine) generateExecutionResultForBlock(
 	// convert Cadence service event representation to flow-go representation
 	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
 	for _, event := range serviceEvents {
-		converted, err := flow.ConvertServiceEvent(event)
+		converted, err := convert.ServiceEvent(event)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
@@ -1258,7 +1267,11 @@ func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
 	return res
 }
 
-// generateChunkDataPack creates a chunk data pack
+// generateChunkDataPack creates a chunk data pack from the given inputs.
+//
+// `proof` includes proofs for all registers read to execute the chunck.
+// Register proofs order must not be correlated to the order of register reads during
+// the chunk execution in order to enforce the SPoCK secret high entropy.
 func generateChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,

@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
 	"github.com/onflow/flow-go/engine/consensus/matching"
@@ -41,7 +41,6 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
-	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -151,7 +150,7 @@ func main() {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
-			sealValidator := validation.NewSealValidator(
+			sealValidator, err := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -159,8 +158,12 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
+				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
+			if err != nil {
+				return fmt.Errorf("could not instantiate seal validator: %w", err)
+			}
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -192,8 +195,7 @@ func main() {
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
+			resultSeals := stdmap.NewIncorporatedResultSeals(sealLimit)
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
@@ -219,6 +221,7 @@ func main() {
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
 			config.EmergencySealingActive = emergencySealing
@@ -230,6 +233,7 @@ func main() {
 				conMetrics,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				sealingTracker,
 				node.Network,
 				node.Me,
 				node.Storage.Headers,
@@ -369,7 +373,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Receipts,
 				guarantees,
-				approvals.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),
@@ -489,6 +493,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		}).

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/protobuf/ptypes"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/crypto"
@@ -131,10 +131,7 @@ func TransactionResultToMessage(result access.TransactionResult) *accessproto.Tr
 func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 	id := h.ID()
 
-	t, err := ptypes.TimestampProto(h.Timestamp)
-	if err != nil {
-		return nil, err
-	}
+	t := timestamppb.New(h.Timestamp)
 
 	return &entitiesproto.BlockHeader{
 		Id:        id[:],
@@ -148,10 +145,7 @@ func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t, err := ptypes.TimestampProto(h.Header.Timestamp)
-	if err != nil {
-		return nil, err
-	}
+	t := timestamppb.New(h.Header.Timestamp)
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {

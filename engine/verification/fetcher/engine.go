@@ -97,12 +97,19 @@ func (e *Engine) WithChunkConsumerNotifier(notifier module.ProcessingNotifier) {
 
 // Ready initializes the engine and returns a channel that is closed when the initialization is done
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	if e.chunkConsumerNotifier == nil {
+		e.log.Fatal().Msg("missing chunk consumer notifier callback in verification fetcher engine")
+	}
+	return e.unit.Ready(func() {
+		<-e.requester.Ready()
+	})
 }
 
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		<-e.requester.Done()
+	})
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
@@ -140,7 +147,9 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Logger()
 	lg.Debug().Msg("result and chunk for locator retrieved")
 
-	requested, err := e.processAssignedChunkWithTracing(chunk, result)
+	requested, blockHeight, err := e.processAssignedChunkWithTracing(chunk, result, locatorID)
+	lg = lg.With().Uint64("block_height", blockHeight).Logger()
+
 	if err != nil {
 		lg.Fatal().Err(err).Msg("could not process assigned chunk")
 	}
@@ -154,7 +163,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 }
 
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
-func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 	chunkID := chunk.ID()
 
 	span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
@@ -167,41 +176,43 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
 	var err error
 	var requested bool
+	var blockHeight uint64
 	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleAssignedChunk, func() {
-		requested, err = e.processAssignedChunk(chunk, result)
+		requested, blockHeight, err = e.processAssignedChunk(chunk, result, chunkLocatorID)
 	})
 
-	return requested, err
+	return requested, blockHeight, err
 }
 
 // processAssignedChunk receives an assigned chunk and its result and requests its chunk data pack from requester.
 // Boolean return value determines whether chunk data pack was requested or not.
-func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult) (bool, error) {
+func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 	// skips processing a chunk if it belongs to a sealed block.
 	chunkID := chunk.ID()
-	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
+	sealed, blockHeight, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not determine whether block has been sealed: %w", err)
+		return false, 0, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
-		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		return false, nil
+		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
+		return false, blockHeight, nil
 	}
 
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{
 		ChunkIndex:      chunk.Index,
 		ExecutionResult: result,
+		BlockHeight:     blockHeight,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
 		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
-		return false, fmt.Errorf("data race detected, received a duplicate chunk locator")
+		return false, blockHeight, fmt.Errorf("data race detected, received a duplicate chunk locator")
 	}
 
 	err = e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not request chunk data pack: %w", err)
+		return false, blockHeight, fmt.Errorf("could not request chunk data pack: %w", err)
 	}
 
 	// requesting a chunk data pack is async, i.e., once engine reaches this point
@@ -211,7 +222,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 	//
 	// both these events happen through requester module calling fetchers callbacks.
 	// it is during those callbacks that we notify the consumer that we are done with this job.
-	return true, nil
+	return true, blockHeight, nil
 }
 
 // HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
@@ -237,6 +248,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	resultID := status.ExecutionResult.ID()
 	lg = lg.With().
 		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).
+		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(resultID)).
 		Uint64("chunk_index", status.ChunkIndex).
 		Logger()
@@ -474,19 +486,26 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 // When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
 // through HandleChunkDataPack).
 func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
+	lg := e.log.With().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Logger()
 	// we need to report that the job has been finished eventually
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
+		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
 		return
 	}
 
+	lg = lg.With().
+		Uint64("block_height", status.BlockHeight).
+		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
 	removed := e.pendingChunks.Rem(chunkID)
 
 	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
-	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
+	lg.Info().
+		Bool("removed", removed).
+		Msg("discards fetching chunk of an already sealed block and notified consumer")
 }
 
 // pushToVerifierWithTracing encapsulates the logic of pushing a verifiable chunk to verifier engine with tracing enabled.
@@ -606,20 +625,20 @@ func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID 
 }
 
 // blockIsSealed returns true if the block at specified height by block ID is sealed.
-func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
+func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, uint64, error) {
 	// TODO: as an optimization, we can keep record of last sealed height on a local variable.
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get block: %w", err)
+		return false, 0, fmt.Errorf("could not get block: %w", err)
 	}
 
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
-		return false, fmt.Errorf("could not get last sealed: %w", err)
+		return false, 0, fmt.Errorf("could not get last sealed: %w", err)
 	}
 
 	sealed := header.Height <= lastSealed.Height
-	return sealed, nil
+	return sealed, header.Height, nil
 }
 
 // executorsOf segregates the executors of the given receipts based on the given execution result id.

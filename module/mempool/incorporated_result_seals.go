@@ -32,4 +32,14 @@ type IncorporatedResultSeals interface {
 
 	// Clear removes all entities from the pool.
 	Clear()
+
+	// PruneUpToHeight remove all seals for blocks whose height is strictly
+	// smaller that height. Note: seals for blocks at height are retained.
+	// After pruning, seals below for blocks below the given height are dropped.
+	//
+	// Monotonicity Requirement:
+	// The pruned height cannot decrease, as we cannot recover already pruned elements.
+	// If `height` is smaller than the previous value, the previous value is kept
+	// and the sentinel empool.NewDecreasingPruningHeightError is returned.
+	PruneUpToHeight(height uint64) error
 }

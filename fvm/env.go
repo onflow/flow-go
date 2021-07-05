@@ -17,7 +17,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -578,19 +577,8 @@ func (e *hostEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgori
 		defer sp.Finish()
 	}
 
-	if len(tag) > 0 {
-		err := errors.NewValueErrorf(tag, "specifying the tag when computing a hash is not yet supported")
-		return nil, err
-	}
-
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	if hashAlgo == hash.UnknownHashingAlgorithm {
-		err := errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("hashing failed: %w", err)
-	}
-
-	hasher := crypto.NewHasher(hashAlgo)
-	return hasher.ComputeHash(data), nil
+	return crypto.HashWithTag(hashAlgo, tag, data)
 }
 
 func (e *hostEnv) VerifySignature(
@@ -623,9 +611,8 @@ func (e *hostEnv) VerifySignature(
 	return valid, nil
 }
 
-func (e *hostEnv) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
-	// TODO: this is a stub for now
-	return false, nil
+func (e *hostEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
 // Block Environment Functions
@@ -1073,6 +1060,7 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 		}
 	}
 
+	e.ctx.Metrics.RuntimeSetNumberOfAccounts(e.addressGenerator.AddressCount())
 	return runtime.Address(flowAddress), nil
 }
 
