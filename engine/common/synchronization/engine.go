@@ -26,19 +26,22 @@ import (
 )
 
 // defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
-const defaultSyncRequestQueueCapacity = 10000
+const defaultSyncRequestQueueCapacity = 500
 
 // defaultSyncRequestQueueCapacity maximum capacity of range requests queue
-const defaultRangeRequestQueueCapacity = 10000
+const defaultRangeRequestQueueCapacity = 500
 
 // defaultSyncRequestQueueCapacity maximum capacity of batch requests queue
-const defaultBatchRequestQueueCapacity = 10000
+const defaultBatchRequestQueueCapacity = 500
 
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
-const defaultSyncResponseQueueCapacity = 10000
+const defaultSyncResponseQueueCapacity = 500
 
 // defaultBlockResponseQueueCapacity maximum capacity of block responses queue
-const defaultBlockResponseQueueCapacity = 10000
+const defaultBlockResponseQueueCapacity = 500
+
+// defaultEngineRequestsWorkers number of workers to dispatch events for requests
+const defaultEngineRequestsWorkers = 8
 
 // finalSnapshot is a helper structure which contains latest finalized header and participants list
 // for consensus nodes, it is used in Engine to access latest valid data
@@ -93,6 +96,10 @@ func New(
 		f(opt)
 	}
 
+	if comp == nil {
+		panic("must initialize synchronization engine with comp engine")
+	}
+
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
 		unit:                      engine.NewUnit(),
@@ -140,8 +147,6 @@ func (e *Engine) finalSnapshot() *finalizedSnapshot {
 
 // onFinalizedBlock updates latest locally cached finalized snapshot
 func (e *Engine) onFinalizedBlock() error {
-	e.unit.Lock()
-	defer e.unit.Unlock()
 	finalSnapshot := e.state.Final()
 	head, err := finalSnapshot.Head()
 	if err != nil {
@@ -154,9 +159,14 @@ func (e *Engine) onFinalizedBlock() error {
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
-		return fmt.Errorf("could not send get consensus participants: %w", err)
+		return fmt.Errorf("could get consensus participants at latest finalized block: %w", err)
 	}
 
+	e.unit.Lock()
+	defer e.unit.Unlock()
+	if e.lastFinalizedSnapshot != nil && e.lastFinalizedSnapshot.head.Height >= head.Height {
+		return nil
+	}
 	e.lastFinalizedSnapshot = &finalizedSnapshot{
 		head:         head,
 		participants: participants,
@@ -262,12 +272,12 @@ func (e *Engine) setupResponseMessageHandler() error {
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	if e.comp == nil {
-		panic("must initialize synchronization engine with comp engine")
-	}
 	e.unit.Launch(e.checkLoop)
-	e.unit.Launch(e.requestProcessingLoop)
+	for i := 0; i < defaultEngineRequestsWorkers; i++ {
+		e.unit.Launch(e.requestProcessingLoop)
+	}
 	e.unit.Launch(e.responseProcessingLoop)
+	e.unit.Launch(e.finalizationProcessingLoop)
 	return e.unit.Ready()
 }
 
@@ -335,6 +345,22 @@ func (e *Engine) requestProcessingLoop() {
 	}
 }
 
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
+	notifier := e.finalizationEventNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-notifier:
+			err := e.onFinalizedBlock()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("could not process latest finalized block")
+			}
+		}
+	}
+}
+
 // responseProcessingLoop is a separate goroutine that performs processing of queued responses
 func (e *Engine) responseProcessingLoop() {
 	notifier := e.responseMessageHandler.GetNotifier()
@@ -342,11 +368,6 @@ func (e *Engine) responseProcessingLoop() {
 		select {
 		case <-e.unit.Quit():
 			return
-		case <-e.finalizationEventNotifier.Channel():
-			err := e.onFinalizedBlock()
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not process latest finalized block")
-			}
 		case <-notifier:
 			err := e.processAvailableResponses()
 			if err != nil {

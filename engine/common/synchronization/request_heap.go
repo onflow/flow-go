@@ -7,18 +7,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RequestQueue is a special queue that implements engine.MessageStore interface and
+// RequestHeap is a special structure that implements engine.MessageStore interface and
 // indexes requests by originator. If request will be sent by same originator then it will replace the old one.
 // Comparing to default FIFO queue this one can contain MAX one request for origin ID.
 // Getting value from queue as well as ejecting is pseudo-random.
-type RequestQueue struct {
+type RequestHeap struct {
 	lock     sync.Mutex
 	limit    uint
 	requests map[flow.Identifier]*engine.Message
 }
 
-func NewRequestQueue(limit uint) *RequestQueue {
-	return &RequestQueue{
+func NewRequestQueue(limit uint) *RequestHeap {
+	return &RequestHeap{
 		limit:    limit,
 		requests: make(map[flow.Identifier]*engine.Message),
 	}
@@ -26,7 +26,7 @@ func NewRequestQueue(limit uint) *RequestQueue {
 
 // Put stores message into requests map using OriginID as key.
 // Returns always true
-func (q *RequestQueue) Put(message *engine.Message) bool {
+func (q *RequestHeap) Put(message *engine.Message) bool {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	// first try to eject if we are at max capacity, we need to do this way
@@ -38,7 +38,7 @@ func (q *RequestQueue) Put(message *engine.Message) bool {
 }
 
 // Get returns pseudo-random element from request storage using go map properties.
-func (q *RequestQueue) Get() (*engine.Message, bool) {
+func (q *RequestHeap) Get() (*engine.Message, bool) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -61,7 +61,7 @@ func (q *RequestQueue) Get() (*engine.Message, bool) {
 
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit. If called on max capacity will eject at least one element.
-func (q *RequestQueue) reduce() {
+func (q *RequestHeap) reduce() {
 
 	// we keep reducing the cache size until we are at limit again
 	for len(q.requests) >= int(q.limit) {
