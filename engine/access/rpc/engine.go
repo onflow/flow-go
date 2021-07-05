@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -13,6 +14,7 @@ import (
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
@@ -82,6 +84,15 @@ func New(log zerolog.Logger,
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
+
+	tlsCredentials, err := loadTLSCredentials(
+		"/Users/vishalchangrani/go/src/github.com/onflow/flow-go/integration/localnet/bootstrap/private-root-information/private-node-info_c048c702ceb9b7e142da96e06b54ab6ab39c142b1a433639edefcd3a014a462a/cert.pem",
+		"/Users/vishalchangrani/go/src/github.com/onflow/flow-go/integration/localnet/bootstrap/private-root-information/private-node-info_c048c702ceb9b7e142da96e06b54ab6ab39c142b1a433639edefcd3a014a462a/key.pem")
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot load TLS credentials")
+	}
+
+	grpcOpts = append(grpcOpts, grpc.Creds(tlsCredentials))
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, first create the grpc metrics interceptor
@@ -251,4 +262,21 @@ func (e *Engine) serveGRPCWebProxy() {
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the http proxy server")
 	}
+}
+
+
+func loadTLSCredentials(serverCertFile, serverKeyFile string) (credentials.TransportCredentials, error) {
+	// Load server's certificate and private key
+	serverCert, err := tls.LoadX509KeyPair(serverCertFile, serverKeyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the credentials and return it
+	config := &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+		ClientAuth:   tls.NoClientCert,
+	}
+
+	return credentials.NewTLS(config), nil
 }
