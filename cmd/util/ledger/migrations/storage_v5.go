@@ -17,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type storageFormatV5MigrationResult struct {
@@ -25,7 +27,11 @@ type storageFormatV5MigrationResult struct {
 	error
 }
 
-func StorageFormatV5Migration(payloads []ledger.Payload) ([]ledger.Payload, error) {
+type StorageFormatV5Migration struct {
+	Log zerolog.Logger
+}
+
+func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
@@ -42,7 +48,7 @@ func StorageFormatV5Migration(payloads []ledger.Payload) ([]ledger.Payload, erro
 	programs := programs.NewEmptyPrograms()
 
 	for i := 0; i < workerCount; i++ {
-		go storageFormatV5MigrationWorker(jobs, results, accounts, programs)
+		go m.work(jobs, results, accounts, programs)
 	}
 
 	go func() {
@@ -66,14 +72,14 @@ func StorageFormatV5Migration(payloads []ledger.Payload) ([]ledger.Payload, erro
 	return migratedPayloads, nil
 }
 
-func storageFormatV5MigrationWorker(
+func (m StorageFormatV5Migration) work(
 	jobs <-chan ledger.Payload,
 	results chan<- storageFormatV5MigrationResult,
 	accounts *state.Accounts,
 	programs *programs.Programs,
 ) {
 	for payload := range jobs {
-		migratedPayload, err := reencodePayloadV5(payload, accounts, programs)
+		migratedPayload, err := m.reencodePayload(payload, accounts, programs)
 		result := struct {
 			key string
 			ledger.Payload
@@ -84,7 +90,7 @@ func storageFormatV5MigrationWorker(
 		if err != nil {
 			result.error = err
 		} else {
-			if err := checkStorageFormatV5(migratedPayload); err != nil {
+			if err := m.checkStorageFormat(migratedPayload); err != nil {
 				panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
 			}
 			result.Payload = migratedPayload
@@ -93,7 +99,7 @@ func storageFormatV5MigrationWorker(
 	}
 }
 
-func checkStorageFormatV5(payload ledger.Payload) error {
+func (m StorageFormatV5Migration) checkStorageFormat(payload ledger.Payload) error {
 
 	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
 		return nil
@@ -120,7 +126,7 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	return decMode
 }()
 
-func reencodePayloadV5(
+func (m StorageFormatV5Migration) reencodePayload(
 	payload ledger.Payload,
 	accounts *state.Accounts,
 	programs *programs.Programs,
@@ -162,7 +168,7 @@ func reencodePayloadV5(
 
 	owner := common.BytesToAddress(rawOwner)
 
-	newValue, err := reencodeValueV5(
+	newValue, err := m.reencodeValue(
 		value,
 		owner,
 		string(rawKey),
@@ -186,7 +192,7 @@ func reencodePayloadV5(
 	return payload, nil
 }
 
-func reencodeValueV5(
+func (m StorageFormatV5Migration) reencodeValue(
 	data []byte,
 	owner common.Address,
 	key string,
@@ -194,8 +200,6 @@ func reencodeValueV5(
 	accounts *state.Accounts,
 	programs *programs.Programs,
 ) ([]byte, error) {
-
-	fmt.Printf(">>> %s\n", key)
 
 	// Decode the value
 
@@ -229,7 +233,7 @@ func reencodeValueV5(
 
 	// Infer the static types for array values and dictionary values
 
-	ok, err := inferContainerStaticTypes(value, accounts, programs)
+	ok, err := m.inferContainerStaticTypes(value, accounts, programs)
 	if err != nil {
 		return nil, err
 	}
@@ -275,10 +279,11 @@ func reencodeValueV5(
 
 	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
 	if err != nil {
-		fmt.Printf(
-			"failed to encode value for owner=%s key=%s: %s\n%s\n",
-			owner, key, err, value,
-		)
+		log.Err(err).
+			Str("key", key).
+			Str("owner", owner.String()).
+			Str("value", value.String()).
+			Msg("failed to encode value")
 		return data, nil
 	}
 
@@ -333,7 +338,7 @@ func reencodeValueV5(
 	return newData, nil
 }
 
-func inferContainerStaticTypes(
+func (m StorageFormatV5Migration) inferContainerStaticTypes(
 	value interpreter.Value,
 	accounts *state.Accounts,
 	programs *programs.Programs,
@@ -356,10 +361,9 @@ func inferContainerStaticTypes(
 			if err != nil {
 				var parsingCheckingError *runtime.ParsingCheckingError
 				if errors.As(err, &parsingCheckingError) {
-					fmt.Printf(
-						"Failed to parse and check program for: %s: %s\n",
-						typeID, err.Error(),
-					)
+					m.Log.Err(err).
+						Str("typeID", string(typeID)).
+						Msg("failed to parse and check program")
 					typeLoadFailure = true
 					err = nil
 				}
@@ -369,6 +373,9 @@ func inferContainerStaticTypes(
 
 			compositeType := program.Elaboration.CompositeTypes[typeID]
 			if compositeType == nil {
+				m.Log.Error().
+					Str("typeID", string(typeID)).
+					Msg("missing composite type")
 				typeLoadFailure = true
 				err = nil
 				return false
@@ -381,7 +388,15 @@ func inferContainerStaticTypes(
 
 				member, ok := compositeType.Members.Get(fieldName)
 				if !ok {
-					err = fmt.Errorf("missing type for composite field: %s.%s", typeID, fieldName)
+					// TODO:
+					//err = fmt.Errorf("missing type for composite field: %s.%s", typeID, fieldName)
+
+					m.Log.Error().
+						Str("typeID", string(typeID)).
+						Msgf("missing type for composite field %s", fieldName)
+					typeLoadFailure = true
+					err = nil
+
 					return false
 				}
 
