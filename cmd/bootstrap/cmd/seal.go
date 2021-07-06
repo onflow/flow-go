@@ -66,7 +66,7 @@ func constructRootResultAndSeal(
 
 // getRandomSource produces the random source which is included in the root
 // EpochSetup event and is used for leader selection. The random source is
-// generated deterministically based on the root block ID, so that the
+// generated deterministically based on the seed, so that the
 // bootstrapping files are deterministic across runs for the same inputs.
 func getRandomSource(seed []byte) []byte {
 
