@@ -244,7 +244,7 @@ func (l *Ledger) ExportCheckpointAt(
 ) (ledger.State, error) {
 
 	l.logger.Info().Msgf(
-		"Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed",
+		"Ledger is loaded, checkpoint export has started for state %s, and %d migrations have been planed",
 		state.String(),
 		len(migrations),
 	)
