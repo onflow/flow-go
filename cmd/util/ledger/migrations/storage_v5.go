@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -226,10 +225,9 @@ func reencodeValueV5(
 		},
 	)
 
-	// TODO: inspect composites, load type,
-	//    - recursively walk each field, use field type
+	// Infer the static types for array values and dictionary values
 
-	ok, err := inferContainerTypeStaticTypes(value, accounts, programs)
+	ok, err := inferContainerStaticTypes(value, accounts, programs)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +301,7 @@ func reencodeValueV5(
 	return newData, nil
 }
 
-func inferContainerTypeStaticTypes(
+func inferContainerStaticTypes(
 	value interpreter.Value,
 	accounts *state.Accounts,
 	programs *programs.Programs,
@@ -338,6 +336,12 @@ func inferContainerTypeStaticTypes(
 			}
 
 			compositeType := program.Elaboration.CompositeTypes[typeID]
+			if compositeType == nil {
+				typeLoadFailure = true
+				err = nil
+				return false
+			}
+
 			fields := compositeValue.Fields()
 			for pair := fields.Oldest(); pair != nil; pair = pair.Next() {
 				fieldName := pair.Key
@@ -349,7 +353,9 @@ func inferContainerTypeStaticTypes(
 					return false
 				}
 
-				err = inferContainerTypeStaticType(fieldValue, member.TypeAnnotation.Type)
+				staticType := interpreter.ConvertSemaToStaticType(member.TypeAnnotation.Type)
+
+				err = inferContainerStaticType(fieldValue, staticType)
 				if err != nil {
 					return false
 				}
@@ -368,18 +374,50 @@ func inferContainerTypeStaticTypes(
 	return true, nil
 }
 
-func inferContainerTypeStaticType(value interpreter.Value, t sema.Type) error {
+func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
 
 	// Only infer static type for arrays and dictionaries
-	switch value.(type) {
-	case *interpreter.ArrayValue,
-		*interpreter.DictionaryValue:
-		break
+	switch value := value.(type) {
+	case *interpreter.ArrayValue:
+
+		switch arrayType := t.(type) {
+		case interpreter.VariableSizedStaticType:
+			value.Type = arrayType
+			// TODO: elements
+
+		case interpreter.ConstantSizedStaticType:
+			value.Type = arrayType
+			// TODO: elements
+
+		default:
+			fmt.Printf("??? ARRAY VALUE NON-ARRAY TYPE: %s\n", t)
+		}
+
+	case *interpreter.DictionaryValue:
+		if dictionaryType, ok := t.(interpreter.DictionaryStaticType); ok {
+			value.Type = dictionaryType
+
+			err := inferContainerStaticType(
+				value.Keys(),
+				interpreter.VariableSizedStaticType{
+					Type: dictionaryType.KeyType,
+				},
+			)
+			if err != nil {
+				return err
+			}
+
+			entries := value.Entries()
+			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
+				// TODO: entry
+			}
+		} else {
+			fmt.Printf("??? DICT VALUE NON-DICT TYPE: %s\n", t)
+		}
+
 	default:
 		return nil
 	}
-
-	// TODO: infer type recursively
 
 	return nil
 }
