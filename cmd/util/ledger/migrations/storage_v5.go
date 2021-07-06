@@ -473,7 +473,10 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 		case interpreter.PrimitiveStaticTypeAnyStruct,
 			interpreter.PrimitiveStaticTypeAnyResource:
 
-			// TODO:
+			value.Type = interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: t,
+			}
 
 		default:
 			return fmt.Errorf("failed to infer static type for dictionary value: %s", value)

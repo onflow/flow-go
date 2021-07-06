@@ -17,7 +17,10 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(array, interpreter.PrimitiveStaticTypeAnyStruct)
+		err := inferContainerStaticType(
+			array,
+			interpreter.PrimitiveStaticTypeAnyStruct,
+		)
 		require.NoError(t, err)
 
 		require.Equal(t,
@@ -34,7 +37,10 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(array, interpreter.PrimitiveStaticTypeAnyResource)
+		err := inferContainerStaticType(
+			array,
+			interpreter.PrimitiveStaticTypeAnyResource,
+		)
 		require.NoError(t, err)
 
 		require.Equal(t,
@@ -51,7 +57,8 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(array,
+		err := inferContainerStaticType(
+			array,
 			interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeInt,
 			},
@@ -72,7 +79,8 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(array,
+		err := inferContainerStaticType(
+			array,
 			interpreter.ConstantSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeInt,
 				Size: 3,
@@ -96,7 +104,10 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 		innerArray := interpreter.NewArrayValueUnownedNonCopying(nil)
 		array := interpreter.NewArrayValueUnownedNonCopying(nil, innerArray)
 
-		err := inferContainerStaticType(array, interpreter.PrimitiveStaticTypeAnyStruct)
+		err := inferContainerStaticType(
+			array,
+			interpreter.PrimitiveStaticTypeAnyStruct,
+		)
 		require.NoError(t, err)
 
 		require.Equal(t,
@@ -114,13 +125,60 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 		)
 	})
 
+	t.Run("dictionary, AnyStruct, no values", func(t *testing.T) {
+
+		t.Parallel()
+
+		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			interpreter.DictionaryStaticType{},
+		)
+
+		err := inferContainerStaticType(
+			dictionary,
+			interpreter.PrimitiveStaticTypeAnyStruct,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeAnyStruct,
+			},
+			dictionary.Type,
+		)
+	})
+
+	t.Run("dictionary, AnyResource, no values", func(t *testing.T) {
+
+		t.Parallel()
+
+		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			interpreter.DictionaryStaticType{},
+		)
+
+		err := inferContainerStaticType(
+			dictionary,
+			interpreter.PrimitiveStaticTypeAnyResource,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			},
+			dictionary.Type,
+		)
+	})
+
 	t.Run("dictionary, {Int: String}, no values", func(t *testing.T) {
 
 		t.Parallel()
 
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(interpreter.DictionaryStaticType{})
 
-		err := inferContainerStaticType(dictionary,
+		err := inferContainerStaticType(
+			dictionary,
 			interpreter.DictionaryStaticType{
 				KeyType:   interpreter.PrimitiveStaticTypeInt,
 				ValueType: interpreter.PrimitiveStaticTypeString,
@@ -149,7 +207,8 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 			interpreter.NewIntValueFromInt64(1), innerDictionary,
 		)
 
-		err := inferContainerStaticType(dictionary,
+		err := inferContainerStaticType(
+			dictionary,
 			interpreter.DictionaryStaticType{
 				KeyType: interpreter.PrimitiveStaticTypeInt,
 				ValueType: interpreter.DictionaryStaticType{
@@ -175,6 +234,41 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 			interpreter.DictionaryStaticType{
 				KeyType:   interpreter.PrimitiveStaticTypeString,
 				ValueType: interpreter.PrimitiveStaticTypeBool,
+			},
+			innerDictionary.Type,
+		)
+	})
+
+	t.Run("dictionary, AnyResource, nested", func(t *testing.T) {
+
+		t.Parallel()
+
+		innerDictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			interpreter.DictionaryStaticType{},
+		)
+		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			interpreter.DictionaryStaticType{},
+			interpreter.NewIntValueFromInt64(1), innerDictionary,
+		)
+
+		err := inferContainerStaticType(
+			dictionary,
+			interpreter.PrimitiveStaticTypeAnyResource,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			},
+			dictionary.Type,
+		)
+
+		require.Equal(t,
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
 			},
 			innerDictionary.Type,
 		)
