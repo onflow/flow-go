@@ -406,6 +406,8 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 				return false
 			}
 
+			var fieldsToDelete []string
+
 			fields := compositeValue.Fields()
 			for pair := fields.Oldest(); pair != nil; pair = pair.Next() {
 				fieldName := pair.Key
@@ -413,16 +415,9 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 				member, ok := compositeType.Members.Get(fieldName)
 				if !ok {
-					// TODO:
-					//err = fmt.Errorf("missing type for composite field: %s.%s", typeID, fieldName)
-
-					m.Log.Error().
-						Str("typeID", string(typeID)).
-						Msgf("missing type for composite field %s", fieldName)
-					typeLoadFailure = true
-					err = nil
-
-					return false
+					// TODO: OK to delete fields with missing type info?
+					fieldsToDelete = append(fieldsToDelete)
+					continue
 				}
 
 				staticType := interpreter.ConvertSemaToStaticType(member.TypeAnnotation.Type)
@@ -431,6 +426,13 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 				if err != nil {
 					return false
 				}
+			}
+
+			for _, fieldName := range fieldsToDelete {
+				m.Log.Warn().
+					Str("typeID", string(typeID)).
+					Msgf("removing field with missing type: %s", fieldName)
+				fields.Delete(fieldName)
 			}
 
 			return true
