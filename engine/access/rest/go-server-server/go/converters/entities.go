@@ -140,51 +140,12 @@ func convertEvent(event *flow.Event) *EntitiesEvent {
 	}
 }
 
-func convertTransactionStatus(transactionStatus *flow.TransactionStatus) *EntitiesTransactionStatus {
-	return &EntitiesTransactionStatus{
-		type entitiesTransactionStatus string
-	}
-
-// 	type TransactionStatus int
-
-// const (
-// 	// TransactionStatusUnknown indicates that the transaction status is not known.
-// 	TransactionStatusUnknown TransactionStatus = iota
-// 	// TransactionStatusPending is the status of a pending transaction.
-// 	TransactionStatusPending
-// 	// TransactionStatusFinalized is the status of a finalized transaction.
-// 	TransactionStatusFinalized
-// 	// TransactionStatusExecuted is the status of an executed transaction.
-// 	TransactionStatusExecuted
-// 	// TransactionStatusSealed is the status of a sealed transaction.
-// 	TransactionStatusSealed
-// 	// TransactionStatusExpired is the status of an expired transaction.
-// 	TransactionStatusExpired
-// )
+func convertTransactionStatus(transactionStatus flow.TransactionStatus) EntitiesTransactionStatus {
+	// TODO????
+	return EntitiesTransactionStatus(flow.TransactionStatus)
 }
 
 func convertTransactionResult(transactionResult *TransactionResult) *AccessTransactionResultResponse {
-
-	// type TransactionResult struct {
-	// 	Status       flow.TransactionStatus
-	// 	StatusCode   uint
-	// 	Events       []flow.Event
-	// 	ErrorMessage string
-	// 	BlockID      flow.Identifier
-	// }
-
-	// type AccessTransactionResultResponse struct {
-
-	// 	Status *EntitiesTransactionStatus `json:"status,omitempty"`
-
-	// 	StatusCode int64 `json:"statusCode,omitempty"`
-
-	// 	ErrorMessage string `json:"errorMessage,omitempty"`
-
-	// 	Events []EntitiesEvent `json:"events,omitempty"`
-
-	// 	BlockId string `json:"blockId,omitempty"`
-	// }
 
 	events := make([]EntitiesEvent, len(transactionResult.Events))
 	for i, event := range transactionResult.Events {
@@ -197,5 +158,48 @@ func convertTransactionResult(transactionResult *TransactionResult) *AccessTrans
 		ErrorMessage: transactionResult.ErrorMessage,
 		Events:       events,
 		BlockId:      convertIdentifier(transactionResult.BlockID),
+	}
+}
+
+func convertAccountPublicKey(accountPublicKey *flow.AccountPublicKey) *EntitiesAccountKey {
+	// TODO
+
+	// type AccountPublicKey struct {
+	// 	Index     int
+	// 	PublicKey crypto.PublicKey
+	// 	SignAlgo  crypto.SigningAlgorithm
+	// 	HashAlgo  hash.HashingAlgorithm
+	// 	SeqNumber uint64
+	// 	Weight    int
+	// 	Revoked   bool
+	// }
+
+	// type EntitiesAccountKey struct {
+	// 	Index int64 `json:"index,omitempty"`
+	// 	PublicKey string `json:"publicKey,omitempty"`
+	// 	SignAlgo int64 `json:"signAlgo,omitempty"`
+	// 	HashAlgo int64 `json:"hashAlgo,omitempty"`
+	// 	Weight int64 `json:"weight,omitempty"`
+	// 	SequenceNumber int64 `json:"sequenceNumber,omitempty"`
+	// 	Revoked bool `json:"revoked,omitempty"`
+	// }
+}
+
+func convertAccount(account *flow.Account) *EntitiesAccount {
+	keys := make([]EntitiesAccountKey, len(account.Keys))
+	for i, key := range account.Keys {
+		keys[i] = convertAccountPublicKey(key)
+	}
+
+	contracts := make(map[string]string)
+	for key, value := range account.Contracts {
+		contracts[key] = base64.RawStdEncoding.EncodeToString(value)
+	}
+
+	return &EntitiesAccount{
+		Address:   convertAddress(account.Address),
+		Balance:   strconv.FormatUint(account.Balance, 10),
+		Keys:      keys,
+		Contracts: contracts,
 	}
 }
