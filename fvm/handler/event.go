@@ -84,8 +84,8 @@ func (h *EventHandler) ServiceEvents() []flow.Event {
 }
 
 type EventCollection struct {
-	events        []flow.Event
-	serviceEvents []flow.Event
+	events        flow.EventsList
+	serviceEvents flow.EventsList
 	totalByteSize uint64
 	eventCounter  uint32
 }
