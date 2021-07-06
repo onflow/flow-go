@@ -125,6 +125,30 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 		)
 	})
 
+	t.Run("array, no type, values", func(t *testing.T) {
+
+		t.Parallel()
+
+		array := interpreter.NewArrayValueUnownedNonCopying(
+			nil,
+			interpreter.NewStringValue("one"),
+			interpreter.NewStringValue("two"),
+		)
+
+		err := inferContainerStaticType(
+			array,
+			nil,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			interpreter.VariableSizedStaticType{
+				Type: interpreter.PrimitiveStaticTypeString,
+			},
+			array.Type,
+		)
+	})
+
 	t.Run("dictionary, AnyStruct, no values", func(t *testing.T) {
 
 		t.Parallel()
@@ -271,6 +295,31 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
 			},
 			innerDictionary.Type,
+		)
+	})
+
+	t.Run("dictionary, no type, values", func(t *testing.T) {
+
+		t.Parallel()
+
+		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			interpreter.DictionaryStaticType{},
+			interpreter.NewStringValue("one"), interpreter.NewIntValueFromInt64(1),
+			interpreter.NewStringValue("two"), interpreter.NewIntValueFromInt64(2),
+		)
+
+		err := inferContainerStaticType(
+			dictionary,
+			nil,
+		)
+		require.NoError(t, err)
+
+		require.Equal(t,
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeInt,
+			},
+			dictionary.Type,
 		)
 	})
 }

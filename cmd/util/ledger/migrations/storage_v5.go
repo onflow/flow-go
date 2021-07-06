@@ -218,14 +218,14 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	interpreter.InspectValue(
 		value,
-		func(value interpreter.Value) bool {
-			switch value := value.(type) {
+		func(inspectedValue interpreter.Value) bool {
+			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.CompositeValue:
-				_ = value.Fields()
+				_ = inspectedValue.Fields()
 			case *interpreter.ArrayValue:
-				_ = value.Elements()
+				_ = inspectedValue.Elements()
 			case *interpreter.DictionaryValue:
-				_ = value.Entries()
+				_ = inspectedValue.Entries()
 			}
 			return true
 		},
@@ -247,24 +247,37 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	interpreter.InspectValue(
 		value,
-		func(value interpreter.Value) bool {
-			switch value := value.(type) {
+		func(inspectedValue interpreter.Value) bool {
+			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.ArrayValue:
 
-				if value.Type == nil ||
-					value.Type.ElementType() == nil {
+				if !m.arrayHasStaticType(inspectedValue) {
 
-					err = fmt.Errorf("missing static type for array: %s", value)
-					return false
+					err = inferArrayStaticType(inspectedValue, nil)
+					if err != nil {
+						return false
+					}
+
+					m.Log.Warn().Msgf(
+						"inferred array static type %s from contents: %s",
+						inspectedValue.StaticType(),
+						inspectedValue,
+					)
 				}
 
 			case *interpreter.DictionaryValue:
 
-				if value.Type.KeyType == nil ||
-					value.Type.ValueType == nil {
+				if !m.dictionaryHasStaticType(inspectedValue) {
+					err = inferDictionaryStaticType(inspectedValue, nil)
+					if err != nil {
+						return false
+					}
 
-					err = fmt.Errorf("missing static type for dictionary: %s", value)
-					return false
+					m.Log.Warn().Msgf(
+						"inferred dictionary static type %s from contents: %s",
+						inspectedValue.StaticType(),
+						inspectedValue,
+					)
 				}
 			}
 
@@ -336,6 +349,18 @@ func (m StorageFormatV5Migration) reencodeValue(
 	}
 
 	return newData, nil
+}
+
+func (m StorageFormatV5Migration) arrayHasStaticType(arrayValue *interpreter.ArrayValue) bool {
+	return arrayValue.Type != nil &&
+		arrayValue.Type.ElementType() != nil
+}
+
+func (m StorageFormatV5Migration) dictionaryHasStaticType(
+	dictionaryValue *interpreter.DictionaryValue,
+) bool {
+	return dictionaryValue.Type.KeyType != nil &&
+		dictionaryValue.Type.ValueType != nil
 }
 
 func (m StorageFormatV5Migration) inferContainerStaticTypes(
@@ -446,24 +471,50 @@ func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType)
 }
 
 func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticType) error {
-	switch arrayType := t.(type) {
-	case interpreter.VariableSizedStaticType:
-		value.Type = arrayType
 
-	case interpreter.ConstantSizedStaticType:
-		value.Type = arrayType
+	if t == nil {
+		if value.Count() == 0 {
+			return fmt.Errorf("cannot infer static type for empty dictionary value")
+		}
 
-	default:
-		switch t {
-		case interpreter.PrimitiveStaticTypeAnyStruct,
-			interpreter.PrimitiveStaticTypeAnyResource:
+		var elementType interpreter.StaticType
 
-			value.Type = interpreter.VariableSizedStaticType{
-				Type: t,
+		for _, element := range value.Elements() {
+			if elementType == nil {
+				elementType = element.StaticType()
+			} else if !element.StaticType().Equal(elementType) {
+				return fmt.Errorf("cannot infer static type for array with mixed elements")
 			}
+		}
+
+		// TODO: infer element type to AnyStruct or AnyResource based on kinds of elements instead?
+		value.Type = interpreter.VariableSizedStaticType{
+			Type: elementType,
+		}
+	} else {
+
+		switch arrayType := t.(type) {
+		case interpreter.VariableSizedStaticType:
+			value.Type = arrayType
+
+		case interpreter.ConstantSizedStaticType:
+			value.Type = arrayType
 
 		default:
-			return fmt.Errorf("failed to infer static type for array value: %s", value)
+			switch t {
+			case interpreter.PrimitiveStaticTypeAnyStruct,
+				interpreter.PrimitiveStaticTypeAnyResource:
+
+				value.Type = interpreter.VariableSizedStaticType{
+					Type: t,
+				}
+
+			default:
+				return fmt.Errorf(
+					"failed to infer static type for array value and given type %s: %s",
+					t, value,
+				)
+			}
 		}
 	}
 
@@ -481,20 +532,47 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 }
 
 func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter.StaticType) error {
-	if dictionaryType, ok := t.(interpreter.DictionaryStaticType); ok {
-		value.Type = dictionaryType
-	} else {
-		switch t {
-		case interpreter.PrimitiveStaticTypeAnyStruct,
-			interpreter.PrimitiveStaticTypeAnyResource:
+	entries := value.Entries()
 
-			value.Type = interpreter.DictionaryStaticType{
-				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
-				ValueType: t,
+	if t == nil {
+		if value.Count() == 0 {
+			return fmt.Errorf("cannot infer static type for empty dictionary value")
+		}
+
+		var valueType interpreter.StaticType
+		for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
+			if valueType == nil {
+				valueType = pair.Value.StaticType()
+			} else if !pair.Value.StaticType().Equal(valueType) {
+				return fmt.Errorf("cannot infer static type for dictionary with mixed values")
 			}
+		}
 
-		default:
-			return fmt.Errorf("failed to infer static type for dictionary value: %s", value)
+		// TODO: infer value type to AnyStruct or AnyResource based on kinds of values instead?
+		value.Type = interpreter.DictionaryStaticType{
+			KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+			ValueType: valueType,
+		}
+	} else {
+
+		if dictionaryType, ok := t.(interpreter.DictionaryStaticType); ok {
+			value.Type = dictionaryType
+		} else {
+			switch t {
+			case interpreter.PrimitiveStaticTypeAnyStruct,
+				interpreter.PrimitiveStaticTypeAnyResource:
+
+				value.Type = interpreter.DictionaryStaticType{
+					KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+					ValueType: t,
+				}
+
+			default:
+				return fmt.Errorf(
+					"failed to infer static type for dictionary value and given type %s: %s",
+					t, value,
+				)
+			}
 		}
 	}
 
@@ -510,7 +588,6 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 		return err
 	}
 
-	entries := value.Entries()
 	for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
 		err := inferContainerStaticType(
 			pair.Value,
