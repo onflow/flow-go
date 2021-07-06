@@ -237,7 +237,37 @@ func reencodeValueV5(
 		return data, nil
 	}
 
-	// TODO: inspect arrays and dictionaries, check static type info (dict key type and dict value type != nil)
+	// Check static types of arrays and dictionaries
+
+	interpreter.InspectValue(
+		value,
+		func(value interpreter.Value) bool {
+			switch value := value.(type) {
+			case *interpreter.ArrayValue:
+
+				if value.Type == nil ||
+					value.Type.ElementType() == nil {
+
+					err = fmt.Errorf("missing static type for array: %s", value)
+					return false
+				}
+
+			case *interpreter.DictionaryValue:
+
+				if value.Type.KeyType == nil ||
+					value.Type.ValueType == nil {
+
+					err = fmt.Errorf("missing static type for dictionary: %s", value)
+					return false
+				}
+			}
+
+			return true
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Encode the value using the new encoder
 
@@ -409,7 +439,7 @@ func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType)
 
 			entries := value.Entries()
 			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-				// TODO: entry
+				// TODO: entry value (keys already inferred above)
 			}
 		} else {
 			fmt.Printf("??? DICT VALUE NON-DICT TYPE: %s\n", t)
