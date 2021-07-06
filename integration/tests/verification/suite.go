@@ -25,8 +25,9 @@ type Suite struct {
 	nodeConfigs                []testnet.NodeConfig // used to keep configuration of nodes in testnet
 	nodeIDs                    []flow.Identifier    // used to keep identifier of nodes in testnet
 	ghostID                    flow.Identifier      // represents id of ghost node
-	exeID                      flow.Identifier      // represents id of execution node
-	verID                      flow.Identifier      // represents id of verification node
+	exe1ID                     flow.Identifier
+	exe2ID                     flow.Identifier
+	verID                      flow.Identifier // represents id of verification node
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
@@ -90,11 +91,18 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates one execution nodes
-	s.exeID = unittest.IdentifierFixture()
+	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
-		testnet.WithID(s.exeID),
+		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.FatalLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
+
+	// generates one execution nodes
+	s.exe2ID = unittest.IdentifierFixture()
+	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
+		testnet.WithID(s.exe2ID),
+		testnet.WithLogLevel(zerolog.FatalLevel))
+	s.nodeConfigs = append(s.nodeConfigs, exe2Config)
 
 	// generates two collection node
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
