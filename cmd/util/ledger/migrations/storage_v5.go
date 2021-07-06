@@ -412,81 +412,96 @@ func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType)
 
 	switch value := value.(type) {
 	case *interpreter.ArrayValue:
-
-		switch arrayType := t.(type) {
-		case interpreter.VariableSizedStaticType:
-			value.Type = arrayType
-
-		case interpreter.ConstantSizedStaticType:
-			value.Type = arrayType
-
-		default:
-			switch t {
-			case interpreter.PrimitiveStaticTypeAnyStruct,
-				interpreter.PrimitiveStaticTypeAnyResource:
-
-				value.Type = interpreter.VariableSizedStaticType{
-					Type: t,
-				}
-
-			default:
-				return fmt.Errorf("failed to infer static type for array value: ")
-			}
-		}
-
-		// Recursively infer type for array elements
-
-		elementType := value.Type.ElementType()
-
-		for _, element := range value.Elements() {
-			err := inferContainerStaticType(element, elementType)
-			if err != nil {
-				return err
-			}
-		}
-
-	case *interpreter.DictionaryValue:
-		if dictionaryType, ok := t.(interpreter.DictionaryStaticType); ok {
-			value.Type = dictionaryType
-		} else {
-			switch t {
-			case interpreter.PrimitiveStaticTypeAnyStruct,
-				interpreter.PrimitiveStaticTypeAnyResource:
-
-				// TODO:
-
-			default:
-				return fmt.Errorf("failed to infer static type for array value: ")
-			}
-		}
-
-		// Recursively infer type for dictionary keys and values
-
-		err := inferContainerStaticType(
-			value.Keys(),
-			interpreter.VariableSizedStaticType{
-				Type: value.Type.KeyType,
-			},
-		)
+		err := inferArrayStaticType(value, t)
 		if err != nil {
 			return err
 		}
 
-		entries := value.Entries()
-		for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-			err := inferContainerStaticType(
-				pair.Value,
-				value.Type.ValueType,
-			)
-			if err != nil {
-				return err
-			}
+	case *interpreter.DictionaryValue:
+		err := inferDictionaryStaticType(value, t)
+		if err != nil {
+			return err
 		}
 
 	default:
 		return nil
 	}
 
+	return nil
+}
+
+func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticType) error {
+	switch arrayType := t.(type) {
+	case interpreter.VariableSizedStaticType:
+		value.Type = arrayType
+
+	case interpreter.ConstantSizedStaticType:
+		value.Type = arrayType
+
+	default:
+		switch t {
+		case interpreter.PrimitiveStaticTypeAnyStruct,
+			interpreter.PrimitiveStaticTypeAnyResource:
+
+			value.Type = interpreter.VariableSizedStaticType{
+				Type: t,
+			}
+
+		default:
+			return fmt.Errorf("failed to infer static type for array value: ")
+		}
+	}
+
+	// Recursively infer type for array elements
+
+	elementType := value.Type.ElementType()
+
+	for _, element := range value.Elements() {
+		err := inferContainerStaticType(element, elementType)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter.StaticType) error {
+	if dictionaryType, ok := t.(interpreter.DictionaryStaticType); ok {
+		value.Type = dictionaryType
+	} else {
+		switch t {
+		case interpreter.PrimitiveStaticTypeAnyStruct,
+			interpreter.PrimitiveStaticTypeAnyResource:
+
+			// TODO:
+
+		default:
+			return fmt.Errorf("failed to infer static type for array value: ")
+		}
+	}
+
+	// Recursively infer type for dictionary keys and values
+
+	err := inferContainerStaticType(
+		value.Keys(),
+		interpreter.VariableSizedStaticType{
+			Type: value.Type.KeyType,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	entries := value.Entries()
+	for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
+		err := inferContainerStaticType(
+			pair.Value,
+			value.Type.ValueType,
+		)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
