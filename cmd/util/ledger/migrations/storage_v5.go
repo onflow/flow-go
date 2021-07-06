@@ -448,7 +448,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 			}
 
 		default:
-			return fmt.Errorf("failed to infer static type for array value: ")
+			return fmt.Errorf("failed to infer static type for array value: %s", value)
 		}
 	}
 
@@ -476,7 +476,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 			// TODO:
 
 		default:
-			return fmt.Errorf("failed to infer static type for array value: ")
+			return fmt.Errorf("failed to infer static type for dictionary value: %s", value)
 		}
 	}
 
