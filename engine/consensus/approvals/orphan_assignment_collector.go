@@ -1,43 +1,30 @@
 package approvals
 
 import (
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type OrphanAssignmentCollector struct {
-	resultID flow.Identifier
-	blockID  flow.Identifier
+	assignmentCollectorBase
 }
 
-func NewOrphanAssignmentCollector(resultID, blockID flow.Identifier) *OrphanAssignmentCollector {
+func NewOrphanAssignmentCollector(collectorBase assignmentCollectorBase) AssignmentCollectorState {
 	return &OrphanAssignmentCollector{
-		resultID: resultID,
-		blockID:  blockID,
+		assignmentCollectorBase: collectorBase,
 	}
 }
 
-func (ac *OrphanAssignmentCollector) BlockID() flow.Identifier {
-	return ac.blockID
+func (oc *OrphanAssignmentCollector) ProcessingStatus() ProcessingStatus { return Orphaned }
+func (oc *OrphanAssignmentCollector) CheckEmergencySealing(uint64, consensus.SealingObservation) error {
+	return nil
 }
-
-func (ac *OrphanAssignmentCollector) ResultID() flow.Identifier {
-	return ac.resultID
+func (oc *OrphanAssignmentCollector) RequestMissingApprovals(uint64, consensus.SealingObservation) (uint, error) {
+	return 0, nil
 }
-
-func (ac *OrphanAssignmentCollector) ProcessIncorporatedResult(*flow.IncorporatedResult) error {
-	return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", ac.resultID)
+func (oc *OrphanAssignmentCollector) ProcessIncorporatedResult(*flow.IncorporatedResult) error {
+	return nil
 }
-
-func (ac *OrphanAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
-	return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", approval.Body.ExecutionResultID)
-}
-
-func (ac *OrphanAssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
-	return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", ac.resultID)
-}
-
-func (ac *OrphanAssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
-	return 0, engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", ac.resultID)
+func (oc *OrphanAssignmentCollector) ProcessApproval(*flow.ResultApproval) error {
+	return nil
 }

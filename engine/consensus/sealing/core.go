@@ -223,16 +223,16 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 // * engine.OutdatedInputError - result is outdated for instance block was already sealed
 // * exception in case of any other error, usually this is not expected
 // * nil - successfully processed incorporated result
-func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error {
-	err := c.checkBlockOutdated(result.Result.BlockID)
+func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error {
+	err := c.checkBlockOutdated(incRes.Result.BlockID)
 	if err != nil {
-		return fmt.Errorf("won't process outdated or unverifiable execution result %s: %w", result.Result.BlockID, err)
+		return fmt.Errorf("won't process outdated or unverifiable execution incRes %s: %w", incRes.Result.BlockID, err)
 	}
 
-	incorporatedBlock, err := c.headers.ByBlockID(result.IncorporatedBlockID)
+	incorporatedBlock, err := c.headers.ByBlockID(incRes.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get block height for incorporated block %s: %w",
-			result.IncorporatedBlockID, err)
+			incRes.IncorporatedBlockID, err)
 	}
 	incorporatedAtHeight := incorporatedBlock.Height
 
@@ -242,30 +242,30 @@ func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error 
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
 		}
-		if finalized.ID() != result.IncorporatedBlockID {
-			// it means that we got incorporated result for a block which doesn't extend our chain
+		if finalized.ID() != incRes.IncorporatedBlockID {
+			// it means that we got incorporated incRes for a block which doesn't extend our chain
 			// and should be discarded from future processing
-			return engine.NewOutdatedInputErrorf("won't process incorporated result from orphan block %s", result.IncorporatedBlockID)
+			return engine.NewOutdatedInputErrorf("won't process incorporated incRes from orphan block %s", incRes.IncorporatedBlockID)
 		}
 	}
 
 	// in case block is not finalized, we will create collector and start processing approvals
 	// no checks for orphans can be made at this point
 	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
-	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
+	lazyCollector, err := c.collectorTree.GetOrCreateCollector(incRes.Result)
 	if err != nil {
 		return fmt.Errorf("cannot create collector: %w", err)
 	}
 
-	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
+	err = lazyCollector.Collector.ProcessIncorporatedResult(incRes)
 	if err != nil {
-		return fmt.Errorf("could not process incorporated result: %w", err)
+		return fmt.Errorf("could not process incorporated incRes: %w", err)
 	}
 
 	// process pending approvals only if it's a new collector
-	// pending approvals are those we haven't received its result yet,
-	// once we received a result and created a new collector, we find the pending
-	// approvals for this result, and process them
+	// pending approvals are those we haven't received its incRes yet,
+	// once we received a incRes and created a new collector, we find the pending
+	// approvals for this incRes, and process them
 	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
 	// time, ensuring that processing of pending approvals happens once for particular assignment
 	if lazyCollector.Created {
@@ -287,7 +287,7 @@ func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error 
 	err := c.processIncorporatedResult(result)
 	span.Finish()
 
-	// We expect only engine.IsOutdatedInputError. If we encounter OutdatedInputError, InvalidInputError, we
+	// We expect only engine.OutdatedInputError. If we encounter UnverifiableInputError or InvalidInputError, we
 	// have a serious problem, because these results are coming from the node's local HotStuff, which is trusted.
 	if engine.IsOutdatedInputError(err) {
 		c.log.Debug().Err(err).Msgf("dropping outdated incorporated result %v", result.ID())
@@ -336,29 +336,26 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	approvalSpan.Finish()
 
 	if err != nil {
-		// only engine.UnverifiableInputError,
-		// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
-		if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
-			logger := c.log.Info()
-			if engine.IsInvalidInputError(err) {
-				logger = c.log.Error()
-			}
+		if engine.IsOutdatedInputError(err) {
+			return nil // potentially delayed input
+		}
 
-			logger.Err(err).
-				Hex("approval_id", logging.Entity(approval)).
-				Msgf("could not process result approval")
-
+		lg := c.log.With().
+			Err(err).
+			Str("approver_id", approval.Body.ApproverID.String()).
+			Str("executed_block_id", approval.Body.BlockID.String()).
+			Str("result_id", approval.Body.ExecutionResultID.String()).
+			Str("approval_id", approval.ID().String()).
+			Logger()
+		if engine.IsUnverifiableInputError(err) {
+			lg.Warn().Msg("received approval for unknown block (this node is potentially behind)")
 			return nil
 		}
-
-		marshalled, err := json.Marshal(approval)
-		if err != nil {
-			marshalled = []byte("json_marshalling_failed")
+		if engine.IsInvalidInputError(err) {
+			lg.Error().Msg("received invalid approval")
+			return nil
 		}
-		c.log.Error().Err(err).
-			Hex("approval_id", logging.Entity(approval)).
-			Str("approval", string(marshalled)).
-			Msgf("unexpected error processing result approval")
+		lg.Error().Msg("unexpected error processing result approval")
 
 		return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
 	}
