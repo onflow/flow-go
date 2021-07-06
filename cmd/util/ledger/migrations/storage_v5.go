@@ -195,6 +195,8 @@ func reencodeValueV5(
 	programs *programs.Programs,
 ) ([]byte, error) {
 
+	fmt.Printf(">>> %s\n", key)
+
 	// Decode the value
 
 	path := []string{key}
@@ -407,42 +409,78 @@ func inferContainerStaticTypes(
 func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
 
 	// Only infer static type for arrays and dictionaries
+
 	switch value := value.(type) {
 	case *interpreter.ArrayValue:
 
 		switch arrayType := t.(type) {
 		case interpreter.VariableSizedStaticType:
 			value.Type = arrayType
-			// TODO: elements
 
 		case interpreter.ConstantSizedStaticType:
 			value.Type = arrayType
-			// TODO: elements
 
 		default:
-			fmt.Printf("??? ARRAY VALUE NON-ARRAY TYPE: %s\n", t)
+			switch t {
+			case interpreter.PrimitiveStaticTypeAnyStruct,
+				interpreter.PrimitiveStaticTypeAnyResource:
+
+				value.Type = interpreter.VariableSizedStaticType{
+					Type: t,
+				}
+
+			default:
+				return fmt.Errorf("failed to infer static type for array value: ")
+			}
+		}
+
+		// Recursively infer type for array elements
+
+		elementType := value.Type.ElementType()
+
+		for _, element := range value.Elements() {
+			err := inferContainerStaticType(element, elementType)
+			if err != nil {
+				return err
+			}
 		}
 
 	case *interpreter.DictionaryValue:
 		if dictionaryType, ok := t.(interpreter.DictionaryStaticType); ok {
 			value.Type = dictionaryType
+		} else {
+			switch t {
+			case interpreter.PrimitiveStaticTypeAnyStruct,
+				interpreter.PrimitiveStaticTypeAnyResource:
 
+				// TODO:
+
+			default:
+				return fmt.Errorf("failed to infer static type for array value: ")
+			}
+		}
+
+		// Recursively infer type for dictionary keys and values
+
+		err := inferContainerStaticType(
+			value.Keys(),
+			interpreter.VariableSizedStaticType{
+				Type: value.Type.KeyType,
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		entries := value.Entries()
+		for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
 			err := inferContainerStaticType(
-				value.Keys(),
-				interpreter.VariableSizedStaticType{
-					Type: dictionaryType.KeyType,
-				},
+				pair.Value,
+				value.Type.ValueType,
 			)
 			if err != nil {
 				return err
 			}
-
-			entries := value.Entries()
-			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-				// TODO: entry value (keys already inferred above)
-			}
-		} else {
-			fmt.Printf("??? DICT VALUE NON-DICT TYPE: %s\n", t)
 		}
 
 	default:
