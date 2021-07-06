@@ -36,20 +36,18 @@ func NewAssignmentCollectorStateMachine(collectorBase assignmentCollectorBase) A
 //  * no errors expected during normal operation;
 //    errors might be symptoms of bugs or internal state corruption (fatal)
 func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
-	collector := asm.collector.Load().(AssignmentCollectorState)
-	currentState := collector.ProcessingStatus()
 	for {
+		collector := asm.collector.Load().(AssignmentCollectorState)
+		currentState := collector.ProcessingStatus()
 		err := collector.ProcessIncorporatedResult(incorporatedResult)
 		if err != nil {
 			return err
 		}
-		if postState := asm.ProcessingStatus(); postState != currentState {
-			currentState = postState
+		if currentState != asm.ProcessingStatus() {
 			continue
 		}
 		break
 	}
-
 	return nil
 }
 
@@ -60,20 +58,18 @@ func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporat
 //  * engine.InvalidInputError if the result approval is invalid
 //  * any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (asm *AssignmentCollectorStateMachine) ProcessApproval(approval *flow.ResultApproval) error {
-	collector := asm.collector.Load().(AssignmentCollectorState)
-	currentState := collector.ProcessingStatus()
 	for {
+		collector := asm.collector.Load().(AssignmentCollectorState)
+		currentState := collector.ProcessingStatus()
 		err := collector.ProcessApproval(approval)
 		if err != nil {
 			return err
 		}
-		if postState := asm.ProcessingStatus(); postState != currentState {
-			currentState = postState
+		if currentState != asm.ProcessingStatus() {
 			continue
 		}
 		break
 	}
-
 	return nil
 }
 
