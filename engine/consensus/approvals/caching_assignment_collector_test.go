@@ -1,12 +1,14 @@
 package approvals
 
 import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"testing"
 )
 
 // CachingAssignmentCollectorTestSuite is a test suite for testing CachingAssignmentCollector. Contains a minimal set of
