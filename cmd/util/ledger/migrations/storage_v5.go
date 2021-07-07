@@ -625,7 +625,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 
 	if t == nil {
 		if value.Count() == 0 {
-			return fmt.Errorf("cannot infer static type for empty dictionary value")
+			return fmt.Errorf("cannot infer static type for empty array value")
 		}
 
 		var elementType interpreter.StaticType
@@ -688,22 +688,34 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 
 	if t == nil {
 		if entries.Len() == 0 {
-			return fmt.Errorf("cannot infer static type for empty dictionary value")
-		}
-
-		var valueType interpreter.StaticType
-		for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-			if valueType == nil {
-				valueType = pair.Value.StaticType()
-			} else if !pair.Value.StaticType().Equal(valueType) {
-				return fmt.Errorf("cannot infer static type for dictionary with mixed values")
+			if value.Count() == 0 {
+				return fmt.Errorf("cannot infer static type for empty dictionary value: %s", value.String())
 			}
-		}
 
-		// TODO: infer value type to AnyStruct or AnyResource based on kinds of values instead?
-		value.Type = interpreter.DictionaryStaticType{
-			KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
-			ValueType: valueType,
+			// The dictionary has deferred values,
+			// which is only the case when the values are resources
+
+			value.Type = interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			}
+
+		} else {
+
+			var valueType interpreter.StaticType
+			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
+				if valueType == nil {
+					valueType = pair.Value.StaticType()
+				} else if !pair.Value.StaticType().Equal(valueType) {
+					return fmt.Errorf("cannot infer static type for dictionary with mixed values")
+				}
+			}
+
+			// TODO: infer value type to AnyStruct or AnyResource based on kinds of values instead?
+			value.Type = interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: valueType,
+			}
 		}
 	} else {
 
