@@ -44,7 +44,6 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.18.0
-	github.com/onflow/flow-go/integration v0.0.0-20210705174858-ada60fedf3e1 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.7.0 // indirect
