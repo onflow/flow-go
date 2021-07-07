@@ -528,10 +528,11 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				return
 			}
 
-			m.Log.Warn().
-				Str("owner", owner.String()).
-				Str("key", key).
-				Msgf("adding known static type to dictionary")
+			location := value.Location()
+			addressLocation, ok := location.(common.AddressLocation)
+			if !ok {
+				return
+			}
 
 			const keyType = interpreter.PrimitiveStaticTypeUInt32
 
@@ -541,9 +542,20 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 
 			dictionaryValue.Type = interpreter.DictionaryStaticType{
 				KeyType: keyType,
-				// TODO: actually DelegatorRecord
-				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+				ValueType: interpreter.CompositeStaticType{
+					Location:            addressLocation,
+					QualifiedIdentifier: "FlowIDTableStaking.DelegatorRecord",
+				},
 			}
+
+			m.Log.Info().
+				Str("owner", owner.String()).
+				Str("key", key).
+				Msgf(
+					"added known static type %s to dictionary: %s",
+					dictionaryValue.Type,
+					dictionaryValue.String(),
+				)
 
 		case "Versus.DropCollection":
 			if !hasAnyLocationAddress(value, "1ff7e32d71183db0") {
@@ -560,10 +572,11 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				return
 			}
 
-			m.Log.Warn().
-				Str("owner", owner.String()).
-				Str("key", key).
-				Msgf("adding known static type to dictionary")
+			location := value.Location()
+			addressLocation, ok := location.(common.AddressLocation)
+			if !ok {
+				return
+			}
 
 			const keyType = interpreter.PrimitiveStaticTypeUInt32
 
@@ -573,9 +586,20 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 
 			dictionaryValue.Type = interpreter.DictionaryStaticType{
 				KeyType: keyType,
-				// TODO: actually Drop
-				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+				ValueType: interpreter.CompositeStaticType{
+					Location:            addressLocation,
+					QualifiedIdentifier: "Versus.Drop",
+				},
 			}
+
+			m.Log.Info().
+				Str("owner", owner.String()).
+				Str("key", key).
+				Msgf(
+					"added known static type %s to dictionary: %s",
+					dictionaryValue.Type,
+					dictionaryValue.String(),
+				)
 
 		case "KittyItemsMarket.Collection":
 
@@ -593,10 +617,11 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				return
 			}
 
-			m.Log.Warn().
-				Str("owner", owner.String()).
-				Str("key", key).
-				Msgf("adding known static type to dictionary")
+			location := value.Location()
+			addressLocation, ok := location.(common.AddressLocation)
+			if !ok {
+				return
+			}
 
 			const keyType = interpreter.PrimitiveStaticTypeUInt64
 
@@ -606,9 +631,20 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 
 			dictionaryValue.Type = interpreter.DictionaryStaticType{
 				KeyType: keyType,
-				// TODO: actually DelegatorRecord
-				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+				ValueType: interpreter.CompositeStaticType{
+					Location:            addressLocation,
+					QualifiedIdentifier: "KittyItemsMarket.SaleOffer",
+				},
 			}
+
+			m.Log.Info().
+				Str("owner", owner.String()).
+				Str("key", key).
+				Msgf(
+					"added known static type %s to dictionary: %s",
+					dictionaryValue.Type,
+					dictionaryValue.String(),
+				)
 		}
 
 	}
