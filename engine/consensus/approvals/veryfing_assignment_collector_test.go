@@ -99,7 +99,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	)
 
 	var err error
-	s.collector, err = NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
+	s.collector, err = NewVerifyingAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
 		s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
