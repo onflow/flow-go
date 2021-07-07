@@ -729,25 +729,44 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 			// The dictionary has deferred values,
 			// which is only the case when the values are resources
 
+			var keyType interpreter.StaticType
+			for _, key := range value.Keys().Elements() {
+				if keyType == nil {
+					keyType = key.StaticType()
+				} else if !key.StaticType().Equal(keyType) {
+					return fmt.Errorf("cannot infer key static type for dictionary with mixed type keys")
+				}
+			}
+
 			value.Type = interpreter.DictionaryStaticType{
-				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				KeyType: keyType,
+				// NOTE: can only infer AnyResource as values are not available
 				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
 			}
 
 		} else {
+
+			var keyType interpreter.StaticType
+			for _, key := range value.Keys().Elements() {
+				if keyType == nil {
+					keyType = key.StaticType()
+				} else if !key.StaticType().Equal(keyType) {
+					return fmt.Errorf("cannot infer key static type for dictionary with mixed type keys")
+				}
+			}
 
 			var valueType interpreter.StaticType
 			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
 				if valueType == nil {
 					valueType = pair.Value.StaticType()
 				} else if !pair.Value.StaticType().Equal(valueType) {
-					return fmt.Errorf("cannot infer static type for dictionary with mixed values")
+					return fmt.Errorf("cannot infer value static type for dictionary with mixed type values")
 				}
 			}
 
 			// TODO: infer value type to AnyStruct or AnyResource based on kinds of values instead?
 			value.Type = interpreter.DictionaryStaticType{
-				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				KeyType:   keyType,
 				ValueType: valueType,
 			}
 		}
