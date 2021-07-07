@@ -66,6 +66,7 @@ func New(
 		sync:           sync,
 	}
 
+	// HERE
 	con, err := net.Register(engine.ReceiveBlocks, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine to network: %w", err)
