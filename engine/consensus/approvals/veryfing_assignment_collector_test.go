@@ -2,13 +2,12 @@ package approvals
 
 import (
 	"fmt"
-	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
 	"math/rand"
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -22,6 +21,7 @@ import (
 	realmempool "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	realproto "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"

@@ -476,7 +476,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
 
 	// try submitting approvals for each result
-	for forkIndex, results := range forkResults {
+	for _, results := range forkResults {
 		for _, result := range results {
 			executedBlockID := result.BlockID
 			resultID := result.ID()
@@ -487,15 +487,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 				unittest.WithExecutionResultID(resultID))
 
 			err := s.core.processApproval(approval)
-
-			// for first fork all results should be valid, since it's a finalized fork
-			// all others forks are orphans and approvals for those should be outdated
-			if forkIndex == 0 {
-				require.NoError(s.T(), err)
-			} else {
-				require.Error(s.T(), err)
-				require.True(s.T(), engine.IsOutdatedInputError(err))
-			}
+			require.NoError(s.T(), err)
 		}
 	}
 }
@@ -545,15 +537,13 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 			collector := s.core.collectorTree.GetCollector(result.ID())
 			if forkIndex > 0 {
 				require.NoError(s.T(), err)
-				_, isOk := collector.(*approvals.VerifyingAssignmentCollector)
-				require.True(s.T(), isOk)
+				require.Equal(s.T(), approvals.VerifyingApprovals, collector.ProcessingStatus())
 			} else {
 				if blockIndex == 0 {
 					require.Error(s.T(), err)
 					require.True(s.T(), engine.IsOutdatedInputError(err))
 				} else {
-					_, isOk := collector.(*approvals.CachingAssignmentCollector)
-					require.True(s.T(), isOk)
+					require.Equal(s.T(), approvals.CachingApprovals, collector.ProcessingStatus())
 				}
 			}
 		}
@@ -797,7 +787,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		collector, err := s.core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
 		require.NoError(s.T(), err)
 		require.False(s.T(), collector.Created)
-		require.True(s.T(), collector.Processable)
+		require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
 	}
 }
 
@@ -846,8 +836,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_ProcessableA
 			err := s.core.ProcessIncorporatedResult(IR)
 			require.NoError(s.T(), err)
 
-			_, processable := s.core.collectorTree.GetCollector(IR.Result.ID())
-			require.False(s.T(), processable)
+			collector := s.core.collectorTree.GetCollector(IR.Result.ID())
+			require.Equal(s.T(), approvals.CachingApprovals, collector.ProcessingStatus())
 
 			prevResult = result
 		}
@@ -870,11 +860,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_ProcessableA
 	// at this point collectors for forks[0] should be processable and for forks[1] not
 	for forkIndex := range forks {
 		for _, result := range results[forkIndex][1:] {
-			_, processable := s.core.collectorTree.GetCollector(result.Result.ID())
+			collector := s.core.collectorTree.GetCollector(result.Result.ID())
 			if forkIndex == 0 {
-				require.True(s.T(), processable)
+				require.Equal(s.T(), approvals.VerifyingApprovals, collector.ProcessingStatus())
 			} else {
-				require.False(s.T(), processable)
+				require.Equal(s.T(), approvals.Orphaned, collector.ProcessingStatus())
 			}
 		}
 	}

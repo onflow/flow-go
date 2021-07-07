@@ -488,7 +488,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
 	err = c.prune(processFinalizedBlockSpan, finalized, lastSealed)
 	if err != nil {
-		return fmt.Errorf("updating to finalized block %v and seald block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
+		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
 	}
 
 	// STEP 2: Check emergency sealing and re-request missing approvals
