@@ -74,6 +74,7 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
+		Initialize().
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")

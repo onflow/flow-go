@@ -16,6 +16,7 @@ func main() {
 	)
 
 	cmd.FlowNode("ghost").
+		Initialize().
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
 		}).

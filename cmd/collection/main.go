@@ -76,6 +76,7 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
+		Initialize().
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&txLimit, "tx-limit", 50000,
 				"maximum number of transactions in the memory pool")

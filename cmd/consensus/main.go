@@ -94,6 +94,7 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
+		Initialize().
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
