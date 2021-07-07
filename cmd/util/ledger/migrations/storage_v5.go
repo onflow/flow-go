@@ -576,7 +576,41 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				// TODO: actually Drop
 				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
 			}
+
+		case "KittyItemsMarket.Collection":
+
+			if !hasAnyLocationAddress(value, "fcceff21d9532b58") {
+				return
+			}
+
+			fieldValue, ok := value.Fields().Get("saleOffers")
+			if !ok {
+				return
+			}
+
+			dictionaryValue, ok := fieldValue.(*interpreter.DictionaryValue)
+			if !ok {
+				return
+			}
+
+			m.Log.Warn().
+				Str("owner", owner.String()).
+				Str("key", key).
+				Msgf("adding known static type to dictionary")
+
+			const keyType = interpreter.PrimitiveStaticTypeUInt64
+
+			dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
+				Type: keyType,
+			}
+
+			dictionaryValue.Type = interpreter.DictionaryStaticType{
+				KeyType: keyType,
+				// TODO: actually DelegatorRecord
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			}
 		}
+
 	}
 }
 
