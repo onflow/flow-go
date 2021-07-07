@@ -8,10 +8,10 @@ if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
    sudo chmod -R 755 ${PKG_DIR}
 fi
 
+rm -rf relic
+
 # relic version or tag
 relic_version="7a9bba7f"
-
-rm -rf relic
 
 # clone a specific version of Relic without history if it's tagged.
 # git clone --branch $(relic_version) --single-branch --depth 1 git@github.com:relic-toolkit/relic.git

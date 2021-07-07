@@ -5,6 +5,7 @@
 /cmd/verification/verification
 /cmd/testclient/testclient
 /cmd/util/util
+/crypto/relic
 
 # Test binary, build with `go test -c`
 *.test

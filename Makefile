@@ -29,17 +29,9 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
-.PHONY: crypto/relic
-crypto/relic:
-	rm -rf crypto/relic
-	git submodule update --init --recursive
-
 .PHONY: crypto/relic/build
-crypto/relic/build: crypto/relic
-	./crypto/relic_build.sh
-
-crypto/relic/update:
-	git submodule update --recursive
+crypto/relic/build:
+	cd ./crypto &&	go generate
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
