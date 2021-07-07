@@ -110,8 +110,9 @@ func (asm *AssignmentCollectorStateMachine) ProcessingStatus() ProcessingStatus 
 // state transition is only executed if AssignmentCollector's internal state is
 // equal to `expectedValue`. The return indicates whether the state was updated.
 // The implementation only allows the transitions
-//         CachingApprovals -> VerifyingApprovals
-//    and                      VerifyingApprovals -> Orphaned
+//         CachingApprovals   -> VerifyingApprovals
+//         CachingApprovals   -> Orphaned
+//    and  VerifyingApprovals -> Orphaned
 // Error returns:
 // * nil if the state transition was successfully executed
 // * ErrDifferentCollectorState if the AssignmentCollector's state is different than expectedCurrentStatus

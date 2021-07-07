@@ -271,7 +271,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	t.size += 1
 	err = t.updateForkState(vertex, newStatus)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to update fork state: %w", err)
 	}
 	return &LazyInitCollector{
 		Collector: vertex.collector,
