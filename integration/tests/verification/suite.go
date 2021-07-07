@@ -90,14 +90,13 @@ func (s *Suite) SetupTest() {
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
-	// generates one execution nodes
+	// generates two execution nodes
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
 		testnet.WithLogLevel(zerolog.FatalLevel))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
 
-	// generates one execution nodes
 	s.exe2ID = unittest.IdentifierFixture()
 	exe2Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe2ID),

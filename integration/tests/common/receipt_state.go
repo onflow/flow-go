@@ -115,6 +115,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	return b2, r2
 }
 
+// WithMinimumChunks creates a qualifier that returns true if receipt has the specified minimum number of chunks.
 func WithMinimumChunks(chunkNum int) func(flow.ExecutionReceipt) bool {
 	return func(receipt flow.ExecutionReceipt) bool {
 		return len(receipt.ExecutionResult.Chunks) >= chunkNum
