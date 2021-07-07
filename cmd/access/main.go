@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/relay"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -230,7 +231,7 @@ func main() {
 			requestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
-				node.Network,
+				node.Network, // HERE
 				node.Me,
 				node.State,
 				engine.RequestCollections,
@@ -350,9 +351,23 @@ func main() {
 		})
 	}
 
-	// initialize the unstaked node's identity
 	if !anb.staked {
+		// initialize the unstaked node's identity
 		anb.PreInit(anb.initUnstakedLocal())
+
+		anb.Component("relay engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+			relayEng, err := relay.New(
+				node.Logger,
+				node.Network, // TODO: pass in the new network
+				node.Me,
+			)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create relay engine: %w", err)
+			}
+
+			return relayEng, nil
+		})
 	}
 	anb.Run()
 }

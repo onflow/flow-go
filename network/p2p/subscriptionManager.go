@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -23,20 +24,26 @@ func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionMa
 }
 
 // Register registers an engine on the channel into the subscription manager.
-func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine network.Engine) error {
+func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine network.Engine) error { // TODO
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	// channel should be registered only once.
 	_, ok := sm.engines[channel]
 	if ok {
-		return fmt.Errorf("subscriptionManager: channel already registered: %s", channel)
+		if channel != network.ChannelRelay {
+			return fmt.Errorf("subscriptionManager: channel already registered: %s", channel)
+		} else {
+			return errors.New("subscriptionManager: relay channel already registered")
+		}
 	}
 
-	// registers the channel with the middleware to let middleware start receiving messages
-	err := sm.mw.Subscribe(channel)
-	if err != nil {
-		return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
+	if channel != network.ChannelRelay {
+		// registers the channel with the middleware to let middleware start receiving messages
+		err := sm.mw.Subscribe(channel)
+		if err != nil {
+			return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
+		}
 	}
 
 	// saves the engine for the provided channel
@@ -74,7 +81,11 @@ func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (networ
 
 	eng, found := sm.engines[channel]
 	if !found {
-		return nil, fmt.Errorf("subscriptionManager: engine for channel %s not found", channel)
+		if channel != network.ChannelRelay {
+			return nil, fmt.Errorf("subscriptionManager: engine for channel %s not found", channel)
+		} else {
+			return nil, errors.New("subscriptionManager: engine for relay channel not found")
+		}
 	}
 	return eng, nil
 }

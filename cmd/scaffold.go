@@ -204,6 +204,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
+		// TODO
 		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
@@ -230,7 +231,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		topologyCache := topology.NewCache(fnb.Logger, top)
 
 		// creates network instance
-		net, err := p2p.NewNetwork(fnb.Logger,
+		net, err := p2p.NewNetwork(fnb.Logger, // TODO
 			codec,
 			participants,
 			fnb.Me,

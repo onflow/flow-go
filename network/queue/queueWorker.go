@@ -10,7 +10,7 @@ const DefaultNumWorkers = 50
 
 // worker de-queues an item from the queue if available and calls the callback function endlessly
 // if no item is available, it blocks
-func worker(ctx context.Context, queue network.MessageQueue, callback func(interface{})) {
+func worker(ctx context.Context, queue network.MessageQueue, callback func(interface{})) { // TODO
 	for {
 		// blocking call
 		item := queue.Remove()
