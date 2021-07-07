@@ -496,7 +496,7 @@ func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identif
 // ExecutionBlockExecuted reports computation and total time spent on a block computation
 func (ec *ExecutionCollector) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
 	ec.totalExecutedBlocksCounter.Inc()
-	ec.blockExecutionTime.Observe(float64(dur / time.Millisecond))
+	ec.blockExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.blockComputationUsed.Observe(float64(compUsed))
 	ec.blockTransactionCounts.Observe(float64(txCounts))
 	ec.blockCollectionCounts.Observe(float64(colCounts))
