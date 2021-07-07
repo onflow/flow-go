@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
@@ -46,9 +47,10 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 	programs := programs.NewEmptyPrograms()
+	var brokenTypeIDs sync.Map
 
 	for i := 0; i < workerCount; i++ {
-		go m.work(jobs, results, accounts, programs)
+		go m.work(jobs, results, accounts, programs, &brokenTypeIDs)
 	}
 
 	go func() {
@@ -77,9 +79,15 @@ func (m StorageFormatV5Migration) work(
 	results chan<- storageFormatV5MigrationResult,
 	accounts *state.Accounts,
 	programs *programs.Programs,
+	brokenTypeIDs *sync.Map,
 ) {
 	for payload := range jobs {
-		migratedPayload, err := m.reencodePayload(payload, accounts, programs)
+		migratedPayload, err := m.reencodePayload(
+			payload,
+			accounts,
+			programs,
+			brokenTypeIDs,
+		)
 		result := struct {
 			key string
 			ledger.Payload
@@ -130,6 +138,7 @@ func (m StorageFormatV5Migration) reencodePayload(
 	payload ledger.Payload,
 	accounts *state.Accounts,
 	programs *programs.Programs,
+	brokenTypeIDs *sync.Map,
 ) (ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
@@ -175,6 +184,7 @@ func (m StorageFormatV5Migration) reencodePayload(
 		version,
 		accounts,
 		programs,
+		brokenTypeIDs,
 	)
 	if err != nil {
 		return ledger.Payload{},
@@ -199,6 +209,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 	version uint16,
 	accounts *state.Accounts,
 	programs *programs.Programs,
+	brokenTypeIDs *sync.Map,
 ) ([]byte, error) {
 
 	// Decode the value
@@ -233,14 +244,9 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	// Infer the static types for array values and dictionary values
 
-	ok, err := m.inferContainerStaticTypes(value, accounts, programs)
+	err = m.inferContainerStaticTypes(value, accounts, programs, brokenTypeIDs)
 	if err != nil {
 		return nil, err
-	}
-	// If the types could not be inferred,
-	// then return the data as-is, unmigrated
-	if !ok {
-		return data, nil
 	}
 
 	// Check static types of arrays and dictionaries
@@ -268,6 +274,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 			case *interpreter.DictionaryValue:
 
 				if !m.dictionaryHasStaticType(inspectedValue) {
+
 					err = inferDictionaryStaticType(inspectedValue, nil)
 					if err != nil {
 						return false
@@ -364,46 +371,70 @@ func (m StorageFormatV5Migration) dictionaryHasStaticType(
 }
 
 func (m StorageFormatV5Migration) inferContainerStaticTypes(
-	value interpreter.Value,
+	rootValue interpreter.Value,
 	accounts *state.Accounts,
 	programs *programs.Programs,
-) (bool, error) {
+	brokenTypeIDs *sync.Map,
+) error {
 	var err error
-	var typeLoadFailure bool
+
+	// Start with composite types and use fields' types to infer values' types
 
 	interpreter.InspectValue(
-		value,
-		func(value interpreter.Value) bool {
-			compositeValue, ok := value.(*interpreter.CompositeValue)
+		rootValue,
+		func(inspectedValue interpreter.Value) bool {
+			compositeValue, ok := inspectedValue.(*interpreter.CompositeValue)
 			if !ok {
+				// The inspected value is not a composite value,
+				// continue inspecting other values
 				return true
 			}
 
+			// If the inference for the composite's type failed before,
+			// then ignore this composite and continue inspecting other values
+
 			typeID := compositeValue.TypeID()
+			_, isBroken := brokenTypeIDs.Load(typeID)
+			if isBroken {
+				return true
+			}
 
 			var program *interpreter.Program
 			program, err = loadProgram(compositeValue.Location(), accounts, programs)
 			if err != nil {
 				var parsingCheckingError *runtime.ParsingCheckingError
-				if errors.As(err, &parsingCheckingError) {
-					m.Log.Err(err).
-						Str("typeID", string(typeID)).
-						Msg("failed to parse and check program")
-					typeLoadFailure = true
-					err = nil
+				if !errors.As(err, &parsingCheckingError) {
+					// If loading the program failed and it was not "just" a parsing / checking error,
+					// then something else is wrong, so abort the migration
+					return false
 				}
 
-				return false
+				// If the program for the composite's type could not be parsed or checked,
+				// report it, prevent a re-parse and re-check, and continue inspecting other values
+
+				m.Log.Err(err).
+					Str("typeID", string(typeID)).
+					Msg("failed to parse and check program")
+
+				brokenTypeIDs.Store(typeID, nil)
+
+				err = nil
+				return true
 			}
 
 			compositeType := program.Elaboration.CompositeTypes[typeID]
 			if compositeType == nil {
+
+				// If the composite type is missing,
+				// report it, prevent a re-parse and re-check, and continue inspecting other values
+
 				m.Log.Error().
 					Str("typeID", string(typeID)).
 					Msg("missing composite type")
-				typeLoadFailure = true
-				err = nil
-				return false
+
+				brokenTypeIDs.Store(typeID, nil)
+
+				return true
 			}
 
 			var fieldsToDelete []string
@@ -415,16 +446,29 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 				member, ok := compositeType.Members.Get(fieldName)
 				if !ok {
-					// TODO: OK to delete fields with missing type info?
+					// TODO: OK?
+					// If the type info for the field is missing,
+					// then delete the field contents
+
 					fieldsToDelete = append(fieldsToDelete)
 					continue
 				}
 
-				staticType := interpreter.ConvertSemaToStaticType(member.TypeAnnotation.Type)
+				fieldType := interpreter.ConvertSemaToStaticType(member.TypeAnnotation.Type)
 
-				err = inferContainerStaticType(fieldValue, staticType)
+				err = inferContainerStaticType(fieldValue, fieldType)
 				if err != nil {
-					return false
+
+					// If the container type cannot be inferred using the field type,
+					// report it and continue inferring other fields
+
+					m.Log.Err(err).
+						Str("typeID", string(typeID)).
+						Str("fieldType", fieldType.String()).
+						Str("fieldValue", fieldValue.String()).
+						Msg("failed to infer container type based on field type")
+
+					err = nil
 				}
 			}
 
@@ -438,14 +482,8 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 			return true
 		},
 	)
-	if err != nil {
-		return false, err
-	}
-	if typeLoadFailure {
-		return false, nil
-	}
 
-	return true, nil
+	return err
 }
 
 func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
@@ -464,9 +502,6 @@ func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType)
 		if err != nil {
 			return err
 		}
-
-	default:
-		return nil
 	}
 
 	return nil
@@ -530,6 +565,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -537,7 +573,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 	entries := value.Entries()
 
 	if t == nil {
-		if value.Count() == 0 {
+		if entries.Len() == 0 {
 			return fmt.Errorf("cannot infer static type for empty dictionary value")
 		}
 
