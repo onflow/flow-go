@@ -329,6 +329,11 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
 			}
 			if !executed {
+				// this should not happen, but if it does, execution should still work
+				e.log.Warn().
+					Hex("block_id", lastExecutedID[:]).
+					Msg("block marked as highest executed one, but not executable - internal inconsistency")
+
 				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
 				if err != nil {
 					return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
@@ -469,16 +474,6 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 	// adding the block to the queue,
 	queue, added, head := enqueue(executableBlock, executionQueues)
 
-	//fmt.Printf("after enqueueing %x\n", executableBlock.ID())
-	//for i, q := range executionQueues.All() {
-	//	fmt.Printf("queue %d\n", i)
-	//	fmt.Printf("head: %d\n", q.Head.Item.Height())
-	//	for j, child := range q.Head.Children {
-	//		fmt.Printf("head child %d: %d\n", j, child.Item.Height())
-	//	}
-	//}
-	//fmt.Printf("/after enqueueing %x\n", executableBlock.ID())
-
 	// if it's not added, it means the block is not a new block, it already
 	// exists in the queue, then bail
 	if !added {
@@ -531,20 +526,22 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		return fmt.Errorf("cannot send collection requests: %w", err)
 	}
 
+	complete := false
+
 	// if newly enqueued block is inside any existing queue, we should skip now and wait
 	// for parent to finish execution
 	if head {
 		// execute the block if the block is ready to be executed
-		completed := e.executeBlockIfComplete(executableBlock)
-
-		lg.Info().
-			// if the execution is halt, but the queue keeps growing, we could check which block
-			// hasn't been executed.
-			Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
-			Bool("completed", completed).
-			Bool("head_of_queue", head).
-			Msg("block is enqueued")
+		complete = e.executeBlockIfComplete(executableBlock)
 	}
+
+	lg.Info().
+		// if the execution is halt, but the queue keeps growing, we could check which block
+		// hasn't been executed.
+		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
+		Bool("complete", complete).
+		Bool("head_of_queue", head).
+		Msg("block is enqueued")
 
 	return nil
 }
@@ -865,8 +862,10 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 	return q, queues.Add(q)
 }
 
-// enqueue adds a block to the queues, return the queue that includes the block and a bool
-// indicating whether the block was a new block, and if new, whether a new queue has been created
+// enqueue adds a block to the queues, return the queue that includes the block and booleans
+// * is block new one (it's not already enqueued, not a duplicate)
+// * is head of the queue (new queue has been created)
+//
 // Queues are chained blocks. Since a block can't be executable until its parent has been
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
