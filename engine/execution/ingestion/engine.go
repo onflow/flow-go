@@ -324,9 +324,20 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		isRoot := rootBlock.ID() == last.ID()
 		if !isRoot {
-			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
+			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, lastExecutedID)
 			if err != nil {
-				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
+				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
+			}
+			if !executed {
+				// this should not happen, but if it does, execution should still work
+				e.log.Warn().
+					Hex("block_id", lastExecutedID[:]).
+					Msg("block marked as highest executed one, but not executable - internal inconsistency")
+
+				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
+				if err != nil {
+					return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
+				}
 			}
 		}
 
@@ -461,12 +472,13 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		Logger()
 
 	// adding the block to the queue,
-	queue, added := enqueue(executableBlock, executionQueues)
+	queue, added, head := enqueue(executableBlock, executionQueues)
 
 	// if it's not added, it means the block is not a new block, it already
 	// exists in the queue, then bail
 	if !added {
 		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
+			Int("block_height", int(executableBlock.Height())).
 			Msg("block already exists in the execution queue")
 		return nil
 	}
@@ -514,14 +526,21 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		return fmt.Errorf("cannot send collection requests: %w", err)
 	}
 
-	// execute the block if the block is ready to be executed
-	completed := e.executeBlockIfComplete(executableBlock)
+	complete := false
+
+	// if newly enqueued block is inside any existing queue, we should skip now and wait
+	// for parent to finish execution
+	if head {
+		// execute the block if the block is ready to be executed
+		complete = e.executeBlockIfComplete(executableBlock)
+	}
 
 	lg.Info().
 		// if the execution is halt, but the queue keeps growing, we could check which block
 		// hasn't been executed.
 		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
-		Bool("completed", completed).
+		Bool("complete", complete).
+		Bool("head_of_queue", head).
 		Msg("block is enqueued")
 
 	return nil
@@ -843,9 +862,11 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 	return q, queues.Add(q)
 }
 
-// enqueue adds a block to the queues, return the queue that includes the block and a bool
-// indicating whether the block was a new block.
-// queues are chained blocks. Since a block can't be executable until its parent has been
+// enqueue adds a block to the queues, return the queue that includes the block and booleans
+// * is block new one (it's not already enqueued, not a duplicate)
+// * is head of the queue (new queue has been created)
+//
+// Queues are chained blocks. Since a block can't be executable until its parent has been
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
 // for instance we have one queue whose head is A:
@@ -855,18 +876,19 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // A <- B <- C
 //   ^- D <- E <- F
 // Even through there are 6 blocks, we only need to check if block A becomes executable.
-// when the parent block isn't in the queue, we add it as a new queue. for instace, if
+// when the parent block isn't in the queue, we add it as a new queue. for instance, if
 // we receive H <- G, then the queues will become:
 // A <- B <- C
 //   ^- D <- E
 // G
-func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
+func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {
-			return queue, isNew
+			return queue, isNew, false
 		}
 	}
-	return newQueue(blockify, queues)
+	queue, isNew := newQueue(blockify, queues)
+	return queue, isNew, true
 }
 
 // check if the block's collections have been received,
