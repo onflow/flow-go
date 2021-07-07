@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/fxamacker/cbor/v2"
@@ -23,7 +24,6 @@ import (
 )
 
 type storageFormatV5MigrationResult struct {
-	key string
 	ledger.Payload
 	error
 }
@@ -63,7 +63,11 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 
 	for result := range results {
 		if result.error != nil {
-			return nil, fmt.Errorf("failed to migrate key: %#+v: %w", result.key, result.error)
+			return nil, fmt.Errorf(
+				"failed to migrate key: %s: %w",
+				result.Payload.Key.String(),
+				result.error,
+			)
 		}
 		migratedPayloads = append(migratedPayloads, result.Payload)
 		if len(migratedPayloads) == len(payloads) {
@@ -89,11 +93,10 @@ func (m StorageFormatV5Migration) work(
 			brokenTypeIDs,
 		)
 		result := struct {
-			key string
 			ledger.Payload
 			error
 		}{
-			key: payload.Key.String(),
+			Payload: payload,
 		}
 		if err != nil {
 			result.error = err
@@ -216,7 +219,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	path := []string{key}
 
-	value, err := interpreter.DecodeValueV4(data, &owner, path, version, nil)
+	rootValue, err := interpreter.DecodeValueV4(data, &owner, path, version, nil)
 	if err != nil {
 		return nil,
 			fmt.Errorf(
@@ -228,7 +231,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 	// Force decoding of all container values
 
 	interpreter.InspectValue(
-		value,
+		rootValue,
 		func(inspectedValue interpreter.Value) bool {
 			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.CompositeValue:
@@ -242,9 +245,11 @@ func (m StorageFormatV5Migration) reencodeValue(
 		},
 	)
 
+	m.addKnownContainerStaticTypes(rootValue, owner, key)
+
 	// Infer the static types for array values and dictionary values
 
-	err = m.inferContainerStaticTypes(value, accounts, programs, brokenTypeIDs)
+	err = m.inferContainerStaticTypes(rootValue, accounts, programs, brokenTypeIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +257,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 	// Check static types of arrays and dictionaries
 
 	interpreter.InspectValue(
-		value,
+		rootValue,
 		func(inspectedValue interpreter.Value) bool {
 			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.ArrayValue:
@@ -297,12 +302,12 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	// Encode the value using the new encoder
 
-	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
+	newData, deferrals, err := interpreter.EncodeValue(rootValue, path, true, nil)
 	if err != nil {
 		log.Err(err).
 			Str("key", key).
 			Str("owner", owner.String()).
-			Str("value", value.String()).
+			Str("rootValue", rootValue.String()).
 			Msg("failed to encode value")
 		return data, nil
 	}
@@ -312,21 +317,21 @@ func (m StorageFormatV5Migration) reencodeValue(
 	if len(deferrals.Values) > 0 {
 		return nil, fmt.Errorf(
 			"re-encoding produced deferred values:\n%s\n",
-			value,
+			rootValue,
 		)
 	}
 
 	if len(deferrals.Moves) > 0 {
 		return nil, fmt.Errorf(
 			"re-encoding produced deferred moves:\n%s\n",
-			value,
+			rootValue,
 		)
 	}
 
 	// Sanity check: Decode the newly encoded data again
 	// and compare it to the initially decoded value
 
-	newValue, err := interpreter.DecodeValue(
+	newRootValue, err := interpreter.DecodeValue(
 		newData,
 		&owner,
 		path,
@@ -336,22 +341,23 @@ func (m StorageFormatV5Migration) reencodeValue(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"failed to decode re-encoded value: %w\n%s\n",
-			err, value,
+			err, rootValue,
 		)
 	}
 
-	equatableValue, ok := value.(interpreter.EquatableValue)
+	equatableValue, ok := rootValue.(interpreter.EquatableValue)
 	if !ok {
 		return nil, fmt.Errorf(
 			"cannot compare unequatable %[1]T\n%[1]s\n",
-			value,
+			rootValue,
 		)
 	}
 
-	if !equatableValue.Equal(newValue, nil, false) {
+	if !equatableValue.Equal(newRootValue, nil, false) {
 		return nil, fmt.Errorf(
 			"values are unequal:\n%s\n%s\n",
-			value, newValue,
+			rootValue,
+			newRootValue,
 		)
 	}
 
@@ -366,7 +372,8 @@ func (m StorageFormatV5Migration) arrayHasStaticType(arrayValue *interpreter.Arr
 func (m StorageFormatV5Migration) dictionaryHasStaticType(
 	dictionaryValue *interpreter.DictionaryValue,
 ) bool {
-	return dictionaryValue.Type.KeyType != nil &&
+	return m.arrayHasStaticType(dictionaryValue.Keys()) &&
+		dictionaryValue.Type.KeyType != nil &&
 		dictionaryValue.Type.ValueType != nil
 }
 
@@ -484,6 +491,47 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 	)
 
 	return err
+}
+
+func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
+	value interpreter.Value,
+	owner common.Address,
+	key string,
+) {
+	// TODO: maybe also check owner
+	if strings.HasPrefix(key, "contract\x1fFlowIDTableStaking\x1fnodes\x1fv\x1f") {
+
+		if compositeValue, ok := value.(*interpreter.CompositeValue); ok &&
+			compositeValue.QualifiedIdentifier() == "FlowIDTableStaking.NodeRecord" {
+
+			delegatorsField, ok := compositeValue.Fields().Get("delegators")
+			if !ok {
+				return
+			}
+
+			dictionaryValue, ok := delegatorsField.(*interpreter.DictionaryValue)
+			if !ok {
+				return
+			}
+
+			m.Log.Warn().
+				Str("owner", owner.String()).
+				Str("key", key).
+				Msgf("adding known static type to dictionary")
+
+			const keyType = interpreter.PrimitiveStaticTypeUInt32
+
+			dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
+				Type: keyType,
+			}
+
+			dictionaryValue.Type = interpreter.DictionaryStaticType{
+				KeyType: keyType,
+				// TODO: actually DelegatorRecord
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			}
+		}
+	}
 }
 
 func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
