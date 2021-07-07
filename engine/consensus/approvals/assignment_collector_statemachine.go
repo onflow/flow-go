@@ -18,15 +18,15 @@ var (
 )
 
 type AssignmentCollectorStateMachine struct {
-	assignmentCollectorBase
+	AssignmentCollectorBase
 
 	sync.Mutex
 	collector atomic.Value
 }
 
-func NewAssignmentCollectorStateMachine(collectorBase assignmentCollectorBase) AssignmentCollector {
+func NewAssignmentCollectorStateMachine(collectorBase AssignmentCollectorBase) AssignmentCollector {
 	return &AssignmentCollectorStateMachine{
-		assignmentCollectorBase: collectorBase,
+		AssignmentCollectorBase: collectorBase,
 	}
 }
 
@@ -73,14 +73,14 @@ func (asm *AssignmentCollectorStateMachine) ProcessApproval(approval *flow.Resul
 	return nil
 }
 
-func (asm *AssignmentCollectorStateMachine) CheckEmergencySealing(finalizedBlockHeight uint64, observer consensus.SealingObservation) error {
+func (asm *AssignmentCollectorStateMachine) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
 	collector := asm.collector.Load().(AssignmentCollectorState)
-	return collector.CheckEmergencySealing(finalizedBlockHeight, observer)
+	return collector.CheckEmergencySealing(observer, finalizedBlockHeight)
 }
 
-func (asm *AssignmentCollectorStateMachine) RequestMissingApprovals(maxHeightForRequesting uint64, observer consensus.SealingObservation) (uint, error) {
+func (asm *AssignmentCollectorStateMachine) RequestMissingApprovals(observer consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error) {
 	collector := asm.collector.Load().(AssignmentCollectorState)
-	return collector.RequestMissingApprovals(maxHeightForRequesting, observer)
+	return collector.RequestMissingApprovals(observer, maxHeightForRequesting)
 }
 
 func (asm *AssignmentCollectorStateMachine) ProcessingStatus() ProcessingStatus {
@@ -119,11 +119,11 @@ func (asm *AssignmentCollectorStateMachine) ChangeProcessingStatus(expectedCurre
 		// re-ingest IncorporatedResults and Approvals that were stored in the cachingCollector
 		for _, ir := range cachingCollector.GetIncorporatedResults() {
 			task := asm.reIngestIncorporatedResultTask(ir)
-			asm.workerpool.Submit(task)
+			asm.workerPool.Submit(task)
 		}
 		for _, approval := range cachingCollector.GetApprovals() {
 			task := asm.reIngestApprovalTask(approval)
-			asm.workerpool.Submit(task)
+			asm.workerPool.Submit(task)
 		}
 		return nil
 	}
@@ -145,7 +145,7 @@ func (asm *AssignmentCollectorStateMachine) verifying2Orphaned() (*VerifyingAssi
 		return nil, fmt.Errorf("collectors current state is %s: %w",
 			verifyingCollector.ProcessingStatus().String(), ErrDifferentCollectorState)
 	}
-	asm.collector.Store(NewOrphanAssignmentCollector(asm.assignmentCollectorBase))
+	asm.collector.Store(NewOrphanAssignmentCollector(asm.AssignmentCollectorBase))
 	return verifyingCollector, nil
 }
 
@@ -164,7 +164,7 @@ func (asm *AssignmentCollectorStateMachine) caching2Verifying() (*CachingAssignm
 			cachingCollector.ProcessingStatus().String(), ErrDifferentCollectorState)
 	}
 
-	verifyingCollector, err := NewVerifyingAssignmentCollector(asm.assignmentCollectorBase)
+	verifyingCollector, err := NewVerifyingAssignmentCollector(asm.AssignmentCollectorBase)
 	if err != nil {
 		return nil, fmt.Errorf("failed to instantiate VerifyingAssignmentCollector: %w", err)
 	}

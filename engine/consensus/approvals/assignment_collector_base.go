@@ -15,7 +15,7 @@ import (
 type base struct {
 	log zerolog.Logger
 
-	workerpool                           *workerpool.WorkerPool
+	workerPool                           *workerpool.WorkerPool
 	assigner                             module.ChunkAssigner            // component for computing chunk assignments
 	state                                protocol.State                  // protocol state
 	headers                              storage.Headers                 // used to query headers from storage
@@ -26,34 +26,55 @@ type base struct {
 	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
 }
 
-type assignmentCollectorBase struct {
+type AssignmentCollectorBase struct {
 	base
 	result        *flow.ExecutionResult // execution result
 	resultID      flow.Identifier       // ID of execution result
 	executedBlock *flow.Header          // header of the executed block
 }
 
-func NewAssignmentCollectorBase(result *flow.ExecutionResult, base base) (assignmentCollectorBase, error) {
-	executedBlock, err := base.headers.ByBlockID(result.BlockID)
+func NewAssignmentCollectorBase(logger zerolog.Logger,
+	workerPool *workerpool.WorkerPool,
+	result *flow.ExecutionResult,
+	state protocol.State,
+	headers storage.Headers,
+	assigner module.ChunkAssigner,
+	seals mempool.IncorporatedResultSeals,
+	sigVerifier module.Verifier,
+	approvalConduit network.Conduit,
+	requestTracker *RequestTracker,
+	requiredApprovalsForSealConstruction uint) (AssignmentCollectorBase, error) {
+	executedBlock, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
-		return assignmentCollectorBase{}, err
+		return AssignmentCollectorBase{}, err
 	}
 
-	return assignmentCollectorBase{
-		base:          base,
+	return AssignmentCollectorBase{
+		base: base{
+			log:                                  logger,
+			workerPool:                           workerPool,
+			assigner:                             assigner,
+			state:                                state,
+			headers:                              headers,
+			verifier:                             sigVerifier,
+			seals:                                seals,
+			approvalConduit:                      approvalConduit,
+			requestTracker:                       requestTracker,
+			requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		},
 		result:        result,
 		resultID:      result.ID(),
 		executedBlock: executedBlock,
 	}, nil
 }
 
-func (cb *assignmentCollectorBase) BlockID() flow.Identifier      { return cb.result.BlockID }
-func (cb *assignmentCollectorBase) Block() *flow.Header           { return cb.executedBlock }
-func (cb *assignmentCollectorBase) ResultID() flow.Identifier     { return cb.resultID }
-func (cb *assignmentCollectorBase) Result() *flow.ExecutionResult { return cb.result }
+func (cb *AssignmentCollectorBase) BlockID() flow.Identifier      { return cb.result.BlockID }
+func (cb *AssignmentCollectorBase) Block() *flow.Header           { return cb.executedBlock }
+func (cb *AssignmentCollectorBase) ResultID() flow.Identifier     { return cb.resultID }
+func (cb *AssignmentCollectorBase) Result() *flow.ExecutionResult { return cb.result }
 
 // OnInvalidApproval logs in invalid approval
-func (cb *assignmentCollectorBase) OnInvalidApproval(approval *flow.ResultApproval, err error) {
+func (cb *AssignmentCollectorBase) OnInvalidApproval(approval *flow.ResultApproval, err error) {
 	cb.log.Error().Err(err).
 		Str("approver_id", approval.Body.ApproverID.String()).
 		Str("executed_block_id", approval.Body.BlockID.String()).

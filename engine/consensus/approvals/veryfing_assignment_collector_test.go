@@ -2,6 +2,9 @@ package approvals
 
 import (
 	"fmt"
+	"github.com/gammazero/workerpool"
+	"github.com/onflow/flow-go/network"
+	"github.com/rs/zerolog"
 	"math/rand"
 	"testing"
 	"time"
@@ -15,6 +18,8 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	realmodule "github.com/onflow/flow-go/module"
+	realmempool "github.com/onflow/flow-go/module/mempool"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -36,9 +41,29 @@ func TestAssignmentCollector(t *testing.T) {
 	suite.Run(t, new(AssignmentCollectorTestSuite))
 }
 
+func newVerifyingAssignmentCollector(logger zerolog.Logger,
+	workerPool *workerpool.WorkerPool,
+	result *flow.ExecutionResult,
+	state realproto.State,
+	headers realstorage.Headers,
+	assigner realmodule.ChunkAssigner,
+	seals realmempool.IncorporatedResultSeals,
+	sigVerifier realmodule.Verifier,
+	approvalConduit network.Conduit,
+	requestTracker *RequestTracker,
+	requiredApprovalsForSealConstruction uint) (*VerifyingAssignmentCollector, error) {
+	b, err := NewAssignmentCollectorBase(logger, workerPool, result, state, headers, assigner, seals, sigVerifier,
+		approvalConduit, requestTracker, requiredApprovalsForSealConstruction)
+	if err != nil {
+		return nil, err
+	}
+	return NewVerifyingAssignmentCollector(b)
+}
+
 type AssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
+	workerPool      *workerpool.WorkerPool
 	blocks          map[flow.Identifier]*flow.Header
 	state           *protocol.State
 	headers         *storage.Headers
@@ -55,6 +80,7 @@ type AssignmentCollectorTestSuite struct {
 func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
+	s.workerPool = workerpool.New(4)
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
 	s.state = &protocol.State{}
 	s.assigner = &module.ChunkAssigner{}
@@ -99,7 +125,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	)
 
 	var err error
-	s.collector, err = NewVerifyingAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
+	s.collector, err = newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, s.state, s.headers,
 		s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
@@ -237,7 +263,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, s.state, s.headers,
 			assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.NoError(s.T(), err)
 
@@ -248,7 +274,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 	s.Run("invalid-verifier-identities", func() {
 		// delete identities for Result.BlockID
 		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
-		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, s.state, s.headers,
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, s.state, s.headers,
 			s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
@@ -274,7 +300,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
@@ -295,7 +321,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
@@ -315,7 +341,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := NewAssignmentCollector(unittest.Logger(), s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)

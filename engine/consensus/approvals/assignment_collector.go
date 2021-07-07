@@ -43,8 +43,8 @@ type AssignmentCollectorState interface {
 	//  * any other errors might be symptoms of bugs or internal state corruption (fatal)
 	ProcessApproval(approval *flow.ResultApproval) error
 
-	CheckEmergencySealing(finalizedBlockHeight uint64, observer consensus.SealingObservation) error
-	RequestMissingApprovals(maxHeightForRequesting uint64, observer consensus.SealingObservation) (uint, error)
+	CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error
+	RequestMissingApprovals(observer consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error)
 
 	// ProcessingStatus returns the AssignmentCollector's  ProcessingStatus
 	ProcessingStatus() ProcessingStatus
@@ -65,5 +65,5 @@ type AssignmentCollector interface {
 	// * ErrDifferentCollectorState if the AssignmentCollector's state is different than expectedCurrentStatus
 	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
 	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-	ChangeProcessingStatus(expectedValue, newValue ProcessingStatus) (bool, error)
+	ChangeProcessingStatus(expectedValue, newValue ProcessingStatus) error
 }

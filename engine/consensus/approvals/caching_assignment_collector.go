@@ -9,25 +9,25 @@ import (
 )
 
 type CachingAssignmentCollector struct {
-	assignmentCollectorBase
+	AssignmentCollectorBase
 
 	approvalsCache *ApprovalsCache           // in-memory cache of approvals (not-verified)
 	incResCache    *IncorporatedResultsCache // in-memory cache for incorporated results that were processed
 }
 
-func NewCachingAssignmentCollector(collectorBase assignmentCollectorBase) *CachingAssignmentCollector {
+func NewCachingAssignmentCollector(collectorBase AssignmentCollectorBase) *CachingAssignmentCollector {
 	return &CachingAssignmentCollector{
-		assignmentCollectorBase: collectorBase,
+		AssignmentCollectorBase: collectorBase,
 		approvalsCache:          NewApprovalsCache(0),
 		incResCache:             NewIncorporatedResultsCache(0),
 	}
 }
 
 func (ac *CachingAssignmentCollector) ProcessingStatus() ProcessingStatus { return CachingApprovals }
-func (ac *CachingAssignmentCollector) CheckEmergencySealing(uint64, consensus.SealingObservation) error {
+func (ac *CachingAssignmentCollector) CheckEmergencySealing(consensus.SealingObservation, uint64) error {
 	return nil
 }
-func (ac *CachingAssignmentCollector) RequestMissingApprovals(uint64, consensus.SealingObservation) (uint, error) {
+func (ac *CachingAssignmentCollector) RequestMissingApprovals(consensus.SealingObservation, uint64) (uint, error) {
 	return 0, nil
 }
 

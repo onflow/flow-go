@@ -6,20 +6,20 @@ import (
 )
 
 type OrphanAssignmentCollector struct {
-	assignmentCollectorBase
+	AssignmentCollectorBase
 }
 
-func NewOrphanAssignmentCollector(collectorBase assignmentCollectorBase) AssignmentCollectorState {
+func NewOrphanAssignmentCollector(collectorBase AssignmentCollectorBase) AssignmentCollectorState {
 	return &OrphanAssignmentCollector{
-		assignmentCollectorBase: collectorBase,
+		AssignmentCollectorBase: collectorBase,
 	}
 }
 
 func (oc *OrphanAssignmentCollector) ProcessingStatus() ProcessingStatus { return Orphaned }
-func (oc *OrphanAssignmentCollector) CheckEmergencySealing(uint64, consensus.SealingObservation) error {
+func (oc *OrphanAssignmentCollector) CheckEmergencySealing(consensus.SealingObservation, uint64) error {
 	return nil
 }
-func (oc *OrphanAssignmentCollector) RequestMissingApprovals(uint64, consensus.SealingObservation) (uint, error) {
+func (oc *OrphanAssignmentCollector) RequestMissingApprovals(consensus.SealingObservation, uint64) (uint, error) {
 	return 0, nil
 }
 func (oc *OrphanAssignmentCollector) ProcessIncorporatedResult(*flow.IncorporatedResult) error {

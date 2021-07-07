@@ -33,7 +33,7 @@ const DefaultEmergencySealingThreshold = 400
 // For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
 // when fork gets orphaned
 type VerifyingAssignmentCollector struct {
-	assignmentCollectorBase
+	AssignmentCollectorBase
 
 	lock                   sync.RWMutex
 	collectors             map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
@@ -43,7 +43,7 @@ type VerifyingAssignmentCollector struct {
 
 // NewVerifyingAssignmentCollector instantiates a new VerifyingAssignmentCollector.
 // All errors are unexpected and potential symptoms of internal bugs or state corruption (fatal).
-func NewVerifyingAssignmentCollector(collectorBase assignmentCollectorBase) (*VerifyingAssignmentCollector, error) {
+func NewVerifyingAssignmentCollector(collectorBase AssignmentCollectorBase) (*VerifyingAssignmentCollector, error) {
 	// pre-select all authorized verifiers at the block that is being sealed
 	authorizedApprovers, err := authorizedVerifiersAtBlock(collectorBase.state, collectorBase.BlockID())
 	if err != nil {
@@ -52,10 +52,11 @@ func NewVerifyingAssignmentCollector(collectorBase assignmentCollectorBase) (*Ve
 	numberChunks := collectorBase.result.Chunks.Len()
 
 	return &VerifyingAssignmentCollector{
-		lock:                   sync.RWMutex{},
-		collectors:             make(map[flow.Identifier]*ApprovalCollector),
-		authorizedApprovers:    authorizedApprovers,
-		verifiedApprovalsCache: NewApprovalsCache(uint(numberChunks * len(authorizedApprovers))),
+		AssignmentCollectorBase: collectorBase,
+		lock:                    sync.RWMutex{},
+		collectors:              make(map[flow.Identifier]*ApprovalCollector),
+		authorizedApprovers:     authorizedApprovers,
+		verifiedApprovalsCache:  NewApprovalsCache(uint(numberChunks * len(authorizedApprovers))),
 	}, nil
 }
 
@@ -78,7 +79,7 @@ func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCol
 
 // CheckEmergencySealing checks the managed assignments whether their result can be emergency
 // sealed. Seals the results where possible.
-func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64, observer consensus.SealingObservation) error {
+func (ac *VerifyingAssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
 	for _, collector := range ac.allCollectors() {
 		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
 		observer.QualifiesForEmergencySealing(collector.IncorporatedResult(), sealable)
@@ -290,7 +291,7 @@ func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApp
 // RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
 // approvals from verifiers.
 // Returns number of requests made and error in case something goes wrong.
-func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(maxHeightForRequesting uint64, observation consensus.SealingObservation) (uint, error) {
+func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error) {
 	overallRequestCount := uint(0) // number of approval requests for all different assignments for this result
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
@@ -315,7 +316,7 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(maxHeightForRequ
 			// making more than 10
 			if requestTrackerItem.Requests >= 10 {
 				log.Debug().Msgf("requesting approvals for result %v, incorporatedBlockID %v chunk %d: %d requests",
-					ac.ResultID,
+					ac.ResultID(),
 					collector.IncorporatedBlockID(),
 					chunkIndex,
 					requestTrackerItem.Requests,

@@ -3,11 +3,11 @@
 package sealing
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
@@ -33,6 +32,10 @@ const DefaultRequiredApprovalsForSealConstruction = 0
 // DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
+
+// defaultAssignmentCollectorsWorkerPoolCapacity is the default number of workers that is available for worker pool which is used
+// by assignment collector state machine to do transitions
+const defaultAssignmentCollectorsWorkerPoolCapacity = 4
 
 // Config is a structure of values that configure behavior of sealing engine
 type Config struct {
@@ -57,6 +60,7 @@ func DefaultConfig() Config {
 // 	- pruning already processed collectorTree
 type Core struct {
 	unit                       *engine.Unit
+	workerPool                 *workerpool.WorkerPool             // worker pool used by collectors
 	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
 	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
@@ -95,6 +99,7 @@ func NewCore(
 
 	core := &Core{
 		log:                        log.With().Str("engine", "sealing.Core").Logger(),
+		workerPool:                 workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		tracer:                     tracer,
 		metrics:                    conMetrics,
 		sealingTracker:             sealingTracker,
@@ -110,9 +115,14 @@ func NewCore(
 		requestTracker:             approvals.NewRequestTracker(10, 30),
 	}
 
-	factoryMethod := func(result *flow.ExecutionResult) (*approvals.VerifyingAssignmentCollector, error) {
-		return approvals.NewAssignmentCollector(core.log, result, core.state, core.headers, assigner, sealsMempool, verifier,
+	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
+		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
+			assigner, sealsMempool, verifier,
 			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
+		if err != nil {
+			return nil, fmt.Errorf("could not create base collector: %w", err)
+		}
+		return approvals.NewAssignmentCollectorStateMachine(base), nil
 	}
 
 	core.collectorTree = approvals.NewAssignmentCollectorTree(lastSealed, headers, factoryMethod)
@@ -418,7 +428,7 @@ func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, last
 	return nil
 }
 
-func (c *Core) processPendingApprovals(collector approvals.AssignmentCollector) error {
+func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorState) error {
 	resultID := collector.ResultID()
 	// filter cached approvals for concrete execution result
 	for _, approval := range c.approvalsCache.TakeByResultID(resultID) {
