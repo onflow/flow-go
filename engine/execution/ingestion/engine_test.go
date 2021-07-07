@@ -13,10 +13,9 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/engine/execution"
-
 	"github.com/onflow/flow-go/crypto"
 	engineCommon "github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/execution"
 	computation "github.com/onflow/flow-go/engine/execution/computation/mock"
 	provider "github.com/onflow/flow-go/engine/execution/provider/mock"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -360,10 +359,18 @@ func (ctx *testingContext) mockStateCommitsWithMap(commits map[flow.Identifier]f
 func TestChunkIndexIsSet(t *testing.T) {
 
 	i := mathRand.Int()
-	chunk := generateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture())
+	chunk := execution.GenerateChunk(i, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), 21)
 
 	assert.Equal(t, i, int(chunk.Index))
 	assert.Equal(t, i, int(chunk.CollectionIndex))
+}
+
+func TestChunkNumberOfTxsIsSet(t *testing.T) {
+
+	i := uint16(mathRand.Uint32())
+	chunk := execution.GenerateChunk(3, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), i)
+
+	assert.Equal(t, i, chunk.NumberOfTransactions)
 }
 
 func TestExecuteOneBlock(t *testing.T) {
@@ -866,22 +873,40 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 
 	execState := new(state.ExecutionState)
 
-	e := Engine{
-		execState: execState,
-	}
+	ctrl := gomock.NewController(t)
+	me := module.NewMockLocal(ctrl)
 
 	executableBlock := unittest.ExecutableBlockFixture([][]flow.Identifier{{collection1Identity.NodeID}, {collection1Identity.NodeID}})
-	endState := unittest.StateCommitmentFixture()
+	startState := unittest.StateCommitmentFixture()
 	previousExecutionResultID := unittest.IdentifierFixture()
+
+	// mock execution state conversion and signing of
+
+	me.EXPECT().SignFunc(gomock.Any(), gomock.Any(), gomock.Any())
+	me.EXPECT().NodeID()
+	me.EXPECT().Sign(gomock.Any(), gomock.Any())
 
 	execState.
 		On("GetExecutionResultID", mock.Anything, executableBlock.Block.Header.ParentID).
 		Return(previousExecutionResultID, nil)
 
-	er, err := e.generateExecutionResultForBlock(context.Background(), executableBlock.Block, nil, endState, nil)
+	execState.
+		On("PersistExecutionState", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil)
+
+	e := Engine{
+		execState: execState,
+		tracer:    trace.NewNoopTracer(),
+		me:        me,
+	}
+
+	cr := executionUnittest.ComputationResultFixture(nil)
+	cr.ExecutableBlock = executableBlock
+
+	er, err := e.saveExecutionResults(context.Background(), cr, startState)
 	assert.NoError(t, err)
 
-	assert.Equal(t, previousExecutionResultID, er.PreviousResultID)
+	assert.Equal(t, previousExecutionResultID, er.ExecutionResult.PreviousResultID)
 
 	execState.AssertExpectations(t)
 }
@@ -1386,41 +1411,4 @@ func TestLoadingUnexecutedBlocks(t *testing.T) {
 			blockH.ID()},
 			pending)
 	})
-}
-
-func TestChunkifyEvents(t *testing.T) {
-	// generate events
-	var events []flow.Event
-	for j := 0; j < 10; j++ {
-		events = append(events, unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0))
-	}
-
-	// chunk size be 0
-	ret := ChunkifyEvents(events, 0)
-	assert.Equal(t, len(ret), 1)
-	assert.Equal(t, ret[0], events[:])
-
-	// chunk size be 1
-	ret = ChunkifyEvents(events, 1)
-	assert.Equal(t, len(ret), 10)
-	for i := 0; i < len(events); i++ {
-		assert.Equal(t, ret[i], events[i:i+1])
-	}
-
-	// chunk size smaller than events
-	ret = ChunkifyEvents(events, 2)
-	assert.Equal(t, len(ret), 5)
-	for i := 0; i < len(ret); i++ {
-		assert.Equal(t, ret[i], events[i*2:i*2+2])
-	}
-
-	// chunk size equal to the size of events
-	ret = ChunkifyEvents(events, 10)
-	assert.Equal(t, len(ret), 1)
-	assert.Equal(t, ret[0], events[:])
-
-	// chunk bigger than the slice
-	ret = ChunkifyEvents(events, 12)
-	assert.Equal(t, len(ret), 1)
-	assert.Equal(t, ret[0], events[:])
 }

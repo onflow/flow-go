@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -1086,45 +1085,17 @@ func (e *Engine) saveExecutionResults(
 	defer span.Finish()
 
 	originalState := startState
-	blockID := result.ExecutableBlock.ID()
 
-	// no need to persist the state interactions, since they are used only by state
-	// syncing, which is currently disabled
-
-	chunks := make([]*flow.Chunk, len(result.StateCommitments))
-	chdps := make([]*flow.ChunkDataPack, len(result.StateCommitments))
-
-	// TODO: check current state root == startState
-	var endState flow.StateCommitment = startState
-
-	for i := range result.StateCommitments {
-		// TODO: deltas should be applied to a particular state
-
-		endState = result.StateCommitments[i]
-		var collectionID flow.Identifier
-
-		// account for system chunk being last
-		if i < len(result.StateCommitments)-1 {
-			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
-			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
-			collectionID = completeCollection.Collection().ID()
-		} else {
-			collectionID = flow.ZeroID
-		}
-
-		eventsHash := result.EventsHashes[i]
-		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
-
-		// chunkDataPack
-		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
-		// TODO use view.SpockSecret() as an input to spock generator
-		chunks[i] = chunk
-		startState = endState
+	block := result.ExecutableBlock.Block
+	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
+			block.Header.ParentID, err)
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(childCtx, result.ExecutableBlock.Block, chunks, endState, result.ServiceEvents)
+	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(previousErID, startState, result)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate execution result: %w", err)
+		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
 	}
 
 	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
@@ -1132,7 +1103,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, result.ExecutableBlock.Block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents, result.TransactionResults)
+	err = e.execState.PersistExecutionState(childCtx, block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents, result.TransactionResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1176,62 +1147,6 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	}
 }
 
-// generateChunk creates a chunk from the provided computation data.
-func generateChunk(colIndex int,
-	startState, endState flow.StateCommitment,
-	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			EventCollection: eventsCollection,
-			BlockID:         blockID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
-		},
-		Index:    uint64(colIndex),
-		EndState: endState,
-	}
-}
-
-// generateExecutionResultForBlock creates new ExecutionResult for a block from
-// the provided chunk results.
-func (e *Engine) generateExecutionResultForBlock(
-	ctx context.Context,
-	block *flow.Block,
-	chunks []*flow.Chunk,
-	endState flow.StateCommitment,
-	serviceEvents []flow.Event,
-) (*flow.ExecutionResult, error) {
-
-	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
-			block.Header.ParentID, err)
-	}
-
-	// convert Cadence service event representation to flow-go representation
-	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
-	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(event)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert service event: %w", err)
-		}
-		convertedServiceEvents = append(convertedServiceEvents, *converted)
-	}
-
-	er := &flow.ExecutionResult{
-		PreviousResultID: previousErID,
-		BlockID:          block.ID(),
-		Chunks:           chunks,
-		ServiceEvents:    convertedServiceEvents,
-	}
-
-	return er, nil
-}
-
 func (e *Engine) generateExecutionReceipt(
 	ctx context.Context,
 	result *flow.ExecutionResult,
@@ -1266,44 +1181,4 @@ func (e *Engine) generateExecutionReceipt(
 	receipt.ExecutorSignature = sig
 
 	return receipt, nil
-}
-
-// ChunkifyEvents breaks an slice of events into smaller chunks
-func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
-	res := make([][]flow.Event, 0)
-	if len(events) == 0 {
-		return res
-	}
-	// if chunkSize zero, return all as one chunk
-	if chunkSize < 1 {
-		res = append(res, events[:])
-		return res
-	}
-
-	for i := 0; i < len(events); i += int(chunkSize) {
-		end := i + int(chunkSize)
-		if end > len(events) {
-			end = len(events)
-		}
-		res = append(res, events[i:end])
-	}
-	return res
-}
-
-// generateChunkDataPack creates a chunk data pack from the given inputs.
-//
-// `proof` includes proofs for all registers read to execute the chunck.
-// Register proofs order must not be correlated to the order of register reads during
-// the chunk execution in order to enforce the SPoCK secret high entropy.
-func generateChunkDataPack(
-	chunk *flow.Chunk,
-	collectionID flow.Identifier,
-	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
-		ChunkID:      chunk.ID(),
-		StartState:   chunk.StartState,
-		Proof:        proof,
-		CollectionID: collectionID,
-	}
 }

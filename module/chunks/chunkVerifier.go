@@ -4,15 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -55,7 +55,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
 	for i, txBody := range vc.Collection.Transactions {
-		tx := fvm.Transaction(txBody, uint32(i))
+		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
 
@@ -161,8 +161,6 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// executes all transactions in this chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
-
-		// tx := fvm.Transaction(txBody, uint32(i))
 
 		err := fcv.vm.Run(context, tx, txView, programs)
 		if err != nil {

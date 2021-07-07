@@ -569,14 +569,20 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 		return nil, fmt.Errorf("could not compute end state of chunk: %w", err)
 	}
 
+	transactionOffset, err := TransactionOffsetForChunk(result.Chunks, chunk.Index)
+	if err != nil {
+		return nil, fmt.Errorf("cannot compute transaction offset for chunk: %w", err)
+	}
+
 	return &verification.VerifiableChunkData{
-		IsSystemChunk: isSystemChunk,
-		Chunk:         chunk,
-		Header:        header,
-		Result:        result,
-		Collection:    collection,
-		ChunkDataPack: chunkDataPack,
-		EndState:      endState,
+		IsSystemChunk:     isSystemChunk,
+		Chunk:             chunk,
+		Header:            header,
+		Result:            result,
+		Collection:        collection,
+		ChunkDataPack:     chunkDataPack,
+		EndState:          endState,
+		TransactionOffset: transactionOffset,
 	}, nil
 }
 
@@ -677,6 +683,19 @@ func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemC
 	}
 
 	return endState, nil
+}
+
+//TransactionOffsetForChunk calculates transaction offset for a given chunk which is the index of the first
+// transaction of this chunk within the whole block
+func TransactionOffsetForChunk(chunks flow.ChunkList, chunkIndex uint64) (uint32, error) {
+	if int(chunkIndex) > len(chunks)-1 {
+		return 0, fmt.Errorf("chunk list out of bounds, len %d asked for chunk %d", len(chunks), chunkIndex)
+	}
+	var offset uint32 = 0
+	for i := 0; i < int(chunkIndex); i++ {
+		offset += uint32(chunks[i].NumberOfTransactions)
+	}
+	return offset, nil
 }
 
 // IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.
