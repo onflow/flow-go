@@ -505,7 +505,7 @@ func (ec *ExecutionCollector) ExecutionBlockExecuted(dur time.Duration, compUsed
 // ExecutionCollectionExecuted reports computation and total time spent on a block computation
 func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, compUsed uint64, txCounts int) {
 	ec.totalExecutedCollectionsCounter.Inc()
-	ec.collectionExecutionTime.Observe(float64(dur / time.Millisecond))
+	ec.collectionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.collectionComputationUsed.Observe(float64(compUsed))
 	ec.collectionTransactionCounts.Observe(float64(txCounts))
 }
@@ -513,7 +513,7 @@ func (ec *ExecutionCollector) ExecutionCollectionExecuted(dur time.Duration, com
 // TransactionExecuted reports the time and computation spent executing a single transaction
 func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, compUsed uint64, eventCounts int, failed bool) {
 	ec.totalExecutedTransactionsCounter.Inc()
-	ec.transactionExecutionTime.Observe(float64(dur / time.Millisecond))
+	ec.transactionExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.transactionComputationUsed.Observe(float64(compUsed))
 	ec.transactionEmittedEvents.Observe(float64(eventCounts))
 	if failed {
@@ -524,7 +524,7 @@ func (ec *ExecutionCollector) ExecutionTransactionExecuted(dur time.Duration, co
 // ScriptExecuted reports the time spent executing a single script
 func (ec *ExecutionCollector) ExecutionScriptExecuted(dur time.Duration, compUsed uint64) {
 	ec.totalExecutedScriptsCounter.Inc()
-	ec.scriptExecutionTime.Observe(float64(dur / time.Millisecond))
+	ec.scriptExecutionTime.Observe(float64(dur.Milliseconds()))
 	ec.scriptComputationUsed.Observe(float64(compUsed))
 }
 
