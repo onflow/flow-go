@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"strings"
 	"sync"
 
 	"github.com/fxamacker/cbor/v2"
@@ -63,9 +62,15 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 
 	for result := range results {
 		if result.error != nil {
+			keyParts := result.Key.KeyParts
+
+			rawOwner := keyParts[0].Value
+			rawKey := keyParts[2].Value
+
 			return nil, fmt.Errorf(
-				"failed to migrate key: %s: %w",
-				result.Payload.Key.String(),
+				"failed to migrate key: %q (owner: %x): %w",
+				rawKey,
+				rawOwner,
 				result.error,
 			)
 		}
@@ -498,13 +503,22 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 	owner common.Address,
 	key string,
 ) {
-	// TODO: maybe also check owner
-	if strings.HasPrefix(key, "contract\x1fFlowIDTableStaking\x1fnodes\x1fv\x1f") {
+	switch value := value.(type) {
+	case *interpreter.CompositeValue:
+		switch value.QualifiedIdentifier() {
+		case "FlowIDTableStaking.NodeRecord":
 
-		if compositeValue, ok := value.(*interpreter.CompositeValue); ok &&
-			compositeValue.QualifiedIdentifier() == "FlowIDTableStaking.NodeRecord" {
+			if !hasAnyLocationAddress(
+				value,
+				"ecda6c5746d5bdf0",
+				"f1a43bfd1354c9b8",
+				"e94f751ba094ef6a",
+				"76d9ea44cef09e20",
+			) {
+				return
+			}
 
-			delegatorsField, ok := compositeValue.Fields().Get("delegators")
+			delegatorsField, ok := value.Fields().Get("delegators")
 			if !ok {
 				return
 			}
@@ -530,8 +544,60 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				// TODO: actually DelegatorRecord
 				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
 			}
+
+		case "Versus.DropCollection":
+			if !hasAnyLocationAddress(value, "1ff7e32d71183db0") {
+				return
+			}
+
+			dropsField, ok := value.Fields().Get("drops")
+			if !ok {
+				return
+			}
+
+			dictionaryValue, ok := dropsField.(*interpreter.DictionaryValue)
+			if !ok {
+				return
+			}
+
+			m.Log.Warn().
+				Str("owner", owner.String()).
+				Str("key", key).
+				Msgf("adding known static type to dictionary")
+
+			const keyType = interpreter.PrimitiveStaticTypeUInt32
+
+			dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
+				Type: keyType,
+			}
+
+			dictionaryValue.Type = interpreter.DictionaryStaticType{
+				KeyType: keyType,
+				// TODO: actually Drop
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			}
 		}
 	}
+}
+
+func hasAnyLocationAddress(value *interpreter.CompositeValue, hexAddresses ...string) bool {
+	location := value.Location()
+	addressLocation, ok := location.(common.AddressLocation)
+	if !ok {
+		return false
+	}
+
+	for _, hexAddress := range hexAddresses {
+		address, err := common.HexToAddress(hexAddress)
+		if err != nil {
+			return false
+		}
+		if addressLocation.Address == address {
+			return true
+		}
+	}
+
+	return false
 }
 
 func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
