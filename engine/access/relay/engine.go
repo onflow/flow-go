@@ -14,12 +14,12 @@ type Engine struct {
 	unit    *engine.Unit   // used to manage concurrency & shutdown
 	log     zerolog.Logger // used to log relevant actions with context
 	me      module.Local
-	conduit network.Conduit
+	conduit network.Conduit // conduit for unstaked network
 }
 
 func New(
 	log zerolog.Logger,
-	net module.Network,
+	unstakedNet module.Network,
 	me module.Local,
 ) (*Engine, error) {
 	e := &Engine{
@@ -28,7 +28,7 @@ func New(
 		me:   me,
 	}
 
-	conduit, err := net.Register(engine.Relay, e)
+	conduit, err := unstakedNet.Register(engine.Relay, e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register relay engine: %w", err)
 	}
@@ -89,6 +89,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 }
 
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
+	// TODO: we actually need to know the channel it was on??
 	err := e.conduit.Publish(event)
 	if err != nil {
 		return fmt.Errorf("could not relay message: %w", err)
