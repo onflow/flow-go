@@ -33,7 +33,7 @@ func NewApprovalCollector(
 	assignment *chunks.Assignment,
 	seals mempool.IncorporatedResultSeals,
 	requiredApprovalsForSealConstruction uint,
-) *ApprovalCollector {
+) (*ApprovalCollector, error) {
 	chunkCollectors := make([]*ChunkApprovalCollector, 0, result.Result.Chunks.Len())
 	for _, chunk := range result.Result.Chunks {
 		chunkAssignment := assignment.Verifiers(chunk).Lookup()
@@ -42,6 +42,10 @@ func NewApprovalCollector(
 	}
 
 	numberOfChunks := uint64(result.Result.Chunks.Len())
+	aggSigs, err := NewAggregatedSignatures(numberOfChunks)
+	if err != nil {
+		return nil, fmt.Errorf("instantiation of AggregatedSignatures failed: %w", err)
+	}
 	collector := ApprovalCollector{
 		log:                  log,
 		incorporatedResult:   result,
@@ -49,7 +53,7 @@ func NewApprovalCollector(
 		executedBlock:        executedBlock,
 		numberOfChunks:       numberOfChunks,
 		chunkCollectors:      chunkCollectors,
-		aggregatedSignatures: NewAggregatedSignatures(numberOfChunks),
+		aggregatedSignatures: aggSigs,
 		seals:                seals,
 	}
 
@@ -60,16 +64,18 @@ func NewApprovalCollector(
 		// them and store them in collector.aggregatedSignatures. If we don't require any signatures,
 		// this condition is satisfied right away. Hence, we add aggregated signature for each chunk.
 		for i := uint64(0); i < numberOfChunks; i++ {
-			collector.aggregatedSignatures.PutSignature(i, flow.AggregatedSignature{})
+			_, err := collector.aggregatedSignatures.PutSignature(i, flow.AggregatedSignature{})
+			if err != nil {
+				return nil, fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
+			}
 		}
 		err := collector.SealResult()
 		if err != nil {
-			err = fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
-			panic(err.Error())
+			return nil, fmt.Errorf("sealing result %x failed: %w", result.ID(), err)
 		}
 	}
 
-	return &collector
+	return &collector, nil
 }
 
 // IncorporatedBlockID returns the ID of block which incorporates execution result
@@ -148,7 +154,10 @@ func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error
 		return nil
 	}
 
-	approvedChunks := c.aggregatedSignatures.PutSignature(chunkIndex, aggregatedSignature)
+	approvedChunks, err := c.aggregatedSignatures.PutSignature(chunkIndex, aggregatedSignature)
+	if err != nil {
+		return fmt.Errorf("adding aggregated signature failed: %w", err)
+	}
 	if approvedChunks < c.numberOfChunks {
 		return nil // still missing approvals for some chunks
 	}
