@@ -36,7 +36,7 @@ func NewComplianceCollector() *ComplianceCollector {
 		}),
 
 		currentEpochPhase: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "consensus_compliance_current_epoch_phase",
+			Name:      "current_epoch_phase",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the current epoch's phase",
