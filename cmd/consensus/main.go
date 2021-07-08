@@ -152,7 +152,7 @@ func main() {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
-			sealValidator := validation.NewSealValidator(
+			sealValidator, err := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -160,8 +160,12 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
+				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
+			if err != nil {
+				return fmt.Errorf("could not instantiate seal validator: %w", err)
+			}
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -491,6 +495,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		}).
