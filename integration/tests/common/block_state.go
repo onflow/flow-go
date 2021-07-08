@@ -23,61 +23,75 @@ type BlockState struct {
 	highestSealed     *messages.BlockProposal
 }
 
-// TODO refactor to remove deep indentation
+func NewBlockState() *BlockState {
+	return &BlockState{
+		Mutex:             sync.Mutex{},
+		blocksByID:        make(map[flow.Identifier]*messages.BlockProposal),
+		finalizedByHeight: make(map[uint64]*messages.BlockProposal),
+	}
+}
+
 func (bs *BlockState) Add(b *messages.BlockProposal) {
 	bs.Lock()
 	defer bs.Unlock()
 
-	if bs.blocksByID == nil {
-		bs.blocksByID = make(map[flow.Identifier]*messages.BlockProposal) // TODO: initialize this map in constructor
-	}
 	bs.blocksByID[b.Header.ID()] = b
-	bs.highestProposed = b.Header.Height
+	if b.Header.Height > bs.highestProposed {
+		bs.highestProposed = b.Header.Height
+	}
 
-	// add confirmations
-	confirmsHeight := b.Header.Height - 3
-	if b.Header.Height >= 3 && confirmsHeight > bs.highestFinalized {
-		if bs.finalizedByHeight == nil {
-			bs.finalizedByHeight = make(map[uint64]*messages.BlockProposal) // TODO: initialize this map in constructor
+	if b.Header.Height < 3 {
+		return
+	}
+
+	confirmsHeight := b.Header.Height - uint64(3)
+	if confirmsHeight < bs.highestFinalized {
+		return
+	}
+
+	bs.processAncestors(b, confirmsHeight)
+}
+
+func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight uint64) {
+	// puts this block proposal and all ancestors into `finalizedByHeight`
+	ancestor, ok := b, true
+	for ancestor.Header.Height > bs.highestFinalized {
+		h := ancestor.Header.Height
+
+		// if ancestor is confirmed put it into the finalized map
+		if h <= confirmsHeight {
+
+			finalized := ancestor
+			bs.finalizedByHeight[h] = finalized
+
+			// highestFinalized is only updated when not only the block is added to finalizedByHeight, but also
+			// it is "exactly" the next height compared to the current value.
+			// doing so prevents the illusion of highestFinalized indicating the highest finalized height "with an available block".
+			if h == bs.highestFinalized+1 {
+				bs.highestFinalized = h
+			}
+
+			// update last sealed height
+			for _, seal := range finalized.Payload.Seals {
+				sealed, ok := bs.blocksByID[seal.BlockID]
+				if !ok {
+					continue
+				}
+
+				if bs.highestSealed == nil ||
+					sealed.Header.Height > bs.highestSealed.Header.Height {
+					bs.highestSealed = sealed
+				}
+			}
+
 		}
-		// put all ancestors into `finalizedByHeight`
-		ancestor, ok := b, true
-		for ancestor.Header.Height > bs.highestFinalized {
-			h := ancestor.Header.Height
 
-			// if ancestor is confirmed put it into the finalized map
-			if h <= confirmsHeight {
+		// find parent
+		ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
 
-				finalized := ancestor
-				bs.finalizedByHeight[h] = finalized
-
-				// if ancestor confirms a heigher height than highestFinalized, increase highestFinalized
-				if h > bs.highestFinalized {
-					bs.highestFinalized = h
-				}
-
-				// update last sealed height
-				for _, seal := range finalized.Payload.Seals {
-					sealed, ok := bs.blocksByID[seal.BlockID]
-					if !ok {
-						continue
-					}
-
-					if bs.highestSealed == nil ||
-						sealed.Header.Height > bs.highestSealed.Header.Height {
-						bs.highestSealed = sealed
-					}
-				}
-
-			}
-
-			// find parent
-			ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
-
-			// stop if parent not found
-			if !ok {
-				return
-			}
+		// stop if parent not found
+		if !ok {
+			return
 		}
 	}
 }
