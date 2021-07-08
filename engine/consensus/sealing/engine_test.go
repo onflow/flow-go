@@ -147,7 +147,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range approvals {
-			err := s.engine.Process(approverID, approval)
+			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -155,7 +155,7 @@ func (s *SealingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, approval := range responseApprovals {
-			err := s.engine.Process(approverID, approval)
+			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
 			s.Require().NoError(err, "should process approval")
 		}
 	}()
@@ -174,7 +174,7 @@ func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
 	originID := unittest.IdentifierFixture()
 	approval := unittest.ResultApprovalFixture() // with random ApproverID
 
-	err := s.engine.Process(originID, approval)
+	err := s.engine.Process(engine.ReceiveApprovals, originID, approval)
 	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
 
 	// sealing engine has at least 100ms ticks for processing events

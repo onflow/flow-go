@@ -543,7 +543,7 @@ func (e *Engine) pushToVerifier(chunk *flow.Chunk,
 		return fmt.Errorf("could not verify chunk: %w", err)
 	}
 
-	err = e.verifier.ProcessLocal(vchunk)
+	err = e.verifier.ProcessLocal(engine.ProvideChunks, vchunk)
 	if err != nil {
 		return fmt.Errorf("verifier could not verify chunk: %w", err)
 	}

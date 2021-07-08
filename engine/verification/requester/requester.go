@@ -102,16 +102,16 @@ func (e *Engine) WithChunkDataPackHandler(handler fetcher.ChunkDataPackHandler) 
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
+func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
 	e.log.Fatal().Msg("engine is not supposed to be invoked on SubmitLocal")
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -119,13 +119,13 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(event interface{}) error {
+func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
 	return fmt.Errorf("should not invoke ProcessLocal of Match engine, use Process instead")
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
