@@ -41,13 +41,6 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 		byHeight: byHeight,
 	}
 
-	// when eject a entity, also update the secondary index
-	r.RegisterEjectionCallbacks(func(entity flow.Entity) {
-		seal := entity.(*flow.IncorporatedResultSeal)
-		sealID := seal.ID()
-		r.removeFromIndex(sealID, seal.Header.Height)
-	})
-
 	return r
 }
 

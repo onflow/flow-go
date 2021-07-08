@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	actormock "github.com/onflow/flow-go/module/mempool/consensus/mock"
 	poolmock "github.com/onflow/flow-go/module/mempool/mock"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -232,7 +231,8 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 		// initialize ExecForkSuppressor
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
 		execForkActor := &actormock.ExecForkActorMock{}
-		wrapper, _ := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
+		wrapper, _ := NewExecStateForkSuppressor(execForkActor.OnExecFork, db, zerolog.New(os.Stderr), 10)
+		wrapper.seals = wrappedMempool
 
 		// add seal
 		block := unittest.BlockFixture()
@@ -262,7 +262,8 @@ func Test_ForkDetectionPersisted(t *testing.T) {
 				assert.Equal(t, sealB.ID(), conflictingSeals[0].ID())
 				assert.Equal(t, sealA.ID(), conflictingSeals[1].ID())
 			}).Return().Once()
-		wrapper2, _ := NewExecStateForkSuppressor(execForkActor2.OnExecFork, wrappedMempool2, db2, zerolog.New(os.Stderr))
+		wrapper2, _ := NewExecStateForkSuppressor(execForkActor2.OnExecFork, db2, zerolog.New(os.Stderr), 10)
+		wrapper2.seals = wrappedMempool2
 
 		// add another (non-conflicting) seal to ExecForkSuppressor
 		// fail test if seal is added to wrapped mempool
@@ -287,8 +288,7 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 		assert.Fail(t, "no call to onExecFork expected ")
 	}
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		wrappedMempool := stdmap.NewIncorporatedResultSeals(10)
-		wrapper, err := NewExecStateForkSuppressor(onExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
+		wrapper, err := NewExecStateForkSuppressor(onExecFork, db, zerolog.New(os.Stderr), 10)
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
 
@@ -306,13 +306,13 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 				require.True(t, added)
 			}
 
-			require.Equal(t, uint(10), wrappedMempool.Size())
+			require.Equal(t, uint(10), wrapper.seals.Size())
 			require.Equal(t, uint(10), wrapper.Size())
 
 			err := wrapper.PruneUpToHeight(uint64((i + 1) * 100))
 			require.NoError(t, err)
 
-			require.Equal(t, uint(0), wrappedMempool.Size())
+			require.Equal(t, uint(0), wrapper.seals.Size())
 			require.Equal(t, uint(0), wrapper.Size())
 			require.Equal(t, 0, len(wrapper.sealsForBlock))
 		}
@@ -328,9 +328,9 @@ func Test_AddRem_SmokeTest(t *testing.T) {
 func WithExecStateForkSuppressor(t testing.TB, testLogic func(wrapper *ExecForkSuppressor, wrappedMempool *poolmock.IncorporatedResultSeals, execForkActor *actormock.ExecForkActorMock)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		wrappedMempool := &poolmock.IncorporatedResultSeals{}
-
 		execForkActor := &actormock.ExecForkActorMock{}
-		wrapper, err := NewExecStateForkSuppressor(execForkActor.OnExecFork, wrappedMempool, db, zerolog.New(os.Stderr))
+		wrapper, err := NewExecStateForkSuppressor(execForkActor.OnExecFork, db, zerolog.New(os.Stderr), 10)
+		wrapper.seals = wrappedMempool
 		require.NoError(t, err)
 		require.NotNil(t, wrapper)
 		testLogic(wrapper, wrappedMempool, execForkActor)

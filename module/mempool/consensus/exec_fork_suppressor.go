@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -55,7 +56,7 @@ type ExecForkSuppressor struct {
 // sealSet is a set of seals; internally represented as a map from sealID -> to seal
 type sealSet map[flow.Identifier]*flow.IncorporatedResultSeal
 
-func NewExecStateForkSuppressor(onExecFork ExecForkActor, seals mempool.IncorporatedResultSeals, db *badger.DB, log zerolog.Logger) (*ExecForkSuppressor, error) {
+func NewExecStateForkSuppressor(onExecFork ExecForkActor, db *badger.DB, log zerolog.Logger, sealLimit uint) (*ExecForkSuppressor, error) {
 	conflictingSeals, err := checkExecutionForkEvidence(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to interface with storage: %w", err)
@@ -65,6 +66,7 @@ func NewExecStateForkSuppressor(onExecFork ExecForkActor, seals mempool.Incorpor
 		onExecFork(conflictingSeals)
 	}
 
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 	wrapper := ExecForkSuppressor{
 		mutex:            sync.RWMutex{},
 		seals:            seals,
