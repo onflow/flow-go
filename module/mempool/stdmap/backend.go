@@ -111,7 +111,7 @@ func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
 		Backdata:          NewBackdata(),
 		limit:             uint(math.MaxUint32),
-		eject:             EjectFakeRandom,
+		eject:             EjectTrueRandomFast,
 		ejectionCallbacks: nil,
 	}
 	for _, option := range options {
@@ -218,20 +218,23 @@ func (b *Backend) reduce() {
 	for len(b.entities) > int(b.limit) {
 
 		// get the key from the eject function
-		key, _ := b.eject(b.entities)
+		key, _ := b.eject(b)
+
+		// TODO: this lookup should be done already by the eject function
 
 		// if the key is not actually part of the map, use stupid fallback eject
 		entity, ok := b.entities[key]
 		if !ok {
-			key, _ = EjectFakeRandom(b.entities)
-		}
+			_, _ = EjectTrueRandomFast(b)
+		} else {
 
-		// remove the key
-		delete(b.entities, key)
+			// remove the key
+			delete(b.entities, key)
 
-		// notify callback
-		for _, callback := range b.ejectionCallbacks {
-			callback(entity)
+			// notify callback
+			for _, callback := range b.ejectionCallbacks {
+				callback(entity)
+			}
 		}
 	}
 }

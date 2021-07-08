@@ -26,7 +26,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 
 	// assuming all the entities are for unsealed blocks, then we will remove a seal
 	// with the largest height.
-	ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	ejector := func(b* Backend ) (flow.Identifier, flow.Entity) {
 		maxHeight := uint64(0)
 		var sealsAtMaxHeight sealSet
 		for height, seals := range byHeight {
