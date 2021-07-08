@@ -27,7 +27,7 @@ type TestSealingHappyPathTestSuite struct {
 // affected by the emitted result approvals.
 func (s *TestSealingHappyPathTestSuite) TestSealingAndVerificationHappyPath() {
 	// captures one finalized block called blockA, just to make sure that the finalization progresses.
-	blockA := s.BlockState.WaitForNextFinalized(s.T())
+	blockA := s.BlockState.WaitForFirstFinalized(s.T())
 	s.T().Logf("blockA generated, height: %v ID: %v", blockA.Header.Height, blockA.Header.ID())
 
 	// sends a transaction
@@ -36,7 +36,7 @@ func (s *TestSealingHappyPathTestSuite) TestSealingAndVerificationHappyPath() {
 
 	// waits until for a different state commitment for a finalized block, call that block blockB,
 	// which has more than one chunk on its execution result.
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), &s.BlockState, &s.ReceiptState, common.WithMinimumChunks(2))
+	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, &s.ReceiptState, common.WithMinimumChunks(2))
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// waits for the execution receipt of blockB from both execution nodes, and makes sure that there is no execution fork.
