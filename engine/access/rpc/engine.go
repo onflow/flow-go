@@ -86,8 +86,8 @@ func New(log zerolog.Logger,
 	}
 
 	tlsCredentials, err := loadTLSCredentials(
-		"/Users/vishalchangrani/go/src/github.com/onflow/flow-go/integration/localnet/bootstrap/private-root-information/private-node-info_c048c702ceb9b7e142da96e06b54ab6ab39c142b1a433639edefcd3a014a462a/cert.pem",
-		"/Users/vishalchangrani/go/src/github.com/onflow/flow-go/integration/localnet/bootstrap/private-root-information/private-node-info_c048c702ceb9b7e142da96e06b54ab6ab39c142b1a433639edefcd3a014a462a/key.pem")
+		"/Users/vishalchangrani/securegrpcbootstrap/bootstrap/private-root-information/private-node-info_c048c702ceb9b7e142da96e06b54ab6ab39c142b1a433639edefcd3a014a462a/cert.pem",
+		"/Users/vishalchangrani/securegrpcbootstrap/bootstrap/private-root-information/private-node-info_c048c702ceb9b7e142da96e06b54ab6ab39c142b1a433639edefcd3a014a462a/key.pem")
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot load TLS credentials")
 	}
