@@ -48,6 +48,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
+			Run(func(args mock.Arguments) {
+				//ctx := args[0].(fvm.Context)
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Events = generateEvents(1, tx.TxIndex)
+			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		committer := new(computermock.ViewCommitter)
@@ -282,6 +288,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		//events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+
+		assertEventHashesMatch(t, collectionCount+1, result)
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
