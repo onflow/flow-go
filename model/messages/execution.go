@@ -16,9 +16,17 @@ type ChunkDataRequest struct {
 // ChunkDataResponse is the response to a chunk data pack request.
 // It contains the chunk data pack of the interest.
 type ChunkDataResponse struct {
-	ChunkDataPack flow.ChunkDataPack
-	Collection    flow.Collection
-	Nonce         uint64 // so that we aren't deduplicated by the network layer
+	Body  ChunkDataResponseBody
+	Nonce uint64 // so that we aren't deduplicated by the network layer
+	// TODO add execution node signature on body part
+}
+
+// ChunkDataResponseBody encapsulates the chunk data requested by verification nodes.
+type ChunkDataResponseBody struct {
+	ChunkID    flow.Identifier
+	StartState flow.StateCommitment
+	Proof      flow.StorageProof
+	Collection flow.Collection
 }
 
 // ExecutionStateSyncRequest represents a request for state deltas between
