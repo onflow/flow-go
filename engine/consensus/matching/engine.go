@@ -162,7 +162,7 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 	e.blockIncorporatedNotifier.Notify()
 }
 
-// processIncorporatedBlock selects receipts that were included into finalized block and submits them
+// processIncorporatedBlock selects receipts that were included into incorporated block and submits them
 // for further processing by matching core.
 // Without the logic below, the sealing engine would produce IncorporatedResults
 // only from receipts received directly from ENs. sealing Core would not know about

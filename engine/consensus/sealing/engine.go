@@ -31,6 +31,9 @@ const defaultApprovalResponseQueueCapacity = 10000
 // defaultSealingEngineWorkers number of workers to dispatch events for sealing core
 const defaultSealingEngineWorkers = 8
 
+// defaultIncorporatedBlockQueueCapacity maximum capacity of block incorporated events queue
+const defaultIncorporatedBlockQueueCapacity = 1000
+
 type (
 	EventSink chan *Event // Channel to push pending events
 )
@@ -45,15 +48,18 @@ type Engine struct {
 	log                        zerolog.Logger
 	me                         module.Local
 	headers                    storage.Headers
-	payloads                   storage.Payloads
+	results                    storage.ExecutionResults
+	index                      storage.Index
 	state                      protocol.State
 	cacheMetrics               module.MempoolMetrics
 	engineMetrics              module.EngineMetrics
 	pendingApprovals           engine.MessageStore
 	pendingRequestedApprovals  engine.MessageStore
 	pendingIncorporatedResults *fifoqueue.FifoQueue
+	pendingIncorporatedBlocks  *fifoqueue.FifoQueue
 	inboundEventsNotifier      engine.Notifier
 	finalizationEventsNotifier engine.Notifier
+	blockIncorporatedNotifier  engine.Notifier
 	messageHandler             *engine.MessageHandler
 	rootHeader                 *flow.Header
 }
@@ -69,6 +75,8 @@ func NewEngine(log zerolog.Logger,
 	me module.Local,
 	headers storage.Headers,
 	payloads storage.Payloads,
+	results storage.ExecutionResults,
+	index storage.Index,
 	state protocol.State,
 	sealsDB storage.Seals,
 	assigner module.ChunkAssigner,
@@ -90,7 +98,8 @@ func NewEngine(log zerolog.Logger,
 		engineMetrics: engineMetrics,
 		cacheMetrics:  mempool,
 		headers:       headers,
-		payloads:      payloads,
+		results:       results,
+		index:         index,
 		rootHeader:    rootHeader,
 	}
 
@@ -137,10 +146,16 @@ func NewEngine(log zerolog.Logger,
 // the networking layer or message handler
 func (e *Engine) setupTrustedInboundQueues() error {
 	e.finalizationEventsNotifier = engine.NewNotifier()
+	e.blockIncorporatedNotifier = engine.NewNotifier()
 	var err error
 	e.pendingIncorporatedResults, err = fifoqueue.NewFifoQueue()
 	if err != nil {
 		return fmt.Errorf("failed to create queue for incorproated results: %w", err)
+	}
+	e.pendingIncorporatedBlocks, err = fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for incorproated blocks: %w", err)
 	}
 	return nil
 }
@@ -281,6 +296,23 @@ func (e *Engine) finalizationProcessingLoop() {
 	}
 }
 
+// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events
+func (e *Engine) blockIncorporatedEventsProcessingLoop() {
+	c := e.blockIncorporatedNotifier.Channel()
+
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-c:
+			err := e.processBlockIncorporatedEvents()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+			}
+		}
+	}
+}
+
 func (e *Engine) loop() {
 	notifier := e.inboundEventsNotifier.Channel()
 	for {
@@ -364,6 +396,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		e.unit.Launch(e.loop)
 	}
 	e.unit.Launch(e.finalizationProcessingLoop)
+	e.unit.Launch(e.blockIncorporatedEventsProcessingLoop)
 	return e.unit.Ready()
 }
 
@@ -384,39 +417,69 @@ func (e *Engine) OnFinalizedBlock(flow.Identifier) {
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
-	e.unit.Launch(func() {
-		// In order to process a block within the sealing engine, we need the block's source of
-		// randomness (to compute the chunk assignment). The source of randomness can be taken from _any_
-		// QC for the block. We know that we have such a QC, once a valid child block is incorporated.
-		// Vice-versa, once a block is incorporated, we know that _its parent_ has a valid child, i.e.
-		// the parent's source of randomness is now know.
+	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
+	e.blockIncorporatedNotifier.Notify()
+}
 
-		incorporatedBlock, err := e.headers.ByBlockID(incorporatedBlockID)
+// processIncorporatedBlock selects receipts that were included into incorporated block and submits them
+// for further processing by sealing core.
+func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) error {
+	// In order to process a block within the sealing engine, we need the block's source of
+	// randomness (to compute the chunk assignment). The source of randomness can be taken from _any_
+	// QC for the block. We know that we have such a QC, once a valid child block is incorporated.
+	// Vice-versa, once a block is incorporated, we know that _its parent_ has a valid child, i.e.
+	// the parent's source of randomness is now know.
+
+	incorporatedBlock, err := e.headers.ByBlockID(incorporatedBlockID)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("could not retrieve header for block %v", incorporatedBlockID)
+	}
+
+	e.log.Info().Msgf("processing incorporated block %v at height %d", incorporatedBlockID, incorporatedBlock.Height)
+
+	// we are interested in blocks with height strictly larger than root block
+	if incorporatedBlock.Height <= e.rootHeader.Height {
+		return nil
+	}
+
+	index, err := e.index.ByBlockID(incorporatedBlock.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not retrieve payload index for block %v", incorporatedBlock.ParentID)
+	}
+
+	for _, receiptID := range index.ResultIDs {
+		result, err := e.results.ByID(receiptID)
 		if err != nil {
-			e.log.Fatal().Err(err).Msgf("could not retrieve header for block %v", incorporatedBlockID)
+			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", incorporatedBlock.ParentID, err)
+		}
+		added := e.pendingIncorporatedResults.Push(result)
+		if !added {
+			// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the
+			// queue capacity is depleted. However, we cannot dropped the incorporated result, because there
+			// is no way that an incorporated result can be re-added later once dropped.
+			return fmt.Errorf("failed to queue incorporated result")
+		}
+	}
+	e.inboundEventsNotifier.Notify()
+	return nil
+}
+
+// processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
+func (e *Engine) processBlockIncorporatedEvents() error {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
 		}
 
-		e.log.Info().Msgf("processing incorporated block %v at height %d", incorporatedBlockID, incorporatedBlock.Height)
-
-		// we are interested in blocks with height strictly larger than root block
-		if incorporatedBlock.Height <= e.rootHeader.Height {
-			return
-		}
-
-		payload, err := e.payloads.ByBlockID(incorporatedBlock.ParentID)
-		if err != nil {
-			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", incorporatedBlock.ParentID)
-		}
-
-		for _, result := range payload.Results {
-			added := e.pendingIncorporatedResults.Push(result)
-			if !added {
-				// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the
-				// queue capacity is depleted. However, we cannot dropped the incorporated result, because there
-				// is no way that an incorporated result can be re-added later once dropped.
-				e.log.Fatal().Msg("failed to queue incorporated result")
+		msg, ok := e.pendingIncorporatedBlocks.Pop()
+		if ok {
+			err := e.processIncorporatedBlock(msg.(flow.Identifier))
+			if err != nil {
+				return fmt.Errorf("could not process incorporated block: %w", err)
 			}
+			continue
 		}
-		e.inboundEventsNotifier.Notify()
-	})
+	}
 }

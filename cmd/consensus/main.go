@@ -240,6 +240,8 @@ func main() {
 				node.Me,
 				node.Storage.Headers,
 				node.Storage.Payloads,
+				node.Storage.Results,
+				node.Storage.Index,
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,

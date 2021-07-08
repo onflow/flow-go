@@ -271,6 +271,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.Headers,
 		node.Payloads,
+		resultsDB,
+		node.Index,
 		node.State,
 		node.Seals,
 		assigner,

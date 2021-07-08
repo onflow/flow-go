@@ -28,8 +28,10 @@ func TestSealingEngineContext(t *testing.T) {
 type SealingEngineSuite struct {
 	suite.Suite
 
-	core  *mockconsensus.SealingCore
-	state *mockprotocol.State
+	core    *mockconsensus.SealingCore
+	state   *mockprotocol.State
+	index   *mockstorage.Index
+	results *mockstorage.ExecutionResults
 
 	// Sealing Engine
 	engine *Engine
@@ -40,6 +42,8 @@ func (s *SealingEngineSuite) SetupTest() {
 	me := &mockmodule.Local{}
 	s.core = &mockconsensus.SealingCore{}
 	s.state = &mockprotocol.State{}
+	s.index = &mockstorage.Index{}
+	s.results = &mockstorage.ExecutionResults{}
 
 	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
 	require.NoError(s.T(), err)
@@ -52,6 +56,8 @@ func (s *SealingEngineSuite) SetupTest() {
 		engineMetrics: metrics,
 		cacheMetrics:  metrics,
 		rootHeader:    rootHeader,
+		index:         s.index,
+		results:       s.results,
 		state:         s.state,
 	}
 
@@ -70,14 +76,8 @@ func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
 	finalizedBlock := unittest.BlockHeaderFixture()
 	finalizedBlockID := finalizedBlock.ID()
-	// setup payload fixture
-	payloads := &mockstorage.Payloads{}
-	payload := unittest.PayloadFixture()
-	payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil).Once()
-	s.engine.payloads = payloads
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
-
 	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
 	s.engine.OnFinalizedBlock(finalizedBlockID)
 
@@ -94,21 +94,22 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&parentBlock)
 	incorporatedBlockID := incorporatedBlock.ID()
 	// setup payload fixture
-	payloads := &mockstorage.Payloads{}
-	payload := unittest.PayloadFixture()
-	unittest.WithAllTheFixins(&payload)
-	payloads.On("ByBlockID", parentBlock.ID()).Return(&payload, nil).Once()
-	s.engine.payloads = payloads
+	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
+	index := &flow.Index{}
+
+	for _, result := range payload.Results {
+		index.ResultIDs = append(index.ReceiptIDs, result.ID())
+		s.results.On("ByID", result.ID()).Return(result, nil).Once()
+
+		IR := flow.NewIncorporatedResult(result.BlockID, result)
+		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
+	}
+	s.index.On("ByBlockID", parentBlock.ID()).Return(index, nil)
 
 	// setup headers storage
 	headers := &mockstorage.Headers{}
 	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
 	s.engine.headers = headers
-
-	for _, result := range payload.Results {
-		IR := flow.NewIncorporatedResult(result.BlockID, result)
-		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
-	}
 
 	s.engine.OnBlockIncorporated(incorporatedBlockID)
 
