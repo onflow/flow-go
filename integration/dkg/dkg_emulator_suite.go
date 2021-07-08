@@ -269,9 +269,10 @@ func (s *DKGSuite) createNode(account *nodeAccount) *node {
 		account.accountAddress.String(),
 		0,
 	)
+	dkgClientWrapper := NewDKGClientWrapper(contractClient)
 	return &node{
 		account:           account,
-		dkgContractClient: contractClient,
+		dkgContractClient: dkgClientWrapper,
 	}
 }
 

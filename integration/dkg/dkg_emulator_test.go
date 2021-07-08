@@ -19,7 +19,7 @@ func TestWithEmulator(t *testing.T) {
 	suite.Run(t, new(DKGSuite))
 }
 
-func (s *DKGSuite) runTest(goodNodes int) {
+func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	nodes := s.nodes[:goodNodes]
 
@@ -80,6 +80,18 @@ func (s *DKGSuite) runTest(goodNodes int) {
 	view := 0
 	for view < 300 {
 		time.Sleep(200 * time.Millisecond)
+
+		// if we are testing situations where the DKG smart-contract is not
+		// reachable, disable the DKG client for intervals of 10 views
+		if emulatorProblems {
+			for _, node := range nodes {
+				if view%20 >= 10 {
+					node.dkgContractClient.Disable()
+				} else {
+					node.dkgContractClient.Enable()
+				}
+			}
+		}
 
 		// deliver private messages
 		s.hub.DeliverAll()
@@ -166,11 +178,19 @@ func (s *DKGSuite) runTest(goodNodes int) {
 
 // TestHappyPath checks that DKG works when all nodes are good
 func (s *DKGSuite) TestHappyPath() {
-	s.runTest(numberOfNodes)
+	s.runTest(numberOfNodes, false)
 }
 
 // TestNodesDown checks that DKG still works with the maximum number of bad
 // nodes (n/2)
 func (s *DKGSuite) TestNodesDown() {
-	s.runTest(numberOfNodes/2 + 1)
+	s.runTest(numberOfNodes/2+1, false)
+}
+
+// TestEmulatorProblems checks that DKG is resilient to transient problems
+// between the node and the DKG smart-contract ( this covers connection issues
+// between consensus node and access node, as well as connection issues between
+// access node and execution node, or the execution node being down).
+func (s *DKGSuite) TestEmulatorProblems() {
+	s.runTest(numberOfNodes, true)
 }
