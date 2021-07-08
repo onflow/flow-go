@@ -447,8 +447,8 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 		return fmt.Errorf("could not retrieve payload index for block %v", incorporatedBlock.ParentID)
 	}
 
-	for _, receiptID := range index.ResultIDs {
-		result, err := e.results.ByID(receiptID)
+	for _, resultID := range index.ResultIDs {
+		result, err := e.results.ByID(resultID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", incorporatedBlock.ParentID, err)
 		}
