@@ -29,13 +29,13 @@
 
 ```
 $ cat myproc.pid-085882.txt| egrep loop
-/GOMAXPROCS=1,GC=100/what[loop-0]/file[mypkg.myFunc:161]/time[1.000000-1.999999]=1 1.912292
-/GOMAXPROCS=8,GC=100/what[loop-1]/file[mypkg.myFunc:161]/time[0.600000-0.699999]=1 0.696432
+/GOMAXPROCS=1,GC=100/what[loop-0]/time[1.000000-1.999999]=1 1.912292 // e.g. mypkg.myFunc:161
+/GOMAXPROCS=8,GC=100/what[loop-1]/time[0.600000-0.699999]=1 0.696432 // e.g. mypkg.myFunc:161
 $ #   user defined string ^^^^^^
-$ #   name & line of instrumented file ^^^^^^^^^^^^^^^^
-$ #                                 bin time range in seconds ^^^^^^^^^^^^^^^^^
-$ #                                                        times bin incremented ^
-$ #                                               total seconds for all increments ^^^^^^^^
+$ #          bin time range in seconds ^^^^^^^^^^^^^^^^^
+$ #                                 times bin incremented ^
+$ #                        total seconds for all increments ^^^^^^^^
+$ #                                         name & line of instrumented file ^^^^^^^^^^^^^^^^
 ```
 
 * If `myFunc()` is identical, why different results? E.g. launches 3 go-routines executing slower if `GOMAXPROCS=1`.
@@ -107,45 +107,50 @@ $ pushd binstat ; GO111MODULE=on go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\
 ```
 {"level":"debug","message":"test: output of command: ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort
 -rw-r--r--  1 simonhardy-francis  staff  3610 23 Jun 17:10 ./binstat.test.pid-047616.binstat.txt
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f1]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=3 1.158629
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f2]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=3 1.103506
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:73]/time[0.200000-0.299999]=1 0.293651
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=2 0.703707
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f4]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=3 1.001581
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:73]/time[0.200000-0.299999]=2 0.575242
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=1 0.337427
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:73]/time[0.300000-0.399999]=1 0.357828
-/GOMAXPROCS=1,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:73]/time[0.400000-0.499999]=2 0.807230
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:4]=4 0.000063
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:5]=3 0.000088
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:8]=1 0.000012
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:9]=1 0.000013
-/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:10-19]=10 0.000146
-/GOMAXPROCS=1,CPUS=8/what[internal-dump]/file[binstat.dump:407]/time[0.000900-0.000999]=1 0.000955
-/GOMAXPROCS=1,CPUS=8/what[loop-0]/file[binstat_test.TestWithPprof:166]/time[1.000000-1.999999]=1 1.842978
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f1]/time[0.200000-0.299999]=1 0.292582 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f1]/time[0.300000-0.399999]=2 0.758238 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f2]/time[0.200000-0.299999]=2 0.587235 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f2]/time[0.300000-0.399999]=1 0.356942 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f3]/time[0.300000-0.399999]=3 1.017089 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f4]/time[0.200000-0.299999]=2 0.562171 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f4]/time[0.300000-0.399999]=1 0.315660 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f5]/time[0.200000-0.299999]=2 0.567996 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f5]/time[0.300000-0.399999]=1 0.301534 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[~1f-via-f6]/time[0.300000-0.399999]=3 1.157075 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/size[leave:4]=6 0.000185 // e.g. binstat.tick:424
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/size[leave:5]=2 0.000042 // e.g. binstat.tick:424
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/size[leave:9]=2 0.000012 // e.g. binstat.tick:424
+/GOMAXPROCS=1,CPUS=8/what[internal-NumG]/size[leave:10-19]=9 0.000137 // e.g. binstat.tick:424
+/GOMAXPROCS=1,CPUS=8/what[internal-dump]/time[0.000600-0.000699]=1 0.000650 // e.g. binstat.dump:436
+/GOMAXPROCS=1,CPUS=8/what[loop-0]/time[1.000000-1.999999]=1 1.812913 // e.g. binstat_test.TestWithPprof:176
 ```
 
 * This part is when `GOMAXPROCS=8`.
   * Note: The `f1` - `f6` functions executed in parallel without pre-emption & therefore quicker.
 
 ```
-/GOMAXPROCS=8,CPUS=8/what[~1f-via-f1]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.221967
-/GOMAXPROCS=8,CPUS=8/what[~1f-via-f2]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.218902
-/GOMAXPROCS=8,CPUS=8/what[~1f-via-f3]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.221567
-/GOMAXPROCS=8,CPUS=8/what[~1f-via-f4]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.218523
-/GOMAXPROCS=8,CPUS=8/what[~1f-via-f5]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.223819
-/GOMAXPROCS=8,CPUS=8/what[~1f-via-f6]/file[binstat_test.run.func1:73]/time[0.070000-0.079999]=3 0.223709
-/GOMAXPROCS=8,CPUS=8/what[~2egEnterTimeVal]/file[binstat.TestBinstatInternal:20]/size[leave:100-199]/time[0.000020-0.000029]=1 0.000025
-/GOMAXPROCS=8,CPUS=8/what[~2egEnterTimeVal]/file[binstat.TestBinstatInternal:20]/size[point:myPoint]/time[0.000007-0.000007]=1 0.000007
-/GOMAXPROCS=8,CPUS=8/what[~2egEnter]/file[binstat.TestBinstatInternal:17]/size[leave:100-199]=1 0.000061
-/GOMAXPROCS=8,CPUS=8/what[~2egenterTimeValInternal]/file[binstat.TestBinstatInternal:24]/size[enter:100-199]/time[0.000006-0.000006]=1 0.000006
-/GOMAXPROCS=8,CPUS=8/what[~2egenterTimeValInternal]/file[binstat.TestBinstatInternal:24]/size[point:myPoint]/time[0.000002-0.000002]=1 0.000003
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:4]=4 0.000078
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:5]=1 0.000084
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:6]=1 0.000009
-/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/file[binstat.tick:395]/size[leave:10-19]=1 0.000273
-/GOMAXPROCS=8,CPUS=8/what[internal-dump]/file[binstat.dump:407]/time[0.000900-0.000999]=1 0.000961
-/GOMAXPROCS=8,CPUS=8/what[loop-1]/file[binstat_test.TestWithPprof:166]/time[0.700000-0.799999]=1 0.752880
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f1]/time[0.070000-0.079999]=2 0.145029 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f1]/time[0.080000-0.089999]=1 0.082286 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f2]/time[0.070000-0.079999]=2 0.144383 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f2]/time[0.100000-0.199999]=1 0.100980 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f3]/time[0.070000-0.079999]=2 0.146867 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f3]/time[0.100000-0.199999]=1 0.106264 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f4]/time[0.070000-0.079999]=2 0.144903 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f4]/time[0.090000-0.099999]=1 0.098164 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f5]/time[0.070000-0.079999]=2 0.144949 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f5]/time[0.090000-0.099999]=1 0.098013 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f6]/time[0.070000-0.079999]=2 0.141520 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~1f-via-f6]/time[0.100000-0.199999]=1 0.103813 // e.g. binstat_test.run.func1:83
+/GOMAXPROCS=8,CPUS=8/what[~2egEnterTimeVal]/size[leave:100-199]/time[0.000010-0.000019]=1 0.000017 // e.g. binstat.TestBinstatInternal:20
+/GOMAXPROCS=8,CPUS=8/what[~2egEnterTimeVal]/size[point:myPoint]/time[0.000005-0.000005]=1 0.000006 // e.g. binstat.TestBinstatInternal:20
+/GOMAXPROCS=8,CPUS=8/what[~2egEnter]/size[leave:100-199]=1 0.000070 // e.g. binstat.TestBinstatInternal:17
+/GOMAXPROCS=8,CPUS=8/what[~2egenterTimeValInternal]/size[enter:100-199]/time[0.000004-0.000004]=1 0.000005 // e.g. binstat.TestBinstatInternal:24
+/GOMAXPROCS=8,CPUS=8/what[~2egenterTimeValInternal]/size[point:myPoint]/time[0.000002-0.000002]=1 0.000002 // e.g. binstat.TestBinstatInternal:24
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/size[leave:4]=5 0.000160 // e.g. binstat.tick:424
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/size[leave:5]=1 0.000029 // e.g. binstat.tick:424
+/GOMAXPROCS=8,CPUS=8/what[internal-NumG]/size[leave:10-19]=2 0.000046 // e.g. binstat.tick:424
+/GOMAXPROCS=8,CPUS=8/what[internal-dump]/time[0.000900-0.000999]=1 0.000943 // e.g. binstat.dump:436
+/GOMAXPROCS=8,CPUS=8/what[loop-1]/time[0.800000-0.899999]=1 0.819436 // e.g. binstat_test.TestWithPprof:176
 ```
 
 * This part shows internal timings, as well as the Unix time, elapsed seconds since process start, & the number of GCs and the total seconds they took..
@@ -163,11 +168,11 @@ $ pushd binstat ; GO111MODULE=on go test -v -vv ./... 2>&1 | perl -lane 's~\\n~\
 ## Environment variables
 
 * If `BINSTAT_ENABLE` exists, `binstat` is enabled. Default: Disabled.
-* If `BINSTAT_VERBOSE` exists, `binstat` outputs debug info. Default: Disabled.
+* If `BINSTAT_VERBOSE` exists, `binstat` outputs debug info & e.g. function location. Default: Disabled.
 * If `BINSTAT_DMP_NAME` exists, use it. Default: `<process name>.pid-<process pid>.binstat.txt`.
 * If `BINSTAT_DMP_PATH` exists, output dump to `<BINSTAT_DMP_PATH>/<BINSTAT_DMP_NAME>`. Default: `.`.
 * If `BINSTAT_CUT_PATH` exists, cut function name path with this. Default: `=github.com/onflow/flow-go/`.
-* If `BINSTAT_LEN_WHAT` exists, truncate `<what>` to `<len>` from `~<what>=<len>`, e.g. `~f=99;~2eg=99`.
+* If `BINSTAT_LEN_WHAT` exists, truncate `<what>` to `<len>` from `~<what>=<len>`, e.g. `~f=99;~2eg=0`.
 
 ## Todo
 

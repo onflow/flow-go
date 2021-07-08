@@ -55,6 +55,7 @@ type globalStruct struct {
 	indexInternalMax int
 	key2index        map[string]int
 	keysArray        []string
+	keysEgLoc        []string
 	frequency        []uint64
 	frequencyShadow  []uint64
 	accumMono        []uint64
@@ -116,6 +117,8 @@ func init() {
 	globalRWMutex.Lock() // lock for single writer <-- harmless but probably unnecessary since init() gets executed before other package functions
 	defer globalRWMutex.Unlock()
 
+	t1 := runtimeNanoAsTimeDuration()
+
 	// inspired by https://github.com/onflow/flow-go/blob/master/utils/unittest/logging.go
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	globalLog = zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Logger()
@@ -145,7 +148,7 @@ func init() {
 		parts := strings.Split(global.lenWhat, ";")
 		for n, part := range parts { // e.g. "~Code=99"
 			subParts := strings.Split(part, "=")
-			if (len(subParts) != 2) || (subParts[0][0:1] != "~") || (0 == len(subParts[0][1:])) || (0 == atoi(subParts[1])) {
+			if (len(subParts) != 2) || (subParts[0][0:1] != "~") || (0 == len(subParts[0][1:])) {
 				panic(fmt.Sprintf("ERROR: BINSTAT: BINSTAT_LEN_WHAT=%s <-- cannot parse <-- format should be ~<what prefix>=<max len>[;...], e.g. ~Code=99;~X=99\n", global.lenWhat))
 			}
 			k := subParts[0][1:]
@@ -164,6 +167,7 @@ func init() {
 			panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: %s", name))
 		}
 		global.keysArray = append(global.keysArray, name)
+		global.keysEgLoc = append(global.keysEgLoc, "")
 		global.frequency = append(global.frequency, 0)
 		global.accumMono = append(global.accumMono, 0)
 		global.frequencyShadow = append(global.frequencyShadow, 0)
@@ -185,6 +189,11 @@ func init() {
 		globalLog.Debug().Msgf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .dmpPath=%s .dmpName=%s .cutPath=%s .lenWhat=%s",
 			elapsedThisProc, os.Getpid(), int64(C.gettid()), global.enable, global.verbose, global.dmpPath, global.dmpName, global.cutPath, global.lenWhat)
 	}
+
+	t2 := runtimeNanoAsTimeDuration()
+	if t2 <= t1 {
+		panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: t1=%d but t2=%d\n", t1, t2))
+	}
 }
 
 func Fin() {
@@ -199,11 +208,16 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 
 	t := runtimeNanoAsTimeDuration()
 
-	// todo: is there a way to speed up runtime.Caller() and/or runtime.FuncForPC() somehow? cache pc value or something like that?
-	pc, _, fileLine, _ := runtime.Caller(2) // 2 assumes private binStat.newGeneric() called indirectly via public stub function; please see eof
-	fn := runtime.FuncForPC(pc)
-	funcName := fn.Name()
-	funcName = strings.ReplaceAll(funcName, global.cutPath, "")
+	funcName := ""
+	fileLine := 0
+	if global.verbose {
+		// todo: is there a way to speed up runtime.Caller() and/or runtime.FuncForPC() somehow? cache pc value or something like that?
+		pc, _, lineNum, _ := runtime.Caller(2) // 2 assumes private binStat.newGeneric() called indirectly via public stub function; please see eof
+		fn := runtime.FuncForPC(pc)
+		funcName = fn.Name()
+		funcName = strings.ReplaceAll(funcName, global.cutPath, "")
+		fileLine = lineNum
+	}
 
 	whatLen := len(what)
 	if (what[0:1] == "~") && (len(what) >= 3) {
@@ -222,9 +236,6 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 	p := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
 
 	t2 := runtimeNanoAsTimeDuration()
-	if t2 <= t {
-		panic(fmt.Sprintf("ERROR: BINSTAT: INTERNAL: t=%d but t3=%d\n", t, t2))
-	}
 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
@@ -241,7 +252,8 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 }
 
 func pointGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen int, verbose bool) time.Duration {
-	if !global.enable {
+	// if binstat disabled, or <what> disabled; "~#" == "~<default len><what>"
+	if (!global.enable) || (2 == len(p.what)) {
 		return time.Duration(0)
 	}
 
@@ -275,7 +287,7 @@ func pointGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWh
 		elapsedSeconds := elapsedNanoAsTimeDuration.Seconds()
 		keyTimeRange = fmt.Sprintf("/time[%s]", x_2_y(elapsedSeconds, false))
 	}
-	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]/file[%s:%d]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), p.what, p.callerFunc, p.callerLine, keySizeRange, keyTimeRange)
+	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), p.what, keySizeRange, keyTimeRange)
 
 tryAgainRaceCondition:
 	var frequency uint64
@@ -291,6 +303,10 @@ tryAgainRaceCondition:
 	if keyExists {
 		// full thru
 	} else {
+		keyEgLoc := ""
+		if global.verbose {
+			keyEgLoc = fmt.Sprintf(" // e.g. %s:%d", p.callerFunc, p.callerLine)
+		}
 		// come here to create new hash table bucket
 		globalRWMutex.Lock() // lock for single writer v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 		_, keyExists = global.key2index[key]
@@ -302,6 +318,7 @@ tryAgainRaceCondition:
 		index = global.index
 		global.key2index[key] = index // https://stackoverflow.com/questions/36167200/how-safe-are-golang-maps-for-concurrent-read-write-operations
 		global.keysArray = append(global.keysArray, key)
+		global.keysEgLoc = append(global.keysEgLoc, keyEgLoc)
 		global.frequency = append(global.frequency, 1)
 		global.accumMono = append(global.accumMono, uint64(elapsedNanoAsTimeDuration))
 		global.index++
@@ -455,7 +472,7 @@ func dump() {
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
 	}
 	for i := range global.keysArray {
-		_, err := fmt.Fprintf(f, "%s=%d %f\n", global.keysArray[i], global.frequency[i], time.Duration(global.accumMono[i]).Seconds())
+		_, err := fmt.Fprintf(f, "%s=%d %f%s\n", global.keysArray[i], global.frequency[i], time.Duration(global.accumMono[i]).Seconds(), global.keysEgLoc[i])
 		if err != nil {
 			globalLog.Fatal().Msgf("ERROR: .Fprintf()=%s", err)
 			panic(fmt.Sprintf("ERROR: BINSTAT: .Fprintf()=%s", err))

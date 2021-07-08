@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"reflect"
 
+	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -88,9 +89,15 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
+	p1 := binstat.EnterTime("~6MakeID/Fingerprint", "")
+	data := fingerprint.Fingerprint(entity)
+	binstat.LeaveVal(p1, int64(len(data)))
+	p2 := binstat.EnterTimeVal("~6MakeID/ComputeHash", "", int64(len(data)))
 	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(fingerprint.Fingerprint(entity))
-	return HashToID(hash)
+	hash := hasher.ComputeHash(data)
+	id := HashToID(hash)
+	binstat.Leave(p2)
+	return id
 }
 
 // PublicKeyToID creates an ID from a public key.
