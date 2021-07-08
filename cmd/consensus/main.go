@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -34,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
@@ -676,7 +678,11 @@ func createDKGContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (m
 
 	var dkgClient module.DKGContractClient
 
-	dkgContractAddress := node.RootChainID.Chain().ServiceAddress().HexWithPrefix()
+	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
+	if err != nil {
+		return nil, err
+	}
+	dkgContractAddress := contracts.DKG.Address.Hex()
 
 	// if not valid return a mock dkg contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {

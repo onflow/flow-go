@@ -34,6 +34,7 @@ func TestCreateQCContractClient(t *testing.T) {
 	// set required attributes
 	cmd.Logger = zerolog.Nop()
 	cmd.Me = local
+	cmd.RootChainID = flow.Testnet
 
 	machineAccountFileName := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, local.NodeID())
 
@@ -49,7 +50,7 @@ func TestCreateQCContractClient(t *testing.T) {
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
 
-			client, err := createQCContractClient(cmd, accessAddress, "")
+			client, err := createQCContractClient(cmd, accessAddress)
 			require.NoError(t, err)
 
 			// verify that client returned is of type `MockQCContractClient`
@@ -69,7 +70,7 @@ func TestCreateQCContractClient(t *testing.T) {
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
 
-			client, err := createQCContractClient(cmd, accessAddress, "")
+			client, err := createQCContractClient(cmd, accessAddress)
 			require.NoError(t, err)
 
 			// verify that client returned is of type `MockQCContractClient`
@@ -91,7 +92,7 @@ func TestCreateQCContractClient(t *testing.T) {
 			writeNodeMachineAccountInfo(t, infoPath)
 			require.FileExists(t, infoPath)
 
-			client, err := createQCContractClient(cmd, accessAddress, "")
+			client, err := createQCContractClient(cmd, accessAddress)
 			require.NoError(t, err)
 
 			// verify that client returned is of type `MockQCContractClient`
@@ -113,7 +114,7 @@ func TestCreateQCContractClient(t *testing.T) {
 			writeNodeMachineAccountInfo(t, infoPath)
 			require.FileExists(t, infoPath)
 
-			client, err := createQCContractClient(cmd, accessAddress, "")
+			client, err := createQCContractClient(cmd, accessAddress)
 			require.NoError(t, err)
 
 			// verify that client returned is of type `MockQCContractClient`

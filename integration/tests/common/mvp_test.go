@@ -124,7 +124,6 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// TODO replace these with actual values
 		testnet.WithAdditionalFlag("--access-address=null"),
-		testnet.WithAdditionalFlag("--qc-contract-address=null"),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){

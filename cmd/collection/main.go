@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/spf13/pflag"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -25,6 +25,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -79,8 +80,7 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		accessAddress     string
-		qcContractAddress string
+		accessAddress string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -135,7 +135,6 @@ func main() {
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-			flags.StringVar(&qcContractAddress, "qc-contract-address", "", "the address of the Epoch QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -384,7 +383,7 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
-			qcContractClient, err := createQCContractClient(node, accessAddress, qcContractAddress)
+			qcContractClient, err := createQCContractClient(node, accessAddress)
 			if err != nil {
 				return nil, fmt.Errorf("could not create qc contract client %w", err)
 			}
@@ -435,9 +434,15 @@ func main() {
 // machine account is very much intended to be temporary.
 // Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
 // Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
-func createQCContractClient(node *cmd.FlowNodeBuilder, accessAddress, qcContractAddress string) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
+
+	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
+	if err != nil {
+		return nil, err
+	}
+	qcContractAddress := contracts.ClusterQC.Address.Hex()
 
 	// if not valid return a mock qc contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
