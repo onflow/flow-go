@@ -26,8 +26,8 @@ func TestMatchingEngineContext(t *testing.T) {
 type MatchingEngineSuite struct {
 	suite.Suite
 
-	payloads *mockstorage.Payloads
-	results  *mockstorage.ExecutionResults
+	index    *mockstorage.Index
+	receipts *mockstorage.ExecutionReceipts
 	core     *mockconsensus.MatchingCore
 	state    *mockprotocol.State
 
@@ -40,8 +40,8 @@ func (s *MatchingEngineSuite) SetupTest() {
 	me := &mockmodule.Local{}
 	net := &mockmodule.Network{}
 	s.core = &mockconsensus.MatchingCore{}
-	s.payloads = &mockstorage.Payloads{}
-	s.results = &mockstorage.ExecutionResults{}
+	s.index = &mockstorage.Index{}
+	s.receipts = &mockstorage.ExecutionReceipts{}
 	s.state = &mockprotocol.State{}
 
 	ourNodeID := unittest.IdentifierFixture()
@@ -51,7 +51,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil).Once()
 
 	var err error
-	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.payloads, s.results, s.core)
+	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.state, s.receipts, s.index, s.core)
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()
@@ -65,13 +65,12 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 	finalizedBlockID := finalizedBlock.ID()
 
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
-	s.payloads.On("ByBlockID", finalizedBlockID).Return(&payload, nil)
-
-	resultsById := payload.Results.Lookup()
-	for _, meta := range payload.Receipts {
-		receipt := flow.ExecutionReceiptFromMeta(*meta, *resultsById[meta.ResultID])
+	index := &flow.Index{}
+	for _, receipt := range payload.Receipts {
+		index.ReceiptIDs = append(index.ReceiptIDs, receipt.ID())
 		s.core.On("ProcessReceipt", receipt).Return(nil).Once()
 	}
+	s.index.On("ByBlockID", finalizedBlockID).Return(&index, nil)
 
 	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
 

@@ -18,6 +18,9 @@ import (
 // defaultReceiptQueueCapacity maximum capacity of receipts queue
 const defaultReceiptQueueCapacity = 10000
 
+// defaultIncorporatedBlockQueueCapacity maximum capacity of block incorporated events queue
+const defaultIncorporatedBlockQueueCapacity = 10
+
 // Engine is a wrapper struct for `Core` which implements consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
@@ -26,12 +29,13 @@ type Engine struct {
 	me                         module.Local
 	core                       sealing.MatchingCore
 	state                      protocol.State
-	results                    storage.ExecutionResults
-	payloads                   storage.Payloads
+	receipts                   storage.ExecutionReceipts
+	index                      storage.Index
 	metrics                    module.EngineMetrics
-	inboundReceiptNotifier     engine.Notifier
-	pendingReceipts            *fifoqueue.FifoQueue
+	inboundEventsNotifier      engine.Notifier
 	finalizationEventsNotifier engine.Notifier
+	pendingReceipts            *fifoqueue.FifoQueue
+	pendingIncorporatedBlocks  *fifoqueue.FifoQueue
 }
 
 func NewEngine(
@@ -41,8 +45,8 @@ func NewEngine(
 	engineMetrics module.EngineMetrics,
 	mempool module.MempoolMetrics,
 	state protocol.State,
-	payloads storage.Payloads,
-	results storage.ExecutionResults,
+	receipts storage.ExecutionReceipts,
+	index storage.Index,
 	core sealing.MatchingCore) (*Engine, error) {
 
 	// FIFO queue for execution receipts
@@ -54,18 +58,25 @@ func NewEngine(
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
 	}
 
+	pendingIncorporatedBlocks, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultIncorporatedBlockQueueCapacity))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create queue for incorporated block events: %w", err)
+	}
+
 	e := &Engine{
 		log:                        log.With().Str("engine", "matching.Engine").Logger(),
 		unit:                       engine.NewUnit(),
 		me:                         me,
 		core:                       core,
 		state:                      state,
-		payloads:                   payloads,
-		results:                    results,
+		receipts:                   receipts,
+		index:                      index,
 		metrics:                    engineMetrics,
-		inboundReceiptNotifier:     engine.NewNotifier(),
+		inboundEventsNotifier:      engine.NewNotifier(),
 		finalizationEventsNotifier: engine.NewNotifier(),
 		pendingReceipts:            receiptsQueue,
+		pendingIncorporatedBlocks:  pendingIncorporatedBlocks,
 	}
 
 	// register engine with the receipt provider
@@ -81,7 +92,7 @@ func NewEngine(
 // started. For consensus engine, this is true once the underlying consensus
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.loop)
+	e.unit.Launch(e.inboundEventsProcessingLoop)
 	e.unit.Launch(e.finalizationProcessingLoop)
 	return e.unit.Ready()
 }
@@ -121,7 +132,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	}
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
-	e.inboundReceiptNotifier.Notify()
+	e.inboundEventsNotifier.Notify()
 	return nil
 }
 
@@ -130,7 +141,7 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
-	e.inboundReceiptNotifier.Notify()
+	e.inboundEventsNotifier.Notify()
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
@@ -138,46 +149,36 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 	e.finalizationEventsNotifier.Notify()
-	e.processFinalizedReceipts(finalizedBlockID)
 }
 
-// processFinalizedReceipts selects receipts that were included into finalized block and submits them
+// OnBlockIncorporated implements the `OnBlockIncorporated` callback from the `hotstuff.FinalizationConsumer`
+// CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
+// from external nodes cannot be considered as inputs to this function
+func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
+	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
+	e.inboundEventsNotifier.Notify()
+}
+
+// processIncorporatedBlock selects receipts that were included into finalized block and submits them
 // for further processing by matching core.
 // Without the logic below, the sealing engine would produce IncorporatedResults
 // only from receipts received directly from ENs. sealing Core would not know about
 // Receipts that are incorporated by other nodes in their blocks blocks (but never
 // received directly from the EN).
-func (e *Engine) processFinalizedReceipts(finalizedBlockID flow.Identifier) {
-	e.unit.Launch(func() {
-		payload, err := e.payloads.ByBlockID(finalizedBlockID)
+func (e *Engine) processIncorporatedBlock(finalizedBlockID flow.Identifier) error {
+	index, err := e.index.ByBlockID(finalizedBlockID)
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("could not retrieve payload index for block %v", finalizedBlockID)
+	}
+	for _, receiptID := range index.ReceiptIDs {
+		receipt, err := e.receipts.ByID(receiptID)
 		if err != nil {
-			e.log.Fatal().Err(err).Msgf("could not retrieve payload for block %v", finalizedBlockID)
+			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", finalizedBlockID, err)
 		}
-		resultsById := payload.Results.Lookup()
-		for _, meta := range payload.Receipts {
-			// Generally speaking we are interested in receipts that were included in block together with execution results
-			// but since we require two receipts from different ENs before sealing we need to add every receipt included in block.
-			result, ok := resultsById[meta.ResultID]
-			if !ok {
-				result, err = e.results.ByID(meta.ResultID)
-				// error at this point means that we have corrupted state or serious bug which allows including
-				// invalid receipts into finalized blocks
-				if err != nil {
-					e.log.Fatal().Err(err).Msgf("could not retrieve result %v", meta.ResultID)
-				}
-			}
-
-			receipt := flow.ExecutionReceiptFromMeta(*meta, *result)
-			added := e.pendingReceipts.Push(receipt)
-			if !added {
-				// Not being able to queue an execution receipt is a fatal edge case. It might happen, if the
-				// queue capacity is depleted. However, we cannot dropped the execution receipt, because there
-				// is no way that an execution receipt can be re-added later once dropped.
-				e.log.Fatal().Msg("failed to queue execution receipt")
-			}
-		}
-		e.inboundReceiptNotifier.Notify()
-	})
+		e.pendingReceipts.Push(receipt)
+	}
+	e.inboundEventsNotifier.Notify()
+	return nil
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
@@ -196,8 +197,8 @@ func (e *Engine) finalizationProcessingLoop() {
 	}
 }
 
-func (e *Engine) loop() {
-	c := e.inboundReceiptNotifier.Channel()
+func (e *Engine) inboundEventsProcessingLoop() {
+	c := e.inboundEventsNotifier.Channel()
 
 	for {
 		select {
@@ -231,7 +232,16 @@ func (e *Engine) processAvailableEvents() error {
 		default:
 		}
 
-		msg, ok := e.pendingReceipts.Pop()
+		msg, ok := e.pendingIncorporatedBlocks.Pop()
+		if ok {
+			err := e.processIncorporatedBlock(msg.(flow.Identifier))
+			if err != nil {
+				return fmt.Errorf("could not process incorporated block: %w", err)
+			}
+			continue
+		}
+
+		msg, ok = e.pendingReceipts.Pop()
 		if ok {
 			err := e.core.ProcessReceipt(msg.(*flow.ExecutionReceipt))
 			if err != nil {
@@ -240,7 +250,7 @@ func (e *Engine) processAvailableEvents() error {
 			continue
 		}
 
-		// when there is no more messages in the queue, back to the loop to wait
+		// when there is no more messages in the queue, back to the inboundEventsProcessingLoop to wait
 		// for the next incoming message to arrive.
 		return nil
 	}

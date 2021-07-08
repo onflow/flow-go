@@ -294,8 +294,8 @@ func main() {
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
 				node.State,
-				node.Storage.Payloads,
-				node.Storage.Results,
+				node.Storage.Receipts,
+				node.Storage.Index,
 				core,
 			)
 			if err != nil {
@@ -305,6 +305,7 @@ func main() {
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
 			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
