@@ -34,12 +34,7 @@ func (_m *VerificationMetrics) OnChunkDataPackArrivedAtFetcher() {
 	_m.Called()
 }
 
-// OnChunkDataPackReceived provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunkDataPackReceived() {
-	_m.Called()
-}
-
-// OnChunkDataPackRequestDispatchedInNetwork provides a mock function with given fields:
+// OnChunkDataPackRequestDispatchedInNetworkByRequester provides a mock function with given fields:
 func (_m *VerificationMetrics) OnChunkDataPackRequestDispatchedInNetworkByRequester() {
 	_m.Called()
 }
@@ -54,12 +49,7 @@ func (_m *VerificationMetrics) OnChunkDataPackRequestSentByFetcher() {
 	_m.Called()
 }
 
-// OnChunkDataPackRequested provides a mock function with given fields:
-func (_m *VerificationMetrics) OnChunkDataPackRequested() {
-	_m.Called()
-}
-
-// OnChunkDataPackResponseReceivedFromNetwork provides a mock function with given fields:
+// OnChunkDataPackResponseReceivedFromNetworkByRequester provides a mock function with given fields:
 func (_m *VerificationMetrics) OnChunkDataPackResponseReceivedFromNetworkByRequester() {
 	_m.Called()
 }
@@ -74,18 +64,8 @@ func (_m *VerificationMetrics) OnChunksAssignmentDoneAtAssigner(chunks int) {
 	_m.Called(chunks)
 }
 
-// OnExecutionReceiptReceived provides a mock function with given fields:
+// OnExecutionResultReceivedAtAssignerEngine provides a mock function with given fields:
 func (_m *VerificationMetrics) OnExecutionResultReceivedAtAssignerEngine() {
-	_m.Called()
-}
-
-// OnExecutionResultReceived provides a mock function with given fields:
-func (_m *VerificationMetrics) OnExecutionResultReceived() {
-	_m.Called()
-}
-
-// OnExecutionResultSent provides a mock function with given fields:
-func (_m *VerificationMetrics) OnExecutionResultSent() {
 	_m.Called()
 }
 
@@ -94,18 +74,13 @@ func (_m *VerificationMetrics) OnFinalizedBlockArrivedAtAssigner(height uint64) 
 	_m.Called(height)
 }
 
-// OnResultApprovalDispatchedInNetwork provides a mock function with given fields:
+// OnResultApprovalDispatchedInNetworkByVerifier provides a mock function with given fields:
 func (_m *VerificationMetrics) OnResultApprovalDispatchedInNetworkByVerifier() {
 	_m.Called()
 }
 
 // OnVerifiableChunkReceivedAtVerifierEngine provides a mock function with given fields:
 func (_m *VerificationMetrics) OnVerifiableChunkReceivedAtVerifierEngine() {
-	_m.Called()
-}
-
-// OnVerifiableChunkSent provides a mock function with given fields:
-func (_m *VerificationMetrics) OnVerifiableChunkSent() {
 	_m.Called()
 }
 

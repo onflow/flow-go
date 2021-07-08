@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -446,7 +447,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	deltas, err := ingestion.NewDeltas(1000)
 	require.NoError(t, err)
 
-	checkerEngine := &CheckerMock{}
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
@@ -478,7 +479,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, followerState, checkerEngine, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
@@ -499,6 +500,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
+
+	finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,

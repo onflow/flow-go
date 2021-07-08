@@ -1,6 +1,8 @@
 package stdmap
 
 import (
+	"log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -24,37 +26,20 @@ func indexByHeight(seal *flow.IncorporatedResultSeal) uint64 {
 func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 	byHeight := make(map[uint64]sealSet)
 
-	// assuming all the entities are for unsealed blocks, then we will remove a seal
-	// with the largest height.
+	// This mempool implementation supports pruning by height, meaning that as soon as sealing advances
+	// seals will be gradually removed from mempool
+	// ejecting a seal from mempool means that we have reached our limit and something is very bad, meaning that sealing
+	// is not actually happening.
+	// By setting high limit ~12 hours we ensure that we have some safety window for sealing to recover and make progress
 	ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
-		maxHeight := uint64(0)
-		var sealsAtMaxHeight sealSet
-		for height, seals := range byHeight {
-			if height > maxHeight || (height == 0 && maxHeight == 0) {
-				maxHeight = height
-				sealsAtMaxHeight = seals
-			}
-		}
-
-		for sealID, seal := range sealsAtMaxHeight {
-			return sealID, seal
-		}
-
-		// this can only happen if mempool is empty or if the secondary index was inconsistently updated
-		panic("cannot eject element from empty mempool")
+		log.Fatalf("incorporated result seals reached max capacity %d", limit)
+		panic("incorporated result seals reached max capacity")
 	}
 
 	r := &IncorporatedResultSeals{
 		Backend:  NewBackend(WithLimit(limit), WithEject(ejector)),
 		byHeight: byHeight,
 	}
-
-	// when eject a entity, also update the secondary indx
-	r.RegisterEjectionCallbacks(func(entity flow.Entity) {
-		seal := entity.(*flow.IncorporatedResultSeal)
-		sealID := seal.ID()
-		r.removeFromIndex(sealID, seal.Header.Height)
-	})
 
 	return r
 }
@@ -156,11 +141,6 @@ func (ir *IncorporatedResultSeals) Clear() {
 	if err != nil {
 		panic(err)
 	}
-}
-
-// RegisterEjectionCallbacks adds the provided OnEjection callbacks
-func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
-	ir.Backend.RegisterEjectionCallbacks(callbacks...)
 }
 
 // PruneUpToHeight remove all seals for blocks whose height is strictly
