@@ -26,7 +26,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 
 	// assuming all the entities are for unsealed blocks, then we will remove a seal
 	// with the largest height.
-	ejector := func(b* Backend ) (flow.Identifier, flow.Entity) {
+	ejector := func(b* Backend ) (flow.Identifier, flow.Entity, bool) {
 		maxHeight := uint64(0)
 		var sealsAtMaxHeight sealSet
 		for height, seals := range byHeight {
@@ -37,7 +37,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 		}
 
 		for sealID, seal := range sealsAtMaxHeight {
-			return sealID, seal
+			return sealID, seal, true
 		}
 
 		// this can only happen if mempool is empty or if the secondary index was inconsistently updated

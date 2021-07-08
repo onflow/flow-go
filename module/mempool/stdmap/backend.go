@@ -215,17 +215,18 @@ func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 func (b *Backend) reduce() {
 
 	// we keep reducing the cache size until we are at limit again
-	for len(b.entities) > int(b.limit) {
+	if len(b.entities) > int(b.limit) {
 
 		// get the key from the eject function
-		key, _ := b.eject(b)
+		key, entity, ok := b.eject(b)
 
 		// TODO: this lookup should be done already by the eject function
 
 		// if the key is not actually part of the map, use stupid fallback eject
-		entity, ok := b.entities[key]
+		// entity, ok := b.entities[key]
 		if !ok {
-			_, _ = EjectTrueRandomFast(b)
+			// this will eject multiple entities, return values are unused
+			_, _, _ = EjectTrueRandomFast(b)
 		} else {
 
 			// remove the key

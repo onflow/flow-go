@@ -14,56 +14,64 @@ import (
 // backend when it overflows its limit. A custom eject function can be injected
 // into the memory pool upon creation, which allows us to hook into the eject
 // to clean up auxiliary data and/or to change the strategy of eviction.
-type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity)
+type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 
 // EjectFakeRandom relies on the random map iteration in Go to pick the entity we eject
 // from the entity set. It picks the first entity upon iteration, thus being the fastest
 // way to pick an entity to be evicted; at the same time, it conserves the random bias
 // of the Go map iteration.
-func EjectFakeRandom(b* Backend) (flow.Identifier, flow.Entity) {
+func EjectFakeRandom(b* Backend) (flow.Identifier, flow.Entity, bool) {
 	var entityID flow.Identifier
 	var entity flow.Entity
+	var bFound bool = false
 	for entityID, entity = range b.entities {
+		bFound = true
 		break
 	}
-	return entityID, entity
+	return entityID, entity, bFound
 }
 
 // EjectTrueRandom relies on a random generator to pick a random entity to eject from the
 // entity set. It will, on average, iterate through half the entities of the set. However,
 // it provides us with a truly evenly distributed random selection.
-func EjectTrueRandom(b* Backend) (flow.Identifier, flow.Entity) {
+func EjectTrueRandom(b* Backend) (flow.Identifier, flow.Entity, bool) {
 	var entityID flow.Identifier
 	var entity flow.Entity
+	var bFound bool = false
 	i := 0
 	n := rand.Intn(len(b.entities))
 	for entityID, entity = range b.entities {
 		if i == n {
+			bFound = true
 			break
 		}
 		i++
 	}
-	return entityID, entity
+	return entityID, entity, bFound
 }
 
 // this function will check to see if the map size is beyond the
 // ideal size, and will iterate through them and eject unneeded
 // entries if that is the case.
-func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity) {
-	const idealSize int = 10000
-
+func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity, bool) {
 	var entities = b.entities
 
+	// an empty, invalid, id for the return value
 	var retval flow.Identifier
 
+	mapSize := len(entities)
 
-	if (len(entities) - idealSize) <= 128  {
-		return retval, nil
+	if b.limit > uint(mapSize) {
+		return retval, nil, false
+	}
+
+	if (uint(mapSize) - b.limit) <= 128  {
+		// nothing to do, yet
+		return retval, nil, false
 	}
 
 	// generate 64 random numbers (the additional 64 is so that we don't
 	// go outside the boundary once the elements are ejected)
-	mapSize := len(entities)
 
 	var entityID flow.Identifier
 	var entity flow.Entity
@@ -103,12 +111,12 @@ func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity) {
 		}
 		i++
 	}
-	return retval, nil
+	return retval, nil, false
 }
 
 // EjectPanic simply panics, crashing the program. Useful when cache is not expected
 // to grow beyond certain limits, but ejecting is not applicable
-func EjectPanic(b* Backend) (flow.Identifier, flow.Entity) {
+func EjectPanic(b* Backend) (flow.Identifier, flow.Entity, bool) {
 	panic("unexpected: mempool size over the limit")
 }
 
@@ -156,7 +164,7 @@ func (q *LRUEjector) Untrack(entityID flow.Identifier) {
 
 // Eject implements EjectFunc for LRUEjector. It finds the entity with the lowest sequence number (i.e.,
 //the oldest entity). It also untracks
-func (q *LRUEjector) Eject(b* Backend) (flow.Identifier, flow.Entity) {
+func (q *LRUEjector) Eject(b* Backend) (flow.Identifier, flow.Entity, bool) {
 	q.Lock()
 	defer q.Unlock()
 
@@ -176,11 +184,11 @@ func (q *LRUEjector) Eject(b* Backend) (flow.Identifier, flow.Entity) {
 	oldestEntity, ok := b.entities[oldestID]
 
 	if !ok {
-		oldestID, oldestEntity = EjectTrueRandom(b)
+		oldestID, oldestEntity, ok = EjectTrueRandom(b)
 	}
 
 	// untracks the oldest id as it is supposed to be ejected
 	delete(q.table, oldestID)
 
-	return oldestID, oldestEntity
+	return oldestID, oldestEntity, ok
 }
