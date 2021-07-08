@@ -183,7 +183,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 				res, ok := args[0].(*messages.ChunkDataResponse)
 				require.True(t, ok)
 
-				actualChunkID := res.ChunkDataPack.ChunkID
+				actualChunkID := res.Body.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
 			}).
 			Return(nil)
@@ -252,7 +252,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 				res, ok := args[0].(*messages.ChunkDataResponse)
 				require.True(t, ok)
 
-				actualChunkID := res.ChunkDataPack.ChunkID
+				actualChunkID := res.Body.ChunkID
 				assert.Equal(t, chunkID, actualChunkID)
 			}).
 			Return(nil).Once()
