@@ -35,8 +35,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// todo: consider using something faster than runtime.nano(), eg. https://github.com/templexxx/tsc/issues/8 <-- but maybe not safe with multiple CPUs? https://stackoverflow.com/questions/3388134/rdtsc-accuracy-across-cpu-cores
-// "Another concern is that if a thread is migrated on a different processor between two measurements, the counter might skip too much or even “go back”. " https://coherent-labs.com/posts/timestamps-for-performance-measurements/
+// todo: consider using something faster than runtime.nano() e.g. [1]
+// But is [1] maybe not safe with multiple CPUs? [2]
+// "Another concern is that if a thread is migrated on a different
+//  processor between two measurements, the counter might skip too much
+//  or even 'go back'." [3]
+// [1] https://github.com/templexxx/tsc/issues/8
+// [2] https://stackoverflow.com/questions/3388134/rdtsc-accuracy-across-cpu-cores
+// [3] https://coherent-labs.com/posts/timestamps-for-performance-measurements/
 
 type globalStruct struct {
 	dumps            uint64
