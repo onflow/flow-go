@@ -117,7 +117,7 @@ func TestCreateQCContractClient(t *testing.T) {
 			client, err := createQCContractClient(cmd, accessAddress)
 			require.NoError(t, err)
 
-			// verify that client returned is of type `MockQCContractClient`
+			// verify that client returned is of type `QCContractClient`
 			assert.IsType(t, &epochs.QCContractClient{}, client)
 		})
 	})
