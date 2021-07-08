@@ -29,7 +29,7 @@ func NewComplianceCollector() *ComplianceCollector {
 	cc := &ComplianceCollector{
 
 		currentEpochCounter: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "consensus_compliance_current_epoch_counter",
+			Name:      "current_epoch_counter",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the current epoch's counter",
