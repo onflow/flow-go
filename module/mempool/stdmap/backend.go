@@ -30,8 +30,7 @@ func (b *Backdata) Has(entityID flow.Identifier) bool {
 }
 
 // Add adds the given item to the pool.
-func (b *Backdata) Add(entity flow.Entity) bool {
-	entityID := entity.ID()
+func (b *Backdata) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	_, exists := b.entities[entityID]
 	if exists {
 		return false
@@ -135,13 +134,17 @@ func (b *Backend) Has(entityID flow.Identifier) bool {
 
 // Add adds the given item to the pool.
 func (b *Backend) Add(entity flow.Entity) bool {
+	p0 := binstat.EnterTime("~7Backend.Add/ID", "")
+	entityID := entity.ID() // this expensive operation done OUTSIDE of lock :-)
+	binstat.Leave(p0)
+
 	p1 := binstat.EnterTime("~4lock:w:Backend.Add", "")
 	b.Lock()
 	binstat.Leave(p1)
 	p2 := binstat.EnterTime("~7Backend.Add", "")
 	defer binstat.Leave(p2)
 	defer b.Unlock()
-	added := b.Backdata.Add(entity)
+	added := b.Backdata.Add(entityID, entity)
 	b.reduce()
 	return added
 }
