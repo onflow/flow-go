@@ -233,6 +233,11 @@ func (m StorageFormatV5Migration) reencodeValue(
 			)
 	}
 
+	m.Log.Info().
+		Str("key", key).
+		Str("owner", owner.String()).
+		Msgf("reencode: %T", rootValue)
+
 	// Force decoding of all container values
 
 	interpreter.InspectValue(
@@ -251,6 +256,22 @@ func (m StorageFormatV5Migration) reencodeValue(
 	)
 
 	m.addKnownContainerStaticTypes(rootValue, owner, key)
+
+	// TODO:
+	//
+	//
+	//addressLocation, ok := location.(common.AddressLocation)
+	//if !ok {
+	//	return nil, fmt.Errorf(
+	//		"cannot load program for unsupported non-address location: %s",
+	//		addressLocation,
+	//	)
+	//}
+	//
+	//contractCode, err := accounts.GetContract(
+	//	addressLocation.Name,
+	//	flow.Address(addressLocation.Address),
+	//)
 
 	// Infer the static types for array values and dictionary values
 
@@ -498,6 +519,17 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 	return err
 }
 
+var testnetNFTLocation = func() common.Location {
+	address, err := common.HexToAddress("631e88ae7f1d7c20")
+	if err != nil {
+		panic(err)
+	}
+	return common.AddressLocation{
+		Address: address,
+		Name:    "NonFungibleToken",
+	}
+}()
+
 func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 	value interpreter.Value,
 	owner common.Address,
@@ -518,136 +550,185 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				return
 			}
 
-			delegatorsField, ok := value.Fields().Get("delegators")
-			if !ok {
-				return
-			}
-
-			dictionaryValue, ok := delegatorsField.(*interpreter.DictionaryValue)
-			if !ok {
-				return
-			}
-
-			location := value.Location()
-			addressLocation, ok := location.(common.AddressLocation)
-			if !ok {
-				return
-			}
-
-			const keyType = interpreter.PrimitiveStaticTypeUInt32
-
-			dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
-				Type: keyType,
-			}
-
-			dictionaryValue.Type = interpreter.DictionaryStaticType{
-				KeyType: keyType,
-				ValueType: interpreter.CompositeStaticType{
-					Location:            addressLocation,
+			m.addDictionaryFieldType(
+				value,
+				"delegators",
+				interpreter.PrimitiveStaticTypeUInt32,
+				interpreter.CompositeStaticType{
+					Location:            value.Location(),
 					QualifiedIdentifier: "FlowIDTableStaking.DelegatorRecord",
 				},
-			}
-
-			m.Log.Info().
-				Str("owner", owner.String()).
-				Str("key", key).
-				Msgf(
-					"added known static type %s to dictionary: %s",
-					dictionaryValue.Type,
-					dictionaryValue.String(),
-				)
+				owner,
+				key,
+			)
 
 		case "Versus.DropCollection":
 			if !hasAnyLocationAddress(value, "1ff7e32d71183db0") {
 				return
 			}
 
-			dropsField, ok := value.Fields().Get("drops")
-			if !ok {
-				return
-			}
-
-			dictionaryValue, ok := dropsField.(*interpreter.DictionaryValue)
-			if !ok {
-				return
-			}
-
-			location := value.Location()
-			addressLocation, ok := location.(common.AddressLocation)
-			if !ok {
-				return
-			}
-
-			const keyType = interpreter.PrimitiveStaticTypeUInt32
-
-			dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
-				Type: keyType,
-			}
-
-			dictionaryValue.Type = interpreter.DictionaryStaticType{
-				KeyType: keyType,
-				ValueType: interpreter.CompositeStaticType{
-					Location:            addressLocation,
+			m.addDictionaryFieldType(
+				value,
+				"drops",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.CompositeStaticType{
+					Location:            value.Location(),
 					QualifiedIdentifier: "Versus.Drop",
 				},
-			}
-
-			m.Log.Info().
-				Str("owner", owner.String()).
-				Str("key", key).
-				Msgf(
-					"added known static type %s to dictionary: %s",
-					dictionaryValue.Type,
-					dictionaryValue.String(),
-				)
+				owner,
+				key,
+			)
 
 		case "KittyItemsMarket.Collection":
 
-			if !hasAnyLocationAddress(value, "fcceff21d9532b58") {
+			if !hasAnyLocationAddress(value,
+				"fcceff21d9532b58",
+				"172be932e9cd0a8f",
+			) {
 				return
 			}
 
-			fieldValue, ok := value.Fields().Get("saleOffers")
-			if !ok {
-				return
-			}
-
-			dictionaryValue, ok := fieldValue.(*interpreter.DictionaryValue)
-			if !ok {
-				return
-			}
-
-			location := value.Location()
-			addressLocation, ok := location.(common.AddressLocation)
-			if !ok {
-				return
-			}
-
-			const keyType = interpreter.PrimitiveStaticTypeUInt64
-
-			dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
-				Type: keyType,
-			}
-
-			dictionaryValue.Type = interpreter.DictionaryStaticType{
-				KeyType: keyType,
-				ValueType: interpreter.CompositeStaticType{
-					Location:            addressLocation,
+			m.addDictionaryFieldType(
+				value,
+				"saleOffers",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.CompositeStaticType{
+					Location:            value.Location(),
 					QualifiedIdentifier: "KittyItemsMarket.SaleOffer",
 				},
+				owner,
+				key,
+			)
+
+		case "RecordShop.Collection":
+
+			// Probably based on KittyItemsMarket
+
+			if !hasAnyLocationAddress(value, "7352d990d2addd95") {
+				return
 			}
 
-			m.Log.Info().
-				Str("owner", owner.String()).
-				Str("key", key).
-				Msgf(
-					"added known static type %s to dictionary: %s",
-					dictionaryValue.Type,
-					dictionaryValue.String(),
-				)
-		}
+			m.addDictionaryFieldType(
+				value,
+				"saleOffers",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.CompositeStaticType{
+					Location:            value.Location(),
+					QualifiedIdentifier: "RecordShop.SaleOffer",
+				},
+				owner,
+				key,
+			)
 
+		case "LikeNastyaItemsMarket.Collection":
+
+			// Probably based on KittyItemsMarket
+
+			if !hasAnyLocationAddress(value, "9f3e19cda04154fc") {
+				return
+			}
+
+			m.addDictionaryFieldType(
+				value,
+				"saleOffers",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.CompositeStaticType{
+					Location:            value.Location(),
+					QualifiedIdentifier: "LikeNastyaItemsMarket.SaleOffer",
+				},
+				owner,
+				key,
+			)
+
+		case "KittyItems.Collection":
+
+			if !hasAnyLocationAddress(value, "f79ee844bfa76528", "fcceff21d9532b58") {
+				return
+			}
+
+			m.addDictionaryFieldType(
+				value,
+				"ownedNFTs",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.InterfaceStaticType{
+					Location:            testnetNFTLocation,
+					QualifiedIdentifier: "NonFungibleToken.NFT",
+				},
+				owner,
+				key,
+			)
+
+		case "LikeNastyaItems.Collection":
+
+			// Likely https://medium.com/pinata/how-to-create-nfts-like-nba-top-shot-with-flow-and-ipfs-701296944bf
+
+			if !hasAnyLocationAddress(value, "9F3E19CDA04154FC") {
+				return
+			}
+
+			m.addDictionaryFieldType(
+				value,
+				"ownedNFTs",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.InterfaceStaticType{
+					Location:            testnetNFTLocation,
+					QualifiedIdentifier: "NonFungibleToken.NFT",
+				},
+				owner,
+				key,
+			)
+
+			m.addDictionaryFieldType(
+				value,
+				"metadataObjs",
+				interpreter.PrimitiveStaticTypeUInt64,
+				interpreter.DictionaryStaticType{
+					KeyType:   interpreter.PrimitiveStaticTypeString,
+					ValueType: interpreter.PrimitiveStaticTypeString,
+				},
+				owner,
+				key,
+			)
+
+		}
 	}
+}
+
+func (m StorageFormatV5Migration) addDictionaryFieldType(
+	value *interpreter.CompositeValue,
+	fieldName string,
+	keyType interpreter.StaticType,
+	valueType interpreter.StaticType,
+	owner common.Address,
+	key string,
+) {
+	fieldValue, ok := value.Fields().Get(fieldName)
+	if !ok {
+		return
+	}
+
+	dictionaryValue, ok := fieldValue.(*interpreter.DictionaryValue)
+	if !ok {
+		return
+	}
+
+	dictionaryValue.Keys().Type = interpreter.VariableSizedStaticType{
+		Type: keyType,
+	}
+
+	dictionaryValue.Type = interpreter.DictionaryStaticType{
+		KeyType:   keyType,
+		ValueType: valueType,
+	}
+
+	m.Log.Info().
+		Str("owner", owner.String()).
+		Str("key", key).
+		Msgf(
+			"added known static type %s to dictionary: %s",
+			dictionaryValue.Type,
+			dictionaryValue.String(),
+		)
 }
 
 func hasAnyLocationAddress(value *interpreter.CompositeValue, hexAddresses ...string) bool {
@@ -758,27 +839,27 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 
 	if t == nil {
 		if entries.Len() == 0 {
-			if value.Count() == 0 {
-				return fmt.Errorf("cannot infer static type for empty dictionary value: %s", value.String())
-			}
-
-			// The dictionary has deferred values,
-			// which is only the case when the values are resources
-
-			var keyType interpreter.StaticType
-			for _, key := range value.Keys().Elements() {
-				if keyType == nil {
-					keyType = key.StaticType()
-				} else if !key.StaticType().Equal(keyType) {
-					return fmt.Errorf("cannot infer key static type for dictionary with mixed type keys")
-				}
-			}
-
-			value.Type = interpreter.DictionaryStaticType{
-				KeyType: keyType,
-				// NOTE: can only infer AnyResource as values are not available
-				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
-			}
+			//if value.Count() == 0 {
+			return fmt.Errorf("cannot infer static type for empty dictionary value: %s", value.String())
+			//}
+			//
+			//// The dictionary has deferred values,
+			//// which is only the case when the values are resources
+			//
+			//var keyType interpreter.StaticType
+			//for _, key := range value.Keys().Elements() {
+			//	if keyType == nil {
+			//		keyType = key.StaticType()
+			//	} else if !key.StaticType().Equal(keyType) {
+			//		return fmt.Errorf("cannot infer key static type for dictionary with mixed type keys")
+			//	}
+			//}
+			//
+			//value.Type = interpreter.DictionaryStaticType{
+			//	KeyType: keyType,
+			//	// NOTE: can only infer AnyResource as values are not available
+			//	ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			//}
 
 		} else {
 
@@ -850,6 +931,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 			return err
 		}
 	}
+
 	return nil
 }
 
