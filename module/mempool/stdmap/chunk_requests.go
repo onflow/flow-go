@@ -59,7 +59,7 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, ok := backdata[chunkID]
 		if !ok {
-			return fmt.Errorf("request does not exit for chunk %x", chunkID)
+			return fmt.Errorf("request does not exist for chunk %x", chunkID)
 		}
 
 		request := toChunkRequestStatus(entity)
