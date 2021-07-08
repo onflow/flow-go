@@ -189,9 +189,13 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *cdp,
-		Nonce:         rand.Uint64(),
-		Collection:    collection,
+		Body: messages.ChunkDataResponseBody{
+			ChunkID:    cdp.ChunkID,
+			StartState: cdp.StartState,
+			Proof:      cdp.Proof,
+			Collection: collection,
+		},
+		Nonce: rand.Uint64(),
 	}
 
 	sinceProcess := time.Since(processStart)
@@ -221,7 +225,7 @@ func (e *Engine) onChunkDataRequest(
 		}
 
 		log.Debug().
-			Hex("collection_id", logging.ID(response.Collection.ID())).
+			Hex("collection_id", logging.ID(response.Body.Collection.ID())).
 			Msg("chunk data pack request successfully replied")
 	})
 
