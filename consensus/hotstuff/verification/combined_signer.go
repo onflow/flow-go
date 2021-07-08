@@ -179,7 +179,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	// create the message to be signed and generate signatures
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	stakingSig, err := c.staking.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)

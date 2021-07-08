@@ -65,7 +65,7 @@ func NewQCContractClient(log zerolog.Logger,
 // contract. This function returns only once the transaction has been
 // processed by the network. An error is returned if the transaction has
 // failed and should be re-submitted.
-func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
+func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote, voteMessage []byte) error {
 
 	// time method was invoked
 	started := time.Now()
