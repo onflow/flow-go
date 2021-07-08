@@ -74,30 +74,26 @@ func (nc *NoopCollector) EmergencySeal()                                        
 func (nc *NoopCollector) OnReceiptProcessingDuration(duration time.Duration)                     {}
 func (nc *NoopCollector) OnApprovalProcessingDuration(duration time.Duration)                    {}
 func (nc *NoopCollector) CheckSealingDuration(duration time.Duration)                            {}
-func (nc *NoopCollector) OnExecutionReceiptReceived()                                            {}
-func (nc *NoopCollector) OnExecutionResultSent()                                                 {}
-func (nc *NoopCollector) OnExecutionResultReceived()                                             {}
-func (nc *NoopCollector) OnVerifiableChunkSent()                                                 {}
+func (nc *NoopCollector) OnExecutionResultReceivedAtAssignerEngine()                             {}
 func (nc *NoopCollector) OnVerifiableChunkReceivedAtVerifierEngine()                             {}
-func (nc *NoopCollector) OnChunkDataPackReceived()                                               {}
-func (nc *NoopCollector) OnChunkDataPackRequested()                                              {}
-func (nc *NoopCollector) OnResultApprovalDispatchedInNetwork()                                   {}
+func (nc *NoopCollector) OnResultApprovalDispatchedInNetworkByVerifier()                         {}
 func (nc *NoopCollector) OnFinalizedBlockArrivedAtAssigner(height uint64)                        {}
 func (nc *NoopCollector) OnChunksAssignmentDoneAtAssigner(chunks int)                            {}
 func (nc *NoopCollector) OnAssignedChunkProcessedAtAssigner()                                    {}
 func (nc *NoopCollector) OnAssignedChunkReceivedAtFetcher()                                      {}
-func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetwork()                             {}
+func (nc *NoopCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester()                  {}
 func (nc *NoopCollector) OnChunkDataPackRequestSentByFetcher()                                   {}
 func (nc *NoopCollector) OnChunkDataPackRequestReceivedByRequester()                             {}
 func (nc *NoopCollector) OnChunkDataPackArrivedAtFetcher()                                       {}
 func (nc *NoopCollector) OnChunkDataPackSentToFetcher()                                          {}
 func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                                       {}
-func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
+func (nc *NoopCollector) OnBlockConsumerJobDone(uint64)                                          {}
+func (nc *NoopCollector) OnChunkConsumerJobDone(uint64)                                          {}
+func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester()                 {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
 func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                    {}
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                               {}
-func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}
 func (nc *NoopCollector) ExecutionLastExecutedBlockHeight(height uint64)                         {}
 func (nc *NoopCollector) ExecutionBlockExecuted(_ time.Duration, _ uint64, _ int, _ int)         {}
