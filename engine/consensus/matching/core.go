@@ -351,7 +351,7 @@ HEIGHT_LOOP:
 	return len(missingBlocksOrderedByHeight), firstMissingHeight, nil
 }
 
-func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
+func (c *Core) OnBlockFinalization() error {
 	startTime := time.Now()
 	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
 	// request execution receipts for unsealed finalized blocks
@@ -379,7 +379,6 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	}
 
 	c.log.Info().
-		Hex("finalized_block_id", finalizedBlockID[:]).
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).

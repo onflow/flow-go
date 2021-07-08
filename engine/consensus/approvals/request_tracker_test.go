@@ -1,6 +1,7 @@
 package approvals
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -54,6 +55,37 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_CreateAndUpdate() {
 		_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
 		require.NoError(s.T(), err)
 		require.True(s.T(), updated)
+	}
+}
+
+// TestTryUpdate_ConcurrentTracking tests that TryUpdate behaves correctly under concurrent updates
+func (s *RequestTrackerTestSuite) TestTryUpdate_ConcurrentTracking() {
+	s.tracker.blackoutPeriodMax = 0
+	s.tracker.blackoutPeriodMin = 0
+
+	executedBlock := unittest.BlockFixture()
+	s.headers.On("ByBlockID", executedBlock.ID()).Return(executedBlock.Header, nil)
+	result := unittest.ExecutionResultFixture(unittest.WithBlock(&executedBlock))
+	chunks := 5
+	var wg sync.WaitGroup
+	for times := 0; times < 10; times++ {
+		wg.Add(1)
+		go func() {
+			for i := 0; i < chunks; i++ {
+				_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
+				require.NoError(s.T(), err)
+				require.True(s.T(), updated)
+			}
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+
+	for i := 0; i < chunks; i++ {
+		tracker, ok := s.tracker.index[result.ID()][executedBlock.ID()][uint64(i)]
+		require.True(s.T(), ok)
+		require.Equal(s.T(), uint(10), tracker.Requests)
 	}
 }
 

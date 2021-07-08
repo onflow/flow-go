@@ -104,6 +104,7 @@ func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBl
 	canUpdate := !item.IsBlackout()
 	if canUpdate {
 		item.Update()
+		rt.index[resultID][incorporatedBlockID][chunkIndex] = item
 	}
 
 	return item, canUpdate, nil

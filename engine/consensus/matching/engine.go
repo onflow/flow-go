@@ -29,7 +29,7 @@ type Engine struct {
 	results                    storage.ExecutionResults
 	payloads                   storage.Payloads
 	metrics                    module.EngineMetrics
-	notifier                   engine.Notifier
+	inboundReceiptNotifier     engine.Notifier
 	pendingReceipts            *fifoqueue.FifoQueue
 	finalizationEventsNotifier engine.Notifier
 }
@@ -63,7 +63,7 @@ func NewEngine(
 		payloads:                   payloads,
 		results:                    results,
 		metrics:                    engineMetrics,
-		notifier:                   engine.NewNotifier(),
+		inboundReceiptNotifier:     engine.NewNotifier(),
 		finalizationEventsNotifier: engine.NewNotifier(),
 		pendingReceipts:            receiptsQueue,
 	}
@@ -82,6 +82,7 @@ func NewEngine(
 // algorithm has started.
 func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.loop)
+	e.unit.Launch(e.finalizationProcessingLoop)
 	return e.unit.Ready()
 }
 
@@ -120,7 +121,7 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 	}
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
-	e.notifier.Notify()
+	e.inboundReceiptNotifier.Notify()
 	return nil
 }
 
@@ -129,7 +130,7 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
-	e.notifier.Notify()
+	e.inboundReceiptNotifier.Notify()
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
@@ -175,22 +176,33 @@ func (e *Engine) processFinalizedReceipts(finalizedBlockID flow.Identifier) {
 				e.log.Fatal().Msg("failed to queue execution receipt")
 			}
 		}
-		e.notifier.Notify()
+		e.inboundReceiptNotifier.Notify()
 	})
 }
 
-func (e *Engine) loop() {
-	c := e.notifier.Channel()
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
 		case <-finalizationNotifier:
-			err := e.processFinalizationEvent()
+			err := e.processLatestFinalizedEvent()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not process finalized block")
+				e.log.Fatal().Err(err).Msg("could not process latest finalized event")
 			}
+		}
+	}
+}
+
+func (e *Engine) loop() {
+	c := e.inboundReceiptNotifier.Channel()
+
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
 		case <-c:
 			err := e.processAvailableEvents()
 			if err != nil {
@@ -200,14 +212,11 @@ func (e *Engine) loop() {
 	}
 }
 
-func (e *Engine) processFinalizationEvent() error {
-	finalized, err := e.state.Final().Head()
+// processLatestFinalizedEvent performs processing of latest finalized event propagating it to core
+func (e *Engine) processLatestFinalizedEvent() error {
+	err := e.core.OnBlockFinalization()
 	if err != nil {
-		return fmt.Errorf("could not retrieve last finalized block: %w", err)
-	}
-	err = e.core.ProcessFinalizedBlock(finalized.ID())
-	if err != nil {
-		return fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err)
+		return fmt.Errorf("could not process last finalized event: %w", err)
 	}
 	return nil
 }

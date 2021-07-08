@@ -52,7 +52,7 @@ type Engine struct {
 	pendingApprovals           engine.MessageStore
 	pendingRequestedApprovals  engine.MessageStore
 	pendingIncorporatedResults *fifoqueue.FifoQueue
-	notifier                   engine.Notifier
+	inboundEventsNotifier      engine.Notifier
 	finalizationEventsNotifier engine.Notifier
 	messageHandler             *engine.MessageHandler
 	rootHeader                 *flow.Header
@@ -171,11 +171,11 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 		FifoQueue: pendingRequestedApprovalsQueue,
 	}
 
-	e.notifier = engine.NewNotifier()
+	e.inboundEventsNotifier = engine.NewNotifier()
 	// define message queueing behaviour
 	e.messageHandler = engine.NewMessageHandler(
 		e.log,
-		e.notifier,
+		e.inboundEventsNotifier,
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*flow.ResultApproval)
@@ -265,18 +265,28 @@ func (e *Engine) processAvailableMessages() error {
 	}
 }
 
-func (e *Engine) loop() {
-	notifier := e.notifier.Channel()
+// finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
+func (e *Engine) finalizationProcessingLoop() {
 	finalizationNotifier := e.finalizationEventsNotifier.Channel()
 	for {
 		select {
 		case <-e.unit.Quit():
 			return
 		case <-finalizationNotifier:
-			err := e.processFinalizationEvent()
+			err := e.processLatestFinalizedEvent()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not process finalized block")
+				e.log.Fatal().Err(err).Msg("could not process latest finalized event")
 			}
+		}
+	}
+}
+
+func (e *Engine) loop() {
+	notifier := e.inboundEventsNotifier.Channel()
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
 		case <-notifier:
 			err := e.processAvailableMessages()
 			if err != nil {
@@ -286,7 +296,8 @@ func (e *Engine) loop() {
 	}
 }
 
-func (e *Engine) processFinalizationEvent() error {
+// processLatestFinalizedEvent performs processing of latest finalized event propagating it to core
+func (e *Engine) processLatestFinalizedEvent() error {
 	finalized, err := e.state.Final().Head()
 	if err != nil {
 		return fmt.Errorf("could not retrieve last finalized block: %w", err)
@@ -352,6 +363,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	for i := 0; i < defaultSealingEngineWorkers; i++ {
 		e.unit.Launch(e.loop)
 	}
+	e.unit.Launch(e.finalizationProcessingLoop)
 	return e.unit.Ready()
 }
 
@@ -405,6 +417,6 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 				e.log.Fatal().Msg("failed to queue incorporated result")
 			}
 		}
-		e.notifier.Notify()
+		e.inboundEventsNotifier.Notify()
 	})
 }
