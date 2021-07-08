@@ -72,4 +72,5 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
 
+// TODO - remove once proper version of Go protobufs are released
 replace github.com/onflow/flow/protobuf/go/flow => ../flow/protobuf/go/flow
