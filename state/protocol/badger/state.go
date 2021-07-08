@@ -399,7 +399,7 @@ func OpenState(
 	// update all epoch related metrics
 	err = state.updateEpochMetrics(finalSnapshot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update current epoch phase: %w", err)
+		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
 
 	return state, nil
