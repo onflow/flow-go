@@ -15,8 +15,8 @@ import (
 
 func TestRoundTripHeader(t *testing.T) {
 	codec := json.NewCodec()
-	block := unittest.BlockFixture()  
-	message := &messages.BlockProposal{ Header: block.Header, Payload: block.Payload }
+	block := unittest.BlockFixture()
+	message := &messages.BlockProposal{Header: block.Header, Payload: block.Payload}
 	encoded, err := codec.Encode(message)
 	assert.NoError(t, err)
 	decodedInterface, err := codec.Decode(encoded)
