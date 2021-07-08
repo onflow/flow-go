@@ -63,19 +63,35 @@ func (s *MatchingEngineSuite) TestOnFinalizedBlock() {
 
 	finalizedBlock := unittest.BlockHeaderFixture()
 	finalizedBlockID := finalizedBlock.ID()
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
+	s.core.On("OnBlockFinalization").Return(nil).Once()
+	s.engine.OnFinalizedBlock(finalizedBlockID)
+
+	// matching engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	s.core.AssertExpectations(s.T())
+}
+
+// TestOnBlockIncorporated tests if incorporated block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (s *MatchingEngineSuite) TestOnBlockIncorporated() {
+
+	incorporatedBlock := unittest.BlockHeaderFixture()
+	incorporatedBlockID := incorporatedBlock.ID()
 
 	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
 	index := &flow.Index{}
+	resultsByID := payload.Results.Lookup()
 	for _, receipt := range payload.Receipts {
 		index.ReceiptIDs = append(index.ReceiptIDs, receipt.ID())
-		s.core.On("ProcessReceipt", receipt).Return(nil).Once()
+		fullReceipt := flow.ExecutionReceiptFromMeta(*receipt, *resultsByID[receipt.ResultID])
+		s.receipts.On("ByID", receipt.ID()).Return(fullReceipt, nil).Once()
+		s.core.On("ProcessReceipt", fullReceipt).Return(nil).Once()
 	}
-	s.index.On("ByBlockID", finalizedBlockID).Return(&index, nil)
+	s.index.On("ByBlockID", incorporatedBlockID).Return(index, nil)
 
-	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
-
-	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
-	s.engine.OnFinalizedBlock(finalizedBlockID)
+	s.engine.OnBlockIncorporated(incorporatedBlockID)
 
 	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)

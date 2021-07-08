@@ -34,6 +34,7 @@ type Engine struct {
 	metrics                    module.EngineMetrics
 	inboundEventsNotifier      engine.Notifier
 	finalizationEventsNotifier engine.Notifier
+	blockIncorporatedNotifier  engine.Notifier
 	pendingReceipts            *fifoqueue.FifoQueue
 	pendingIncorporatedBlocks  *fifoqueue.FifoQueue
 }
@@ -75,6 +76,7 @@ func NewEngine(
 		metrics:                    engineMetrics,
 		inboundEventsNotifier:      engine.NewNotifier(),
 		finalizationEventsNotifier: engine.NewNotifier(),
+		blockIncorporatedNotifier:  engine.NewNotifier(),
 		pendingReceipts:            receiptsQueue,
 		pendingIncorporatedBlocks:  pendingIncorporatedBlocks,
 	}
@@ -94,6 +96,7 @@ func NewEngine(
 func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.inboundEventsProcessingLoop)
 	e.unit.Launch(e.finalizationProcessingLoop)
+	e.unit.Launch(e.blockIncorporatedEventsProcessingLoop)
 	return e.unit.Ready()
 }
 
@@ -147,7 +150,7 @@ func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
+func (e *Engine) OnFinalizedBlock(flow.Identifier) {
 	e.finalizationEventsNotifier.Notify()
 }
 
@@ -156,7 +159,7 @@ func (e *Engine) OnFinalizedBlock(finalizedBlockID flow.Identifier) {
 // from external nodes cannot be considered as inputs to this function
 func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 	e.pendingIncorporatedBlocks.Push(incorporatedBlockID)
-	e.inboundEventsNotifier.Notify()
+	e.blockIncorporatedNotifier.Notify()
 }
 
 // processIncorporatedBlock selects receipts that were included into finalized block and submits them
@@ -197,6 +200,23 @@ func (e *Engine) finalizationProcessingLoop() {
 	}
 }
 
+// blockIncorporatedEventsProcessingLoop is a separate goroutine for processing block incorporated events
+func (e *Engine) blockIncorporatedEventsProcessingLoop() {
+	c := e.blockIncorporatedNotifier.Channel()
+
+	for {
+		select {
+		case <-e.unit.Quit():
+			return
+		case <-c:
+			err := e.processBlockIncorporatedEvents()
+			if err != nil {
+				e.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+			}
+		}
+	}
+}
+
 func (e *Engine) inboundEventsProcessingLoop() {
 	c := e.inboundEventsNotifier.Channel()
 
@@ -220,6 +240,26 @@ func (e *Engine) processLatestFinalizedEvent() error {
 		return fmt.Errorf("could not process last finalized event: %w", err)
 	}
 	return nil
+}
+
+// processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
+func (e *Engine) processBlockIncorporatedEvents() error {
+	for {
+		select {
+		case <-e.unit.Quit():
+			return nil
+		default:
+		}
+
+		msg, ok := e.pendingIncorporatedBlocks.Pop()
+		if ok {
+			err := e.processIncorporatedBlock(msg.(flow.Identifier))
+			if err != nil {
+				return fmt.Errorf("could not process incorporated block: %w", err)
+			}
+			continue
+		}
+	}
 }
 
 // processAvailableEvents processes _all_ available events (untrusted messages
