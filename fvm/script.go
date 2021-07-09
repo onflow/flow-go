@@ -91,7 +91,7 @@ func (i ScriptInvocator) Process(
 	}
 
 	proc.Value = value
-	proc.Logs = env.getLogs()
+	proc.Logs = env.Logs()
 	proc.Events = env.Events()
 	proc.GasUsed = env.GetComputationUsed()
 	return nil

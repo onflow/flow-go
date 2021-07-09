@@ -168,7 +168,7 @@ func (i *TransactionInvocator) Process(
 		txError = i.deductTransactionFees(env, proc)
 	}
 
-	proc.Logs = append(proc.Logs, env.getLogs()...)
+	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	if txError != nil {
@@ -189,7 +189,7 @@ func (i *TransactionInvocator) Process(
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
-	proc.Events = append(proc.Events, env.getEvents()...)
+	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
 
 	i.logger.Info().

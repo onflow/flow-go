@@ -32,37 +32,27 @@ var _ runtime.Interface = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx              Context
-	sth              *state.StateHolder
-	vm               *VirtualMachine
-	accounts         *state.Accounts
-	contracts        *handler.ContractHandler
-	programs         *handler.ProgramsHandler
-	accountKeys      *handler.AccountKeyHandler
-	metrics          *handler.MetricsHandler
-	addressGenerator flow.AddressGenerator
-	uuidGenerator    *state.UUIDGenerator
-	eventHandler     *handler.EventHandler
-	logs             []string
-	totalGasUsed     uint64
-	rng              *rand.Rand
-	traceSpan        opentracing.Span
+	ctx           Context
+	sth           *state.StateHolder
+	vm            *VirtualMachine
+	accounts      *state.Accounts
+	contracts     *handler.ContractHandler
+	programs      *handler.ProgramsHandler
+	accountKeys   *handler.AccountKeyHandler
+	metrics       *handler.MetricsHandler
+	uuidGenerator *state.UUIDGenerator
+	logs          []string
+	totalGasUsed  uint64
+	rng           *rand.Rand
+	traceSpan     opentracing.Span
 }
 
 func NewScriptEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *ScriptEnv {
 	accounts := state.NewAccounts(sth)
-	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	uuidGenerator := state.NewUUIDGenerator(sth)
 
 	programsHandler := handler.NewProgramsHandler(
 		programs, sth,
-	)
-
-	// TODO set the flags on context
-	eventHandler := handler.NewEventHandler(ctx.Chain,
-		ctx.EventCollectionEnabled,
-		ctx.ServiceEventCollectionEnabled,
-		ctx.EventCollectionByteSizeLimit,
 	)
 
 	accountKeys := handler.NewAccountKeyHandler(accounts)
@@ -70,16 +60,14 @@ func NewScriptEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolde
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	env := &ScriptEnv{
-		ctx:              ctx,
-		sth:              sth,
-		vm:               vm,
-		metrics:          metrics,
-		accounts:         accounts,
-		accountKeys:      accountKeys,
-		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
-		eventHandler:     eventHandler,
-		programs:         programsHandler,
+		ctx:           ctx,
+		sth:           sth,
+		vm:            vm,
+		metrics:       metrics,
+		accounts:      accounts,
+		accountKeys:   accountKeys,
+		uuidGenerator: uuidGenerator,
+		programs:      programsHandler,
 	}
 
 	contracts := handler.NewContractHandler(accounts,
@@ -132,10 +120,6 @@ func (e *ScriptEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
 		return defaultAccounts
 	}
 	return adresses
-}
-
-func (e *ScriptEnv) getLogs() []string {
-	return e.logs
 }
 
 func (e *ScriptEnv) isTraceable() bool {
@@ -506,7 +490,7 @@ func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, err
 }
 
 func (e *ScriptEnv) Events() []flow.Event {
-	return e.eventHandler.Events()
+	return []flow.Event{}
 }
 
 func (e *ScriptEnv) Logs() []string {

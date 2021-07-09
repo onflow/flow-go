@@ -38,12 +38,12 @@ type TransactionEnv struct {
 	sth              *state.StateHolder
 	programs         *handler.ProgramsHandler
 	accounts         *state.Accounts
+	uuidGenerator    *state.UUIDGenerator
 	contracts        *handler.ContractHandler
 	accountKeys      *handler.AccountKeyHandler
 	metrics          *handler.MetricsHandler
-	addressGenerator flow.AddressGenerator
-	uuidGenerator    *state.UUIDGenerator
 	eventHandler     *handler.EventHandler
+	addressGenerator flow.AddressGenerator
 	rng              *rand.Rand
 	logs             []string
 	totalGasUsed     uint64
@@ -137,16 +137,8 @@ func (e *TransactionEnv) VM() *VirtualMachine {
 	return e.vm
 }
 
-func (e *TransactionEnv) getEvents() []flow.Event {
-	return e.eventHandler.Events()
-}
-
 func (e *TransactionEnv) getServiceEvents() []flow.Event {
 	return e.eventHandler.ServiceEvents()
-}
-
-func (e *TransactionEnv) getLogs() []string {
-	return e.logs
 }
 
 func (e *TransactionEnv) isTraceable() bool {
@@ -507,6 +499,10 @@ func (e *TransactionEnv) ProgramLog(message string) error {
 	return nil
 }
 
+func (e *TransactionEnv) Logs() []string {
+	return e.logs
+}
+
 func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 	// only trace when extensive tracing
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
@@ -515,6 +511,10 @@ func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 	}
 
 	return e.eventHandler.EmitEvent(event, e.txID, e.txIndex, e.tx.Payer)
+}
+
+func (e *TransactionEnv) Events() []flow.Event {
+	return e.eventHandler.Events()
 }
 
 func (e *TransactionEnv) GenerateUUID() (uint64, error) {
@@ -581,14 +581,6 @@ func (e *TransactionEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value
 	}
 
 	return v, err
-}
-
-func (e *TransactionEnv) Events() []flow.Event {
-	return e.eventHandler.Events()
-}
-
-func (e *TransactionEnv) Logs() []string {
-	return e.logs
 }
 
 func (e *TransactionEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
@@ -666,15 +658,6 @@ func (e *TransactionEnv) UnsafeRandom() (uint64, error) {
 	buf := make([]byte, 8)
 	_, _ = e.rng.Read(buf) // Always succeeds, no need to check error
 	return binary.LittleEndian.Uint64(buf), nil
-}
-
-func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
-	return runtime.Block{
-		Height:    header.Height,
-		View:      header.View,
-		Hash:      runtime.BlockHash(header.ID()),
-		Timestamp: header.Timestamp.UnixNano(),
-	}
 }
 
 // GetBlockAtHeight returns the block at the given height.
