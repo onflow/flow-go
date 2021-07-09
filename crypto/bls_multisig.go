@@ -133,12 +133,10 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	}
 
 	var sum scalar
+
 	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
 		(C.int)(len(scalars)))
-	return &PrKeyBLSBLS12381{
-		pk:     nil,
-		scalar: sum,
-	}, nil
+	return newPrKeyBLSBLS12381(&sum), nil
 }
 
 // AggregateBLSPublicKeys aggregate multiple BLS public keys into one.
@@ -167,9 +165,7 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	var sum pointG2
 	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
 		(C.int)(len(points)))
-	return &PubKeyBLSBLS12381{
-		point: sum,
-	}, nil
+	return newPubKeyBLSBLS12381(&sum), nil
 }
 
 func NeutralBLSPublicKey() PublicKey {
@@ -217,9 +213,7 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 	C.ep2_subtract_vector((*C.ep2_st)(&resultKey), (*C.ep2_st)(&aggPKBLS.point),
 		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
-	return &PubKeyBLSBLS12381{
-		point: resultKey,
-	}, nil
+	return newPubKeyBLSBLS12381(&resultKey), nil
 }
 
 // VerifyBLSSignatureOneMessage is a multi-signature verification that verifies a

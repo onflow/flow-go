@@ -155,19 +155,14 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	}
 
 	// private key of the current node
-	x := &PrKeyBLSBLS12381{
-		scalar: s.x, // the private share
-	}
+	x := newPrKeyBLSBLS12381(&s.x)
+
 	// Group public key
-	Y := &PubKeyBLSBLS12381{
-		point: s.vA[0],
-	}
+	Y := newPubKeyBLSBLS12381(&s.vA[0])
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
-		y[i] = &PubKeyBLSBLS12381{
-			point: p,
-		}
+		y[i] = newPubKeyBLSBLS12381(&p)
 	}
 	return x, Y, y, nil
 }

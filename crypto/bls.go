@@ -171,7 +171,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 			KeyGenSeedMaxLenBLSBLS12381)
 	}
 
-	sk := newPrKeyBLSBLS12381()
+	sk := newPrKeyBLSBLS12381(nil)
 
 	// maps the seed to a private key
 	// error is not checked as it is guaranteed to be nil
@@ -187,7 +187,7 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 			"the input length has to be equal to %d",
 			prKeyLengthBLSBLS12381)
 	}
-	sk := newPrKeyBLSBLS12381()
+	sk := newPrKeyBLSBLS12381(nil)
 
 	readScalar(&sk.scalar, privateKeyBytes)
 	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
@@ -227,13 +227,19 @@ type PrKeyBLSBLS12381 struct {
 	scalar scalar
 }
 
-func newPrKeyBLSBLS12381() *PrKeyBLSBLS12381 {
-	sk := PrKeyBLSBLS12381{
-		// public key is only computed when needed
-		pk: nil,
+// newPrKeyBLSBLS12381 creates a new BLS private key with the given scalar.
+// If no scalar is provided, the function allocates an
+// empty scalar.
+func newPrKeyBLSBLS12381(x *scalar) *PrKeyBLSBLS12381 {
+	var sk PrKeyBLSBLS12381
+	if x == nil {
+		// initialize the scalar
+		C.bn_new_wrapper((*C.bn_st)(&sk.scalar))
+	} else {
+		// set the scalar
+		sk.scalar = *x
 	}
-	// initialize the scalar
-	C.bn_new_wrapper((*C.bn_st)(&sk.scalar))
+	// the embedded public key is only computed when needed
 	return &sk
 }
 
@@ -293,6 +299,21 @@ func (sk *PrKeyBLSBLS12381) String() string {
 type PubKeyBLSBLS12381 struct {
 	// public key data
 	point pointG2
+}
+
+// newPubKeyBLSBLS12381 creates a new BLS public key with the given point.
+// If no scalar is provided, the function allocates an
+// empty scalar.
+func newPubKeyBLSBLS12381(p *pointG2) *PubKeyBLSBLS12381 {
+	var pk PubKeyBLSBLS12381
+	if p == nil {
+		// initialize the point
+		C.ep2_new_wrapper((*C.ep2_st)(&pk.point))
+	} else {
+		// set the point
+		pk.point = *p
+	}
+	return &pk
 }
 
 // Algorithm returns the Signing Algorithm

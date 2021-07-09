@@ -22,6 +22,10 @@ void bn_new_wrapper(bn_t a) {
     bn_new(a);
 }
 
+void  ep2_new_wrapper(ep2_t p) {
+    ep2_new(p);
+}
+
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;

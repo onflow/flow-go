@@ -180,19 +180,15 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current node
-	x := &PrKeyBLSBLS12381{
-		scalar: *jointx, // the private share
-	}
+	x := newPrKeyBLSBLS12381(jointx)
+
 	// Group public key
-	Y := &PubKeyBLSBLS12381{
-		point: *jointPublicKey,
-	}
+	Y := newPubKeyBLSBLS12381(jointPublicKey)
+
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
-		y[i] = &PubKeyBLSBLS12381{
-			point: p,
-		}
+		y[i] = newPubKeyBLSBLS12381(&p)
 	}
 	return x, Y, y, nil
 }
