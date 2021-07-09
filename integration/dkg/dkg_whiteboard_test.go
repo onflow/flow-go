@@ -34,7 +34,8 @@ func createNodes(
 	chainID flow.ChainID,
 	whiteboard *whiteboard,
 	conIdentities flow.IdentityList,
-	epochSetup flow.EpochSetup,
+	currentEpochSetup flow.EpochSetup,
+	nextEpochSetup flow.EpochSetup,
 	firstBlockID flow.Identifier) ([]*node, flow.IdentityList) {
 
 	// We need to initialise the nodes with a list of identities that contain
@@ -43,7 +44,15 @@ func createNodes(
 
 	nodes := []*node{}
 	for _, id := range conIdentities {
-		nodes = append(nodes, createNode(t, id, identities, hub, chainID, whiteboard, epochSetup, firstBlockID))
+		nodes = append(nodes, createNode(t,
+			id,
+			identities,
+			hub,
+			chainID,
+			whiteboard,
+			currentEpochSetup,
+			nextEpochSetup,
+			firstBlockID))
 	}
 
 	return nodes, conIdentities
@@ -58,11 +67,12 @@ func createNode(
 	hub *stub.Hub,
 	chainID flow.ChainID,
 	whiteboard *whiteboard,
-	epochSetup flow.EpochSetup,
+	currentSetup flow.EpochSetup,
+	nextSetup flow.EpochSetup,
 	firstBlock flow.Identifier) *node {
 
 	core := testutil.GenericNodeFromParticipants(t, hub, id, ids, chainID)
-	core.Log = zerolog.New(os.Stdout).Level(zerolog.ErrorLevel)
+	core.Log = zerolog.New(os.Stdout).Level(zerolog.WarnLevel)
 
 	// the viewsObserver is used by the reactor engine to subscribe to when
 	// blocks are finalized that are in a new view
@@ -74,16 +84,23 @@ func createNode(
 	dkgKeys := badger.NewDKGKeys(core.Metrics, core.DB)
 
 	// configure the state snapthost at firstBlock to return the desired
-	// EpochSetup
-	epoch := new(protocolmock.Epoch)
-	epoch.On("Counter").Return(epochSetup.Counter, nil)
-	epoch.On("InitialIdentities").Return(epochSetup.Participants, nil)
-	epoch.On("DKGPhase1FinalView").Return(epochSetup.DKGPhase1FinalView, nil)
-	epoch.On("DKGPhase2FinalView").Return(epochSetup.DKGPhase2FinalView, nil)
-	epoch.On("DKGPhase3FinalView").Return(epochSetup.DKGPhase3FinalView, nil)
-	epoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(epochSetup.RandomSource, nil)
-	epochQuery := mocks.NewEpochQuery(t, epochSetup.Counter-1)
-	epochQuery.Add(epoch)
+	// Epochs
+	currentEpoch := new(protocolmock.Epoch)
+	currentEpoch.On("Counter").Return(currentSetup.Counter, nil)
+	currentEpoch.On("InitialIdentities").Return(currentSetup.Participants, nil)
+	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
+	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
+	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
+	currentEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+
+	nextEpoch := new(protocolmock.Epoch)
+	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
+	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
+	nextEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+
+	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
+	epochQuery.Add(currentEpoch)
+	epochQuery.Add(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
 	state := new(protocolmock.MutableState)
@@ -104,6 +121,15 @@ func createNode(
 	)
 	require.NoError(t, err)
 
+	// We add a hook to the logger such that the test fails if the broker writes
+	// a Warn log, which happens when it flags or disqualifies a node
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			t.Fatal("DKG flagging misbehaviour")
+		}
+	})
+	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
+
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -112,7 +138,7 @@ func createNode(
 		core.State,
 		dkgKeys,
 		dkg.NewControllerFactory(
-			core.Log,
+			controllerFactoryLogger,
 			core.Me,
 			NewWhiteboardClient(id.NodeID, whiteboard),
 			brokerTunnel,
@@ -173,10 +199,11 @@ func TestWithWhiteboard(t *testing.T) {
 	}
 	firstBlock := blocks[100]
 
-	// create the EpochSetup that will trigger the next DKG run with all the
-	// desired parameters
-	epochSetup := flow.EpochSetup{
-		Counter:            999,
+	// we arbitrarily use 999 as the current epoch counter
+	currentCounter := uint64(999)
+
+	currentEpochSetup := flow.EpochSetup{
+		Counter:            currentCounter,
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
@@ -185,13 +212,22 @@ func TestWithWhiteboard(t *testing.T) {
 		RandomSource:       []byte("random bytes for seed"),
 	}
 
+	// create the EpochSetup that will trigger the next DKG run with all the
+	// desired parameters
+	nextEpochSetup := flow.EpochSetup{
+		Counter:      currentCounter + 1,
+		Participants: conIdentities,
+		RandomSource: []byte("random bytes for seed"),
+	}
+
 	nodes, _ := createNodes(
 		t,
 		hub,
 		chainID,
 		whiteboard,
 		conIdentities,
-		epochSetup,
+		currentEpochSetup,
+		nextEpochSetup,
 		firstBlock.ID())
 
 	for _, n := range nodes {
@@ -201,8 +237,7 @@ func TestWithWhiteboard(t *testing.T) {
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
 	for _, n := range nodes {
-		// n.reactorEngine.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
-		n.ProtocolEvents.EpochSetupPhaseStarted(epochSetup.Counter, firstBlock)
+		n.ProtocolEvents.EpochSetupPhaseStarted(currentCounter, firstBlock)
 	}
 
 	// trigger the BlockFinalized events for each view of interest, effectively
@@ -234,7 +269,7 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(epochSetup.Counter)
+		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
 		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)

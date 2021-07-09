@@ -92,10 +92,10 @@ func (e *MessagingEngine) Process(originID flow.Identifier, event interface{}) e
 
 func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
-	case msg.DKGMessage:
+	case *msg.DKGMessage:
 		e.tunnel.SendIn(
 			msg.PrivDKGMessageIn{
-				DKGMessage: v,
+				DKGMessage: *v,
 				OriginID:   originID,
 			},
 		)
@@ -109,7 +109,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 	for {
 		select {
 		case msg := <-e.tunnel.MsgChOut:
-			err := e.conduit.Unicast(msg.DKGMessage, msg.DestID)
+			err := e.conduit.Unicast(&msg.DKGMessage, msg.DestID)
 			if err != nil {
 				e.log.Err(err).Msg("error sending dkg message")
 			}

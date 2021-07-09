@@ -102,6 +102,11 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
+		// 6) set metric values
+		err = state.updateCommittedEpochFinalView(root)
+		if err != nil {
+			return fmt.Errorf("could not set epoch final view value: %w", err)
+		}
 		state.metrics.BlockSealed(tail)
 		state.metrics.SealedHeight(tail.Header.Height)
 		state.metrics.FinalizedHeight(head.Header.Height)
@@ -389,6 +394,12 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	// update committed final view metric
+	err = state.updateCommittedEpochFinalView(state.Final())
+	if err != nil {
+		return nil, fmt.Errorf("failed to update committed epoch final view: %w", err)
+	}
+
 	return state, nil
 }
 
@@ -475,4 +486,43 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 		return false, fmt.Errorf("retrieving finalized height failed: %w", err)
 	}
 	return true, nil
+}
+
+// updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric
+// based on the current epoch phase of the input snapshot. It should be called
+// at startup and during transitions between EpochSetup and EpochCommitted phases.
+//
+// For example, suppose we have epochs N and N+1.
+// If we are in epoch N's Staking or Setup Phase, then epoch N's final view should be the value of the metric.
+// If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
+func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error {
+
+	phase, err := snap.Phase()
+	if err != nil {
+		return fmt.Errorf("could not get epoch phase: %w", err)
+	}
+
+	// update metric based of epoch phase
+	switch phase {
+	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
+
+		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
+		finalView, err := snap.Epochs().Current().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get current epoch final view from snapshot: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	case flow.EpochPhaseCommitted:
+
+		// if we are in Committed phase, then set the metric value to the next epoch's final view
+		finalView, err := snap.Epochs().Next().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get next epoch final view from snapshot: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	default:
+		return fmt.Errorf("invalid phase: %s", phase)
+	}
+
+	return nil
 }

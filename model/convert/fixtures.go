@@ -2,6 +2,7 @@ package convert
 
 import (
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -11,9 +12,20 @@ import (
 
 // epochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
-func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
-	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture())
+func epochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := unittest.EventFixture(events.EpochSetup.EventType(), 1, 1, unittest.IdentifierFixture())
 	event.Payload = []byte(epochSetupFixtureJSON)
+
+	// randomSource is [0,0,...,1,2,3,4]
+	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
+	for i := 0; i < 4; i++ {
+		randomSource[flow.EpochSetupRandomSourceLength-1-i] = uint8(4 - i)
+	}
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -22,7 +34,7 @@ func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
-		RandomSource:       []byte{1, 2, 3, 4},
+		RandomSource:       randomSource,
 		Assignments: flow.AssignmentList{
 			{
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -98,8 +110,14 @@ func epochSetupFixture() (flow.Event, *flow.EpochSetup) {
 
 // epochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func epochCommitFixture() (flow.Event, *flow.EpochCommit) {
-	event := unittest.EventFixture(flow.EventEpochCommit, 1, 1, unittest.IdentifierFixture())
+func epochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := unittest.EventFixture(events.EpochCommit.EventType(), 1, 1, unittest.IdentifierFixture())
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{

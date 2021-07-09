@@ -47,19 +47,20 @@ const notSet = "not set"
 
 // BaseConfig is the general config for the FlowNodeBuilder
 type BaseConfig struct {
-	nodeIDHex        string
-	bindAddr         string
-	nodeRole         string
-	timeout          time.Duration
-	datadir          string
-	level            string
-	metricsPort      uint
-	BootstrapDir     string
-	profilerEnabled  bool
-	profilerDir      string
-	profilerInterval time.Duration
-	profilerDuration time.Duration
-	tracerEnabled    bool
+	nodeIDHex          string
+	bindAddr           string
+	nodeRole           string
+	timeout            time.Duration
+	datadir            string
+	level              string
+	metricsPort        uint
+	BootstrapDir       string
+	peerUpdateInterval time.Duration
+	profilerEnabled    bool
+	profilerDir        string
+	profilerInterval   time.Duration
+	profilerDuration   time.Duration
+	tracerEnabled      bool
 }
 
 type Metrics struct {
@@ -153,6 +154,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
+	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", p2p.DefaultPeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
 	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
@@ -206,6 +208,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
 			fnb.RootBlock.ID().String(),
+			p2p.DefaultPeerUpdateInterval,
 			fnb.MsgValidators...)
 
 		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)

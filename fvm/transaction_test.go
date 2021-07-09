@@ -220,14 +220,14 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
-		require.Contains(t, proc.Logs[0], "Düsseldorf")
+		require.Contains(t, proc.Logs[0], "\"D\\u{fc}sseldorf\"")
 
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
 		err = vm.Run(context, proc, st.State().View(), programsStorage)
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
-		require.Contains(t, proc.Logs[0], "Düsseldorf")
+		require.Contains(t, proc.Logs[0], "\"D\\u{fc}sseldorf\"")
 
 		// freeze account
 		err = accounts.SetAccountFrozen(frozenAddress, true)

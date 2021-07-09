@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"google.golang.org/grpc"
-
 	"github.com/spf13/pflag"
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -27,6 +27,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
@@ -83,8 +84,7 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		accessAddress     string
-		qcContractAddress string
+		accessAddress string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -139,7 +139,6 @@ func main() {
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-			flags.StringVar(&qcContractAddress, "qc-contract-address", "", "the address of the Epoch QC contract")
 		}).
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
@@ -392,9 +391,6 @@ func main() {
 			if accessAddress == "" {
 				return nil, fmt.Errorf("flag `access-address` required")
 			}
-			if qcContractAddress == "" {
-				return nil, fmt.Errorf("flag `qc-contract-address` required")
-			}
 
 			// loads the private account info for this node from disk for use in the QCContractClient.
 			accountInfo, err := loadEpochQCPrivateData(node)
@@ -415,8 +411,19 @@ func main() {
 				return nil, err
 			}
 
-			qcContractClient := epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(),
-				accountInfo.Address, accountInfo.KeyIndex, qcContractAddress, txSigner)
+			contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
+			if err != nil {
+				return nil, err
+			}
+			qcContractClient := epochs.NewQCContractClient(
+				node.Logger,
+				flowClient,
+				node.Me.NodeID(),
+				accountInfo.Address,
+				accountInfo.KeyIndex,
+				contracts.ClusterQC.Address.HexWithPrefix(),
+				txSigner,
+			)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,

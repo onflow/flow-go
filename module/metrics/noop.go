@@ -44,6 +44,7 @@ func (nc *NoopCollector) BlockProposed(*flow.Block)                             
 func (nc *NoopCollector) BlockFinalized(*flow.Block)                                             {}
 func (nc *NoopCollector) BlockSealed(*flow.Block)                                                {}
 func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)                           {}
+func (nc *NoopCollector) CommittedEpochFinalView(view uint64)                                    {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                             {}
 func (nc *NoopCollector) CacheHit(resource string)                                               {}
 func (nc *NoopCollector) CacheNotFound(resource string)                                          {}
@@ -94,7 +95,7 @@ func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                      
 func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
-func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                                    {}
+func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                    {}
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                               {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}

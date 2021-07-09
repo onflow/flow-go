@@ -25,9 +25,9 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
@@ -197,21 +197,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := handler.GetServiceEventWhitelist()
+		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+		require.NoError(t, err)
+
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochSetup.Address.Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
 		}
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochCommit.Address.Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
 		}
 
@@ -264,7 +266,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// all events should have been collected
 		require.Len(t, result.ServiceEvents, 2)
 
-		//events are ordered
+		// events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 	})

@@ -2,9 +2,9 @@ package crypto
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -12,59 +12,23 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const runtimeUserDomainTag = "user"
+func HashWithTag(hashAlgo hash.HashingAlgorithm, tag string, data []byte) ([]byte, error) {
+	var hasher hash.Hasher
 
-type SignatureVerifier interface {
-	Verify(
-		signature []byte,
-		tag []byte,
-		message []byte,
-		publicKey crypto.PublicKey,
-		hashAlgo hash.HashingAlgorithm,
-	) (bool, error)
-}
-
-type DefaultSignatureVerifier struct{}
-
-func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
-	return DefaultSignatureVerifier{}
-}
-
-func (DefaultSignatureVerifier) Verify(
-	signature []byte,
-	tag []byte,
-	message []byte,
-	publicKey crypto.PublicKey,
-	hashAlgo hash.HashingAlgorithm,
-) (bool, error) {
-	hasher := NewHasher(hashAlgo)
-	if hasher == nil {
-		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
-	}
-
-	message = append(tag, message...)
-
-	valid, err := publicKey.Verify(signature, message, hasher)
-	if err != nil {
-		return false, fmt.Errorf("failed to verify signature: %w", err)
-	}
-
-	return valid, nil
-}
-
-// NewHasher returns a crypto hasher supported by runtime.
-func NewHasher(hashAlgo hash.HashingAlgorithm) hash.Hasher {
 	switch hashAlgo {
-	case hash.SHA2_256:
-		return hash.NewSHA2_256()
-	case hash.SHA3_256:
-		return hash.NewSHA3_256()
-	case hash.SHA2_384:
-		return hash.NewSHA2_384()
-	case hash.SHA3_384:
-		return hash.NewSHA3_384()
+	case hash.SHA2_256, hash.SHA3_256, hash.SHA2_384, hash.SHA3_384:
+		var err error
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
+			return nil, errors.NewValueErrorf(err.Error(), "verification failed")
+		}
+	case hash.KMAC128:
+		hasher = NewBLSKMAC(tag)
+	default:
+		err := errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
+		return nil, fmt.Errorf("hashing failed: %w", err)
 	}
-	return nil
+
+	return hasher.ComputeHash(data), nil
 }
 
 // RuntimeToCryptoSigningAlgorithm converts a runtime signature algorithm to a crypto signature algorithm.
@@ -74,6 +38,8 @@ func RuntimeToCryptoSigningAlgorithm(s runtime.SignatureAlgorithm) crypto.Signin
 		return crypto.ECDSAP256
 	case runtime.SignatureAlgorithmECDSA_secp256k1:
 		return crypto.ECDSASecp256k1
+	case runtime.SignatureAlgorithmBLS_BLS12_381:
+		return crypto.BLSBLS12381
 	default:
 		return crypto.UnknownSigningAlgorithm
 	}
@@ -86,6 +52,8 @@ func CryptoToRuntimeSigningAlgorithm(s crypto.SigningAlgorithm) runtime.Signatur
 		return runtime.SignatureAlgorithmECDSA_P256
 	case crypto.ECDSASecp256k1:
 		return runtime.SignatureAlgorithmECDSA_secp256k1
+	case crypto.BLSBLS12381:
+		return runtime.SignatureAlgorithmBLS_BLS12_381
 	default:
 		return runtime.SignatureAlgorithmUnknown
 	}
@@ -102,6 +70,8 @@ func RuntimeToCryptoHashingAlgorithm(s runtime.HashAlgorithm) hash.HashingAlgori
 		return hash.SHA2_384
 	case runtime.HashAlgorithmSHA3_384:
 		return hash.SHA3_384
+	case runtime.HashAlgorithmKMAC128_BLS_BLS12_381:
+		return hash.KMAC128
 	default:
 		return hash.UnknownHashingAlgorithm
 	}
@@ -118,9 +88,26 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 		return runtime.HashAlgorithmSHA2_384
 	case hash.SHA3_384:
 		return runtime.HashAlgorithmSHA3_384
+	case hash.KMAC128:
+		return runtime.HashAlgorithmKMAC128_BLS_BLS12_381
 	default:
 		return runtime.HashAlgorithmUnknown
 	}
+}
+
+// ValidatePublicKey returns true if public key is valid
+func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bool, err error) {
+	sigAlgo := RuntimeToCryptoSigningAlgorithm(signAlgo)
+
+	_, err = crypto.DecodePublicKey(sigAlgo, pk)
+
+	if err != nil {
+		if crypto.IsInvalidInputsError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("validate public key failed: %w", err)
+	}
+	return true, nil
 }
 
 // VerifySignatureFromRuntime is an adapter that performs signature verification using
@@ -128,36 +115,47 @@ func CryptoToRuntimeHashingAlgorithm(h hash.HashingAlgorithm) runtime.HashAlgori
 func VerifySignatureFromRuntime(
 	verifier SignatureVerifier,
 	signature []byte,
-	rawTag string,
+	tag string,
 	message []byte,
 	rawPublicKey []byte,
 	signatureAlgorithm runtime.SignatureAlgorithm,
 	hashAlgorithm runtime.HashAlgorithm,
 ) (bool, error) {
+
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
 		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
-	}
-	if sigAlgo == crypto.BLSBLS12381 {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type %s not supported", crypto.BLSBLS12381.String())
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
 		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 	}
-	if hashAlgo == hash.KMAC128 {
-		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "hashing algorithm %s not supported", hash.KMAC128.String())
+
+	// check ECDSA compatibilites
+	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
+		// hashing compatibility
+		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
+			return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
+				hashAlgo.String(), sigAlgo.String())
+		}
+
+		// tag compatibility
+		if !tagECDSACheck(tag) {
+			return false, errors.NewValueErrorf("tag %s is not supported", tag)
+		}
+
+		// check BLS compatibilites
+	} else if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
+		// hashing compatibility
+		return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
+			hashAlgo.String(), sigAlgo.String())
+		// there are no tag constraints
 	}
 
 	publicKey, err := crypto.DecodePublicKey(sigAlgo, rawPublicKey)
 	if err != nil {
 		return false, errors.NewValueErrorf(string(rawPublicKey), "cannot decode public key: %w", err)
-	}
-
-	tag := parseRuntimeDomainTag(rawTag)
-	if tag == nil {
-		return false, errors.NewValueErrorf(string(rawTag), "invalid domain tag")
 	}
 
 	valid, err := verifier.Verify(
@@ -174,46 +172,70 @@ func VerifySignatureFromRuntime(
 	return valid, nil
 }
 
-//  NewAccountPublicKey construct an account public key given a runtime public key.
-func NewAccountPublicKey(publicKey *runtime.PublicKey,
-	hashAlgo sema.HashAlgorithm,
-	keyIndex int,
-	weight int,
-) (*flow.AccountPublicKey, error) {
-	var err error
-	signAlgorithm := RuntimeToCryptoSigningAlgorithm(publicKey.SignAlgo)
-	if signAlgorithm == crypto.UnknownSigningAlgorithm {
-		err = errors.NewValueErrorf(publicKey.SignAlgo.Name(), "signature algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
+// check compatible tags with ECDSA
+//
+// Only tags with a prefix flow.UserTagString and zero paddings are accepted.
+func tagECDSACheck(tag string) bool {
+
+	if len(tag) > flow.DomainTagLength ||
+		!strings.HasPrefix(tag, flow.UserTagString) {
+
+		return false
 	}
 
-	hashAlgorithm := RuntimeToCryptoHashingAlgorithm(hashAlgo)
-	if hashAlgorithm == hash.UnknownHashingAlgorithm {
-		err = errors.NewValueErrorf(hashAlgo.Name(), "hashing algorithm type not found")
-		return nil, fmt.Errorf("adding account key failed: %w", err)
+	// check the remaining bytes are zeros
+	remaining := tag[len(flow.UserTagString):]
+	for _, b := range []byte(remaining) {
+		if b != 0 {
+			return false
+		}
 	}
 
-	decodedPublicKey, err := crypto.DecodePublicKey(signAlgorithm, publicKey.PublicKey)
-	if err != nil {
-		err = errors.NewValueErrorf(string(publicKey.PublicKey), "cannot decode public key: %w", err)
-		return nil, fmt.Errorf("adding account key failed: %w", err)
-	}
-
-	return &flow.AccountPublicKey{
-		Index:     keyIndex,
-		PublicKey: decodedPublicKey,
-		SignAlgo:  signAlgorithm,
-		HashAlgo:  hashAlgorithm,
-		SeqNumber: 0,
-		Weight:    weight,
-		Revoked:   false,
-	}, nil
+	return true
 }
 
-func parseRuntimeDomainTag(tag string) []byte {
-	if tag == runtimeUserDomainTag {
-		return flow.UserDomainTag[:]
+type SignatureVerifier interface {
+	Verify(
+		signature []byte,
+		tag string,
+		message []byte,
+		publicKey crypto.PublicKey,
+		hashAlgo hash.HashingAlgorithm,
+	) (bool, error)
+}
+
+type DefaultSignatureVerifier struct{}
+
+func NewDefaultSignatureVerifier() DefaultSignatureVerifier {
+	return DefaultSignatureVerifier{}
+}
+
+func (DefaultSignatureVerifier) Verify(
+	signature []byte,
+	tag string,
+	message []byte,
+	publicKey crypto.PublicKey,
+	hashAlgo hash.HashingAlgorithm,
+) (bool, error) {
+
+	var hasher hash.Hasher
+
+	switch hashAlgo {
+	case hash.SHA2_256, hash.SHA3_256:
+		var err error
+		if hasher, err = NewPrefixedHashing(hashAlgo, tag); err != nil {
+			return false, errors.NewValueErrorf(err.Error(), "verification failed")
+		}
+	case hash.KMAC128:
+		hasher = NewBLSKMAC(tag)
+	default:
+		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
 	}
 
-	return nil
+	valid, err := publicKey.Verify(signature, message, hasher)
+	if err != nil {
+		return false, fmt.Errorf("failed to verify signature: %w", err)
+	}
+
+	return valid, nil
 }

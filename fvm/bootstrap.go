@@ -203,6 +203,8 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.setupStorageForServiceAccounts(service, fungibleToken, flowToken, feeContract)
 
+	b.createMinter(service, flowToken)
+
 	b.deployDKG(service)
 
 	b.deployQC(service)
@@ -316,6 +318,20 @@ func (b *BootstrapProcedure) deployStorageFees(service, fungibleToken, flowToken
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to deploy storage fees contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) createMinter(service, flowToken flow.Address) {
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.CreateFlowTokenMinterTransaction(
+				service,
+				flowToken),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to create flow token minter: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) deployDKG(service flow.Address) {
@@ -473,10 +489,10 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flow.Address) {
 	for _, id := range b.identities {
 
-		// create a machine account for the node
+		// create a staking account for the node
 		nodeAddress := b.createAccount()
 
-		// give a vault resource to the machine account
+		// give a vault resource to the staking account
 		txError, err := b.vm.invokeMetaTransaction(
 			b.ctx,
 			setupAccountTransaction(
@@ -489,7 +505,7 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 		)
 		panicOnMetaInvokeErrf("failed to setup machine account: %s", txError, err)
 
-		// fund the machine account
+		// fund the staking account
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
 			fundAccountTransaction(service,
@@ -499,9 +515,11 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 			b.sth,
 			b.programs,
 		)
-		panicOnMetaInvokeErrf("failed to fund machine account: %s", txError, err)
+		panicOnMetaInvokeErrf("failed to fund node staking account: %s", txError, err)
 
 		// register the node
+		// for collection/consensus nodes this will also create the machine account
+		// and set it up with the QC/DKG participant resource
 		txError, err = b.vm.invokeMetaTransaction(
 			b.ctx,
 			registerNodeTransaction(service,
@@ -678,11 +696,15 @@ func fundAccountTransaction(
 	nodeAddress flow.Address,
 ) *TransactionProcedure {
 
-	// register node
+	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", 2_000_000))
+	if err != nil {
+		panic(err)
+	}
+
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript([]byte(fmt.Sprintf(fundAccountTemplate, fungibleToken, flowToken))).
-			AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_000_000))).
+			AddArgument(jsoncdc.MustEncode(cdcAmount)).
 			AddArgument(jsoncdc.MustEncode(cadence.NewAddress(nodeAddress))).
 			AddAuthorizer(service),
 		0,
@@ -713,6 +735,7 @@ func registerNodeTransaction(
 		PublicKey: id.NetworkPubKey,
 		SignAlgo:  id.NetworkPubKey.Algorithm(),
 		HashAlgo:  hash.SHA3_256,
+		Weight:    1000,
 	}
 	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
 	cadencePublicKeys := cadence.NewArray(
@@ -720,6 +743,11 @@ func registerNodeTransaction(
 			bytesToCadenceArray(encAccountKey),
 		},
 	)
+
+	cdcAmount, err := cadence.NewUFix64(fmt.Sprintf("%d.0", id.Stake))
+	if err != nil {
+		panic(err)
+	}
 
 	// register node
 	return Transaction(
@@ -730,7 +758,7 @@ func registerNodeTransaction(
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.Address))).
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NetworkPubKey.String()[2:]))).
 			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
-			AddArgument(jsoncdc.MustEncode(cadence.UFix64(id.Stake))).
+			AddArgument(jsoncdc.MustEncode(cdcAmount)).
 			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
 			AddAuthorizer(nodeAddress),
 		0,
