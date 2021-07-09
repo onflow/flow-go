@@ -39,6 +39,12 @@ func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine n
 		sm.engines[channel] = make([]network.Engine, 0)
 	}
 
+	for _, e := range sm.engines[channel] {
+		if e == engine {
+			return fmt.Errorf("subscriptionManager: engine already registered on channel: %s", channel)
+		}
+	}
+
 	sm.engines[channel] = append(sm.engines[channel], engine)
 
 	return nil
