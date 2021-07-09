@@ -7,8 +7,8 @@ type SubscriptionManager interface {
 	// Unregister removes the engine associated with a channel.
 	Unregister(channel Channel) error
 
-	// GetEngine returns engine associated with a channel.
-	GetEngine(channel Channel) (Engine, error)
+	// GetEngine returns the engines associated with a channel.
+	GetEngines(channel Channel) ([]Engine, error)
 
 	// Channels returns all the channels registered in this subscription manager.
 	Channels() ChannelList

@@ -11,13 +11,13 @@ import (
 // Each channel should be taken by at most a single engine.
 type ChannelSubscriptionManager struct {
 	mu      sync.RWMutex
-	engines map[network.Channel]network.Engine
+	engines map[network.Channel][]network.Engine
 	mw      network.Middleware
 }
 
 func NewChannelSubscriptionManager(mw network.Middleware) *ChannelSubscriptionManager {
 	return &ChannelSubscriptionManager{
-		engines: make(map[network.Channel]network.Engine),
+		engines: make(map[network.Channel][]network.Engine),
 		mw:      mw,
 	}
 }
@@ -27,20 +27,19 @@ func (sm *ChannelSubscriptionManager) Register(channel network.Channel, engine n
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	// channel should be registered only once.
 	_, ok := sm.engines[channel]
-	if ok {
-		return fmt.Errorf("subscriptionManager: channel already registered: %s", channel)
+	if !ok {
+		// registers the channel with the middleware to let middleware start receiving messages
+		err := sm.mw.Subscribe(channel)
+		if err != nil {
+			return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
+		}
+
+		// initializes the engine set for the provided channel
+		sm.engines[channel] = make([]network.Engine, 0)
 	}
 
-	// registers the channel with the middleware to let middleware start receiving messages
-	err := sm.mw.Subscribe(channel)
-	if err != nil {
-		return fmt.Errorf("subscriptionManager: failed to subscribe to channel %s: %w", channel, err)
-	}
-
-	// saves the engine for the provided channel
-	sm.engines[channel] = engine
+	sm.engines[channel] = append(sm.engines[channel], engine)
 
 	return nil
 }
@@ -67,16 +66,16 @@ func (sm *ChannelSubscriptionManager) Unregister(channel network.Channel) error 
 	return nil
 }
 
-// GetEngine returns engine associated with a channel.
-func (sm *ChannelSubscriptionManager) GetEngine(channel network.Channel) (network.Engine, error) {
+// GetEngines returns the engines associated with a channel.
+func (sm *ChannelSubscriptionManager) GetEngines(channel network.Channel) ([]network.Engine, error) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	eng, found := sm.engines[channel]
+	engines, found := sm.engines[channel]
 	if !found {
 		return nil, fmt.Errorf("subscriptionManager: engine for channel %s not found", channel)
 	}
-	return eng, nil
+	return engines, nil
 }
 
 // Channels returns all the channels registered in this subscription manager.

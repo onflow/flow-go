@@ -401,7 +401,7 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QMessage)
-	eng, err := n.subMngr.GetEngine(qm.Target)
+	engines, err := n.subMngr.GetEngines(qm.Target)
 	if err != nil {
 		n.logger.Error().
 			Err(err).
@@ -415,13 +415,20 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	// tracks its processing time.
 	startTimestamp := time.Now()
 
-	err = eng.Process(qm.SenderID, qm.Payload)
-	if err != nil {
-		n.logger.Error().
-			Err(err).
-			Str("channel_id", qm.Target.String()).
-			Str("sender_id", qm.SenderID.String()).
-			Msg("failed to process message")
+	var wg sync.WaitGroup
+	for _, eng := range engines {
+		wg.Add(1)
+		go func(engine network.Engine) {
+			err := engine.Process(qm.SenderID, qm.Payload)
+
+			if err != nil {
+				n.logger.Error().
+					Err(err).
+					Str("channel_id", qm.Target.String()).
+					Str("sender_id", qm.SenderID.String()).
+					Msg("failed to process message")
+			}
+		}(eng)
 	}
 
 	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))

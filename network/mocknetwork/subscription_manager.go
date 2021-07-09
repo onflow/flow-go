@@ -28,16 +28,16 @@ func (_m *SubscriptionManager) Channels() network.ChannelList {
 	return r0
 }
 
-// GetEngine provides a mock function with given fields: channel
-func (_m *SubscriptionManager) GetEngine(channel network.Channel) (network.Engine, error) {
+// GetEngines provides a mock function with given fields: channel
+func (_m *SubscriptionManager) GetEngines(channel network.Channel) ([]network.Engine, error) {
 	ret := _m.Called(channel)
 
-	var r0 network.Engine
-	if rf, ok := ret.Get(0).(func(network.Channel) network.Engine); ok {
+	var r0 []network.Engine
+	if rf, ok := ret.Get(0).(func(network.Channel) []network.Engine); ok {
 		r0 = rf(channel)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(network.Engine)
+			r0 = ret.Get(0).([]network.Engine)
 		}
 	}
 

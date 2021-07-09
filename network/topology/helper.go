@@ -80,7 +80,7 @@ func MockSubscriptionManager(t *testing.T, ids flow.IdentityList) []network.Subs
 		err := fmt.Errorf("this method should not be called on mock subscription manager")
 		sm.On("Register", mock.Anything, mock.Anything).Return(err)
 		sm.On("Unregister", mock.Anything).Return(err)
-		sm.On("GetEngine", mock.Anything).Return(err)
+		sm.On("GetEngines", mock.Anything).Return(err)
 		sm.On("Channels").Return(engine.ChannelsByRole(id.Role))
 		sms[i] = sm
 	}
