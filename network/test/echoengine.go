@@ -56,9 +56,9 @@ func (te *EchoEngine) SubmitLocal(event interface{}) {
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *EchoEngine) Submit(originID flow.Identifier, event interface{}) {
+func (te *EchoEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	go func() {
-		err := te.Process(originID, event)
+		err := te.Process(channel, originID, event)
 		if err != nil {
 			require.Fail(te.t, "could not process submitted event")
 		}
@@ -75,7 +75,7 @@ func (te *EchoEngine) ProcessLocal(event interface{}) error {
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // EchoEngine. It then flags the received channel on reception of an event.
 // It also sends back an echo of the message to the origin ID
-func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error {
+func (te *EchoEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	te.Lock()
 	defer te.Unlock()
 	te.originID = originID

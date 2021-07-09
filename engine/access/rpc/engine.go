@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
@@ -188,7 +189,7 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(event interface{}) {
+func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(event)
 		if err != nil {

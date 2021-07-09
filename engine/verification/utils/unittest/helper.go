@@ -64,14 +64,14 @@ func SetupChunkDataPackProvider(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(len(assignedChunkIDs))
 
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	exeEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			originID, ok := args[0].(flow.Identifier)
+			originID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 			// request should be dispatched by a verification node.
 			require.Contains(t, participants.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs(), originID)
 
-			req, ok := args[1].(*messages.ChunkDataRequest)
+			req, ok := args[2].(*messages.ChunkDataRequest)
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
@@ -174,12 +174,12 @@ func SetupMockConsensusNode(t *testing.T,
 	// creates a hasher for spock
 	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
 
-	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	conEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			originID, ok := args[0].(flow.Identifier)
+			originID, ok := args[1].(flow.Identifier)
 			assert.True(t, ok)
 
-			resultApproval, ok := args[1].(*flow.ResultApproval)
+			resultApproval, ok := args[2].(*flow.ResultApproval)
 			assert.True(t, ok)
 
 			lg.Debug().
