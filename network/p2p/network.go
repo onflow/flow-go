@@ -416,6 +416,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	startTimestamp := time.Now()
 
 	var wg sync.WaitGroup
+
 	for _, eng := range engines {
 		wg.Add(1)
 		go func(engine network.Engine) {
@@ -430,6 +431,8 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			}
 		}(eng)
 	}
+
+	wg.Wait()
 
 	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
 }
