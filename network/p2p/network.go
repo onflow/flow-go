@@ -420,6 +420,8 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	for _, eng := range engines {
 		wg.Add(1)
 		go func(engine network.Engine) {
+			defer wg.Done()
+
 			err := engine.Process(qm.SenderID, qm.Payload)
 
 			if err != nil {
