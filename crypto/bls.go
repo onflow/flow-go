@@ -305,15 +305,12 @@ type PubKeyBLSBLS12381 struct {
 // If no scalar is provided, the function allocates an
 // empty scalar.
 func newPubKeyBLSBLS12381(p *pointG2) *PubKeyBLSBLS12381 {
-	var pk PubKeyBLSBLS12381
-	if p == nil {
-		// initialize the point
-		C.ep2_new_wrapper((*C.ep2_st)(&pk.point))
-	} else {
-		// set the point
-		pk.point = *p
+	if p != nil {
+		return &PubKeyBLSBLS12381{
+			point: *p,
+		}
 	}
-	return &pk
+	return &PubKeyBLSBLS12381{}
 }
 
 // Algorithm returns the Signing Algorithm
