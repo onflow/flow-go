@@ -35,7 +35,7 @@ type atomicValueWrapper struct {
 	collector AssignmentCollectorState
 }
 
-func NewAssignmentCollectorStateMachine(collectorBase AssignmentCollectorBase) AssignmentCollector {
+func NewAssignmentCollectorStateMachine(collectorBase AssignmentCollectorBase) *AssignmentCollectorStateMachine {
 	sm := &AssignmentCollectorStateMachine{
 		AssignmentCollectorBase: collectorBase,
 	}

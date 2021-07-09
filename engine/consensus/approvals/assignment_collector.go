@@ -21,6 +21,9 @@ func (ps ProcessingStatus) String() string {
 	return names[ps]
 }
 
+// AssignmentCollectorState is a general interface for representing AssignmentCollector in business logic.
+// AssignmentCollectorState can be in 3 different states, described by ProcessingStatus.
+// Objects implementing AssignmentCollectorState can change their internal state over object lifetime.
 type AssignmentCollectorState interface {
 	BlockID() flow.Identifier
 	Block() *flow.Header
@@ -50,6 +53,7 @@ type AssignmentCollectorState interface {
 	ProcessingStatus() ProcessingStatus
 }
 
+// AssignmentCollector is an specific extended interface which is used by state machine to perform state transitions.
 type AssignmentCollector interface {
 	AssignmentCollectorState
 
