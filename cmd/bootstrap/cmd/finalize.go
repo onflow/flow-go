@@ -119,7 +119,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	actualSeedLength := len(flagBootstrapRandomSeed)
 	if actualSeedLength != randomSeedBytes {
-		log.Error().Int("expected", 48).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
+		log.Error().Int("expected", randomSeedBytes).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
 		return
 	}
 
