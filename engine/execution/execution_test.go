@@ -22,7 +22,7 @@ import (
 )
 
 func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *messages.BlockProposal) error {
-	return exeNode.FollowerEngine.Process(from, proposal)
+	return exeNode.FollowerEngine.Process(engine.ReceiveBlocks, from, proposal)
 }
 
 // Test when the ingestion engine receives a block, it will

@@ -43,9 +43,9 @@ func (e *MeshEngine) SubmitLocal(event interface{}) {
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (e *MeshEngine) Submit(originID flow.Identifier, event interface{}) {
+func (e *MeshEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	go func() {
-		err := e.Process(originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			require.Fail(e.t, "could not process submitted event")
 		}
@@ -61,7 +61,7 @@ func (e *MeshEngine) ProcessLocal(event interface{}) error {
 
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // MeshEngine. It then flags the received channel on reception of an event.
-func (e *MeshEngine) Process(originID flow.Identifier, event interface{}) error {
+func (e *MeshEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	// stores the message locally
 	e.originID = originID
 	e.event <- event

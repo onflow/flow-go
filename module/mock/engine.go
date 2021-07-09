@@ -44,13 +44,13 @@ func (_m *Engine) Process(channel network.Channel, originID flow.Identifier, eve
 	return r0
 }
 
-// ProcessLocal provides a mock function with given fields: channel, event
-func (_m *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	ret := _m.Called(channel, event)
+// ProcessLocal provides a mock function with given fields: event
+func (_m *Engine) ProcessLocal(event interface{}) error {
+	ret := _m.Called(event)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(network.Channel, interface{}) error); ok {
-		r0 = rf(channel, event)
+	if rf, ok := ret.Get(0).(func(interface{}) error); ok {
+		r0 = rf(event)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -79,7 +79,7 @@ func (_m *Engine) Submit(channel network.Channel, originID flow.Identifier, even
 	_m.Called(channel, originID, event)
 }
 
-// SubmitLocal provides a mock function with given fields: channel, event
-func (_m *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	_m.Called(channel, event)
+// SubmitLocal provides a mock function with given fields: event
+func (_m *Engine) SubmitLocal(event interface{}) {
+	_m.Called(event)
 }
