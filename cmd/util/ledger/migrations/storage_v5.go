@@ -362,6 +362,35 @@ func (m StorageFormatV5Migration) reencodeValue(
 		)
 	}
 
+	defer func() {
+		if r := recover(); r != nil {
+			if err, ok := r.(error); ok {
+				m.Log.Err(err).
+					Str("key", key).
+					Str("owner", owner.String()).
+					Msgf(
+						"failed to decode re-encoded value:\n\nvalue: %s\n\nnewData:\n%s\n\noldData:\n%s\n",
+						rootValue,
+						hex.Dump(newData),
+						hex.Dump(data),
+					)
+			} else {
+				m.Log.Error().
+					Str("key", key).
+					Str("owner", owner.String()).
+					Msgf(
+						"failed to decode re-encoded value: %s\n\nvalue: %s\n\nnewData:\n%s\n\noldData:\n%s\n",
+						r,
+						rootValue,
+						hex.Dump(newData),
+						hex.Dump(data),
+					)
+			}
+
+			panic(r)
+		}
+	}()
+
 	// Sanity check: Decode the newly encoded data again
 	// and compare it to the initially decoded value
 
