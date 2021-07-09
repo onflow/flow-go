@@ -597,6 +597,7 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 			if !hasAnyLocationAddress(
 				value,
 				"dee35303492e5a0b",
+				"1864ff317a35af46",
 			) {
 				return
 			}
@@ -608,6 +609,43 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 				interpreter.CompositeStaticType{
 					Location:            value.Location(),
 					QualifiedIdentifier: "FlowIDTableStaking.NodeRecord",
+				},
+				owner,
+				key,
+			)
+
+			for _, fieldName := range []string{
+				"minimumStakeRequired",
+				"totalTokensStakedByNodeType",
+				"rewardRatios",
+			} {
+				m.addDictionaryFieldType(
+					value,
+					fieldName,
+					interpreter.PrimitiveStaticTypeUInt8,
+					interpreter.PrimitiveStaticTypeUFix64,
+					owner,
+					key,
+				)
+			}
+
+		case "MessageBoard":
+
+			if !hasAnyLocationAddress(
+				value,
+				"ac98da57ce4dd4ef",
+			) {
+				return
+			}
+
+			m.addArrayFieldType(
+				value,
+				"posts",
+				interpreter.VariableSizedStaticType{
+					Type: interpreter.CompositeStaticType{
+						Location:            value.Location(),
+						QualifiedIdentifier: "MessageBoard.Post",
+					},
 				},
 				owner,
 				key,
@@ -803,6 +841,35 @@ func (m StorageFormatV5Migration) addDictionaryFieldType(
 			"added known static type %s to dictionary: %s",
 			dictionaryValue.Type,
 			dictionaryValue.String(),
+		)
+}
+
+func (m StorageFormatV5Migration) addArrayFieldType(
+	value *interpreter.CompositeValue,
+	fieldName string,
+	arrayType interpreter.ArrayStaticType,
+	owner common.Address,
+	key string,
+) {
+	fieldValue, ok := value.Fields().Get(fieldName)
+	if !ok {
+		return
+	}
+
+	arrayValue, ok := fieldValue.(*interpreter.ArrayValue)
+	if !ok {
+		return
+	}
+
+	arrayValue.Type = arrayType
+
+	m.Log.Info().
+		Str("owner", owner.String()).
+		Str("key", key).
+		Msgf(
+			"added known static type %s to array: %s",
+			arrayValue.Type,
+			arrayValue.String(),
 		)
 }
 
