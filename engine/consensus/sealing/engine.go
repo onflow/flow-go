@@ -3,6 +3,7 @@ package sealing
 import (
 	"fmt"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -34,6 +35,10 @@ const defaultFinalizationEventsQueueCapacity = 1000
 // defaultSealingEngineWorkers number of workers to dispatch events for sealing core
 const defaultSealingEngineWorkers = 8
 
+// defaultAssignmentCollectorsWorkerPoolCapacity is the default number of workers that is available for worker pool which is used
+// by assignment collector state machine to do transitions
+const defaultAssignmentCollectorsWorkerPoolCapacity = 4
+
 type (
 	EventSink chan *Event // Channel to push pending events
 )
@@ -44,6 +49,7 @@ type (
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	unit                       *engine.Unit
+	workerPool                 *workerpool.WorkerPool
 	core                       consensus.SealingCore
 	log                        zerolog.Logger
 	me                         module.Local
@@ -86,6 +92,7 @@ func NewEngine(log zerolog.Logger,
 	unit := engine.NewUnit()
 	e := &Engine{
 		unit:          unit,
+		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		log:           log.With().Str("engine", "sealing.Engine").Logger(),
 		me:            me,
 		engineMetrics: engineMetrics,
@@ -117,7 +124,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	core, err := NewCore(log, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -352,7 +359,9 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		e.workerPool.StopWait()
+	})
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`

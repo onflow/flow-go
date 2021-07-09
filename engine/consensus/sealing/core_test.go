@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -43,6 +44,7 @@ const RequiredApprovalsForSealConstructionTestingValue = 1
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseApprovalsTestSuite
 
+	workerPool        *workerpool.WorkerPool
 	blocks            map[flow.Identifier]*flow.Header
 	headers           *storage.Headers
 	state             *protocol.State
@@ -60,12 +62,13 @@ func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
 	// Without this line we are risking running into weird situations where one test has finished but there are active workers
 	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
 	// starting next test.
-	s.core.workerPool.StopWait()
+	s.workerPool.StopWait()
 }
 
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
+	s.workerPool = workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity)
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
 	s.state = &protocol.State{}
 	s.assigner = &module.ChunkAssigner{}
@@ -153,7 +156,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.workerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 

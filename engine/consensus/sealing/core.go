@@ -33,10 +33,6 @@ const DefaultRequiredApprovalsForSealConstruction = 0
 // to make fire fighting easier while seal & verification is under development.
 const DefaultEmergencySealingActive = false
 
-// defaultAssignmentCollectorsWorkerPoolCapacity is the default number of workers that is available for worker pool which is used
-// by assignment collector state machine to do transitions
-const defaultAssignmentCollectorsWorkerPoolCapacity = 4
-
 // Config is a structure of values that configure behavior of sealing engine
 type Config struct {
 	EmergencySealingActive               bool   // flag which indicates if emergency sealing is active or not. NOTE: this is temporary while sealing & verification is under development
@@ -79,6 +75,7 @@ type Core struct {
 
 func NewCore(
 	log zerolog.Logger,
+	workerPool *workerpool.WorkerPool,
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
 	sealingTracker consensus.SealingTracker,
@@ -99,7 +96,7 @@ func NewCore(
 
 	core := &Core{
 		log:                        log.With().Str("engine", "sealing.Core").Logger(),
-		workerPool:                 workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
+		workerPool:                 workerPool,
 		tracer:                     tracer,
 		metrics:                    conMetrics,
 		sealingTracker:             sealingTracker,
