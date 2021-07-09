@@ -75,6 +75,7 @@ typedef struct prec_ {
 int      get_valid();
 int      get_invalid();
 void     bn_new_wrapper(bn_t a);
+void     ep2_new_wrapper(ep2_t p);
 
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
