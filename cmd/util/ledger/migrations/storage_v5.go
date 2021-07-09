@@ -592,6 +592,27 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 	switch value := value.(type) {
 	case *interpreter.CompositeValue:
 		switch value.QualifiedIdentifier() {
+		case "FlowIDTableStaking":
+
+			if !hasAnyLocationAddress(
+				value,
+				"dee35303492e5a0b",
+			) {
+				return
+			}
+
+			m.addDictionaryFieldType(
+				value,
+				"nodes",
+				interpreter.PrimitiveStaticTypeString,
+				interpreter.CompositeStaticType{
+					Location:            value.Location(),
+					QualifiedIdentifier: "FlowIDTableStaking.NodeRecord",
+				},
+				owner,
+				key,
+			)
+
 		case "FlowIDTableStaking.NodeRecord":
 
 			if !hasAnyLocationAddress(
