@@ -107,8 +107,8 @@ func TestExecutionFlow(t *testing.T) {
 	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
 	providerEngine.On("Submit", mock.Anything, exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID := args.Get(0).(flow.Identifier)
-			req := args.Get(1).(*messages.EntityRequest)
+			originID := args.Get(1).(flow.Identifier)
+			req := args.Get(2).(*messages.EntityRequest)
 
 			var entities []flow.Entity
 			for _, entityID := range req.EntityIDs {
@@ -143,7 +143,7 @@ func TestExecutionFlow(t *testing.T) {
 	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	verificationEngine.On("Submit", mock.Anything, exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).
@@ -156,7 +156,7 @@ func TestExecutionFlow(t *testing.T) {
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
 	consensusEngine.On("Submit", mock.Anything, exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
@@ -334,8 +334,8 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	consensusEngine.On("Submit", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
-			originID := args[0].(flow.Identifier)
-			receipt := args[1].(*flow.ExecutionReceipt)
+			originID := args[1].(flow.Identifier)
+			receipt := args[2].(*flow.ExecutionReceipt)
 			finalState, _ := receipt.ExecutionResult.FinalStateCommitment()
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
@@ -401,8 +401,8 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 	}
 	collectionEngine.On("Submit", mock.Anything, mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID := args[0].(flow.Identifier)
-			req := args[1].(*messages.EntityRequest)
+			originID := args[1].(flow.Identifier)
+			req := args[2].(*messages.EntityRequest)
 			blob, ok := colMap[req.EntityIDs[0]]
 			if !ok {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
@@ -459,7 +459,7 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verificationEngine.On("Submit", mock.Anything, exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).
