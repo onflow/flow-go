@@ -14,20 +14,19 @@ import (
 // assignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
 // AssignmentCollector and information if collector is processable or not
 type assignmentCollectorVertex struct {
-	collector   *AssignmentCollector
-	processable bool
+	collector AssignmentCollector
 }
 
 /* Methods implementing LevelledForest's Vertex interface */
 
-func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collector.ResultID }
-func (v *assignmentCollectorVertex) Level() uint64             { return v.collector.BlockHeight }
+func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collector.ResultID() }
+func (v *assignmentCollectorVertex) Level() uint64             { return v.collector.Block().Height }
 func (v *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
-	return v.collector.result.PreviousResultID, v.collector.BlockHeight - 1
+	return v.collector.Result().PreviousResultID, v.collector.Block().Height - 1
 }
 
 // NewCollector is a factory method to generate an AssignmentCollector for an execution result
-type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
+type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (AssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
 // formed by the execution results. The mempool supports pruning by height: only collectors
@@ -64,16 +63,16 @@ func (t *AssignmentCollectorTree) GetSize() uint64 {
 }
 
 // GetCollector returns collector by ID and whether it is processable or not
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*AssignmentCollector, bool) {
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollectorState {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
 	if !found {
-		return nil, false
+		return nil
 	}
 
 	v := vertex.(*assignmentCollectorVertex)
-	return v.collector, v.processable
+	return v.collector
 }
 
 // FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
@@ -97,7 +96,10 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
 			if finalizedBlockID != vertex.collector.BlockID() {
-				t.markForkProcessable(vertex, false)
+				err = t.updateForkState(vertex, Orphaned)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -118,13 +120,20 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 		}
 
 		if len(finalizedFork) > 0 {
-			if !finalizedFork[0].processable {
+			if finalizedFork[0].collector.ProcessingStatus() != VerifyingApprovals {
 				log.Error().Msgf("AssignmentCollectorTree has found not processable finalized fork %v,"+
 					" this is unexpected and shouldn't happen, recovering", finalizedFork[0].collector.BlockID())
 				for _, vertex := range finalizedFork {
-					vertex.processable = true
+					expectedStatus := vertex.collector.ProcessingStatus()
+					err = vertex.collector.ChangeProcessingStatus(expectedStatus, VerifyingApprovals)
+					if err != nil {
+						return err
+					}
 				}
-				t.markForkProcessable(finalizedFork[len(finalizedFork)-1], true)
+				err = t.updateForkState(finalizedFork[len(finalizedFork)-1], VerifyingApprovals)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
@@ -156,18 +165,28 @@ func (t *AssignmentCollectorTree) selectFinalizedFork(startHeight, finalizedHeig
 	return fork, nil
 }
 
-// markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
-func (t *AssignmentCollectorTree) markForkProcessable(vertex *assignmentCollectorVertex, processable bool) {
-	vertex.processable = processable
+// updateForkState takes starting vertex of some fork and marks it as processable in recursive manner
+func (t *AssignmentCollectorTree) updateForkState(vertex *assignmentCollectorVertex, newState ProcessingStatus) error {
+	expectedState := vertex.collector.ProcessingStatus()
+	err := vertex.collector.ChangeProcessingStatus(expectedState, newState)
+	if err != nil {
+		return err
+	}
+
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
-		t.markForkProcessable(iter.NextVertex().(*assignmentCollectorVertex), processable)
+		err := t.updateForkState(iter.NextVertex().(*assignmentCollectorVertex), newState)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // GetCollectorsByInterval returns processable collectors that satisfy interval [from; to)
-func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollector {
-	var vertices []*AssignmentCollector
+func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []AssignmentCollector {
+	var vertices []AssignmentCollector
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -179,7 +198,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 		iter := t.forest.GetVerticesAtLevel(l)
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
-			if vertex.processable {
+			if vertex.collector.ProcessingStatus() == VerifyingApprovals {
 				vertices = append(vertices, vertex.collector)
 			}
 		}
@@ -190,21 +209,19 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
-	Collector   *AssignmentCollector
-	Processable bool // whether collector is processable
-	Created     bool // whether collector was created or retrieved from cache
+	Collector AssignmentCollectorState
+	Created   bool // whether collector was created or retrieved from cache
 }
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double-checked locking.
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*LazyInitCollector, error) {
 	resultID := result.ID()
 	// first let's check if we have a collector already
-	cachedCollector, processable := t.GetCollector(resultID)
+	cachedCollector := t.GetCollector(resultID)
 	if cachedCollector != nil {
 		return &LazyInitCollector{
-			Collector:   cachedCollector,
-			Processable: processable,
-			Created:     false,
+			Collector: cachedCollector,
+			Created:   false,
 		}, nil
 	}
 
@@ -213,8 +230,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
 	}
 	vertex := &assignmentCollectorVertex{
-		collector:   collector,
-		processable: false,
+		collector: collector,
 	}
 
 	executedBlock, err := t.headers.ByBlockID(result.BlockID)
@@ -230,9 +246,8 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
-			Collector:   v.(*assignmentCollectorVertex).collector,
-			Processable: v.(*assignmentCollectorVertex).processable,
-			Created:     false,
+			Collector: v.(*assignmentCollectorVertex).collector,
+			Created:   false,
 		}, nil
 	}
 
@@ -240,10 +255,11 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	// either (i) the parent result is the latest sealed result (seal is finalized)
 	//    or (ii) the result's parent is processable
 	parent, parentFound := t.forest.GetVertex(result.PreviousResultID)
+	newStatus := CachingApprovals
 	if parentFound {
-		vertex.processable = parent.(*assignmentCollectorVertex).processable
+		newStatus = parent.(*assignmentCollectorVertex).collector.ProcessingStatus()
 	} else if executedBlock.ParentID == t.lastSealedID {
-		vertex.processable = true
+		newStatus = VerifyingApprovals
 	}
 
 	err = t.forest.VerifyVertex(vertex)
@@ -253,11 +269,13 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 
 	t.forest.AddVertex(vertex)
 	t.size += 1
-	t.markForkProcessable(vertex, vertex.processable)
+	err = t.updateForkState(vertex, newStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update fork state: %w", err)
+	}
 	return &LazyInitCollector{
-		Collector:   vertex.collector,
-		Processable: vertex.processable,
-		Created:     true,
+		Collector: vertex.collector,
+		Created:   true,
 	}, nil
 }
 

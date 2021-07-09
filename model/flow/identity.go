@@ -292,10 +292,10 @@ func (il IdentityList) Selector() IdentityFilter {
 	}
 }
 
-func (il IdentityList) Lookup() map[Identifier]struct{} {
-	lookup := make(map[Identifier]struct{})
+func (il IdentityList) Lookup() map[Identifier]*Identity {
+	lookup := make(map[Identifier]*Identity, len(il))
 	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
+		lookup[identity.NodeID] = identity
 	}
 	return lookup
 }
