@@ -56,6 +56,13 @@ type ApprovalProcessingCoreTestSuite struct {
 	core              *Core
 }
 
+func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
+	// Without this line we are risking running into weird situations where one test has finished but there are active workers
+	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
+	// starting next test.
+	s.core.workerPool.StopWait()
+}
+
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
