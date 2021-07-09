@@ -564,7 +564,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Error(t, err)
 
 		// finalize block 3 so we can finalize subsequent blocks
-		// ensure an epoch phase transition when we finalize block 3
 		err = state.Finalize(block3.ID())
 		require.NoError(t, err)
 
