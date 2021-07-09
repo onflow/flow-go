@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/fxamacker/cbor/v2"
@@ -253,11 +254,6 @@ func (m StorageFormatV5Migration) reencodeValue(
 			)
 	}
 
-	m.Log.Info().
-		Str("key", key).
-		Str("owner", owner.String()).
-		Msgf("reencode: %T", rootValue)
-
 	// Force decoding of all container values
 
 	interpreter.InspectValue(
@@ -276,22 +272,6 @@ func (m StorageFormatV5Migration) reencodeValue(
 	)
 
 	m.addKnownContainerStaticTypes(rootValue, owner, key)
-
-	// TODO:
-	//
-	//
-	//addressLocation, ok := location.(common.AddressLocation)
-	//if !ok {
-	//	return nil, fmt.Errorf(
-	//		"cannot load program for unsupported non-address location: %s",
-	//		addressLocation,
-	//	)
-	//}
-	//
-	//contractCode, err := accounts.GetContract(
-	//	addressLocation.Name,
-	//	flow.Address(addressLocation.Address),
-	//)
 
 	// Infer the static types for array values and dictionary values
 
@@ -315,11 +295,15 @@ func (m StorageFormatV5Migration) reencodeValue(
 						return false
 					}
 
-					m.Log.Warn().Msgf(
-						"inferred array static type %s from contents: %s",
-						inspectedValue.StaticType(),
-						inspectedValue,
-					)
+					m.Log.Warn().
+						Str("key", key).
+						Str("owner", owner.String()).
+						Str("rootValue", rootValue.String()).
+						Msgf(
+							"inferred array static type %s from contents: %s",
+							inspectedValue.StaticType(),
+							inspectedValue,
+						)
 				}
 
 			case *interpreter.DictionaryValue:
@@ -331,11 +315,15 @@ func (m StorageFormatV5Migration) reencodeValue(
 						return false
 					}
 
-					m.Log.Warn().Msgf(
-						"inferred dictionary static type %s from contents: %s",
-						inspectedValue.StaticType(),
-						inspectedValue,
-					)
+					m.Log.Warn().
+						Str("key", key).
+						Str("owner", owner.String()).
+						Str("rootValue", rootValue.String()).
+						Msgf(
+							"inferred dictionary static type %s from contents: %s",
+							inspectedValue.StaticType(),
+							inspectedValue,
+						)
 				}
 			}
 
