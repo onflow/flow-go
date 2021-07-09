@@ -155,7 +155,7 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *messages.ChunkDataResponse:
-		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack, &resource.Collection)
+		e.handleChunkDataPackWithTracing(originID, resource)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -164,24 +164,24 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // handleChunkDataPackWithTracing encapsulates the logic of handling a chunk data pack with tracing enabled.
-func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
-	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
+func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, response *messages.ChunkDataResponse) {
+	span, ok := e.tracer.GetSpan(response.Body.ChunkID, trace.VERProcessChunkDataPackRequest)
 	if !ok {
-		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", chunkDataPack.ChunkID)
+		span = e.tracer.StartSpan(response.Body.ChunkID, trace.VERProcessChunkDataPackRequest)
+		span.SetTag("chunk_id", response.Body.ChunkID)
 		defer span.Finish()
 	}
 
 	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
 	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataResponse, func() {
-		e.handleChunkDataPack(originID, chunkDataPack, collection)
+		e.handleChunkDataPack(originID, response)
 	})
 }
 
-// handleChunkDataPack sends the received chunk data pack and its collection to the registered handler, and cleans up its request status.
-func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
-	chunkID := chunkDataPack.ChunkID
-	collectionID := collection.ID()
+// handleChunkDataPack sends the received chunk data pack response to the registered handler, and cleans up its request status.
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, response *messages.ChunkDataResponse) {
+	chunkID := response.Body.ChunkID
+	collectionID := response.Body.Collection.ID()
 	lg := e.log.With().
 		Hex("chunk_id", logging.ID(chunkID)).
 		Hex("collection_id", logging.ID(collectionID)).
@@ -197,7 +197,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 
-	e.handler.HandleChunkDataPack(originID, chunkDataPack, collection)
+	e.handler.HandleChunkDataPack(originID, response)
 
 	e.metrics.OnChunkDataPackSentToFetcher()
 	lg.Info().Msg("successfully sent the chunk data pack to the handler")
