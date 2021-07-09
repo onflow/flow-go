@@ -793,10 +793,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 // TestProcessFinalizedBlock_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
 // after parent block gets sealed. More specifically this case:
-// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
-//               <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
-//                     |
-//                 finalized
+// P <- A <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
+//        <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
+//               |
+//           finalized
 // Initially P was executed,  B is finalized and incorporates ER for A, C incorporates ER for B, D was forked from
 // A but wasn't finalized, E incorporates ER for D.
 // Let's take a case where we have collectors for ER incorporated in blocks B, C, D, E. Since we don't
