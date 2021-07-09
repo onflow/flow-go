@@ -134,14 +134,6 @@ func (e *ScriptEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
 	return adresses
 }
 
-func (e *ScriptEnv) getEvents() []flow.Event {
-	return e.eventHandler.Events()
-}
-
-func (e *ScriptEnv) getServiceEvents() []flow.Event {
-	return e.eventHandler.ServiceEvents()
-}
-
 func (e *ScriptEnv) getLogs() []string {
 	return e.logs
 }
