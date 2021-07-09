@@ -38,16 +38,16 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 	jobs := make(chan ledger.Payload)
 	results := make(chan storageFormatV5MigrationResult)
 
-	// TODO: runtime.NumCPU()
-	workerCount := 1
+	m.Log.Info().Msg("Loading account contracts ...")
 
-	l := newView(payloads)
-	st := state.NewState(l)
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
+	accounts := m.getContractsOnlyAccounts(payloads)
+
+	m.Log.Info().Msg("Loaded account contracts")
+
 	programs := programs.NewEmptyPrograms()
 	var brokenTypeIDs sync.Map
 
+	workerCount := 1 // goruntime.NumCPU()
 	for i := 0; i < workerCount; i++ {
 		go m.work(jobs, results, accounts, programs, &brokenTypeIDs)
 	}
@@ -81,6 +81,26 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 	}
 
 	return migratedPayloads, nil
+}
+
+func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+	var filteredPayloads []ledger.Payload
+
+	for _, payload := range payloads {
+		rawKey := string(payload.Key.KeyParts[2].Value)
+		if strings.HasPrefix(rawKey, "contract_names") ||
+			strings.HasPrefix(rawKey, "code.") ||
+			rawKey == "exists" {
+
+			filteredPayloads = append(filteredPayloads, payload)
+		}
+	}
+
+	l := newView(filteredPayloads)
+	st := state.NewState(l)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+	return accounts
 }
 
 func (m StorageFormatV5Migration) work(
