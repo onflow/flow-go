@@ -2,6 +2,11 @@ package approvals
 
 import (
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
 	mempool "github.com/onflow/flow-go/module/mempool/mock"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -9,11 +14,6 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
-
-	"github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 

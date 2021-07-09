@@ -1,14 +1,16 @@
 package approvals
 
 import (
-	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // AssignmentCollectorStateMachineTestSuite is a test suite for testing AssignmentCollectorStateMachine. Contains a minimal set of
