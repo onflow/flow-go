@@ -133,7 +133,7 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	}
 
 	var sum scalar
-
+	C.bn_new_wrapper((*C.bn_st)(&sum))
 	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
 		(C.int)(len(scalars)))
 	return newPrKeyBLSBLS12381(&sum), nil
@@ -172,7 +172,7 @@ func NeutralBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
 
-	var neutralPk PubKeyBLSBLS12381
+	neutralPk := *newPubKeyBLSBLS12381(nil)
 	// set the point to infinity
 	C.ep2_set_infty((*C.ep2_st)(&neutralPk.point))
 	return &neutralPk

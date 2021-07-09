@@ -73,6 +73,7 @@ func (s *feldmanVSSstate) init() {
 	s.y = nil
 	s.xReceived = false
 	s.vAReceived = false
+	C.bn_new_wrapper((*C.bn_st)(&s.x))
 }
 
 // Start starts running the protocol in the current node
@@ -236,6 +237,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	randZrStar(&s.a[0]) // non zero a[0]
 	genScalarMultG2(&s.vA[0], &s.a[0])
 	for i := 1; i < s.threshold+1; i++ {
+		C.bn_new_wrapper((*C.bn_st)(&s.a[i]))
 		randZr(&s.a[i])
 		genScalarMultG2(&s.vA[i], &s.a[i])
 	}

@@ -260,6 +260,7 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 
 	// sum up x
 	var jointx scalar
+	C.bn_new_wrapper((*C.bn_st)(&jointx))
 	C.bn_sum_vector((*C.bn_st)(&jointx), (*C.bn_st)(&qualifiedx[0]),
 		(C.int)(qualified))
 	// sum up Y
