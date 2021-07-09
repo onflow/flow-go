@@ -117,6 +117,12 @@ func addFinalizeCmdFlags() {
 
 func finalize(cmd *cobra.Command, args []string) {
 
+	actualSeedLength := len(flagBootstrapRandomSeed)
+	if actualSeedLength != randomSeedBytes {
+		log.Error().Int("expected", 48).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
+		return
+	}
+
 	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
 	log.Info().Msg("")
 
@@ -173,7 +179,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
-			getRandomSource(blockID),
+			getRandomSource(flagBootstrapRandomSeed),
 			assignments,
 			clusterQCs,
 			dkgData,
@@ -191,6 +197,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
+
 	// write snapshot to disk
 	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")

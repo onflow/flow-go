@@ -39,7 +39,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`constructing root blocks for collection node clusters` +
 	`constructing root QCs for collection node clusters` +
 	`constructing root execution result and block seal` +
-	`constructing root procotol snapshot` +
+	`constructing root protocol snapshot` +
 	`wrote file \S+/root-protocol-state-snapshot.json` +
 	`saved result and seal are matching` +
 	`attempting to copy private key files` +
@@ -245,5 +245,48 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, randomSource1, randomSource2)
 		assert.Equal(t, randomSource1, getRandomSource(deterministicSeed))
+	})
+}
+
+func TestFinalize_InvalidRandomSeedLength(t *testing.T) {
+	rootCommit := unittest.StateCommitmentFixture()
+	rootParent := unittest.StateCommitmentFixture()
+	chainName := "main"
+	rootHeight := uint64(12332)
+	epochCounter := uint64(2)
+
+	// set random seed with smaller length
+	deterministicSeed, err := hex.DecodeString("a12354a343234aa44bbb43")
+	require.NoError(t, err)
+
+	// invalid length execution logs
+	expectedLogs := regexp.MustCompile("random seed provided length is not valid")
+
+	utils.RunWithSporkBootstrapDir(t, func(bootDir, partnerDir, partnerStakes, internalPrivDir, configPath string) {
+
+		flagOutdir = bootDir
+
+		flagConfig = configPath
+		flagPartnerNodeInfoDir = partnerDir
+		flagPartnerStakes = partnerStakes
+		flagInternalNodePrivInfoDir = internalPrivDir
+
+		flagFastKG = true
+
+		flagRootCommit = hex.EncodeToString(rootCommit[:])
+		flagRootParent = hex.EncodeToString(rootParent[:])
+		flagRootChain = chainName
+		flagRootHeight = rootHeight
+		flagEpochCounter = epochCounter
+
+		// set deterministic bootstrapping seed
+		flagBootstrapRandomSeed = deterministicSeed
+
+		hook := zeroLoggerHook{logs: &strings.Builder{}}
+		log = log.Hook(hook)
+
+		finalize(nil, nil)
+		assert.Regexp(t, expectedLogs, hook.logs.String())
+		hook.logs.Reset()
 	})
 }
