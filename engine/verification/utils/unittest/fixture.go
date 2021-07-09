@@ -313,7 +313,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				collectionID = flow.ZeroID
 			}
 
-			eventsHash, err := computationResult.Events[i].Hash()
+			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
 			require.NoError(t, err)
 
 			chunk := &flow.Chunk{

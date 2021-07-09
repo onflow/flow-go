@@ -97,13 +97,13 @@ type BlockEvents struct {
 
 type EventsList []Event
 
-// Hash calculates a hash of events list,
+// EventsListHash calculates a hash of events list,
 // by simply hashing byte representation of events in the lists
-func (e EventsList) Hash() (Identifier, error) {
+func EventsListHash(el EventsList) (Identifier, error) {
 
 	hasher := hash.NewSHA3_256()
 
-	for _, event := range e {
+	for _, event := range el {
 		_, err := hasher.Write(event.Fingerprint())
 		if err != nil {
 			return ZeroID, fmt.Errorf("cannot write to hasher: %w", err)

@@ -4,15 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -37,6 +37,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 		vmCtx: vmCtx,
 		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithTransactionFeesEnabled(false),
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
@@ -55,7 +56,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
 	for i, txBody := range vc.Collection.Transactions {
-		tx := fvm.Transaction(txBody, uint32(i))
+		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
 
@@ -121,6 +122,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]*ledger.Key)
+	var problematicTx flow.Identifier
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
 		registerID := flow.NewRegisterID(owner, controller, key)
@@ -161,13 +163,15 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
 
-		// tx := fvm.Transaction(txBody, uint32(i))
-
 		err := fcv.vm.Run(context, tx, txView, programs)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
+		}
+
+		if len(unknownRegTouch) > 0 {
+			problematicTx = tx.ID
 		}
 
 		events = append(events, tx.Events...)
@@ -186,10 +190,10 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		for _, key := range unknownRegTouch {
 			missingRegs = append(missingRegs, key.String())
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx), nil
 	}
 
-	eventsHash, err := events.Hash()
+	eventsHash, err := flow.EventsListHash(events)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
@@ -241,9 +245,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			for i, key := range keys {
 				stringKeys[i] = key.String()
 			}
-			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID), nil
+			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
