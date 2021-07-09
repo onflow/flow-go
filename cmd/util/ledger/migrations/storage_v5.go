@@ -275,9 +275,11 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	// Infer the static types for array values and dictionary values
 
-	err = m.inferContainerStaticTypes(rootValue, accounts, programs, brokenTypeIDs)
-	if err != nil {
-		return nil, err
+	if accounts != nil {
+		err = m.inferContainerStaticTypes(rootValue, accounts, programs, brokenTypeIDs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// Check static types of arrays and dictionaries
@@ -285,6 +287,13 @@ func (m StorageFormatV5Migration) reencodeValue(
 	interpreter.InspectValue(
 		rootValue,
 		func(inspectedValue interpreter.Value) bool {
+
+			// NOTE: important: walking of siblings continues
+			// after setting an error and returning false (to stop walking),
+			// so don't overwrite a potentially already set error
+			if err != nil {
+				return false
+			}
 			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.ArrayValue:
 
@@ -453,6 +462,14 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 	interpreter.InspectValue(
 		rootValue,
 		func(inspectedValue interpreter.Value) bool {
+
+			// NOTE: important: walking of siblings continues
+			// after setting an error and returning false (to stop walking),
+			// so don't overwrite a potentially already set error
+			if err != nil {
+				return false
+			}
+
 			compositeValue, ok := inspectedValue.(*interpreter.CompositeValue)
 			if !ok {
 				// The inspected value is not a composite value,
