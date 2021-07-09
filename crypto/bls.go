@@ -171,10 +171,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 			KeyGenSeedMaxLenBLSBLS12381)
 	}
 
-	sk := &PrKeyBLSBLS12381{
-		// public key is only computed when needed
-		pk: nil,
-	}
+	sk := newPrKeyBLSBLS12381()
 
 	// maps the seed to a private key
 	// error is not checked as it is guaranteed to be nil
@@ -190,9 +187,8 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 			"the input length has to be equal to %d",
 			prKeyLengthBLSBLS12381)
 	}
-	sk := &PrKeyBLSBLS12381{
-		pk: nil,
-	}
+	sk := newPrKeyBLSBLS12381()
+
 	readScalar(&sk.scalar, privateKeyBytes)
 	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
 		return sk, nil
@@ -229,6 +225,16 @@ type PrKeyBLSBLS12381 struct {
 	pk *PubKeyBLSBLS12381
 	// private key data
 	scalar scalar
+}
+
+func newPrKeyBLSBLS12381() *PrKeyBLSBLS12381 {
+	sk := PrKeyBLSBLS12381{
+		// public key is only computed when needed
+		pk: nil,
+	}
+	// initialize the scalar
+	C.bn_new_wrapper((*C.bn_st)(&sk.scalar))
+	return &sk
 }
 
 // Algorithm returns the Signing Algorithm
