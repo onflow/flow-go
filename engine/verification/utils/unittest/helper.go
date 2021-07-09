@@ -337,7 +337,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 
 			}
 
-			chunkAssigner.On("Assign", &receipt.ExecutionResult, receipt.ExecutionResult.BlockID).Return(a, nil)
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(a, nil)
 			visited[receipt.ExecutionResult.ID()] = struct{}{}
 		}
 	}
