@@ -5,7 +5,6 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -147,7 +146,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 			// collection.
 
 			// TODO add real signatures here (2711)
-			f.prov.SubmitLocal(engine.PushGuarantees, &messages.SubmitCollectionGuarantee{
+			f.prov.SubmitLocal(&messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID:     payload.Collection.ID(),
 					ReferenceBlockID: payload.ReferenceBlockID,

@@ -108,8 +108,13 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
@@ -125,8 +130,10 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
@@ -345,7 +352,7 @@ func (e *Engine) processIncomingBlock(originID flow.Identifier, block *clustermo
 		Block:    block,
 	}
 
-	e.comp.SubmitLocal(engine.ChannelConsensusCluster(e.chainID), synced)
+	e.comp.SubmitLocal(synced)
 }
 
 // checkLoop will regularly scan for items that need requesting.

@@ -88,8 +88,13 @@ func New(
 	return &eng, nil
 }
 
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.ProcessLocal(event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
@@ -101,8 +106,10 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 	})
 }
 
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Ready returns a channel that will close when the engine has

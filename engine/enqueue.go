@@ -6,12 +6,10 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
 type Message struct {
-	Channel  network.Channel
 	OriginID flow.Identifier
 	Payload  interface{}
 }
@@ -52,10 +50,9 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 	}
 }
 
-func (e *MessageHandler) Process(channel network.Channel, originID flow.Identifier, payload interface{}) (err error) {
+func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) (err error) {
 
 	msg := &Message{
-		Channel:  channel,
 		OriginID: originID,
 		Payload:  payload,
 	}
@@ -63,7 +60,6 @@ func (e *MessageHandler) Process(channel network.Channel, originID flow.Identifi
 	log := e.log.
 		Warn().
 		Str("msg_type", logging.Type(payload)).
-		Str("channel", channel.String()).
 		Hex("origin_id", originID[:])
 
 	for _, pattern := range e.patterns {

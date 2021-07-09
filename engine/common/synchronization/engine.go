@@ -289,33 +289,41 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	err := e.process(e.me.NodeID(), event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
+	err := e.process(originID, event)
 	if err != nil {
 		engine.LogError(e.log, err)
 	}
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	return e.process(originID, event)
+}
+
+// process processes events for the synchronization engine.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
-		return e.requestMessageHandler.Process(channel, originID, event)
+		return e.requestMessageHandler.Process(originID, event)
 	case *messages.SyncResponse, *messages.BlockResponse:
-		return e.responseMessageHandler.Process(channel, originID, event)
+		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -600,7 +608,7 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 			OriginID: originID,
 			Block:    block,
 		}
-		e.comp.SubmitLocal(engine.ReceiveBlocks, synced)
+		e.comp.SubmitLocal(synced)
 	}
 	return nil
 }

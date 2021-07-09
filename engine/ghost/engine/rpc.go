@@ -150,8 +150,13 @@ func (e *RPC) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *RPC) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *RPC) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
@@ -167,8 +172,10 @@ func (e *RPC) Submit(channel network.Channel, originID flow.Identifier, event in
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *RPC) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *RPC) ProcessLocal(event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in

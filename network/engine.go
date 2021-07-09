@@ -12,7 +12,7 @@ import (
 type Engine interface {
 
 	// SubmitLocal submits an event originating on the local node.
-	SubmitLocal(channel Channel, event interface{})
+	SubmitLocal(event interface{})
 
 	// Submit submits the given event from the node with the given origin ID
 	// for processing in a non-blocking manner. It returns instantly and logs
@@ -20,7 +20,7 @@ type Engine interface {
 	Submit(channel Channel, originID flow.Identifier, event interface{})
 
 	// ProcessLocal processes an event originating on the local node.
-	ProcessLocal(channel Channel, event interface{}) error
+	ProcessLocal(event interface{}) error
 
 	// Process processes the given event from the node with the given origin ID
 	// in a blocking manner. It returns the potential processing error when

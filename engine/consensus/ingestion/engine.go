@@ -90,8 +90,11 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		engine.LogError(e.log, err)
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
@@ -105,8 +108,10 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in

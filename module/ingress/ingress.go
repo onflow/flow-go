@@ -134,7 +134,7 @@ func (h *handler) SendTransaction(ctx context.Context, req *access.SendTransacti
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("failed to convert transaction: %v", err))
 	}
 
-	err = h.engine.ProcessLocal(engine.PushTransactions, &tx)
+	err = h.engine.ProcessLocal(&tx)
 	if err != nil {
 		return nil, err
 	}

@@ -102,7 +102,7 @@ func (e *Engine) WithChunkDataPackHandler(handler fetcher.ChunkDataPackHandler) 
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
+func (e *Engine) SubmitLocal(event interface{}) {
 	e.log.Fatal().Msg("engine is not supposed to be invoked on SubmitLocal")
 }
 
@@ -119,7 +119,7 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
+func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("should not invoke ProcessLocal of Match engine, use Process instead")
 }
 

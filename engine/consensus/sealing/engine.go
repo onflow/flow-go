@@ -228,7 +228,7 @@ func (e *Engine) setupMessageHandler(requiredApprovalsForSealConstruction uint) 
 
 // Process sends event into channel with pending events. Generally speaking shouldn't lock for too long.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.messageHandler.Process(channel, originID, event)
+	return e.messageHandler.Process(originID, event)
 }
 
 // processAvailableMessages is processor of pending events which drives events from networking layer to business logic in `Core`.
@@ -322,8 +322,11 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	err := e.ProcessLocal(event)
+	if err != nil {
+		engine.LogError(e.log, err)
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
@@ -337,8 +340,8 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.messageHandler.Process(e.me.NodeID(), event)
 }
 
 // Ready returns a ready channel that is closed once the engine has fully

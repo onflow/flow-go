@@ -96,8 +96,11 @@ func (e *Engine) Done() <-chan struct{} {
 }
 
 // SubmitLocal submits an event originating on the local node.
-func (e *Engine) SubmitLocal(channel network.Channel, event interface{}) {
-	e.Submit(channel, e.me.NodeID(), event)
+func (e *Engine) SubmitLocal(event interface{}) {
+	err := e.ProcessLocal(event)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("internal error processing event")
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
@@ -111,13 +114,18 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 }
 
 // ProcessLocal processes an event originating on the local node.
-func (e *Engine) ProcessLocal(channel network.Channel, event interface{}) error {
-	return e.Process(channel, e.me.NodeID(), event)
+func (e *Engine) ProcessLocal(event interface{}) error {
+	return e.process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	return e.process(originID, event)
+}
+
+// process processes events for the matching engine on the consensus node.
+func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	receipt, ok := event.(*flow.ExecutionReceipt)
 	if !ok {
 		return fmt.Errorf("input message of incompatible type: %T, origin: %x", event, originID[:])
