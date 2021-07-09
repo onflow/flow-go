@@ -64,7 +64,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(len(assignedChunkIDs))
 
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	exeEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			originID, ok := args[0].(flow.Identifier)
 			require.True(t, ok)
@@ -174,7 +174,7 @@ func SetupMockConsensusNode(t *testing.T,
 	// creates a hasher for spock
 	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
 
-	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	conEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			originID, ok := args[0].(flow.Identifier)
 			assert.True(t, ok)
