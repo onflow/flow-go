@@ -61,7 +61,8 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 
 // WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
 // compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState) (*messages.BlockProposal,
+func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState,
+	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*messages.BlockProposal,
 	*flow.ExecutionReceipt) {
 
 	// get the state commitment for the highest finalized block
@@ -96,6 +97,13 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 			currentHeight++
 			return false
 		}
+
+		for _, qualifier := range qualifiers {
+			if !qualifier(*r2) {
+				return false
+			}
+		}
+
 		return true
 	}, receiptStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
@@ -105,4 +113,11 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 			currentHeight, currentID))
 
 	return b2, r2
+}
+
+// WithMinimumChunks creates a qualifier that returns true if receipt has the specified minimum number of chunks.
+func WithMinimumChunks(chunkNum int) func(flow.ExecutionReceipt) bool {
+	return func(receipt flow.ExecutionReceipt) bool {
+		return len(receipt.ExecutionResult.Chunks) >= chunkNum
+	}
 }

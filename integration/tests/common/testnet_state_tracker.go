@@ -15,7 +15,7 @@ import (
 
 type TestnetStateTracker struct {
 	ghostTracking bool
-	BlockState    BlockState
+	BlockState    *BlockState
 	ReceiptState  ReceiptState
 	ApprovalState ResultApprovalState
 	MsgState      MsgState
@@ -25,7 +25,7 @@ type TestnetStateTracker struct {
 // be used to stop tracking
 func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *client.GhostClient) {
 	// reset the state for in between tests
-	tst.BlockState = BlockState{}
+	tst.BlockState = NewBlockState()
 	tst.ReceiptState = ReceiptState{}
 
 	var reader *client.FlowMessageStreamReader
