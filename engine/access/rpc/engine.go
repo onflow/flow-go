@@ -13,6 +13,7 @@ import (
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
@@ -37,6 +38,7 @@ type Config struct {
 	MaxHeightRange            uint          // max size of height range requests
 	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
 	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
+	TransportCredentials      credentials.TransportCredentials
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -82,6 +84,8 @@ func New(log zerolog.Logger,
 		grpc.MaxRecvMsgSize(config.MaxMsgSize),
 		grpc.MaxSendMsgSize(config.MaxMsgSize),
 	}
+
+	grpcOpts = append(grpcOpts, grpc.Creds(config.TransportCredentials))
 
 	var interceptors []grpc.UnaryServerInterceptor // ordered list of interceptors
 	// if rpc metrics is enabled, first create the grpc metrics interceptor

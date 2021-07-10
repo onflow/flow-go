@@ -672,7 +672,7 @@ func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.Priv
 	key := generateNetworkingKey(t)
 
 	// translates flow key into libp2p key
-	libP2Pkey, err := privKey(key)
+	libP2Pkey, err := PrivKey(key)
 	require.NoError(t, err)
 
 	return libP2Pkey, key
