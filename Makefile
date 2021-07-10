@@ -41,6 +41,10 @@ crypto/relic/build: crypto/relic
 crypto/relic/update:
 	git submodule update --recursive
 
+.PHONY: crypto/relic/build-arm-crosscompile
+crypto/relic/build-arm-crosscompile: crypto/relic
+	./crypto/relic_arm_crossbuild.sh
+
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
@@ -49,6 +53,16 @@ cmd/util/util:
 
 .PHONY: install-tools
 install-tools: crypto/relic/build check-go-version
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.29.0; \
+	cd ${GOPATH}; \
+	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
+	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
+	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
+	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
+	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
+
+.PHONY: install-tools-arm
+install-tools: crypto/relic/build-arm-crosscompile check-go-version
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.29.0; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
@@ -66,8 +80,20 @@ unittest:
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
+.PHONY: unittest-arm
+unittest-arm:
+	# test all packages with Relic library enabled
+	#CC=aarch64-linux-gnu-gcc GOARCH=arm GOARM=6 GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	#$(MAKE) -C crypto test
+	#$(MAKE) -C integration test
+	cd crypto && CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc GOOS=linux GOARCH=arm GOARM=6 GO111MODULE=on go test -tags=relic && cd ..
+
+
 .PHONY: test
 test: generate-mocks unittest
+
+.PHONY: test-arm
+test-arm: generate-mocks unittest-arm
 
 .PHONY: integration-test
 integration-test: docker-build-flow
@@ -154,6 +180,10 @@ fix-lint:
 # Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci
 ci: install-tools tidy test # lint coverage
+
+# Runs unit tests using an ARM compiler
+.PHONY: ci-arm
+ci-arm: install-tools-arm tidy test-arm 
 
 # Runs integration tests
 .PHONY: ci-integration
