@@ -173,10 +173,10 @@ func TestDifferentSeedWillProduceDifferentSelection(t *testing.T) {
 		identity.Stake = uint64(i)
 	}
 
-	seed1 := make([]byte, 16)
+	seed1 := make([]byte, 32)
 	seed1[0] = 34
 
-	seed2 := make([]byte, 16)
+	seed2 := make([]byte, 32)
 	seed2[0] = 8
 
 	leaders1, err := ComputeLeaderSelectionFromSeed(0, seed1, N_VIEWS, identities)
@@ -301,7 +301,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	})
 
 	t.Run("fuzzy set", func(t *testing.T) {
-		rng, err := random.NewRand(someSeed)
+		rng, err := random.NewRand(someSeed, []byte("leader_selec"))
 		require.NoError(t, err)
 
 		for i := 0; i < 100; i++ {
@@ -338,7 +338,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 		}
 
 		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
-			rng, err := random.NewRand(someSeed)
+			rng, err := random.NewRand(someSeed, []byte("leader_selec"))
 			require.NoError(t, err)
 
 			for i := 0; i < 100; i++ {

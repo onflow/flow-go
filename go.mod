@@ -57,9 +57,8 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
-	golang.org/x/sys v0.0.0-20210603125802-9665404d3644 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.33.2

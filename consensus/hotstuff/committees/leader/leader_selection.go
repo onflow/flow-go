@@ -88,7 +88,7 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // seed - the random seed for leader selection
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the stake info, which is used as weight for the chance of
-// 							the identity to be selected as leader.
+//							the identity to be selected as leader.
 func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
 
 	if count < 1 {
@@ -119,7 +119,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
 func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
 	// create random number generator from the seed
-	rng, err := random.NewRand(seed)
+	rng, err := random.NewRand(seed, []byte("leader_selec"))
 	if err != nil {
 		return nil, fmt.Errorf("can not create rng: %w", err)
 	}
