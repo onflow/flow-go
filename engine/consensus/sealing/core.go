@@ -202,12 +202,22 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	c.log.Info().Msgf("reloading assignments from %d unfinalized blocks into collector tree", len(validPending))
 
+	// When adding an incorporated result to the AssignmentCollectorTree, the verifier assignment is computed.
+	// This requires the Source of Randomness (SoR). However, the SoR is only available, if a valid child block exists.
+	// That is why we need to traverse blocks that already have a valid child
+	// This situation cannot happen in phase 2 because SoR is taken from executed block(not the one which incorporates result)
 	for _, blockID := range validPending {
 		block, err := c.headers.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", blockID, err)
 		}
-		err = resultProcessor(block)
+
+		parent, err := c.headers.ByBlockID(block.ParentID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", block.ParentID, err)
+		}
+
+		err = resultProcessor(parent)
 		if err != nil {
 			return fmt.Errorf("failed to process results for unfinalized block %x at height %d: %w", blockID, block.Height, err)
 		}
