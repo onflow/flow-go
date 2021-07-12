@@ -250,10 +250,24 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	rootValue, err := interpreter.DecodeValueV4(data, &owner, path, version, nil)
 	if err != nil {
-		return nil, false, fmt.Errorf(
-			"failed to decode value: %w\n\nvalue:\n%s\n",
-			err, hex.Dump(data),
-		)
+		const cborTagStorageReference = 202
+		if tagErr, ok := err.(interpreter.UnsupportedTagDecodingError); ok &&
+			tagErr.Tag == cborTagStorageReference &&
+			bytes.Compare(data[:2], []byte{0xd8, cborTagStorageReference}) == 0 {
+
+			m.Log.Warn().
+				Str("key", key).
+				Str("owner", owner.String()).
+				Msgf("DELETING unsupported storage reference")
+
+			return nil, false, nil
+
+		} else {
+			return nil, false, fmt.Errorf(
+				"failed to decode value: %w\n\nvalue:\n%s\n",
+				err, hex.Dump(data),
+			)
+		}
 	}
 
 	// Force decoding of all container values
