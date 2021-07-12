@@ -515,11 +515,14 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 				member, ok := compositeType.Members.Get(fieldName)
 				if !ok {
+					m.Log.Warn().
+						Msgf("missing type for field: %s.%s", typeID, fieldName)
+
 					// TODO: OK?
 					// If the type info for the field is missing,
 					// then delete the field contents
 
-					fieldsToDelete = append(fieldsToDelete)
+					fieldsToDelete = append(fieldsToDelete, fieldName)
 					continue
 				}
 
@@ -543,8 +546,8 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 			for _, fieldName := range fieldsToDelete {
 				m.Log.Warn().
-					Str("typeID", string(typeID)).
-					Msgf("removing field with missing type: %s", fieldName)
+					Msgf("removing field with missing type: %s.%s", typeID, fieldName)
+
 				fields.Delete(fieldName)
 			}
 
