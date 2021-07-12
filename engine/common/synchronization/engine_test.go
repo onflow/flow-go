@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -436,7 +437,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
-		require.NoError(ss.T(), ss.e.Process(originID, msg))
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
 	}
 
 	finalHeight := ss.head.Height
@@ -451,7 +452,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
-		require.NoError(ss.T(), ss.e.Process(originID, msg))
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
 	}
 
 	// give at least some time to process items

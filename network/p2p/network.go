@@ -415,7 +415,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	// tracks its processing time.
 	startTimestamp := time.Now()
 
-	err = eng.Process(qm.SenderID, qm.Payload)
+	err = eng.Process(qm.Target, qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
 			Err(err).
