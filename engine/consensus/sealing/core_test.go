@@ -590,7 +590,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingSealedRe
 // verifiers assigned to those chunks. It also checks that the threshold and
 // rate limiting is respected.
 func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
-	s.core.requestTracker = approvals.NewRequestTracker(1, 3)
+	s.core.requestTracker = approvals.NewRequestTracker(s.core.headers, 1, 3)
 	s.sealsPL.On("ByID", mock.Anything).Return(nil, false)
 
 	// n is the total number of blocks and incorporated-results we add to the

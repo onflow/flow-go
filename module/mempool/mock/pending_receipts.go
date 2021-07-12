@@ -43,6 +43,20 @@ func (_m *PendingReceipts) ByPreviousResultID(previousReusltID flow.Identifier) 
 	return r0
 }
 
+// PruneUpToHeight provides a mock function with given fields: height
+func (_m *PendingReceipts) PruneUpToHeight(height uint64) error {
+	ret := _m.Called(height)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(height)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Rem provides a mock function with given fields: receiptID
 func (_m *PendingReceipts) Rem(receiptID flow.Identifier) bool {
 	ret := _m.Called(receiptID)
