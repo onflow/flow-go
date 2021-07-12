@@ -161,7 +161,7 @@ func (i *TransactionInvocator) Process(
 	}
 
 	if txError == nil {
-		txError = i.checkAccountStorageLimit(env, sth.State().UpdatedAddresses())
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 	}
 
 	if txError == nil {
@@ -233,15 +233,6 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
 	}
 	return nil
-}
-
-func (i *TransactionInvocator) checkAccountStorageLimit(env Enviornment, addresses []flow.Address) error {
-	if !env.Context().LimitAccountStorage {
-		return nil
-	}
-
-	// check the storage limits
-	return NewTransactionStorageLimiter().CheckLimits(env, addresses)
 }
 
 func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {

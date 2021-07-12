@@ -44,7 +44,16 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		err := d.CheckLimits(env, []flow.Address{owner})
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
+	t.Run("if ctx LimitAccountStorage false-> OK", func(t *testing.T) {
+		env := &fvmmock.Enviornment{}
+		env.On("Context").Return(&fvm.Context{LimitAccountStorage: false})
+		env.On("GetStorageCapacity", mock.Anything).Return(uint64(100), nil)
+		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
 
+		d := &fvm.TransactionStorageLimiter{}
+		err := d.CheckLimits(env, []flow.Address{owner})
+		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
+	})
 	t.Run("non existing accounts or any other errors on fetching storage used -> Not OK", func(t *testing.T) {
 		env := &fvmmock.Enviornment{}
 		env.On("Context").Return(&fvm.Context{LimitAccountStorage: true})
