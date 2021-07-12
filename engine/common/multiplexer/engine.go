@@ -9,15 +9,17 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 type Engine struct {
-	unit     *engine.Unit   // used to manage concurrency & shutdown
-	log      zerolog.Logger // used to log relevant actions with context
-	me       module.Local
-	net      module.Network
-	engines  map[network.Channel][]network.Engine // stores engine registration mapping
-	conduits map[network.Channel]network.Conduit  // stores conduits for all registered channels
+	unit        *engine.Unit   // used to manage concurrency & shutdown
+	log         zerolog.Logger // used to log relevant actions with context
+	me          module.Local
+	net         module.Network
+	chanEngines map[network.Channel][]network.Engine // stores engine registration mapping
+	conduits    map[network.Channel]network.Conduit  // stores conduits for all registered channels
+	engines     map[network.Engine]struct{}          // set of all registered engines
 }
 
 func New(
@@ -26,12 +28,13 @@ func New(
 	me module.Local,
 ) (*Engine, error) {
 	e := &Engine{
-		unit:     engine.NewUnit(),
-		log:      log.With().Str("engine", "multiplexer").Logger(),
-		me:       me,
-		net:      net,
-		engines:  make(map[network.Channel][]network.Engine),
-		conduits: make(map[network.Channel]network.Conduit),
+		unit:        engine.NewUnit(),
+		log:         log.With().Str("engine", "multiplexer").Logger(),
+		me:          me,
+		net:         net,
+		chanEngines: make(map[network.Channel][]network.Engine),
+		conduits:    make(map[network.Channel]network.Conduit),
+		engines:     make(map[network.Engine]struct{}),
 	}
 
 	return e, nil
@@ -41,7 +44,7 @@ func New(
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 func (e *Engine) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
-	_, ok := e.engines[channel]
+	_, ok := e.chanEngines[channel]
 
 	if !ok {
 		conduit, err := e.net.Register(channel, e)
@@ -52,16 +55,17 @@ func (e *Engine) Register(channel network.Channel, engine network.Engine) (netwo
 		e.conduits[channel] = conduit
 
 		// initializes the engine set for the provided channel
-		e.engines[channel] = make([]network.Engine, 0)
+		e.chanEngines[channel] = make([]network.Engine, 0)
 	}
 
-	for _, eng := range e.engines[channel] {
+	for _, eng := range e.chanEngines[channel] {
 		if eng == engine {
 			return nil, fmt.Errorf("engine already registered on channel: %s", channel)
 		}
 	}
 
-	e.engines[channel] = append(e.engines[channel], engine)
+	e.chanEngines[channel] = append(e.chanEngines[channel], engine)
+	e.engines[engine] = struct{}{}
 
 	return e.conduits[channel], nil
 }
@@ -71,14 +75,21 @@ func (e *Engine) Register(channel network.Channel, engine network.Engine) (netwo
 // registered engines have started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		for _, engines := range e.engines {
-			for _, engine := range engines {
-				engine, ok := engine.(module.ReadyDoneAware)
-				if ok {
-					<-engine.Ready()
-				}
+		for engine := range e.engines {
+			engine, ok := engine.(module.ReadyDoneAware)
+			if ok {
+				<-engine.Ready()
 			}
 		}
+
+		// for _, engines := range e.chanEngines {
+		// 	for _, engine := range engines {
+		// 		engine, ok := engine.(module.ReadyDoneAware)
+		// 		if ok {
+		// 			<-engine.Ready()
+		// 		}
+		// 	}
+		// }
 	})
 }
 
@@ -87,14 +98,21 @@ func (e *Engine) Ready() <-chan struct{} {
 // have stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		for _, engines := range e.engines {
-			for _, engine := range engines {
-				engine, ok := engine.(module.ReadyDoneAware)
-				if ok {
-					<-engine.Done()
-				}
+		for engine := range e.engines {
+			engine, ok := engine.(module.ReadyDoneAware)
+			if ok {
+				<-engine.Done()
 			}
 		}
+
+		// for _, engines := range e.chanEngines {
+		// 	for _, engine := range engines {
+		// 		engine, ok := engine.(module.ReadyDoneAware)
+		// 		if ok {
+		// 			<-engine.Done()
+		// 		}
+		// 	}
+		// }
 	})
 }
 
@@ -137,10 +155,15 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // process fans out the given event in parallel to all the engines that have
 // registered with this multiplexer on the given channel.
 func (e *Engine) process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	engines, ok := e.engines[channel]
+	engines, ok := e.chanEngines[channel]
 
 	if !ok {
-		return fmt.Errorf("multiplexer has no engines registered on channel %s", channel)
+		log.Warn().Msgf("multiplexer has no engines registered on channel %s", channel)
+		return nil
+
+		// TODO: should we consider this an actual error?
+
+		// return fmt.Errorf("multiplexer has no engines registered on channel %s", channel)
 	}
 
 	var wg sync.WaitGroup
@@ -160,6 +183,8 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	}
 
 	wg.Wait()
+
+	// TODO: should we just call Submit instead and return immediately?
 
 	// for _, eng := range engines {
 	// 	eng.Submit(channel, originID, event)
