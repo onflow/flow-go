@@ -1,6 +1,7 @@
 package multiplexer_test
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -14,6 +15,14 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
+
+func getEvent() interface{} {
+	return struct {
+		foo string
+	}{
+		foo: "bar",
+	}
+}
 
 type Suite struct {
 	suite.Suite
@@ -45,11 +54,7 @@ func TestMultiplexer(t *testing.T) {
 
 func (suite *Suite) TestHappyPath() {
 	id := unittest.IdentifierFixture()
-	event := struct {
-		foo string
-	}{
-		foo: "bar",
-	}
+	event := getEvent()
 
 	chan1 := network.Channel("test-chan-1")
 	chan2 := network.Channel("test-chan-2")
@@ -134,7 +139,48 @@ func (suite *Suite) TestHappyPath() {
 }
 
 func (suite *Suite) TestDownstreamEngineFailure() {
-	// TODO: test failure in downstream engine
+	id := unittest.IdentifierFixture()
+	event := getEvent()
+
+	channel := network.Channel("test-chan")
+
+	engine1 := new(mocknetwork.Engine)
+	engine2 := new(mocknetwork.Engine)
+
+	con, err := suite.engine.Register(channel, engine1)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(channel, engine2)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+
+	// engine1 processing error should not impact engine2
+
+	engine1.On("Process", channel, id, event).Return(errors.New("Process Error!")).Once()
+	engine2.On("Process", channel, id, event).Return(nil).Once()
+
+	err = suite.engine.Process(channel, id, event)
+	suite.Assert().Nil(err)
+
+	engine1.AssertNumberOfCalls(suite.T(), "Process", 1)
+	engine2.AssertNumberOfCalls(suite.T(), "Process", 1)
+
+	engine1.AssertExpectations(suite.T())
+	engine2.AssertExpectations(suite.T())
+
+	// engine2 processing error should not impact engine1
+
+	engine1.On("Process", channel, id, event).Return(nil).Once()
+	engine2.On("Process", channel, id, event).Return(errors.New("Process Error!")).Once()
+
+	err = suite.engine.Process(channel, id, event)
+	suite.Assert().Nil(err)
+
+	engine1.AssertNumberOfCalls(suite.T(), "Process", 2)
+	engine2.AssertNumberOfCalls(suite.T(), "Process", 2)
+
+	engine1.AssertExpectations(suite.T())
+	engine2.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestProcessUnregisteredChannel() {
