@@ -4,11 +4,11 @@ on:
   push:
     branches: 
       - master
-      - auto-cadence-upgrade/*
+      - 'auto-cadence-upgrade/*'
   pull_request:
     branches:
       - master
-      - auto-cadence-upgrade/*
+      - 'auto-cadence-upgrade/*'
 
 jobs:
   golangci:
