@@ -59,22 +59,29 @@ func (suite *Suite) TestHappyPath() {
 	engine2 := new(mocknetwork.Engine)
 	engine3 := new(mocknetwork.Engine)
 
-	suite.engine.Register(chan1, engine1)
-	suite.engine.Register(chan1, engine2)
+	_, err := suite.engine.Register(chan1, engine1)
+	suite.Assert().Nil(err)
+	_, err = suite.engine.Register(chan1, engine2)
+	suite.Assert().Nil(err)
 
-	suite.engine.Register(chan2, engine2)
-	suite.engine.Register(chan2, engine3)
+	_, err = suite.engine.Register(chan2, engine2)
+	suite.Assert().Nil(err)
+	_, err = suite.engine.Register(chan2, engine3)
+	suite.Assert().Nil(err)
 
-	suite.engine.Register(chan3, engine1)
-	suite.engine.Register(chan3, engine2)
-	suite.engine.Register(chan3, engine3)
+	_, err = suite.engine.Register(chan3, engine1)
+	suite.Assert().Nil(err)
+	_, err = suite.engine.Register(chan3, engine2)
+	suite.Assert().Nil(err)
+	_, err = suite.engine.Register(chan3, engine3)
+	suite.Assert().Nil(err)
 
 	// Message sent on chan1 should be delivered to engine1 and engine2
 
 	engine1.On("Process", chan1, id, event).Return(nil).Once()
 	engine2.On("Process", chan1, id, event).Return(nil).Once()
 
-	err := suite.engine.Process(chan1, id, event)
+	err = suite.engine.Process(chan1, id, event)
 	suite.Assert().Nil(err)
 
 	engine1.AssertNumberOfCalls(suite.T(), "Process", 1)
