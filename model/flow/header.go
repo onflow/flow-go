@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
@@ -95,6 +96,52 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	err := json.Unmarshal(data, Decodable(h))
 
 	// NOTE: the timezone check is not required for JSON, as it already encodes
+	// timezones, but it doesn't hurt to add it in case someone messes with the
+	// raw encoded format
+	if h.Timestamp.Location() != time.UTC {
+		h.Timestamp = h.Timestamp.UTC()
+	}
+
+	return err
+}
+
+// MarshalJSON makes sure the timestamp is encoded in UTC.
+func (h Header) MarshalCBOR() ([]byte, error) {
+
+	// NOTE: this is just a sanity check to make sure that we don't get
+	// different encodings if someone forgets to use UTC timestamps
+	if h.Timestamp.Location() != time.UTC {
+		h.Timestamp = h.Timestamp.UTC()
+	}
+
+	// we use an alias to avoid endless recursion; the alias will not have the
+	// marshal function and encode like a raw header
+	type Encodable Header
+//	opts := cbor.CanonicalEncOptions()
+	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
+	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
+	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
+	opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
+	em, err := opts.EncMode() 
+	if err != nil {
+		return nil, err
+	}
+	return em.Marshal(Encodable(h))
+}
+
+// UnmarshalJSON makes sure the timestamp is decoded in UTC.
+func (h *Header) UnmarshalCBOR(data []byte) error {
+
+	// we use an alias to avoid endless recursion; the alias will not have the
+	// unmarshal function and decode like a raw header
+	// NOTE: for some reason, the pointer alias works for JSON to not recurse,
+	// but msgpack will still recurse; we have to do an extra struct copy here
+	type Decodable Header
+	decodable := Decodable(*h)
+	err := cbor.Unmarshal(data, &decodable)
+	*h = Header(decodable)
+
+	// NOTE: the timezone check is not required for CBOR, as it already encodes
 	// timezones, but it doesn't hurt to add it in case someone messes with the
 	// raw encoded format
 	if h.Timestamp.Location() != time.UTC {

@@ -1,0 +1,76 @@
+// (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
+
+package cbor
+
+import (
+	"fmt"
+	"io"
+
+	"github.com/fxamacker/cbor/v2"
+
+	"github.com/onflow/flow-go/binstat"
+	"github.com/onflow/flow-go/network"
+)
+
+// Codec represents a JSON codec for our network.
+type Codec struct {
+}
+
+// NewCodec creates a new JSON codec.
+func NewCodec() *Codec {
+	c := &Codec{}
+	return c
+}
+
+// NewEncoder creates a new JSON encoder with the given underlying writer.
+func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
+	enc := cbor.NewEncoder(w)
+	return &Encoder{enc: enc}
+}
+
+// NewDecoder creates a new JSON decoder with the given underlying reader.
+func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
+	dec := cbor.NewDecoder(r)
+	return &Decoder{dec: dec}
+}
+
+// Encode will encode the givene entity and return the bytes.
+func (c *Codec) Encode(v interface{}) ([]byte, error) {
+
+	// encode the value
+	env, err := v2envEncode(v, "~3net:wire<1")
+	if err != nil {
+		return nil, fmt.Errorf("could not encode envelope: %w", err)
+	}
+
+	// encode the envelope
+	p := binstat.EnterTime("~3net:wire<2envelope2payload", "")
+	data, err := cbor.Marshal(env)
+	binstat.LeaveVal(p, int64(len(data)))
+	if err != nil {
+		return nil, fmt.Errorf("could not encode value: %w", err)
+	}
+
+	return data, nil
+}
+
+// Decode will attempt to decode the given entity from bytes.
+func (c *Codec) Decode(data []byte) (interface{}, error) {
+
+	// decode the envelope
+	var env Envelope
+	p := binstat.EnterTime("~3net:wire>3payload2envelope", "")
+	err := cbor.Unmarshal(data, &env)
+	binstat.LeaveVal(p, int64(len(env.Data)))
+	if err != nil {
+		return nil, fmt.Errorf("could not decode envelope: %w", err)
+	}
+
+	// decode the value
+	v, err := env2vDecode(env, "~3net:wire>4")
+	if err != nil {
+		return nil, fmt.Errorf("could not decode value: %w", err)
+	}
+
+	return v, nil
+}

@@ -8,13 +8,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/network/codec/json"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestRoundTripHeader(t *testing.T) {
-	codec := json.NewCodec()
+func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
 	message := &messages.BlockProposal{Header: block.Header, Payload: block.Payload}
 	encoded, err := codec.Encode(message)
@@ -26,4 +27,14 @@ func TestRoundTripHeader(t *testing.T) {
 	messageHeader := fmt.Sprintf("- .Header=%+v\n", message.Header)
 	decodedHeader := fmt.Sprintf("- .Header=%+v\n", decoded.Header)
 	assert.Equal(t, messageHeader, decodedHeader)
+}
+
+func TestRoundTripHeaderViaJSON(t *testing.T) {
+	codec := jsoncodec.NewCodec()
+	roundTripHeaderViaCodec(t, codec)
+}
+
+func TestRoundTripHeaderViaCBOR(t *testing.T) {
+	codec := cborcodec.NewCodec()
+	roundTripHeaderViaCodec(t, codec)
 }
