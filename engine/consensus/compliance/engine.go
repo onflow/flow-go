@@ -204,7 +204,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.messageHandler.Process(originID, event)
 }
 
