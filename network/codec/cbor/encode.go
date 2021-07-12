@@ -191,7 +191,7 @@ func v2envEncode(v interface{}, via string) (*Envelope, error) {
 	// encode the payload
 	p := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code), "")
 	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
-	em, err3 := opts.EncMode() 
+	em, err3 := opts.EncMode()
 	if err3 != nil {
 		return nil, err3
 	}

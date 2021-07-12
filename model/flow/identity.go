@@ -11,8 +11,8 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/pkg/errors"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"

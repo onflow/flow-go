@@ -117,7 +117,6 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
 	type Encodable Header
-//	opts := cbor.CanonicalEncOptions()
 	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
 	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
 	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
