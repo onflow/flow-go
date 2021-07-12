@@ -207,7 +207,7 @@ func (e *Engine) processFinalizedBlock(blockID flow.Identifier) error {
 	}
 
 	// Notify rpc handler of new finalized block height
-	e.rpcEngine.SubmitLocal(engine.ReceiveBlocks, block)
+	e.rpcEngine.SubmitLocal(block)
 
 	// FIX: we can't index guarantees here, as we might have more than one block
 	// with the same collection as long as it is not finalized
