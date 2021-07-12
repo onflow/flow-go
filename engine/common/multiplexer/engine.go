@@ -16,8 +16,8 @@ type Engine struct {
 	log      zerolog.Logger // used to log relevant actions with context
 	me       module.Local
 	net      module.Network
-	engines  map[network.Channel][]network.Engine
-	conduits map[network.Channel]network.Conduit
+	engines  map[network.Channel][]network.Engine // stores engine registration mapping
+	conduits map[network.Channel]network.Conduit  // stores conduits for all registered channels
 }
 
 func New(
@@ -80,8 +80,6 @@ func (e *Engine) Ready() <-chan struct{} {
 			}
 		}
 	})
-
-	// return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
@@ -98,14 +96,16 @@ func (e *Engine) Done() <-chan struct{} {
 			}
 		}
 	})
-
-	// return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	// TODO: throw error
-	// e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.ProcessLocal(event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
@@ -113,7 +113,7 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.process(channel, originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -122,8 +122,7 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	// return e.Process(e.me.NodeID(), event)
-	// TODO: throw error
+	return fmt.Errorf("multiplexer engine does not process local events")
 }
 
 // Process processes the given event from the node with the given origin ID
@@ -155,8 +154,7 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 			err := e.Process(channel, originID, event)
 
 			if err != nil {
-				engine.LogError(e.log, err)
-				LogErrorWithMsg(log, "could not process message for ", err)
+				engine.LogErrorWithMsg(log, "downstream engine failed to process message", err)
 			}
 		}(eng, e.log)
 	}
