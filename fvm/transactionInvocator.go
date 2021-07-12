@@ -235,8 +235,8 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 	return nil
 }
 
-func (i *TransactionInvocator) checkAccountStorageLimit(env *hostEnv, addresses []flow.Address) error {
-	if !env.ctx.LimitAccountStorage {
+func (i *TransactionInvocator) checkAccountStorageLimit(env Enviornment, addresses []flow.Address) error {
+	if !env.Context().LimitAccountStorage {
 		return nil
 	}
 

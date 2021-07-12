@@ -16,10 +16,10 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 }
 
 func (d *TransactionStorageLimiter) CheckLimits(
-	env *hostEnv,
+	env Enviornment,
 	addresses []flow.Address,
 ) error {
-	if !env.ctx.LimitAccountStorage {
+	if !env.Context().LimitAccountStorage {
 		return nil
 	}
 

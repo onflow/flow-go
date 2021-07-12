@@ -186,6 +186,10 @@ func (e *ScriptEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 	return len(v) > 0, nil
 }
 
+func (e *ScriptEnv) AccountExists(address common.Address) (exists bool, err error) {
+	return e.accounts.Exists(flow.BytesToAddress(address.Bytes()))
+}
+
 func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
