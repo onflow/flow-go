@@ -193,9 +193,9 @@ func (e *Engine) onChunkDataRequest(
 			ChunkID:    cdp.ChunkID,
 			StartState: cdp.StartState,
 			Proof:      cdp.Proof,
+			Collection: collection,
 		},
-		Nonce:      rand.Uint64(),
-		Collection: collection,
+		Nonce: rand.Uint64(),
 	}
 
 	sinceProcess := time.Since(processStart)
