@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -326,6 +327,24 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 			dictionary.Type,
 		)
 	})
+}
+
+func TestGetContractValueChildKeyContractName(t *testing.T) {
+
+	assert.Equal(t,
+		"FlowAssets",
+		getContractValueChildKeyContractName([]byte("contract\x1fFlowAssets\x1fsets\x1fv\x1f12")),
+	)
+
+	assert.Equal(t,
+		"",
+		getContractValueChildKeyContractName([]byte("contract\x1fFlowAssets")),
+	)
+
+	assert.Equal(t,
+		"",
+		getContractValueChildKeyContractName([]byte("storage\x1fFlowAssets\x1fsets\x1fv\x1f12")),
+	)
 }
 
 func TestStorageFormatV5Migration_InspectionErrorOverwrite(t *testing.T) {

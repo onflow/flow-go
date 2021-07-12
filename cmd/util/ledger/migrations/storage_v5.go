@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 
@@ -24,8 +26,9 @@ import (
 )
 
 type storageFormatV5MigrationResult struct {
-	ledger.Payload
-	error
+	key     ledger.Key
+	payload *ledger.Payload
+	err     error
 }
 
 type StorageFormatV5Migration struct {
@@ -36,9 +39,6 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
-	jobs := make(chan ledger.Payload)
-	results := make(chan storageFormatV5MigrationResult)
-
 	m.Log.Info().Msg("Loading account contracts ...")
 
 	accounts := m.getContractsOnlyAccounts(payloads)
@@ -48,36 +48,28 @@ func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.P
 	programs := programs.NewEmptyPrograms()
 	var brokenTypeIDs sync.Map
 
-	workerCount := 1 // goruntime.NumCPU()
-	for i := 0; i < workerCount; i++ {
-		go m.work(jobs, results, accounts, programs, &brokenTypeIDs)
-	}
 
-	go func() {
-		for _, payload := range payloads {
-			jobs <- payload
-		}
+	for _, payload := range payloads {
 
-		close(jobs)
-	}()
+		result := m.migrate(payload, accounts, programs, &brokenTypeIDs)
 
-	for result := range results {
-		if result.error != nil {
-			keyParts := result.Key.KeyParts
+		keyParts := result.key.KeyParts
 
-			rawOwner := keyParts[0].Value
-			rawKey := keyParts[2].Value
+		rawOwner := keyParts[0].Value
+		rawKey := keyParts[2].Value
+
+		if result.err != nil {
 
 			return nil, fmt.Errorf(
 				"failed to migrate key: %q (owner: %x): %w",
 				rawKey,
 				rawOwner,
-				result.error,
+				result.err,
 			)
-		}
-		migratedPayloads = append(migratedPayloads, result.Payload)
-		if len(migratedPayloads) == len(payloads) {
-			break
+		} else if result.payload != nil {
+			migratedPayloads = append(migratedPayloads, *result.payload)
+		} else {
+			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
 		}
 	}
 
@@ -104,36 +96,30 @@ func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Pay
 	return accounts
 }
 
-func (m StorageFormatV5Migration) work(
-	jobs <-chan ledger.Payload,
-	results chan<- storageFormatV5MigrationResult,
+func (m StorageFormatV5Migration) migrate(
+	payload ledger.Payload,
 	accounts *state.Accounts,
 	programs *programs.Programs,
 	brokenTypeIDs *sync.Map,
-) {
-	for payload := range jobs {
-		migratedPayload, err := m.reencodePayload(
-			payload,
-			accounts,
-			programs,
-			brokenTypeIDs,
-		)
-		result := struct {
-			ledger.Payload
-			error
-		}{
-			Payload: payload,
-		}
-		if err != nil {
-			result.error = err
-		} else {
-			if err := m.checkStorageFormat(migratedPayload); err != nil {
-				panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
-			}
-			result.Payload = migratedPayload
-		}
-		results <- result
+) storageFormatV5MigrationResult {
+	migratedPayload, err := m.reencodePayload(
+		payload,
+		accounts,
+		programs,
+		brokenTypeIDs,
+	)
+	result := storageFormatV5MigrationResult{
+		key: payload.Key,
 	}
+	if err != nil {
+		result.err = err
+	} else if migratedPayload != nil {
+		if err := m.checkStorageFormat(*migratedPayload); err != nil {
+			panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
+		}
+		result.payload = migratedPayload
+	}
+	return result
 }
 
 func (m StorageFormatV5Migration) checkStorageFormat(payload ledger.Payload) error {
@@ -168,7 +154,7 @@ func (m StorageFormatV5Migration) reencodePayload(
 	accounts *state.Accounts,
 	programs *programs.Programs,
 	brokenTypeIDs *sync.Map,
-) (ledger.Payload, error) {
+) (*ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
 
@@ -183,13 +169,13 @@ func (m StorageFormatV5Migration) reencodePayload(
 		string(rawController),
 		string(rawKey),
 	) {
-		return payload, nil
+		return &payload, nil
 	}
 
 	value, version := interpreter.StripMagic(payload.Value)
 
 	if version != interpreter.CurrentEncodingVersion-1 {
-		return ledger.Payload{},
+		return nil,
 			fmt.Errorf(
 				"invalid storage format version for key: %s: %d",
 				rawKey,
@@ -199,16 +185,24 @@ func (m StorageFormatV5Migration) reencodePayload(
 
 	err := storageMigrationV5DecMode.Valid(value)
 	if err != nil {
-		return payload, nil
+		return &payload, nil
 	}
 
-	// Extract the owner from the key and re-encode the value
+	// Delete known dead or orphaned contract value child keys
 
-	owner := common.BytesToAddress(rawOwner)
+	if m.isOrphanContactValueChildKey(
+		rawKey,
+		flow.BytesToAddress(rawOwner),
+		accounts,
+	) {
+		return nil, nil
+	}
+
+	// Extract the owner from the key
 
 	newValue, err := m.reencodeValue(
 		value,
-		owner,
+		common.BytesToAddress(rawOwner),
 		string(rawKey),
 		version,
 		accounts,
@@ -216,7 +210,7 @@ func (m StorageFormatV5Migration) reencodePayload(
 		brokenTypeIDs,
 	)
 	if err != nil {
-		return ledger.Payload{},
+		return nil,
 			fmt.Errorf(
 				"failed to re-encode key: %s: %w\n\nvalue:\n%s",
 				rawKey, err, hex.Dump(value),
@@ -228,7 +222,7 @@ func (m StorageFormatV5Migration) reencodePayload(
 		interpreter.CurrentEncodingVersion,
 	)
 
-	return payload, nil
+	return &payload, nil
 }
 
 func (m StorageFormatV5Migration) reencodeValue(
@@ -871,6 +865,41 @@ func (m StorageFormatV5Migration) addArrayFieldType(
 			arrayValue.Type,
 			arrayValue.String(),
 		)
+}
+
+var contractValueChildKeyRegexp = regexp.MustCompile("^contract\x1f([^\x1f]+)\x1f.+")
+
+func (m StorageFormatV5Migration) isOrphanContactValueChildKey(
+	key []byte,
+	owner flow.Address,
+	accounts *state.Accounts,
+) bool {
+	contractName := getContractValueChildKeyContractName(key)
+	return contractName != "" &&
+		!m.contractExists(accounts, owner, contractName)
+}
+
+func (m StorageFormatV5Migration) contractExists(
+	accounts *state.Accounts,
+	owner flow.Address,
+	contractName string,
+) bool {
+	contractNames, err := accounts.GetContractNames(owner)
+	if err != nil {
+		m.Log.Err(err).Msgf("failed to get contract names for account %s", owner.String())
+		return false
+	}
+
+	i := sort.SearchStrings(contractNames, contractName)
+	return i != len(contractNames) && contractNames[i] == contractName
+}
+
+func getContractValueChildKeyContractName(key []byte) string {
+	matches := contractValueChildKeyRegexp.FindSubmatch(key)
+	if len(matches) == 0 {
+		return ""
+	}
+	return string(matches[1])
 }
 
 func hasAnyLocationAddress(value *interpreter.CompositeValue, hexAddresses ...string) bool {
