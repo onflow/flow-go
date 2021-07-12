@@ -55,7 +55,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 	}
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
-	for i, txBody := range vc.Collection.Transactions {
+	for i, txBody := range vc.ChunkDataPack.Collection.Transactions {
 		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
