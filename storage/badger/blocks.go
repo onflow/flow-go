@@ -77,12 +77,14 @@ func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 
 // ByHeight ...
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
-	var blockID flow.Identifier
-	err := b.db.View(operation.LookupBlockHeight(height, &blockID))
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := b.headers.retrieveIdByHeightTx(height)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up block: %w", err)
+		return nil, err
 	}
-	return b.ByID(blockID)
+	return b.retrieveTx(blockID)(tx)
 }
 
 // ByCollectionID ...

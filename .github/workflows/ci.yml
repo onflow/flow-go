@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: 
+    branches:
       - master
-      - auto-cadence-upgrade/*
+      - 'auto-cadence-upgrade/*'
   pull_request:
     branches:
       - master
-      - auto-cadence-upgrade/*
+      - 'auto-cadence-upgrade/*'
 
 jobs:
   golangci:
@@ -25,6 +25,11 @@ jobs:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.29
         args: -v --build-tags relic
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        scandir: './crypto'
+        ignore: 'relic'
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest
