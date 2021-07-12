@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
+	storagemodel "github.com/onflow/flow-go/storage/model"
 )
 
 type ChunkDataPacks struct {
@@ -48,7 +49,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCa
 	return &ch
 }
 
-func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
+func (ch *ChunkDataPacks) Store(c *storagemodel.StoredChunkDataPack) error {
 	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(c.ChunkID, c))
 	if err != nil {
 		return fmt.Errorf("could not store chunk datapack: %w", err)
@@ -66,7 +67,7 @@ func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 	return nil
 }
 
-func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
+func (ch *ChunkDataPacks) BatchStore(c *storagemodel.StoredChunkDataPack, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
 	batch.OnSucceed(func() {
 		ch.byChunkIDCache.Insert(c.ChunkID, c)
@@ -74,18 +75,18 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 	return operation.BatchInsertChunkDataPack(c)(writeBatch)
 }
 
-func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*storagemodel.StoredChunkDataPack, error) {
 	tx := ch.db.NewTransaction(false)
 	defer tx.Discard()
 	return ch.retrieveCHDP(chunkID)(tx)
 }
 
-func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*flow.ChunkDataPack, error) {
-	return func(tx *badger.Txn) (*flow.ChunkDataPack, error) {
+func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*storagemodel.StoredChunkDataPack, error) {
+	return func(tx *badger.Txn) (*storagemodel.StoredChunkDataPack, error) {
 		val, err := ch.byChunkIDCache.Get(chunkID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return val.(*flow.ChunkDataPack), nil
+		return val.(*storagemodel.StoredChunkDataPack), nil
 	}
 }

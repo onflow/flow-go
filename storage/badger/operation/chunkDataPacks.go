@@ -4,6 +4,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
+	storagemodel "github.com/onflow/flow-go/storage/model"
 )
 
 // InsertChunkDataPack inserts a chunk data pack keyed by chunk ID.
@@ -11,8 +12,8 @@ func InsertChunkDataPack(c *flow.ChunkDataPack) func(*badger.Txn) error {
 	return insert(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
-// BatchInsertChunkDataPack upserts a chunk data pack keyed by chunk ID into a batch
-func BatchInsertChunkDataPack(c *flow.ChunkDataPack) func(batch *badger.WriteBatch) error {
+// BatchInsertChunkDataPack inserts a chunk data pack keyed by chunk ID into a batch
+func BatchInsertChunkDataPack(c *storagemodel.StoredChunkDataPack) func(batch *badger.WriteBatch) error {
 	return batchInsert(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
