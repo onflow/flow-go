@@ -233,6 +233,11 @@ func cborMeLink(value []byte) string {
 	return fmt.Sprintf("http://cbor.me/?bytes=%x", value)
 }
 
+const cborTagStorageReference = 202
+
+var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
+var emptyArrayEncoding = []byte{0x80}
+
 func (m StorageFormatV5Migration) reencodeValue(
 	data []byte,
 	owner common.Address,
@@ -244,16 +249,24 @@ func (m StorageFormatV5Migration) reencodeValue(
 	err error,
 ) {
 
+	if bytes.Compare(data, emptyArrayEncoding) == 0 {
+		m.Log.Warn().
+			Str("key", key).
+			Str("owner", owner.String()).
+			Msgf("DELETING empty array")
+
+		return nil, false, nil
+	}
+
 	// Decode the value
 
 	path := []string{key}
 
 	rootValue, err := interpreter.DecodeValueV4(data, &owner, path, version, nil)
 	if err != nil {
-		const cborTagStorageReference = 202
 		if tagErr, ok := err.(interpreter.UnsupportedTagDecodingError); ok &&
 			tagErr.Tag == cborTagStorageReference &&
-			bytes.Compare(data[:2], []byte{0xd8, cborTagStorageReference}) == 0 {
+			bytes.Compare(data[:2], storageReferenceEncodingStart) == 0 {
 
 			m.Log.Warn().
 				Str("key", key).
