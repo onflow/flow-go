@@ -4,11 +4,9 @@ package consensus
 
 import (
 	"fmt"
-	"time"
-
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
@@ -59,7 +57,7 @@ func NewBuilder(
 
 	// initialize default config
 	cfg := Config{
-		blockTimestamp:    hotstuff.NewBlockTimestamp(500*time.Millisecond, 10*time.Second),
+		blockTimestamp:    model.DefaultBlockTimestamp,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,

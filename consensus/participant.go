@@ -52,6 +52,7 @@ func NewParticipant(
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		BlockTimestamp:             model.DefaultBlockTimestamp,
 	}
 
 	// apply the configuration options
@@ -68,7 +69,7 @@ func NewParticipant(
 
 	// initialize the validator
 	var validator hotstuff.Validator
-	validator = validatorImpl.New(committee, forks, signer)
+	validator = validatorImpl.New(committee, forks, signer, cfg.BlockTimestamp)
 	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started

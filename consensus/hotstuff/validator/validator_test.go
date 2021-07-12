@@ -26,19 +26,20 @@ func TestValidateProposal(t *testing.T) {
 
 type ProposalSuite struct {
 	suite.Suite
-	participants flow.IdentityList
-	leader       *flow.Identity
-	finalized    uint64
-	parent       *model.Block
-	block        *model.Block
-	voters       flow.IdentityList
-	proposal     *model.Proposal
-	vote         *model.Vote
-	voter        *flow.Identity
-	committee    *mocks.Committee
-	forks        *mocks.Forks
-	verifier     *mocks.Verifier
-	validator    *Validator
+	participants   flow.IdentityList
+	leader         *flow.Identity
+	finalized      uint64
+	parent         *model.Block
+	block          *model.Block
+	voters         flow.IdentityList
+	proposal       *model.Proposal
+	vote           *model.Vote
+	voter          *flow.Identity
+	committee      *mocks.Committee
+	forks          *mocks.Forks
+	verifier       *mocks.Verifier
+	validator      *Validator
+	blockTimestamp *mocks.BlockTimestamp
 }
 
 func (ps *ProposalSuite) SetupTest() {
@@ -87,8 +88,11 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(true, nil)
 	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(true, nil)
 
+	ps.blockTimestamp = &mocks.BlockTimestamp{}
+	ps.blockTimestamp.On("Validate", mock.Anything, mock.Anything).Return(nil)
+
 	// set up the validator with the mocked dependencies
-	ps.validator = New(ps.committee, ps.forks, ps.verifier)
+	ps.validator = New(ps.committee, ps.forks, ps.verifier, ps.blockTimestamp)
 }
 
 func (ps *ProposalSuite) TestProposalOK() {
@@ -234,19 +238,31 @@ func (ps *ProposalSuite) TestProposalQCError() {
 	assert.False(ps.T(), model.IsInvalidBlockError(err), "if we can't verify the QC, we should not generate a invalid error")
 }
 
+func (ps *ProposalSuite) TestProposalInvalidTimestamp() {
+	// replace with new mock
+	*ps.blockTimestamp = mocks.BlockTimestamp{}
+	ps.blockTimestamp.On("Validate", mock.Anything, mock.Anything).Return(model.NewInvalidBlockTimestamp(""))
+
+	err := ps.validator.ValidateProposal(ps.proposal)
+	assert.Error(ps.T(), err, "a proposal with invalid timestamp has to be rejected")
+
+	assert.True(ps.T(), model.IsInvalidBlockError(err), "if timestamp is invalid it should return invalid block error")
+}
+
 func TestValidateVote(t *testing.T) {
 	suite.Run(t, new(VoteSuite))
 }
 
 type VoteSuite struct {
 	suite.Suite
-	signer    *flow.Identity
-	block     *model.Block
-	vote      *model.Vote
-	forks     *mocks.Forks
-	verifier  *mocks.Verifier
-	committee *mocks.Committee
-	validator *Validator
+	signer         *flow.Identity
+	block          *model.Block
+	vote           *model.Vote
+	forks          *mocks.Forks
+	verifier       *mocks.Verifier
+	committee      *mocks.Committee
+	validator      *Validator
+	blockTimestamp *mocks.BlockTimestamp
 }
 
 func (vs *VoteSuite) SetupTest() {
@@ -277,8 +293,10 @@ func (vs *VoteSuite) SetupTest() {
 	vs.committee = &mocks.Committee{}
 	vs.committee.On("Identity", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
+	vs.blockTimestamp = &mocks.BlockTimestamp{}
+
 	// set up the validator with the mocked dependencies
-	vs.validator = New(vs.committee, vs.forks, vs.verifier)
+	vs.validator = New(vs.committee, vs.forks, vs.verifier, vs.blockTimestamp)
 }
 
 func (vs *VoteSuite) TestVoteOK() {
@@ -329,13 +347,14 @@ func TestValidateQC(t *testing.T) {
 
 type QCSuite struct {
 	suite.Suite
-	participants flow.IdentityList
-	signers      flow.IdentityList
-	block        *model.Block
-	qc           *flow.QuorumCertificate
-	committee    *mocks.Committee
-	verifier     *mocks.Verifier
-	validator    *Validator
+	participants   flow.IdentityList
+	signers        flow.IdentityList
+	block          *model.Block
+	qc             *flow.QuorumCertificate
+	committee      *mocks.Committee
+	verifier       *mocks.Verifier
+	validator      *Validator
+	blockTimestamp *mocks.BlockTimestamp
 }
 
 func (qs *QCSuite) SetupTest() {
@@ -366,8 +385,10 @@ func (qs *QCSuite) SetupTest() {
 	qs.verifier = &mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(true, nil)
 
+	qs.blockTimestamp = &mocks.BlockTimestamp{}
+
 	// set up the validator with the mocked dependencies
-	qs.validator = New(qs.committee, nil, qs.verifier)
+	qs.validator = New(qs.committee, nil, qs.verifier, qs.blockTimestamp)
 }
 
 func (qs *QCSuite) TestQCOK() {

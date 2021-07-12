@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	hotstuffModel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -91,7 +92,7 @@ func main() {
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
-		blockTimestamp          *hotstuff.BlockTimestamp
+		blockTimestamp          hotstuff.BlockTimestamp
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -363,7 +364,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
-			blockTimestamp = hotstuff.NewBlockTimestamp(minInterval, maxInterval)
+			blockTimestamp = hotstuffModel.NewBlockTimestamp(minInterval, maxInterval)
 
 			// initialize the block builder
 			var build module.Builder
@@ -469,6 +470,7 @@ func main() {
 				node.RootQC,
 				finalized,
 				pending,
+				consensus.WithBlockTimestamp(blockTimestamp),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
