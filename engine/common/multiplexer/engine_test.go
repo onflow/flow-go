@@ -10,7 +10,9 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/multiplexer"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -42,7 +44,79 @@ func TestMultiplexer(t *testing.T) {
 }
 
 func (suite *Suite) TestHappyPath() {
-	// TODO: test happy path
+	id := unittest.IdentifierFixture()
+	event := struct {
+		foo string
+	}{
+		foo: "bar",
+	}
+
+	chan1 := network.Channel("test-chan-1")
+	chan2 := network.Channel("test-chan-2")
+	chan3 := network.Channel("test-chan-3")
+
+	engine1 := new(mocknetwork.Engine)
+	engine2 := new(mocknetwork.Engine)
+	engine3 := new(mocknetwork.Engine)
+
+	suite.engine.Register(chan1, engine1)
+	suite.engine.Register(chan1, engine2)
+
+	suite.engine.Register(chan2, engine2)
+	suite.engine.Register(chan2, engine3)
+
+	suite.engine.Register(chan3, engine1)
+	suite.engine.Register(chan3, engine2)
+	suite.engine.Register(chan3, engine3)
+
+	// Message sent on chan1 should be delivered to engine1 and engine2
+
+	engine1.On("Process", chan1, id, event).Return(nil).Once()
+	engine2.On("Process", chan1, id, event).Return(nil).Once()
+
+	err := suite.engine.Process(chan1, id, event)
+	suite.Assert().Nil(err)
+
+	engine1.AssertNumberOfCalls(suite.T(), "Process", 1)
+	engine2.AssertNumberOfCalls(suite.T(), "Process", 1)
+	engine3.AssertNumberOfCalls(suite.T(), "Process", 0)
+
+	engine1.AssertExpectations(suite.T())
+	engine2.AssertExpectations(suite.T())
+	engine3.AssertExpectations(suite.T())
+
+	// Message sent on chan2 should be delivered to engine2 and engine3
+
+	engine2.On("Process", chan2, id, event).Return(nil).Once()
+	engine3.On("Process", chan2, id, event).Return(nil).Once()
+
+	err = suite.engine.Process(chan2, id, event)
+	suite.Assert().Nil(err)
+
+	engine1.AssertNumberOfCalls(suite.T(), "Process", 1)
+	engine2.AssertNumberOfCalls(suite.T(), "Process", 2)
+	engine3.AssertNumberOfCalls(suite.T(), "Process", 1)
+
+	engine1.AssertExpectations(suite.T())
+	engine2.AssertExpectations(suite.T())
+	engine3.AssertExpectations(suite.T())
+
+	// Message sent on chan3 should be delivered to all engines
+
+	engine1.On("Process", chan3, id, event).Return(nil).Once()
+	engine2.On("Process", chan3, id, event).Return(nil).Once()
+	engine3.On("Process", chan3, id, event).Return(nil).Once()
+
+	err = suite.engine.Process(chan3, id, event)
+	suite.Assert().Nil(err)
+
+	engine1.AssertNumberOfCalls(suite.T(), "Process", 2)
+	engine2.AssertNumberOfCalls(suite.T(), "Process", 3)
+	engine3.AssertNumberOfCalls(suite.T(), "Process", 2)
+
+	engine1.AssertExpectations(suite.T())
+	engine2.AssertExpectations(suite.T())
+	engine3.AssertExpectations(suite.T())
 }
 
 func (suite *Suite) TestDownstreamEngineFailure() {
