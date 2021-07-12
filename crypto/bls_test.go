@@ -4,10 +4,14 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
 	"testing"
 	"time"
+
+	blst "github.com/supranational/blst/bindings/go"
+	"pgregory.net/rapid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,6 +106,123 @@ func TestBLSEncodeDecode(t *testing.T) {
 	_, err = DecodePublicKey(BLSBLS12381, pkBytes)
 	require.Error(t, err, "the key decoding should fail - key value is identity")
 	assert.IsType(t, expectedError, err)
+}
+
+func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
+	var skBytes []byte = rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381).Example().([]byte)
+	skBLS, err := DecodePrivateKey(BLSBLS12381, skBytes)
+
+	var skBLST blst.Scalar
+	res := skBLST.Deserialize(skBytes)
+
+	bothFail := (err != nil && res == nil)
+	bothPass := (err == nil && res != nil)
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
+	}
+
+	if bothPass {
+		skBLSOutBytes := skBLS.Encode()
+		skBLSTOutBytes := skBLST.Serialize()
+		assert.Equal(t, skBLSOutBytes, skBLSTOutBytes)
+	}
+
+}
+
+func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
+	var pkBytes []byte = rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381).Example().([]byte)
+	pkBLS, err := DecodePublicKey(BLSBLS12381, pkBytes)
+
+	var pkBLST blst.P2Affine
+	res := pkBLST.Uncompress(pkBytes)
+	pkValidBLST := pkBLST.KeyValidate()
+
+	bothFail := (err != nil && (res == nil || !pkValidBLST))
+	bothPass := (err == nil && res != nil && pkValidBLST)
+
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of %v differs, internal finds pubkey validity %v, blst finds pubkey validity %v ", hex.EncodeToString(pkBytes), (err == nil), (res != nil && pkValidBLST))
+	}
+
+	if bothPass {
+		pkBLSOutBytes := pkBLS.Encode()
+		pkBLSTOutBytes := pkBLST.Compress()
+
+		assert.Equal(t, pkBLSOutBytes, pkBLSTOutBytes)
+	}
+}
+
+func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
+	var sigBytes []byte = rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381).Example().([]byte)
+	// here we test readPointG1 rather than the simple Signature type alias
+	var sigBLSPt pointG1
+	err := readPointG1(&sigBLSPt, sigBytes)
+	sigValidBLS := (err == nil)
+	if sigValidBLS {
+		sigValidBLS = checkInG1Test(&sigBLSPt)
+	}
+
+	var sigBLST blst.P1Affine
+	res := sigBLST.Uncompress(sigBytes)
+	// our validation has no infinity rejection for G1
+	sigValidBLST := sigBLST.SigValidate(false)
+
+	bothFail := (!sigValidBLS && (res == nil || !sigValidBLST))
+	bothPass := (sigValidBLS && res != nil && sigValidBLST)
+
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of sig %v differs, internal finds signature validity %v, blst finds signature validity %v", hex.EncodeToString(sigBytes), sigValidBLS, (res != nil && sigValidBLST))
+	}
+
+	if bothPass {
+		sigBLSOutBytes := make([]byte, signatureLengthBLSBLS12381)
+		writePointG1(sigBLSOutBytes, &sigBLSPt)
+
+		sigBLSTOutBytes := sigBLST.Compress()
+
+		assert.Equal(t, sigBLSOutBytes, sigBLSTOutBytes)
+	}
+
+}
+
+func testBLSWithRelicSignCrossBLST(t *rapid.T) {
+	blsCipher := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	var msgBytes []byte = rapid.SliceOfN(rapid.Byte(), 1, 1000).Example().([]byte)
+
+	var skBytes []byte = rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381).Example().([]byte)
+	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
+
+	var skBLST blst.Scalar
+	res := skBLST.Deserialize(skBytes)
+
+	bothFail := (err != nil && res == nil)
+	bothPass := (err == nil && res != nil)
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
+	}
+	if bothPass {
+		var sigBLST blst.P1Affine
+		sigBLST.Sign(&skBLST, msgBytes, blsCipher)
+		sigBytesBLST := sigBLST.Compress()
+
+		skBLS, ok := sk.(*PrKeyBLSBLS12381)
+		if !ok {
+			panic("incoherent sk interpretation")
+		}
+		sig, err := skBLS.signWithRelicMapTest(msgBytes)
+		require.NoError(t, err)
+		sigBytesBLS := sig.Bytes()
+		assert.Equal(t, sigBytesBLST, sigBytesBLS)
+
+	}
+
+}
+
+func TestBLSCross(t *testing.T) {
+	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
+	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
+	rapid.Check(t, testBLSEncodeDecodeSigCrossBLST)
+	rapid.Check(t, testBLSWithRelicSignCrossBLST)
 }
 
 // TestBLSEquals tests equal for BLS keys
