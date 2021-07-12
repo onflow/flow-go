@@ -60,14 +60,14 @@ func (i *TransactionInvocator) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *hostEnv
+	var env *TransactionEnv
 	var txError error
 	retry := false
 	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = newEnvironment(*ctx, vm, sth, programs)
+	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
@@ -118,11 +118,8 @@ func (i *TransactionInvocator) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = newEnvironment(*ctx, vm, sth, programs)
+			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 		}
-
-		env.setTransaction(proc.Transaction, proc.TxIndex)
-		env.setTraceSpan(span)
 
 		location := common.TransactionLocation(proc.ID[:])
 
@@ -171,7 +168,7 @@ func (i *TransactionInvocator) Process(
 		txError = i.deductTransactionFees(env, proc)
 	}
 
-	proc.Logs = append(proc.Logs, env.getLogs()...)
+	proc.Logs = append(proc.Logs, env.Logs()...)
 	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	if txError != nil {
@@ -192,7 +189,7 @@ func (i *TransactionInvocator) Process(
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
-	proc.Events = append(proc.Events, env.getEvents()...)
+	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
 
 	i.logger.Info().
@@ -205,7 +202,7 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *TransactionProcedure) error {
+func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
@@ -247,7 +244,7 @@ func (i *TransactionInvocator) checkAccountStorageLimit(env *hostEnv, addresses 
 	return NewTransactionStorageLimiter().CheckLimits(env, addresses)
 }
 
-func valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
+func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
