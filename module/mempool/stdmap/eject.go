@@ -54,6 +54,11 @@ func EjectTrueRandom(b* Backend) (flow.Identifier, flow.Entity, bool) {
 // ideal size, and will iterate through them and eject unneeded
 // entries if that is the case.
 func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity, bool) {
+	// 64 in batch plus a buffer of 64 to prevent boundary conditions
+	const threshold = 128
+
+	const batchSize = 64
+
 	var entities = b.entities
 
 	// an empty, invalid, id for the return value
@@ -65,7 +70,7 @@ func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity, bool) {
 		return retval, nil, false
 	}
 
-	if (uint(mapSize) - b.limit) <= 128  {
+	if (uint(mapSize) - b.limit) <= threshold {
 		// nothing to do, yet
 		return retval, nil, false
 	}
@@ -76,14 +81,14 @@ func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity, bool) {
 	var entityID flow.Identifier
 	var entity flow.Entity
 
-	maxInterval := mapSize / 64
+	maxInterval := mapSize / batchSize
 
 	// this array will store 64 indexes into the map
-	var mapIndexes[64] int64
+	var mapIndexes[batchSize] int64
 
 	// starting point, create 64 random, sequentially increasing, values
 	var index int64 =  0
-	for  i := 0; i < 64;i++ {
+	for  i := 0; i < batchSize;i++ {
 		// get a random number between 0 and maxInterval
 		index += int64(rand.Intn(maxInterval))
 		mapIndexes[i] = index
@@ -105,7 +110,7 @@ func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity, bool) {
 
 			// increment the index
 			idx++
-			if idx >= 64 {
+			if idx >= batchSize {
 				break
 			}
 		}
