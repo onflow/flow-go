@@ -1139,7 +1139,6 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
-		Collection:    &col,
 		ChunkDataPack: ChunkDataPackFixture(result.ID()),
 		EndState:      endState,
 	}
@@ -1150,15 +1149,12 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 func ChunkDataResponseFixture(chunkID flow.Identifier, opts ...func(*messages.ChunkDataResponse)) *messages.ChunkDataResponse {
 	cdp := &messages.ChunkDataResponse{
 		ChunkDataPack: *ChunkDataPackFixture(chunkID),
-		Collection:    CollectionFixture(1),
 		Nonce:         rand.Uint64(),
 	}
 
 	for _, opt := range opts {
 		opt(cdp)
 	}
-
-	cdp.ChunkDataPack.CollectionID = cdp.Collection.ID()
 
 	return cdp
 }
@@ -1236,9 +1232,9 @@ func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verifica
 	return req
 }
 
-func WithCollectionID(collectionID flow.Identifier) func(*flow.ChunkDataPack) {
+func WithChunkDataPackCollection(collection flow.Collection) func(*flow.ChunkDataPack) {
 	return func(cdp *flow.ChunkDataPack) {
-		cdp.CollectionID = collectionID
+		cdp.Collection = collection
 	}
 }
 
@@ -1254,9 +1250,8 @@ func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataP
 	cdp := &flow.ChunkDataPack{
 		ChunkID:    chunkID,
 		StartState: StateCommitmentFixture(),
-		//RegisterTouches: []flow.RegisterTouch{{RegisterID: ids[0], Value: values[0], Proof: []byte{'p'}}},
-		Proof:        []byte{'p'},
-		CollectionID: IdentifierFixture(),
+		Proof:      []byte{'p'},
+		Collection: CollectionFixture(1),
 	}
 
 	for _, opt := range opts {
