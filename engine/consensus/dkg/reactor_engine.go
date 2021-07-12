@@ -58,9 +58,13 @@ func NewReactorEngine(
 	viewEvents events.Views,
 ) *ReactorEngine {
 
+	logger := log.With().
+		Str("engine", "dkg_reactor").
+		Logger()
+
 	return &ReactorEngine{
 		unit:              engine.NewUnit(),
-		log:               log.With().Str("engine", "dkg_reactor").Logger(),
+		log:               logger,
 		me:                me,
 		State:             state,
 		keyStorage:        keyStorage,

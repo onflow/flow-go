@@ -27,7 +27,7 @@ type DKGClientWrapper struct {
 func NewDKGClientWrapper(client *dkgmod.Client) *DKGClientWrapper {
 	return &DKGClientWrapper{
 		client:  client,
-		enabled: false,
+		enabled: true,
 	}
 }
 
