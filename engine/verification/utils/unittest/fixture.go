@@ -33,7 +33,6 @@ import (
 // to verify the result of an execution receipt.
 type ExecutionReceiptData struct {
 	ReferenceBlock *flow.Block // block that execution receipt refers to
-	Collections    []*flow.Collection
 	ChunkDataPacks []*flow.ChunkDataPack
 	SpockSecrets   [][]byte
 }
@@ -57,18 +56,13 @@ type CompleteExecutionReceiptList []*CompleteExecutionReceipt
 //
 // It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
 func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
-	result, chunkIndex := c.resultOf(t, chunkID)
+	_, chunkIndex := c.resultOf(t, chunkID)
 	receiptData := c.ReceiptDataOf(t, chunkID)
 
 	// publishes the chunk data pack response to the network
 	res := &messages.ChunkDataResponse{
 		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
 		Nonce:         rand.Uint64(),
-	}
-
-	// only non-system chunks have a collection
-	if !isSystemChunk(chunkIndex, len(result.Chunks)) {
-		res.Collection = *receiptData.Collections[chunkIndex]
 	}
 
 	return res
@@ -302,17 +296,6 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			endStateCommitment, err := led.Set(update)
 			require.NoError(t, err, "error updating registers")
 
-			var collectionID flow.Identifier
-
-			// account for system chunk being last
-			if i < len(computationResult.StateSnapshots)-1 {
-				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
-				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
-				collectionID = completeCollection.Collection().ID()
-			} else {
-				collectionID = flow.ZeroID
-			}
-
 			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
 			require.NoError(t, err)
 
@@ -346,10 +329,10 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			require.NoError(t, err, "error reading registers with proofs from ledger")
 
 			chunkDataPack := &flow.ChunkDataPack{
-				ChunkID:      chunk.ID(),
-				StartState:   chunk.StartState,
-				Proof:        proof,
-				CollectionID: collectionID,
+				ChunkID:    chunk.ID(),
+				StartState: chunk.StartState,
+				Proof:      proof,
+				Collection: collection,
 			}
 
 			chunks = append(chunks, chunk)
@@ -373,7 +356,6 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 	return result, &ExecutionReceiptData{
 		ReferenceBlock: &referenceBlock,
-		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
 	}
@@ -452,7 +434,6 @@ func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
 		ReceiptsData: []*ExecutionReceiptData{
 			{
 				ReferenceBlock: &referenceBlock,
-				Collections:    collections,
 				ChunkDataPacks: chunkDataPacks,
 			},
 		},

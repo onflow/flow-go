@@ -153,7 +153,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 		collection *flow.Collection) {
 
 		// mocks replying to the requests by sending a chunk data pack.
-		e.HandleChunkDataPack(originID, cdp, collection)
+		e.HandleChunkDataPack(originID, cdp)
 	})
 
 	// fetcher engine should create and pass a verifiable chunk to verifier engine upon receiving each
@@ -208,7 +208,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	chunkDataPacks, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Once()
-	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collMap[chunkID])
+	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID])
 
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
@@ -281,30 +281,18 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 // as the necessary conditions for chunk data integrity.
 func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 	tt := []struct {
-		alterChunkDataResponse func(*flow.ChunkDataPack, *flow.Collection)
+		alterChunkDataResponse func(*flow.ChunkDataPack)
 		mockStateFunc          func(flow.Identity, *protocol.State, flow.Identifier) // mocks state at block identifier for the given identity.
 		msg                    string
 	}{
 		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
-				cdp.CollectionID = unittest.IdentifierFixture()
-			},
-			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
-				// mocks a valid execution node as originID
-				mockStateAtBlockIDForIdentities(state, blockID, flow.IdentityList{&identity})
-			},
-			msg: "conflicting-collection-ID-with-chunk-data-pack",
-		},
-		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
 				// re-writes collection with a random one that is different than original collection ID
 				// in block's guarantee.
 				txBody := unittest.TransactionBodyFixture()
-				coll.Transactions = []*flow.TransactionBody{
+				cdp.Collection.Transactions = []*flow.TransactionBody{
 					&txBody,
 				}
-				require.NotEqual(t, cdp.CollectionID, coll.ID(), "could not generate a different collection ID")
-				cdp.CollectionID = coll.ID()
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
 				// mocks a valid execution node as originID
@@ -313,7 +301,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			msg: "conflicting-collection-with-blocks-storage",
 		},
 		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
 				cdp.ChunkID = unittest.IdentifierFixture()
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
@@ -323,7 +311,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			msg: "invalid-chunk-ID",
 		},
 		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
 				cdp.StartState = unittest.StateCommitmentFixture()
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
@@ -333,7 +321,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			msg: "invalid-start-state",
 		},
 		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
 				// we don't alter chunk data pack content
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
@@ -342,7 +330,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			msg: "invalid-origin-id",
 		},
 		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
 				// we don't alter chunk data pack content
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
@@ -352,7 +340,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 			msg: "unstaked-origin-id",
 		},
 		{
-			alterChunkDataResponse: func(cdp *flow.ChunkDataPack, coll *flow.Collection) {
+			alterChunkDataResponse: func(cdp *flow.ChunkDataPack) {
 				// we don't alter chunk data pack content
 			},
 			mockStateFunc: func(identity flow.Identity, state *protocol.State, blockID flow.Identifier) {
@@ -377,7 +365,7 @@ func TestChunkResponse_InvalidChunkDataPack(t *testing.T) {
 //
 // The input alter function alters the chunk data response to break its integrity.
 func testInvalidChunkDataResponse(t *testing.T,
-	alterChunkDataResponse func(*flow.ChunkDataPack, *flow.Collection),
+	alterChunkDataResponse func(*flow.ChunkDataPack),
 	mockStateFunc func(flow.Identity, *protocol.State, flow.Identifier)) {
 	s := setupTest()
 	e := newFetcherEngine(s)
@@ -397,11 +385,11 @@ func testInvalidChunkDataResponse(t *testing.T,
 	chunkDataPacks, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// alters chunk data pack so that it become invalid.
-	alterChunkDataResponse(chunkDataPacks[chunkID], collMap[chunkID])
+	alterChunkDataResponse(chunkDataPacks[chunkID])
 	mockStateFunc(*agrees[0], s.state, block.ID())
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
-	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID], collMap[chunkID])
+	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 	// no verifiable chunk should be passed to verifier engine
@@ -435,7 +423,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
-	e.HandleChunkDataPack(unittest.IdentifierFixture(), chunkDataPacks[chunkID], collMap[chunkID])
+	e.HandleChunkDataPack(unittest.IdentifierFixture(), chunkDataPacks[chunkID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 
@@ -672,9 +660,10 @@ func mockVerifierEngine(t *testing.T,
 
 			if vc.IsSystemChunk {
 				// system chunk has an empty collection
-				require.Equal(t, vc.Collection.Len(), 0)
+				// TODO: nil checkign
+				require.Equal(t, vc.ChunkDataPack.Collection.Len(), 0)
 			} else {
-				require.Equal(t, expected.Collection.ID(), vc.Collection.ID())
+				require.Equal(t, expected.ChunkDataPack.Collection.ID(), vc.ChunkDataPack.Collection.ID())
 			}
 
 			require.Equal(t, *expected.ChunkDataPack, *vc.ChunkDataPack)
@@ -784,7 +773,7 @@ func chunkDataPackResponseFixture(t *testing.T, chunks flow.ChunkList, collMap m
 
 		chunkDataPacks[chunkID] = unittest.ChunkDataPackFixture(chunkID,
 			unittest.WithStartState(chunk.StartState),
-			unittest.WithCollectionID(coll.ID()))
+			unittest.WithChunkDataPackCollection(*coll))
 	}
 
 	return chunkDataPacks
@@ -805,7 +794,6 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 		chunkDataPack := chunkDataPacks[chunkID]
 
 		if fetcher.IsSystemChunk(chunk.Index, result) {
-			chunkDataPack.CollectionID = flow.ZeroID
 			collMap[chunkID] = &flow.Collection{Transactions: nil}
 		}
 
@@ -816,7 +804,6 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 			Chunk:             chunk,
 			Header:            block.Header,
 			Result:            result,
-			Collection:        collMap[chunkID],
 			ChunkDataPack:     chunkDataPack,
 			TransactionOffset: offsetForChunk,
 		}
