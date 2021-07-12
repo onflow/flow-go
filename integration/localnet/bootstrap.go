@@ -18,37 +18,39 @@ import (
 )
 
 const (
-	BootstrapDir             = "./bootstrap"
-	ProfilerDir              = "./profiler"
-	DataDir                  = "./data"
-	TrieDir                  = "./trie"
-	DockerComposeFile        = "./docker-compose.nodes.yml"
-	DockerComposeFileVersion = "3.7"
-	PrometheusTargetsFile    = "./targets.nodes.json"
-	DefaultCollectionCount   = 3
-	DefaultConsensusCount    = 3
-	DefaultExecutionCount    = 1
-	DefaultVerificationCount = 1
-	DefaultAccessCount       = 1
-	DefaultNClusters         = 1
-	DefaultProfiler          = false
-	DefaultConsensusDelay    = 800 * time.Millisecond
-	DefaultCollectionDelay   = 950 * time.Millisecond
-	AccessAPIPort            = 3569
-	MetricsPort              = 8080
-	RPCPort                  = 9000
+	BootstrapDir               = "./bootstrap"
+	ProfilerDir                = "./profiler"
+	DataDir                    = "./data"
+	TrieDir                    = "./trie"
+	DockerComposeFile          = "./docker-compose.nodes.yml"
+	DockerComposeFileVersion   = "3.7"
+	PrometheusTargetsFile      = "./targets.nodes.json"
+	DefaultCollectionCount     = 3
+	DefaultConsensusCount      = 3
+	DefaultExecutionCount      = 1
+	DefaultVerificationCount   = 1
+	DefaultAccessCount         = 1
+	DefaultUnstakedAccessCount = 0
+	DefaultNClusters           = 1
+	DefaultProfiler            = false
+	DefaultConsensusDelay      = 800 * time.Millisecond
+	DefaultCollectionDelay     = 950 * time.Millisecond
+	AccessAPIPort              = 3569
+	MetricsPort                = 8080
+	RPCPort                    = 9000
 )
 
 var (
-	collectionCount   int
-	consensusCount    int
-	executionCount    int
-	verificationCount int
-	accessCount       int
-	nClusters         uint
-	profiler          bool
-	consensusDelay    time.Duration
-	collectionDelay   time.Duration
+	collectionCount     int
+	consensusCount      int
+	executionCount      int
+	verificationCount   int
+	accessCount         int
+	unstakedAccessCount int
+	nClusters           uint
+	profiler            bool
+	consensusDelay      time.Duration
+	collectionDelay     time.Duration
 )
 
 func init() {
@@ -56,7 +58,8 @@ func init() {
 	flag.IntVar(&consensusCount, "consensus", DefaultConsensusCount, "number of consensus nodes")
 	flag.IntVar(&executionCount, "execution", DefaultExecutionCount, "number of execution nodes")
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
-	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
+	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
+	flag.IntVar(&unstakedAccessCount, "unstaked-access", DefaultUnstakedAccessCount, "number of un-staked access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
@@ -73,7 +76,8 @@ func main() {
 	fmt.Printf("- Consensus: %d\n", consensusCount)
 	fmt.Printf("- Execution: %d\n", executionCount)
 	fmt.Printf("- Verification: %d\n", verificationCount)
-	fmt.Printf("- Access: %d\n\n", accessCount)
+	fmt.Printf("- Staked Access: %d\n", accessCount)
+	fmt.Printf("- Unstaked Access: %d\n\n", unstakedAccessCount)
 
 	nodes := prepareNodes()
 
@@ -124,6 +128,15 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Println("Node bootstrapping data generated...")
+	for i, c := range containers {
+		fmt.Printf("%d: %s", i+1, c.Identity().String())
+		if c.Unstaked {
+			fmt.Printf(" (unstaked)")
+		}
+		fmt.Println()
+	}
+
 	services := prepareServices(containers)
 
 	err = writeDockerComposeConfig(services)
@@ -169,6 +182,12 @@ func prepareNodes() []testnet.NodeConfig {
 
 	for i := 0; i < accessCount; i++ {
 		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess))
+	}
+
+	for i := 0; i < unstakedAccessCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess, func(cfg *testnet.NodeConfig) {
+			cfg.Unstaked = true
+		}))
 	}
 
 	return nodes

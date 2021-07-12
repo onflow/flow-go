@@ -19,6 +19,7 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
 		}).
+		Initialize().
 		Module("message validators", func(node *cmd.FlowNodeBuilder) error {
 			node.MsgValidators = []network.MessageValidator{
 				// filter out messages sent by this node itself

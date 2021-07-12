@@ -41,6 +41,7 @@ type ContainerConfig struct {
 	Ghost           bool
 	AdditionalFlags []string
 	Debug           bool
+	Unstaked        bool
 }
 
 // ImageName returns the Docker image name for the given config.

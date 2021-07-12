@@ -89,7 +89,7 @@ func NewMiddleware(log zerolog.Logger,
 
 	if len(validators) == 0 {
 		// add default validators to filter out unwanted messages received by this node
-		validators = defaultValidators(log, flowID)
+		validators = DefaultValidators(log, flowID)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -114,7 +114,7 @@ func NewMiddleware(log zerolog.Logger,
 	}
 }
 
-func defaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
+func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		validator.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
 		validator.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
