@@ -201,6 +201,5 @@ func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 		return nil, 0, fmt.Errorf("could not encode payload: %w", err)
 	}
 
-
 	return data, code, nil
 }

@@ -2,9 +2,6 @@
 
 package cbor
 
-import (
-)
-
 const (
 
 	CodeMin = iota + 1
