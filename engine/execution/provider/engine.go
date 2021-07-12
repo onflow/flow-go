@@ -225,7 +225,7 @@ func (e *Engine) onChunkDataRequest(
 		}
 
 		log.Debug().
-			Hex("collection_id", logging.ID(response.Collection.ID())).
+			Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
 			Msg("chunk data pack request successfully replied")
 	})
 
