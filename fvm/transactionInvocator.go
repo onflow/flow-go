@@ -156,6 +156,10 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	// Ramtin's Notes
+	// we need the updated addresses for storage checks :(
+	// so we need to commit before call storage limit checks
+
 	// applying contract changes
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
