@@ -34,7 +34,7 @@ func (suite *Suite) SetupTest() {
 	// TODO
 
 	eng, err := multiplexer.New(zerolog.Logger{}, suite.net, suite.me)
-	require.Nil(suite.T(), err)
+	require.NoError(suite.T(), err)
 
 	suite.engine = eng
 }
@@ -59,22 +59,29 @@ func (suite *Suite) TestHappyPath() {
 	engine2 := new(mocknetwork.Engine)
 	engine3 := new(mocknetwork.Engine)
 
-	_, err := suite.engine.Register(chan1, engine1)
+	con, err := suite.engine.Register(chan1, engine1)
 	suite.Assert().Nil(err)
-	_, err = suite.engine.Register(chan1, engine2)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(chan1, engine2)
 	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
 
-	_, err = suite.engine.Register(chan2, engine2)
+	con, err = suite.engine.Register(chan2, engine2)
 	suite.Assert().Nil(err)
-	_, err = suite.engine.Register(chan2, engine3)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(chan2, engine3)
 	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
 
-	_, err = suite.engine.Register(chan3, engine1)
+	con, err = suite.engine.Register(chan3, engine1)
 	suite.Assert().Nil(err)
-	_, err = suite.engine.Register(chan3, engine2)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(chan3, engine2)
 	suite.Assert().Nil(err)
-	_, err = suite.engine.Register(chan3, engine3)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(chan3, engine3)
 	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
 
 	// Message sent on chan1 should be delivered to engine1 and engine2
 
