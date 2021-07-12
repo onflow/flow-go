@@ -28,13 +28,13 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 
 	// assuming all the entities are for unsealed blocks, then we will remove a seal
 	// with the largest height.
-  
-  // This mempool implementation supports pruning by height, meaning that as soon as sealing advances
+
+	// This mempool implementation supports pruning by height, meaning that as soon as sealing advances
 	// seals will be gradually removed from mempool
 	// ejecting a seal from mempool means that we have reached our limit and something is very bad, meaning that sealing
 	// is not actually happening.
 	// By setting high limit ~12 hours we ensure that we have some safety window for sealing to recover and make progress
-	ejector := func(b* Backend ) (flow.Identifier, flow.Entity, bool) {
+	ejector := func(b *Backend) (flow.Identifier, flow.Entity, bool) {
 		log.Fatalf("incorporated result seals reached max capacity %d", limit)
 		panic("incorporated result seals reached max capacity")
 	}
