@@ -123,13 +123,7 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 
 		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithResult(previousResult),
-			// ATTENTION: For sealing phase 2, the value for IncorporatedBlockID
-			// is the block the result pertains to (here parentBlock).
-			// In later development phases, we will change the logic such that
-			// IncorporatedBlockID references the
-			// block which actually incorporates the result:
-			//unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID())
-			unittest.IncorporatedResult.WithIncorporatedBlockID(parentBlock.ID()),
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 		)
 
 		result := unittest.ExecutionResultFixture(
@@ -702,9 +696,9 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 	bs.T().Run("verify that multiple execution forks are properly handled", func(t *testing.T) {
 		bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
 		sealResultA_1 := storeSealForIncorporatedResult(&receiptChain1[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
-		sealResultB_1 := storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		sealResultB_1 := storeSealForIncorporatedResult(&receiptChain1[2].ExecutionResult, blocks[3].ID(), bs.pendingSeals)
 		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
-		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
+		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[3].ID(), bs.pendingSeals)
 
 		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
 		bs.Require().NoError(err)
@@ -1227,13 +1221,6 @@ func (bs *BuilderSuite) TestIntegration_ResultAlreadyIncorporated() {
 }
 
 func storeSealForIncorporatedResult(result *flow.ExecutionResult, incorporatingBlockID flow.Identifier, pendingSeals map[flow.Identifier]*flow.IncorporatedResultSeal) *flow.IncorporatedResultSeal {
-	// ATTENTION: For sealing phase 2, the value for IncorporatedBlockID
-	// is the block the result pertains to (here parentBlock). In later
-	// development phases, we will change the logic such that IncorporatedBlockID
-	// references the block which actually incorporates the result.
-	// Then, the following line can simply be removed
-	incorporatingBlockID = result.BlockID
-
 	incorporatedResultSeal := unittest.IncorporatedResultSeal.Fixture(
 		unittest.IncorporatedResultSeal.WithResult(result),
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatingBlockID),

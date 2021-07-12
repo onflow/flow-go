@@ -642,7 +642,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 	prevResult := s.IncorporatedResult.Result
 	resultIDs := make([]flow.Identifier, 0, n)
 	chunkCount := 2
-	for i := 0; i < n; i++ {
+	for i := 0; i < n-1; i++ {
 
 		// Create an incorporated result for unsealedFinalizedBlocks[i].
 		// By default the result will contain 17 chunks.
@@ -655,7 +655,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 				),
 			),
 			unittest.IncorporatedResult.WithIncorporatedBlockID(
-				unsealedFinalizedBlocks[i].ID(),
+				unsealedFinalizedBlocks[i+1].ID(),
 			),
 		)
 

@@ -234,16 +234,6 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
 
-	// TODO remove shortcut which is only applicable during Sealing Phase 2
-	// Details: in the mature protocol, the chunk assignment for a result is computed
-	// using the Source of Randomness from the _first_ block that incorporates the result
-	// in the respective fork. Per protocol definition, a result is only incorporated _once_
-	// in each fork, specifically in the first block that contains an execution receipt
-	// committing to the result.
-	// However, for Sealing Phase 2, we use a NON-BFT shortcut: we use the source of
-	// randomness from the block the result is for.
-	incorporatingBlock = result.BlockID
-
 	assignment, err := e.assigner.Assign(result, incorporatingBlock)
 	if err != nil {
 		return nil, err
