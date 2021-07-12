@@ -58,8 +58,10 @@ func extractExecutionState(
 	migrations := []ledger.Migration{}
 	reporters := []ledger.Reporter{}
 	if migrate {
+		storageFormatV5Migration := mgr.StorageFormatV5Migration{Log: log}
+
 		migrations = []ledger.Migration{
-			mgr.StorageFormatV5Migration{Log: log}.Migrate,
+			storageFormatV5Migration.Migrate,
 		}
 	}
 	if report {

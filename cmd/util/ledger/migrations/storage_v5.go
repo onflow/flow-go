@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
@@ -32,26 +31,36 @@ type storageFormatV5MigrationResult struct {
 }
 
 type StorageFormatV5Migration struct {
-	Log zerolog.Logger
+	Log           zerolog.Logger
+	accounts      *state.Accounts
+	programs      *programs.Programs
+	brokenTypeIDs map[common.TypeID]brokenTypeCause
 }
 
-func (m StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
+type brokenTypeCause int
+
+const (
+	brokenTypeCauseParsingCheckingError brokenTypeCause = iota
+	brokenTypeCauseMissingCompositeType
+)
+
+func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
 	m.Log.Info().Msg("Loading account contracts ...")
 
-	accounts := m.getContractsOnlyAccounts(payloads)
+	m.accounts = m.getContractsOnlyAccounts(payloads)
 
 	m.Log.Info().Msg("Loaded account contracts")
 
-	programs := programs.NewEmptyPrograms()
-	var brokenTypeIDs sync.Map
+	m.programs = programs.NewEmptyPrograms()
+	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
 
 
 	for _, payload := range payloads {
 
-		result := m.migrate(payload, accounts, programs, &brokenTypeIDs)
+		result := m.migrate(payload)
 
 		keyParts := result.key.KeyParts
 
@@ -98,16 +107,8 @@ func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Pay
 
 func (m StorageFormatV5Migration) migrate(
 	payload ledger.Payload,
-	accounts *state.Accounts,
-	programs *programs.Programs,
-	brokenTypeIDs *sync.Map,
 ) storageFormatV5MigrationResult {
-	migratedPayload, err := m.reencodePayload(
-		payload,
-		accounts,
-		programs,
-		brokenTypeIDs,
-	)
+	migratedPayload, err := m.reencodePayload(payload)
 	result := storageFormatV5MigrationResult{
 		key: payload.Key,
 	}
@@ -151,9 +152,6 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 
 func (m StorageFormatV5Migration) reencodePayload(
 	payload ledger.Payload,
-	accounts *state.Accounts,
-	programs *programs.Programs,
-	brokenTypeIDs *sync.Map,
 ) (*ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
@@ -193,7 +191,6 @@ func (m StorageFormatV5Migration) reencodePayload(
 	if m.isOrphanContactValueChildKey(
 		rawKey,
 		flow.BytesToAddress(rawOwner),
-		accounts,
 	) {
 		return nil, nil
 	}
@@ -205,9 +202,6 @@ func (m StorageFormatV5Migration) reencodePayload(
 		common.BytesToAddress(rawOwner),
 		string(rawKey),
 		version,
-		accounts,
-		programs,
-		brokenTypeIDs,
 	)
 	if err != nil {
 		return nil,
@@ -230,9 +224,6 @@ func (m StorageFormatV5Migration) reencodeValue(
 	owner common.Address,
 	key string,
 	version uint16,
-	accounts *state.Accounts,
-	programs *programs.Programs,
-	brokenTypeIDs *sync.Map,
 ) ([]byte, error) {
 
 	// Decode the value
@@ -269,8 +260,8 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	// Infer the static types for array values and dictionary values
 
-	if accounts != nil {
-		err = m.inferContainerStaticTypes(rootValue, accounts, programs, brokenTypeIDs)
+	if m.accounts != nil {
+		err = m.inferContainerStaticTypes(rootValue)
 		if err != nil {
 			return nil, err
 		}
@@ -445,9 +436,6 @@ func (m StorageFormatV5Migration) dictionaryHasStaticType(
 
 func (m StorageFormatV5Migration) inferContainerStaticTypes(
 	rootValue interpreter.Value,
-	accounts *state.Accounts,
-	programs *programs.Programs,
-	brokenTypeIDs *sync.Map,
 ) error {
 	var err error
 
@@ -475,13 +463,13 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 			// then ignore this composite and continue inspecting other values
 
 			typeID := compositeValue.TypeID()
-			_, isBroken := brokenTypeIDs.Load(typeID)
+			_, isBroken := m.brokenTypeIDs[typeID]
 			if isBroken {
 				return true
 			}
 
 			var program *interpreter.Program
-			program, err = loadProgram(compositeValue.Location(), accounts, programs)
+			program, err = m.loadProgram(compositeValue.Location())
 			if err != nil {
 				var parsingCheckingError *runtime.ParsingCheckingError
 				if !errors.As(err, &parsingCheckingError) {
@@ -497,7 +485,7 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 					Str("typeID", string(typeID)).
 					Msg("failed to parse and check program")
 
-				brokenTypeIDs.Store(typeID, nil)
+				m.brokenTypeIDs[typeID] = brokenTypeCauseParsingCheckingError
 
 				err = nil
 				return true
@@ -513,7 +501,7 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 					Str("typeID", string(typeID)).
 					Msg("missing composite type")
 
-				brokenTypeIDs.Store(typeID, nil)
+				m.brokenTypeIDs[typeID] = brokenTypeCauseMissingCompositeType
 
 				return true
 			}
@@ -943,19 +931,17 @@ var contractValueChildKeyRegexp = regexp.MustCompile("^contract\x1f([^\x1f]+)\x1
 func (m StorageFormatV5Migration) isOrphanContactValueChildKey(
 	key []byte,
 	owner flow.Address,
-	accounts *state.Accounts,
 ) bool {
 	contractName := getContractValueChildKeyContractName(key)
 	return contractName != "" &&
-		!m.contractExists(accounts, owner, contractName)
+		!m.contractExists(owner, contractName)
 }
 
 func (m StorageFormatV5Migration) contractExists(
-	accounts *state.Accounts,
 	owner flow.Address,
 	contractName string,
 ) bool {
-	contractNames, err := accounts.GetContractNames(owner)
+	contractNames, err := m.accounts.GetContractNames(owner)
 	if err != nil {
 		m.Log.Err(err).Msgf("failed to get contract names for account %s", owner.String())
 		return false
@@ -1177,15 +1163,13 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 	return nil
 }
 
-func loadProgram(
+func (m StorageFormatV5Migration) loadProgram(
 	location common.Location,
-	accounts *state.Accounts,
-	programs *programs.Programs,
 ) (
 	*interpreter.Program,
 	error,
 ) {
-	program, _, ok := programs.Get(location)
+	program, _, ok := m.programs.Get(location)
 	if ok {
 		return program, nil
 	}
@@ -1198,7 +1182,7 @@ func loadProgram(
 		)
 	}
 
-	contractCode, err := accounts.GetContract(
+	contractCode, err := m.accounts.GetContract(
 		addressLocation.Name,
 		flow.Address(addressLocation.Address),
 	)
@@ -1210,7 +1194,7 @@ func loadProgram(
 	program, err = rt.ParseAndCheckProgram(
 		contractCode,
 		runtime.Context{
-			Interface: migrationRuntimeInterface{accounts, programs},
+			Interface: migrationRuntimeInterface{m.accounts, m.programs},
 			Location:  location,
 		},
 	)
@@ -1218,7 +1202,7 @@ func loadProgram(
 		return nil, err
 	}
 
-	programs.Set(location, program, nil)
+	m.programs.Set(location, program, nil)
 
 	return program, nil
 }
