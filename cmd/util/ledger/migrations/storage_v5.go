@@ -789,8 +789,24 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 					)
 
 				case "TopShot.Collection",
-					"KittyItems.Collection",
-					"Art.Collection",
+					"KittyItems.Collection":
+
+					// NOTE: not checking owner,
+					// assume this an unmodified copy
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"ownedNFTs",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.InterfaceStaticType{
+							Location:            testnetNFTLocation,
+							QualifiedIdentifier: "NonFungibleToken.NFT",
+						},
+						owner,
+						key,
+					)
+
+				case "Art.Collection",
 					"FlowAssets.Collection",
 					"TRART.Collection",
 					"TRARTNFTTest1.Collection":
@@ -807,6 +823,7 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 						"92d59da2af37f015",
 						"566c813b3632783e",
 						"b4544c1d61e8f500",
+						"6358f863215dda14",
 					) {
 						return
 					}
@@ -883,15 +900,17 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 						return
 					}
 
-					m.addArrayFieldType(
-						inspectedValue,
-						"code",
-						interpreter.VariableSizedStaticType{
-							Type: interpreter.PrimitiveStaticTypeUInt8,
-						},
-						owner,
-						key,
-					)
+					for _, fieldName := range []string{"code", "environment"} {
+						m.addArrayFieldType(
+							inspectedValue,
+							fieldName,
+							interpreter.VariableSizedStaticType{
+								Type: interpreter.PrimitiveStaticTypeUInt8,
+							},
+							owner,
+							key,
+						)
+					}
 
 				case "LikeNastyaItems.Collection":
 
@@ -963,6 +982,26 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 						owner,
 						key,
 					)
+
+				case "Connections.Base":
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"7ed3a3ff81329797",
+					) {
+						return
+					}
+
+					for _, fieldName := range []string{"followers", "following"} {
+
+						m.addDictionaryFieldType(
+							inspectedValue,
+							fieldName,
+							interpreter.PrimitiveStaticTypeAddress,
+							interpreter.PrimitiveStaticTypeBool,
+							owner,
+							key,
+						)
+					}
 				}
 			}
 
