@@ -12,7 +12,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	startState flow.StateCommitment,
 	result *ComputationResult) (
 	endState flow.StateCommitment,
-	chdps []*flow.ChunkDataPack,
+	chdps []*storedChunkDataPack,
 	executionResult *flow.ExecutionResult,
 	err error,
 ) {
@@ -23,7 +23,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	blockID := block.ID()
 
 	chunks := make([]*flow.Chunk, len(result.StateCommitments))
-	chdps = make([]*flow.ChunkDataPack, len(result.StateCommitments))
+	chdps = make([]*storedChunkDataPack, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
 	endState = startState
