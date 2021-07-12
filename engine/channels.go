@@ -119,6 +119,9 @@ const (
 	RequestReceiptsByBlockID = network.Channel("request-receipts-by-block-id")
 	RequestApprovalsByChunk  = network.Channel("request-approvals-by-chunk")
 
+	// Channel for registering and unregistering an unstaked access node with a staked access node
+	ManageUnstakedAccess       = network.Channel("manage-unstaked-access")
+
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
 	ReceiveGuarantees   = PushGuarantees
