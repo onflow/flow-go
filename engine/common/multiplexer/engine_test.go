@@ -40,7 +40,6 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
-	// TODO
 
 	eng, err := multiplexer.New(zerolog.Logger{}, suite.net, suite.me)
 	require.NoError(suite.T(), err)
