@@ -5,6 +5,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"path/filepath"
 	"time"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	hotstuffModel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -364,7 +364,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
-			blockTimestamp = hotstuffModel.NewBlockTimestamp(minInterval, maxInterval)
+			blockTimestamp = timestamp.NewBlockTimestamp(minInterval, maxInterval)
 
 			// initialize the block builder
 			var build module.Builder

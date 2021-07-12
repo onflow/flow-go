@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -52,7 +53,7 @@ func NewParticipant(
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
-		BlockTimestamp:             model.DefaultBlockTimestamp,
+		BlockTimestamp:             timestamp.DefaultBlockTimestamp,
 	}
 
 	// apply the configuration options

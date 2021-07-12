@@ -1,7 +1,9 @@
-package model
+package timestamp
 
 import (
 	"time"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // BlockTimestamp is a helper structure that performs building and validation of valid
@@ -54,7 +56,7 @@ func (b BlockTimestamp) Validate(parentTimestamp, currentTimestamp time.Time) er
 	from := parentTimestamp.Add(b.minInterval)
 	to := parentTimestamp.Add(b.maxInterval)
 	if currentTimestamp.Before(from) || currentTimestamp.After(to) {
-		return NewInvalidBlockTimestamp("timestamp %v is not within interval [%v; %v]", currentTimestamp, from, to)
+		return model.NewInvalidBlockTimestamp("timestamp %v is not within interval [%v; %v]", currentTimestamp, from, to)
 	}
 	return nil
 }
