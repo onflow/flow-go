@@ -192,12 +192,17 @@ func (m StorageFormatV5Migration) reencodePayload(
 		rawKey,
 		flow.BytesToAddress(rawOwner),
 	) {
+		m.Log.Warn().Msgf(
+			"DELETING orphaned contract value child key: %s (owner: %x)",
+			string(rawKey), rawOwner,
+		)
+
 		return nil, nil
 	}
 
 	// Extract the owner from the key
 
-	newValue, err := m.reencodeValue(
+	newValue, keep, err := m.reencodeValue(
 		value,
 		common.BytesToAddress(rawOwner),
 		string(rawKey),
@@ -209,6 +214,9 @@ func (m StorageFormatV5Migration) reencodePayload(
 				"failed to re-encode key: %s: %w\n\nvalue:\n%s",
 				rawKey, err, hex.Dump(value),
 			)
+	}
+	if !keep {
+		return nil, nil
 	}
 
 	payload.Value = interpreter.PrependMagic(
@@ -224,7 +232,11 @@ func (m StorageFormatV5Migration) reencodeValue(
 	owner common.Address,
 	key string,
 	version uint16,
-) ([]byte, error) {
+) (
+	newData []byte,
+	keep bool,
+	err error,
+) {
 
 	// Decode the value
 
@@ -232,11 +244,10 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	rootValue, err := interpreter.DecodeValueV4(data, &owner, path, version, nil)
 	if err != nil {
-		return nil,
-			fmt.Errorf(
-				"failed to decode value: %w\n\nvalue:\n%s\n",
-				err, hex.Dump(data),
-			)
+		return nil, false, fmt.Errorf(
+			"failed to decode value: %w\n\nvalue:\n%s\n",
+			err, hex.Dump(data),
+		)
 	}
 
 	// Force decoding of all container values
@@ -263,7 +274,26 @@ func (m StorageFormatV5Migration) reencodeValue(
 	if m.accounts != nil {
 		err = m.inferContainerStaticTypes(rootValue)
 		if err != nil {
-			return nil, err
+			return nil, false, err
+		}
+
+		// If the migrated value is a composite and its type is missing,
+		// then delete it
+
+		if compositeValue, ok := rootValue.(*interpreter.CompositeValue); ok {
+			if cause, ok := m.brokenTypeIDs[compositeValue.TypeID()]; ok &&
+				cause == brokenTypeCauseMissingCompositeType {
+
+				m.Log.Warn().
+					Str("owner", owner.String()).
+					Str("key", key).
+					Msgf(
+						"DELETING composite value with missing type: %s",
+						compositeValue.String(),
+					)
+
+				return nil, false, nil
+			}
 		}
 	}
 
@@ -325,7 +355,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 		},
 	)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Encode the value using the new encoder
@@ -337,20 +367,20 @@ func (m StorageFormatV5Migration) reencodeValue(
 			Str("owner", owner.String()).
 			Str("rootValue", rootValue.String()).
 			Msg("failed to encode value")
-		return data, nil
+		return data, false, nil
 	}
 
 	// Encoding should not provide any deferred values or deferred moves
 
 	if len(deferrals.Values) > 0 {
-		return nil, fmt.Errorf(
+		return nil, false, fmt.Errorf(
 			"re-encoding produced deferred values:\n%s\n",
 			rootValue,
 		)
 	}
 
 	if len(deferrals.Moves) > 0 {
-		return nil, fmt.Errorf(
+		return nil, false, fmt.Errorf(
 			"re-encoding produced deferred moves:\n%s\n",
 			rootValue,
 		)
@@ -396,7 +426,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 		nil,
 	)
 	if err != nil {
-		return nil, fmt.Errorf(
+		return nil, false, fmt.Errorf(
 			"failed to decode re-encoded value: %w\n%s\n",
 			err, rootValue,
 		)
@@ -404,21 +434,21 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	equatableValue, ok := rootValue.(interpreter.EquatableValue)
 	if !ok {
-		return nil, fmt.Errorf(
+		return nil, false, fmt.Errorf(
 			"cannot compare unequatable %[1]T\n%[1]s\n",
 			rootValue,
 		)
 	}
 
 	if !equatableValue.Equal(newRootValue, nil, false) {
-		return nil, fmt.Errorf(
+		return nil, false, fmt.Errorf(
 			"values are unequal:\n%s\n%s\n",
 			rootValue,
 			newRootValue,
 		)
 	}
 
-	return newData, nil
+	return newData, true, nil
 }
 
 func (m StorageFormatV5Migration) arrayHasStaticType(arrayValue *interpreter.ArrayValue) bool {
@@ -437,6 +467,7 @@ func (m StorageFormatV5Migration) dictionaryHasStaticType(
 func (m StorageFormatV5Migration) inferContainerStaticTypes(
 	rootValue interpreter.Value,
 ) error {
+
 	var err error
 
 	// Start with composite types and use fields' types to infer values' types
@@ -590,6 +621,7 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 						"dee35303492e5a0b",
 						"1864ff317a35af46",
 						"16a5fe3b527633d4",
+						"9798362e92e5539a",
 					) {
 						return
 					}
@@ -780,6 +812,76 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 						interpreter.InterfaceStaticType{
 							Location:            testnetNFTLocation,
 							QualifiedIdentifier: "NonFungibleToken.NFT",
+						},
+						owner,
+						key,
+					)
+
+				case "StargateNFT.StargateMasterCollection":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"dd9ed5717c7d1af1",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"ownedNFTs",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.InterfaceStaticType{
+							Location:            testnetNFTLocation,
+							QualifiedIdentifier: "NonFungibleToken.NFT",
+						},
+						owner,
+						key,
+					)
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"nonces",
+						interpreter.PrimitiveStaticTypeAddress,
+						interpreter.PrimitiveStaticTypeUInt64,
+						owner,
+						key,
+					)
+
+				case "HastenScript.Collection":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"f8d51e8d9f1ceb86",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"ownedScripts",
+						interpreter.PrimitiveStaticTypeUInt256,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "HastenScript.Script",
+						},
+						owner,
+						key,
+					)
+
+				case "HastenScript.Script":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"f8d51e8d9f1ceb86",
+					) {
+						return
+					}
+
+					m.addArrayFieldType(
+						inspectedValue,
+						"code",
+						interpreter.VariableSizedStaticType{
+							Type: interpreter.PrimitiveStaticTypeUInt8,
 						},
 						owner,
 						key,
@@ -1069,29 +1171,10 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 	entries := value.Entries()
 
 	if t == nil {
+		// NOTE: use entries.Len() instead of Count, because Count() > 0 && entries.Len() == 0 means
+		// the dictionary has deferred (separately stored) values, and we cannot get the types of those values
 		if entries.Len() == 0 {
-			//if value.Count() == 0 {
 			return fmt.Errorf("cannot infer static type for empty dictionary value: %s", value.String())
-			//}
-			//
-			//// The dictionary has deferred values,
-			//// which is only the case when the values are resources
-			//
-			//var keyType interpreter.StaticType
-			//for _, key := range value.Keys().Elements() {
-			//	if keyType == nil {
-			//		keyType = key.StaticType()
-			//	} else if !key.StaticType().Equal(keyType) {
-			//		return fmt.Errorf("cannot infer key static type for dictionary with mixed type keys")
-			//	}
-			//}
-			//
-			//value.Type = interpreter.DictionaryStaticType{
-			//	KeyType: keyType,
-			//	// NOTE: can only infer AnyResource as values are not available
-			//	ValueType: interpreter.PrimitiveStaticTypeAnyResource,
-			//}
-
 		} else {
 
 			var keyType interpreter.StaticType
