@@ -33,16 +33,17 @@ func (s *sha3State) Algorithm() HashingAlgorithm {
 		return SHA3_256
 	case HashLenSha3_384:
 		return SHA3_384
+	default:
+		panic("failed to return the hashing algorithm because of an incompatible output length")
 	}
-	return UnknownHashingAlgorithm
 }
 
 // ComputeHash calculates and returns the SHA3 digest of the input.
-// It updates the state and doesn't allow further writing without
-// calling Reset().
+// It updates the state (and therefore not thread-safe) and doesn't allow
+// further writing without calling Reset().
 func (s *sha3State) ComputeHash(data []byte) Hash {
 	s.Reset()
-	_, _ = s.Write(data)
+	s.write(data)
 	return s.sum()
 }
 
@@ -51,6 +52,13 @@ func (s *sha3State) ComputeHash(data []byte) Hash {
 // calling Reset().
 func (s *sha3State) SumHash() Hash {
 	return s.sum()
+}
+
+// Write absorbs more data into the hash's state.
+// It returns the number of bytes written and never errors.
+func (d *sha3State) Write(p []byte) (int, error) {
+	d.write(p)
+	return len(p), nil
 }
 
 // The functions below were copied and modified from golang.org/x/crypto/sha3.
@@ -126,13 +134,10 @@ func (d *sha3State) permute() {
 	keccakF1600(&d.a)
 }
 
-// Write absorbs more data into the hash's state.
-// It returns the number of bytes written and never errors.
-func (d *sha3State) Write(p []byte) (written int, err error) {
+func (d *sha3State) write(p []byte) {
 	if d.buf == nil {
 		d.buf = d.storage.asBytes()[:0]
 	}
-	written = len(p)
 
 	for len(p) > 0 {
 		if len(d.buf) == 0 && len(p) >= d.rate {

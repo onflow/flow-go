@@ -2,6 +2,7 @@ package delta
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/state"
@@ -19,10 +20,11 @@ type View struct {
 	delta       Delta
 	regTouchSet map[string]flow.RegisterID // contains all the registers that have been touched (either read or written to)
 	readsCount  uint64                     // contains the total number of reads
-	// SpocksSecret keeps the secret used for SPoCKs
-	// TODO we can add a flag to disable capturing SpocksSecret
+	// spockSecret keeps the secret used for SPoCKs
+	// TODO we can add a flag to disable capturing spockSecret
 	// for views other than collection views to improve performance
-	spocksSecret      []byte
+	spockSecret       []byte
+	spockSecretLock   sync.Mutex
 	spockSecretHasher hash.Hasher
 	readFunc          GetRegisterFunc
 }
@@ -254,11 +256,13 @@ func (v *View) ReadsCount() uint64 {
 // This function modifies the internal state of the SPoCK secret hasher.
 // Once called, it doesn't allow writing more data into the SPoCK secret.
 func (v *View) SpockSecret() []byte {
-	// check if spocksSecret has been already computed
-	if v.spocksSecret == nil {
-		v.spocksSecret = v.spockSecretHasher.SumHash()
+	// check if spockSecret has been already computed
+	v.spockSecretLock.Lock()
+	if v.spockSecret == nil {
+		v.spockSecret = v.spockSecretHasher.SumHash()
 	}
-	return v.spocksSecret
+	v.spockSecretLock.Unlock()
+	return v.spockSecret
 }
 
 // Detach detaches view from parent, by setting readFunc to

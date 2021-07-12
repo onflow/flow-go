@@ -33,7 +33,7 @@ func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) 
 	var k kmac128
 	if outputSize < 0 {
 		return nil,
-			fmt.Errorf("kmac output size must be positive, got %d", outputSize)
+			fmt.Errorf("kmac output cannot be negative, got %d", outputSize)
 	}
 
 	// check the key size (required if the key is used as a security key)
@@ -145,7 +145,7 @@ func (k *kmac128) Reset() {
 }
 
 // ComputeHash computes the mac of the input data.
-// It does not update the underlying hash state.
+// It does not update the underlying hash state (the function is thread safe).
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Reset()

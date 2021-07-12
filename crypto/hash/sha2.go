@@ -22,10 +22,11 @@ func (s *sha2_256Algo) Algorithm() HashingAlgorithm {
 }
 
 // ComputeHash calculates and returns the SHA2-256 digest of the input.
-// It does not reset the state to allow further writing.
+// The function updates the state (and therefore not thread-safe)
+// but does not reset the state to allow further writing.
 func (s *sha2_256Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	// Write does not return an error in this case
+	// `Write` delegates this call to sha256.digest's `Write` which does not return an error.
 	_, _ = s.Write(data)
 	return s.Sum(nil)
 }
@@ -55,7 +56,7 @@ func (s *sha2_384Algo) Algorithm() HashingAlgorithm {
 // It does not reset the state to allow further writing.
 func (s *sha2_384Algo) ComputeHash(data []byte) Hash {
 	s.Reset()
-	// Write does not return an error in this case
+	// `Write` delegates this call to sha512.digest's `Write` which does not return an error.
 	_, _ = s.Write(data)
 	return s.Sum(nil)
 }
