@@ -203,7 +203,16 @@ func (suite *Suite) TestProcessUnregisteredChannel() {
 }
 
 func (suite *Suite) TestDuplicateRegistrations() {
-	// TODO: test registering same engine twice on same channel
+	channel := network.Channel("test-chan")
+	engine := new(mocknetwork.Engine)
+
+	con, err := suite.engine.Register(channel, engine)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+
+	con, err = suite.engine.Register(channel, engine)
+	suite.Assert().Nil(con)
+	suite.Assert().Error(err)
 }
 
 func (suite *Suite) TestReadyDone() {
