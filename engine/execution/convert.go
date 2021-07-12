@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
+	storagemodel "github.com/onflow/flow-go/storage/model"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
@@ -12,7 +13,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	startState flow.StateCommitment,
 	result *ComputationResult) (
 	endState flow.StateCommitment,
-	chdps []*StoredChunkDataPack,
+	chdps []*storagemodel.StoredChunkDataPack,
 	executionResult *flow.ExecutionResult,
 	err error,
 ) {
@@ -23,7 +24,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	blockID := block.ID()
 
 	chunks := make([]*flow.Chunk, len(result.StateCommitments))
-	chdps = make([]*StoredChunkDataPack, len(result.StateCommitments))
+	chdps = make([]*storagemodel.StoredChunkDataPack, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
 	endState = startState
@@ -117,8 +118,8 @@ func generateStoredChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
 	proof flow.StorageProof,
-) *StoredChunkDataPack {
-	return &StoredChunkDataPack{
+) *storagemodel.StoredChunkDataPack {
+	return &storagemodel.StoredChunkDataPack{
 		ChunkID:      chunk.ID(),
 		StartState:   chunk.StartState,
 		Proof:        proof,
