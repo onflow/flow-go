@@ -349,7 +349,7 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	contract := contracts.FlowQC()
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract, "FlowEpochClusterQC"),
+		deployContractTransaction(service, contract, "FlowClusterQC"),
 		b.sth,
 		b.programs,
 	)
@@ -550,10 +550,10 @@ transaction {
 `
 
 const deployEpochTransactionTemplate = `
-import FlowEpochClusterQC from 0x%s
+import FlowClusterQC from 0x%s
 
-transaction(collectorClusters: [FlowEpochClusterQC.Cluster],
-			clusterQCs: [FlowEpochClusterQC.ClusterQC],
+transaction(collectorClusters: [FlowClusterQC.Cluster],
+			clusterQCs: [FlowClusterQC.ClusterQC],
 			dkgPubKeys: [String], 
 	) {
   prepare(serviceAccount: AuthAccount)	{

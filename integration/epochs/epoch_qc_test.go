@@ -1,25 +1,21 @@
 package epochs
 
 import (
+	// "context"
 	"context"
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/epochs"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -27,14 +23,6 @@ import (
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	protomock "github.com/onflow/flow-go/state/protocol/mock"
 )
-
-type ClusterNode struct {
-	NodeID  flow.Identifier
-	Key     *sdk.AccountKey
-	Address sdk.Address
-	Signer  sdkcrypto.Signer
-	Voter   module.ClusterRootQCVoter
-}
 
 func TestClusterEpoch(t *testing.T) {
 	suite.Run(t, new(Suite))
@@ -64,6 +52,8 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	// create cluster nodes with voter resource
 	for _, node := range nodes {
 		nodeID := node.NodeID
+		stakingPrivKey, err := unittest.StakingKey()
+		s.Require().NoError(err)
 
 		// find cluster and create root block
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
@@ -73,14 +63,15 @@ func (s *Suite) TestEpochQuorumCertificate() {
 
 		// create account on emualted chain
 		address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, nodeID, address.String(), 0, s.qcAddress.String(), signer)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 
 		local := &modulemock.Local{}
 		local.On("NodeID").Return(nodeID)
 
+		// TODO: create signature of vote
 		vote := hotstuffmodel.VoteFromFlow(nodeID, unittest.IdentifierFixture(), 0, unittest.SignatureFixture())
 		hotSigner := &hotstuff.Signer{}
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
@@ -96,11 +87,11 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, client)
 
 		// create voter resource
-		s.CreateVoterResource(address, nodeID, signer)
+		s.CreateVoterResource(address, nodeID, stakingPrivKey.PublicKey(), signer)
 
 		// cast vote
 		err = voter.Vote(context.Background(), epoch)
-		require.NoError(s.T(), err)
+		s.Require().NoError(err)
 	}
 
 	// stop voting
@@ -109,48 +100,6 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	// check if each node has voted
 	for _, node := range nodes {
 		hasVoted := s.NodeHasVoted(node.NodeID)
-		assert.True(s.T(), hasVoted)
+		s.Assert().True(hasVoted)
 	}
-}
-
-// CreateClusterNode ...
-func (s *Suite) CreateClusterNode(rootBlock *cluster.Block, me *flow.Identity) *ClusterNode {
-
-	key, signer := test.AccountKeyGenerator().NewWithSigner()
-
-	// create account on emualted chain
-	address, err := s.blockchain.CreateAccount([]*sdk.AccountKey{key}, []sdktemplates.Contract{})
-	require.NoError(s.T(), err)
-
-	client := epochs.NewQCContractClient(zerolog.Nop(), s.emulatorClient, me.NodeID, address.String(), 0, s.qcAddress.String(), signer)
-	require.NoError(s.T(), err)
-
-	local := &modulemock.Local{}
-	local.On("NodeID").Return(me.NodeID)
-
-	vote := hotstuffmodel.VoteFromFlow(me.NodeID, unittest.IdentifierFixture(), 0, unittest.SignatureFixture())
-
-	hotSigner := &hotstuff.Signer{}
-	hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
-
-	snapshot := &protomock.Snapshot{}
-	snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil)
-
-	state := &protomock.State{}
-	state.On("CanonicalRootBlock").Return(rootBlock)
-	state.On("Final").Return(snapshot)
-
-	// create QC voter object to be used for voting for the root QC contract
-	voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, client)
-
-	// create node and set node
-	node := &ClusterNode{
-		NodeID:  me.NodeID,
-		Key:     key,
-		Address: address,
-		Voter:   voter,
-		Signer:  signer,
-	}
-
-	return node
 }

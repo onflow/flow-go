@@ -36,8 +36,8 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.18.1-0.20210621164449-25b6135332eb
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210630193825-c1e8973f5628
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210630193825-c1e8973f5628
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210708181502-81b75f1a0ff8
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210708181502-81b75f1a0ff8
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.18.0

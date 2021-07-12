@@ -1,6 +1,7 @@
 package epochs
 
 import (
+	"crypto"
 	"fmt"
 
 	"github.com/stretchr/testify/assert"
@@ -12,6 +13,7 @@ import (
 	emulator "github.com/onflow/flow-emulator"
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	emulatormod "github.com/onflow/flow-go/module/emulator"
 
@@ -40,11 +42,14 @@ type Suite struct {
 
 // SetupTest creates an instance of the emulated chain and deploys the EpochQC contract
 func (s *Suite) SetupTest() {
+
 	// create a new instance of the emulated blockchain
-	blockchain, err := emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
-	require.NoError(s.T(), err)
-	s.blockchain = blockchain
-	s.emulatorClient = emulatormod.NewEmulatorClient(blockchain)
+	var err error
+	s.blockchain, err = emulator.NewBlockchain(emulator.WithStorageLimitEnabled(false))
+	s.Require().NoError(err)
+	s.emulatorClient = emulatormod.NewEmulatorClient(s.blockchain)
+
+	// deploy epoch qc contract
 	s.deployEpochQCContract()
 }
 
@@ -59,11 +64,11 @@ func (s *Suite) deployEpochQCContract() {
 	// deploy the contract to the emulator
 	QCAddress, err := s.blockchain.CreateAccount([]*sdk.AccountKey{QCAccountKey}, []sdktemplates.Contract{
 		{
-			Name:   "FlowEpochClusterQC",
+			Name:   "FlowClusterQC",
 			Source: string(QCCode),
 		},
 	})
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
 
 	env := templates.Environment{
 		QuorumCertificateAddress: QCAddress.Hex(),
@@ -84,7 +89,7 @@ func (s *Suite) CreateClusterList(clusterCount, nodesPerCluster int) (flow.Clust
 
 	// create `ClusterList` object from nodes and assignment
 	clusterList, err := flow.NewClusterList(clusterAssignment, nodes)
-	require.NoError(s.T(), err)
+	s.Require().NoError(err)
 
 	return clusterList, nodes
 }
@@ -159,7 +164,7 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 }
 
 // CreateVoterResource creates the Voter resource in cadence for a cluster node
-func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier, nodeSigner sdkcrypto.Signer) {
+func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier, publicStakingKey crypto.PublicKey, nodeSigner sdkcrypto.Signer) {
 
 	registerVoterTx := sdk.NewTransaction().
 		SetScript(templates.GenerateCreateVoterScript(s.env)).
@@ -170,6 +175,9 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 		AddAuthorizer(address)
 
 	err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
+	require.NoError(s.T(), err)
+
+	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
 	require.NoError(s.T(), err)
 
 	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
