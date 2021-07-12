@@ -50,7 +50,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		chunk := GenerateChunk(i, startState, endState, collectionID, blockID, eventsHash, uint16(txNumber))
 
 		// chunkDataPack
-		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
+		chdps[i] = generateStoredChunkDataPack(chunk, collectionID, result.Proofs[i])
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
@@ -112,13 +112,13 @@ func GenerateChunk(colIndex int,
 	}
 }
 
-// generateChunkDataPack creates a chunk data pack
-func generateChunkDataPack(
+// generateStoredChunkDataPack creates a stored chunk data pack for maintaining internally on execution node side.
+func generateStoredChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
 	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
+) *storedChunkDataPack {
+	return &storedChunkDataPack{
 		ChunkID:      chunk.ID(),
 		StartState:   chunk.StartState,
 		Proof:        proof,
