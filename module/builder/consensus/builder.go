@@ -8,6 +8,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
@@ -58,8 +59,7 @@ func NewBuilder(
 
 	// initialize default config
 	cfg := Config{
-		minInterval:       500 * time.Millisecond,
-		maxInterval:       10 * time.Second,
+		blockTimestamp:    hotstuff.NewBlockTimestamp(500*time.Millisecond, 10*time.Second),
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
@@ -607,18 +607,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
-	// calculate the timestamp and cutoffs
-	timestamp := time.Now().UTC()
-	from := parent.Timestamp.Add(b.cfg.minInterval)
-	to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-	// adjust timestamp if outside of cutoffs
-	if timestamp.Before(from) {
-		timestamp = from
-	}
-	if timestamp.After(to) {
-		timestamp = to
-	}
+	timestamp := b.cfg.blockTimestamp.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{

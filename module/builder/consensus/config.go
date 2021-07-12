@@ -3,12 +3,11 @@
 package consensus
 
 import (
-	"time"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 )
 
 type Config struct {
-	minInterval time.Duration
-	maxInterval time.Duration
+	blockTimestamp *hotstuff.BlockTimestamp
 	// the max number of seals to be included in a block proposal
 	maxSealCount      uint
 	maxGuaranteeCount uint
@@ -16,15 +15,9 @@ type Config struct {
 	expiry            uint
 }
 
-func WithMinInterval(minInterval time.Duration) func(*Config) {
+func WithBlockTimestamp(blockTimestamp *hotstuff.BlockTimestamp) func(*Config) {
 	return func(cfg *Config) {
-		cfg.minInterval = minInterval
-	}
-}
-
-func WithMaxInterval(maxInterval time.Duration) func(*Config) {
-	return func(cfg *Config) {
-		cfg.maxInterval = maxInterval
+		cfg.blockTimestamp = blockTimestamp
 	}
 }
 

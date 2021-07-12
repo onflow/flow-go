@@ -91,6 +91,7 @@ func main() {
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
+		blockTimestamp          *hotstuff.BlockTimestamp
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -362,6 +363,8 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
+			blockTimestamp = hotstuff.NewBlockTimestamp(minInterval, maxInterval)
+
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -378,8 +381,7 @@ func main() {
 				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
-				builder.WithMinInterval(minInterval),
-				builder.WithMaxInterval(maxInterval),
+				builder.WithBlockTimestamp(blockTimestamp),
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
