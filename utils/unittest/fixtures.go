@@ -1232,7 +1232,7 @@ func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verifica
 	return req
 }
 
-func WithChunkDataPackCollection(collection flow.Collection) func(*flow.ChunkDataPack) {
+func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
 	return func(cdp *flow.ChunkDataPack) {
 		cdp.Collection = collection
 	}
@@ -1245,13 +1245,12 @@ func WithStartState(startState flow.StateCommitment) func(*flow.ChunkDataPack) {
 }
 
 func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataPack)) *flow.ChunkDataPack {
-	//ids := utils.GetRandomRegisterIDs(1)
-	//values := utils.GetRandomValues(1, 1, 32)
+	coll := CollectionFixture(1)
 	cdp := &flow.ChunkDataPack{
 		ChunkID:    chunkID,
 		StartState: StateCommitmentFixture(),
 		Proof:      []byte{'p'},
-		Collection: CollectionFixture(1),
+		Collection: &coll,
 	}
 
 	for _, opt := range opts {
