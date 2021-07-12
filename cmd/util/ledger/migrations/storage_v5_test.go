@@ -347,7 +347,7 @@ func TestGetContractValueChildKeyContractName(t *testing.T) {
 	)
 }
 
-func TestStorageFormatV5Migration_InspectionErrorOverwrite(t *testing.T) {
+func TestStorageFormatV5Migration_AddKnownStaticType(t *testing.T) {
 
 	key := "contract\x1fFlowIDTableStaking"
 	owner, err := common.HexToAddress("dee35303492e5a0b")
@@ -388,17 +388,13 @@ func TestStorageFormatV5Migration_InspectionErrorOverwrite(t *testing.T) {
 		0x62, 0x6c, 0x65, 0x53, 0x74, 0x61, 0x6b, 0x69, 0x6e, 0x67,
 	}
 
-	migration := StorageFormatV5Migration{log.Output(zerolog.ConsoleWriter{Out: os.Stderr})}
+	migration := StorageFormatV5Migration{Log: log.Output(zerolog.ConsoleWriter{Out: os.Stderr})}
 
-	_, err = migration.reencodeValue(
+	_, _, err = migration.reencodeValue(
 		oldData,
 		owner,
 		key,
 		4,
-		nil,
-		nil,
-		nil,
 	)
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot infer static type for empty dictionary value")
+	require.NoError(t, err)
 }
