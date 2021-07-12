@@ -38,10 +38,9 @@ func (ch *Chunk) Checksum() Identifier {
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
-	ChunkID      Identifier
-	StartState   StateCommitment
-	Proof        StorageProof
-	CollectionID Identifier
+	ChunkID    Identifier
+	StartState StateCommitment
+	Proof      StorageProof
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of
