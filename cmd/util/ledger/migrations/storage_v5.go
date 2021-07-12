@@ -211,8 +211,10 @@ func (m StorageFormatV5Migration) reencodePayload(
 	if err != nil {
 		return nil,
 			fmt.Errorf(
-				"failed to re-encode key: %s: %w\n\nvalue:\n%s",
-				rawKey, err, hex.Dump(value),
+				"failed to re-encode key: %s: %w\n\nvalue:\n%s\n\n%s",
+				rawKey, err,
+				hex.Dump(value),
+				cborMeLink(value),
 			)
 	}
 	if !keep {
@@ -225,6 +227,10 @@ func (m StorageFormatV5Migration) reencodePayload(
 	)
 
 	return &payload, nil
+}
+
+func cborMeLink(value []byte) string {
+	return fmt.Sprintf("http://cbor.me/?bytes=%x", value)
 }
 
 func (m StorageFormatV5Migration) reencodeValue(
