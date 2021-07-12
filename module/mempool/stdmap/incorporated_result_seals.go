@@ -28,7 +28,6 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 
 	// assuming all the entities are for unsealed blocks, then we will remove a seal
 	// with the largest height.
-
 	// This mempool implementation supports pruning by height, meaning that as soon as sealing advances
 	// seals will be gradually removed from mempool
 	// ejecting a seal from mempool means that we have reached our limit and something is very bad, meaning that sealing
