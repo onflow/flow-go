@@ -513,7 +513,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng.OnCollection(originID, &collection)
 
 		for _, r := range executionReceipts {
-			err = ingestEng.Process(enNodeIDs[0], r)
+			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
 		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
