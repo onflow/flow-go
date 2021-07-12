@@ -1,10 +1,12 @@
 package timestamp
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // TestBlockTimestamp_Build tests that builder correctly generates new block time

@@ -7,6 +7,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/follower"
+	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,7 +27,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers stora
 	}
 
 	// initialize the validator
-	validator := validator.New(committee, finalizer, verifier)
+	validator := validator.New(committee, finalizer, verifier, timestamp.NewNoopBlockTimestamp())
 
 	// recover the hotstuff state as a follower
 	err = recovery.Follower(log, finalizer, validator, finalized, pending)
