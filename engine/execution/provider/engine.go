@@ -189,9 +189,13 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *cdp,
-		Nonce:         rand.Uint64(),
-		Collection:    collection,
+		ChunkDataPack: flow.ChunkDataPack{
+			ChunkID:    cdp.ChunkID,
+			StartState: cdp.StartState,
+			Proof:      cdp.Proof,
+		},
+		Nonce:      rand.Uint64(),
+		Collection: collection,
 	}
 
 	sinceProcess := time.Since(processStart)
