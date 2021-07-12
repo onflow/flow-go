@@ -34,6 +34,16 @@ func (_m *ComplianceMetrics) CommittedEpochFinalView(view uint64) {
 	_m.Called(view)
 }
 
+// CurrentEpochCounter provides a mock function with given fields: counter
+func (_m *ComplianceMetrics) CurrentEpochCounter(counter uint64) {
+	_m.Called(counter)
+}
+
+// CurrentEpochPhase provides a mock function with given fields: phase
+func (_m *ComplianceMetrics) CurrentEpochPhase(phase flow.EpochPhase) {
+	_m.Called(phase)
+}
+
 // FinalizedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)

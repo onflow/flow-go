@@ -528,9 +528,13 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				// update current epoch phase
+				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
+				// update current epoch phase
+				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
 				// track final view of committed epoch
@@ -555,6 +559,9 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// this block begins the next epoch
 	if header.View > finalView {
 		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+
+		// set current epoch counter
+		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
