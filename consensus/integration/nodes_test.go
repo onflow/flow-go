@@ -181,11 +181,12 @@ func createNode(
 
 	receipts := consensusMempools.NewExecutionTree()
 
-	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
-		guarantees, seals, receipts, tracer)
+	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
+		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
+	require.NoError(t, err)
 
 	signer := &Signer{identity.ID()}
 

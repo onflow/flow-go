@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -22,8 +23,10 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/provider"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -38,7 +41,6 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
-	"github.com/onflow/flow-go/module/mempool/ejectors"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -73,24 +75,22 @@ func main() {
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
 
-		err               error
-		mutableState      protocol.MutableState
-		privateDKGData    *bootstrap.DKGParticipantPriv
-		guarantees        mempool.Guarantees
-		results           mempool.IncorporatedResults
-		receipts          mempool.ExecutionTree
-		approvals         mempool.Approvals
-		seals             mempool.IncorporatedResultSeals
-		pendingReceipts   mempool.PendingReceipts
-		prov              *provider.Engine
-		receiptRequester  *requester.Engine
-		syncCore          *synchronization.Core
-		comp              *compliance.Engine
-		conMetrics        module.ConsensusMetrics
-		mainMetrics       module.HotstuffMetrics
-		receiptValidator  module.ReceiptValidator
-		approvalValidator module.ApprovalValidator
-		chunkAssigner     *chmodule.ChunkAssigner
+		err                     error
+		mutableState            protocol.MutableState
+		privateDKGData          *bootstrap.DKGParticipantPriv
+		guarantees              mempool.Guarantees
+		receipts                mempool.ExecutionTree
+		seals                   mempool.IncorporatedResultSeals
+		pendingReceipts         mempool.PendingReceipts
+		prov                    *provider.Engine
+		receiptRequester        *requester.Engine
+		syncCore                *synchronization.Core
+		comp                    *compliance.Engine
+		conMetrics              module.ConsensusMetrics
+		mainMetrics             module.HotstuffMetrics
+		receiptValidator        module.ReceiptValidator
+		chunkAssigner           *chmodule.ChunkAssigner
+		finalizationDistributor *pubsub.FinalizationDistributor
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -98,7 +98,9 @@ func main() {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
-			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
+			// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
+			// ever gets full, the node will simply crash instead of employing complex ejection logic.
+			flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
 			flags.UintVar(&pendngReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
@@ -150,11 +152,7 @@ func main() {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
-			approvalValidator = validation.NewApprovalValidator(
-				node.State,
-				resultApprovalSigVerifier)
-
-			sealValidator := validation.NewSealValidator(
+			sealValidator, err := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -162,8 +160,12 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
+				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
+			if err != nil {
+				return fmt.Errorf("could not instantiate seal validator: %w", err)
+			}
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -183,10 +185,6 @@ func main() {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
 		}).
-		Module("execution results mempool", func(node *cmd.FlowNodeBuilder) error {
-			results, err = stdmap.NewIncorporatedResults(resultLimit)
-			return err
-		}).
 		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
 			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
@@ -196,19 +194,14 @@ func main() {
 			}
 			return nil
 		}).
-		Module("result approvals mempool", func(node *cmd.FlowNodeBuilder) error {
-			approvals, err = stdmap.NewApprovals(approvalLimit)
-			return err
-		}).
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			ejector := ejectors.NewLatestIncorporatedResultSeal(node.Storage.Headers)
-			resultSeals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit), stdmap.WithEject(ejector.Eject))
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingIncorporatedSeal, seals.Size)
 			return nil
 		}).
 		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
@@ -223,8 +216,45 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
+		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			return nil
+		}).
 		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
+			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
+
+			config := sealing.DefaultConfig()
+			config.EmergencySealingActive = emergencySealing
+			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
+
+			e, err := sealing.NewEngine(
+				node.Logger,
+				node.Tracer,
+				conMetrics,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				sealingTracker,
+				node.Network,
+				node.Me,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				node.State,
+				node.Storage.Seals,
+				chunkAssigner,
+				resultApprovalSigVerifier,
+				seals,
+				config,
+			)
+
+			// subscribe for finalization events from hotstuff
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
+
+			return e, err
+		}).
+		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -241,34 +271,39 @@ func main() {
 				return nil, err
 			}
 
-			match, err := sealing.NewEngine(
+			core := matching.NewCore(
 				node.Logger,
-				node.Metrics.Engine,
 				node.Tracer,
-				node.Metrics.Mempool,
 				conMetrics,
-				node.Network,
+				node.Metrics.Mempool,
 				node.State,
-				node.Me,
-				receiptRequester,
-				node.Storage.Receipts,
 				node.Storage.Headers,
-				node.Storage.Index,
-				results,
+				node.Storage.Receipts,
 				receipts,
-				approvals,
-				seals,
 				pendingReceipts,
-				chunkAssigner,
+				seals,
 				receiptValidator,
-				approvalValidator,
-				requiredApprovalsForSealConstruction,
-				emergencySealing,
+				receiptRequester,
+				matching.DefaultConfig(),
 			)
 
-			receiptRequester.WithHandle(match.HandleReceipt)
+			e, err := matching.NewEngine(
+				node.Logger,
+				node.Network,
+				node.Me,
+				node.Metrics.Engine,
+				node.Metrics.Mempool,
+				core,
+			)
+			if err != nil {
+				return nil, err
+			}
 
-			return match, err
+			// subscribe engine to inputs from other node-internal components
+			receiptRequester.WithHandle(e.HandleReceipt)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+
+			return e, err
 		}).
 		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
@@ -329,7 +364,7 @@ func main() {
 
 			// initialize the block builder
 			var build module.Builder
-			build = builder.NewBuilder(
+			build, err = builder.NewBuilder(
 				node.Metrics.Mempool,
 				node.DB,
 				mutableState,
@@ -338,8 +373,9 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Blocks,
 				node.Storage.Results,
+				node.Storage.Receipts,
 				guarantees,
-				seals,
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
 				builder.WithMinInterval(minInterval),
@@ -347,6 +383,10 @@ func main() {
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialized block builder: %w", err)
+			}
+
 			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			// initialize the block finalizer
@@ -399,7 +439,9 @@ func main() {
 				node.Storage.Index,
 				node.RootChainID,
 			)
-			// make compliance engine as a FinalizationConsumer
+
+			notifier.AddConsumer(finalizationDistributor)
+
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
@@ -453,6 +495,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		}).

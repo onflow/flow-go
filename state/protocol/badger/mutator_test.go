@@ -448,7 +448,29 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 	consumer.On("BlockFinalized", mock.Anything)
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 
-	util.RunWithFullProtocolStateAndConsumer(t, rootSnapshot, consumer, func(db *badger.DB, state *protocol.MutableState) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+		// set up state and mock ComplianceMetrics object
+		metrics := new(mockmodule.ComplianceMetrics)
+		metrics.On("BlockSealed", mock.Anything)
+		metrics.On("SealedHeight", mock.Anything)
+		metrics.On("FinalizedHeight", mock.Anything)
+		metrics.On("BlockFinalized", mock.Anything)
+
+		// expect committed epoch final view metric at bootstrap
+		finalView, err := rootSnapshot.Epochs().Current().FinalView()
+		require.NoError(t, err)
+		metrics.On("CommittedEpochFinalView", finalView).Once()
+
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		require.NoError(t, err)
+		receiptValidator := util.MockReceiptValidator()
+		sealValidator := util.MockSealValidator(seals)
+		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		require.NoError(t, err)
+
 		head, err := rootSnapshot.Head()
 		require.NoError(t, err)
 		result, _, err := rootSnapshot.SealedResult()
@@ -598,9 +620,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch phase transition once we finalize block 6
 		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+		// expect committed final view to be updated, since we are committing epoch 2
+		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
 		err = state.Finalize(block6.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block6.Header)
+		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 
 		// finalize block 7 so we can finalize subsequent blocks
 		err = state.Finalize(block7.ID())
@@ -651,6 +676,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		err = state.Finalize(block9.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
+
+		metrics.AssertExpectations(t)
 	})
 }
 
@@ -1036,7 +1063,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
-				commit.ClusterQCs = append(commit.ClusterQCs, unittest.QuorumCertificateFixture())
+				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
 			})
 
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)

@@ -32,6 +32,7 @@ import (
 // the non-consensus nodes have to perform.
 type FollowerState struct {
 	*State
+
 	index    storage.Index
 	payloads storage.Payloads
 	tracer   module.Tracer
@@ -421,19 +422,19 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 
 	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
-		err := m.blocks.StoreTxn(candidate)(tx)
+		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store candidate block: %w", err)
 		}
 
 		// index the latest sealed block in this fork
-		err = operation.IndexBlockSeal(blockID, last.ID())(tx.DBTxn)
+		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
 
 		// index the child block for recovery
-		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx.DBTxn)
+		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -477,7 +478,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	}
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve pending block: %w", err)
+		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
 	}
 	header := block.Header
 	if header.ParentID != finalID {
@@ -502,13 +503,13 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	currentEpochSetup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
 
 	payload := block.Payload
-	// track protocol events that should be emitted
+	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {
 		result, err := m.results.ByID(seal.ResultID)
@@ -518,9 +519,17 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				// track epoch phase transition (staking->setup)
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
+				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
+				// track final view of committed epoch
+				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+				if err != nil {
+					return fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
+				}
+				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -536,7 +545,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// if this block's view exceeds the final view of its parent's current epoch,
 	// this block begins the next epoch
 	if header.View > finalView {
-		events = append(events, func() { m.consumer.EpochTransition(setup.Counter, header) })
+		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
@@ -744,7 +753,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				epochStatus.NextEpoch.SetupID = ev.ID()
 
 				// we'll insert the setup event when we insert the block
-				ops = append(ops, m.epoch.setups.StoreTxn(ev))
+				ops = append(ops, m.epoch.setups.StoreTx(ev))
 
 			case *flow.EpochCommit:
 
@@ -778,7 +787,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				epochStatus.NextEpoch.CommitID = ev.ID()
 
 				// we'll insert the commit event when we insert the block
-				ops = append(ops, m.epoch.commits.StoreTxn(ev))
+				ops = append(ops, m.epoch.commits.StoreTx(ev))
 
 			default:
 				return nil, fmt.Errorf("invalid service event type: %s", event.Type)
@@ -787,7 +796,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	}
 
 	// we always index the epoch status, even when there are no service events
-	ops = append(ops, m.epoch.statuses.StoreTxn(block.ID(), epochStatus))
+	ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
 }

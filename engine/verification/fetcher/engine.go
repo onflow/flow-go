@@ -1,8 +1,10 @@
 package fetcher
 
 import (
+	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -12,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -41,7 +44,8 @@ type Engine struct {
 
 	// memory and storage
 	pendingChunks mempool.ChunkStatuses     // stores all pending chunks that their chunk data is requested from requester.
-	headers       storage.Headers           // used to fetch the block header for building verifiable chunk data.
+	blocks        storage.Blocks            // used to for verifying collection ID.
+	headers       storage.Headers           // used for building verifiable chunk data.
 	results       storage.ExecutionResults  // used to retrieve execution result of an assigned chunk.
 	receipts      storage.ExecutionReceipts // used to find executor ids of a chunk, for requesting chunk data pack.
 
@@ -59,6 +63,7 @@ func New(
 	state protocol.State,
 	pendingChunks mempool.ChunkStatuses,
 	headers storage.Headers,
+	blocks storage.Blocks,
 	results storage.ExecutionResults,
 	receipts storage.ExecutionReceipts,
 	requester ChunkDataPackRequester,
@@ -71,6 +76,7 @@ func New(
 		verifier:      verifier,
 		state:         state,
 		pendingChunks: pendingChunks,
+		blocks:        blocks,
 		headers:       headers,
 		results:       results,
 		receipts:      receipts,
@@ -94,12 +100,16 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.chunkConsumerNotifier == nil {
 		e.log.Fatal().Msg("missing chunk consumer notifier callback in verification fetcher engine")
 	}
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		<-e.requester.Ready()
+	})
 }
 
 // Done terminates the engine and returns a channel that is closed when the termination is done
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		<-e.requester.Done()
+	})
 }
 
 // ProcessAssignedChunk is the entry point of fetcher engine.
@@ -113,13 +123,14 @@ func (e *Engine) Done() <-chan struct{} {
 // Once a chunk has been processed, it will call the processing notifier callback to notify
 // the chunk consumer in order to process the next chunk.
 func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
-	// TODO: add tracing and metrics.
 	locatorID := locator.ID()
 	lg := e.log.With().
 		Hex("locator_id", logging.ID(locatorID)).
 		Hex("result_id", logging.ID(locator.ResultID)).
 		Uint64("chunk_index", locator.Index).
 		Logger()
+
+	e.metrics.OnAssignedChunkReceivedAtFetcher()
 
 	// retrieves result and chunk using the locator
 	result, err := e.results.ByID(locator.ResultID)
@@ -136,33 +147,72 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 		Logger()
 	lg.Debug().Msg("result and chunk for locator retrieved")
 
-	// skips processing a chunk if it belongs to a sealed block.
-	sealed, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
+	requested, blockHeight, err := e.processAssignedChunkWithTracing(chunk, result, locatorID)
+	lg = lg.With().Uint64("block_height", blockHeight).Logger()
+
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not determine whether block has been sealed")
+		lg.Fatal().Err(err).Msg("could not process assigned chunk")
+	}
+
+	lg.Info().Bool("requested", requested).Msg("assigned chunk processed successfully")
+
+	if requested {
+		e.metrics.OnChunkDataPackRequestSentByFetcher()
+	}
+
+}
+
+// processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
+func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
+	chunkID := chunk.ID()
+
+	span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
+	if !ok {
+		span = e.tracer.StartSpan(chunkID, trace.VERProcessAssignedChunk)
+		span.SetTag("chunk_id", chunkID)
+		defer span.Finish()
+	}
+
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	var err error
+	var requested bool
+	var blockHeight uint64
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleAssignedChunk, func() {
+		requested, blockHeight, err = e.processAssignedChunk(chunk, result, chunkLocatorID)
+	})
+
+	return requested, blockHeight, err
+}
+
+// processAssignedChunk receives an assigned chunk and its result and requests its chunk data pack from requester.
+// Boolean return value determines whether chunk data pack was requested or not.
+func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
+	// skips processing a chunk if it belongs to a sealed block.
+	chunkID := chunk.ID()
+	sealed, blockHeight, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
+	if err != nil {
+		return false, 0, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
 	if sealed {
-		e.chunkConsumerNotifier.Notify(chunkID) // tells consumer that we are done with this chunk.
-		lg.Info().Msg("drops requesting chunk of a sealed block")
-		return
+		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
+		return false, blockHeight, nil
 	}
 
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{
-		ChunkIndex:      locator.Index,
+		ChunkIndex:      chunk.Index,
 		ExecutionResult: result,
+		BlockHeight:     blockHeight,
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
 		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
-		lg.Fatal().Msg("received a duplicate chunk locator, possible data race")
-		return
+		return false, blockHeight, fmt.Errorf("data race detected, received a duplicate chunk locator")
 	}
 
-	err = e.requestChunkDataPack(chunkID, locator.ResultID, chunk.BlockID)
+	err = e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not request chunk data pack")
-		return
+		return false, blockHeight, fmt.Errorf("could not request chunk data pack: %w", err)
 	}
 
 	// requesting a chunk data pack is async, i.e., once engine reaches this point
@@ -172,7 +222,7 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 	//
 	// both these events happen through requester module calling fetchers callbacks.
 	// it is during those callbacks that we notify the consumer that we are done with this job.
-	lg.Info().Msg("chunk data pack requested from requester engine")
+	return true, blockHeight, nil
 }
 
 // HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
@@ -186,6 +236,8 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 	lg.Info().Msg("chunk data pack arrived")
 
+	e.metrics.OnChunkDataPackArrivedAtFetcher()
+
 	// make sure we still need it
 	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
 	if !exists {
@@ -193,45 +245,118 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 
-	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	resultID := status.ExecutionResult.ID()
-
 	lg = lg.With().
 		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).
+		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(resultID)).
 		Uint64("chunk_index", status.ChunkIndex).
 		Logger()
 
-	// make sure the chunk data pack is valid
-	err := e.validateChunkDataPack(chunk, originID, chunkDataPack, collection, status.ExecutionResult)
-	if err != nil {
-		// TODO: this can be due to a byzantine behavior
+	processed, err := e.handleChunkDataPackWithTracing(originID, status, chunkDataPack, collection)
+	if IsChunkDataPackValidationError(err) {
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
 		return
 	}
 
-	lg = lg.With().
-		Hex("result_id", logging.ID(resultID)).
-		Hex("block_id", logging.ID(status.ExecutionResult.BlockID)).Logger()
+	if err != nil {
+		lg.Fatal().Err(err).Msg("could not handle chunk data pack")
+		return
+	}
 
+	if processed {
+		e.metrics.OnVerifiableChunkSentToVerifier()
+
+		// we need to report that the job has been finished eventually
+		e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
+		lg.Info().Msg("verifiable chunk pushed to verifier engine")
+	}
+
+}
+
+// handleChunkDataPackWithTracing encapsulates the logic of handling chunk data pack with tracing enabled.
+//
+// Boolean returned value determines whether the chunk data pack passed validation and its verifiable chunk
+// submitted to verifier.
+// The first returned value determines non-critical errors (i.e., expected ones).
+// The last returned value determines the critical errors that are unexpected, and should lead program to halt.
+func (e *Engine) handleChunkDataPackWithTracing(
+	originID flow.Identifier,
+	status *verification.ChunkStatus,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) (bool, error) {
+
+	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
+	if !ok {
+		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
+		span.SetTag("chunk_id", chunkDataPack.ChunkID)
+		defer span.Finish()
+	}
+
+	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+
+	var ferr error
+	processed := false
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleChunkDataPack, func() {
+		// make sure the chunk data pack is valid
+		err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, collection, status.ExecutionResult)
+		if err != nil {
+			// TODO: this can be due to a byzantine behavio
+			ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.CollectionID, err)
+			return
+		}
+
+		processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack, collection)
+		if err != nil {
+			ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
+			return
+		}
+	})
+
+	return processed, ferr
+}
+
+// handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
+// verifier engine.
+// Boolean return value determines whether verifiable chunk pushed to verifier or not.
+func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
+	status *verification.ChunkStatus,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) (bool, error) {
+
+	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
-	lg.Debug().Bool("removed", removed).Msg("removed chunk status")
+
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
 		// on processing current one.
-		return
+		return false, nil
 	}
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
-	err = e.pushToVerifier(chunk, status.ExecutionResult, chunkDataPack, collection)
+	err := e.pushToVerifierWithTracing(ctx, chunk, status.ExecutionResult, chunkDataPack, collection)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not push the chunk to verifier engine")
-		return
+		return false, fmt.Errorf("could not push the chunk to verifier engine")
 	}
-	// we need to report that the job has been finished eventually
-	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
-	lg.Info().Msg("chunk verification is done")
+
+	return true, nil
+}
+
+// validateChunkDataPackWithTracing encapsulates the logic of validating a chunk data pack with tracing enabled.
+func (e *Engine) validateChunkDataPackWithTracing(ctx context.Context,
+	chunkIndex uint64,
+	senderID flow.Identifier,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection,
+	result *flow.ExecutionResult) error {
+
+	var err error
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherValidateChunkDataPack, func() {
+		err = e.validateChunkDataPack(chunkIndex, senderID, chunkDataPack, collection, result)
+	})
+
+	return err
 }
 
 // validateChunkDataPack validates the integrity of a received chunk data pack as well as the authenticity of its sender.
@@ -239,11 +364,14 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // given collection.
 //
 // Regarding the authenticity: the chunk data pack should be coming from a sender that is an staked execution node at the block of the chunk.
-func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
+func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	senderID flow.Identifier,
 	chunkDataPack *flow.ChunkDataPack,
 	collection *flow.Collection,
 	result *flow.ExecutionResult) error {
+
+	chunk := result.Chunks[chunkIndex]
+
 	// 1. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
@@ -265,7 +393,7 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 	}
 
 	// 3. collection id must match
-	err := e.validateCollectionID(collection, chunkDataPack, chunk.Index, result)
+	err := e.validateCollectionID(collection, chunkDataPack, result, chunk)
 	if err != nil {
 		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
 			collection.ID(),
@@ -282,20 +410,21 @@ func (e *Engine) validateChunkDataPack(chunk *flow.Chunk,
 // and returns nil otherwise.
 func (e Engine) validateCollectionID(collection *flow.Collection,
 	chunkDataPack *flow.ChunkDataPack,
-	chunkIndex uint64,
-	result *flow.ExecutionResult) error {
+	result *flow.ExecutionResult,
+	chunk *flow.Chunk) error {
 
-	if IsSystemChunk(chunkIndex, result) {
+	if IsSystemChunk(chunk.Index, result) {
 		return e.validateSystemChunkCollection(collection, chunkDataPack)
 	}
 
-	return e.validateNonSystemChunkCollection(collection, chunkDataPack)
+	return e.validateNonSystemChunkCollection(collection, chunkDataPack, chunk)
 }
 
 // validateSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
 // A collection is valid against a system chunk if collection is empty of transactions, and chunk data pack has a zero ID collection.
 func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
 	collID := flow.ZeroID // for system chunk, the collection ID should be always zero ID.
+
 	if collection.Len() != 0 {
 		return engine.NewInvalidInputErrorf("non-empty collection for system chunk, found on chunk data pack: %v, actual collection: %v, len: %d",
 			chunkDataPack.CollectionID, collection.ID(), collection.Len())
@@ -309,14 +438,26 @@ func (e Engine) validateSystemChunkCollection(collection *flow.Collection, chunk
 }
 
 // validateNonSystemChunkCollection returns nil if the collection is matching the non-system chunk data pack.
-// A collection is valid against a non-system chunk if it has a matching collection ID with system chunk's collection ID field.
-//
-// TODO: collection ID should also be checked against its block.
-func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack) error {
+// A collection is valid against a non-system chunk if it has a matching ID with chunk data pack's collection ID field, as well as the
+// collection ID of corresponding guarantee of the chunk in the referenced block payload.
+func (e Engine) validateNonSystemChunkCollection(collection *flow.Collection, chunkDataPack *flow.ChunkDataPack, chunk *flow.Chunk) error {
 	collID := collection.ID()
 
+	block, err := e.blocks.ByID(chunk.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get block: %w", err)
+	}
+
+	if block.Payload.Guarantees[chunk.Index].CollectionID != collID {
+		return engine.NewInvalidInputErrorf("mismatch collection id with guarantee, expected: %v, got: %v",
+			block.Payload.Guarantees[chunk.Index].CollectionID,
+			collID)
+	}
+
 	if chunkDataPack.CollectionID != collID {
-		return engine.NewInvalidInputErrorf("mismatch collection id, %v != %v", chunkDataPack.CollectionID, collID)
+		return engine.NewInvalidInputErrorf("mismatch collection id with chunk data pack, expected %v, got: %v",
+			chunkDataPack.CollectionID,
+			collID)
 	}
 
 	return nil
@@ -345,29 +486,56 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 // When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
 // through HandleChunkDataPack).
 func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
+	lg := e.log.With().
+		Hex("chunk_id", logging.ID(chunkID)).
+		Logger()
 	// we need to report that the job has been finished eventually
 	status, exists := e.pendingChunks.ByID(chunkID)
 	if !exists {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(chunkID)).
+		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
 		return
 	}
 
+	lg = lg.With().
+		Uint64("block_height", status.BlockHeight).
+		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
 	removed := e.pendingChunks.Rem(chunkID)
 
 	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
-	e.log.Info().Bool("removed", removed).Msg("discards fetching chunk of an already sealed block and notified consumer")
+	lg.Info().
+		Bool("removed", removed).
+		Msg("discards fetching chunk of an already sealed block and notified consumer")
+}
+
+// pushToVerifierWithTracing encapsulates the logic of pushing a verifiable chunk to verifier engine with tracing enabled.
+func (e *Engine) pushToVerifierWithTracing(
+	ctx context.Context,
+	chunk *flow.Chunk,
+	result *flow.ExecutionResult,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) error {
+
+	var err error
+	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherPushToVerifier, func() {
+		err = e.pushToVerifier(chunk, result, chunkDataPack, collection)
+	})
+
+	return err
 }
 
 // pushToVerifier makes a verifiable chunk data out of the input and pass it to the verifier for verification.
 //
 // When this method returns without any error, it means that the verification of the chunk at the verifier engine is done (either successfully,
 // or unsuccessfully)
-func (e *Engine) pushToVerifier(chunk *flow.Chunk, result *flow.ExecutionResult, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) error {
+func (e *Engine) pushToVerifier(chunk *flow.Chunk,
+	result *flow.ExecutionResult,
+	chunkDataPack *flow.ChunkDataPack,
+	collection *flow.Collection) error {
+
 	header, err := e.headers.ByBlockID(chunk.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not get block header: %w", err)
+		return fmt.Errorf("could not get block: %w", err)
 	}
 
 	vchunk, err := e.makeVerifiableChunkData(chunk, header, result, chunkDataPack, collection)
@@ -401,14 +569,20 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 		return nil, fmt.Errorf("could not compute end state of chunk: %w", err)
 	}
 
+	transactionOffset, err := TransactionOffsetForChunk(result.Chunks, chunk.Index)
+	if err != nil {
+		return nil, fmt.Errorf("cannot compute transaction offset for chunk: %w", err)
+	}
+
 	return &verification.VerifiableChunkData{
-		IsSystemChunk: isSystemChunk,
-		Chunk:         chunk,
-		Header:        header,
-		Result:        result,
-		Collection:    collection,
-		ChunkDataPack: chunkDataPack,
-		EndState:      endState,
+		IsSystemChunk:     isSystemChunk,
+		Chunk:             chunk,
+		Header:            header,
+		Result:            result,
+		Collection:        collection,
+		ChunkDataPack:     chunkDataPack,
+		EndState:          endState,
+		TransactionOffset: transactionOffset,
 	}, nil
 }
 
@@ -438,6 +612,7 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 	}
 
 	e.requester.Request(request)
+
 	return nil
 }
 
@@ -456,20 +631,20 @@ func (e *Engine) getAgreeAndDisagreeExecutors(blockID flow.Identifier, resultID 
 }
 
 // blockIsSealed returns true if the block at specified height by block ID is sealed.
-func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, error) {
+func (e Engine) blockIsSealed(blockID flow.Identifier) (bool, uint64, error) {
 	// TODO: as an optimization, we can keep record of last sealed height on a local variable.
 	header, err := e.headers.ByBlockID(blockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get block header: %w", err)
+		return false, 0, fmt.Errorf("could not get block: %w", err)
 	}
 
 	lastSealed, err := e.state.Sealed().Head()
 	if err != nil {
-		return false, fmt.Errorf("could not get last sealed: %w", err)
+		return false, 0, fmt.Errorf("could not get last sealed: %w", err)
 	}
 
 	sealed := header.Height <= lastSealed.Height
-	return sealed, nil
+	return sealed, header.Height, nil
 }
 
 // executorsOf segregates the executors of the given receipts based on the given execution result id.
@@ -508,6 +683,19 @@ func EndStateCommitment(result *flow.ExecutionResult, chunkIndex uint64, systemC
 	}
 
 	return endState, nil
+}
+
+//TransactionOffsetForChunk calculates transaction offset for a given chunk which is the index of the first
+// transaction of this chunk within the whole block
+func TransactionOffsetForChunk(chunks flow.ChunkList, chunkIndex uint64) (uint32, error) {
+	if int(chunkIndex) > len(chunks)-1 {
+		return 0, fmt.Errorf("chunk list out of bounds, len %d asked for chunk %d", len(chunks), chunkIndex)
+	}
+	var offset uint32 = 0
+	for i := 0; i < int(chunkIndex); i++ {
+		offset += uint32(chunks[i].NumberOfTransactions)
+	}
+	return offset, nil
 }
 
 // IsSystemChunk returns true if `chunkIndex` points to a system chunk in `result`.

@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/synchronization"
 	consensusingest "github.com/onflow/flow-go/engine/consensus/ingestion"
+	"github.com/onflow/flow-go/engine/consensus/matching"
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation"
@@ -28,8 +29,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
-	"github.com/onflow/flow-go/engine/verification/finder"
-	"github.com/onflow/flow-go/engine/verification/match"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
@@ -43,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -125,11 +123,11 @@ type CollectionNode struct {
 type ConsensusNode struct {
 	GenericNode
 	Guarantees      mempool.Guarantees
-	Approvals       mempool.Approvals
 	Receipts        mempool.ExecutionTree
 	Seals           mempool.IncorporatedResultSeals
 	IngestionEngine *consensusingest.Engine
 	SealingEngine   *sealing.Engine
+	MatchingEngine  *matching.Engine
 }
 
 func (cn ConsensusNode) Ready() {
@@ -218,20 +216,10 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	*GenericNode
-	CachedReceipts           mempool.ReceiptDataPacks
-	ReadyReceipts            mempool.ReceiptDataPacks // TODO: backward compatibility, remove once new verification node is active.
-	PendingReceipts          mempool.ReceiptDataPacks // TODO: backward compatibility, remove once new verification node is active.
-	PendingResults           mempool.ResultDataPacks  // TODO: backward compatibility, remove once new verification node is active.
-	ChunkStatuses            mempool.ChunkStatuses
-	ChunkRequests            mempool.ChunkRequests
-	ProcessedResultIDs       mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
-	DiscardedResultIDs       mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
-	BlockIDsCache            mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
-	Results                  storage.ExecutionResults
-	Receipts                 storage.ExecutionReceipts
-	PendingReceiptIDsByBlock mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
-	ReceiptIDsByResult       mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
-	ChunkIDsByResult         mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
+	ChunkStatuses mempool.ChunkStatuses
+	ChunkRequests mempool.ChunkRequests
+	Results       storage.ExecutionResults
+	Receipts      storage.ExecutionReceipts
 
 	// chunk consumer and processor for fetcher engine
 	ProcessedChunkIndex storage.ConsumerProgress
@@ -242,10 +230,7 @@ type VerificationNode struct {
 	ProcessedBlockHeight storage.ConsumerProgress
 	BlockConsumer        *blockconsumer.BlockConsumer
 
-	PendingChunks   *match.Chunks // TODO: backward compatibility, remove once new verification node is active.
 	VerifierEngine  *verifier.Engine
-	FinderEngine    *finder.Engine // TODO: backward compatibility, remove once new verification node is active.
-	MatchEngine     network.Engine // TODO: backward compatibility, remove once new verification node is active.
 	AssignerEngine  *assigner.Engine
 	FetcherEngine   *fetcher.Engine
 	RequesterEngine *verificationrequester.Engine

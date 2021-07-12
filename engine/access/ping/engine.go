@@ -109,9 +109,9 @@ func (e *Engine) pingNode(peer *flow.Identity) {
 	id := peer.ID()
 
 	// ping the node
-	resp, rtt, err := e.middleware.Ping(id) // ping will timeout in libp2p.PingTimeoutSecs seconds
-	if err != nil {
-		e.log.Debug().Err(err).Str("target", id.String()).Msg("failed to ping")
+	resp, rtt, pingErr := e.middleware.Ping(id) // ping will timeout in libp2p.PingTimeoutSecs seconds
+	if pingErr != nil {
+		e.log.Debug().Err(pingErr).Str("target", id.String()).Msg("failed to ping")
 		// report the rtt duration as negative to make it easier to distinguish between pingable and non-pingable nodes
 		rtt = -1
 	}
@@ -120,5 +120,10 @@ func (e *Engine) pingNode(peer *flow.Identity) {
 	info := e.nodeInfo[id]
 
 	// update metric
-	e.metrics.NodeReachable(peer, info, rtt, resp.Version)
+	e.metrics.NodeReachable(peer, info, rtt)
+
+	// if ping succeeded then update the node info metric
+	if pingErr == nil {
+		e.metrics.NodeInfo(peer, info, resp.Version, resp.BlockHeight)
+	}
 }

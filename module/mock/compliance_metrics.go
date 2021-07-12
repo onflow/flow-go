@@ -29,6 +29,11 @@ func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
 	_m.Called(_a0)
 }
 
+// CommittedEpochFinalView provides a mock function with given fields: view
+func (_m *ComplianceMetrics) CommittedEpochFinalView(view uint64) {
+	_m.Called(view)
+}
+
 // FinalizedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)

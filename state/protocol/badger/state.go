@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/invalid"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type State struct {
@@ -55,7 +56,7 @@ func Bootstrap(
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
-	err = operation.RetryOnConflict(db.Update, func(tx *badger.Txn) error {
+	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 
 		// 1) insert each block in the root chain segment
 		err = state.bootstrapSealingSegment(root)(tx)
@@ -74,7 +75,7 @@ func Bootstrap(
 		tail := segment[0]              // last sealed block
 
 		// 2) insert the root execution result and seal into the database and index it
-		err = state.bootstrapSealedResult(root)(tx)
+		err = transaction.WithTx(state.bootstrapSealedResult(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealed result: %w", err)
 		}
@@ -84,13 +85,13 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
 		}
-		err = operation.InsertRootQuorumCertificate(qc)(tx)
+		err = transaction.WithTx(operation.InsertRootQuorumCertificate(qc))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
 
 		// 4) initialize the current protocol state height/view pointers
-		err = state.bootstrapStatePointers(root)(tx)
+		err = transaction.WithTx(state.bootstrapStatePointers(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
@@ -101,6 +102,11 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
+		// 6) set metric values
+		err = state.updateCommittedEpochFinalView(root)
+		if err != nil {
+			return fmt.Errorf("could not set epoch final view value: %w", err)
+		}
 		state.metrics.BlockSealed(tail)
 		state.metrics.SealedHeight(tail.Header.Height)
 		state.metrics.FinalizedHeight(head.Header.Height)
@@ -119,8 +125,8 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		segment, err := root.SealingSegment()
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
@@ -135,18 +141,18 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger
 			if err != nil {
 				return fmt.Errorf("could not insert root block: %w", err)
 			}
-			err = operation.InsertBlockValidity(blockID, true)(tx)
+			err = transaction.WithTx(operation.InsertBlockValidity(blockID, true))(tx)
 			if err != nil {
 				return fmt.Errorf("could not mark root block as valid: %w", err)
 			}
-			err = operation.IndexBlockHeight(height, blockID)(tx)
+			err = transaction.WithTx(operation.IndexBlockHeight(height, blockID))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
 			}
 
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
-				err = operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID})(tx)
+				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
 				if err != nil {
 					return fmt.Errorf("could not insert child index for block (id=%x): %w", blockID, err)
 				}
@@ -154,7 +160,7 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*badger
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = operation.InsertBlockChildren(head.ID(), nil)(tx)
+		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -240,8 +246,8 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
 		next := root.Epochs().Next()
@@ -388,6 +394,12 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	// update committed final view metric
+	err = state.updateCommittedEpochFinalView(state.Final())
+	if err != nil {
+		return nil, fmt.Errorf("failed to update committed epoch final view: %w", err)
+	}
+
 	return state, nil
 }
 
@@ -474,4 +486,43 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 		return false, fmt.Errorf("retrieving finalized height failed: %w", err)
 	}
 	return true, nil
+}
+
+// updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric
+// based on the current epoch phase of the input snapshot. It should be called
+// at startup and during transitions between EpochSetup and EpochCommitted phases.
+//
+// For example, suppose we have epochs N and N+1.
+// If we are in epoch N's Staking or Setup Phase, then epoch N's final view should be the value of the metric.
+// If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
+func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error {
+
+	phase, err := snap.Phase()
+	if err != nil {
+		return fmt.Errorf("could not get epoch phase: %w", err)
+	}
+
+	// update metric based of epoch phase
+	switch phase {
+	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
+
+		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
+		finalView, err := snap.Epochs().Current().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get current epoch final view from snapshot: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	case flow.EpochPhaseCommitted:
+
+		// if we are in Committed phase, then set the metric value to the next epoch's final view
+		finalView, err := snap.Epochs().Next().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get next epoch final view from snapshot: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	default:
+		return fmt.Errorf("invalid phase: %s", phase)
+	}
+
+	return nil
 }

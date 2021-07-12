@@ -40,8 +40,9 @@ const (
 
 // Consensus subsystems represent the different components of the consensus algorithm.
 const (
-	subsystemCompliance = "compliance"
-	subsystemHotstuff   = "hotstuff"
+	subsystemCompliance  = "compliance"
+	subsystemHotstuff    = "hotstuff"
+	subsystemMatchEngine = "match"
 )
 
 // Execution Subsystems
@@ -55,10 +56,12 @@ const (
 
 // Verification Subsystems
 const (
-	subsystemAssignerEngine = "assigner"
-	subsystemFinderEngine   = "finder"
-	subsystemMatchEngine    = "match"
-	subsystemVerifierEngine = "verifier"
+	subsystemAssignerEngine  = "assigner"
+	subsystemFetcherEngine   = "fetcher"
+	subsystemRequesterEngine = "requester"
+	subsystemVerifierEngine  = "verifier"
+	subsystemBlockConsumer   = "block_consumer"
+	subsystemChunkConsumer   = "chunk_consumer"
 )
 
 // METRIC NAMING GUIDELINES

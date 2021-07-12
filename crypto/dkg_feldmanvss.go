@@ -141,8 +141,10 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), orig)
+		return newInvalidInputsError(
+			"wrong origin input, should be less than %d, got %d",
+			s.Size(),
+			orig)
 	}
 
 	if len(msg) == 0 {
@@ -175,7 +177,10 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return errors.New("wrong input")
+		return newInvalidInputsError(
+			"wrong origin, should be positive less than %d, got %d",
+			s.Size(),
+			orig)
 	}
 
 	if len(msg) == 0 {
@@ -209,8 +214,10 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), node)
+		return newInvalidInputsError(
+			"wrong origin input, should be less than %d, got %d",
+			s.Size(),
+			node)
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false
@@ -222,8 +229,12 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
+		if IsInvalidInputsError(err) {
+			return newInvalidInputsError("generating shares failed: %s", err)
+		}
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
+
 	// Generate a polyomial P in Zr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.vA = make([]pointG2, s.threshold+1)
@@ -360,13 +371,16 @@ func writeVerifVector(dest []byte, A []pointG2) {
 // readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) error {
-	if C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
+	switch C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(A)),
-	) != valid {
-		return errors.New("the verifcation vector does not serialize points correctly")
+		(C.int)(len(A))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("the verifcation vector does not serialize G2 points")
+	default:
+		return errors.New("reading the verifcation vector failed")
 	}
-	return nil
 }
 
 func (s *feldmanVSSstate) verifyShare() bool {

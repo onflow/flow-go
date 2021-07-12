@@ -491,13 +491,23 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 	node1Id := *identities[0]
 	node2Id := *identities[1]
 
+	_, expectedVersion, expectedHeight := MockPingInfoProvider()
+
 	// test node1 can ping node 2
-	_, _, err := node1.Ping(suite.ctx, node2Id)
-	require.NoError(suite.T(), err)
+	testPing(suite.T(), node1, node2Id, expectedVersion, expectedHeight)
 
 	// test node 2 can ping node 1
-	_, _, err = node2.Ping(suite.ctx, node1Id)
-	require.NoError(suite.T(), err)
+	testPing(suite.T(), node2, node1Id, expectedVersion, expectedHeight)
+}
+
+func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64) {
+	pctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resp, rtt, err := source.Ping(pctx, target)
+	assert.NoError(t, err)
+	assert.NotZero(t, rtt)
+	assert.Equal(t, expectedVersion, resp.Version)
+	assert.Equal(t, expectedHeight, resp.BlockHeight)
 }
 
 // TestConnectionGating tests node allow listing by peer.ID
@@ -630,7 +640,7 @@ func MockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64) {
 	height := uint64(5000)
 	pingInfoProvider := new(mocknetwork.PingInfoProvider)
 	pingInfoProvider.On("SoftwareVersion").Return(version)
-	pingInfoProvider.On("LatestFinalizedBlockHeight").Return(height)
+	pingInfoProvider.On("SealedBlockHeight").Return(height)
 	return pingInfoProvider, version, height
 }
 

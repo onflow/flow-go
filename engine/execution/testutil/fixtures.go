@@ -10,6 +10,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -25,17 +27,35 @@ import (
 )
 
 func CreateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
+
 	encoded := hex.EncodeToString([]byte(contract))
 
-	return flow.NewTransactionBody().
-		SetScript([]byte(fmt.Sprintf(`transaction {
+	script := []byte(fmt.Sprintf(`transaction {
               prepare(signer: AuthAccount, service: AuthAccount) {
                 signer.contracts.add(name: "%s", code: "%s".decodeHex())
               }
-            }`, contractName, encoded)),
-		).
+            }`, contractName, encoded))
+
+	txBody := flow.NewTransactionBody().
+		SetScript(script).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
+
+	// to synthetically generate event using Cadence code we would need a lot of
+	// copying, so its easier to just hardcode the json string
+	// TODO - extract parts of Cadence to make exporting events easy without interpreter
+
+	interpreterHash := runtime.CodeToHashValue(script)
+	hashElements := interpreterHash.Elements()
+
+	valueStrings := make([]string, len(hashElements))
+
+	for i, value := range hashElements {
+		uint8 := value.(interpreter.UInt8Value)
+		valueStrings[i] = fmt.Sprintf("{\"type\":\"UInt8\",\"value\":\"%d\"}", uint8)
+	}
+
+	return txBody
 }
 
 func UpdateContractDeploymentTransaction(contractName string, contract string, authorizer flow.Address, chain flow.Chain) *flow.TransactionBody {
@@ -218,10 +238,10 @@ func CreateAccountsWithSimpleAddresses(
 				addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
 				break
 			}
-
+		}
+		if addr == flow.EmptyAddress {
 			return nil, errors.New("no account creation event emitted")
 		}
-
 		accounts = append(accounts, addr)
 	}
 

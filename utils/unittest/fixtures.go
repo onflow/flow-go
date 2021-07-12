@@ -242,6 +242,17 @@ func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	}
 }
 
+func BlockWithGuaranteesFixture(guarantees []*flow.CollectionGuarantee) *flow.Block {
+	payload := PayloadFixture(WithGuarantees(guarantees...))
+	header := BlockHeaderFixture()
+	header.PayloadHash = payload.Hash()
+	return &flow.Block{
+		Header:  &header,
+		Payload: &payload,
+	}
+
+}
+
 func WithoutGuarantee(payload *flow.Payload) {
 	payload.Guarantees = nil
 }
@@ -298,7 +309,7 @@ func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDe
 	}
 }
 
-func GenesisFixture(identities flow.IdentityList) *flow.Block {
+func GenesisFixture() *flow.Block {
 	genesis := flow.Genesis(flow.Emulator)
 	return genesis
 }
@@ -422,6 +433,15 @@ func CollectionGuaranteeFixture(options ...func(*flow.CollectionGuarantee)) *flo
 	return guarantee
 }
 
+func CollectionGuaranteesWithCollectionIDFixture(collections []*flow.Collection) []*flow.CollectionGuarantee {
+	guarantees := make([]*flow.CollectionGuarantee, 0, len(collections))
+	for i := 0; i < len(collections); i++ {
+		guarantee := CollectionGuaranteeFixture(WithCollection(collections[i]))
+		guarantees = append(guarantees, guarantee)
+	}
+	return guarantees
+}
+
 func CollectionGuaranteesFixture(n int, options ...func(*flow.CollectionGuarantee)) []*flow.CollectionGuarantee {
 	guarantees := make([]*flow.CollectionGuarantee, 0, n)
 	for i := 1; i <= n; i++ {
@@ -438,6 +458,16 @@ func BlockSealsFixture(n int) []*flow.Seal {
 		seals = append(seals, seal)
 	}
 	return seals
+}
+
+func CollectionListFixture(n int) []*flow.Collection {
+	collections := make([]*flow.Collection, n)
+	for i := 0; i < n; i++ {
+		collection := CollectionFixture(1)
+		collections[i] = &collection
+	}
+
+	return collections
 }
 
 func CollectionFixture(n int) flow.Collection {
@@ -462,6 +492,16 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	}
 }
 
+func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.CompleteCollection {
+	return &entity.CompleteCollection{
+		Guarantee: &flow.CollectionGuarantee{
+			CollectionID: flow.Collection{Transactions: txs}.ID(),
+			Signature:    SignatureFixture(),
+		},
+		Transactions: txs,
+	}
+}
+
 func ExecutableBlockFixture(collectionsSignerIDs [][]flow.Identifier) *entity.ExecutableBlock {
 
 	header := BlockHeaderFixture()
@@ -479,6 +519,29 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 		completeCollection.Guarantee.SignerIDs = signerIDs
 		block.Payload.Guarantees = append(block.Payload.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
+	}
+
+	block.Header.PayloadHash = block.Payload.Hash()
+
+	executableBlock := &entity.ExecutableBlock{
+		Block:               &block,
+		CompleteCollections: completeCollections,
+	}
+	// Preload the id
+	executableBlock.ID()
+	return executableBlock
+}
+
+func ExecutableBlockFromTransactions(txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
+
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txss))
+	block := BlockFixture()
+	block.Payload.Guarantees = nil
+
+	for _, txs := range txss {
+		cc := CompleteCollectionFromTransactions(txs)
+		block.Payload.Guarantees = append(block.Payload.Guarantees, cc.Guarantee)
+		completeCollections[cc.Guarantee.CollectionID] = cc
 	}
 
 	block.Header.PayloadHash = block.Payload.Hash()
@@ -981,7 +1044,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 		ProposalKey:        ProposalKeyFixture(),
 		Payer:              AddressFixture(),
 		Authorizers:        []flow.Address{AddressFixture()},
-		PayloadSignatures:  []flow.TransactionSignature{TransactionSignatureFixture()},
 		EnvelopeSignatures: []flow.TransactionSignature{TransactionSignatureFixture()},
 	}
 
@@ -1221,7 +1283,7 @@ func SeedFixtures(m int, n int) [][]byte {
 }
 
 // EventFixture returns an event
-func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier) flow.Event {
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, payloadSize int) flow.Event {
 	return flow.Event{
 		Type:             eType,
 		TransactionIndex: transactionIndex,
@@ -1333,6 +1395,14 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 	return &qc
 }
 
+func QuorumCertificatesFixtures(n uint, opts ...func(*flow.QuorumCertificate)) []*flow.QuorumCertificate {
+	qcs := make([]*flow.QuorumCertificate, 0, n)
+	for i := 0; i < int(n); i++ {
+		qcs = append(qcs, QuorumCertificateFixture(opts...))
+	}
+	return qcs
+}
+
 func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
 	return func(qc *flow.QuorumCertificate) {
 		qc.BlockID = blockID
@@ -1440,7 +1510,7 @@ func CommitWithCounter(counter uint64) func(*flow.EpochCommit) {
 func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	commit := &flow.EpochCommit{
 		Counter:            uint64(rand.Uint32()),
-		ClusterQCs:         []*flow.QuorumCertificate{QuorumCertificateFixture()},
+		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesFixtures(1)),
 		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
 		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
 	}
@@ -1454,7 +1524,7 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 // protocol state.
 func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block)) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 
-	root := GenesisFixture(participants)
+	root := GenesisFixture()
 	for _, apply := range opts {
 		apply(root)
 	}

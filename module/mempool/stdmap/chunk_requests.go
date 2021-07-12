@@ -52,13 +52,24 @@ func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 // The last boolean parameter returns whether a chunk request for this chunk ID
 // exists in memory-pool.
 func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.Time, time.Duration, bool) {
-	entity, exists := cs.Backend.ByID(chunkID)
-	if !exists {
-		return 0, time.Time{}, time.Duration(0), false
-	}
-	request := toChunkRequestStatus(entity)
+	var lastAttempt time.Time
+	var retryAfter time.Duration
+	var attempts uint64
 
-	return request.Attempt, request.LastAttempt, request.RetryAfter, true
+	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, ok := backdata[chunkID]
+		if !ok {
+			return fmt.Errorf("request does not exist for chunk %x", chunkID)
+		}
+
+		request := toChunkRequestStatus(entity)
+		lastAttempt = request.LastAttempt
+		retryAfter = request.RetryAfter
+		attempts = request.Attempt
+		return nil
+	})
+
+	return attempts, lastAttempt, retryAfter, err == nil
 }
 
 // Add provides insertion functionality into the memory pool.
@@ -144,6 +155,11 @@ func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
 		requests = append(requests, status.ChunkDataPackRequest)
 	}
 	return requests
+}
+
+// Size returns total number of chunk requests in the memory pool.
+func (cs ChunkRequests) Size() uint {
+	return cs.Backend.Size()
 }
 
 // chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining

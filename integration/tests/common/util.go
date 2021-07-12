@@ -178,7 +178,7 @@ func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
 		ProposalKey:        convert.ToSDKProposalKey(unittest.ProposalKeyFixture()),
 		Payer:              sdk.Address(unittest.AddressFixture()),
 		Authorizers:        []sdk.Address{sdk.Address(unittest.AddressFixture())},
-		PayloadSignatures:  []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
+		PayloadSignatures:  []sdk.TransactionSignature{},
 		EnvelopeSignatures: []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
 	}
 
