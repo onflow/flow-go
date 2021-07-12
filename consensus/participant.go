@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
@@ -52,6 +53,7 @@ func NewParticipant(
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
+		BlockTimestamp:             timestamp.DefaultBlockTimestamp,
 	}
 
 	// apply the configuration options
@@ -68,7 +70,7 @@ func NewParticipant(
 
 	// initialize the validator
 	var validator hotstuff.Validator
-	validator = validatorImpl.New(committee, forks, signer)
+	validator = validatorImpl.New(committee, forks, signer, cfg.BlockTimestamp)
 	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started

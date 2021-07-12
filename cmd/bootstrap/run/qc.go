@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
@@ -107,7 +108,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		signers[i] = signer
 
 		// create validator
-		v := validator.New(committee, forks, signer)
+		v := validator.New(committee, forks, signer, timestamp.NewNoopBlockTimestamp())
 		validators[i] = v
 	}
 

@@ -127,8 +127,10 @@ func (as *AggregatorSuite) SetupTest() {
 		},
 	)
 
-	as.validator = validator.New(as.committee, as.forks, as.signer) // create a real validator
-	as.notifier = &mocks.Consumer{}                                 // create a mock notification Consumer
+	blockTimestamp := &mocks.BlockTimestamp{}
+
+	as.validator = validator.New(as.committee, as.forks, as.signer, blockTimestamp) // create a real validator
+	as.notifier = &mocks.Consumer{}                                                 // create a mock notification Consumer
 	// create the aggregator
 	as.aggregator = New(as.notifier, 0, as.committee, as.validator, as.signer)
 }
