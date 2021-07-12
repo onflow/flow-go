@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 type Engine struct {
@@ -158,12 +157,12 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	engines, ok := e.chanEngines[channel]
 
 	if !ok {
-		log.Warn().Msgf("multiplexer has no engines registered on channel %s", channel)
-		return nil
+		// log.Warn().Msgf("multiplexer has no engines registered on channel %s", channel)
+		// return nil
 
 		// TODO: should we consider this an actual error?
 
-		// return fmt.Errorf("multiplexer has no engines registered on channel %s", channel)
+		return fmt.Errorf("multiplexer has no engines registered on channel %s", channel)
 	}
 
 	var wg sync.WaitGroup

@@ -184,7 +184,22 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 }
 
 func (suite *Suite) TestProcessUnregisteredChannel() {
-	// TODO: test processing message from channel that has no subscriptions
+	id := unittest.IdentifierFixture()
+	event := getEvent()
+
+	channel := network.Channel("test-chan")
+	unregisteredChannel := network.Channel("unregistered-chan")
+
+	engine := new(mocknetwork.Engine)
+
+	con, err := suite.engine.Register(channel, engine)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+
+	err = suite.engine.Process(unregisteredChannel, id, event)
+	suite.Assert().Error(err)
+
+	engine.AssertNumberOfCalls(suite.T(), "Process", 0)
 }
 
 func (suite *Suite) TestDuplicateRegistrations() {
