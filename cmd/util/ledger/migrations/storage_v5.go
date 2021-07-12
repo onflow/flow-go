@@ -583,222 +583,293 @@ func (m StorageFormatV5Migration) addKnownContainerStaticTypes(
 	owner common.Address,
 	key string,
 ) {
-	switch value := value.(type) {
-	case *interpreter.CompositeValue:
-		switch value.QualifiedIdentifier() {
-		case "FlowIDTableStaking":
 
-			if !hasAnyLocationAddress(
-				value,
-				"dee35303492e5a0b",
-				"1864ff317a35af46",
-			) {
-				return
+	interpreter.InspectValue(
+		value,
+		func(inspectedValue interpreter.Value) (cont bool) {
+			cont = true
+
+			switch inspectedValue := inspectedValue.(type) {
+			case *interpreter.CompositeValue:
+				switch inspectedValue.QualifiedIdentifier() {
+				case "FlowIDTableStaking":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"dee35303492e5a0b",
+						"1864ff317a35af46",
+						"16a5fe3b527633d4",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"nodes",
+						interpreter.PrimitiveStaticTypeString,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "FlowIDTableStaking.NodeRecord",
+						},
+						owner,
+						key,
+					)
+
+					for _, fieldName := range []string{
+						"minimumStakeRequired",
+						"totalTokensStakedByNodeType",
+						"rewardRatios",
+					} {
+						m.addDictionaryFieldType(
+							inspectedValue,
+							fieldName,
+							interpreter.PrimitiveStaticTypeUInt8,
+							interpreter.PrimitiveStaticTypeUFix64,
+							owner,
+							key,
+						)
+					}
+
+				case "MessageBoard":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"ac98da57ce4dd4ef",
+					) {
+						return
+					}
+
+					m.addArrayFieldType(
+						inspectedValue,
+						"posts",
+						interpreter.VariableSizedStaticType{
+							Type: interpreter.CompositeStaticType{
+								Location:            inspectedValue.Location(),
+								QualifiedIdentifier: "MessageBoard.Post",
+							},
+						},
+						owner,
+						key,
+					)
+
+				case "FlowIDTableStaking.NodeRecord":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"ecda6c5746d5bdf0",
+						"f1a43bfd1354c9b8",
+						"e94f751ba094ef6a",
+						"76d9ea44cef09e20",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"delegators",
+						interpreter.PrimitiveStaticTypeUInt32,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "FlowIDTableStaking.DelegatorRecord",
+						},
+						owner,
+						key,
+					)
+
+				case "KittyItemsMarket.Collection":
+
+					if !hasAnyLocationAddress(inspectedValue,
+						"fcceff21d9532b58",
+						"172be932e9cd0a8f",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"saleOffers",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "KittyItemsMarket.SaleOffer",
+						},
+						owner,
+						key,
+					)
+
+				case "FlowAssetsMarket.Collection":
+
+					// Probably based on KittyItemsMarket
+
+					if !hasAnyLocationAddress(inspectedValue,
+						"108040d5a5922573",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"saleOffers",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "FlowAssetsMarket.SaleOffer",
+						},
+						owner,
+						key,
+					)
+
+				case "RecordShop.Collection":
+
+					// Probably based on KittyItemsMarket
+
+					if !hasAnyLocationAddress(inspectedValue, "7352d990d2addd95") {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"saleOffers",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "RecordShop.SaleOffer",
+						},
+						owner,
+						key,
+					)
+
+				case "LikeNastyaItemsMarket.Collection":
+
+					// Probably based on KittyItemsMarket
+
+					if !hasAnyLocationAddress(inspectedValue, "9f3e19cda04154fc") {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"saleOffers",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "LikeNastyaItemsMarket.SaleOffer",
+						},
+						owner,
+						key,
+					)
+
+				case "TopShot.Collection",
+					"KittyItems.Collection",
+					"Art.Collection",
+					"FlowAssets.Collection",
+					"TRART.Collection",
+					"TRARTNFTTest1.Collection":
+
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"f79ee844bfa76528",
+						"fcceff21d9532b58",
+						"0f349bd983379597",
+						"1ff7e32d71183db0",
+						"b4544c1d61e8f500",
+						"dbe2ee1818a49053",
+						"172be932e9cd0a8f",
+						"92d59da2af37f015",
+						"566c813b3632783e",
+						"b4544c1d61e8f500",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"ownedNFTs",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.InterfaceStaticType{
+							Location:            testnetNFTLocation,
+							QualifiedIdentifier: "NonFungibleToken.NFT",
+						},
+						owner,
+						key,
+					)
+
+				case "LikeNastyaItems.Collection":
+
+					// Likely https://medium.com/pinata/how-to-create-nfts-like-nba-top-shot-with-flow-and-ipfs-701296944bf
+
+					if !hasAnyLocationAddress(inspectedValue, "9F3E19CDA04154FC") {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"ownedNFTs",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.InterfaceStaticType{
+							Location:            testnetNFTLocation,
+							QualifiedIdentifier: "NonFungibleToken.NFT",
+						},
+						owner,
+						key,
+					)
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"metadataObjs",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.DictionaryStaticType{
+							KeyType:   interpreter.PrimitiveStaticTypeString,
+							ValueType: interpreter.PrimitiveStaticTypeString,
+						},
+						owner,
+						key,
+					)
+
+				case "Versus.DropCollection":
+					if !hasAnyLocationAddress(
+						inspectedValue,
+						"1ff7e32d71183db0",
+						"467694dd28ef0a12",
+					) {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"drops",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.CompositeStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "Versus.Drop",
+						},
+						owner,
+						key,
+					)
+
+				case "Auction.AuctionCollection":
+
+					if !hasAnyLocationAddress(inspectedValue, "1ff7e32d71183db0") {
+						return
+					}
+
+					m.addDictionaryFieldType(
+						inspectedValue,
+						"auctionItems",
+						interpreter.PrimitiveStaticTypeUInt64,
+						interpreter.InterfaceStaticType{
+							Location:            inspectedValue.Location(),
+							QualifiedIdentifier: "Auction.AuctionItem",
+						},
+						owner,
+						key,
+					)
+				}
 			}
 
-			m.addDictionaryFieldType(
-				value,
-				"nodes",
-				interpreter.PrimitiveStaticTypeString,
-				interpreter.CompositeStaticType{
-					Location:            value.Location(),
-					QualifiedIdentifier: "FlowIDTableStaking.NodeRecord",
-				},
-				owner,
-				key,
-			)
-
-			for _, fieldName := range []string{
-				"minimumStakeRequired",
-				"totalTokensStakedByNodeType",
-				"rewardRatios",
-			} {
-				m.addDictionaryFieldType(
-					value,
-					fieldName,
-					interpreter.PrimitiveStaticTypeUInt8,
-					interpreter.PrimitiveStaticTypeUFix64,
-					owner,
-					key,
-				)
-			}
-
-		case "MessageBoard":
-
-			if !hasAnyLocationAddress(
-				value,
-				"ac98da57ce4dd4ef",
-			) {
-				return
-			}
-
-			m.addArrayFieldType(
-				value,
-				"posts",
-				interpreter.VariableSizedStaticType{
-					Type: interpreter.CompositeStaticType{
-						Location:            value.Location(),
-						QualifiedIdentifier: "MessageBoard.Post",
-					},
-				},
-				owner,
-				key,
-			)
-
-		case "FlowIDTableStaking.NodeRecord":
-
-			if !hasAnyLocationAddress(
-				value,
-				"ecda6c5746d5bdf0",
-				"f1a43bfd1354c9b8",
-				"e94f751ba094ef6a",
-				"76d9ea44cef09e20",
-			) {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"delegators",
-				interpreter.PrimitiveStaticTypeUInt32,
-				interpreter.CompositeStaticType{
-					Location:            value.Location(),
-					QualifiedIdentifier: "FlowIDTableStaking.DelegatorRecord",
-				},
-				owner,
-				key,
-			)
-
-		case "Versus.DropCollection":
-			if !hasAnyLocationAddress(value, "1ff7e32d71183db0") {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"drops",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.CompositeStaticType{
-					Location:            value.Location(),
-					QualifiedIdentifier: "Versus.Drop",
-				},
-				owner,
-				key,
-			)
-
-		case "KittyItemsMarket.Collection":
-
-			if !hasAnyLocationAddress(value,
-				"fcceff21d9532b58",
-				"172be932e9cd0a8f",
-			) {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"saleOffers",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.CompositeStaticType{
-					Location:            value.Location(),
-					QualifiedIdentifier: "KittyItemsMarket.SaleOffer",
-				},
-				owner,
-				key,
-			)
-
-		case "RecordShop.Collection":
-
-			// Probably based on KittyItemsMarket
-
-			if !hasAnyLocationAddress(value, "7352d990d2addd95") {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"saleOffers",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.CompositeStaticType{
-					Location:            value.Location(),
-					QualifiedIdentifier: "RecordShop.SaleOffer",
-				},
-				owner,
-				key,
-			)
-
-		case "LikeNastyaItemsMarket.Collection":
-
-			// Probably based on KittyItemsMarket
-
-			if !hasAnyLocationAddress(value, "9f3e19cda04154fc") {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"saleOffers",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.CompositeStaticType{
-					Location:            value.Location(),
-					QualifiedIdentifier: "LikeNastyaItemsMarket.SaleOffer",
-				},
-				owner,
-				key,
-			)
-
-		case "KittyItems.Collection":
-
-			if !hasAnyLocationAddress(value, "f79ee844bfa76528", "fcceff21d9532b58") {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"ownedNFTs",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.InterfaceStaticType{
-					Location:            testnetNFTLocation,
-					QualifiedIdentifier: "NonFungibleToken.NFT",
-				},
-				owner,
-				key,
-			)
-
-		case "LikeNastyaItems.Collection":
-
-			// Likely https://medium.com/pinata/how-to-create-nfts-like-nba-top-shot-with-flow-and-ipfs-701296944bf
-
-			if !hasAnyLocationAddress(value, "9F3E19CDA04154FC") {
-				return
-			}
-
-			m.addDictionaryFieldType(
-				value,
-				"ownedNFTs",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.InterfaceStaticType{
-					Location:            testnetNFTLocation,
-					QualifiedIdentifier: "NonFungibleToken.NFT",
-				},
-				owner,
-				key,
-			)
-
-			m.addDictionaryFieldType(
-				value,
-				"metadataObjs",
-				interpreter.PrimitiveStaticTypeUInt64,
-				interpreter.DictionaryStaticType{
-					KeyType:   interpreter.PrimitiveStaticTypeString,
-					ValueType: interpreter.PrimitiveStaticTypeString,
-				},
-				owner,
-				key,
-			)
-
-		}
-	}
+			return
+		},
+	)
 }
 
 func (m StorageFormatV5Migration) addDictionaryFieldType(
