@@ -138,7 +138,6 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 	// before the phase transition, which guarantees that it will be called
 	// before because callbacks for the same views are executed on a FIFO basis.
 	// Moreover, the poll callback does not return until all received messages
-
 	// are processed by the underlying DKG controller (as guaranteed by the
 	// specifications and implementations of the DKGBroker and DKGController
 	// interfaces).
@@ -166,24 +165,24 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	nextDKG, err := e.State.Final().Epochs().Next().DKG()
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not retrieve next DKG info")
+		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
 		return
 	}
 
 	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not retrieve DKG private info")
+		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not retrieve DKG public key")
+		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
 	}
 
 	localPubKey := dkgPrivInfo.RandomBeaconPrivKey.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
-		e.log.Warn().Msg("locally computed dkg public key does not match dkg public key for next epoch")
+		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
 	}
 }
 
