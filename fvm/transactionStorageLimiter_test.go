@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/opentracing/opentracing-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
@@ -29,7 +30,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, programs.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms(), nil)
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
@@ -46,7 +47,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, programs.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms(), nil)
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
@@ -63,7 +64,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, programs.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms(), nil)
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("non account registers are ignored", func(t *testing.T) {
@@ -80,7 +81,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, programs.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms(), nil)
 
 		require.NoError(t, err)
 	})
@@ -97,7 +98,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 
 		err := d.Process(nil, &fvm.Context{
 			LimitAccountStorage: true,
-		}, nil, sm, programs.NewEmptyPrograms())
+		}, nil, sm, programs.NewEmptyPrograms(), nil)
 
 		require.NoError(t, err)
 	})
@@ -142,7 +143,7 @@ func newMockStateHolder(updatedKeys []string, ownerKeyStorageValue []OwnerKeyVal
 	return sm
 }
 
-func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateHolder, _ *programs.Programs) (func(address common.Address) (value uint64, err error), error) {
+func mockGetStorageCapacityFuncFactory(_ *fvm.VirtualMachine, _ fvm.Context, _ *fvm.TransactionProcedure, _ *state.StateHolder, _ *programs.Programs, _ opentracing.Span) (func(address common.Address) (value uint64, err error), error) {
 	return func(address common.Address) (value uint64, err error) {
 		return 100, nil
 	}, nil
