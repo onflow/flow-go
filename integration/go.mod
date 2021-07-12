@@ -17,7 +17,7 @@ require (
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.18.1-0.20210621164449-25b6135332eb
+	github.com/onflow/cadence v0.18.1-0.20210624193306-81999eb7875b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210602203947-82cffc9c55ed
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210602203947-82cffc9c55ed
 	github.com/onflow/flow-emulator v0.20.3

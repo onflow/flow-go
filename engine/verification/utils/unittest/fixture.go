@@ -185,10 +185,12 @@ func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain,
 // for that result.
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
+
 	// setups up the first collection of block consists of three transactions
 	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
+
 	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
@@ -304,8 +306,12 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				collectionID = flow.ZeroID
 			}
 
-			chunk := ingestion.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID())
+			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+			require.NoError(t, err)
+
+			chunk := ingestion.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID(), eventsHash)
 			chunkDataPack := ingestion.GenerateChunkDataPack(chunk, collectionID, computationResult.Proofs[i])
+
 			chunks = append(chunks, chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
 			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
