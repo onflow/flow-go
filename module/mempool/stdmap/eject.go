@@ -54,7 +54,8 @@ func EjectTrueRandom(b* Backend) (flow.Identifier, flow.Entity, bool) {
 // ideal size, and will iterate through them and eject unneeded
 // entries if that is the case.
 func EjectTrueRandomFast(b* Backend) (flow.Identifier, flow.Entity, bool) {
-	// 64 in batch plus a buffer of 64 to prevent boundary conditions
+	// 64 in batch plus a buffer of 64 to prevent boundary conditions from
+	// rounding errors
 	const threshold = 128
 
 	const batchSize = 64
