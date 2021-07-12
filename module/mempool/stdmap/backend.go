@@ -107,11 +107,12 @@ type Backend struct {
 }
 
 // NewBackend creates a new memory pool backend.
+// This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
 		Backdata:          NewBackdata(),
 		limit:             uint(math.MaxUint32),
-		eject:             EjectTrueRandom,
+		eject:             EjectTrueRandomFast,
 		ejectionCallbacks: nil,
 	}
 	for _, option := range options {
@@ -215,23 +216,25 @@ func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 func (b *Backend) reduce() {
 
 	// we keep reducing the cache size until we are at limit again
-	for len(b.entities) > int(b.limit) {
+	// this was a loop, but the loop is now in EjectTrueRandomFast()
+	if len(b.entities) > int(b.limit) {
 
 		// get the key from the eject function
-		key, _ := b.eject(b.entities)
+		key, entity, ok := b.eject(b)
 
 		// if the key is not actually part of the map, use stupid fallback eject
-		entity, ok := b.entities[key]
 		if !ok {
-			key, _ = EjectFakeRandom(b.entities)
-		}
+			// this will eject multiple entities, return values are unused
+			_, _, _ = EjectTrueRandomFast(b)
+		} else {
 
-		// remove the key
-		delete(b.entities, key)
+			// remove the key
+			delete(b.entities, key)
 
-		// notify callback
-		for _, callback := range b.ejectionCallbacks {
-			callback(entity)
+			// notify callback
+			for _, callback := range b.ejectionCallbacks {
+				callback(entity)
+			}
 		}
 	}
 }
