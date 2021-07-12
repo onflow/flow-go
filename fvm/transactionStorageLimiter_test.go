@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -42,5 +43,16 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		d := &fvm.TransactionStorageLimiter{}
 		err := d.CheckLimits(env, []flow.Address{owner})
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
+	})
+
+	t.Run("non existing accounts or any other errors on fetching storage used -> Not OK", func(t *testing.T) {
+		env := &fvmmock.Enviornment{}
+		env.On("Context").Return(&fvm.Context{LimitAccountStorage: true})
+		env.On("GetStorageCapacity", mock.Anything).Return(uint64(100), nil)
+		env.On("GetStorageUsed", mock.Anything).Return(uint64(0), errors.NewAccountNotFoundError(owner))
+
+		d := &fvm.TransactionStorageLimiter{}
+		err := d.CheckLimits(env, []flow.Address{owner})
+		require.Error(t, err, "check storage used on non existing account (not general registers) should fail")
 	})
 }
