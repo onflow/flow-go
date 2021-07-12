@@ -14,10 +14,10 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 )
 
-func switchenv2v(env Envelope) (interface{}, error) {
+func switchenv2v(code uint8) (interface{}, error) {
 	var v interface{}
 
-	switch env.Code {
+	switch code {
 
 	// consensus
 	case CodeBlockProposal:
@@ -87,16 +87,16 @@ func switchenv2v(env Envelope) (interface{}, error) {
 		v = &message.TestMessage{}
 
 	default:
-		return nil, errors.Errorf("invalid message code (%d)", env.Code)
+		return nil, errors.Errorf("invalid message code (%d)", code)
 	}
 
 	return v, nil
 }
 
-func switchenv2what(env Envelope) (string, error) {
+func switchenv2what(code uint8) (string, error) {
 	var what string
 
-	switch env.Code {
+	switch code {
 
 	// consensus
 	case CodeBlockProposal:
@@ -166,18 +166,18 @@ func switchenv2what(env Envelope) (string, error) {
 		what = "CodeEcho"
 
 	default:
-		return "", errors.Errorf("invalid message code (%d)", env.Code)
+		return "", errors.Errorf("invalid message code (%d)", code)
 	}
 
 	return what, nil
 }
 
 // decode will decode the envelope into an entity.
-func env2vDecode(env Envelope, via string) (interface{}, error) {
+func env2vDecode(data []byte, code uint8, via string) (interface{}, error) {
 
 	// create the desired message
-	v, err1 := switchenv2v(env)
-	what, err2 := switchenv2what(env)
+	v, err1 := switchenv2v(code)
+	what, err2 := switchenv2what(code)
 
 	if nil != err1 {
 		return nil, err1
@@ -188,8 +188,8 @@ func env2vDecode(env Envelope, via string) (interface{}, error) {
 	}
 
 	// unmarshal the payload
-	p := binstat.EnterTimeVal(fmt.Sprintf("%s%s:%d", via, what, env.Code), "", int64(len(env.Data)))
-	err := cbor.Unmarshal(env.Data, v)
+	p := binstat.EnterTimeVal(fmt.Sprintf("%s%s:%d", via, what, code), "", int64(len(data)))
+	err := cbor.Unmarshal(data, v)
 	binstat.Leave(p)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode payload: %w", err)

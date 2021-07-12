@@ -174,18 +174,18 @@ func switchv2what(v interface{}) (string, error) {
 	return what, nil
 }
 
-func v2envEncode(v interface{}, via string) (*Envelope, error) {
+func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 
 	// determine the message type
 	code, err1 := switchv2code(v)
 	what, err2 := switchv2what(v)
 
 	if nil != err1 {
-		return nil, err1
+		return nil, 0, err1
 	}
 
 	if nil != err2 {
-		return nil, err2
+		return nil, 0, err2
 	}
 
 	// encode the payload
@@ -193,18 +193,14 @@ func v2envEncode(v interface{}, via string) (*Envelope, error) {
 	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
 	em, err3 := opts.EncMode()
 	if err3 != nil {
-		return nil, err3
+		return nil, 0, err3
 	}
 	data, err := em.Marshal(v)
 	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("could not encode payload: %w", err)
+		return nil, 0, fmt.Errorf("could not encode payload: %w", err)
 	}
 
-	env := Envelope{
-		Code: code,
-		Data: data,
-	}
 
-	return &env, nil
+	return data, code, nil
 }

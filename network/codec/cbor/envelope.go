@@ -3,13 +3,14 @@
 package cbor
 
 import (
-	"github.com/fxamacker/cbor/v2"
 )
 
 const (
 
+	CodeMin = iota + 1
+
 	// consensus
-	CodeBlockProposal = iota + 1
+	CodeBlockProposal
 	CodeBlockVote
 
 	// protocol state sync
@@ -51,11 +52,6 @@ const (
 
 	// testing
 	CodeEcho
-)
 
-// Envelope is a wrapper to convey type information with JSON encoding without
-// writing custom bytes to the wire.
-type Envelope struct {
-	Code uint8
-	Data cbor.RawMessage
-}
+	CodeMax
+)
