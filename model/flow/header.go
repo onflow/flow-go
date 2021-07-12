@@ -121,7 +121,7 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
 	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
 	opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-	em, err := opts.EncMode() 
+	em, err := opts.EncMode()
 	if err != nil {
 		return nil, err
 	}
