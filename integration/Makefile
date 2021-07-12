@@ -22,6 +22,10 @@ collection-tests:
 consensus-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/consensus
 
+.PHONY: epoch-tests
+epoch-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/epochs
+
 .PHONY: common-tests
 common-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/common
