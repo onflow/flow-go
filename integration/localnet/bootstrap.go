@@ -40,15 +40,18 @@ const (
 )
 
 var (
-	collectionCount   int
-	consensusCount    int
-	executionCount    int
-	verificationCount int
-	accessCount       int
-	nClusters         uint
-	profiler          bool
-	consensusDelay    time.Duration
-	collectionDelay   time.Duration
+	collectionCount        int
+	consensusCount         int
+	executionCount         int
+	verificationCount      int
+	accessCount            int
+	nClusters              uint
+	numViewsInStakingPhase uint64
+	numViewsInDKGPhase     uint64
+	numViewsEpoch          uint64
+	profiler               bool
+	consensusDelay         time.Duration
+	collectionDelay        time.Duration
 )
 
 func init() {
@@ -58,6 +61,9 @@ func init() {
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
+	flag.Uint64Var(&numViewsEpoch, "epoch-length", 0, "number of views in epoch")
+	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 0, "number of views in epoch staking phase")
+	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 0, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -77,7 +83,23 @@ func main() {
 
 	nodes := prepareNodes()
 
-	conf := testnet.NewNetworkConfig("localnet", nodes, testnet.WithClusters(nClusters))
+	opts := []testnet.NetworkConfigOpt{testnet.WithClusters(nClusters)}
+	if numViewsEpoch != 0 {
+		opts = append(opts, testnet.WithViewsInEpoch(numViewsEpoch))
+	}
+	if numViewsInStakingPhase != 0 {
+		opts = append(opts, testnet.WithViewsInStakingAuction(numViewsInStakingPhase))
+	}
+	if numViewsInDKGPhase != 0 {
+		opts = append(opts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
+	}
+	conf := testnet.NewNetworkConfig("localnet", nodes, opts...)
+
+	fmt.Printf("Network config:\n")
+	fmt.Printf("- Clusters: %d\n", conf.NClusters)
+	fmt.Printf("- Epoch Length: %d\n", conf.ViewsInEpoch)
+	fmt.Printf("- Staking Phase Length: %d\n", conf.ViewsInStakingAuction)
+	fmt.Printf("- DKG Phase Length: %d\n", conf.ViewsInDKGPhase)
 
 	err := os.RemoveAll(BootstrapDir)
 	if err != nil && !os.IsNotExist(err) {
