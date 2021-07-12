@@ -35,6 +35,7 @@ func TestBlockTimestamp_Build(t *testing.T) {
 	})
 }
 
+// TestBlockTimestamp_Validate tests that validation accepts valid time and rejects invalid
 func TestBlockTimestamp_Validate(t *testing.T) {
 	t.Parallel()
 	builder := NewBlockTimestamp(10*time.Millisecond, 1*time.Second)
@@ -49,5 +50,15 @@ func TestBlockTimestamp_Validate(t *testing.T) {
 		err := builder.Validate(parentTime, blockTime)
 		require.Error(t, err)
 		require.True(t, model.IsInvalidBlockTimestampError(err))
+	})
+	t.Run("valid min interval", func(t *testing.T) {
+		parentTime := time.Now().UTC()
+		blockTime := parentTime.Add(builder.minInterval)
+		require.NoError(t, builder.Validate(parentTime, blockTime))
+	})
+	t.Run("valid max interval", func(t *testing.T) {
+		parentTime := time.Now().UTC()
+		blockTime := parentTime.Add(builder.maxInterval)
+		require.NoError(t, builder.Validate(parentTime, blockTime))
 	})
 }
