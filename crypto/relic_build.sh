@@ -46,7 +46,7 @@ else
 fi
 
 # Set RELIC config for Flow
-COMP=(-DCOMP="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} -mtune=native")
+COMP=(-DCFLAGS="-O3 -funroll-loops -fomit-frame-pointer ${MARCH} -mtune=native")
 GENERAL=(-DTIMER=CYCLE -DCHECK=OFF -DVERBS=OFF)
 LIBS=(-DSHLIB=OFF -DSTLIB=ON)
 RAND=(-DRAND=HASHD -DSEED=)
