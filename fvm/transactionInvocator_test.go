@@ -19,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/extralog"
+	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -267,7 +268,12 @@ func TestSafetyCheck(t *testing.T) {
 
 		view := utils.NewSimpleView()
 		header := unittest.BlockHeaderFixture()
-		context := fvm.NewContext(log, fvm.WithBlockHeader(&header))
+
+		blocks := new(fvmmock.Blocks)
+		blocks.On("Current").Return(runtimeBlockFromFlowHeader(&header), nil)
+		blocks.On("Height").Return(header.Height)
+
+		context := fvm.NewContext(log, fvm.WithBlocks(blocks))
 
 		sth := state.NewStateHolder(state.NewState(view))
 

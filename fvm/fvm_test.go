@@ -909,11 +909,13 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 
 	blocks.On("ByHeight", block1.Header.Height).Return(runtimeBlockFromFlowHeader(block1.Header), true, nil)
 	blocks.On("ByHeight", block2.Header.Height).Return(runtimeBlockFromFlowHeader(block2.Header), true, nil)
+	blocks.On("Current").Return(runtimeBlockFromFlowHeader(block1.Header), nil)
+	blocks.On("Height").Return(block1.Header.Height)
 
 	type logPanic struct{}
 	blocks.On("ByHeight", block3.Header.Height).Run(func(args mock.Arguments) { panic(logPanic{}) })
 
-	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
+	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlocks(blocks))
 
 	t.Run("works as transaction", func(t *testing.T) {
 		txBody := flow.NewTransactionBody().
@@ -1169,10 +1171,13 @@ func TestBlockContext_UnsafeRandom(t *testing.T) {
 
 	header := flow.Header{Height: 42}
 
+	blocks := new(fvmmock.Blocks)
+	blocks.On("Current").Return(runtimeBlockFromFlowHeader(&header), nil)
+	blocks.On("Height").Return(header.Height)
 	ctx := fvm.NewContext(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
-		fvm.WithBlockHeader(&header),
+		fvm.WithBlocks(blocks),
 		fvm.WithCadenceLogging(true),
 	)
 
