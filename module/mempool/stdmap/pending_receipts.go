@@ -66,7 +66,11 @@ func removeReceipt(
 	delete(entities, receiptID)
 
 	index := indexByPreviousResultID(receipt)
-	delete(byPreviousResultID[index], receiptID)
+	siblings := byPreviousResultID[index]
+	delete(siblings, receiptID)
+	if len(siblings) == 0 {
+		delete(byPreviousResultID, index)
+	}
 }
 
 // Add adds an execution receipt to the mempool.
