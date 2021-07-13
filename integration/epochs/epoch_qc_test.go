@@ -75,12 +75,11 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		local := &modulemock.Local{}
 		local.On("NodeID").Return(nodeID)
 
-		// TODO: create signature of vote
 		blockID := unittest.IdentifierFixture()
 		view := uint64(rand.Uint32())
 		voteMessage := hotstuffver.MakeVoteMessage(view, blockID)
 
-		// create signer
+		// create valid signature
 		hasher := crypto.NewBLSKMAC(encoding.CollectorVoteTag)
 		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
 		s.Require().NoError(err)
