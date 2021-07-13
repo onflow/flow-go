@@ -34,7 +34,7 @@ func setPubKey(c elliptic.Curve, x *big.Int, y *big.Int) *goecdsa.PublicKey {
 // Both Flow and LibP2P define a crypto package with their own abstraction of Keys
 // These utility functions convert a Flow crypto key to a LibP2P key (Flow --> LibP2P)
 
-// privKey converts a Flow private key to a LibP2P Private key
+// PrivKey converts a Flow private key to a LibP2P Private key
 func PrivKey(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 	// get the signature algorithm
 	keyType, err := keyType(fpk.Algorithm())

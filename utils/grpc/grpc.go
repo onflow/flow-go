@@ -32,14 +32,13 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 	}
 
 	// extract the TLSConfig from it which will contains the generated x509 certificate
+	// (ignore the public key that is returned - it is the public key of the private key used to generate the ID)
 	libp2pTlsConfig, _ := id.ConfigForAny()
 
 	// verify that exactly one certificate was generated for the given key
-	if len(libp2pTlsConfig.Certificates) == 0 {
-		return nil, fmt.Errorf("failed to generate the x509 certificate")
-	}
-	if len(libp2pTlsConfig.Certificates) > 1 {
-		return nil, fmt.Errorf("unexpected number of x509 certificate chains generated")
+	certCount := len(libp2pTlsConfig.Certificates)
+	if certCount != 1 {
+		return nil, fmt.Errorf("invalid count for the generated x509 certificate: %d", certCount)
 	}
 
 	return &libp2pTlsConfig.Certificates[0], nil
