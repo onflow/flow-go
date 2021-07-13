@@ -37,13 +37,15 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	env, err := v2envEncode(v, "~3net:wire<1")
+	env, err := v2envEncode(v, "~3net:wire<1(json)")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
+	// TODO: consider eliminating envelope / double .Marshal as implemented in sibling codec CBOR using append()?
+
 	// encode the envelope
-	p := binstat.EnterTime("~3net:wire<2envelope2payload", "")
+	p := binstat.EnterTime("~3net:wire<2(json)envelope2payload", "")
 	data, err := json.Marshal(env)
 	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
@@ -58,7 +60,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
 	var env Envelope
-	p := binstat.EnterTime("~3net:wire>3payload2envelope", "")
+	p := binstat.EnterTime("~3net:wire>3(json)payload2envelope", "")
 	err := json.Unmarshal(data, &env)
 	binstat.LeaveVal(p, int64(len(env.Data)))
 	if err != nil {
@@ -66,7 +68,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	}
 
 	// decode the value
-	v, err := env2vDecode(env, "~3net:wire>4")
+	v, err := env2vDecode(env, "~3net:wire>4(json)")
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}

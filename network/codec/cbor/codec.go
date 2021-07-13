@@ -38,13 +38,13 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	data, code, err := v2envEncode(v, "~3net:wire<1")
+	data, code, err := v2envEncode(v, "~3net:wire<1(cbor)")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
 	// encode the envelope
-	p := binstat.EnterTime("~3net:wire<2envelope2payload", "")
+	p := binstat.EnterTime("~3net:wire<2(cbor)envelope2payload", "")
 	data = append(data, code)
 	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
@@ -58,12 +58,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
-	p := binstat.EnterTime("~3net:wire>3payload2envelope", "")
+	p := binstat.EnterTime("~3net:wire>3(cbor)payload2envelope", "")
 	code := data[len(data)-1] // only last byte
 	binstat.LeaveVal(p, int64(len(data)))
 
 	// decode the value
-	v, err := env2vDecode(data[:len(data)-1], code, "~3net:wire>4") // all but last byte
+	v, err := env2vDecode(data[:len(data)-1], code, "~3net:wire>4(cbor)") // all but last byte
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
