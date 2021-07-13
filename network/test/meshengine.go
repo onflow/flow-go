@@ -26,6 +26,7 @@ func NewMeshEngine(t *testing.T, net module.Network, cap int, channel network.Ch
 	te := &MeshEngine{
 		t:        t,
 		event:    make(chan interface{}, cap),
+		channel:  make(chan network.Channel, cap),
 		received: make(chan struct{}, cap),
 	}
 

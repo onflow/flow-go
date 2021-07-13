@@ -36,6 +36,7 @@ func NewEchoEngine(t *testing.T, net module.Network, cap int, channel network.Ch
 		t:        t,
 		echomsg:  "this is an echo",
 		event:    make(chan interface{}, cap),
+		channel:  make(chan network.Channel, cap),
 		received: make(chan struct{}, cap),
 		seen:     make(map[string]int),
 		echo:     echo,
