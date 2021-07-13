@@ -3,6 +3,7 @@ package multiplexer_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -10,7 +11,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/common/multiplexer"
-	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -27,17 +29,17 @@ func getEvent() interface{} {
 type Suite struct {
 	suite.Suite
 
-	net *module.Network
+	net *mockmodule.Network
 	con *mocknetwork.Conduit
-	me  *module.Local
+	me  *mockmodule.Local
 
 	engine *multiplexer.Engine
 }
 
 func (suite *Suite) SetupTest() {
-	suite.net = new(module.Network)
+	suite.net = new(mockmodule.Network)
 	suite.con = new(mocknetwork.Conduit)
-	suite.me = new(module.Local)
+	suite.me = new(mockmodule.Local)
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 
@@ -214,6 +216,66 @@ func (suite *Suite) TestDuplicateRegistrations() {
 	suite.Assert().Error(err)
 }
 
-func (suite *Suite) TestReadyDone() {
-	// TODO: test Ready and Done
+func (suite *Suite) TestReady() {
+	chan1 := network.Channel("test-chan-1")
+	chan2 := network.Channel("test-chan-2")
+
+	engine1 := new(mocknetwork.Engine)
+	engine2 := new(mocknetwork.Engine)
+	rda1 := new(mockmodule.ReadyDoneAware)
+	rda2 := new(mockmodule.ReadyDoneAware)
+	combined1 := struct {
+		network.Engine
+		module.ReadyDoneAware
+	}{engine1, rda1}
+	combined2 := struct {
+		network.Engine
+		module.ReadyDoneAware
+	}{engine2, rda2}
+
+	con, err := suite.engine.Register(chan1, combined1)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(chan1, combined2)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+
+	con, err = suite.engine.Register(chan2, combined1)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+	con, err = suite.engine.Register(chan2, combined2)
+	suite.Assert().Nil(err)
+	suite.Assert().Equal(suite.con, con)
+
+	ready1 := make(chan struct{})
+	ready2 := make(chan struct{})
+
+	rda1.On("Ready").Return((<-chan struct{})(ready1)).Once()
+	rda2.On("Ready").Return((<-chan struct{})(ready2)).Once()
+
+	multiplexerReady := suite.engine.Ready()
+	<-time.After(100 * time.Millisecond)
+
+	select {
+	case <-multiplexerReady:
+		suite.FailNow("Multiplexer should not be ready until all registered engines are.")
+	default:
+	}
+
+	close(ready1)
+	<-time.After(100 * time.Millisecond)
+
+	select {
+	case <-multiplexerReady:
+		suite.FailNow("Multiplexer should not be ready until all registered engines are.")
+	default:
+	}
+
+	close(ready2)
+
+	_, ok := <-multiplexerReady
+	suite.Assert().False(ok)
+
+	engine1.AssertExpectations(suite.T())
+	engine2.AssertExpectations(suite.T())
 }
