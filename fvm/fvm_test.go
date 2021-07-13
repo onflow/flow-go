@@ -907,11 +907,11 @@ func TestBlockContext_GetBlockInfo(t *testing.T) {
 	block2 := unittest.BlockWithParentFixture(block1.Header)
 	block3 := unittest.BlockWithParentFixture(block2.Header)
 
-	blocks.On("ByHeightFrom", block1.Header.Height, block1.Header).Return(block1.Header, nil)
-	blocks.On("ByHeightFrom", block2.Header.Height, block1.Header).Return(block2.Header, nil)
+	blocks.On("ByHeight", block1.Header.Height).Return(runtimeBlockFromFlowHeader(block1.Header), true, nil)
+	blocks.On("ByHeight", block2.Header.Height).Return(runtimeBlockFromFlowHeader(block2.Header), true, nil)
 
 	type logPanic struct{}
-	blocks.On("ByHeightFrom", block3.Header.Height, block1.Header).Run(func(args mock.Arguments) { panic(logPanic{}) })
+	blocks.On("ByHeight", block3.Header.Height).Run(func(args mock.Arguments) { panic(logPanic{}) })
 
 	blockCtx := fvm.NewContextFromParent(ctx, fvm.WithBlocks(blocks), fvm.WithBlockHeader(block1.Header))
 
@@ -2399,5 +2399,14 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				)
 			}),
 		)
+	}
+}
+
+func runtimeBlockFromFlowHeader(header *flow.Header) runtime.Block {
+	return runtime.Block{
+		Height:    header.Height,
+		View:      header.View,
+		Hash:      runtime.BlockHash(header.ID()),
+		Timestamp: header.Timestamp.UnixNano(),
 	}
 }

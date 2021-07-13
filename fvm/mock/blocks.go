@@ -3,8 +3,7 @@
 package mock
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
-
+	runtime "github.com/onflow/cadence/runtime"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,22 +12,48 @@ type Blocks struct {
 	mock.Mock
 }
 
-// ByHeightFrom provides a mock function with given fields: height, header
-func (_m *Blocks) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
-	ret := _m.Called(height, header)
+// ByHeight provides a mock function with given fields: height
+func (_m *Blocks) ByHeight(height uint64) (runtime.Block, bool, error) {
+	ret := _m.Called(height)
 
-	var r0 *flow.Header
-	if rf, ok := ret.Get(0).(func(uint64, *flow.Header) *flow.Header); ok {
-		r0 = rf(height, header)
+	var r0 runtime.Block
+	if rf, ok := ret.Get(0).(func(uint64) runtime.Block); ok {
+		r0 = rf(height)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.Header)
-		}
+		r0 = ret.Get(0).(runtime.Block)
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(uint64) bool); ok {
+		r1 = rf(height)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(uint64) error); ok {
+		r2 = rf(height)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// Current provides a mock function with given fields:
+func (_m *Blocks) Current() (runtime.Block, error) {
+	ret := _m.Called()
+
+	var r0 runtime.Block
+	if rf, ok := ret.Get(0).(func() runtime.Block); ok {
+		r0 = rf()
+	} else {
+		r0 = ret.Get(0).(runtime.Block)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64, *flow.Header) error); ok {
-		r1 = rf(height, header)
+	if rf, ok := ret.Get(1).(func() error); ok {
+		r1 = rf()
 	} else {
 		r1 = ret.Error(1)
 	}

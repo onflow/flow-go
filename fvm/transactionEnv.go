@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
 )
 
 var _ runtime.Interface = &TransactionEnv{}
@@ -660,23 +659,12 @@ func (e *TransactionEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 		defer sp.Finish()
 	}
 
+	// TODO change this to Fatal, there should be Blocks set for transactions
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
 	}
 
-	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
-		return runtimeBlockFromHeader(e.ctx.BlockHeader), true, nil
-	}
-
-	header, err := e.ctx.Blocks.ByHeightFrom(height, e.ctx.BlockHeader)
-	// TODO (ramtin): remove dependency on storage and move this if condition to blockfinder
-	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.Block{}, false, nil
-	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("getting block at height failed for height %v: %w", height, err)
-	}
-
-	return runtimeBlockFromHeader(header), true, nil
+	return e.ctx.Blocks.ByHeight(height)
 }
 
 // TODO (ramtin): check with Janez about not passing env

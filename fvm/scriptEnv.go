@@ -24,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/storage"
 )
 
 var _ runtime.Interface = &ScriptEnv{}
@@ -558,19 +557,7 @@ func (e *ScriptEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, error)
 		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
 	}
 
-	if e.ctx.BlockHeader != nil && height == e.ctx.BlockHeader.Height {
-		return runtimeBlockFromHeader(e.ctx.BlockHeader), true, nil
-	}
-
-	header, err := e.ctx.Blocks.ByHeightFrom(height, e.ctx.BlockHeader)
-	// TODO (ramtin): remove dependency on storage and move this if condition to blockfinder
-	if errors.Is(err, storage.ErrNotFound) {
-		return runtime.Block{}, false, nil
-	} else if err != nil {
-		return runtime.Block{}, false, fmt.Errorf("getting block at height failed for height %v: %w", height, err)
-	}
-
-	return runtimeBlockFromHeader(header), true, nil
+	return e.ctx.Blocks.ByHeight(height)
 }
 
 func (e *ScriptEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
