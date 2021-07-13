@@ -184,6 +184,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		}
 	}
 
+	for _, event := range events {
+		fmt.Printf("=> Ver event chunk %d of %x - %s\n", chIndex, chunk.BlockID, event.String())
+	}
 	// check read access to unknown registers
 	if len(unknownRegTouch) > 0 {
 		var missingRegs []string

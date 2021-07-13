@@ -2,6 +2,7 @@ package vertestutils
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"testing"
 
@@ -305,6 +306,10 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				txNumber = len(completeCollection.Transactions)
 			} else {
 				collectionID = flow.ZeroID
+			}
+
+			for _, event := range computationResult.Events[i] {
+				fmt.Printf("=> Exe event chunk %d of block %x - %s\n", i, executableBlock.ID(), event.String())
 			}
 
 			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
