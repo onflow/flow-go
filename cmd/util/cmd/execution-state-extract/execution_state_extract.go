@@ -58,16 +58,24 @@ func extractExecutionState(
 	migrations := []ledger.Migration{}
 	reporters := []ledger.Reporter{}
 	if migrate {
-		storageFormatV5Migration := mgr.StorageFormatV5Migration{Log: log}
-
+		storageFormatV5Migration := mgr.StorageFormatV5Migration{
+			Log:       log,
+			OutputDir: outputDir,
+		}
 		migrations = []ledger.Migration{
 			storageFormatV5Migration.Migrate,
 		}
 	}
 	if report {
 		reporters = []ledger.Reporter{
-			mgr.ContractReporter{Log: log, OutputDir: outputDir},
-			mgr.StorageReporter{Log: log, OutputDir: outputDir},
+			mgr.ContractReporter{
+				Log:       log,
+				OutputDir: outputDir,
+			},
+			mgr.StorageReporter{
+				Log:       log,
+				OutputDir: outputDir,
+			},
 		}
 	}
 	newState, err := led.ExportCheckpointAt(

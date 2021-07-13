@@ -6,9 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
@@ -32,9 +35,11 @@ type storageFormatV5MigrationResult struct {
 
 type StorageFormatV5Migration struct {
 	Log           zerolog.Logger
+	OutputDir     string
 	accounts      *state.Accounts
 	programs      *programs.Programs
 	brokenTypeIDs map[common.TypeID]brokenTypeCause
+	reportFile    *os.File
 }
 
 type brokenTypeCause int
@@ -44,9 +49,27 @@ const (
 	brokenTypeCauseMissingCompositeType
 )
 
+func (m StorageFormatV5Migration) filename() string {
+	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
+}
+
 func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
 
-	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
+	filename := m.filename()
+	m.Log.Info().Msgf("Running storage format V5 migration. Saving report to %s.", filename)
+
+	reportFile, err := os.Create(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = reportFile.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	m.reportFile = reportFile
 
 	m.Log.Info().Msg("Loading account contracts ...")
 
@@ -58,14 +81,16 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
 
 
+	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
+
 	for _, payload := range payloads {
 
-		result := m.migrate(payload)
-
-		keyParts := result.key.KeyParts
+		keyParts := payload.Key.KeyParts
 
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
+
+		result := m.migrate(payload)
 
 		if result.err != nil {
 
@@ -79,6 +104,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 			migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
 			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
+			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 		}
 	}
 
