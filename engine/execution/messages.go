@@ -21,6 +21,7 @@ type ComputationResult struct {
 	StateCommitments   []flow.StateCommitment
 	Proofs             [][]byte
 	Events             []flow.EventsList
+	EventsHashes       []flow.Identifier
 	ServiceEvents      flow.EventsList
 	TransactionResults []flow.TransactionResult
 	ComputationUsed    uint64

@@ -198,22 +198,24 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Error().Msg(chFault.String())
+			e.log.Warn().Msg(chFault.String())
+			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
+			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
+			return nil
 		case *chmodels.CFInvalidEventsCollection:
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
+			return nil
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
 				chFault, chFault.String())
 		}
-		// don't do anything else, but skip generating result approvals
-		return nil
 	}
 
 	// Generate result approval
@@ -251,7 +253,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 	log.Info().Msg("result approval submitted")
 	// increases number of sent result approvals for sake of metrics
-	e.metrics.OnResultApprovalDispatchedInNetwork()
+	e.metrics.OnResultApprovalDispatchedInNetworkByVerifier()
 
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
@@ -47,6 +48,12 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
+			Run(func(args mock.Arguments) {
+				//ctx := args[0].(fvm.Context)
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Events = generateEvents(1, tx.TxIndex)
+			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		committer := new(computermock.ViewCommitter)
@@ -76,6 +83,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+
+		assertEventHashesMatch(t, 1+1, result)
 
 		vm.AssertExpectations(t)
 	})
@@ -111,7 +120,64 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Len(t, result.StateSnapshots, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
+		assertEventHashesMatch(t, 1, result)
+
 		vm.AssertExpectations(t)
+	})
+
+	t.Run("system chunk transaction should not fail", func(t *testing.T) {
+
+		// include all fees. System chunk should ignore them
+		contextOptions := []fvm.Option{
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+		}
+		bootstrapOptions := []fvm.BootstrapProcedureOption{
+			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		}
+
+		rt := fvm.NewInterpreterRuntime()
+		chain := flow.Testnet.Chain()
+		vm := fvm.NewVirtualMachine(rt)
+		baseOpts := []fvm.Option{
+			fvm.WithChain(chain),
+		}
+
+		opts := append(baseOpts, contextOptions...)
+		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		}
+		progs := programs.NewEmptyPrograms()
+		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
+		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, progs)
+		require.NoError(t, err)
+
+		comm := new(computermock.ViewCommitter)
+
+		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm)
+		require.NoError(t, err)
+
+		// create an empty block
+		block := generateBlock(0, 0, rag)
+
+		comm.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil).
+			Once() // just system chunk
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TransactionResults, 1)
+
+		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
@@ -195,6 +261,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
 
+		assertEventHashesMatch(t, collectionCount+1, result)
+
 		vm.AssertExpectations(t)
 	})
 
@@ -262,19 +330,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
-		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-		//	Run(func(args mock.Arguments) {
-		//
-		//		tx := args[1].(*fvm.TransactionProcedure)
-		//
-		//
-		//		tx.Err = &fvm.MissingPayerError{}
-		//		tx.Events = events[txCount]
-		//		txCount++
-		//	}).
-		//	Return(nil).
-		//	Times(totalTransactionCount)
-
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
@@ -288,6 +343,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		//events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+
+		assertEventHashesMatch(t, collectionCount+1, result)
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
@@ -402,6 +459,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		require.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // +1 system chunk
 	})
+}
+
+func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
+
+	require.Len(t, result.Events, expectedNoOfChunks)
+	require.Len(t, result.EventsHashes, expectedNoOfChunks)
+
+	for i := 0; i < expectedNoOfChunks; i++ {
+		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		require.NoError(t, err)
+
+		require.Equal(t, calculatedHash, result.EventsHashes[i])
+	}
 }
 
 type testRuntime struct {
