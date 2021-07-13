@@ -31,7 +31,6 @@ func NewBlockState() *BlockState {
 	}
 }
 
-// TODO refactor to remove deep indentation
 func (bs *BlockState) Add(b *messages.BlockProposal) {
 	bs.Lock()
 	defer bs.Unlock()
@@ -50,11 +49,14 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 		return
 	}
 
-	bs.processBackward(b, confirmsHeight)
-
+	bs.processAncestors(b, confirmsHeight)
+	bs.updateHighestFinalizedHeight()
 }
 
-func (bs *BlockState) processBackward(b *messages.BlockProposal, confirmsHeight uint64) {
+// processAncestors checks whether ancestors of block are within the confirming height, and finalizes
+// them if that is the case.
+// It also processes the seals of blocks being finalized.
+func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight uint64) {
 	// puts this block proposal and all ancestors into `finalizedByHeight`
 	ancestor, ok := b, true
 	for ancestor.Header.Height > bs.highestFinalized {
@@ -65,13 +67,6 @@ func (bs *BlockState) processBackward(b *messages.BlockProposal, confirmsHeight 
 
 			finalized := ancestor
 			bs.finalizedByHeight[h] = finalized
-
-			// highestFinalized is only updated when not only the block is added to finalizedByHeight, but also
-			// it is "exactly" the next height compared to the current value.
-			// doing so prevents the illusion of highestFinalized indicating the highest finalized height "with an available block".
-			if h == bs.highestFinalized+1 {
-				bs.highestFinalized = h
-			}
 
 			// update last sealed height
 			for _, seal := range finalized.Payload.Seals {
@@ -95,6 +90,27 @@ func (bs *BlockState) processBackward(b *messages.BlockProposal, confirmsHeight 
 		if !ok {
 			return
 		}
+
+		// find parent
+		ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
+
+		// stop if parent not found
+		if !ok {
+			return
+		}
+	}
+}
+
+// updateHighestFinalizedHeight moves forward the highestFinalized height for the newly finalized blocks.
+func (bs *BlockState) updateHighestFinalizedHeight() {
+	for {
+		// checks whether next height has been finalized and updates highest finalized height
+		// if that is the case.
+		if _, ok := bs.finalizedByHeight[bs.highestFinalized+1]; !ok {
+			return
+		}
+
+		bs.highestFinalized++
 	}
 }
 

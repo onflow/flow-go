@@ -41,19 +41,19 @@ func (b *backendEvents) GetEventsForHeightRange(
 
 	rangeSize := endHeight - startHeight + 1 // range is inclusive on both ends
 	if rangeSize > uint64(b.maxHeightRange) {
-		return nil, fmt.Errorf("requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
+		return nil, status.Errorf(codes.InvalidArgument, "requested block range (%d) exceeded maximum (%d)", rangeSize, b.maxHeightRange)
 	}
 
 	// get the latest sealed block header
 	head, err := b.state.Sealed().Head()
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, " failed to get events: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to get events: %v", err)
 	}
 
 	// start height should not be beyond the last sealed height
 	if head.Height < startHeight {
-		return nil, status.Errorf(codes.Internal,
-			" start height %d is greater than the last sealed block height %d", startHeight, head.Height)
+		return nil, status.Errorf(codes.OutOfRange,
+			"start height %d is greater than the last sealed block height %d", startHeight, head.Height)
 	}
 
 	// limit max height to last sealed block in the chain
