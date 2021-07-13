@@ -57,13 +57,14 @@ func extractExecutionState(dir string,
 	reporters := []ledger.Reporter{}
 	if migrate {
 		migrations = []ledger.Migration{
-			mgr.PruneMigration,
+			//mgr.PruneMigration,
 		}
 	}
 	if report {
 		reporters = []ledger.Reporter{
-			mgr.ContractReporter{Log: log, OutputDir: outputDir},
-			mgr.StorageReporter{Log: log, OutputDir: outputDir},
+			//mgr.ContractReporter{Log: log, OutputDir: outputDir},
+			//mgr.StorageReporter{Log: log, OutputDir: outputDir},
+			&mgr.BalanceReporter{Log: log, OutputDir: outputDir},
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
