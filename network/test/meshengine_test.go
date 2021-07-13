@@ -183,7 +183,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 
 		for i := 0; i < count-1; i++ {
 			unittest.AssertReturnsBefore(suite.T(), func() {
-				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
+				assert.Equal(suite.T(), engine.TestNetwork, <-e.channel)
 			}, 100*time.Millisecond)
 		}
 
@@ -254,7 +254,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
 
 			unittest.AssertReturnsBefore(suite.T(), func() {
-				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
+				assert.Equal(suite.T(), engine.TestNetwork, <-e.channel)
 			}, 100*time.Millisecond)
 		} else {
 			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
@@ -306,7 +306,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
 
 		unittest.AssertReturnsBefore(suite.T(), func() {
-			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
+			assert.Equal(suite.T(), engine.TestNetwork, <-e.channel)
 		}, 100*time.Millisecond)
 	}
 }
