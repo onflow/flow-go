@@ -15,10 +15,11 @@ import (
 // driving the engines with libp2p, it simply receives and stores the incoming messages
 type MeshEngine struct {
 	t        *testing.T
-	con      network.Conduit  // used to directly communicate with the network
-	originID flow.Identifier  // used to keep track of the id of the sender of the messages
-	event    chan interface{} // used to keep track of the events that the node receives
-	received chan struct{}    // used as an indicator on reception of messages for testing
+	con      network.Conduit      // used to directly communicate with the network
+	originID flow.Identifier      // used to keep track of the id of the sender of the messages
+	event    chan interface{}     // used to keep track of the events that the node receives
+	channel  chan network.Channel // used to keep track of the channels that events are received on
+	received chan struct{}        // used as an indicator on reception of messages for testing
 }
 
 func NewMeshEngine(t *testing.T, net module.Network, cap int, channel network.Channel) *MeshEngine {
@@ -64,6 +65,7 @@ func (e *MeshEngine) ProcessLocal(event interface{}) error {
 func (e *MeshEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	// stores the message locally
 	e.originID = originID
+	e.channel <- channel
 	e.event <- event
 	e.received <- struct{}{}
 	return nil

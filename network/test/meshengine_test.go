@@ -166,6 +166,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 		go func(e *MeshEngine) {
 			for x := 0; x < count-1; x++ {
 				<-e.received
+				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 				wg.Done()
 			}
 		}(engs[i])
@@ -236,6 +237,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 		wg.Add(1)
 		go func(e *MeshEngine) {
 			<-e.received
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 			wg.Done()
 		}(engs[i])
 	}
@@ -285,6 +287,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 		wg.Add(1)
 		go func(e *MeshEngine) {
 			<-e.received
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 			wg.Done()
 		}(eng)
 	}
@@ -353,6 +356,7 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 			expectedMsgCnt := count - 2 // count less self and unsubscribed engine
 			for x := 0; x < expectedMsgCnt; x++ {
 				<-e.received
+				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 			}
 			wg.Done()
 		}(engs[i])

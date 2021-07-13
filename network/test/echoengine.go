@@ -23,6 +23,7 @@ type EchoEngine struct {
 	con      network.Conduit        // used to directly communicate with the network
 	originID flow.Identifier        // used to keep track of the id of the sender of the messages
 	event    chan interface{}       // used to keep track of the events that the node receives
+	channel  chan network.Channel   // used to keep track of the channels that events are received on
 	received chan struct{}          // used as an indicator on reception of messages for testing
 	echomsg  string                 // used as a fix string to be included in the reply echos
 	seen     map[string]int         // used to track the seen events
@@ -80,6 +81,7 @@ func (te *EchoEngine) Process(channel network.Channel, originID flow.Identifier,
 	defer te.Unlock()
 	te.originID = originID
 	te.event <- event
+	te.channel <- channel
 	te.received <- struct{}{}
 
 	// asserting event as string
