@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onflow/flow-go/binstat"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 // Encoder is an encoder to write serialized JSON to a writer.

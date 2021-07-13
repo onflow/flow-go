@@ -8,9 +8,9 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until

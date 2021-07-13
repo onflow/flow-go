@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/binstat"
+	"github.com/onflow/flow-go/utils/binstat"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -27,7 +27,7 @@ import (
  * 5. Strip "time" field from JSON log line output for shorter read, and
  * 6. Show the amount of code coverage from the tests.
  *
- * pushd binstat ; go fmt ./*.go ; golangci-lint run && GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
+ * pushd utils/binstat ; go fmt ./*.go ; golangci-lint run && GO111MODULE=on go test -v -vv -coverprofile=coverage.txt -covermode=atomic --tags relic ./... | perl -lane 's~\\n~\n~g; s~"time".*?,~~g; print;' ; go tool cover -func=coverage.txt ; popd
  */
 
 /*
@@ -109,12 +109,12 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 	/*
 		e.g. $ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof.txt 2>&1 | egrep '(binstat_test.f|cum)'
 		e.g.      flat  flat%   sum%        cum   cum%
-		e.g.         0     0%   100%      0.07s 19.44%  github.com/onflow/flow-go/binstat_test.f1
-		e.g.         0     0%   100%      0.02s  5.56%  github.com/onflow/flow-go/binstat_test.f2
-		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/binstat_test.f3
-		e.g.         0     0%   100%      0.11s 30.56%  github.com/onflow/flow-go/binstat_test.f4
-		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/binstat_test.f5
-		e.g.         0     0%   100%      0.03s  8.33%  github.com/onflow/flow-go/binstat_test.f6
+		e.g.         0     0%   100%      0.07s 19.44%  github.com/onflow/flow-go/utils/binstat_test.f1
+		e.g.         0     0%   100%      0.02s  5.56%  github.com/onflow/flow-go/utils/binstat_test.f2
+		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f3
+		e.g.         0     0%   100%      0.11s 30.56%  github.com/onflow/flow-go/utils/binstat_test.f4
+		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f5
+		e.g.         0     0%   100%      0.03s  8.33%  github.com/onflow/flow-go/utils/binstat_test.f6
 
 		$ # todo: consider workaround: have seen pprof fail on macOS extremely infrequently, e.g. below .f5 completely missing?! how?!
 		$ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof.txt
@@ -123,12 +123,12 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 		Duration: 200.55ms, Total samples = 0.36s (179.51%)
 		Showing nodes accounting for 0.36s, 100% of 0.36s total
 				flat  flat%   sum%        cum   cum%
-				0.36s   100%   100%      0.36s   100%  github.com/onflow/flow-go/binstat_test.run.func1
-					0     0%   100%      0.07s 19.44%  github.com/onflow/flow-go/binstat_test.f1
-					0     0%   100%      0.09s 25.00%  github.com/onflow/flow-go/binstat_test.f2
-					0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/binstat_test.f3
-					0     0%   100%      0.08s 22.22%  github.com/onflow/flow-go/binstat_test.f4
-					0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/binstat_test.f6
+				0.36s   100%   100%      0.36s   100%  github.com/onflow/flow-go/utils/binstat_test.run.func1
+					0     0%   100%      0.07s 19.44%  github.com/onflow/flow-go/utils/binstat_test.f1
+					0     0%   100%      0.09s 25.00%  github.com/onflow/flow-go/utils/binstat_test.f2
+					0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f3
+					0     0%   100%      0.08s 22.22%  github.com/onflow/flow-go/utils/binstat_test.f4
+					0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f6
 	*/
 	command := fmt.Sprintf("go tool pprof -top -unit seconds %s 2>&1 | egrep '(binstat_test.f|cum)'", pprofFileName)
 	out, err := exec.Command("bash", "-c", command).Output()

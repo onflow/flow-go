@@ -6,9 +6,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 // Backdata implements a generic memory pool backed by a Go map.

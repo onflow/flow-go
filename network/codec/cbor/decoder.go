@@ -7,7 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/flow-go/binstat"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 // Decoder implements a stream decoder for JSON.

@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 func switchv2code(v interface{}) (uint8, error) {

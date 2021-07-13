@@ -8,11 +8,11 @@ import (
 	"math/rand"
 	"reflect"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 // Identifier represents a 32-byte unique identifier for an entity.

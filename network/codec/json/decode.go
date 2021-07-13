@@ -8,10 +8,10 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 func switchenv2v(env Envelope) (interface{}, error) {

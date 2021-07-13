@@ -469,7 +469,10 @@ func dump() {
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
 	}
 	for i := range global.keysArray {
-		_, err := fmt.Fprintf(f, "%s=%d %f%s\n", global.keysArray[i], global.frequency[i], time.Duration(global.accumMono[i]).Seconds(), global.keysEgLoc[i])
+		// grab these atomically (because they may be atomically updated in parallel) so as not to trigger Golang's "WARNING: DATA RACE"
+		u1 := atomic.LoadUint64(&global.frequency[i])
+		u2 := atomic.LoadUint64(&global.accumMono[i])
+		_, err := fmt.Fprintf(f, "%s=%d %f%s\n", global.keysArray[i], u1, time.Duration(u2).Seconds(), global.keysEgLoc[i])
 		if err != nil {
 			globalLog.Fatal().Msgf("ERROR: .Fprintf()=%s", err)
 			panic(fmt.Sprintf("ERROR: BINSTAT: .Fprintf()=%s", err))

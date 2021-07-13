@@ -9,7 +9,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/crypto/hash"
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)

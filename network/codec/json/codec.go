@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 // Codec represents a JSON codec for our network.

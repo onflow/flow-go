@@ -3,9 +3,9 @@ package stdmap
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/queue"
+	"github.com/onflow/flow-go/utils/binstat"
 )
 
 type Queues struct {
