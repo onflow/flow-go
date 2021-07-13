@@ -95,8 +95,6 @@ const (
 	internalGC
 )
 
-const maxDigitsUint64 = 20
-
 var globalRWMutex = sync.RWMutex{}
 var global = globalStruct{}
 var globalLog zerolog.Logger
@@ -360,36 +358,35 @@ tryAgainRaceCondition:
 // todo: there must be a better / faster way to do all the operations below :-)
 // todo: allow configuration for more granular ranges, e.g. 1.100000-1.199999, or bigger ranges e.g. 0.200000-0.399999 ?
 // todo: consider outputting int range in hex for 16 bins instead of 10 bins (at a particular magnitude)?
-func x_2_y(v float64, isInt bool) string { // e.g. 1.234567
+func x_2_y(v float64, isInt bool) string { // e.g. 12.345678
 	t := runtimeNanoAsTimeDuration()
 
-	vInt64 := int64(v * 1000000)         // e.g.  1234567
-	vString := fmt.Sprintf("%d", vInt64) // e.g. "1234567"
-	var vaBytes [maxDigitsUint64]byte
-	var vbBytes [maxDigitsUint64]byte
-	copy(vaBytes[:], []byte(vString)) // e.g. ['1' '2' '3' '4' '5' '6']
-	copy(vbBytes[:], []byte(vString)) // e.g. ['1' '2' '3' '4' '5' '6']
-	for i := 1; i < len(vString); i++ {
-		vaBytes[i] = '0' // e.g. ['1' '0' '0' '0' '0' '0']
-		vbBytes[i] = '9' // e.g. ['1' '9' '9' '9' '9' '9']
-	}
-	vaString := string(vaBytes[0:len(vString)])      // e.g. "1000000"
-	vbString := string(vbBytes[0:len(vString)])      // e.g. "1999999"
-	vaInt64, _ := strconv.ParseInt(vaString, 10, 64) // e.g.  1000000
-	vbInt64, _ := strconv.ParseInt(vbString, 10, 64) // e.g.  1999999
-	vaFloat64 := float64(vaInt64) / 1000000          // e.g. 1.000000
-	vbFloat64 := float64(vbInt64) / 1000000          // e.g. 1.999999
-	//fmt.Printf("debug: v=%f -> vInt64=%d -> vString=%s -> vaBytes(%T)=%+v -> vaString=%s -> vaInt64=%d err=%+v -> vaFloat64=%f\n", v, vInt64, vString, vaBytes, vaBytes, vaString, vaInt64, err, vaFloat64)
-	var returnString string
+	var s string
 	if isInt {
-		if int64(vaFloat64) == int64(vbFloat64) {
-			returnString = fmt.Sprintf("%d", int64(vaFloat64))
-		} else {
-			returnString = fmt.Sprintf("%d-%d", int64(vaFloat64), int64(vbFloat64))
-		}
+		s = fmt.Sprintf("%d", int64(v)) // e.g. "12"
 	} else {
-		returnString = fmt.Sprintf("%f-%f", vaFloat64, vbFloat64)
+		s = fmt.Sprintf("%f", v) // e.g. "12.2345678"
 	}
+	// make lo & hi copy of strings
+	lo := []byte(s)
+	hi := []byte(s)
+	// find first non-zero digit
+	var z int
+	for z = 0; z < len(lo); z++ {
+		if (lo[z] != '0') && (lo[z] != '.') {
+			goto foundFirstNonZeroNonDot
+		}
+	}
+foundFirstNonZeroNonDot:
+	// turn the remaining lo digits to '0' and hi digits to '1'
+	z++
+	for i := z; i < len(lo); i++ {
+		if lo[i] != '.' {
+			lo[i] = '0'
+			hi[i] = '9'
+		}
+	}
+	returnString := fmt.Sprintf("%s-%s", lo, hi)
 
 	t2 := runtimeNanoAsTimeDuration()
 
@@ -464,7 +461,7 @@ func dump() {
 		atomic.StoreUint64(&global.accumMono[i], v2)
 	}
 
-	fileTmp := fmt.Sprintf("%s/%s.tmp", global.dmpPath, global.dmpName)
+	fileTmp := fmt.Sprintf("%s/%s.%d.tmp", global.dmpPath, global.dmpName, seconds)
 	fileNew := fmt.Sprintf("%s/%s", global.dmpPath, global.dmpName)
 	f, err := os.Create(fileTmp)
 	if err != nil {
