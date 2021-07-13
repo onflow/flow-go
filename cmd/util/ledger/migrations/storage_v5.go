@@ -631,6 +631,38 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 						Msg("failed to infer container type based on field type")
 
 					err = nil
+
+					// The field's type may have been updated from an array to a dictionary, and vice versa.
+					// If the field value is an empty array or dictionary, replace the value with a new
+					// empty container that has the expected type
+
+					var newFieldValue interpreter.Value
+
+					switch fieldValue := fieldValue.(type) {
+					case *interpreter.ArrayValue:
+						if dictionaryType, ok := fieldType.(interpreter.DictionaryStaticType); ok &&
+							fieldValue.Count() == 0 {
+
+							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(dictionaryType)
+						}
+					case *interpreter.DictionaryValue:
+						if arrayStaticType, ok := fieldType.(interpreter.ArrayStaticType); ok &&
+							fieldValue.Count() == 0 {
+
+							newFieldValue = interpreter.NewArrayValueUnownedNonCopying(arrayStaticType)
+						}
+					}
+
+					if newFieldValue != nil {
+						fields.Set(fieldName, newFieldValue)
+
+						m.Log.Warn().
+							Str("typeID", string(typeID)).
+							Str("fieldType", fieldType.String()).
+							Str("oldFieldValue", fieldValue.String()).
+							Str("newFieldValue", newFieldValue.String()).
+							Msg("replaced incorrect empty container value")
+					}
 				}
 			}
 
