@@ -74,10 +74,11 @@ typedef struct prec_ {
 // Utility functions
 int      get_valid();
 int      get_invalid();
+void     bn_new_wrapper(bn_t a);
 
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
-void     precomputed_data_set(prec_st* p);
+void     precomputed_data_set(const prec_st* p);
 void     seed_relic(byte*, int);
 
 int      ep_read_bin_compact(ep_t, const byte *, const int);
