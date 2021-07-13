@@ -5,10 +5,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/state/protocol"
+	state "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/storage/badger"
 )
 
 func TestEpochs(t *testing.T) {
@@ -21,26 +26,31 @@ func (s *Suite) TestViewsProgress() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// testCase is a utility struct that defines what epoch and phase is
-	// expected at a certain view. We will populate a list of testCases for a
-	// selection of views within two epochs.
-	type testCase struct {
-		view  uint64
-		epoch uint64
-		phase flow.EpochPhase
+	// phaseCheck is a utility struct that contains information about the
+	// final view and final block for epoch phases.
+	type phaseCheck struct {
+		epoch      uint64
+		phase      flow.EpochPhase
+		finalView  uint64          // the final view of the phase as defined by the EpochSetup
+		finalBlock flow.Identifier // the parent of the first sealed block that has a view greater or equal than finalView
 	}
 
-	// iterate through two epochs
+	phaseChecks := []*phaseCheck{}
+
+	// iterate through two epochs and populate a list of phase checks
 	for counter := 0; counter < 2; counter++ {
 
-		// Get the current epoch to populate a list of test cases
-		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-		require.NoError(s.T(), err)
-		epoch := snapshot.Epochs().Current()
+		// wait until the access node reaches the desired epoch
+		var epoch protocol.Epoch
+		var epochCounter uint64
+		for epoch == nil || epochCounter != uint64(counter) {
+			snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+			require.NoError(s.T(), err)
+			epoch = snapshot.Epochs().Current()
+			epochCounter, err = epoch.Counter()
+			require.NoError(s.T(), err)
+		}
 
-		epochCounter, err := epoch.Counter()
-		require.NoError(s.T(), err)
-		require.Equal(s.T(), uint64(counter), epochCounter)
 		epochFirstView, err := epoch.FirstView()
 		require.NoError(s.T(), err)
 		epochDKGPhase1Final, err := epoch.DKGPhase1FinalView()
@@ -52,36 +62,79 @@ func (s *Suite) TestViewsProgress() {
 		epochFinal, err := epoch.FinalView()
 		require.NoError(s.T(), err)
 
-		expectedViews := []testCase{
-			{epoch: epochCounter, view: epochFirstView, phase: flow.EpochPhaseStaking},
-			{epoch: epochCounter, view: epochDKGPhase1Final, phase: flow.EpochPhaseSetup},
-			{epoch: epochCounter, view: epochDKGPhase2Final, phase: flow.EpochPhaseSetup},
-			{epoch: epochCounter, view: epochDKGPhase3Final, phase: flow.EpochPhaseSetup},
-			{epoch: epochCounter, view: epochFinal, phase: flow.EpochPhaseCommitted},
+		epochViews := []*phaseCheck{
+			{epoch: epochCounter, phase: flow.EpochPhaseStaking, finalView: epochFirstView},
+			{epoch: epochCounter, phase: flow.EpochPhaseSetup, finalView: epochDKGPhase1Final},
+			{epoch: epochCounter, phase: flow.EpochPhaseSetup, finalView: epochDKGPhase2Final},
+			{epoch: epochCounter, phase: flow.EpochPhaseSetup, finalView: epochDKGPhase3Final},
+			{epoch: epochCounter, phase: flow.EpochPhaseCommitted, finalView: epochFinal},
 		}
 
-		for _, expectedView := range expectedViews {
-			_ = s.BlockState.WaitForSealedView(s.T(), expectedView.view)
+		for _, v := range epochViews {
+			proposal := s.BlockState.WaitForSealedView(s.T(), v.finalView)
+			v.finalBlock = proposal.Header.ParentID
+		}
 
-			snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-			require.NoError(s.T(), err)
+		phaseChecks = append(phaseChecks, epochViews...)
+	}
 
-			// BlockState and s.client are not necessarily in sync
-			head, err := snapshot.Head()
-			require.NoError(s.T(), err)
-			if expectedView.view != head.View {
-				log.Debug().Msgf(">>> BlockState (view: %d) and ghost client (view: %d) not synchronized", expectedView.view, head.View)
-			}
+	s.net.StopContainers()
+
+	consensusContainers := []*testnet.Container{}
+	for _, c := range s.net.Containers {
+		if c.Config.Role == flow.RoleConsensus {
+			consensusContainers = append(consensusContainers, c)
+		}
+	}
+
+	for _, c := range consensusContainers {
+		containerState, err := openContainerState(c)
+		require.NoError(s.T(), err)
+
+		for _, v := range phaseChecks {
+			snapshot := containerState.AtBlockID(v.finalBlock)
 
 			epoch := snapshot.Epochs().Current()
 
 			currentEpochCounter, err := epoch.Counter()
 			require.NoError(s.T(), err)
-			require.Equal(s.T(), expectedView.epoch, currentEpochCounter, "wrong epoch")
+			require.Equal(s.T(), v.epoch, currentEpochCounter, fmt.Sprintf("wrong epoch at view %d", v.finalView))
 
 			currentPhase, err := snapshot.Phase()
 			require.NoError(s.T(), err)
-			require.Equal(s.T(), expectedView.phase, currentPhase, fmt.Sprintf("wrong phase at view %d", expectedView.view))
+			require.Equal(s.T(), v.phase, currentPhase, fmt.Sprintf("wrong phase at view %d", v.finalView))
 		}
 	}
+}
+
+func openContainerState(container *testnet.Container) (*state.State, error) {
+	db, err := container.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	metrics := metrics.NewNoopCollector()
+	index := badger.NewIndex(metrics, db)
+	headers := badger.NewHeaders(metrics, db)
+	seals := badger.NewSeals(metrics, db)
+	results := badger.NewExecutionResults(metrics, db)
+	receipts := badger.NewExecutionReceipts(metrics, db, results)
+	guarantees := badger.NewGuarantees(metrics, db)
+	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := badger.NewBlocks(db, headers, payloads)
+	setups := badger.NewEpochSetups(metrics, db)
+	commits := badger.NewEpochCommits(metrics, db)
+	statuses := badger.NewEpochStatuses(metrics, db)
+
+	return state.OpenState(
+		metrics,
+		db,
+		headers,
+		seals,
+		results,
+		blocks,
+		setups,
+		commits,
+		statuses,
+	)
 }
