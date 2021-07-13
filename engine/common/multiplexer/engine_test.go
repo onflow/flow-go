@@ -53,6 +53,7 @@ func TestMultiplexer(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
+// TestHappyPath tests a basic scenario with three channels and three engines
 func (suite *Suite) TestHappyPath() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
@@ -139,6 +140,8 @@ func (suite *Suite) TestHappyPath() {
 	engine3.AssertExpectations(suite.T())
 }
 
+// TestDownstreamEngineFailure tests the case where one of the engines registered with
+// the multiplexer encounters an error while processing a message.
 func (suite *Suite) TestDownstreamEngineFailure() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
@@ -184,6 +187,8 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	engine2.AssertExpectations(suite.T())
 }
 
+// TestProcessUnregisteredChannel tests that receiving a message on an unregistered channel
+// returns an error.
 func (suite *Suite) TestProcessUnregisteredChannel() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
@@ -203,6 +208,7 @@ func (suite *Suite) TestProcessUnregisteredChannel() {
 	engine.AssertNumberOfCalls(suite.T(), "Process", 0)
 }
 
+// TestDuplicateRegistrations tests that an engine cannot register for the same channel twice.
 func (suite *Suite) TestDuplicateRegistrations() {
 	channel := network.Channel("test-chan")
 	engine := new(mocknetwork.Engine)
@@ -216,6 +222,8 @@ func (suite *Suite) TestDuplicateRegistrations() {
 	suite.Assert().Error(err)
 }
 
+// TestReady tests that the multiplexer's Ready channel closes once all
+// registered engines are ready.
 func (suite *Suite) TestReady() {
 	chan1 := network.Channel("test-chan-1")
 	chan2 := network.Channel("test-chan-2")

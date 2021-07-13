@@ -80,15 +80,6 @@ func (e *Engine) Ready() <-chan struct{} {
 				<-engine.Ready()
 			}
 		}
-
-		// for _, engines := range e.chanEngines {
-		// 	for _, engine := range engines {
-		// 		engine, ok := engine.(module.ReadyDoneAware)
-		// 		if ok {
-		// 			<-engine.Ready()
-		// 		}
-		// 	}
-		// }
 	})
 }
 
@@ -103,15 +94,6 @@ func (e *Engine) Done() <-chan struct{} {
 				<-engine.Done()
 			}
 		}
-
-		// for _, engines := range e.chanEngines {
-		// 	for _, engine := range engines {
-		// 		engine, ok := engine.(module.ReadyDoneAware)
-		// 		if ok {
-		// 			<-engine.Done()
-		// 		}
-		// 	}
-		// }
 	})
 }
 
@@ -157,10 +139,10 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	engines, ok := e.chanEngines[channel]
 
 	if !ok {
+		// TODO: should we consider this an actual error, or just log warning?
+
 		// log.Warn().Msgf("multiplexer has no engines registered on channel %s", channel)
 		// return nil
-
-		// TODO: should we consider this an actual error?
 
 		return fmt.Errorf("multiplexer has no engines registered on channel %s", channel)
 	}
