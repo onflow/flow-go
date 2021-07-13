@@ -56,8 +56,8 @@ func (i *TransactionInvocator) Process(
 	}
 
 	var blockHeight uint64
-	if ctx.BlockHeader != nil {
-		blockHeight = ctx.BlockHeader.Height
+	if ctx.Blocks != nil {
+		blockHeight = ctx.Blocks.Height()
 	}
 
 	var env *TransactionEnv

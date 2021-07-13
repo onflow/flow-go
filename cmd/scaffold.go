@@ -566,10 +566,8 @@ func (fnb *FlowNodeBuilder) initState() {
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
-	blockFinder := fvm.NewBlockFinder(fnb.Storage.Headers)
 	vmOpts := []fvm.Option{
 		fvm.WithChain(fnb.RootChainID.Chain()),
-		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet {

@@ -12,6 +12,7 @@ import (
 	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine/execution"
+	bfinder "github.com/onflow/flow-go/engine/execution/computation/blocks"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
@@ -21,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -41,13 +43,14 @@ type BlockComputer interface {
 }
 
 type blockComputer struct {
-	vm             VirtualMachine
-	vmCtx          fvm.Context
-	metrics        module.ExecutionMetrics
-	tracer         module.Tracer
-	log            zerolog.Logger
-	systemChunkCtx fvm.Context
-	committer      ViewCommitter
+	vm        VirtualMachine
+	vmCtx     fvm.Context
+	metrics   module.ExecutionMetrics
+	tracer    module.Tracer
+	log       zerolog.Logger
+	committer ViewCommitter
+	headers   storage.Headers
+	minHeight uint64
 }
 
 // NewBlockComputer creates a new block executor.
@@ -58,24 +61,19 @@ func NewBlockComputer(
 	tracer module.Tracer,
 	logger zerolog.Logger,
 	committer ViewCommitter,
+	headers storage.Headers,
+	minHeight uint64,
 ) (BlockComputer, error) {
 
-	systemChunkCtx := fvm.NewContextFromParent(
-		vmCtx,
-		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
-	)
-
 	return &blockComputer{
-		vm:             vm,
-		vmCtx:          vmCtx,
-		metrics:        metrics,
-		tracer:         tracer,
-		log:            logger,
-		systemChunkCtx: systemChunkCtx,
-		committer:      committer,
+		vm:        vm,
+		vmCtx:     vmCtx,
+		metrics:   metrics,
+		tracer:    tracer,
+		log:       logger,
+		committer: committer,
+		headers:   headers,
+		minHeight: minHeight,
 	}, nil
 }
 
@@ -119,7 +117,7 @@ func (e *blockComputer) executeBlock(
 		return nil, fmt.Errorf("executable block start state is not set")
 	}
 
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(block.Block.Header))
+	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlocks(bfinder.NewBlockFinder(block.Block.Header, e.headers, e.minHeight, block.Block.Header.Height)))
 	collections := block.Collections()
 
 	chunksSize := len(collections) + 1 // + 1 system chunk
@@ -198,7 +196,7 @@ func (e *blockComputer) executeBlock(
 	// executing system chunk
 	e.log.Debug().Hex("block_id", logging.Entity(block)).Msg("executing system chunk")
 	colView := stateView.NewChild()
-	_, err = e.executeSystemCollection(blockSpan, collectionIndex, txIndex, colView, programs, res)
+	_, err = e.executeSystemCollection(blockSpan, blockCtx, collectionIndex, txIndex, colView, programs, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute system chunk transaction: %w", err)
 	}
@@ -222,6 +220,7 @@ func (e *blockComputer) executeBlock(
 
 func (e *blockComputer) executeSystemCollection(
 	blockSpan opentracing.Span,
+	blockCtx fvm.Context,
 	collectionIndex int,
 	txIndex uint32,
 	collectionView state.View,
@@ -234,7 +233,16 @@ func (e *blockComputer) executeSystemCollection(
 
 	serviceAddress := e.vmCtx.Chain.ServiceAddress()
 	tx := blueprints.SystemChunkTransaction(serviceAddress)
-	err := e.executeTransaction(tx, colSpan, collectionView, programs, e.systemChunkCtx, collectionIndex, txIndex, res)
+
+	systemChunkCtx := fvm.NewContextFromParent(
+		blockCtx,
+		fvm.WithRestrictedDeployment(false),
+		fvm.WithTransactionFeesEnabled(false),
+		fvm.WithServiceEventCollectionEnabled(),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(e.log)),
+	)
+
+	err := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
 	if err != nil {
 		return txIndex, err
@@ -255,7 +263,6 @@ func (e *blockComputer) executeCollection(
 ) (uint32, error) {
 
 	e.log.Debug().
-		Hex("block_id", logging.Entity(blockCtx.BlockHeader)).
 		Hex("collection_id", logging.Entity(collection.Guarantee)).
 		Msg("executing collection")
 

@@ -98,8 +98,12 @@ func NewTransactionEnvironment(
 		env.GetAuthorizedAccountsForContractUpdates,
 	)
 
-	if ctx.BlockHeader != nil {
-		env.seedRNG(ctx.BlockHeader)
+	if ctx.Blocks != nil {
+		block, err := ctx.Blocks.Current()
+		if err != nil {
+			panic(err)
+		}
+		env.seedRNG(block)
 	}
 
 	return env
@@ -121,11 +125,10 @@ func (e *TransactionEnv) VM() *VirtualMachine {
 	return e.vm
 }
 
-func (e *TransactionEnv) seedRNG(header *flow.Header) {
+func (e *TransactionEnv) seedRNG(block runtime.Block) {
 	// Seed the random number generator with entropy created from the block header ID. The random number generator will
 	// be used by the UnsafeRandom function.
-	id := header.ID()
-	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
+	source := rand.NewSource(int64(binary.BigEndian.Uint64(block.Hash[:])))
 	e.rng = rand.New(source)
 }
 
@@ -628,10 +631,10 @@ func (e *TransactionEnv) GetCurrentBlockHeight() (uint64, error) {
 		defer sp.Finish()
 	}
 
-	if e.ctx.BlockHeader == nil {
+	if e.ctx.Blocks == nil {
 		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
 	}
-	return e.ctx.BlockHeader.Height, nil
+	return e.ctx.Blocks.Height(), nil
 }
 
 // UnsafeRandom returns a random uint64, where the process of random number derivation is not cryptographically

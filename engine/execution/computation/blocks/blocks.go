@@ -1,27 +1,17 @@
-package fvm
+package bfinder
 
 import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
 
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
-// TODO figure out errors
-type Blocks interface {
-	// returns current block header
-	Current() (runtime.Block, error)
-	// ByHeight returns the block at the given height in the chain ending in `header` (or finalized
-	// if `header` is nil). This enables querying un-finalized blocks by height with respect to the
-	// chain defined by the block we are executing. It returns a runtime block,
-	// a boolean which is set if block is found and an error if any fatal error happens
-	ByHeight(height uint64) (runtime.Block, bool, error)
-}
-
-// BlocksFinder finds blocks and return block headers
+// BlocksFinder implements blocks
 type BlocksFinder struct {
 	minHeightAvailable uint64 // inclusive
 	maxHeightAvailable uint64 // inclusive
@@ -30,13 +20,17 @@ type BlocksFinder struct {
 }
 
 // NewBlockFinder constructs a new block finder
-func NewBlockFinder(header *flow.Header, storage storage.Headers, minHeightAvailable uint64, maxHeightAvailable uint64) Blocks {
+func NewBlockFinder(header *flow.Header, storage storage.Headers, minHeightAvailable uint64, maxHeightAvailable uint64) fvm.Blocks {
 	return &BlocksFinder{
 		header:             header,
 		minHeightAvailable: minHeightAvailable,
 		maxHeightAvailable: maxHeightAvailable,
 		storage:            storage,
 	}
+}
+
+func (b *BlocksFinder) Height() uint64 {
+	return b.header.Height
 }
 
 // TODO we might evaluate the header first and return error if not exist

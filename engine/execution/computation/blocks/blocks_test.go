@@ -1,10 +1,11 @@
-package fvm
+package bfinder_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	bfinder "github.com/onflow/flow-go/engine/execution/computation/blocks"
 	"github.com/onflow/flow-go/storage"
 	storageMock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -16,11 +17,11 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		headers := new(storageMock.Headers)
 		header := unittest.BlockHeaderFixture()
 		header.Height = 5
-		blockFinder := NewBlockFinder(&header, headers, 0, 5)
+		blockFinder := bfinder.NewBlockFinder(&header, headers, 0, 5)
 		heightFrom, found, err := blockFinder.ByHeight(5)
 		require.NoError(t, err)
 		require.True(t, found)
-		require.Equal(t, RuntimeBlockFromFlowHeader(&header), heightFrom)
+		require.Equal(t, bfinder.RuntimeBlockFromFlowHeader(&header), heightFrom)
 
 		headers.AssertExpectations(t)
 	})
@@ -29,13 +30,13 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		headers := new(storageMock.Headers)
 		header := unittest.BlockHeaderFixture()
 		header.Height = 5
-		blockFinder := NewBlockFinder(nil, headers, 0, 5)
+		blockFinder := bfinder.NewBlockFinder(nil, headers, 0, 5)
 
 		headers.On("ByHeight", uint64(5)).Return(&header, nil)
 		heightFrom, found, err := blockFinder.ByHeight(5)
 		require.NoError(t, err)
 		require.True(t, found)
-		require.Equal(t, RuntimeBlockFromFlowHeader(&header), heightFrom)
+		require.Equal(t, bfinder.RuntimeBlockFromFlowHeader(&header), heightFrom)
 		headers.AssertExpectations(t)
 	})
 
@@ -43,7 +44,7 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		headers := new(storageMock.Headers)
 		header := unittest.BlockHeaderFixture()
 		header.Height = 5
-		blockFinder := NewBlockFinder(nil, headers, 0, 5)
+		blockFinder := bfinder.NewBlockFinder(nil, headers, 0, 5)
 
 		_, found, err := blockFinder.ByHeight(6)
 		require.Error(t, err)
@@ -72,12 +73,12 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		headers.On("ByHeight", uint64(1)).Return(nil, storage.ErrNotFound)
 		headers.On("ByBlockID", header0.ID()).Return(&header0, nil)
 
-		blockFinder := NewBlockFinder(&header5, headers, 0, 5)
+		blockFinder := bfinder.NewBlockFinder(&header5, headers, 0, 5)
 
 		heightFrom, found, err := blockFinder.ByHeight(0)
 		require.NoError(t, err)
 		require.True(t, found)
-		require.Equal(t, RuntimeBlockFromFlowHeader(&header0), heightFrom)
+		require.Equal(t, bfinder.RuntimeBlockFromFlowHeader(&header0), heightFrom)
 		headers.AssertExpectations(t)
 	})
 
@@ -98,12 +99,12 @@ func Test_BlockFinder_ReturnsHeaderIfSameHeight(t *testing.T) {
 		headers.On("ByHeight", uint64(3)).Return(&header3, nil)
 		headers.On("ByHeight", uint64(0)).Return(&header0, nil)
 
-		blockFinder := NewBlockFinder(&header5, headers, 0, 5)
+		blockFinder := bfinder.NewBlockFinder(&header5, headers, 0, 5)
 
 		heightFrom, found, err := blockFinder.ByHeight(0)
 		require.NoError(t, err)
 		require.True(t, found)
-		require.Equal(t, RuntimeBlockFromFlowHeader(&header0), heightFrom)
+		require.Equal(t, bfinder.RuntimeBlockFromFlowHeader(&header0), heightFrom)
 		headers.AssertExpectations(t)
 	})
 

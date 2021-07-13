@@ -146,7 +146,6 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 
 	fvmContext := fvm.NewContext(logger,
 		fvm.WithChain(chain),
-		//fvm.WithBlocks(blockFinder),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 	)

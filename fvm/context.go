@@ -3,12 +3,27 @@ package fvm
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
+
+// TODO figure out errors
+type Blocks interface {
+	// returns current block header
+	Current() (runtime.Block, error)
+	// returns the height of the current block
+	Height() uint64
+	// ByHeight returns the block at the given height in the chain ending in `header` (or finalized
+	// if `header` is nil). This enables querying un-finalized blocks by height with respect to the
+	// chain defined by the block we are executing. It returns a runtime block,
+	// a boolean which is set if block is found and an error if any fatal error happens
+	ByHeight(height uint64) (runtime.Block, bool, error)
+}
 
 // A Context defines a set of execution parameters used by the virtual machine.
 type Context struct {
@@ -22,7 +37,6 @@ type Context struct {
 	MaxStateInteractionSize       uint64
 	EventCollectionByteSizeLimit  uint64
 	MaxNumOfTxRetries             uint8
-	BlockHeader                   *flow.Header
 	ServiceAccountEnabled         bool
 	RestrictedDeploymentEnabled   bool
 	LimitAccountStorage           bool
@@ -76,7 +90,6 @@ func defaultContext(logger zerolog.Logger) Context {
 		MaxStateInteractionSize:       state.DefaultMaxInteractionSize,
 		EventCollectionByteSizeLimit:  DefaultEventCollectionByteSizeLimit,
 		MaxNumOfTxRetries:             DefaultMaxNumOfTxRetries,
-		BlockHeader:                   nil,
 		ServiceAccountEnabled:         true,
 		RestrictedDeploymentEnabled:   true,
 		CadenceLoggingEnabled:         false,
@@ -147,17 +160,6 @@ func WithMaxStateInteractionSize(limit uint64) Option {
 func WithEventCollectionSizeLimit(limit uint64) Option {
 	return func(ctx Context) Context {
 		ctx.EventCollectionByteSizeLimit = limit
-		return ctx
-	}
-}
-
-// WithBlockHeader sets the block header for a virtual machine context.
-//
-// The VM uses the header to provide current block information to the Cadence runtime,
-// as well as to seed the pseudorandom number generator.
-func WithBlockHeader(header *flow.Header) Option {
-	return func(ctx Context) Context {
-		ctx.BlockHeader = header
 		return ctx
 	}
 }

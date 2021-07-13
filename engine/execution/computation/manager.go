@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
+	bfinder "github.com/onflow/flow-go/engine/execution/computation/blocks"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -19,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -50,6 +52,8 @@ type Manager struct {
 	blockComputer      computer.BlockComputer
 	programsCache      *ProgramsCache
 	scriptLogThreshold time.Duration
+	headers            storage.Headers
+	minHeight          uint64
 }
 
 func New(
@@ -63,8 +67,14 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
+	headers storage.Headers,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
+
+	root, err := protoState.Params().Root()
+	if err != nil {
+		return nil, fmt.Errorf("cannot fetch root block: %w", err)
+	}
 
 	blockComputer, err := computer.NewBlockComputer(
 		vm,
@@ -73,6 +83,8 @@ func New(
 		tracer,
 		log.With().Str("component", "block_computer").Logger(),
 		committer,
+		headers,
+		root.Height,
 	)
 
 	if err != nil {
@@ -94,6 +106,8 @@ func New(
 		blockComputer:      blockComputer,
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
+		headers:            headers,
+		minHeight:          root.Height,
 	}
 
 	return &e, nil
@@ -111,7 +125,7 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 
 	startedAt := time.Now()
 
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlocks(bfinder.NewBlockFinder(blockHeader, e.headers, e.minHeight, blockHeader.Height)))
 
 	script := fvm.Script(code).WithArguments(arguments...)
 
@@ -217,7 +231,7 @@ func (e *Manager) ComputeBlock(
 }
 
 func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, view state.View) (*flow.Account, error) {
-	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
+	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlocks(bfinder.NewBlockFinder(blockHeader, e.headers, e.minHeight, blockHeader.Height)))
 
 	programs := e.getChildProgramsOrEmpty(blockHeader.ID())
 
