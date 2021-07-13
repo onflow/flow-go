@@ -232,7 +232,7 @@ func (e *ReactorEngine) registerPoll(view uint64) {
 			log.Info().Msg("polling DKG smart-contract...")
 			err := e.controller.Poll(header.ID())
 			if err != nil {
-				log.Fatal().Err(err).Msg("failed to poll DKG smart-contract")
+				log.Err(err).Msg("failed to poll DKG smart-contract")
 			}
 		})
 	})

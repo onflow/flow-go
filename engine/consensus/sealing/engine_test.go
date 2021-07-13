@@ -3,12 +3,10 @@
 package sealing
 
 import (
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -36,7 +34,6 @@ type SealingEngineSuite struct {
 }
 
 func (s *SealingEngineSuite) SetupTest() {
-	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
 	s.core = &mockconsensus.SealingCore{}
@@ -45,7 +42,7 @@ func (s *SealingEngineSuite) SetupTest() {
 	require.NoError(s.T(), err)
 
 	s.engine = &Engine{
-		log:           log,
+		log:           unittest.Logger(),
 		unit:          engine.NewUnit(),
 		core:          s.core,
 		me:            me,

@@ -67,6 +67,10 @@ const (
 
 	// ExeNodeMetricsPort
 	ExeNodeMetricsPort = "exe-metrics-port"
+
+	DefaultViewsInStakingAuction uint64 = 5
+	DefaultViewsInDKGPhase       uint64 = 50
+	DefaultViewsInEpoch          uint64 = 180
 )
 
 func init() {
@@ -211,9 +215,9 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConf
 		Nodes:                 nodes,
 		Name:                  name,
 		NClusters:             1, // default to 1 cluster
-		ViewsInDKGPhase:       50,
-		ViewsInStakingAuction: 5,
-		ViewsInEpoch:          180,
+		ViewsInStakingAuction: DefaultViewsInStakingAuction,
+		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
+		ViewsInEpoch:          DefaultViewsInEpoch,
 	}
 
 	for _, apply := range opts {

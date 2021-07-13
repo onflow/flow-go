@@ -8,9 +8,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
-	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -185,10 +185,12 @@ func CompleteExecutionReceiptFixture(t *testing.T, chunks int, chain flow.Chain,
 // for that result.
 func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refBlkHeader *flow.Header) (*flow.ExecutionResult,
 	*ExecutionReceiptData) {
+
 	// setups up the first collection of block consists of three transactions
 	tx1 := testutil.DeployCounterContractTransaction(chain.ServiceAddress(), chain)
 	err := testutil.SignTransactionAsServiceAccount(tx1, 0, chain)
 	require.NoError(t, err)
+
 	tx2 := testutil.CreateCounterTransaction(chain.ServiceAddress(), chain.ServiceAddress())
 	err = testutil.SignTransactionAsServiceAccount(tx2, 1, chain)
 	require.NoError(t, err)
@@ -290,22 +292,27 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		startState := startStateCommitment
 
 		for i := range computationResult.StateCommitments {
-			// TODO: deltas should be applied to a particular state
-
 			endState := computationResult.StateCommitments[i]
+
 			var collectionID flow.Identifier
 
+			txNumber := 1 //default for system chunk
 			// account for system chunk being last
 			if i < len(computationResult.StateCommitments)-1 {
 				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 				collectionID = completeCollection.Collection().ID()
+				txNumber = len(completeCollection.Transactions)
 			} else {
 				collectionID = flow.ZeroID
 			}
 
-			chunk := ingestion.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID())
-			chunkDataPack := ingestion.GenerateChunkDataPack(chunk, collectionID, computationResult.Proofs[i])
+			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+			require.NoError(t, err)
+
+			chunk := execution.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID(), eventsHash, uint16(txNumber))
+			chunkDataPack := execution.GenerateChunkDataPack(chunk, collectionID, computationResult.Proofs[i])
+
 			chunks = append(chunks, chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
 			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
