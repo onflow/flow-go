@@ -113,7 +113,7 @@ func TestPendingReceipts(t *testing.T) {
 		}
 
 		actual := pool.ByPreviousResultID(parentID)
-		require.Equal(t, rs, actual)
+		require.ElementsMatch(t, rs, actual)
 	})
 
 	t.Run("adding too many will eject", func(t *testing.T) {

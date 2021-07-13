@@ -288,9 +288,13 @@ func (e *Engine) finalizationProcessingLoop() {
 		case <-e.unit.Quit():
 			return
 		case <-finalizationNotifier:
-			err := e.processLatestFinalizedEvent()
+			finalized, err := e.state.Final().Head()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not process latest finalized event")
+				e.log.Fatal().Err(err).Msg("could not retrieve last finalized block")
+			}
+			err = e.core.ProcessFinalizedBlock(finalized.ID())
+			if err != nil {
+				e.log.Fatal().Err(err).Msgf("could not process finalized block %v", finalized.ID())
 			}
 		}
 	}
@@ -326,19 +330,6 @@ func (e *Engine) loop() {
 			}
 		}
 	}
-}
-
-// processLatestFinalizedEvent performs processing of latest finalized event propagating it to core
-func (e *Engine) processLatestFinalizedEvent() error {
-	finalized, err := e.state.Final().Head()
-	if err != nil {
-		return fmt.Errorf("could not retrieve last finalized block: %w", err)
-	}
-	err = e.core.ProcessFinalizedBlock(finalized.ID())
-	if err != nil {
-		return fmt.Errorf("could not process finalized block %v: %w", finalized.ID(), err)
-	}
-	return nil
 }
 
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
@@ -479,7 +470,11 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 			if err != nil {
 				return fmt.Errorf("could not process incorporated block: %w", err)
 			}
+			continue
 		}
-   	return nil // no more events to process
-   }
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
 }

@@ -44,7 +44,7 @@ func NewPendingReceipts(headers storage.Headers, limit uint) *PendingReceipts {
 	r := &PendingReceipts{
 		Backend:            NewBackend(WithLimit(limit)),
 		headers:            headers,
-		byPreviousResultID: make(map[flow.Identifier][]flow.Identifier),
+		byPreviousResultID: make(map[flow.Identifier]receiptsSet),
 		byHeight:           make(map[uint64]receiptsSet),
 	}
 	// TODO: there is smarter eject exists. For instance:
@@ -60,24 +60,13 @@ func NewPendingReceipts(headers storage.Headers, limit uint) *PendingReceipts {
 func removeReceipt(
 	receipt *flow.ExecutionReceipt,
 	entities map[flow.Identifier]flow.Entity,
-	byPreviousResultID map[flow.Identifier][]flow.Identifier) {
+	byPreviousResultID map[flow.Identifier]receiptsSet) {
 
 	receiptID := receipt.ID()
 	delete(entities, receiptID)
 
 	index := indexByPreviousResultID(receipt)
-	siblings := byPreviousResultID[index]
-	newsiblings := make([]flow.Identifier, 0, len(siblings))
-	for _, sibling := range siblings {
-		if sibling != receiptID {
-			newsiblings = append(newsiblings, sibling)
-		}
-	}
-	if len(newsiblings) == 0 {
-		delete(byPreviousResultID, index)
-	} else {
-		byPreviousResultID[index] = newsiblings
-	}
+	delete(byPreviousResultID[index], receiptID)
 }
 
 // Add adds an execution receipt to the mempool.
@@ -107,10 +96,10 @@ func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 		previousResultID := indexByPreviousResultID(receipt)
 		siblings, ok := r.byPreviousResultID[previousResultID]
 		if !ok {
-			r.byPreviousResultID[previousResultID] = []flow.Identifier{receiptID}
-		} else {
-			r.byPreviousResultID[previousResultID] = append(siblings, receiptID)
+			siblings = make(receiptsSet)
+			r.byPreviousResultID[previousResultID] = siblings
 		}
+		siblings[receiptID] = struct{}{}
 
 		sameHeight, ok := r.byHeight[height]
 		if !ok {
@@ -155,8 +144,7 @@ func (r *PendingReceipts) ByPreviousResultID(previousResultID flow.Identifier) [
 		if !foundIndex {
 			return nil
 		}
-		receipts = make([]*flow.ExecutionReceipt, 0, len(siblings))
-		for _, receiptID := range siblings {
+		for receiptID := range siblings {
 			entity, ok := entities[receiptID]
 			if !ok {
 				return fmt.Errorf("inconsistent index. can not find entity by id: %v", receiptID)

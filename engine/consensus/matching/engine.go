@@ -192,9 +192,9 @@ func (e *Engine) finalizationProcessingLoop() {
 		case <-e.unit.Quit():
 			return
 		case <-finalizationNotifier:
-			err := e.processLatestFinalizedEvent()
+			err := e.core.OnBlockFinalization()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("could not process latest finalized event")
+				e.log.Fatal().Err(err).Msg("could not process last finalized event")
 			}
 		}
 	}
@@ -233,15 +233,6 @@ func (e *Engine) inboundEventsProcessingLoop() {
 	}
 }
 
-// processLatestFinalizedEvent performs processing of latest finalized event propagating it to core
-func (e *Engine) processLatestFinalizedEvent() error {
-	err := e.core.OnBlockFinalization()
-	if err != nil {
-		return fmt.Errorf("could not process last finalized event: %w", err)
-	}
-	return nil
-}
-
 // processBlockIncorporatedEvents performs processing of block incorporated hot stuff events
 func (e *Engine) processBlockIncorporatedEvents() error {
 	for {
@@ -259,8 +250,11 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 			}
 			continue
 		}
-   	return nil // no more events to process
-   }
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
 }
 
 // processAvailableEvents processes _all_ available events (untrusted messages
