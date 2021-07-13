@@ -42,6 +42,7 @@ var DefaultScriptLogThreshold = 1 * time.Second
 // Manager manages computation and execution
 type Manager struct {
 	log                zerolog.Logger
+	metrics            module.ExecutionMetrics
 	me                 module.Local
 	protoState         protocol.State
 	vm                 VirtualMachine
@@ -85,6 +86,7 @@ func New(
 
 	e := Manager{
 		log:                log,
+		metrics:            metrics,
 		me:                 me,
 		protoState:         protoState,
 		vm:                 vm,
@@ -106,6 +108,9 @@ func (e *Manager) getChildProgramsOrEmpty(blockID flow.Identifier) *programs.Pro
 }
 
 func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *flow.Header, view state.View) ([]byte, error) {
+
+	startedAt := time.Now()
+
 	blockCtx := fvm.NewContextFromParent(e.vmCtx, fvm.WithBlockHeader(blockHeader))
 
 	script := fvm.Script(code).WithArguments(arguments...)
@@ -160,6 +165,8 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode runtime value: %w", err)
 	}
+
+	e.metrics.ExecutionScriptExecuted(time.Since(startedAt), script.GasUsed)
 
 	return encodedValue, nil
 }

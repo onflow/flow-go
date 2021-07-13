@@ -492,6 +492,16 @@ func CompleteCollectionFixture() *entity.CompleteCollection {
 	}
 }
 
+func CompleteCollectionFromTransactions(txs []*flow.TransactionBody) *entity.CompleteCollection {
+	return &entity.CompleteCollection{
+		Guarantee: &flow.CollectionGuarantee{
+			CollectionID: flow.Collection{Transactions: txs}.ID(),
+			Signature:    SignatureFixture(),
+		},
+		Transactions: txs,
+	}
+}
+
 func ExecutableBlockFixture(collectionsSignerIDs [][]flow.Identifier) *entity.ExecutableBlock {
 
 	header := BlockHeaderFixture()
@@ -509,6 +519,29 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 		completeCollection.Guarantee.SignerIDs = signerIDs
 		block.Payload.Guarantees = append(block.Payload.Guarantees, completeCollection.Guarantee)
 		completeCollections[completeCollection.Guarantee.CollectionID] = completeCollection
+	}
+
+	block.Header.PayloadHash = block.Payload.Hash()
+
+	executableBlock := &entity.ExecutableBlock{
+		Block:               &block,
+		CompleteCollections: completeCollections,
+	}
+	// Preload the id
+	executableBlock.ID()
+	return executableBlock
+}
+
+func ExecutableBlockFromTransactions(txss [][]*flow.TransactionBody) *entity.ExecutableBlock {
+
+	completeCollections := make(map[flow.Identifier]*entity.CompleteCollection, len(txss))
+	block := BlockFixture()
+	block.Payload.Guarantees = nil
+
+	for _, txs := range txss {
+		cc := CompleteCollectionFromTransactions(txs)
+		block.Payload.Guarantees = append(block.Payload.Guarantees, cc.Guarantee)
+		completeCollections[cc.Guarantee.CollectionID] = cc
 	}
 
 	block.Header.PayloadHash = block.Payload.Hash()
@@ -1028,7 +1061,6 @@ func TransactionBodyFixture(opts ...func(*flow.TransactionBody)) flow.Transactio
 		ProposalKey:        ProposalKeyFixture(),
 		Payer:              AddressFixture(),
 		Authorizers:        []flow.Address{AddressFixture()},
-		PayloadSignatures:  []flow.TransactionSignature{TransactionSignatureFixture()},
 		EnvelopeSignatures: []flow.TransactionSignature{TransactionSignatureFixture()},
 	}
 
@@ -1268,7 +1300,7 @@ func SeedFixtures(m int, n int) [][]byte {
 }
 
 // EventFixture returns an event
-func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier) flow.Event {
+func EventFixture(eType flow.EventType, transactionIndex uint32, eventIndex uint32, txID flow.Identifier, payloadSize int) flow.Event {
 	return flow.Event{
 		Type:             eType,
 		TransactionIndex: transactionIndex,

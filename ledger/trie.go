@@ -268,7 +268,7 @@ func NewTrieProof() *TrieProof {
 		Payload:   EmptyPayload(),
 		Interims:  make([]hash.Hash, 0),
 		Inclusion: false,
-		Flags:     make([]byte, 0),
+		Flags:     make([]byte, PathLen),
 		Steps:     0,
 	}
 }

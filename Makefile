@@ -59,8 +59,10 @@ install-tools: crypto/relic/build check-go-version
 
 .PHONY: unittest
 unittest:
+	# test some packages with Relic library and data race detection enabled
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) -race --tags relic ./access/... ./consensus/... ./model/... ./state/... ./storage/... ./utils/...
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./cmd...  ./engine/... ./fvm/... ./ledger/... ./module/... ./network/...
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
@@ -143,6 +145,11 @@ tidy:
 lint:
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
+
+.PHONY: fix-lint
+fix-lint:
+	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
+	golangci-lint run -v --build-tags relic --fix ./...
 
 # Runs unit tests, SKIP FOR NOW linter, coverage
 .PHONY: ci

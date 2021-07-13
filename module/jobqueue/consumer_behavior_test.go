@@ -75,6 +75,8 @@ func TestConsumer(t *testing.T) {
 	// when job queue crashed and restarted, the queue can be resumed
 	t.Run("testWorkOnNextAfterFastforward", testWorkOnNextAfterFastforward)
 
+	t.Run("testMovingProcessedIndex", testMovingProcessedIndex)
+
 	// [+1, +2, +3, +4, Stop, 2*] => [0#, 1!, 2*, 3!, 4]
 	// when Stop is called, it won't work on any job any more
 	t.Run("testStopRunning", testStopRunning)
@@ -86,6 +88,13 @@ func testOnStartup(t *testing.T) {
 	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
 		require.NoError(t, c.Start(DefaultIndex))
 		assertProcessed(t, cp, 0)
+	})
+}
+
+func TestProcessedOrder(t *testing.T) {
+	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start(5))
+		assertProcessed(t, cp, 5)
 	})
 }
 
@@ -187,6 +196,64 @@ func testNonNextFinished(t *testing.T) {
 		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
 
 		time.Sleep(1 * time.Millisecond)
+
+		w.AssertCalled(t, []int64{1, 2, 3, 4})
+	})
+}
+
+// testMovingProcessedIndex evaluates that the processedIndex only moves to job at index i when all job indices preceding that are
+// already processed.
+// +: added job to consumer
+// *: finished job
+// #: processed job
+//
+// [+1, +2, +3, +3, +4] => 	[1, 2, 3*, 4] => [1, 2, 3*, 4*] => => [1#, 2, 3*, 4*] => [1#, 2#, 3#, 4#]
+func testMovingProcessedIndex(t *testing.T) {
+	runWith(t, func(c module.JobConsumer, cp storage.ConsumerProgress, w *mockWorker, j *jobqueue.MockJobs, db *badgerdb.DB) {
+		require.NoError(t, c.Start(DefaultIndex))
+		require.NoError(t, j.PushOne()) // +1
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +2
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +3
+		c.Check()
+
+		require.NoError(t, j.PushOne()) // +4
+		c.Check()
+
+		// when job 3 is done, the processed index should not move, since all jobs
+		// preceding it are not processed.
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(3)) // 3*
+		time.Sleep(1 * time.Millisecond)
+		processedIndex, err := cp.ProcessedIndex()
+		require.NoError(t, err)
+		require.Equal(t, processedIndex, uint64(0))
+
+		// when job 4 is done, the processed index should not move, since all jobs
+		// preceding it are not processed.
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(4)) // 4*
+		time.Sleep(1 * time.Millisecond)
+		processedIndex, err = cp.ProcessedIndex()
+		require.NoError(t, err)
+		require.Equal(t, processedIndex, uint64(0))
+
+		// when job 1 is done, the processed index should move to 1, since all jobs
+		// preceding it are processed.
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(1)) // 1* -> 1#
+		time.Sleep(1 * time.Millisecond)
+		processedIndex, err = cp.ProcessedIndex()
+		require.NoError(t, err)
+		require.Equal(t, processedIndex, uint64(1))
+
+		// when job 2 is done, the processed index should move to 4, since all jobs
+		// preceding it are processed.
+		c.NotifyJobIsDone(jobqueue.JobIDAtIndex(2)) // 2* -> 4#
+		time.Sleep(1 * time.Millisecond)
+		processedIndex, err = cp.ProcessedIndex()
+		require.NoError(t, err)
+		require.Equal(t, processedIndex, uint64(4))
 
 		w.AssertCalled(t, []int64{1, 2, 3, 4})
 	})

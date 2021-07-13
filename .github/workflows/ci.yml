@@ -4,30 +4,36 @@ on:
   push:
     branches:
       - master
-      - auto-cadence-upgrade/*
       - feature/epochs
       - feature/dkg
+      - 'auto-cadence-upgrade/*'
   pull_request:
     branches:
       - master
-      - auto-cadence-upgrade/*
       - feature/epochs
       - feature/dkg
+      - 'auto-cadence-upgrade/*'
+
 jobs:
   golangci:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v2
-      - name: Build relic
-        run: make crypto/relic/build
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v2.3.0
-        with:
-          # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-          version: v1.29
-          args: -v --build-tags relic
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build relic
+      run: make crypto/relic/build
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v2.3.0
+      with:
+        # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
+        version: v1.29
+        args: -v --build-tags relic
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        scandir: './crypto'
+        ignore: 'relic'
   unit-test:
     name: Unit Tests
     runs-on: ubuntu-latest

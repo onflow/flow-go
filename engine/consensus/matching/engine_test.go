@@ -1,12 +1,10 @@
 package matching
 
 import (
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -33,7 +31,6 @@ type MatchingEngineSuite struct {
 }
 
 func (s *MatchingEngineSuite) SetupTest() {
-	log := zerolog.New(os.Stderr)
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
 	net := &mockmodule.Network{}
@@ -46,7 +43,7 @@ func (s *MatchingEngineSuite) SetupTest() {
 	net.On("Register", mock.Anything, mock.Anything).Return(con, nil).Once()
 
 	var err error
-	s.engine, err = NewEngine(log, net, me, metrics, metrics, s.core)
+	s.engine, err = NewEngine(unittest.Logger(), net, me, metrics, metrics, s.core)
 	require.NoError(s.T(), err)
 
 	<-s.engine.Ready()

@@ -1,4 +1,4 @@
-package sealing
+package consensus
 
 import "github.com/onflow/flow-go/model/flow"
 

@@ -10,15 +10,15 @@ import (
 // This file contains service event fixtures for testing purposes.
 // The Cadence form is represented by JSON-CDC-encoded string variables.
 
-// epochSetupFixture returns an EpochSetup service event as a Cadence event
+// EpochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
-func epochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
+func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {
 		panic(err)
 	}
 
-	event := unittest.EventFixture(events.EpochSetup.EventType(), 1, 1, unittest.IdentifierFixture())
+	event := unittest.EventFixture(events.EpochSetup.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochSetupFixtureJSON)
 
 	// randomSource is [0,0,...,1,2,3,4]
@@ -108,16 +108,16 @@ func epochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
 	return event, expected
 }
 
-// epochCommitFixture returns an EpochCommit service event as a Cadence event
+// EpochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func epochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+func EpochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
 
 	events, err := systemcontracts.ServiceEventsForChain(chain)
 	if err != nil {
 		panic(err)
 	}
 
-	event := unittest.EventFixture(events.EpochCommit.EventType(), 1, 1, unittest.IdentifierFixture())
+	event := unittest.EventFixture(events.EpochCommit.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{

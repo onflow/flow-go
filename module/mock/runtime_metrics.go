@@ -13,17 +13,22 @@ type RuntimeMetrics struct {
 	mock.Mock
 }
 
-// TransactionChecked provides a mock function with given fields: dur
-func (_m *RuntimeMetrics) TransactionChecked(dur time.Duration) {
+// RuntimeSetNumberOfAccounts provides a mock function with given fields: count
+func (_m *RuntimeMetrics) RuntimeSetNumberOfAccounts(count uint64) {
+	_m.Called(count)
+}
+
+// RuntimeTransactionChecked provides a mock function with given fields: dur
+func (_m *RuntimeMetrics) RuntimeTransactionChecked(dur time.Duration) {
 	_m.Called(dur)
 }
 
-// TransactionInterpreted provides a mock function with given fields: dur
-func (_m *RuntimeMetrics) TransactionInterpreted(dur time.Duration) {
+// RuntimeTransactionInterpreted provides a mock function with given fields: dur
+func (_m *RuntimeMetrics) RuntimeTransactionInterpreted(dur time.Duration) {
 	_m.Called(dur)
 }
 
-// TransactionParsed provides a mock function with given fields: dur
-func (_m *RuntimeMetrics) TransactionParsed(dur time.Duration) {
+// RuntimeTransactionParsed provides a mock function with given fields: dur
+func (_m *RuntimeMetrics) RuntimeTransactionParsed(dur time.Duration) {
 	_m.Called(dur)
 }

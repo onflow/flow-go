@@ -3,11 +3,9 @@ package compliance
 import (
 	"errors"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -239,8 +237,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.tracer = trace.NewNoopTracer()
 
 	// initialize the engine
-	log := zerolog.New(os.Stderr)
-	e, err := NewCore(log, cs.metrics, cs.tracer, cs.metrics, cs.metrics, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.pending, cs.sync)
+	e, err := NewCore(unittest.Logger(), cs.metrics, cs.tracer, cs.metrics, cs.metrics, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.pending, cs.sync)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = e

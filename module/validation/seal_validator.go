@@ -3,8 +3,6 @@ package validation
 import (
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -31,14 +29,29 @@ type sealValidator struct {
 	headers                              storage.Headers
 	index                                storage.Index
 	results                              storage.ExecutionResults
-	requiredApprovalsForSealVerification uint
+	requiredApprovalsForSealConstruction uint // number of required approvals per chunk to construct a seal
+	requiredApprovalsForSealVerification uint // number of required approvals per chunk for a seal to be valid
 	metrics                              module.ConsensusMetrics
 }
 
-func NewSealValidator(state protocol.State, headers storage.Headers, index storage.Index, results storage.ExecutionResults, seals storage.Seals,
-	assigner module.ChunkAssigner, verifier module.Verifier, requiredApprovalsForSealVerification uint, metrics module.ConsensusMetrics) *sealValidator {
+func NewSealValidator(
+	state protocol.State,
+	headers storage.Headers,
+	index storage.Index,
+	results storage.ExecutionResults,
+	seals storage.Seals,
+	assigner module.ChunkAssigner,
+	verifier module.Verifier,
+	requiredApprovalsForSealConstruction uint,
+	requiredApprovalsForSealVerification uint,
+	metrics module.ConsensusMetrics,
+) (*sealValidator, error) {
+	if requiredApprovalsForSealConstruction < requiredApprovalsForSealVerification {
+		return nil, fmt.Errorf("required number of approvals for seal construction (%d) cannot be smaller than for seal verification (%d)",
+			requiredApprovalsForSealConstruction, requiredApprovalsForSealVerification)
+	}
 
-	rv := &sealValidator{
+	return &sealValidator{
 		state:                                state,
 		assigner:                             assigner,
 		verifier:                             verifier,
@@ -46,11 +59,10 @@ func NewSealValidator(state protocol.State, headers storage.Headers, index stora
 		results:                              results,
 		seals:                                seals,
 		index:                                index,
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 		requiredApprovalsForSealVerification: requiredApprovalsForSealVerification,
 		metrics:                              metrics,
-	}
-
-	return rv
+	}, nil
 }
 
 func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.AggregatedSignature,
@@ -203,18 +215,10 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		// check the integrity of the seal (by itself)
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
-			if engine.IsInvalidInputError(err) {
-				// Skip fail on an invalid seal. We don't put this earlier in the function
-				// because we still want to test that the above code doesn't panic.
-				// TODO: this is only here temporarily to ease the migration to chunk-based sealing.
-				if s.requiredApprovalsForSealVerification == 0 {
-					log.Warn().Msgf("payload includes invalid seal, continuing validation (%x): %s", seal.ID(), err.Error())
-				} else {
-					return nil, fmt.Errorf("payload includes invalid seal (%x): %w", seal.ID(), err)
-				}
-			} else {
-				return nil, fmt.Errorf("unexpected seal validation error: %w", err)
+			if !engine.IsInvalidInputError(err) {
+				return nil, fmt.Errorf("unexpected internal error while validating seal %x: %w", seal.ID(), err)
 			}
+			return nil, fmt.Errorf("invalid seal %x for result %x: %w", seal.ID(), seal.ResultID, err)
 		}
 
 		// check that the sealed execution results form a chain
@@ -247,16 +251,6 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 	// check that each chunk has an AggregatedSignature
 	if len(seal.AggregatedApprovalSigs) != executionResult.Chunks.Len() {
-		// this is not an error if we don't require any approvals
-		if s.requiredApprovalsForSealVerification == 0 {
-			// TODO: remove this metric after emergency-sealing development
-			// phase. Here we assume that the seal was created in emergency-mode
-			// (because the flag required-contruction-seal-approvals is > 0),
-			// so we increment the related metric and accept the seal.
-			s.metrics.EmergencySeal()
-			return nil
-		}
-
 		return engine.NewInvalidInputErrorf("mismatching signatures, expected: %d, got: %d",
 			executionResult.Chunks.Len(),
 			len(seal.AggregatedApprovalSigs))
@@ -270,30 +264,51 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 	// Check that each AggregatedSignature has enough valid signatures from
 	// verifiers that were assigned to the corresponding chunk.
 	executionResultID := executionResult.ID()
+	emergencySealed := false
 	for _, chunk := range executionResult.Chunks {
 		chunkSigs := &seal.AggregatedApprovalSigs[chunk.Index]
-		numberApprovals := len(chunkSigs.SignerIDs)
-		if uint(numberApprovals) < s.requiredApprovalsForSealVerification {
-			return engine.NewInvalidInputErrorf("not enough chunk approvals %d vs %d",
-				numberApprovals, s.requiredApprovalsForSealVerification)
+
+		// for each approving Verification Node (SignerID), we expect exactly one signature
+		numberApprovers := chunkSigs.CardinalitySignerSet()
+		if len(chunkSigs.SignerIDs) != numberApprovers {
+			return engine.NewInvalidInputErrorf("chunk %d contains repeated approvals from the same verifier", chunk.Index)
+		}
+		if len(chunkSigs.VerifierSignatures) != numberApprovers {
+			return engine.NewInvalidInputErrorf("expecting signatures from %d approvers but got %d", numberApprovers, len(chunkSigs.VerifierSignatures))
 		}
 
-		lenVerifierSigs := len(chunkSigs.VerifierSignatures)
-		if lenVerifierSigs != numberApprovals {
-			return engine.NewInvalidInputErrorf("mismatched signatures length %d vs %d",
-				lenVerifierSigs, numberApprovals)
+		// the chunk must have been approved by at least the minimally
+		// required number of Verification Nodes
+		if uint(numberApprovers) < s.requiredApprovalsForSealConstruction {
+			if uint(numberApprovers) >= s.requiredApprovalsForSealVerification {
+				// Emergency sealing is a _temporary_ fallback to reduce the probability of
+				// sealing halts due to bugs in the verification nodes, where they don't
+				// approve a chunk even though they should (false-negative).
+				// TODO: remove this fallback for BFT
+				emergencySealed = true
+			} else {
+				return engine.NewInvalidInputErrorf("chunk %d has %d approvals but require at least %d",
+					chunk.Index, numberApprovers, s.requiredApprovalsForSealVerification)
+			}
 		}
 
+		// only Verification Nodes that were assigned to the chunk are allowed to approve it
 		for _, signerId := range chunkSigs.SignerIDs {
 			if !assignments.HasVerifier(chunk, signerId) {
 				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
 			}
 		}
 
+		// Verification Nodes' approval signatures must be valid
 		err := s.verifySealSignature(chunkSigs, chunk, executionResultID)
 		if err != nil {
 			return fmt.Errorf("invalid seal signature: %w", err)
 		}
+	}
+
+	// TODO: remove this metric after emergency-sealing development
+	if emergencySealed {
+		s.metrics.EmergencySeal()
 	}
 
 	return nil

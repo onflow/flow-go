@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -153,8 +154,10 @@ func WithConsumer(
 			process: process,
 		}
 
+		collector := &metrics.NoopCollector{}
 		consumer := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
+			collector,
 			processedIndex,
 			chunksQueue,
 			engine,

@@ -24,6 +24,7 @@ type BlockConsumer struct {
 	consumer     module.JobConsumer
 	defaultIndex uint64
 	unit         *engine.Unit
+	metrics      module.VerificationMetrics
 }
 
 // defaultProcessedIndex returns the last sealed block height from the protocol state.
@@ -41,6 +42,7 @@ func defaultProcessedIndex(state protocol.State) (uint64, error) {
 // NewBlockConsumer creates a new consumer and returns the default processed
 // index for initializing the processed index in storage.
 func NewBlockConsumer(log zerolog.Logger,
+	metrics module.VerificationMetrics,
 	processedHeight storage.ConsumerProgress,
 	blocks storage.Blocks,
 	state protocol.State,
@@ -67,6 +69,7 @@ func NewBlockConsumer(log zerolog.Logger,
 		consumer:     consumer,
 		defaultIndex: defaultIndex,
 		unit:         engine.NewUnit(),
+		metrics:      metrics,
 	}
 	worker.withBlockConsumer(blockConsumer)
 
@@ -76,7 +79,8 @@ func NewBlockConsumer(log zerolog.Logger,
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
 // processing a (block) job.
 func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
-	c.consumer.NotifyJobIsDone(jobID)
+	processedIndex := c.consumer.NotifyJobIsDone(jobID)
+	c.metrics.OnBlockConsumerJobDone(processedIndex)
 }
 
 // Size returns number of in-memory block jobs that block consumer is processing.

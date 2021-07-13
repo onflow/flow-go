@@ -55,7 +55,7 @@ const (
 	// Sealing
 	CONSealingProcessFinalizedBlock           SpanName = "con.sealing.processFinalizedBlock"
 	CONSealingCheckForEmergencySealableBlocks SpanName = "con.sealing.processFinalizedBlock.checkEmergencySealing"
-	CONSealingUpdateAssignmentCollectorTree   SpanName = "con.sealing.processFinalizedBlock.updateAssignmentCollectorTree"
+	CONSealingPruning                         SpanName = "con.sealing.processFinalizedBlock.pruning"
 	CONSealingRequestingPendingApproval       SpanName = "con.sealing.processFinalizedBlock.requestPendingApprovals"
 
 	CONSealingProcessIncorporatedResult SpanName = "con.sealing.processIncorporatedResult"
@@ -117,6 +117,7 @@ const (
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
+	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
 	//

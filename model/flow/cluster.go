@@ -13,6 +13,23 @@ type AssignmentList [][]Identifier
 // nodes assigned to a specific cluster.
 type ClusterList []IdentityList
 
+func (al AssignmentList) EqualTo(other AssignmentList) bool {
+	if len(al) != len(other) {
+		return false
+	}
+	for i, a := range al {
+		if len(a) != len(other[i]) {
+			return false
+		}
+		for j, identifier := range a {
+			if identifier != other[i][j] {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // Assignments returns the assignment list for a cluster.
 func (clusters ClusterList) Assignments() AssignmentList {
 	assignments := make(AssignmentList, 0, len(clusters))

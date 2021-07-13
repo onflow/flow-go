@@ -192,6 +192,41 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 	return nil
 }
 
+func (iy *Identity) EqualTo(other *Identity) bool {
+	if iy.NodeID != other.NodeID {
+		return false
+	}
+	if iy.Address != other.Address {
+		return false
+	}
+	if iy.Role != other.Role {
+		return false
+	}
+	if iy.Stake != other.Stake {
+		return false
+	}
+	if iy.Ejected != other.Ejected {
+		return false
+	}
+	if (iy.StakingPubKey != nil && other.StakingPubKey == nil) ||
+		(iy.StakingPubKey == nil && other.StakingPubKey != nil) {
+		return false
+	}
+	if iy.StakingPubKey != nil && !iy.StakingPubKey.Equals(other.StakingPubKey) {
+		return false
+	}
+
+	if (iy.NetworkPubKey != nil && other.NetworkPubKey == nil) ||
+		(iy.NetworkPubKey == nil && other.NetworkPubKey != nil) {
+		return false
+	}
+	if iy.NetworkPubKey != nil && !iy.NetworkPubKey.Equals(other.NetworkPubKey) {
+		return false
+	}
+
+	return true
+}
+
 // IdentityFilter is a filter on identities.
 type IdentityFilter func(*Identity) bool
 
@@ -403,4 +438,18 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	}
 
 	return union
+}
+
+// EqualTo checks if the other list if the same, that it contains the same elements
+// in the same order
+func (il IdentityList) EqualTo(other IdentityList) bool {
+	if len(il) != len(other) {
+		return false
+	}
+	for i, identity := range il {
+		if !identity.EqualTo(other[i]) {
+			return false
+		}
+	}
+	return true
 }

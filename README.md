@@ -59,9 +59,9 @@ The following table lists all work streams and links to their home directory and
 - Clone this repository
 - Clone this repository's submodules:
 
-```bash
-git submodule update --init --recursive
-```
+    ```bash
+    git submodule update --init --recursive
+    ```
 
 ### Install Dependencies
 
@@ -69,11 +69,20 @@ git submodule update --init --recursive
 - Install [CMake](https://cmake.org/install/), which is used for building the crypto library
 - Install [Docker](https://docs.docker.com/get-docker/), which is used for running
   a local network and integration tests
-- All remaining dependencies can be installed automatically:
+- Make sure the [`GOPATH`](https://golang.org/cmd/go/#hdr-GOPATH_environment_variable) and `GOBIN` environment variables are set, and `GOBIN` is added to your path:
 
-```bash
-make install-tools
-```
+    ```bash
+    export GOPATH=$(go env GOPATH)
+    export GOBIN=$GOPATH/bin
+    export PATH=$PATH:$GOBIN
+    ```
+
+  Add these to your shell profile to persist them for future runs.
+- Then, run the following command:
+
+    ```bash
+    make install-tools
+    ```
 
 At this point, you should be ready to build, test, and run Flow! 🎉
 

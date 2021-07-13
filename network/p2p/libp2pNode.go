@@ -309,6 +309,10 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 
 		s, err = n.host.NewStream(ctx, peerID, n.flowLibP2PProtocolID)
 		if err != nil {
+			// if the stream creation failed due to invalid protocol id, skip the re-attempt
+			if strings.Contains(err.Error(), "protocol not supported") {
+				return nil, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, n.flowLibP2PProtocolID)
+			}
 			errs = multierror.Append(errs, err)
 			continue
 		}

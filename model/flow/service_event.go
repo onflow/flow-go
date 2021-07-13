@@ -24,6 +24,27 @@ type ServiceEvent struct {
 	Event interface{}
 }
 
+// ServiceEventList is a handy container to enable comparisons
+type ServiceEventList []ServiceEvent
+
+func (sel ServiceEventList) EqualTo(other ServiceEventList) (bool, error) {
+	if len(sel) != len(other) {
+		return false, nil
+	}
+
+	for i, se := range sel {
+		equalTo, err := se.EqualTo(&other[i])
+		if err != nil {
+			return false, fmt.Errorf("error while comparing service event index %d: %w", i, err)
+		}
+		if !equalTo {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
 func (se *ServiceEvent) UnmarshalJSON(b []byte) error {
 
 	var enc map[string]interface{}
@@ -122,4 +143,35 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 		Event: event,
 	}
 	return nil
+}
+
+func (se *ServiceEvent) EqualTo(other *ServiceEvent) (bool, error) {
+	if se.Type != other.Type {
+		return false, nil
+	}
+	switch se.Type {
+	case ServiceEventSetup:
+		setup, ok := se.Event.(*EpochSetup)
+		if !ok {
+			return false, fmt.Errorf("internal invalid type for ServiceEventSetup: %T", se.Event)
+		}
+		otherSetup, ok := other.Event.(*EpochSetup)
+		if !ok {
+			return false, fmt.Errorf("internal invalid type for ServiceEventSetup: %T", other.Event)
+		}
+		return setup.EqualTo(otherSetup), nil
+
+	case ServiceEventCommit:
+		commit, ok := se.Event.(*EpochCommit)
+		if !ok {
+			return false, fmt.Errorf("internal invalid type for ServiceEventCommit: %T", se.Event)
+		}
+		otherCommit, ok := other.Event.(*EpochCommit)
+		if !ok {
+			return false, fmt.Errorf("internal invalid type for ServiceEventCommit: %T", other.Event)
+		}
+		return commit.EqualTo(otherCommit), nil
+	default:
+		return false, fmt.Errorf("unknown serice event type: %s", se.Type)
+	}
 }

@@ -1,8 +1,6 @@
 package queue
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -153,31 +151,6 @@ func (q *Queue) TryAdd(element Blockify) (stored bool, new bool) {
 		q.Highest = newNode
 	}
 	return true, true
-}
-
-// Attach joins the other queue to this one, modifying this queue in-place.
-// Other queue be attached if only if the following conditions hold:
-//   * The head of other has a parent in this queue.
-//   * Both queues have no nodes in common. Specifically, this means that
-//     the head of _other_ cannot be a member of this queue.
-// Fails otherwise with an error. CAUTION: failing with an error leaves
-// this queue in a _dysfunctional_ (partially joined) state.
-func (q *Queue) Attach(other *Queue) error {
-	n, ok := q.Nodes[other.Head.Item.ParentID()]
-	if !ok {
-		return fmt.Errorf("other queue head does not reference known parent")
-	}
-	n.Children = append(n.Children, other.Head)
-	for identifier, node := range other.Nodes {
-		if _, ok := q.Nodes[identifier]; ok {
-			return fmt.Errorf("queues have common nodes")
-		}
-		q.Nodes[identifier] = node
-	}
-	if other.Highest.Item.Height() > q.Highest.Item.Height() {
-		q.Highest = other.Highest
-	}
-	return nil
 }
 
 // Dismount removes the head element, returns it and it's children as new queues

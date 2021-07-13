@@ -76,3 +76,13 @@ func (g *StateBoundAddressGenerator) CurrentAddress() flow.Address {
 	address = addressGenerator.CurrentAddress()
 	return address
 }
+
+func (g *StateBoundAddressGenerator) AddressCount() uint64 {
+	addressGenerator, err := g.constructAddressGen()
+	if err != nil {
+		// TODO update CurrentAddress to return an error if needed
+		panic(err)
+	}
+
+	return addressGenerator.AddressCount()
+}

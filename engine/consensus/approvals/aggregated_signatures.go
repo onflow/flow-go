@@ -1,6 +1,7 @@
 package approvals
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -14,23 +15,33 @@ type AggregatedSignatures struct {
 	numberOfChunks uint64
 }
 
-func NewAggregatedSignatures(chunks uint64) *AggregatedSignatures {
+// NewAggregatedSignatures instantiates a AggregatedSignatures. Requires that
+// number of chunks is positive integer. Errors otherwise.
+func NewAggregatedSignatures(chunks uint64) (*AggregatedSignatures, error) {
+	if chunks < 1 {
+		return nil, fmt.Errorf("number of chunks must be positive but got %d", chunks)
+	}
 	return &AggregatedSignatures{
 		signatures:     make(map[uint64]flow.AggregatedSignature, chunks),
 		lock:           sync.RWMutex{},
 		numberOfChunks: chunks,
-	}
+	}, nil
 }
 
 // PutSignature adds the AggregatedSignature from the collector to `aggregatedSignatures`.
 // The returned int is the resulting number of approved chunks.
-func (as *AggregatedSignatures) PutSignature(chunkIndex uint64, aggregatedSignature flow.AggregatedSignature) uint64 {
+// Errors if chunk index exceeds valid range.
+func (as *AggregatedSignatures) PutSignature(chunkIndex uint64, aggregatedSignature flow.AggregatedSignature) (uint64, error) {
+	if chunkIndex >= as.numberOfChunks {
+		return uint64(len(as.signatures)), fmt.Errorf("chunk index must be in range [0, %d] but is %d", as.numberOfChunks-1, chunkIndex)
+	}
+
 	as.lock.Lock()
 	defer as.lock.Unlock()
 	if _, found := as.signatures[chunkIndex]; !found {
 		as.signatures[chunkIndex] = aggregatedSignature
 	}
-	return uint64(len(as.signatures))
+	return uint64(len(as.signatures)), nil
 }
 
 // HasSignature returns boolean depending if we have signature for particular chunk
@@ -43,7 +54,7 @@ func (as *AggregatedSignatures) HasSignature(chunkIndex uint64) bool {
 
 // Collect returns array with aggregated signature for each chunk
 func (as *AggregatedSignatures) Collect() []flow.AggregatedSignature {
-	aggregatedSigs := make([]flow.AggregatedSignature, len(as.signatures))
+	aggregatedSigs := make([]flow.AggregatedSignature, as.numberOfChunks)
 
 	as.lock.RLock()
 	defer as.lock.RUnlock()

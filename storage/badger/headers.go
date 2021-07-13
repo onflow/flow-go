@@ -107,6 +107,16 @@ func (h *Headers) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.H
 	}
 }
 
+func (h *Headers) retrieveIdByHeightTx(height uint64) func(*badger.Txn) (flow.Identifier, error) {
+	return func(tx *badger.Txn) (flow.Identifier, error) {
+		blockID, err := h.heightCache.Get(height)(tx)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("failed to retrieve block ID for height %d: %w", height, err)
+		}
+		return blockID.(flow.Identifier), nil
+	}
+}
+
 func (h *Headers) Store(header *flow.Header) error {
 	return operation.RetryOnConflictTx(h.db, transaction.Update, h.storeTx(header))
 }
@@ -121,11 +131,11 @@ func (h *Headers) ByHeight(height uint64) (*flow.Header, error) {
 	tx := h.db.NewTransaction(false)
 	defer tx.Discard()
 
-	blockID, err := h.heightCache.Get(height)(tx)
+	blockID, err := h.retrieveIdByHeightTx(height)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up height: %w", err)
+		return nil, err
 	}
-	return h.ByBlockID(blockID.(flow.Identifier))
+	return h.retrieveTx(blockID)(tx)
 }
 
 func (h *Headers) ByParentID(parentID flow.Identifier) ([]*flow.Header, error) {
