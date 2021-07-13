@@ -308,8 +308,8 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 				collectionID = flow.ZeroID
 			}
 
-			for _, event := range computationResult.Events[i] {
-				fmt.Printf("=> Exe event chunk %d of block %x - %s\n", i, executableBlock.ID(), event.String())
+			for jj, event := range computationResult.Events[i] {
+				fmt.Printf("=> Exe event chunk %d block of %x - (event %d) %s (txIndex %d) (txHash %x)\n", i, executableBlock.ID(), jj, event.String(), event.TransactionIndex, event.ID())
 			}
 
 			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
