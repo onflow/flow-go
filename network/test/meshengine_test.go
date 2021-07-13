@@ -181,6 +181,10 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.event)))
 		}
 
+		for i := 0; i < count-1; i++ {
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
+		}
+
 		// extracts failed messages
 		receivedIndices, err := extractSenderID(count, e.event, "hello from node")
 		require.NoError(suite.Suite.T(), err)
@@ -246,6 +250,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	for index, e := range engs {
 		if index < len(engs)/2 {
 			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 		} else {
 			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
@@ -294,6 +299,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	// evaluates that all messages are received
 	for index, e := range engs[1:] {
 		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
+		assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 	}
 }
 

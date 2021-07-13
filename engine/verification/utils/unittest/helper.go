@@ -64,8 +64,13 @@ func SetupChunkDataPackProvider(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(len(assignedChunkIDs))
 
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+	mu := &sync.Mutex{} // making testify Run thread-safe
+
+	exeEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
+			mu.Lock()
+			defer mu.Unlock()
+
 			originID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 			// request should be dispatched by a verification node.
@@ -174,8 +179,13 @@ func SetupMockConsensusNode(t *testing.T,
 	// creates a hasher for spock
 	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
 
-	conEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+	mu := &sync.Mutex{} // making testify mock thread-safe
+
+	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
+			mu.Lock()
+			defer mu.Unlock()
+
 			originID, ok := args[1].(flow.Identifier)
 			assert.True(t, ok)
 

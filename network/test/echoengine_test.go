@@ -473,6 +473,9 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 		// evaluates content of received message
 		assert.Equal(suite.Suite.T(), event, rcvEvent)
 
+		// evaluates channel that message was received on
+		assert.Equal(suite.Suite.T(), engine.TestNetwork, <-receiver.channel)
+
 	case <-time.After(10 * time.Second):
 		assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
 	}
@@ -498,6 +501,9 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 			}
 			assert.Equal(suite.Suite.T(), echoEvent, rcvEvent)
+
+			// evaluates channel that message was received on
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-sender.channel)
 
 		case <-time.After(10 * time.Second):
 			assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -547,6 +553,9 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 			// evaluates content of received message
 			assert.Equal(suite.Suite.T(), event, rcvEvent)
 
+			// evaluates channel that message was received on
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-receiver.channel)
+
 		case <-time.After(2 * time.Second):
 			assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
 		}
@@ -572,6 +581,9 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 				}
 				assert.Equal(suite.Suite.T(), echoEvent, rcvEvent)
+
+				// evaluates channel that message was received on
+				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-sender.channel)
 
 			case <-time.After(10 * time.Second):
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -636,6 +648,9 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 			// marking event as received
 			received[rcvEvent.Text] = struct{}{}
 
+			// evaluates channel that message was received on
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-receiver.channel)
+
 		case <-time.After(2 * time.Second):
 			assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
 		}
@@ -666,6 +681,9 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 				assert.True(suite.Suite.T(), strings.HasPrefix(rcvEvent.Text, receiver.echomsg))
 				// marking echo event as received
 				received[rcvEvent.Text] = struct{}{}
+
+				// evaluates channel that message was received on
+				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-sender.channel)
 
 			case <-time.After(10 * time.Second):
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
