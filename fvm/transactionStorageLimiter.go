@@ -24,14 +24,14 @@ func (d *TransactionStorageLimiter) CheckLimits(
 	}
 
 	for _, address := range addresses {
-		add := common.BytesToAddress(address.Bytes())
+		commonAddress := common.BytesToAddress(address.Bytes())
 
-		capacity, err := env.GetStorageCapacity(add)
+		capacity, err := env.GetStorageCapacity(commonAddress)
 		if err != nil {
 			return fmt.Errorf("storage limit check failed: %w", err)
 		}
 
-		usage, err := env.GetStorageUsed(add)
+		usage, err := env.GetStorageUsed(commonAddress)
 		if err != nil {
 			return fmt.Errorf("storage limit check failed: %w", err)
 		}
