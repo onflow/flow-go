@@ -661,8 +661,9 @@ func mockVerifierEngine(t *testing.T,
 			if vc.IsSystemChunk {
 				// system chunk has an empty collection
 				// TODO: nil checkign
-				require.Equal(t, vc.ChunkDataPack.Collection.Len(), 0)
+				require.Nil(t, vc.ChunkDataPack.Collection)
 			} else {
+				require.NotNil(t, vc.ChunkDataPack.Collection)
 				require.Equal(t, expected.ChunkDataPack.Collection.ID(), vc.ChunkDataPack.Collection.ID())
 			}
 
@@ -763,17 +764,22 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 }
 
 // chunkDataPackResponseFixture creates chunk data packs for given chunks.
-func chunkDataPackResponseFixture(t *testing.T, chunks flow.ChunkList, collMap map[flow.Identifier]*flow.Collection) map[flow.Identifier]*flow.ChunkDataPack {
+func chunkDataPackResponseFixture(t *testing.T,
+	chunks flow.ChunkList,
+	collMap map[flow.Identifier]*flow.Collection,
+	result *flow.ExecutionResult,
+) map[flow.Identifier]*flow.ChunkDataPack {
 	chunkDataPacks := make(map[flow.Identifier]*flow.ChunkDataPack)
 
 	for _, chunk := range chunks {
 		chunkID := chunk.ID()
 		coll, ok := collMap[chunkID]
-		require.True(t, ok)
+		// only non-system chunks must have a collection
+		require.Equal(t, ok, !fetcher.IsSystemChunk(chunk.Index, result))
 
 		chunkDataPacks[chunkID] = unittest.ChunkDataPackFixture(chunkID,
 			unittest.WithStartState(chunk.StartState),
-			unittest.WithChunkDataPackCollection(*coll))
+			unittest.WithChunkDataPackCollection(coll))
 	}
 
 	return chunkDataPacks
@@ -785,7 +791,7 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 	map[flow.Identifier]*flow.ChunkDataPack,
 	map[flow.Identifier]*verification.VerifiableChunkData) {
 
-	chunkDataPacks := chunkDataPackResponseFixture(t, chunks, collMap)
+	chunkDataPacks := chunkDataPackResponseFixture(t, chunks, collMap, result)
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, chunk := range chunks {
@@ -860,6 +866,9 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 
 	for _, status := range statuses {
+		if fetcher.IsSystemChunk(status.ChunkIndex, result) {
+			continue
+		}
 		collMap[status.ID()] = collections[status.ChunkIndex]
 	}
 

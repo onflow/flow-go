@@ -231,9 +231,15 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
 		Logger()
+
+	if chunkDataPack.Collection != nil {
+		lg = lg.With().
+			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
+			Logger()
+	}
+
 	lg.Info().Msg("chunk data pack arrived")
 
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
