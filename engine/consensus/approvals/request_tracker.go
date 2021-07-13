@@ -38,12 +38,13 @@ func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) RequestTrac
 }
 
 // Update increments the number of requests and recomputes the NextTimeout.
-func (i *RequestTrackerItem) Update() {
+func (i RequestTrackerItem) Update() RequestTrackerItem {
 	i.Requests++
 	i.NextTimeout = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)
+	return i
 }
 
-func (i *RequestTrackerItem) IsBlackout() bool {
+func (i RequestTrackerItem) IsBlackout() bool {
 	return time.Now().Before(i.NextTimeout)
 }
 
@@ -103,7 +104,7 @@ func (rt *RequestTracker) TryUpdate(result *flow.ExecutionResult, incorporatedBl
 
 	canUpdate := !item.IsBlackout()
 	if canUpdate {
-		item.Update()
+		item = item.Update()
 		rt.index[resultID][incorporatedBlockID][chunkIndex] = item
 	}
 

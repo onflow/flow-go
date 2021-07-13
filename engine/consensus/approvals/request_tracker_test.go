@@ -52,9 +52,10 @@ func (s *RequestTrackerTestSuite) TestTryUpdate_CreateAndUpdate() {
 	time.Sleep(time.Second * 3)
 
 	for i := 0; i < chunks; i++ {
-		_, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
+		item, updated, err := s.tracker.TryUpdate(result, executedBlock.ID(), uint64(i))
 		require.NoError(s.T(), err)
 		require.True(s.T(), updated)
+		require.Equal(s.T(), uint(1), item.Requests)
 	}
 }
 
