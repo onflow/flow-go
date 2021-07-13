@@ -276,6 +276,6 @@ func (suite *Suite) TestReady() {
 	_, ok := <-multiplexerReady
 	suite.Assert().False(ok)
 
-	engine1.AssertExpectations(suite.T())
-	engine2.AssertExpectations(suite.T())
+	rda1.AssertExpectations(suite.T())
+	rda2.AssertExpectations(suite.T())
 }
