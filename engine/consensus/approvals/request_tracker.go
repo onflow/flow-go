@@ -184,8 +184,8 @@ func (rt *RequestTracker) PruneUpToHeight(height uint64) error {
 		return nil
 	}
 
-	// Optimization: if there are less height in the index than the height range to prune,
-	// range to prune, then just go through each seal.
+	// Optimization: if there are less elements in the `byHeight` map
+	// than the height range to prune: inspect each map element.
 	// Otherwise, go through each height to prune.
 	if uint64(len(rt.byHeight)) < height-rt.lowestHeight {
 		for h := range rt.byHeight {

@@ -422,7 +422,7 @@ func (e *Engine) OnBlockIncorporated(incorporatedBlockID flow.Identifier) {
 }
 
 // processIncorporatedBlock selects receipts that were included into incorporated block and submits them
-// for further processing by sealing core.
+// for further processing to sealing core.
 func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) error {
 	// In order to process a block within the sealing engine, we need the block's source of
 	// randomness (to compute the chunk assignment). The source of randomness can be taken from _any_
@@ -479,7 +479,7 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 			if err != nil {
 				return fmt.Errorf("could not process incorporated block: %w", err)
 			}
-			continue
 		}
-	}
+   	return nil // no more events to process
+   }
 }

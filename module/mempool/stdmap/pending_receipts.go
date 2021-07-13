@@ -18,7 +18,7 @@ type PendingReceipts struct {
 	headers storage.Headers // used to query headers of executed blocks
 	// secondary index by parent result id, since multiple receipts could
 	// have the same parent result, (even if they have different result)
-	byPreviousResultID map[flow.Identifier][]flow.Identifier
+	byPreviousResultID map[flow.Identifier]receiptsSet
 	// secondary index by height, we need this to prune pending receipts to some height
 	// it's safe to cleanup this index only when pruning. Even if some receipts are deleted manually,
 	// eventually index will be cleaned up.

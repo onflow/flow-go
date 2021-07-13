@@ -259,7 +259,8 @@ func (e *Engine) processBlockIncorporatedEvents() error {
 			}
 			continue
 		}
-	}
+   	return nil // no more events to process
+   }
 }
 
 // processAvailableEvents processes _all_ available events (untrusted messages
