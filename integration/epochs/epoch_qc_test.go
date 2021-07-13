@@ -3,6 +3,7 @@ package epochs
 import (
 	// "context"
 	"context"
+	"math/rand"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -10,11 +11,14 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -72,7 +76,16 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		local.On("NodeID").Return(nodeID)
 
 		// TODO: create signature of vote
-		vote := hotstuffmodel.VoteFromFlow(nodeID, unittest.IdentifierFixture(), 0, unittest.SignatureFixture())
+		blockID := unittest.IdentifierFixture()
+		view := uint64(rand.Uint32())
+		voteMessage := hotstuffver.MakeVoteMessage(view, blockID)
+
+		// create signer
+		hasher := crypto.NewBLSKMAC(encoding.CollectorVoteTag)
+		signature, err := stakingPrivKey.Sign(voteMessage, hasher)
+		s.Require().NoError(err)
+
+		vote := hotstuffmodel.VoteFromFlow(nodeID, blockID, view, signature)
 		hotSigner := &hotstuff.Signer{}
 		hotSigner.On("CreateVote", mock.Anything).Return(vote, nil)
 
@@ -90,7 +103,8 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		s.CreateVoterResource(address, nodeID, stakingPrivKey.PublicKey(), signer)
 
 		// cast vote
-		err = voter.Vote(context.Background(), epoch)
+		ctx := context.Background()
+		err = voter.Vote(ctx, epoch)
 		s.Require().NoError(err)
 	}
 
