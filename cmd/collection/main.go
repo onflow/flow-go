@@ -383,6 +383,11 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
+			// make sure access address has a valid network address format
+			if ok := cmd.IsValidNetworkAddressFormat(accessAddress); !ok {
+				return nil, fmt.Errorf("--access-address provided is not a valid address format")
+			}
+
 			qcContractClient, err := createQCContractClient(node, accessAddress)
 			if err != nil {
 				return nil, fmt.Errorf("could not create qc contract client %w", err)
