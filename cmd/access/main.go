@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -357,13 +356,9 @@ func main() {
 		anb.PreInit(anb.initUnstakedLocal())
 
 		anb.Component("relay engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
-			var subMngr network.SubscriptionManager
-			subMngr = node.Network.subMngr
-
 			relayEng, err := relay.New(
 				node.Logger,
-				subMngr.Channels(),
+				node.Network.subMngr.Channels(),
 				node.Network,
 				anb.unstakedNetwork,
 				node.Me,
