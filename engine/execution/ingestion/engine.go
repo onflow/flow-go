@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -1147,74 +1146,6 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	}
 }
 
-// generateChunk creates a chunk from the provided computation data.
-func GenerateChunk(colIndex int,
-	startState, endState flow.StateCommitment,
-	colID, blockID flow.Identifier) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
-			// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
-			// startState stays the same if blocks are empty
-			EventCollection: colID,
-			BlockID:         blockID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
-		},
-		Index:    uint64(colIndex),
-		EndState: endState,
-	}
-}
-
-// generateExecutionResultForBlock creates new ExecutionResult for a block from
-// the provided chunk results.
-func (e *Engine) generateExecutionResultForBlock(
-	ctx context.Context,
-	block *flow.Block,
-	chunks []*flow.Chunk,
-	endState flow.StateCommitment,
-	serviceEvents []flow.Event,
-) (*flow.ExecutionResult, error) {
-
-	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
-			block.Header.ParentID, err)
-	}
-
-	// convert Cadence service event representation to flow-go representation
-	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
-	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(block.Header.ChainID, event)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert service event: %w", err)
-		}
-		convertedServiceEvents = append(convertedServiceEvents, *converted)
-
-		// log the service event in full - service events happen very infrequently
-		e.log.Info().
-			Hex("block_id", logging.ID(block.ID())).
-			Uint64("block_height", block.Header.Height).
-			Uint64("block_view", block.Header.View).
-			Str("event_payload", string(event.Payload)).
-			Str("event_type", string(event.Type)).
-			Msg("received service event")
-	}
-
-	er := &flow.ExecutionResult{
-		PreviousResultID: previousErID,
-		BlockID:          block.ID(),
-		Chunks:           chunks,
-		ServiceEvents:    convertedServiceEvents,
-	}
-
-	return er, nil
-}
-
 func (e *Engine) generateExecutionReceipt(
 	ctx context.Context,
 	result *flow.ExecutionResult,
@@ -1249,40 +1180,4 @@ func (e *Engine) generateExecutionReceipt(
 	receipt.ExecutorSignature = sig
 
 	return receipt, nil
-}
-
-// ChunkifyEvents breaks an slice of events into smaller chunks
-func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
-	res := make([][]flow.Event, 0)
-	if len(events) == 0 {
-		return res
-	}
-	// if chunkSize zero, return all as one chunk
-	if chunkSize < 1 {
-		res = append(res, events[:])
-		return res
-	}
-
-	for i := 0; i < len(events); i += int(chunkSize) {
-		end := i + int(chunkSize)
-		if end > len(events) {
-			end = len(events)
-		}
-		res = append(res, events[i:end])
-	}
-	return res
-}
-
-// generateChunkDataPack creates a chunk data pack
-func GenerateChunkDataPack(
-	chunk *flow.Chunk,
-	collectionID flow.Identifier,
-	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
-		ChunkID:      chunk.ID(),
-		StartState:   chunk.StartState,
-		Proof:        proof,
-		CollectionID: collectionID,
-	}
 }
