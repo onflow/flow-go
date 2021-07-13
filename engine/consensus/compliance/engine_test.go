@@ -2,12 +2,10 @@ package compliance
 
 import (
 	"math/rand"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -29,8 +27,7 @@ type ComplianceSuite struct {
 
 func (cs *ComplianceSuite) SetupTest() {
 	cs.ComplianceCoreSuite.SetupTest()
-	log := zerolog.New(os.Stderr)
-	e, err := NewEngine(log, cs.net, cs.me, cs.prov, cs.core)
+	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.prov, cs.core)
 	require.NoError(cs.T(), err)
 	cs.engine = e
 

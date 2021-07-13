@@ -15,11 +15,11 @@ type Events struct {
 }
 
 // BatchStore provides a mock function with given fields: blockID, events, batch
-func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+func (_m *Events) BatchStore(blockID flow.Identifier, events []flow.EventsList, batch storage.BatchStorage) error {
 	ret := _m.Called(blockID, events, batch)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.Event, storage.BatchStorage) error); ok {
+	if rf, ok := ret.Get(0).(func(flow.Identifier, []flow.EventsList, storage.BatchStorage) error); ok {
 		r0 = rf(blockID, events, batch)
 	} else {
 		r0 = ret.Error(0)

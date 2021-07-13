@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/storage v1.10.0
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
@@ -63,6 +64,7 @@ require (
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
+	pgregory.net/rapid v0.4.6
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

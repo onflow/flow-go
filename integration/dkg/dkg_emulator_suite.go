@@ -46,6 +46,7 @@ type DKGSuite struct {
 	dkgAddress             sdk.Address
 	dkgAccountKey          *sdk.AccountKey
 	dkgSigner              sdkcrypto.Signer
+	checkDKGUnhappy        bool // activate log hook for DKGBroker to check if the DKG core is flagging misbehaviours
 
 	netIDs       flow.IdentityList
 	nodeAccounts []*nodeAccount
@@ -71,13 +72,31 @@ func (s *DKGSuite) SetupTest() {
 	for _, node := range s.nodes {
 		s.claimDKGParticipant(node)
 	}
+}
 
+func (s *DKGSuite) BeforeTest(suiteName, testName string) {
+	// In the happy case we add a log hook to check if the DKGBroker emits Warn
+	// logs (which it shouldn't)
+	if testName == "TestHappyPath" {
+		s.checkDKGUnhappy = true
+	}
 	// We need to initialise the nodes with a list of identities that contain
 	// all roles, otherwise there would be an error initialising the first epoch
 	identities := unittest.CompleteIdentitySet(s.netIDs...)
 	for _, node := range s.nodes {
 		s.initEngines(node, identities)
 	}
+}
+
+func (s *DKGSuite) TearDownTest() {
+	s.hub = nil
+	s.blockchain = nil
+	s.adminEmulatorClient = nil
+	s.adminDKGContractClient = nil
+	s.netIDs = nil
+	s.nodeAccounts = []*nodeAccount{}
+	s.nodes = []*node{}
+	s.checkDKGUnhappy = false
 }
 
 // initEmulator initializes the emulator and the admin emulator client
@@ -250,9 +269,10 @@ func (s *DKGSuite) createNode(account *nodeAccount) *node {
 		account.accountAddress.String(),
 		0,
 	)
+	dkgClientWrapper := NewDKGClientWrapper(contractClient)
 	return &node{
 		account:           account,
-		dkgContractClient: contractClient,
+		dkgContractClient: dkgClientWrapper,
 	}
 }
 
@@ -398,14 +418,17 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	)
 	require.NoError(s.T(), err)
 
-	// We add a hook to the logger such that the test fails if the broker writes
-	// a Warn log, which happens when it flags or disqualifies a node
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			s.T().Fatal("DKG flagging misbehaviour")
-		}
-	})
-	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
+	controllerFactoryLogger := zerolog.New(os.Stdout)
+	if s.checkDKGUnhappy {
+		// We add a hook to the logger such that the test fails if the broker writes
+		// a Warn log, which happens when it flags or disqualifies a node
+		hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+			if level == zerolog.WarnLevel {
+				s.T().Fatal("DKG flagging misbehaviour")
+			}
+		})
+		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
+	}
 
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
