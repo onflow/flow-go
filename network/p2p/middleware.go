@@ -13,6 +13,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -409,7 +410,9 @@ func (m *Middleware) processMessage(msg *message.Message) {
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 
 	// convert the message to bytes to be put on the wire.
+	p := binstat.EnterTime("~3net:wire<4message2protobuf", "")
 	data, err := msg.Marshal()
+	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}

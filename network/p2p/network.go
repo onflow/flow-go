@@ -9,6 +9,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/crypto/hash"
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -252,6 +253,8 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
+	p := binstat.EnterTimeVal("~3net:wire<3payload2message", "", int64(len(payload)))
+
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
 	_, err = h.Write([]byte("libp2ppacking" + channel))
@@ -288,6 +291,8 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 		Payload:   payload,
 		Type:      msgType,
 	}
+
+	binstat.Leave(p)
 
 	return msg, nil
 }

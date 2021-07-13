@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
@@ -203,6 +204,21 @@ func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (commit *EpochCommit) MarshalCBOR() ([]byte, error) {
+	return cbor.Marshal(encodableFromCommit(commit))
+}
+
+func (commit *EpochCommit) UnmarshalCBOR(b []byte) error {
+	var enc encodableCommit
+	err := cbor.Unmarshal(b, &enc)
+	if err != nil {
+		return err
+	}
+
+	*commit = commitFromEncodable(enc)
+	return nil
+}
+
 func (commit *EpochCommit) MarshalMsgpack() ([]byte, error) {
 	return msgpack.Marshal(encodableFromCommit(commit))
 }
@@ -329,6 +345,22 @@ func (part DKGParticipant) MarshalJSON() ([]byte, error) {
 func (part *DKGParticipant) UnmarshalJSON(b []byte) error {
 	var enc encodableDKGParticipant
 	err := json.Unmarshal(b, &enc)
+	if err != nil {
+		return err
+	}
+
+	*part = dkgParticipantFromEncodable(enc)
+	return nil
+}
+
+func (part DKGParticipant) MarshalCBOR() ([]byte, error) {
+	enc := encodableFromDKGParticipant(part)
+	return cbor.Marshal(enc)
+}
+
+func (part *DKGParticipant) UnmarshalCBOR(b []byte) error {
+	var enc encodableDKGParticipant
+	err := cbor.Unmarshal(b, &enc)
 	if err != nil {
 		return err
 	}

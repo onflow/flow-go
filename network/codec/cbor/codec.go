@@ -1,11 +1,12 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package json
+package cbor
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-go/binstat"
 	"github.com/onflow/flow-go/network"
@@ -23,13 +24,13 @@ func NewCodec() *Codec {
 
 // NewEncoder creates a new JSON encoder with the given underlying writer.
 func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
-	enc := json.NewEncoder(w)
+	enc := cbor.NewEncoder(w)
 	return &Encoder{enc: enc}
 }
 
 // NewDecoder creates a new JSON decoder with the given underlying reader.
 func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
-	dec := json.NewDecoder(r)
+	dec := cbor.NewDecoder(r)
 	return &Decoder{dec: dec}
 }
 
@@ -37,14 +38,14 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	env, err := v2envEncode(v, "~3net:wire<1")
+	data, code, err := v2envEncode(v, "~3net:wire<1")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
 	// encode the envelope
 	p := binstat.EnterTime("~3net:wire<2envelope2payload", "")
-	data, err := json.Marshal(env)
+	data = append(data, code)
 	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not encode value: %w", err)
@@ -57,16 +58,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
-	var env Envelope
 	p := binstat.EnterTime("~3net:wire>3payload2envelope", "")
-	err := json.Unmarshal(data, &env)
-	binstat.LeaveVal(p, int64(len(env.Data)))
-	if err != nil {
-		return nil, fmt.Errorf("could not decode envelope: %w", err)
-	}
+	code := data[len(data)-1] // only last byte
+	binstat.LeaveVal(p, int64(len(data)))
 
 	// decode the value
-	v, err := env2vDecode(env, "~3net:wire>4")
+	v, err := env2vDecode(data[:len(data)-1], code, "~3net:wire>4") // all but last byte
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}
