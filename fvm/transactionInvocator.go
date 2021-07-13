@@ -190,7 +190,7 @@ func (i *TransactionInvocator) Process(
 	programs.Cleanup(updatedKeys)
 
 	proc.Events = append(proc.Events, env.Events()...)
-	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
+	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).

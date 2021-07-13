@@ -67,20 +67,14 @@ func NewTransactionEnvironment(
 	accounts := state.NewAccounts(sth)
 	generator := state.NewStateBoundAddressGenerator(sth, ctx.Chain)
 	uuidGenerator := state.NewUUIDGenerator(sth)
-
-	programsHandler := handler.NewProgramsHandler(
-		programs, sth,
-	)
-
+	programsHandler := handler.NewProgramsHandler(programs, sth)
 	// TODO set the flags on context
 	eventHandler := handler.NewEventHandler(ctx.Chain,
 		ctx.EventCollectionEnabled,
 		ctx.ServiceEventCollectionEnabled,
 		ctx.EventCollectionByteSizeLimit,
 	)
-
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	env := &TransactionEnv{
@@ -110,7 +104,6 @@ func NewTransactionEnvironment(
 	}
 
 	return env
-
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -121,14 +114,6 @@ func (e *TransactionEnv) TxID() flow.Identifier {
 	return e.txID
 }
 
-func (e *TransactionEnv) seedRNG(header *flow.Header) {
-	// Seed the random number generator with entropy created from the block header ID. The random number generator will
-	// be used by the UnsafeRandom function.
-	id := header.ID()
-	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
-	e.rng = rand.New(source)
-}
-
 func (e *TransactionEnv) Context() *Context {
 	return &e.ctx
 }
@@ -137,8 +122,12 @@ func (e *TransactionEnv) VM() *VirtualMachine {
 	return e.vm
 }
 
-func (e *TransactionEnv) getServiceEvents() []flow.Event {
-	return e.eventHandler.ServiceEvents()
+func (e *TransactionEnv) seedRNG(header *flow.Header) {
+	// Seed the random number generator with entropy created from the block header ID. The random number generator will
+	// be used by the UnsafeRandom function.
+	id := header.ID()
+	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
+	e.rng = rand.New(source)
 }
 
 func (e *TransactionEnv) isTraceable() bool {
@@ -515,6 +504,10 @@ func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 
 func (e *TransactionEnv) Events() []flow.Event {
 	return e.eventHandler.Events()
+}
+
+func (e *TransactionEnv) ServiceEvents() []flow.Event {
+	return e.eventHandler.ServiceEvents()
 }
 
 func (e *TransactionEnv) GenerateUUID() (uint64, error) {

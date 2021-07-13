@@ -22,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/storage"
@@ -47,16 +46,17 @@ type ScriptEnv struct {
 	traceSpan     opentracing.Span
 }
 
-func NewScriptEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolder, programs *programs.Programs) *ScriptEnv {
+func NewScriptEnvironment(
+	ctx Context,
+	vm *VirtualMachine,
+	sth *state.StateHolder,
+	programs *programs.Programs,
+) *ScriptEnv {
+
 	accounts := state.NewAccounts(sth)
 	uuidGenerator := state.NewUUIDGenerator(sth)
-
-	programsHandler := handler.NewProgramsHandler(
-		programs, sth,
-	)
-
+	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
-
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
 
 	env := &ScriptEnv{
@@ -70,11 +70,10 @@ func NewScriptEnvironment(ctx Context, vm *VirtualMachine, sth *state.StateHolde
 		programs:      programsHandler,
 	}
 
-	contracts := handler.NewContractHandler(accounts,
-		ctx.RestrictedDeploymentEnabled,
-		env.GetAuthorizedAccountsForContractUpdates,
-	)
-	env.contracts = contracts
+	env.contracts = handler.NewContractHandler(
+		accounts,
+		true,
+		func() []common.Address { return []common.Address{} })
 
 	if ctx.BlockHeader != nil {
 		env.seedRNG(ctx.BlockHeader)
@@ -89,37 +88,6 @@ func (e *ScriptEnv) seedRNG(header *flow.Header) {
 	id := header.ID()
 	source := rand.NewSource(int64(binary.BigEndian.Uint64(id[:])))
 	e.rng = rand.New(source)
-}
-
-// GetAuthorizedAccountsForContractUpdates returns a list of addresses that
-// are authorized to update/deploy contracts
-//
-// It reads a storage path from service account and parse the addresses.
-// if any issue occurs on the process (missing registers, stored value properly not set)
-// it gracefully handle it and falls back to default behaviour (only service account be authorized)
-func (e *ScriptEnv) GetAuthorizedAccountsForContractUpdates() []common.Address {
-	// set default to service account only
-	service := runtime.Address(e.ctx.Chain.ServiceAddress())
-	defaultAccounts := []runtime.Address{service}
-
-	value, err := e.vm.Runtime.ReadStored(
-		service,
-		cadence.Path{
-			Domain:     blueprints.ContractDeploymentAuthorizedAddressesPathDomain,
-			Identifier: blueprints.ContractDeploymentAuthorizedAddressesPathIdentifier,
-		},
-		runtime.Context{Interface: e},
-	)
-	if err != nil {
-		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
-		return defaultAccounts
-	}
-	adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
-	if !ok {
-		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
-		return defaultAccounts
-	}
-	return adresses
 }
 
 func (e *ScriptEnv) isTraceable() bool {
@@ -151,6 +119,7 @@ func (e *ScriptEnv) GetValue(owner, key []byte) ([]byte, error) {
 	return v, nil
 }
 
+// TODO disable SetValue for scripts, right now the view changes are discarded
 func (e *ScriptEnv) SetValue(owner, key, value []byte) error {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvSetValue)
@@ -440,8 +409,16 @@ func (e *ScriptEnv) ProgramLog(message string) error {
 	return nil
 }
 
+func (e *ScriptEnv) Logs() []string {
+	return e.logs
+}
+
 func (e *ScriptEnv) EmitEvent(event cadence.Event) error {
 	return errors.NewOperationNotSupportedError("EmitEvent")
+}
+
+func (e *ScriptEnv) Events() []flow.Event {
+	return []flow.Event{}
 }
 
 func (e *ScriptEnv) GenerateUUID() (uint64, error) {
@@ -491,14 +468,6 @@ func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, err
 	}
 
 	return v, err
-}
-
-func (e *ScriptEnv) Events() []flow.Event {
-	return []flow.Event{}
-}
-
-func (e *ScriptEnv) Logs() []string {
-	return e.logs
 }
 
 func (e *ScriptEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgorithm) ([]byte, error) {
@@ -664,7 +633,6 @@ func (e *ScriptEnv) GetAccountContractCode(address runtime.Address, name string)
 
 func (e *ScriptEnv) RemoveAccountContractCode(address runtime.Address, name string) (err error) {
 	return errors.NewOperationNotSupportedError("RemoveAccountContractCode")
-
 }
 
 func (e *ScriptEnv) GetSigningAccounts() ([]runtime.Address, error) {
