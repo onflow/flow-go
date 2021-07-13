@@ -166,7 +166,6 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 		go func(e *MeshEngine) {
 			for x := 0; x < count-1; x++ {
 				<-e.received
-				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 				wg.Done()
 			}
 		}(engs[i])
@@ -180,6 +179,10 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 		if len(e.event) != (count - 1) {
 			assert.Fail(suite.Suite.T(),
 				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.event)))
+		}
+
+		for i := 0; i < count-1; i++ {
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 		}
 
 		// extracts failed messages
@@ -237,7 +240,6 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 		wg.Add(1)
 		go func(e *MeshEngine) {
 			<-e.received
-			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 			wg.Done()
 		}(engs[i])
 	}
@@ -248,6 +250,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	for index, e := range engs {
 		if index < len(engs)/2 {
 			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
+			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 		} else {
 			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
@@ -287,7 +290,6 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 		wg.Add(1)
 		go func(e *MeshEngine) {
 			<-e.received
-			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 			wg.Done()
 		}(eng)
 	}
@@ -297,6 +299,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	// evaluates that all messages are received
 	for index, e := range engs[1:] {
 		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
+		assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 	}
 }
 
@@ -356,7 +359,6 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 			expectedMsgCnt := count - 2 // count less self and unsubscribed engine
 			for x := 0; x < expectedMsgCnt; x++ {
 				<-e.received
-				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-e.channel)
 			}
 			wg.Done()
 		}(engs[i])
