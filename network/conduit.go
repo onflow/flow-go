@@ -16,10 +16,6 @@ import (
 type Channel string
 type ChannelList []Channel
 
-const (
-	ChannelRelay Channel = "*"
-)
-
 func (c Channel) String() string {
 	return string(c)
 }

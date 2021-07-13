@@ -132,7 +132,7 @@ func (m *Middleware) GetIPPort() (string, string, error) {
 }
 
 // Start will start the middleware.
-func (m *Middleware) Start(ov network.Overlay) error { // TODO
+func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
 
@@ -350,7 +350,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 }
 
 // Subscribe subscribes the middleware to a channel.
-func (m *Middleware) Subscribe(channel network.Channel) error { // TODO
+func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 

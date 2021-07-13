@@ -11,28 +11,38 @@ import (
 )
 
 type Engine struct {
-	unit    *engine.Unit   // used to manage concurrency & shutdown
-	log     zerolog.Logger // used to log relevant actions with context
-	me      module.Local
-	conduit network.Conduit // conduit for unstaked network
+	unit     *engine.Unit   // used to manage concurrency & shutdown
+	log      zerolog.Logger // used to log relevant actions with context
+	me       module.Local
+	conduits map[network.Channel]network.Conduit // conduits for unstaked network
 }
 
 func New(
 	log zerolog.Logger,
+	channels network.ChannelList,
+	net module.Network,
 	unstakedNet module.Network,
 	me module.Local,
 ) (*Engine, error) {
 	e := &Engine{
-		unit: engine.NewUnit(),
-		log:  log.With().Str("engine", "relay").Logger(),
-		me:   me,
+		unit:     engine.NewUnit(),
+		log:      log.With().Str("engine", "relay").Logger(),
+		me:       me,
+		conduits: make(map[network.Channel]network.Conduit),
 	}
 
-	conduit, err := unstakedNet.Register(engine.Relay, e)
-	if err != nil {
-		return nil, fmt.Errorf("could not register relay engine: %w", err)
+	for _, channel := range channels {
+		_, err := net.Register(channel, e)
+		if err != nil {
+			return nil, fmt.Errorf("could not register relay engine on channel: %w", err)
+		}
+
+		conduit, err := unstakedNet.Register(channel, e)
+		if err != nil {
+			return nil, fmt.Errorf("could not register relay engine on unstaked network channel: %w", err)
+		}
+		e.conduits[channel] = conduit
 	}
-	e.conduit = conduit
 
 	return e, nil
 }
@@ -40,34 +50,19 @@ func New(
 // Ready returns a ready channel that is closed once the engine has fully
 // started. For the relay engine, ... TODO
 func (e *Engine) Ready() <-chan struct{} {
-	// return e.unit.Ready(func() {
-	// 	<-e.follower.Ready()
-	// })
-
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the relay engine, ... TODO
 func (e *Engine) Done() <-chan struct{} {
-	// return e.unit.Done(func() {
-	// 	<-e.follower.Done()
-	// })
-
 	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
-}
-
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.ProcessLocal(event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -76,21 +71,40 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return fmt.Errorf("relay engine does not process local events")
+	})
+}
+
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+	e.unit.Launch(func() {
+		err := e.Process(channel, originID, event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Process processes the given event from the node with the given origin ID
 // in a blocking manner. It returns the potential processing error when
 // done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(originID, event)
+		return e.process(channel, originID, event)
 	})
 }
 
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	// TODO: we actually need to know the channel it was on??
-	err := e.conduit.Publish(event)
+func (e *Engine) process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	conduit, ok := e.conduits[channel]
+
+	if !ok {
+		return fmt.Errorf("could not find unstaked network conduit for channel %s", channel)
+	}
+
+	err := conduit.Publish(event)
 	if err != nil {
 		return fmt.Errorf("could not relay message: %w", err)
 	}

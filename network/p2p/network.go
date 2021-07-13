@@ -110,7 +110,7 @@ func (n *Network) Done() <-chan struct{} {
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) { // TODO
+func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -176,7 +176,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	return top, nil
 }
 
-func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error { // TODO
+func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 	err := n.processNetworkMessage(nodeID, msg)
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
@@ -203,7 +203,7 @@ func (n *Network) SetIDs(ids flow.IdentityList) error {
 	return nil
 }
 
-func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error { // TODO: MAIN
+func (n *Network) processNetworkMessage(senderID flow.Identifier, message *message.Message) error {
 	// checks the cache for deduplication and adds the message if not already present
 	if n.rcache.add(message.EventID, network.Channel(message.ChannelID)) {
 		log := n.logger.With().
@@ -401,7 +401,7 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QMessage)
-	eng, err := n.subMngr.GetEngine(qm.Target) // TODO:
+	eng, err := n.subMngr.GetEngine(qm.Target)
 	if err != nil {
 		n.logger.Error().
 			Err(err).
@@ -409,11 +409,6 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 			Str("sender_id", qm.SenderID.String()).
 			Msg("failed to submit message")
 		return
-	}
-
-	relayEng, err := n.subMngr.GetEngine(network.ChannelRelay)
-	if err == nil {
-		relayEng.Submit(qm.SenderID, qm.Payload)
 	}
 
 	// submits the message to the engine synchronously and

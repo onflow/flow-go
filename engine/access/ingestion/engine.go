@@ -105,7 +105,7 @@ func New(
 	}
 
 	// register engine with the execution receipt provider
-	_, err := net.Register(engine.ReceiveReceipts, eng) // HERE
+	_, err := net.Register(engine.ReceiveReceipts, eng)
 	if err != nil {
 		return nil, fmt.Errorf("could not register for results: %w", err)
 	}

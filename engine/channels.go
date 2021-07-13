@@ -119,9 +119,6 @@ const (
 	RequestReceiptsByBlockID = network.Channel("request-receipts-by-block-id")
 	RequestApprovalsByChunk  = network.Channel("request-approvals-by-chunk")
 
-	// Relay channel
-	Relay = network.ChannelRelay
-
 	// Channel aliases to make the code more readable / more robust to errors
 	ReceiveTransactions = PushTransactions
 	ReceiveGuarantees   = PushGuarantees
