@@ -23,11 +23,11 @@ import (
 // It is composed of the FlowNodeBuilder
 type AccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
-	staked                bool
-	stakedAccessNodeIDHex string
-	unstakedBindAddr      string
-	unstakedNetwork       *p2p.Network
-	unstakedMiddleware    *p2p.Middleware
+	staked                  bool
+	stakedAccessNodeIDHex   string
+	unstakedNetworkBindAddr string
+	unstakedNetwork         *p2p.Network
+	unstakedMiddleware      *p2p.Middleware
 }
 
 func FlowAccessNode() *AccessNodeBuilder {
@@ -52,7 +52,7 @@ func (anb *AccessNodeBuilder) Initialize() *AccessNodeBuilder {
 	}
 
 	// if an unstaked bind address is provided, initialize the network to communicate on the unstaked network
-	if anb.unstakedBindAddr != cmd.NotSet {
+	if anb.unstakedNetworkBindAddr != cmd.NotSet {
 		anb.EnqueueUnstakedNetworkInit()
 	}
 
@@ -76,7 +76,7 @@ func (anb *AccessNodeBuilder) validateParams() {
 	}
 
 	// and also the unstaked bind address
-	if anb.unstakedBindAddr == cmd.NotSet {
+	if anb.unstakedNetworkBindAddr == cmd.NotSet {
 		anb.Logger.Fatal().Msg("unstaked bind address not set")
 	}
 }
@@ -101,7 +101,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(node.Logger.Level(zerolog.ErrorLevel),
 			node.Me.NodeID(),
-			anb.unstakedBindAddr,
+			anb.unstakedNetworkBindAddr,
 			node.NetworkKey,
 			node.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
@@ -113,12 +113,17 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 
 		peerUpdateInterval := time.Hour // pretty much not needed for the unstaked access node
 
-		// for an unstaked node, use message sender validator but not target validator since the staked AN will
-		// be broadcasting messages to ALL unstaked ANs without knowing their target IDs
-		msgValidators := []network.MessageValidator{
-			// filter out messages sent by this node itself
-			validator.NewSenderValidator(node.Me.NodeID()),
-			// but retain all the 1-k messages even if they are not intended for this node
+		var msgValidators []network.MessageValidator
+		if anb.staked {
+			msgValidators = p2p.DefaultValidators(node.Logger, node.Me.NodeID())
+		} else {
+			// for an unstaked node, use message sender validator but not target validator since the staked AN will
+			// be broadcasting messages to ALL unstaked ANs without knowing their target IDs
+			msgValidators = []network.MessageValidator{
+				// filter out messages sent by this node itself
+				validator.NewSenderValidator(node.Me.NodeID()),
+				// but retain all the 1-k messages even if they are not intended for this node
+			}
 		}
 
 		anb.unstakedMiddleware = p2p.NewMiddleware(node.Logger.Level(zerolog.ErrorLevel),
@@ -172,7 +177,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 			anb.Network = anb.unstakedNetwork
 			anb.Middleware = anb.unstakedMiddleware
 		}
-		anb.Logger.Info().Msgf("unstaked network will run on address: %s", anb.unstakedBindAddr)
+		anb.Logger.Info().Msgf("unstaked network will run on address: %s", anb.unstakedNetworkBindAddr)
 		return net, err
 	})
 }
@@ -185,7 +190,7 @@ func (anb *AccessNodeBuilder) initUnstakedLocal() func(node *cmd.FlowNodeBuilder
 			NetworkPubKey: anb.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the unstaked node
 			Role:          flow.RoleAccess, // unstaked node can only run as an access node
-			Address:       anb.unstakedBindAddr,
+			Address:       anb.unstakedNetworkBindAddr,
 		}
 
 		me, err := local.New(self, nil)

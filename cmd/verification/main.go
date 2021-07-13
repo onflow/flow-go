@@ -76,7 +76,6 @@ func main() {
 	)
 
 	cmd.FlowNode(flow.RoleVerification.String()).
-		Initialize().
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
@@ -90,6 +89,7 @@ func main() {
 			flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 
 		}).
+		Initialize().
 		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
