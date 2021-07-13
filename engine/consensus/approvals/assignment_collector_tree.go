@@ -131,6 +131,11 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 		t.lastSealedHeight = sealed.Height
 	}
 
+	err := t.pruneUpToHeight(sealed.Height) // prune AssignmentCollectorTree
+	if err != nil {
+		return fmt.Errorf("could not prune collectors tree up to height %d: %w", sealed.Height, err)
+	}
+
 	return nil
 }
 
@@ -261,36 +266,28 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	}, nil
 }
 
-// PruneUpToHeight prunes all results for all assignment collectors with height up to but
+// pruneUpToHeight prunes all results for all assignment collectors with height up to but
 // NOT INCLUDING `limit`. Noop, if limit is lower than the previous value (caution:
-// this is different than the levelled forest's convention).
-// Returns list of resultIDs that were pruned
-func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifier, error) {
-	var pruned []flow.Identifier
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+// this is different than the levelled forest's convention). This function is not concurrency safe
+// it has to run in context of some other function which holds the lock.
+func (t *AssignmentCollectorTree) pruneUpToHeight(limit uint64) error {
 	if t.forest.LowestLevel >= limit {
-		return pruned, nil
+		return nil
 	}
 
+	elementsPruned := uint64(0)
 	if t.size > 0 {
-		// collect IDs of vertices that were pruned
 		for l := t.forest.LowestLevel; l < limit; l++ {
-			iterator := t.forest.GetVerticesAtLevel(l)
-			for iterator.HasNext() {
-				vertex := iterator.NextVertex()
-				pruned = append(pruned, vertex.VertexID())
-			}
+			elementsPruned += uint64(t.forest.GetNumberOfVerticesAtLevel(l))
 		}
 	}
 
 	// remove vertices and adjust size
 	err := t.forest.PruneUpToLevel(limit)
 	if err != nil {
-		return nil, fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
+		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
-	t.size -= uint64(len(pruned))
+	t.size -= elementsPruned
 
-	return pruned, nil
+	return nil
 }
