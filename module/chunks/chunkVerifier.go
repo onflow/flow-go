@@ -49,7 +49,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 // It returns a Spock Secret as a byte array, verification fault of the chunk, and an error.
 // Note: Verify should only be executed on non-system chunks. It returns an error if it is invoked on
 // system chunks.
-func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, chmodels.ChunkFault, error) {
+func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData, blocks fvm.Blocks) ([]byte, chmodels.ChunkFault, error) {
 	if vc.IsSystemChunk {
 		return nil, nil, fmt.Errorf("wrong method invoked for verifying system chunk")
 	}
@@ -60,7 +60,9 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 		transactions = append(transactions, tx)
 	}
 
-	return fcv.verifyTransactions(vc.Chunk, vc.ChunkDataPack, vc.Result, vc.Header, transactions, vc.EndState)
+	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlocks(blocks))
+
+	return fcv.verifyTransactions(blockCtx, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState)
 }
 
 // SystemChunkVerify verifies a given VerifiableChunk corresponding to a system chunk.
@@ -68,7 +70,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 // It returns a Spock Secret as a byte array, verification fault of the chunk, and an error.
 // Note: SystemChunkVerify should only be executed on system chunks. It returns an error if it is invoked on
 // non-system chunks.
-func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData) ([]byte, chmodels.ChunkFault, error) {
+func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData, blocks fvm.Blocks) ([]byte, chmodels.ChunkFault, error) {
 	if !vc.IsSystemChunk {
 		return nil, nil, fmt.Errorf("wrong method invoked for verifying non-system chunk")
 	}
@@ -79,17 +81,22 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	transactions := []*fvm.TransactionProcedure{tx}
 
 	systemChunkContext := fvm.NewContextFromParent(fcv.systemChunkCtx,
-		fvm.WithBlockHeader(vc.Header),
+		fvm.WithBlocks(blocks),
 	)
 
 	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState, true)
 }
 
-func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk *flow.Chunk,
+func (fcv *ChunkVerifier) verifyTransactionsInContext(
+	context fvm.Context,
+	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment, systemChunk bool) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment,
+	systemChunk bool,
+) (
+	[]byte, chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
@@ -259,15 +266,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	return chunkView.SpockSecret(), nil, nil
 }
 
-func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
+func (fcv *ChunkVerifier) verifyTransactions(
+	blockCtx fvm.Context,
+	chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
-	header *flow.Header,
 	transactions []*fvm.TransactionProcedure,
 	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
-
-	// build a block context
-	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
 	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState, false)
 }

@@ -89,7 +89,7 @@ func TestChunkVerifier(t *testing.T) {
 func (s *ChunkVerifierTestSuite) TestHappyPath() {
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
@@ -103,7 +103,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[:1]
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
@@ -118,7 +118,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 	assert.NotNil(s.T(), vch)
 	// remove the second register touch
 	//vch.ChunkDataPack.RegisterTouches = vch.ChunkDataPack.RegisterTouches[1:]
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
@@ -132,7 +132,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
 func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 	vch := GetBaselineVerifiableChunk(s.T(), "wrongEndState", false)
 	assert.NotNil(s.T(), vch)
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFaults)
 	assert.Nil(s.T(), spockSecret)
@@ -146,7 +146,7 @@ func (s *ChunkVerifierTestSuite) TestWrongEndState() {
 func (s *ChunkVerifierTestSuite) TestFailedTx() {
 	vch := GetBaselineVerifiableChunk(s.T(), "failedTx", false)
 	assert.NotNil(s.T(), vch)
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)
@@ -157,7 +157,7 @@ func (s *ChunkVerifierTestSuite) TestFailedTx() {
 func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 	vch := GetBaselineVerifiableChunk(s.T(), "eventsMismatch", false)
 	assert.NotNil(s.T(), vch)
-	_, chFault, err := s.verifier.Verify(vch)
+	_, chFault, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFault)
 	assert.IsType(s.T(), &chunksmodels.CFInvalidEventsCollection{}, chFault)
@@ -168,7 +168,7 @@ func (s *ChunkVerifierTestSuite) TestEventsMismatch() {
 func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	assert.NotNil(s.T(), vch)
-	_, chFault, err := s.systemBadVerifier.SystemChunkVerify(vch)
+	_, chFault, err := s.systemBadVerifier.SystemChunkVerify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.NotNil(s.T(), chFault)
 	assert.IsType(s.T(), &chunksmodels.CFInvalidServiceEventsEmitted{}, chFault)
@@ -178,7 +178,7 @@ func (s *ChunkVerifierTestSuite) TestServiceEventsMismatch() {
 func (s *ChunkVerifierTestSuite) TestServiceEventsAreChecked() {
 	vch := GetBaselineVerifiableChunk(s.T(), "doesn't matter", true)
 	assert.NotNil(s.T(), vch)
-	_, chFault, err := s.systemOkVerifier.SystemChunkVerify(vch)
+	_, chFault, err := s.systemOkVerifier.SystemChunkVerify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFault)
 }
@@ -192,7 +192,7 @@ func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
 		IsSystemChunk: true,
 	}
 	// invoking Verify method with system chunk should return an error
-	_, _, err := s.verifier.Verify(svc)
+	_, _, err := s.verifier.Verify(svc, nil)
 	require.Error(s.T(), err)
 
 	// defines verifiable chunk for a non-system chunk
@@ -200,7 +200,7 @@ func (s *ChunkVerifierTestSuite) TestVerifyWrongChunkType() {
 		IsSystemChunk: false,
 	}
 	// invoking SystemChunkVerify method with a non-system chunk should return an error
-	_, _, err = s.verifier.SystemChunkVerify(vc)
+	_, _, err = s.verifier.SystemChunkVerify(vc, nil)
 	require.Error(s.T(), err)
 }
 
@@ -215,7 +215,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
 	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
-	spockSecret, chFaults, err := s.verifier.Verify(vch)
+	spockSecret, chFaults, err := s.verifier.Verify(vch, nil)
 	assert.Nil(s.T(), err)
 	assert.Nil(s.T(), chFaults)
 	assert.NotNil(s.T(), spockSecret)

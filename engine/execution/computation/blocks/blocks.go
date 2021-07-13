@@ -12,7 +12,7 @@ import (
 )
 
 // BlocksFinder implements blocks
-type BlocksFinder struct {
+type BlockFinder struct {
 	minHeightAvailable uint64 // inclusive
 	maxHeightAvailable uint64 // inclusive
 	header             *flow.Header
@@ -21,7 +21,7 @@ type BlocksFinder struct {
 
 // NewBlockFinder constructs a new block finder
 func NewBlockFinder(header *flow.Header, storage storage.Headers, minHeightAvailable uint64, maxHeightAvailable uint64) fvm.Blocks {
-	return &BlocksFinder{
+	return &BlockFinder{
 		header:             header,
 		minHeightAvailable: minHeightAvailable,
 		maxHeightAvailable: maxHeightAvailable,
@@ -29,17 +29,17 @@ func NewBlockFinder(header *flow.Header, storage storage.Headers, minHeightAvail
 	}
 }
 
-func (b *BlocksFinder) Height() uint64 {
+func (b *BlockFinder) Height() uint64 {
 	return b.header.Height
 }
 
 // TODO we might evaluate the header first and return error if not exist
-func (b *BlocksFinder) Current() (runtime.Block, error) {
+func (b *BlockFinder) Current() (runtime.Block, error) {
 	return RuntimeBlockFromFlowHeader(b.header), nil
 }
 
 // ByHeightFrom returns the block header by height.
-func (b *BlocksFinder) ByHeight(height uint64) (runtime.Block, bool, error) {
+func (b *BlockFinder) ByHeight(height uint64) (runtime.Block, bool, error) {
 	// don't return any block from the future or
 	// from before root block or starting block of the spork.
 	if height > b.maxHeightAvailable || height < b.minHeightAvailable {
