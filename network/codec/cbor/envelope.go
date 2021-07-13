@@ -3,7 +3,6 @@
 package cbor
 
 const (
-
 	CodeMin = iota + 1
 
 	// consensus
