@@ -93,7 +93,9 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) SubmitLocal(event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(e.me.NodeID(), event)
-		engine.LogError(e.log, err)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
 	})
 }
 
