@@ -15,10 +15,7 @@ type Engine struct {
 	unit        *engine.Unit   // used to manage concurrency & shutdown
 	log         zerolog.Logger // used to log relevant actions with context
 	me          module.Local
-	net         module.Network
-	chanEngines map[network.Channel][]network.Engine // stores engine registration mapping
-	conduits    map[network.Channel]network.Conduit  // stores conduits for all registered channels
-	engines     map[network.Engine]struct{}          // set of all registered engines
+	chanEngines map[network.Channel]map[network.Engine]struct{} // stores engine registration mapping
 }
 
 func New(
@@ -30,43 +27,37 @@ func New(
 		unit:        engine.NewUnit(),
 		log:         log.With().Str("engine", "multiplexer").Logger(),
 		me:          me,
-		net:         net,
-		chanEngines: make(map[network.Channel][]network.Engine),
-		conduits:    make(map[network.Channel]network.Conduit),
-		engines:     make(map[network.Engine]struct{}),
+		chanEngines: make(map[network.Channel]map[network.Engine]struct{}),
 	}
 
 	return e, nil
 }
 
-// Register will subscribe the given engine with the multiplexer on the given channel, and all registered
-// engines will be notified with incoming messages on the channel.
-// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
-func (e *Engine) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+func (e *Engine) RegisterEngine(channel network.Channel, engine network.Engine) error {
 	_, ok := e.chanEngines[channel]
 
 	if !ok {
-		conduit, err := e.net.Register(channel, e)
-		if err != nil {
-			return nil, fmt.Errorf("failed to register multiplexer engine on channel %s: %w", channel, err)
-		}
-
-		e.conduits[channel] = conduit
-
 		// initializes the engine set for the provided channel
-		e.chanEngines[channel] = make([]network.Engine, 0)
+		e.chanEngines[channel] = make(map[network.Engine]struct{})
 	}
 
-	for _, eng := range e.chanEngines[channel] {
-		if eng == engine {
-			return nil, fmt.Errorf("engine already registered on channel: %s", channel)
-		}
+	_, ok = e.chanEngines[channel][engine]
+
+	if ok {
+		return fmt.Errorf("engine already registered on channel: %s", channel)
 	}
 
-	e.chanEngines[channel] = append(e.chanEngines[channel], engine)
-	e.engines[engine] = struct{}{}
+	e.chanEngines[channel][engine] = struct{}{}
 
-	return e.conduits[channel], nil
+	return nil
+}
+
+func (e *Engine) UnregisterEngine(channel network.Channel, engine network.Engine) {
+	_, ok := e.chanEngines[channel]
+
+	if ok {
+		delete(e.chanEngines[channel], engine)
+	}
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -74,10 +65,12 @@ func (e *Engine) Register(channel network.Channel, engine network.Engine) (netwo
 // registered engines have started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		for engine := range e.engines {
-			engine, ok := engine.(module.ReadyDoneAware)
-			if ok {
-				<-engine.Ready()
+		for _, engines := range e.chanEngines {
+			for engine := range engines {
+				engine, ok := engine.(module.ReadyDoneAware)
+				if ok {
+					<-engine.Ready()
+				}
 			}
 		}
 	})
@@ -88,10 +81,12 @@ func (e *Engine) Ready() <-chan struct{} {
 // have stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		for engine := range e.engines {
-			engine, ok := engine.(module.ReadyDoneAware)
-			if ok {
-				<-engine.Done()
+		for _, engines := range e.chanEngines {
+			for engine := range engines {
+				engine, ok := engine.(module.ReadyDoneAware)
+				if ok {
+					<-engine.Done()
+				}
 			}
 		}
 	})
@@ -149,7 +144,7 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 
 	var wg sync.WaitGroup
 
-	for _, eng := range engines {
+	for eng := range engines {
 		wg.Add(1)
 
 		go func(e network.Engine, log zerolog.Logger) {
