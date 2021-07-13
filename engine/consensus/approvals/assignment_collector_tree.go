@@ -25,7 +25,7 @@ func (v *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
 	return v.collector.Result().PreviousResultID, v.collector.Block().Height - 1
 }
 
-// NewCollector is a factory method to generate an AssignmentCollector for an execution result
+// NewCollectorFactoryMethod is a factory method to generate an AssignmentCollector for an execution result
 type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (AssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
