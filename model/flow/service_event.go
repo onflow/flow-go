@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 )
 
@@ -130,6 +131,65 @@ func (se *ServiceEvent) UnmarshalMsgpack(b []byte) error {
 	case ServiceEventCommit:
 		commit := new(EpochCommit)
 		err = msgpack.Unmarshal(evb, commit)
+		if err != nil {
+			return err
+		}
+		event = commit
+	default:
+		return fmt.Errorf("invalid type: %s", tp)
+	}
+
+	*se = ServiceEvent{
+		Type:  tp,
+		Event: event,
+	}
+	return nil
+}
+
+func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
+
+	var enc map[string]interface{}
+	err := cbor.Unmarshal(b, &enc)
+	if err != nil {
+		return err
+	}
+
+	tp, ok := enc["Type"].(string)
+	if !ok {
+		return fmt.Errorf("missing type key")
+	}
+	ev, ok := enc["Event"]
+	if !ok {
+		return fmt.Errorf("missing event key")
+	}
+
+	// re-marshal the event, we'll unmarshal it into the appropriate type
+	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
+	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
+	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
+	opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
+	em, err1 := opts.EncMode()
+	if err1 != nil {
+		return err
+	}
+
+	evb, err := em.Marshal(ev)
+	if err != nil {
+		return err
+	}
+
+	var event interface{}
+	switch tp {
+	case ServiceEventSetup:
+		setup := new(EpochSetup)
+		err = cbor.Unmarshal(evb, setup)
+		if err != nil {
+			return err
+		}
+		event = setup
+	case ServiceEventCommit:
+		commit := new(EpochCommit)
+		err = cbor.Unmarshal(evb, commit)
 		if err != nil {
 			return err
 		}
