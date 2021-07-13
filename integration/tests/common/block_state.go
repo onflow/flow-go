@@ -90,14 +90,6 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 		if !ok {
 			return
 		}
-
-		// find parent
-		ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
-
-		// stop if parent not found
-		if !ok {
-			return
-		}
 	}
 }
 
