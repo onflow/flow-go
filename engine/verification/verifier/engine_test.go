@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -113,20 +112,6 @@ func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
 	suite.net.AssertExpectations(suite.T())
 	return e
 
-}
-
-func (suite *VerifierEngineTestSuite) TestInvalidSender() {
-	eng := suite.TestNewEngine()
-
-	myID := unittest.IdentifierFixture()
-
-	// mocks NodeID method of the local
-	suite.me.MockNodeID(myID)
-
-	vc := unittest.VerifiableChunkDataFixture(0)
-
-	err := eng.ProcessLocal(&completeRA)
-	assert.Error(suite.T(), err)
 }
 
 func (suite *VerifierEngineTestSuite) TestIncorrectResult() {
