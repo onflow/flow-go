@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -380,11 +379,4 @@ func CreateRemoveAccountKeyTransaction(index int) *flow.TransactionBody {
 	return &flow.TransactionBody{
 		Script: []byte(script),
 	}
-}
-
-func languageEncodeBytes(b []byte) string {
-	if len(b) == 0 {
-		return "[]"
-	}
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
