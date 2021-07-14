@@ -3,6 +3,7 @@ package splitter
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
@@ -10,6 +11,7 @@ import (
 )
 
 type Network struct {
+	mu        sync.Mutex
 	net       module.Network
 	log       zerolog.Logger
 	splitters map[network.Channel]*Engine         // stores splitters for each channel
@@ -39,6 +41,9 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	if !ok {
 		return nil, errors.New("engine does not have the correct type")
 	}
+
+	n.mu.Lock()
+	defer n.mu.Unlock()
 
 	splitter, ok := n.splitters[channel]
 
