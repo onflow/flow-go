@@ -45,6 +45,8 @@ import (
 // [3] https://coherent-labs.com/posts/timestamps-for-performance-measurements/
 
 type globalStruct struct {
+	rwMutex          sync.RWMutex
+	log              zerolog.Logger
 	dumps            uint64
 	dmpName          string
 	dmpPath          string
@@ -95,9 +97,7 @@ const (
 	internalGC
 )
 
-var globalRWMutex = sync.RWMutex{}
 var global = globalStruct{}
-var globalLog zerolog.Logger
 
 //go:linkname runtimeNano runtime.nanotime
 func runtimeNano() int64
@@ -112,14 +112,11 @@ func atoi(s string) int {
 }
 
 func init() {
-	globalRWMutex.Lock() // lock for single writer <-- harmless but probably unnecessary since init() gets executed before other package functions
-	defer globalRWMutex.Unlock()
-
 	t1 := runtimeNanoAsTimeDuration()
 
 	// inspired by https://github.com/onflow/flow-go/blob/master/utils/unittest/logging.go
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	globalLog = zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Logger()
+	global.log = zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Logger()
 
 	global.dumps = 0
 	global.startTime = time.Now()
@@ -154,7 +151,7 @@ func init() {
 			global.what2len[k] = v
 			if global.verbose {
 				elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - global.startTimeMono).Seconds()
-				globalLog.Debug().Msgf("%f %d=pid %d=tid init() // parsing .lenWhat=%s; extracted #%d k=%s v=%d", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.lenWhat, n, k, v)
+				global.log.Debug().Msgf("%f %d=pid %d=tid init() // parsing .lenWhat=%s; extracted #%d k=%s v=%d", elapsedThisProc, os.Getpid(), int64(C.gettid()), global.lenWhat, n, k, v)
 			}
 		}
 	}
@@ -184,7 +181,7 @@ func init() {
 
 	if global.verbose {
 		elapsedThisProc := time.Duration(runtimeNanoAsTimeDuration() - global.startTimeMono).Seconds()
-		globalLog.Debug().Msgf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .dmpPath=%s .dmpName=%s .cutPath=%s .lenWhat=%s",
+		global.log.Debug().Msgf("%f %d=pid %d=tid init() // .enable=%t .verbose=%t .dmpPath=%s .dmpName=%s .cutPath=%s .lenWhat=%s",
 			elapsedThisProc, os.Getpid(), int64(C.gettid()), global.enable, global.verbose, global.dmpPath, global.dmpName, global.cutPath, global.lenWhat)
 	}
 
@@ -238,7 +235,7 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedThisFunc := time.Duration(t2 - t).Seconds()
-		globalLog.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // enter in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d",
+		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // enter in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d",
 			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine())
 	}
 
@@ -290,13 +287,13 @@ func pointGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWh
 tryAgainRaceCondition:
 	var frequency uint64
 	var accumMono uint64
-	globalRWMutex.RLock() // lock for many readers v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
+	global.rwMutex.RLock() // lock for many readers v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 	index, keyExists := global.key2index[key]
 	if keyExists {
 		frequency = atomic.AddUint64(&global.frequency[index], 1)
 		accumMono = atomic.AddUint64(&global.accumMono[index], uint64(elapsedNanoAsTimeDuration))
 	}
-	globalRWMutex.RUnlock() // unlock for many readers ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+	global.rwMutex.RUnlock() // unlock for many readers ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
 
 	if keyExists {
 		// full thru
@@ -306,10 +303,10 @@ tryAgainRaceCondition:
 			keyEgLoc = fmt.Sprintf(" // e.g. %s:%d", p.callerFunc, p.callerLine)
 		}
 		// come here to create new hash table bucket
-		globalRWMutex.Lock() // lock for single writer v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
+		global.rwMutex.Lock() // lock for single writer v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 		_, keyExists = global.key2index[key]
 		if keyExists { // come here if another func beat us to key creation
-			globalRWMutex.Unlock() // unlock for single writer ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+			global.rwMutex.Unlock() // unlock for single writer ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 			goto tryAgainRaceCondition
 		}
 		// come here to create key and associated counter array element
@@ -320,7 +317,7 @@ tryAgainRaceCondition:
 		global.frequency = append(global.frequency, 1)
 		global.accumMono = append(global.accumMono, uint64(elapsedNanoAsTimeDuration))
 		global.index++
-		globalRWMutex.Unlock() // unlock for single writer ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+		global.rwMutex.Unlock() // unlock for single writer ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
 		frequency = 1
 		accumMono = uint64(elapsedNanoAsTimeDuration)
 	}
@@ -339,7 +336,7 @@ tryAgainRaceCondition:
 		}
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedSinceNew := elapsedNanoAsTimeDuration.Seconds()
-		globalLog.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s",
+		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s",
 			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint)
 	}
 
@@ -406,7 +403,7 @@ func debugGeneric(p *BinStat, debugText string, verbose bool) {
 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t - global.startTimeMono).Seconds()
-		globalLog.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // debug %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText)
+		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // debug %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText)
 	}
 
 	t2 := runtimeNanoAsTimeDuration()
@@ -443,8 +440,8 @@ func dump() {
 	global.frequencyShadow[internalGC] = uint64(gcStats.NumGC)
 	global.accumMonoShadow[internalGC] = uint64(gcStats.PauseTotal)
 
-	globalRWMutex.RLock() // lock for many readers until function return
-	defer globalRWMutex.RUnlock()
+	global.rwMutex.RLock() // lock for many readers until function return
+	defer global.rwMutex.RUnlock()
 
 	// todo: copy into buffer and then write to file outside of reader lock?
 
@@ -465,7 +462,7 @@ func dump() {
 	fileNew := fmt.Sprintf("%s/%s", global.dmpPath, global.dmpName)
 	f, err := os.Create(fileTmp)
 	if err != nil {
-		globalLog.Fatal().Msgf("ERROR: .Create(%s)=%s", fileTmp, err)
+		global.log.Fatal().Msgf("ERROR: .Create(%s)=%s", fileTmp, err)
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
 	}
 	for i := range global.keysArray {
@@ -474,18 +471,18 @@ func dump() {
 		u2 := atomic.LoadUint64(&global.accumMono[i])
 		_, err := fmt.Fprintf(f, "%s=%d %f%s\n", global.keysArray[i], u1, time.Duration(u2).Seconds(), global.keysEgLoc[i])
 		if err != nil {
-			globalLog.Fatal().Msgf("ERROR: .Fprintf()=%s", err)
+			global.log.Fatal().Msgf("ERROR: .Fprintf()=%s", err)
 			panic(fmt.Sprintf("ERROR: BINSTAT: .Fprintf()=%s", err))
 		}
 	}
 	err = f.Close()
 	if err != nil {
-		globalLog.Fatal().Msgf("ERROR: .Close()=%s", err)
+		global.log.Fatal().Msgf("ERROR: .Close()=%s", err)
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Close()=%s", err))
 	}
 	err = os.Rename(fileTmp, fileNew) // atomically rename / move on Linux :-)
 	if err != nil {
-		globalLog.Fatal().Msgf("ERROR: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err)
+		global.log.Fatal().Msgf("ERROR: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err)
 		panic(fmt.Sprintf("ERROR: BINSTAT: .Rename(%s, %s)=%s", fileTmp, fileNew, err))
 	}
 }
