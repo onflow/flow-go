@@ -119,7 +119,7 @@ var cborEncMode = func() cbor.EncMode {
 	return encMode
 }()
 
-// MarshalJSON makes sure the timestamp is encoded in UTC.
+// MarshalCBOR makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalCBOR() ([]byte, error) {
 
 	// NOTE: this is just a sanity check to make sure that we don't get
@@ -134,7 +134,7 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 	return cborEncMode.Marshal(Encodable(h))
 }
 
-// UnmarshalJSON makes sure the timestamp is decoded in UTC.
+// UnmarshalCBOR makes sure the timestamp is decoded in UTC.
 func (h *Header) UnmarshalCBOR(data []byte) error {
 
 	// we use an alias to avoid endless recursion; the alias will not have the
