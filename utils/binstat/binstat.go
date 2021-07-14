@@ -226,7 +226,7 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 		//                       ^ 1 char; tilda means use next digit as default len unless override len exists in .what2len map
 		whatLenDefault := atoi(what[1:2])
 		whatLen = whatLenDefault + tildaCharLen + lenCharLen
-		if whatLenOverride, keyExists := global.what2len[what[tildaCharLen+lenCharLen:tildaCharLen+lenCharLen+whatLenDefault]]; keyExists {
+		if whatLenOverride, keyExists := global.what2len[what[tildaCharLen+lenCharLen:whatLen]]; keyExists {
 			whatLen = whatLenOverride + tildaCharLen + lenCharLen
 		}
 		if whatLen > len(what) {
