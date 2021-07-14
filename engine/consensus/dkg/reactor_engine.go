@@ -141,7 +141,7 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 	// starting the phase transition. Here we register the polling callback
 	// before the phase transition, which guarantees that it will be called
 	// before because callbacks for the same views are executed on a FIFO basis.
-	// Moreover, the poll calback does not return until all received messages
+	// Moreover, the poll callback does not return until all received messages
 	// are processed by the underlying DKG controller (as guaranteed by the
 	// specifications and implementations of the DKGBroker and DKGController
 	// interfaces).
@@ -160,6 +160,34 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 		e.registerPoll(view)
 	}
 	e.registerPhaseTransition(curDKGInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
+}
+
+// EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol event. It
+// compares the key vector locally produced by Consensus nodes against the FlowDKG smart contract
+// key vectors. If the keys don't match a log statement will be invoked. In the happy case the locally
+// produced key should match, if the keys do not match the node will have a invalid random beacon key.
+func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+	nextDKG, err := e.State.Final().Epochs().Next().DKG()
+	if err != nil {
+		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
+		return
+	}
+
+	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
+	if err != nil {
+		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+	}
+
+	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)
+	if err != nil {
+		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+	}
+
+	localPubKey := dkgPrivInfo.RandomBeaconPrivKey.PublicKey()
+
+	if !nextDKGPubKey.Equals(localPubKey) {
+		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
+	}
 }
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {

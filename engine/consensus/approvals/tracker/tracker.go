@@ -1,103 +1,42 @@
 package tracker
 
 import (
+	"encoding/hex"
 	"encoding/json"
-	"strings"
+	"time"
 
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module/mempool"
-	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
-// SealingTracker is an auxiliary component for tracking sealing progress.
-// Its primary purpose is to decide which SealingRecords should be tracked
-// and to store references to them.
-// A SealingTracker is intended to track progress for a _single run_
-// of the sealing algorithm, i.e. Core.CheckSealing().
-// Not concurrency safe.
+// SealingTracker is an auxiliary component for tracking progress of the sealing
+// logic (specifically sealing.Core). It has access to the storage, to collect data
+// that is not be available directly from sealing.Core. The SealingTracker is immutable
+// and therefore intrinsically thread safe.
+//
+// The SealingTracker essentially acts as a factory for individual SealingObservations,
+// which capture information about the progress of a _single_ go routine. Consequently,
+// SealingObservations don't need to be concurrency safe, as they are supposed to
+// be thread-local structure.
 type SealingTracker struct {
-	state      protocol.State
-	isRelevant flow.IdentifierFilter
-	records    []*SealingRecord
+	log        zerolog.Logger
+	headersDB  storage.Headers
+	receiptsDB storage.ExecutionReceipts
+	sealsPl    mempool.IncorporatedResultSeals
 }
 
-func NewSealingTracker(state protocol.State) *SealingTracker {
+func NewSealingTracker(log zerolog.Logger, headersDB storage.Headers, receiptsDB storage.ExecutionReceipts, sealsPl mempool.IncorporatedResultSeals) *SealingTracker {
 	return &SealingTracker{
-		state:      state,
-		isRelevant: nextUnsealedFinalizedBlock(state),
+		log:        log.With().Str("engine", "sealing.SealingTracker").Logger(),
+		headersDB:  headersDB,
+		receiptsDB: receiptsDB,
+		sealsPl:    sealsPl,
 	}
-}
-
-// String converts the most relevant information from the SealingRecords
-// to key-value pairs (in json format).
-func (st *SealingTracker) String() string {
-	rcrds := make([]string, 0, len(st.records))
-	for _, r := range st.records {
-		s, err := st.sealingRecord2String(r)
-		if err != nil {
-			continue
-		}
-		rcrds = append(rcrds, s)
-	}
-	return "[" + strings.Join(rcrds, ", ") + "]"
-}
-
-// MempoolHasNextSeal returns true iff the seals mempool contains a candidate seal
-// for the next block
-func (st *SealingTracker) MempoolHasNextSeal(seals mempool.IncorporatedResultSeals) bool {
-	for _, nextUnsealed := range st.records {
-		_, mempoolHasNextSeal := seals.ByID(nextUnsealed.IncorporatedResult.ID())
-		if mempoolHasNextSeal {
-			return true
-		}
-	}
-	return false
-}
-
-// Track tracks the given SealingRecord, provided it should be tracked
-// according to the SealingTracker's internal policy.
-func (st *SealingTracker) Track(sealingRecord *SealingRecord) {
-	executedBlockID := sealingRecord.IncorporatedResult.Result.BlockID
-	if st.isRelevant(executedBlockID) {
-		st.records = append(st.records, sealingRecord)
-	}
-}
-
-// sealingRecord2String generates a string representation of a sealing record.
-// We specifically attach this method to the SealingTracker, as it is the Tracker's
-// responsibility to decide what information from the record should be captured
-// and what additional details (like block height), should be added.
-func (st *SealingTracker) sealingRecord2String(record *SealingRecord) (string, error) {
-	result := record.IncorporatedResult.Result
-	executedBlock, err := st.state.AtBlockID(result.BlockID).Head()
-	if err != nil {
-		return "", err
-	}
-
-	kvps := map[string]interface{}{
-		"executed_block_id":                result.BlockID.String(),
-		"executed_block_height":            executedBlock.Height,
-		"result_id":                        result.ID().String(),
-		"incorporated_result_id":           record.IncorporatedResult.ID().String(),
-		"number_chunks":                    len(result.Chunks),
-		"sufficient_approvals_for_sealing": record.SufficientApprovalsForSealing,
-	}
-	if record.firstUnmatchedChunkIndex != nil {
-		kvps["first_unmatched_chunk_index"] = *record.firstUnmatchedChunkIndex
-	}
-	if record.qualifiesForEmergencySealing != nil {
-		kvps["qualifies_for_emergency_sealing"] = *record.qualifiesForEmergencySealing
-	}
-	if record.hasMultipleReceipts != nil {
-		kvps["has_multiple_receipts"] = *record.hasMultipleReceipts
-	}
-
-	bytes, err := json.Marshal(kvps)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
 }
 
 // nextUnsealedFinalizedBlock determines the ID of the finalized but unsealed
@@ -105,16 +44,147 @@ func (st *SealingTracker) sealingRecord2String(record *SealingRecord) (string, e
 // the respective ID.
 // In case the next unsealed block has not been finalized, we return the
 // False-filter (or if we encounter any problems).
-func nextUnsealedFinalizedBlock(state protocol.State) flow.IdentifierFilter {
-	lastSealed, err := state.Sealed().Head()
-	if err != nil {
-		return id.False
-	}
-
-	nextUnsealedHeight := lastSealed.Height + 1
-	nextUnsealed, err := state.AtHeight(nextUnsealedHeight).Head()
+func (st *SealingTracker) nextUnsealedFinalizedBlock(sealedBlock *flow.Header) flow.IdentifierFilter {
+	nextUnsealedHeight := sealedBlock.Height + 1
+	nextUnsealed, err := st.headersDB.ByHeight(nextUnsealedHeight)
 	if err != nil {
 		return id.False
 	}
 	return id.Is(nextUnsealed.ID())
+}
+
+// NewSealingObservation constructs a SealingObservation, which capture information
+// about the progress of a _single_ go routine. Consequently, SealingObservations
+// don't need to be concurrency safe, as they are supposed to be thread-local structure.
+func (st *SealingTracker) NewSealingObservation(finalizedBlock *flow.Header, seal *flow.Seal, sealedBlock *flow.Header) consensus.SealingObservation {
+	return &SealingObservation{
+		SealingTracker:      st,
+		startTime:           time.Now(),
+		finalizedBlock:      finalizedBlock,
+		latestFinalizedSeal: seal,
+		latestSealedBlock:   sealedBlock,
+		isRelevant:          st.nextUnsealedFinalizedBlock(sealedBlock),
+		records:             make(map[flow.Identifier]*SealingRecord),
+	}
+}
+
+// SealingObservation captures information about the progress of a _single_ go routine.
+// Consequently, it is _not concurrency safe_, as SealingObservation is intended to be
+// a thread-local structure.
+// SealingObservation is supposed to track the status of various (unsealed) incorporated
+// results, which sealing.Core processes (driven by that single goroutine).
+type SealingObservation struct {
+	*SealingTracker
+
+	finalizedBlock      *flow.Header
+	latestFinalizedSeal *flow.Seal
+	latestSealedBlock   *flow.Header
+
+	startTime  time.Time                          // time when this instance was created
+	isRelevant flow.IdentifierFilter              // policy to determine for which blocks we want to track
+	records    map[flow.Identifier]*SealingRecord // each record is for one (unsealed) incorporated result
+}
+
+// QualifiesForEmergencySealing captures whether sealing.Core has
+// determined that the incorporated result qualifies for emergency sealing.
+func (st *SealingObservation) QualifiesForEmergencySealing(ir *flow.IncorporatedResult, emergencySealable bool) {
+	if !st.isRelevant(ir.Result.BlockID) {
+		return
+	}
+	st.getOrCreateRecord(ir).QualifiesForEmergencySealing(emergencySealable)
+}
+
+// ApprovalsMissing captures whether sealing.Core has determined that
+// some approvals are still missing for the incorporated result. Calling this
+// method with empty `chunksWithMissingApprovals` indicates that all chunks
+// have sufficient approvals.
+func (st *SealingObservation) ApprovalsMissing(ir *flow.IncorporatedResult, chunksWithMissingApprovals map[uint64]flow.IdentifierList) {
+	if !st.isRelevant(ir.Result.BlockID) {
+		return
+	}
+	st.getOrCreateRecord(ir).ApprovalsMissing(chunksWithMissingApprovals)
+}
+
+// ApprovalsRequested captures the number of approvals that the business
+// logic has re-requested for the incorporated result.
+func (st *SealingObservation) ApprovalsRequested(ir *flow.IncorporatedResult, requestCount uint) {
+	if !st.isRelevant(ir.Result.BlockID) {
+		return
+	}
+	st.getOrCreateRecord(ir).ApprovalsRequested(requestCount)
+}
+
+// getOrCreateRecord returns the sealing record for the given incorporated result.
+// If no such record is found, a new record is created and stored in `records`.
+func (st *SealingObservation) getOrCreateRecord(ir *flow.IncorporatedResult) *SealingRecord {
+	irID := ir.ID()
+	record, found := st.records[irID]
+	if !found {
+		record = &SealingRecord{
+			SealingObservation: st,
+			IncorporatedResult: ir,
+			entries:            make(Rec),
+		}
+		st.records[irID] = record
+	}
+	return record
+}
+
+// Complete is supposed to be called when a single execution of the sealing logic
+// has been completed. It compiles the information about the incorporated results.
+func (st *SealingObservation) Complete() {
+	observation := st.log.Info()
+
+	// basic information
+	observation.Str("finalized_block", st.finalizedBlock.ID().String()).
+		Uint64("finalized_block_height", st.finalizedBlock.Height).
+		Uint("seals_mempool_size", st.sealsPl.Size())
+
+	// details about the latest finalized seal
+	sealDetails, err := st.latestFinalizedSealInfo()
+	if err != nil {
+		st.log.Error().Err(err).Msg("failed to marshal latestFinalizedSeal details")
+	} else {
+		observation = observation.Str("finalized_seal", sealDetails)
+	}
+
+	// details about the unsealed results that are next
+	recList := make([]Rec, 0, len(st.records))
+	for irID, rec := range st.records {
+		r, err := rec.Generate()
+		if err != nil {
+			st.log.Error().Err(err).
+				Str("incorporated_result", irID.String()).
+				Msg("failed to generate sealing record")
+			continue
+		}
+		recList = append(recList, r)
+	}
+	if len(recList) > 0 {
+		bytes, err := json.Marshal(recList)
+		if err != nil {
+			st.log.Error().Err(err).Msg("failed to marshal records")
+		}
+		observation = observation.Str("next_unsealed_results", string(bytes))
+	}
+
+	// dump observation to Logger
+	observation = observation.Int64("duration_ms", time.Since(st.startTime).Milliseconds())
+	observation.Msg("sealing observation")
+}
+
+// latestFinalizedSealInfo returns a json string representation with the most
+// relevant data about the latest finalized seal
+func (st *SealingObservation) latestFinalizedSealInfo() (string, error) {
+	r := make(map[string]interface{})
+	r["executed_block_id"] = st.latestFinalizedSeal.BlockID.String()
+	r["executed_block_height"] = st.latestSealedBlock.Height
+	r["result_id"] = st.latestFinalizedSeal.ResultID.String()
+	r["result_final_state"] = hex.EncodeToString(st.latestFinalizedSeal.FinalState[:])
+
+	bytes, err := json.Marshal(r)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
 }

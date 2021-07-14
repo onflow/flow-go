@@ -455,6 +455,11 @@ func (s TransactionSignature) String() string {
 		s.Address, s.SignerIndex, s.KeyIndex, s.Signature)
 }
 
+// UniqueKeyString returns constructs an string with combination of address and key
+func (s TransactionSignature) UniqueKeyString() string {
+	return fmt.Sprintf("%s-%d", s.Address.String(), s.KeyIndex)
+}
+
 // ByteSize returns the byte size of the transaction signature
 func (s TransactionSignature) ByteSize() int {
 	signerIndexLen := 8

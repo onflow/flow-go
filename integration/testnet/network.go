@@ -16,16 +16,18 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
-	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/utils/io"
+
 	"github.com/dapperlabs/testingdock"
 
 	"github.com/onflow/cadence"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -210,7 +212,9 @@ type NetworkConfig struct {
 	ViewsInEpoch          uint64
 }
 
-func NewNetworkConfig(name string, nodes []NodeConfig, opts ...func(*NetworkConfig)) NetworkConfig {
+type NetworkConfigOpt func(*NetworkConfig)
+
+func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:                 nodes,
 		Name:                  name,
@@ -236,6 +240,12 @@ func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
 func WithViewsInEpoch(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInEpoch = views
+	}
+}
+
+func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
+	return func(config *NetworkConfig) {
+		config.ViewsInDKGPhase = views
 	}
 }
 

@@ -51,6 +51,7 @@ const (
 	ResourceCollection               = "collection"
 	ResourceApproval                 = "approval"
 	ResourceSeal                     = "seal"
+	ResourcePendingIncorporatedSeal  = "pending_incorporated_seal"
 	ResourceCommit                   = "commit"
 	ResourceTransaction              = "transaction"
 	ResourceClusterPayload           = "cluster_payload"
