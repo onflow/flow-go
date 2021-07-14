@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -37,8 +38,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
-	"github.com/onflow/flow-go/engine/verification/finder"
-	"github.com/onflow/flow-go/engine/verification/match"
 	vereq "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
@@ -62,7 +61,6 @@ import (
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -241,7 +239,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receipts := consensusMempools.NewExecutionTree()
 
 	seals := stdmap.NewIncorporatedResultSeals(1000)
-	pendingReceipts := stdmap.NewPendingReceipts(1000)
+	pendingReceipts := stdmap.NewPendingReceipts(node.Headers, 1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
@@ -273,6 +271,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.Headers,
 		node.Payloads,
+		resultsDB,
+		node.Index,
 		node.State,
 		node.Seals,
 		assigner,
@@ -304,6 +304,9 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.Metrics,
 		node.Metrics,
+		node.State,
+		receiptsDB,
+		node.Index,
 		matchingCore,
 	)
 	require.NoError(t, err)
@@ -446,7 +449,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	deltas, err := ingestion.NewDeltas(1000)
 	require.NoError(t, err)
 
-	checkerEngine := &CheckerMock{}
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
@@ -478,7 +481,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, followerState, checkerEngine, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
@@ -499,6 +502,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
+
+	finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
@@ -608,12 +613,6 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 
 type VerificationOpt func(*testmock.VerificationNode)
 
-func WithMatchEngine(eng network.Engine) VerificationOpt {
-	return func(node *testmock.VerificationNode) {
-		node.MatchEngine = eng
-	}
-}
-
 func WithChunkConsumer(chunkConsumer *chunkconsumer.ChunkConsumer) VerificationOpt {
 	return func(node *testmock.VerificationNode) {
 		node.ChunkConsumer = chunkConsumer
@@ -626,206 +625,9 @@ func WithGenericNode(genericNode *testmock.GenericNode) VerificationOpt {
 	}
 }
 
-// TODO: this is fixture for old verification node (i.e., the one currently in place)
-// remove it once we have the new verification node rolled-in.
-func VerificationNode(t testing.TB,
-	hub *stub.Hub,
-	identity *flow.Identity,
-	identities []*flow.Identity,
-	assigner module.ChunkAssigner,
-	requestInterval time.Duration,
-	processInterval time.Duration,
-	receiptsLimit uint,
-	chunksLimit uint,
-	failureThreshold uint,
-	chainID flow.ChainID,
-	collector module.VerificationMetrics, // used to enable collecting metrics on happy path integration
-	mempoolCollector module.MempoolMetrics, // used to enable collecting metrics on happy path integration
-	opts ...VerificationOpt) testmock.VerificationNode {
-
-	var err error
-	var node testmock.VerificationNode
-
-	for _, apply := range opts {
-		apply(&node)
-	}
-
-	if node.GenericNode == nil {
-		gn := GenericNode(t, hub, identity, identities, chainID)
-		node.GenericNode = &gn
-	}
-
-	if node.CachedReceipts == nil {
-		node.CachedReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceCachedReceipt, node.CachedReceipts.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingReceipts == nil {
-		node.PendingReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, node.PendingReceipts.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ReadyReceipts == nil {
-		node.ReadyReceipts, err = stdmap.NewReceiptDataPacks(receiptsLimit)
-		require.Nil(t, err)
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceReceipt, node.ReadyReceipts.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingResults == nil {
-		node.PendingResults = stdmap.NewResultDataPacks(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingResult, node.PendingResults.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingChunks == nil {
-		node.PendingChunks = match.NewChunks(chunksLimit)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingChunk, node.PendingChunks.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ProcessedResultIDs == nil {
-		node.ProcessedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, node.ProcessedResultIDs.Size)
-		require.Nil(t, err)
-	}
-
-	if node.DiscardedResultIDs == nil {
-		node.DiscardedResultIDs, err = stdmap.NewIdentifiers(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceDiscardedResultID, node.DiscardedResultIDs.Size)
-		require.Nil(t, err)
-	}
-
-	if node.BlockIDsCache == nil {
-		node.BlockIDsCache, err = stdmap.NewIdentifiers(1000)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceCachedBlockID, node.BlockIDsCache.Size)
-		require.Nil(t, err)
-	}
-
-	if node.PendingReceiptIDsByBlock == nil {
-		node.PendingReceiptIDsByBlock, err = stdmap.NewIdentifierMap(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, node.PendingReceiptIDsByBlock.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ReceiptIDsByResult == nil {
-		node.ReceiptIDsByResult, err = stdmap.NewIdentifierMap(receiptsLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, node.ReceiptIDsByResult.Size)
-		require.Nil(t, err)
-	}
-
-	if node.ChunkIDsByResult == nil {
-		node.ChunkIDsByResult, err = stdmap.NewIdentifierMap(chunksLimit)
-		require.Nil(t, err)
-
-		// registers size method of backend for metrics
-		err = mempoolCollector.Register(metrics.ResourceChunkIDsByResult, node.ChunkIDsByResult.Size)
-		require.Nil(t, err)
-	}
-
-	if node.VerifierEngine == nil {
-		rt := fvm.NewInterpreterRuntime()
-
-		vm := fvm.NewVirtualMachine(rt)
-
-		blockFinder := fvm.NewBlockFinder(node.Headers)
-
-		vmCtx := fvm.NewContext(
-			node.Log,
-			fvm.WithChain(node.ChainID.Chain()),
-			fvm.WithBlocks(blockFinder),
-		)
-
-		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-
-		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
-
-		node.VerifierEngine, err = verifier.New(node.Log,
-			collector,
-			node.Tracer,
-			node.Net,
-			node.State,
-			node.Me,
-			chunkVerifier,
-			approvalStorage)
-		require.Nil(t, err)
-	}
-
-	if node.MatchEngine == nil {
-		node.MatchEngine, err = match.New(node.Log,
-			collector,
-			node.Tracer,
-			node.Net,
-			node.Me,
-			node.PendingResults,
-			node.ChunkIDsByResult,
-			node.VerifierEngine,
-			assigner,
-			node.State,
-			node.PendingChunks,
-			node.Headers,
-			requestInterval,
-			int(failureThreshold))
-		require.Nil(t, err)
-	}
-
-	if node.FinderEngine == nil {
-		node.FinderEngine, err = finder.New(node.Log,
-			collector,
-			node.Tracer,
-			node.Net,
-			node.Me,
-			node.State,
-			node.MatchEngine,
-			node.CachedReceipts,
-			node.PendingReceipts,
-			node.ReadyReceipts,
-			node.Headers,
-			node.ProcessedResultIDs,
-			node.DiscardedResultIDs,
-			node.PendingReceiptIDsByBlock,
-			node.ReceiptIDsByResult,
-			node.BlockIDsCache,
-			processInterval)
-		require.Nil(t, err)
-	}
-
-	return node
-}
-
-// NewVerificationNode creates a verification node with all functional engines and actual modules for purpose of
+// VerificationNode creates a verification node with all functional engines and actual modules for purpose of
 // (integration) testing.
-//
-// TODO: refactor to VerificationNode once the old constructor is dropped.
-func NewVerificationNode(t testing.TB,
+func VerificationNode(t testing.TB,
 	hub *stub.Hub,
 	verIdentity *flow.Identity, // identity of this verification node.
 	participants flow.IdentityList, // identity of all nodes in system including this verification node.
