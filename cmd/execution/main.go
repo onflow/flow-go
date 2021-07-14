@@ -130,7 +130,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.ProtocolState())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
@@ -303,7 +303,7 @@ func main() {
 			return checkerEng, nil
 		}).
 		Component("ingestion engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
-			collectionRequester, err = requester.New(node.Logger(), node.Metrics().Engine, node.Network, node.Me(), node.ProtocolState(),
+			collectionRequester, err = requester.New(node.Logger(), node.Metrics().Engine, node.Network(), node.Me(), node.ProtocolState(),
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
@@ -313,15 +313,16 @@ func main() {
 
 			preferredExeFilter := filter.Any
 			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			logger := node.Logger()
 			if err == nil {
-				node.Logger().Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
+				logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
 			} else if err != nil && preferredExeNodeIDStr != "" {
-				node.Logger().Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
+				logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 			}
 
 			ingestionEng, err = ingestion.New(
-				*node.Logger(),
+				logger,
 				node.Network(),
 				node.Me(),
 				collectionRequester,

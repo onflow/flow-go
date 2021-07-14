@@ -95,19 +95,19 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.ProtocolState())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
 				node.Storage().Index,
 				node.Storage().Payloads,
-				node.Tracer,
+				node.Tracer(),
 				node.ProtocolEvents(),
 			)
 			return err
 		}).
 		Module("verification metrics", func(node cmd.NodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
+			collector = metrics.NewVerificationCollector(node.Tracer(), node.MetricsRegisterer())
 			return nil
 		}).
 		Module("chunk status memory pool", func(node cmd.NodeBuilder) error {
@@ -135,13 +135,14 @@ func main() {
 			return nil
 		}).
 		Module("chunks queue", func(node cmd.NodeBuilder) error {
-			chunkQueue = storage.NewChunkQueue(node.DB)
+			chunkQueue = storage.NewChunkQueue(node.DB())
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
 				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
 
-			node.Logger.Info().
+			logger := node.Logger()
+			logger.Info().
 				Str("component", "node-builder").
 				Bool("init_to_default", ok).
 				Msg("chunks queue index has been initialized")
@@ -167,16 +168,16 @@ func main() {
 		Component("verifier engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger(), node.FvmOptions...)
+			vmCtx := fvm.NewContext(node.Logger(), node.FvmOptions()...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-			approvalStorage := storage.NewResultApprovals(node.Metrics().Cache, node.DB)
+			approvalStorage := storage.NewResultApprovals(node.Metrics().Cache, node.DB())
 			verifierEng, err = verifier.New(
 				node.Logger(),
 				collector,
-				node.Tracer,
-				node.Network,
+				node.Tracer(),
+				node.Network(),
 				node.ProtocolState(),
-				node.Me,
+				node.Me(),
 				chunkVerifier,
 				approvalStorage)
 			return verifierEng, err
@@ -185,8 +186,8 @@ func main() {
 			requesterEngine, err = vereq.New(
 				node.Logger(),
 				node.ProtocolState(),
-				node.Network,
-				node.Tracer,
+				node.Network(),
+				node.Tracer(),
 				collector,
 				chunkRequests,
 				requestInterval,
@@ -197,7 +198,7 @@ func main() {
 			fetcherEngine = fetcher.New(
 				node.Logger(),
 				collector,
-				node.Tracer,
+				node.Tracer(),
 				verifierEng,
 				node.ProtocolState(),
 				chunkStatuses,
@@ -225,7 +226,7 @@ func main() {
 		}).
 		Component("assigner engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
-			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
+			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.ProtocolState())
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize chunk assigner: %w", err)
 			}
@@ -233,8 +234,8 @@ func main() {
 			assignerEngine = assigner.New(
 				node.Logger(),
 				collector,
-				node.Tracer,
-				node.Me,
+				node.Tracer(),
+				node.Me(),
 				node.ProtocolState(),
 				chunkAssigner,
 				chunkQueue,
@@ -263,7 +264,8 @@ func main() {
 				return nil, fmt.Errorf("could not register backend metric: %w", err)
 			}
 
-			node.Logger.Info().
+			logger := node.Logger()
+			logger.Info().
 				Str("component", "node-builder").
 				Uint64("init_height", initBlockHeight).
 				Msg("block consumer initialized")
@@ -287,7 +289,7 @@ func main() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me.NodeID())
+			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me().NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -305,16 +307,16 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.rootBlock.Header,
-				node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.RootBlock().Header,
+				node.RootQC(), finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			followerEng, err = followereng.New(
 				node.Logger(),
-				node.Network,
-				node.Me,
+				node.Network(),
+				node.Me(),
 				node.Metrics().Engine,
 				node.Metrics().Mempool,
 				cleaner,
@@ -335,8 +337,8 @@ func main() {
 			sync, err := synceng.New(
 				node.Logger(),
 				node.Metrics().Engine,
-				node.Network,
-				node.Me,
+				node.Network(),
+				node.Me(),
 				node.ProtocolState(),
 				node.Storage().Blocks,
 				followerEng,

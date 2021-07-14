@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -24,6 +25,7 @@ type NodeBuilder interface {
 	Initialize() NodeBuilder
 	EnqueueNetworkInit()
 	EnqueueMetricsServerInit()
+	EnqueueTracer()
 	ParseAndPrintFlags()
 	PrintBuildVersionDetails()
 	InitLocal()
@@ -32,11 +34,12 @@ type NodeBuilder interface {
 	Component(name string, f func(NodeBuilder) (module.ReadyDoneAware, error)) NodeBuilder
 	Run()
 	PostInit(f func(node NodeBuilder)) NodeBuilder
+	RegisterBadgerMetrics()
 
 	// getters
 	Config() BaseConfig
 	NodeID() flow.Identifier
-	Logger() *zerolog.Logger
+	Logger() zerolog.Logger
 	Me() *local.Local
 	Tracer() module.Tracer
 	MetricsRegisterer() prometheus.Registerer
@@ -49,10 +52,17 @@ type NodeBuilder interface {
 	Network() *p2p.Network
 	MsgValidators() []network.MessageValidator
 	FvmOptions() []fvm.Option
+	NetworkKey() crypto.PrivateKey
 	RootBlock() *flow.Block
 	RootQC() *flow.QuorumCertificate
 	RootSeal() *flow.Seal
 	RootChainID() flow.ChainID
+
+	// setters
+	SetMsgValidators(validators []network.MessageValidator)
+	SetMe(me *local.Local)
+	SetMiddleware(m *p2p.Middleware)
+	SetNetwork(n *p2p.Network)
 }
 
 // BaseConfig is the general config for the NodeBuilder

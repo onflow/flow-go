@@ -21,11 +21,12 @@ func main() {
 		}).
 		Initialize().
 		Module("message validators", func(node cmd.NodeBuilder) error {
-			node.MsgValidators = []network.MessageValidator{
+			validators := []network.MessageValidator{
 				// filter out messages sent by this node itself
 				validator.NewSenderValidator(node.Me().NodeID()),
 				// but retain all the 1-k messages even if they are not intended for this node
 			}
+			node.SetMsgValidators(validators)
 			return nil
 		}).
 		Component("RPC engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {

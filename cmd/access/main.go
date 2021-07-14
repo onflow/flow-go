@@ -115,7 +115,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State())
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.ProtocolState())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
@@ -128,12 +128,13 @@ func main() {
 		}).
 		Module("collection node client", func(node cmd.NodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
+			logger := node.Logger()
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
-				node.Logger().Info().Msg("using a dynamic collection node address")
+				logger.Info().Msg("using a dynamic collection node address")
 				return nil
 			}
 
-			node.Logger().Info().
+			logger.Info().
 				Str("collection_node", rpcConf.CollectionAddr).
 				Msg("using the static collection node address")
 
@@ -149,12 +150,13 @@ func main() {
 			return nil
 		}).
 		Module("historical access node clients", func(node cmd.NodeBuilder) error {
+			logger := node.Logger()
 			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
 					continue
 				}
-				node.Logger.Info().Err(err).Msgf("Historical access node Addr: %s", addr)
+				logger.Err(err).Msgf("Historical access node Addr: %s", addr)
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
@@ -215,7 +217,7 @@ func main() {
 				node.Storage().Collections,
 				node.Storage().Transactions,
 				node.Storage().Receipts,
-				node.rootChainID,
+				node.RootChainID(),
 				transactionMetrics,
 				collectionGRPCPort,
 				executionGRPCPort,
@@ -230,8 +232,8 @@ func main() {
 			requestEng, err = requester.New(
 				node.Logger(),
 				node.Metrics().Engine,
-				node.Network,
-				node.Me,
+				node.Network(),
+				node.Me(),
 				node.ProtocolState(),
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
@@ -240,7 +242,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			ingestEng, err = ingestion.New(node.Logger(), node.Network, node.ProtocolState(), node.Me, requestEng, node.Storage().Blocks, node.Storage().Headers, node.Storage().Collections, node.Storage().Transactions, node.Storage().Receipts, transactionMetrics,
+			ingestEng, err = ingestion.New(node.Logger(), node.Network(), node.ProtocolState(), node.Me(), requestEng, node.Storage().Blocks, node.Storage().Headers, node.Storage().Collections, node.Storage().Transactions, node.Storage().Receipts, transactionMetrics,
 				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
@@ -267,8 +269,8 @@ func main() {
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me.NodeID())
+			// Note: node.Me().NodeID() is not part of the consensus committee
+			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me().NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -286,15 +288,15 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.rootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.RootBlock().Header, node.RootQC(), finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
 
 			followerEng, err = followereng.New(
 				node.Logger(),
-				node.Network,
-				node.Me,
+				node.Network(),
+				node.Me(),
 				node.Metrics().Engine,
 				node.Metrics().Mempool,
 				cleaner,
@@ -315,8 +317,8 @@ func main() {
 			sync, err := synceng.New(
 				node.Logger(),
 				node.Metrics().Engine,
-				node.Network,
-				node.Me,
+				node.Network(),
+				node.Me(),
 				node.ProtocolState(),
 				node.Storage().Blocks,
 				followerEng,
@@ -337,10 +339,10 @@ func main() {
 			ping, err := pingeng.New(
 				node.Logger(),
 				node.ProtocolState(),
-				node.Me,
+				node.Me(),
 				pingMetrics,
 				pingEnabled,
-				node.Middleware,
+				node.Middleware(),
 				nodeInfoFile,
 			)
 			if err != nil {

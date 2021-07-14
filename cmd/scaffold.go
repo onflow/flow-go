@@ -96,7 +96,7 @@ type FlowNodeBuilder struct {
 	BaseConfig        BaseConfig
 	nodeID            flow.Identifier
 	flags             *pflag.FlagSet
-	logger            *zerolog.Logger
+	logger            zerolog.Logger
 	me                *local.Local
 	tracer            module.Tracer
 	metricsRegisterer prometheus.Registerer
@@ -134,12 +134,16 @@ func (fnb *FlowNodeBuilder) NodeID() flow.Identifier {
 	return fnb.nodeID
 }
 
-func (fnb *FlowNodeBuilder) Logger() *zerolog.Logger {
+func (fnb *FlowNodeBuilder) Logger() zerolog.Logger {
 	return fnb.logger
 }
 
 func (fnb *FlowNodeBuilder) Me() *local.Local {
 	return fnb.me
+}
+
+func (fnb *FlowNodeBuilder) SetMe(me *local.Local) {
+	fnb.me = me
 }
 
 func (fnb *FlowNodeBuilder) Tracer() module.Tracer {
@@ -174,16 +178,32 @@ func (fnb *FlowNodeBuilder) Middleware() *p2p.Middleware {
 	return fnb.middleware
 }
 
+func (fnb *FlowNodeBuilder) SetMiddleware(m *p2p.Middleware) {
+	fnb.middleware = m
+}
+
 func (fnb *FlowNodeBuilder) Network() *p2p.Network {
 	return fnb.network
+}
+
+func (fnb *FlowNodeBuilder) SetNetwork(n *p2p.Network) {
+	fnb.network = n
 }
 
 func (fnb *FlowNodeBuilder) MsgValidators() []network.MessageValidator {
 	return fnb.msgValidators
 }
 
+func (fnb *FlowNodeBuilder) SetMsgValidators(validators []network.MessageValidator) {
+	fnb.msgValidators = validators
+}
+
 func (fnb *FlowNodeBuilder) FvmOptions() []fvm.Option {
 	return fnb.fvmOptions
+}
+
+func (fnb *FlowNodeBuilder) NetworkKey() crypto.PrivateKey {
+	return fnb.networkKey
 }
 
 func (fnb *FlowNodeBuilder) RootBlock() *flow.Block {
@@ -280,14 +300,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		// topology
 		// subscription manager
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.middleware)
-		top, err := topology.NewTopicBasedTopology(fnb.nodeID, *fnb.logger, fnb.state)
+		top, err := topology.NewTopicBasedTopology(fnb.nodeID, fnb.logger, fnb.state)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
-		topologyCache := topology.NewCache(*fnb.logger, top)
+		topologyCache := topology.NewCache(fnb.logger, top)
 
 		// creates network instance
-		net, err := p2p.NewNetwork(*fnb.logger,
+		net, err := p2p.NewNetwork(fnb.logger,
 			codec,
 			participants,
 			fnb.me,
@@ -302,7 +322,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.network = net
 
-		idRefresher := p2p.NewNodeIDRefresher(*fnb.logger, fnb.state, net.SetIDs)
+		idRefresher := p2p.NewNodeIDRefresher(fnb.logger, fnb.state, net.SetIDs)
 		idEvents := gadgets.NewIdentityDeltas(idRefresher.OnIdentityTableChanged)
 		fnb.protocolEvents.AddConsumer(idEvents)
 
@@ -312,7 +332,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(builder NodeBuilder) (module.ReadyDoneAware, error) {
-		server := metrics.NewServer(*fnb.logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
+		server := metrics.NewServer(fnb.logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
 }
@@ -383,14 +403,14 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	}
 	log = log.Level(lvl)
 
-	fnb.logger = &log
+	fnb.logger = log
 }
 
 func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		tracer, err := trace.NewTracer(*fnb.logger, fnb.BaseConfig.NodeRole)
+		tracer, err := trace.NewTracer(fnb.logger, fnb.BaseConfig.NodeRole)
 		fnb.MustNot(err).Msg("could not initialize tracer")
 		fnb.logger.Info().Msg("Tracer Started")
 		fnb.tracer = tracer
@@ -418,7 +438,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		return
 	}
 	profiler, err := debug.NewAutoProfiler(
-		*fnb.logger,
+		fnb.logger,
 		fnb.BaseConfig.profilerDir,
 		fnb.BaseConfig.profilerInterval,
 		fnb.BaseConfig.profilerDuration,
@@ -434,7 +454,7 @@ func (fnb *FlowNodeBuilder) initDB() {
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
 
-	log := sutil.NewLogger(*fnb.logger)
+	log := sutil.NewLogger(fnb.logger)
 
 	// we initialize the database with options that allow us to keep the maximum
 	// item size in the trie itself (up to 1MB) and where we keep all level zero
