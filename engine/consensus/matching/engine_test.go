@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -120,7 +121,7 @@ func (s *MatchingEngineSuite) TestMultipleProcessingItems() {
 	go func() {
 		defer wg.Done()
 		for _, receipt := range receipts {
-			err := s.engine.Process(originID, receipt)
+			err := s.engine.Process(engine.ReceiveReceipts, originID, receipt)
 			s.Require().NoError(err, "should add receipt and result to mempool if valid")
 		}
 	}()
