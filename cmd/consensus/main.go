@@ -59,7 +59,7 @@ func main() {
 		resultLimit                            uint
 		approvalLimit                          uint
 		sealLimit                              uint
-		pendngReceiptsLimit                    uint
+		pendingReceiptsLimit                   uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		maxSealPerBlock                        uint
@@ -101,7 +101,7 @@ func main() {
 			// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
 			// ever gets full, the node will simply crash instead of employing complex ejection logic.
 			flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
-			flags.UintVar(&pendngReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
+			flags.UintVar(&pendingReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
@@ -205,7 +205,7 @@ func main() {
 			return nil
 		}).
 		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts = stdmap.NewPendingReceipts(pendngReceiptsLimit)
+			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendingReceiptsLimit)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -240,6 +240,8 @@ func main() {
 				node.Me,
 				node.Storage.Headers,
 				node.Storage.Payloads,
+				node.Storage.Results,
+				node.Storage.Index,
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
@@ -293,6 +295,9 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.State,
+				node.Storage.Receipts,
+				node.Storage.Index,
 				core,
 			)
 			if err != nil {
@@ -302,6 +307,7 @@ func main() {
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
 			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
