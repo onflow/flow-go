@@ -181,11 +181,14 @@ func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkD
 // handleChunkDataPack sends the received chunk data pack to the registered handler, and cleans up its request status.
 func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	chunkID := chunkDataPack.ChunkID
-	collectionID := chunkDataPack.Collection.ID()
 	lg := e.log.With().
 		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("collection_id", logging.ID(collectionID)).
 		Logger()
+
+	if chunkDataPack.Collection != nil {
+		collectionID := chunkDataPack.Collection.ID()
+		lg = lg.With().Hex("collection_id", logging.ID(collectionID)).Logger()
+	}
 	lg.Debug().Msg("chunk data pack received")
 
 	e.metrics.OnChunkDataPackResponseReceivedFromNetworkByRequester()
