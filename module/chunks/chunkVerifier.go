@@ -75,7 +75,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 
 	// transaction body of system chunk
 	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
-	tx := fvm.Transaction(txBody, uint32(0))
+	tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
 	systemChunkContext := fvm.NewContextFromParent(fcv.systemChunkCtx,
