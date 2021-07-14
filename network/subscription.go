@@ -1,14 +1,14 @@
 package network
 
 type SubscriptionManager interface {
-	// Register registers an engine on the channel into the subscription manager.
-	Register(channel Channel, engine Engine) error
+	// Register registers a message processor on the channel into the subscription manager.
+	Register(channel Channel, messageProcessor MessageProcessor) error
 
-	// Unregister removes the engine associated with a channel.
+	// Unregister removes the message processor associated with a channel.
 	Unregister(channel Channel) error
 
-	// GetEngine returns engine associated with a channel.
-	GetEngine(channel Channel) (Engine, error)
+	// GetMessageProcessor returns message processor associated with a channel.
+	GetMessageProcessor(channel Channel) (MessageProcessor, error)
 
 	// Channels returns all the channels registered in this subscription manager.
 	Channels() ChannelList

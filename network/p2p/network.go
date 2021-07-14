@@ -107,17 +107,16 @@ func (n *Network) Done() <-chan struct{} {
 	return done
 }
 
-// Register will register the given engine with the given unique engine engineID,
-// returning a conduit to directly submit messages to the message bus of the
-// engine.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+// Register will register the given message processor with the given unique processor ID,
+// returning a conduit to directly submit messages to the message bus of the processor.
+func (n *Network) Register(channel network.Channel, messageProcessor network.MessageProcessor) (network.Conduit, error) {
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
 
-	err := n.subMngr.Register(channel, engine)
+	err := n.subMngr.Register(channel, messageProcessor)
 	if err != nil {
-		return nil, fmt.Errorf("failed to register engine for channel %s: %w", channel, err)
+		return nil, fmt.Errorf("failed to register messageProcessor for channel %s: %w", channel, err)
 	}
 
 	n.logger.Info().
@@ -141,12 +140,12 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	return conduit, nil
 }
 
-// unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
-// receive messages from that channel
+// unregister unregisters the message processor for the specified channel. The message
+// processor will no longer be able to send or receive messages from that channel
 func (n *Network) unregister(channel network.Channel) error {
 	err := n.subMngr.Unregister(channel)
 	if err != nil {
-		return fmt.Errorf("failed to unregister engine for channel %s: %w", channel, err)
+		return fmt.Errorf("failed to unregister message processor for channel %s: %w", channel, err)
 	}
 	return nil
 }
@@ -252,7 +251,7 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	// use a hash with an engine-specific salt to get the payload hash
+	// use a hash with an processor-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
 	_, err = h.Write([]byte("libp2ppacking" + channel))
 	if err != nil {
@@ -397,11 +396,11 @@ func (n *Network) sendOnChannel(channel network.Channel, message interface{}, ta
 	return nil
 }
 
-// queueSubmitFunc submits the message to the engine synchronously. It is the callback for the queue worker
+// queueSubmitFunc submits the message to the processor synchronously. It is the callback for the queue worker
 // when it gets a message from the queue
 func (n *Network) queueSubmitFunc(message interface{}) {
 	qm := message.(queue.QMessage)
-	eng, err := n.subMngr.GetEngine(qm.Target)
+	eng, err := n.subMngr.GetMessageProcessor(qm.Target)
 	if err != nil {
 		n.logger.Error().
 			Err(err).
@@ -411,7 +410,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 		return
 	}
 
-	// submits the message to the engine synchronously and
+	// submits the message to the processor synchronously and
 	// tracks its processing time.
 	startTimestamp := time.Now()
 
