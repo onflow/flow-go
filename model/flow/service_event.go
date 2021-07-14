@@ -163,17 +163,7 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 		return fmt.Errorf("missing event key")
 	}
 
-	// re-marshal the event, we'll unmarshal it into the appropriate type
-	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
-	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
-	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
-	opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-	em, err1 := opts.EncMode()
-	if err1 != nil {
-		return err
-	}
-
-	evb, err := em.Marshal(ev)
+	evb, err := cborEncMode.Marshal(ev)
 	if err != nil {
 		return err
 	}

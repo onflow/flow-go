@@ -174,6 +174,20 @@ func switchv2what(v interface{}) (string, error) {
 	return what, nil
 }
 
+// "For best performance, reuse EncMode and DecMode after creating them." [1]
+// [1] https://github.com/fxamacker/cbor
+var cborEncMode = func() cbor.EncMode {
+	options := cbor.CoreDetEncOptions() // CBOR deterministic options
+	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
+	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
+	options.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
+	encMode, err := options.EncMode()
+	if err != nil {
+		panic(err)
+	}
+	return encMode
+}()
+
 func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 
 	// determine the message type
@@ -190,12 +204,7 @@ func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 
 	// encode the payload
 	p := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code), "")
-	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
-	em, err3 := opts.EncMode()
-	if err3 != nil {
-		return nil, 0, err3
-	}
-	data, err := em.Marshal(v)
+	data, err := cborEncMode.Marshal(v)
 	binstat.LeaveVal(p, int64(len(data)))
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not encode payload: %w", err)

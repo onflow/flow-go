@@ -105,6 +105,20 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	return err
 }
 
+// "For best performance, reuse EncMode and DecMode after creating them." [1]
+// [1] https://github.com/fxamacker/cbor
+var cborEncMode = func() cbor.EncMode {
+	options := cbor.CoreDetEncOptions() // CBOR deterministic options
+	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
+	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
+	options.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
+	encMode, err := options.EncMode()
+	if err != nil {
+		panic(err)
+	}
+	return encMode
+}()
+
 // MarshalJSON makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalCBOR() ([]byte, error) {
 
@@ -117,15 +131,7 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
 	type Encodable Header
-	opts := cbor.CoreDetEncOptions() // CBOR deterministic options
-	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
-	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
-	opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-	em, err := opts.EncMode()
-	if err != nil {
-		return nil, err
-	}
-	return em.Marshal(Encodable(h))
+	return cborEncMode.Marshal(Encodable(h))
 }
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.

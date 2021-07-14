@@ -15,6 +15,20 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// "For best performance, reuse EncMode and DecMode after creating them." [1]
+// [1] https://github.com/fxamacker/cbor
+var cborEncMode = func() cbor.EncMode {
+	options := cbor.CoreDetEncOptions() // CBOR deterministic options
+	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
+	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
+	options.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
+	encMode, err := options.EncMode()
+	if err != nil {
+		panic(err)
+	}
+	return encMode
+}()
+
 func TestEncodeDecode(t *testing.T) {
 
 	setup := unittest.EpochSetupFixture()
@@ -128,14 +142,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	t.Run("cbor", func(t *testing.T) {
 		t.Run("specific event types", func(t *testing.T) {
-			opts := cbor.CoreDetEncOptions() // CBOR deterministic options
-			// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
-			// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
-			opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-			em, err1 := opts.EncMode()
-			require.Nil(t, err1)
-
-			b, err := em.Marshal(setup)
+			b, err := cborEncMode.Marshal(setup)
 			require.Nil(t, err)
 
 			gotSetup := new(flow.EpochSetup)
@@ -143,7 +150,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.Nil(t, err)
 			assert.DeepEqual(t, setup, gotSetup)
 
-			b, err = em.Marshal(commit)
+			b, err = cborEncMode.Marshal(commit)
 			require.Nil(t, err)
 
 			gotCommit := new(flow.EpochCommit)
@@ -157,15 +164,8 @@ func TestEncodeDecode(t *testing.T) {
 		})
 
 		t.Run("generic type", func(t *testing.T) {
-			opts := cbor.CoreDetEncOptions() // CBOR deterministic options
-			// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
-			// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
-			opts.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-			em, err1 := opts.EncMode()
-			require.Nil(t, err1)
-
 			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
-			b, err := em.Marshal(setup.ServiceEvent())
+			b, err := cborEncMode.Marshal(setup.ServiceEvent())
 			require.Nil(t, err)
 
 			outer := new(flow.ServiceEvent)
@@ -177,7 +177,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.True(t, ok)
 			assert.DeepEqual(t, setup, gotSetup)
 
-			b, err = em.Marshal(commit.ServiceEvent())
+			b, err = cborEncMode.Marshal(commit.ServiceEvent())
 			require.Nil(t, err)
 
 			outer = new(flow.ServiceEvent)
