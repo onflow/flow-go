@@ -22,14 +22,14 @@ type ChunkDataPacks struct {
 func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCacheSize uint) *ChunkDataPacks {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		chdp := val.(*flow.ChunkDataPack)
+		chdp := val.(*storagemodel.StoredChunkDataPack)
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(chdp)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		chunkID := key.(flow.Identifier)
 
-		var c flow.ChunkDataPack
+		var c storagemodel.StoredChunkDataPack
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := operation.RetrieveChunkDataPack(chunkID, &c)(tx)
 			return &c, err

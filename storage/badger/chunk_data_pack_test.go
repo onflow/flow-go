@@ -25,7 +25,7 @@ func TestChunkDataPack(t *testing.T) {
 
 		// store in db
 		chunkID := unittest.IdentifierFixture()
-		expected := unittest.ChunkDataPackFixture(chunkID)
+		expected := unittest.StoredChunkDataPackFixture(chunkID)
 		err = store.Store(expected)
 		require.NoError(t, err)
 
