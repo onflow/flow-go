@@ -123,7 +123,10 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 	// check validity of block timestamp using parent's timestamp
 	err = v.blockTimer.Validate(parent.Timestamp, block.Timestamp)
 	if err != nil {
-		return newInvalidBlockError(block, err)
+		if model.IsInvalidBlockTimestampError(err) {
+			return newInvalidBlockError(block, err)
+		}
+		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
 	// validate QC - keep the most expensive the last to check
