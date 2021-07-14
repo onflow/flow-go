@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
-	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -171,7 +171,7 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 	fnb.Component("network", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
 
-		codec := cborcodec.NewCodec()
+		codec := jsoncodec.NewCodec()
 
 		myAddr := fnb.Me.Address()
 		if fnb.BaseConfig.bindAddr != notSet {
