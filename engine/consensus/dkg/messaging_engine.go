@@ -65,13 +65,13 @@ func (e *MessagingEngine) Done() <-chan struct{} {
 
 // SubmitLocal implements the network Engine interface
 func (e *MessagingEngine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.Submit(engine.DKGCommittee, e.me.NodeID(), event)
 }
 
 // Submit implements the network Engine interface
-func (e *MessagingEngine) Submit(originID flow.Identifier, event interface{}) {
+func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(engine.DKGCommittee, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -80,11 +80,11 @@ func (e *MessagingEngine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal implements the network Engine interface
 func (e *MessagingEngine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.Process(engine.DKGCommittee, e.me.NodeID(), event)
 }
 
 // Process implements the network Engine interface
-func (e *MessagingEngine) Process(originID flow.Identifier, event interface{}) error {
+func (e *MessagingEngine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
