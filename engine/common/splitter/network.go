@@ -11,7 +11,7 @@ import (
 )
 
 type Network struct {
-	mu        sync.Mutex
+	mu        sync.RWMutex
 	net       module.Network
 	log       zerolog.Logger
 	splitters map[network.Channel]*Engine         // stores splitters for each channel
@@ -67,6 +67,7 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 
 		if err != nil {
 			splitter.UnregisterEngine(engine)
+			delete(n.splitters, channel)
 			return nil, fmt.Errorf("failed to register splitter engine on channel %s: %w", channel, err)
 		}
 
@@ -74,4 +75,17 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	}
 
 	return conduit, nil
+}
+
+// Channels returns all the channels registered on this network.
+func (n *Network) Channels() network.ChannelList {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	channels := make(network.ChannelList, 0)
+	for channel := range n.conduits {
+		channels = append(channels, channel)
+	}
+
+	return channels
 }
