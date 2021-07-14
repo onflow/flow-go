@@ -12,7 +12,6 @@ import (
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	dkgmod "github.com/onflow/flow-go/module/dkg"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
@@ -33,7 +32,7 @@ type nodeAccount struct {
 type node struct {
 	testmock.GenericNode
 	account           *nodeAccount
-	dkgContractClient *dkgmod.Client
+	dkgContractClient *DKGClientWrapper
 	keyStorage        storage.DKGKeys
 	messagingEngine   *dkg.MessagingEngine
 	reactorEngine     *dkg.ReactorEngine

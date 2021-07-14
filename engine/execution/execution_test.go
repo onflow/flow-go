@@ -22,7 +22,7 @@ import (
 )
 
 func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *messages.BlockProposal) error {
-	return exeNode.FollowerEngine.Process(from, proposal)
+	return exeNode.FollowerEngine.Process(engine.ReceiveBlocks, from, proposal)
 }
 
 // Test when the ingestion engine receives a block, it will
@@ -105,10 +105,10 @@ func TestExecutionFlow(t *testing.T) {
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
 	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
-	providerEngine.On("Submit", exeID.NodeID, mock.Anything).
+	providerEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID := args.Get(0).(flow.Identifier)
-			req := args.Get(1).(*messages.EntityRequest)
+			originID := args.Get(1).(flow.Identifier)
+			req := args.Get(2).(*messages.EntityRequest)
 
 			var entities []flow.Entity
 			for _, entityID := range req.EntityIDs {
@@ -141,9 +141,9 @@ func TestExecutionFlow(t *testing.T) {
 	// check the verification engine received the ER from execution node
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).
@@ -154,9 +154,9 @@ func TestExecutionFlow(t *testing.T) {
 	// check the consensus engine has received the result from execution node
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
+	consensusEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
@@ -331,11 +331,11 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Submit", mock.Anything, mock.Anything).
+	consensusEngine.On("Submit", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
-			originID := args[0].(flow.Identifier)
-			receipt := args[1].(*flow.ExecutionReceipt)
+			originID := args[1].(flow.Identifier)
+			receipt := args[2].(*flow.ExecutionReceipt)
 			finalState, _ := receipt.ExecutionResult.FinalStateCommitment()
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
@@ -401,10 +401,10 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 		blob, _ := msgpack.Marshal(col)
 		colMap[col.ID()] = blob
 	}
-	collectionEngine.On("Submit", mock.Anything, mock.Anything).
+	collectionEngine.On("Submit", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID := args[0].(flow.Identifier)
-			req := args[1].(*messages.EntityRequest)
+			originID := args[1].(flow.Identifier)
+			req := args[2].(*messages.EntityRequest)
 			blob, ok := colMap[req.EntityIDs[0]]
 			if !ok {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
@@ -458,10 +458,10 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).

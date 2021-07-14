@@ -15,7 +15,7 @@ import (
 
 type TestnetStateTracker struct {
 	ghostTracking bool
-	BlockState    BlockState
+	BlockState    *BlockState
 	ReceiptState  ReceiptState
 	ApprovalState ResultApprovalState
 	MsgState      MsgState
@@ -25,7 +25,7 @@ type TestnetStateTracker struct {
 // be used to stop tracking
 func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *client.GhostClient) {
 	// reset the state for in between tests
-	tst.BlockState = BlockState{}
+	tst.BlockState = NewBlockState()
 	tst.ReceiptState = ReceiptState{}
 
 	var reader *client.FlowMessageStreamReader
@@ -76,9 +76,10 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			switch m := msg.(type) {
 			case *messages.BlockProposal:
 				tst.BlockState.Add(m)
-				t.Logf("block proposal received from %s at height %v: %x",
+				t.Logf("block proposal received from %s at height %v, view %v: %x",
 					sender,
 					m.Header.Height,
+					m.Header.View,
 					m.Header.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)

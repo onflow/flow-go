@@ -19,7 +19,9 @@ func TestWithEmulator(t *testing.T) {
 	suite.Run(t, new(DKGSuite))
 }
 
-func (s *DKGSuite) TestHappyPath() {
+func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
+
+	nodes := s.nodes[:goodNodes]
 
 	// The EpochSetup event is received at view 100.  The current epoch is
 	// configured with phase transitions at views 150, 200, and 250. In between
@@ -59,17 +61,17 @@ func (s *DKGSuite) TestHappyPath() {
 
 	firstBlock := &flow.Header{View: 100}
 
-	for _, node := range s.nodes {
+	for _, node := range nodes {
 		node.setEpochs(s.T(), currentEpochSetup, nextEpochSetup, firstBlock)
 	}
 
-	for _, n := range s.nodes {
+	for _, n := range nodes {
 		n.Ready()
 	}
 
 	// trigger the EpochSetupPhaseStarted event for all nodes, effectively
 	// starting the next DKG run
-	for _, n := range s.nodes {
+	for _, n := range nodes {
 		n.ProtocolEvents.EpochSetupPhaseStarted(currentCounter, firstBlock)
 	}
 
@@ -79,6 +81,18 @@ func (s *DKGSuite) TestHappyPath() {
 	for view < 300 {
 		time.Sleep(200 * time.Millisecond)
 
+		// if we are testing situations where the DKG smart-contract is not
+		// reachable, disable the DKG client for intervals of 10 views
+		if emulatorProblems {
+			for _, node := range nodes {
+				if view%20 >= 10 {
+					node.dkgContractClient.Disable()
+				} else {
+					node.dkgContractClient.Enable()
+				}
+			}
+		}
+
 		// deliver private messages
 		s.hub.DeliverAll()
 
@@ -86,14 +100,14 @@ func (s *DKGSuite) TestHappyPath() {
 		block, err := s.sendDummyTx()
 
 		if err == nil {
-			for _, node := range s.nodes {
+			for _, node := range nodes {
 				node.ProtocolEvents.BlockFinalized(block.Header)
 			}
 			view = int(block.Header.View)
 		}
 	}
 
-	for _, n := range s.nodes {
+	for _, n := range nodes {
 		n.Done()
 	}
 
@@ -122,10 +136,10 @@ func (s *DKGSuite) TestHappyPath() {
 
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := make([]*signature.ThresholdProvider, 0, len(s.nodes))
+	signers := make([]*signature.ThresholdProvider, 0, len(nodes))
 	signatures := []crypto.Signature{}
 	indices := []uint{}
-	for i, n := range s.nodes {
+	for i, n := range nodes {
 		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
 
@@ -152,10 +166,31 @@ func (s *DKGSuite) TestHappyPath() {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
+	// combining the threshold signature needs to be called with the total
+	// number of nodes
 	groupSignature, err := signature.CombineThresholdShares(uint(len(s.nodes)), signatures, indices)
 	require.NoError(s.T(), err)
 
 	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)
 	require.NoError(s.T(), err)
 	assert.True(s.T(), ok, "failed to verify threshold signature")
+}
+
+// TestHappyPath checks that DKG works when all nodes are good
+func (s *DKGSuite) TestHappyPath() {
+	s.runTest(numberOfNodes, false)
+}
+
+// TestNodesDown checks that DKG still works with the maximum number of bad
+// nodes (n/2)
+func (s *DKGSuite) TestNodesDown() {
+	s.runTest(numberOfNodes/2+1, false)
+}
+
+// TestEmulatorProblems checks that DKG is resilient to transient problems
+// between the node and the DKG smart-contract ( this covers connection issues
+// between consensus node and access node, as well as connection issues between
+// access node and execution node, or the execution node being down).
+func (s *DKGSuite) TestEmulatorProblems() {
+	s.runTest(numberOfNodes, true)
 }

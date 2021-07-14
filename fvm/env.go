@@ -775,16 +775,23 @@ func (e *hostEnv) GetAccountKey(address runtime.Address, index int) (*runtime.Ac
 		defer sp.Finish()
 	}
 
-	if e.transactionEnv == nil {
-		return nil, errors.NewOperationNotSupportedError("GetAccountKey")
+	if e.transactionEnv != nil {
+		accKey, err := e.transactionEnv.GetAccountKey(address, index)
+		if err != nil {
+			return nil, fmt.Errorf("getting account key failed: %w", err)
+		}
+		return accKey, err
 	}
 
-	accKey, err := e.transactionEnv.GetAccountKey(address, index)
-	if err != nil {
-		return nil, fmt.Errorf("getting account key failed: %w", err)
+	if e.accountKeys != nil {
+		accKey, err := e.accountKeys.GetAccountKey(address, index)
+		if err != nil {
+			return nil, fmt.Errorf("getting account key failed: %w", err)
+		}
+		return accKey, err
 	}
 
-	return accKey, nil
+	return nil, errors.NewOperationNotSupportedError("GetAccountKey")
 }
 
 func (e *hostEnv) RevokeAccountKey(address runtime.Address, index int) (*runtime.AccountKey, error) {
@@ -1060,6 +1067,7 @@ func (e *transactionEnv) CreateAccount(env *hostEnv, payer runtime.Address) (add
 		}
 	}
 
+	e.ctx.Metrics.RuntimeSetNumberOfAccounts(e.addressGenerator.AddressCount())
 	return runtime.Address(flowAddress), nil
 }
 

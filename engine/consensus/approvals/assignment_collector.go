@@ -2,14 +2,14 @@ package approvals
 
 import (
 	"fmt"
-	"math"
 	"math/rand"
 	"sync"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
+	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
@@ -41,6 +41,7 @@ type GetCachedBlockHeight = func(blockID flow.Identifier) (uint64, error)
 // For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
 // when fork gets orphaned
 type AssignmentCollector struct {
+	log                                  zerolog.Logger
 	ResultID                             flow.Identifier                        // ID of execution result
 	result                               *flow.ExecutionResult                  // execution result that we are collecting approvals for
 	BlockHeight                          uint64                                 // height of block targeted by execution result
@@ -58,8 +59,17 @@ type AssignmentCollector struct {
 	requestTracker                       *RequestTracker                        // used to keep track of number of approval requests, and blackout periods, by chunk
 }
 
-func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, headers storage.Headers, assigner module.ChunkAssigner, seals mempool.IncorporatedResultSeals,
-	sigVerifier module.Verifier, approvalConduit network.Conduit, requestTracker *RequestTracker, requiredApprovalsForSealConstruction uint,
+func NewAssignmentCollector(
+	logger zerolog.Logger,
+	result *flow.ExecutionResult,
+	state protocol.State,
+	headers storage.Headers,
+	assigner module.ChunkAssigner,
+	seals mempool.IncorporatedResultSeals,
+	sigVerifier module.Verifier,
+	approvalConduit network.Conduit,
+	requestTracker *RequestTracker,
+	requiredApprovalsForSealConstruction uint,
 ) (*AssignmentCollector, error) {
 	block, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
@@ -72,6 +82,7 @@ func NewAssignmentCollector(result *flow.ExecutionResult, state protocol.State, 
 	}
 
 	collector := &AssignmentCollector{
+		log:                                  logger,
 		ResultID:                             result.ID(),
 		result:                               result,
 		BlockHeight:                          block.Height,
@@ -112,9 +123,12 @@ func (ac *AssignmentCollector) emergencySealable(collector *ApprovalCollector, f
 	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
 
-func (ac *AssignmentCollector) CheckEmergencySealing(finalizedBlockHeight uint64) error {
+// CheckEmergencySealing checks the managed assignments whether their result can be emergency
+// sealed. Seals the results where possible.
+func (ac *AssignmentCollector) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
 	for _, collector := range ac.allCollectors() {
 		sealable := ac.emergencySealable(collector, finalizedBlockHeight)
+		observer.QualifiesForEmergencySealing(collector.IncorporatedResult(), sealable)
 		if sealable {
 			err := collector.SealResult()
 			if err != nil {
@@ -158,7 +172,10 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 		return fmt.Errorf("failed to retrieve header of incorporatedResult %s: %w",
 			incorporatedResult.Result.BlockID, err)
 	}
-	collector := NewApprovalCollector(incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
+	collector, err := NewApprovalCollector(ac.log, incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
+	if err != nil {
+		return fmt.Errorf("instantiation of ApprovalCollector failed: %w", err)
+	}
 
 	// Now, we add the ApprovalCollector to the AssignmentCollector:
 	// no-op if an ApprovalCollector has already been added by a different routine
@@ -300,29 +317,33 @@ func (ac *AssignmentCollector) ProcessApproval(approval *flow.ResultApproval) er
 // RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
 // approvals from verifiers.
 // Returns number of requests made and error in case something goes wrong.
-func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.SealingTracker, maxHeightForRequesting uint64) (int, error) {
-	requestCount := 0
+func (ac *AssignmentCollector) RequestMissingApprovals(observation consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error) {
+	overallRequestCount := uint(0) // number of approval requests for all different assignments for this result
 	for _, collector := range ac.allCollectors() {
 		if collector.IncorporatedBlock().Height > maxHeightForRequesting {
 			continue
 		}
 
-		firstChunkWithMissingApproval := uint64(math.MaxUint64)
 		missingChunks := collector.CollectMissingVerifiers()
+		observation.ApprovalsMissing(collector.IncorporatedResult(), missingChunks)
+		requestCount := uint(0)
 		for chunkIndex, verifiers := range missingChunks {
-			if firstChunkWithMissingApproval < chunkIndex {
-				firstChunkWithMissingApproval = chunkIndex
-			}
-
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := ac.requestTracker.Get(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex)
-			if requestTrackerItem.IsBlackout() {
+			requestTrackerItem, updated, err := ac.requestTracker.TryUpdate(ac.result, collector.IncorporatedBlockID(), chunkIndex)
+			if err != nil {
+				// it could happen that other gorotuine will prune request tracker because of sealing progress
+				// in this case we should just stop requesting approvals as block was already sealed
+				if mempool.IsDecreasingPruningHeightError(err) {
+					return 0, nil
+				}
+				return 0, err
+			}
+
+			if !updated {
 				continue
 			}
-			requestTrackerItem.Update()
-			ac.requestTracker.Set(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
@@ -343,20 +364,18 @@ func (ac *AssignmentCollector) RequestMissingApprovals(sealingTracker *tracker.S
 			}
 
 			requestCount++
-			err := ac.approvalConduit.Publish(req, verifiers...)
+			err = ac.approvalConduit.Publish(req, verifiers...)
 			if err != nil {
 				log.Error().Err(err).
 					Msgf("could not publish approval request for chunk %d", chunkIndex)
 			}
 		}
 
-		if sealingTracker != nil && len(missingChunks) > 0 {
-			sealingRecord := tracker.NewRecordWithInsufficientApprovals(collector.incorporatedResult, firstChunkWithMissingApproval)
-			sealingTracker.Track(sealingRecord)
-		}
-
+		observation.ApprovalsRequested(collector.IncorporatedResult(), requestCount)
+		overallRequestCount += requestCount
 	}
-	return requestCount, nil
+
+	return overallRequestCount, nil
 }
 
 // authorizedVerifiersAtBlock pre-select all authorized Verifiers at the block that incorporates the result.

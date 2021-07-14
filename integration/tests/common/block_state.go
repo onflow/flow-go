@@ -23,62 +23,86 @@ type BlockState struct {
 	highestSealed     *messages.BlockProposal
 }
 
-// TODO refactor to remove deep indentation
+func NewBlockState() *BlockState {
+	return &BlockState{
+		Mutex:             sync.Mutex{},
+		blocksByID:        make(map[flow.Identifier]*messages.BlockProposal),
+		finalizedByHeight: make(map[uint64]*messages.BlockProposal),
+	}
+}
+
 func (bs *BlockState) Add(b *messages.BlockProposal) {
 	bs.Lock()
 	defer bs.Unlock()
 
-	if bs.blocksByID == nil {
-		bs.blocksByID = make(map[flow.Identifier]*messages.BlockProposal) // TODO: initialize this map in constructor
-	}
 	bs.blocksByID[b.Header.ID()] = b
-	bs.highestProposed = b.Header.Height
+	if b.Header.Height > bs.highestProposed {
+		bs.highestProposed = b.Header.Height
+	}
 
-	// add confirmations
-	confirmsHeight := b.Header.Height - 3
-	if b.Header.Height >= 3 && confirmsHeight > bs.highestFinalized {
-		if bs.finalizedByHeight == nil {
-			bs.finalizedByHeight = make(map[uint64]*messages.BlockProposal) // TODO: initialize this map in constructor
-		}
-		// put all ancestors into `finalizedByHeight`
-		ancestor, ok := b, true
-		for ancestor.Header.Height > bs.highestFinalized {
-			h := ancestor.Header.Height
+	if b.Header.Height < 3 {
+		return
+	}
 
-			// if ancestor is confirmed put it into the finalized map
-			if h <= confirmsHeight {
+	confirmsHeight := b.Header.Height - uint64(3)
+	if confirmsHeight < bs.highestFinalized {
+		return
+	}
 
-				finalized := ancestor
-				bs.finalizedByHeight[h] = finalized
+	bs.processAncestors(b, confirmsHeight)
+	bs.updateHighestFinalizedHeight()
+}
 
-				// if ancestor confirms a heigher height than highestFinalized, increase highestFinalized
-				if h > bs.highestFinalized {
-					bs.highestFinalized = h
+// processAncestors checks whether ancestors of block are within the confirming height, and finalizes
+// them if that is the case.
+// It also processes the seals of blocks being finalized.
+func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight uint64) {
+	// puts this block proposal and all ancestors into `finalizedByHeight`
+	ancestor, ok := b, true
+	for ancestor.Header.Height > bs.highestFinalized {
+		h := ancestor.Header.Height
+
+		// if ancestor is confirmed put it into the finalized map
+		if h <= confirmsHeight {
+
+			finalized := ancestor
+			bs.finalizedByHeight[h] = finalized
+
+			// update last sealed height
+			for _, seal := range finalized.Payload.Seals {
+				sealed, ok := bs.blocksByID[seal.BlockID]
+				if !ok {
+					continue
 				}
 
-				// update last sealed height
-				for _, seal := range finalized.Payload.Seals {
-					sealed, ok := bs.blocksByID[seal.BlockID]
-					if !ok {
-						continue
-					}
-
-					if bs.highestSealed == nil ||
-						sealed.Header.Height > bs.highestSealed.Header.Height {
-						bs.highestSealed = sealed
-					}
+				if bs.highestSealed == nil ||
+					sealed.Header.Height > bs.highestSealed.Header.Height {
+					bs.highestSealed = sealed
 				}
-
 			}
 
-			// find parent
-			ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
-
-			// stop if parent not found
-			if !ok {
-				return
-			}
 		}
+
+		// find parent
+		ancestor, ok = bs.blocksByID[ancestor.Header.ParentID]
+
+		// stop if parent not found
+		if !ok {
+			return
+		}
+	}
+}
+
+// updateHighestFinalizedHeight moves forward the highestFinalized height for the newly finalized blocks.
+func (bs *BlockState) updateHighestFinalizedHeight() {
+	for {
+		// checks whether next height has been finalized and updates highest finalized height
+		// if that is the case.
+		if _, ok := bs.finalizedByHeight[bs.highestFinalized+1]; !ok {
+			return
+		}
+
+		bs.highestFinalized++
 	}
 }
 
@@ -163,4 +187,19 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 		return nil, false
 	}
 	return bs.highestSealed, true
+}
+
+func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.BlockProposal {
+	timeout := 2 * blockStateTimeout
+	require.Eventually(t,
+		func() bool {
+			if bs.highestSealed != nil {
+				fmt.Println("waiting for sealed", bs.highestSealed.Header.View, view)
+			}
+			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
+		},
+		timeout,
+		100*time.Millisecond,
+		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, timeout))
+	return bs.highestSealed
 }
