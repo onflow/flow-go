@@ -304,9 +304,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 			var chunkDataPack *flow.ChunkDataPack
 			if i < len(computationResult.StateCommitments)-1 {
-				chunkDataPack = execution.GenerateChunkDataPack(chunk, &collection, computationResult.Proofs[i])
+				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
-				chunkDataPack = execution.GenerateSystemChunkDataPack(chunk, computationResult.Proofs[i])
+				chunkDataPack = execution.GenerateSystemChunkDataPack(chunk.ID(), chunk.StartState, computationResult.Proofs[i])
 			}
 
 			chunks = append(chunks, chunk)
@@ -332,85 +332,6 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		ReferenceBlock: &referenceBlock,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
-	}
-}
-
-// LightExecutionResultFixture returns a light mocked version of execution result with an
-// execution receipt referencing the block/collections. In the light version of execution result,
-// everything is wired properly, but with the minimum viable content provided. This version is basically used
-// for profiling.
-// TODO: remove this once new architecture of verification node is in place.
-func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
-	collections := make([]*flow.Collection, 0, chunkCount)
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
-
-	// creates collections and guarantees
-	for i := 0; i < chunkCount; i++ {
-		coll := unittest.CollectionFixture(1)
-		guarantee := coll.Guarantee()
-		collections = append(collections, &coll)
-		guarantees = append(guarantees, &guarantee)
-	}
-
-	payload := flow.Payload{
-		Guarantees: guarantees,
-	}
-
-	header := unittest.BlockHeaderFixture()
-	header.Height = 0
-	header.PayloadHash = payload.Hash()
-
-	referenceBlock := flow.Block{
-		Header:  &header,
-		Payload: &payload,
-	}
-	blockID := referenceBlock.ID()
-
-	// creates chunks
-	chunks := make([]*flow.Chunk, 0)
-	for i := 0; i < chunkCount; i++ {
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				BlockID:         blockID,
-				EventCollection: unittest.IdentifierFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a light (quite empty) chunk data pack for the chunk at bare minimum
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID: chunk.ID(),
-		}
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
-	}
-
-	result := flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  chunks,
-	}
-
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
-	// container block contains the execution receipt and points back to reference block
-	// as its parent.
-	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
-	containerBlock.Payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-	containerBlock.Payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
-
-	return &CompleteExecutionReceipt{
-		ContainerBlock: &containerBlock,
-		Receipts:       []*flow.ExecutionReceipt{receipt},
-		ReceiptsData: []*ExecutionReceiptData{
-			{
-				ReferenceBlock: &referenceBlock,
-				ChunkDataPacks: chunkDataPacks,
-			},
-		},
 	}
 }
 
