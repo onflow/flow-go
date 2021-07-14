@@ -119,14 +119,13 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	eng := suite.TestNewEngine()
 
 	myID := unittest.IdentifierFixture()
-	invalidID := unittest.IdentifierFixture()
 
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
 	vc := unittest.VerifiableChunkDataFixture(0)
 
-	err := eng.Process(invalidID, &vc)
+	err := eng.ProcessLocal(&completeRA)
 	assert.Error(suite.T(), err)
 }
 
@@ -176,7 +175,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 		}).
 		Once()
 
-	err := eng.Process(myID, vChunk)
+	err := eng.ProcessLocal(vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
 	suite.pushCon.AssertExpectations(suite.T())
@@ -219,7 +218,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
 	}
 	for _, test := range tests {
-		err := eng.Process(myID, test.vc)
+		err := eng.ProcessLocal(test.vc)
 		suite.Assert().NoError(err)
 	}
 }

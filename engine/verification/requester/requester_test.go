@@ -108,7 +108,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
-	err := e.Process(originID, response)
+	err := e.Process(engine.RequestChunks, originID, response)
 	require.Nil(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
@@ -135,7 +135,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
 	for _, response := range responses {
-		err := e.Process(originID, response)
+		err := e.Process(engine.RequestChunks, originID, response)
 		require.Nil(t, err)
 	}
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler, s.metrics)
@@ -159,7 +159,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
-	err := e.Process(originID, response)
+	err := e.Process(engine.RequestChunks, originID, response)
 	require.Nil(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
@@ -231,7 +231,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 
 	// we wait till the engine submits the chunk request to the network, and receive the response
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *messages.ChunkDataRequest) {
-		err := e.Process(requests[0].Agrees[0], response)
+		err := e.Process(engine.RequestChunks, requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
