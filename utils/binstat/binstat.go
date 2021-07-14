@@ -232,7 +232,6 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 		if whatLen > len(what) {
 			whatLen = len(what)
 		}
-		//debug fmt.Printf("debug: detected ~%d%s in %s; using ~%d..\n", whatLenDefault, what[2:2 + whatLenDefault], what, whatLen)
 	}
 
 	p := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
