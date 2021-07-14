@@ -197,9 +197,13 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 
 	for i, chunk := range er.Chunks {
 		isSystemChunk := i == er.Chunks.Len()-1
-		var collection flow.Collection
+		var cdp *flow.ChunkDataPack
 		if !isSystemChunk {
-			collection = executableBlock.CompleteCollections[chdps[i].CollectionID].Collection()
+			coll := executableBlock.CompleteCollections[chdps[i].CollectionID].Collection()
+			cdp = execution.ToChunkDataPack(chdps[i], &coll)
+		} else {
+			// system chunk has a nil collection
+			cdp = execution.ToChunkDataPack(chdps[i], nil)
 		}
 		offsetForChunk, err := fetcher.TransactionOffsetForChunk(er.Chunks, chunk.Index)
 		require.NoError(t, err)
@@ -209,8 +213,7 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 			Chunk:             chunk,
 			Header:            executableBlock.Block.Header,
 			Result:            er,
-			Collection:        &collection,
-			ChunkDataPack:     chdps[i],
+			ChunkDataPack:     cdp,
 			EndState:          chunk.EndState,
 			TransactionOffset: offsetForChunk,
 		}
