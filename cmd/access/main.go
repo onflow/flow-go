@@ -110,30 +110,30 @@ func main() {
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
 	})
 	anb.Initialize().
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(node cmd.NodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
+				node.Storage().Index,
+				node.Storage().Payloads,
+				node.Tracer(),
+				node.ProtocolEvents(),
 			)
 			return err
 		}).
-		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection node client", func(node cmd.NodeBuilder) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
-				node.Logger.Info().Msg("using a dynamic collection node address")
+				node.Logger().Info().Msg("using a dynamic collection node address")
 				return nil
 			}
 
-			node.Logger.Info().
+			node.Logger().Info().
 				Str("collection_node", rpcConf.CollectionAddr).
 				Msg("using the static collection node address")
 
@@ -148,7 +148,7 @@ func main() {
 			collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
-		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
+		Module("historical access node clients", func(node cmd.NodeBuilder) error {
 			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
@@ -167,15 +167,15 @@ func main() {
 			}
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("block cache", func(node cmd.NodeBuilder) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
-			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+		Module("sync core", func(node cmd.NodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger(), synchronization.DefaultConfig())
 			return err
 		}).
-		Module("transaction timing mempools", func(node *cmd.FlowNodeBuilder) error {
+		Module("transaction timing mempools", func(node cmd.NodeBuilder) error {
 			transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
 				return err
@@ -194,28 +194,28 @@ func main() {
 			blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 			return err
 		}).
-		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
-			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
+		Module("transaction metrics", func(node cmd.NodeBuilder) error {
+			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger(), logTxTimeToFinalized,
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
 			return nil
 		}).
-		Module("ping metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("ping metrics", func(node cmd.NodeBuilder) error {
 			pingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			rpcEng = rpc.New(
-				node.Logger,
-				node.State,
+				node.Logger(),
+				node.ProtocolState(),
 				rpcConf,
 				collectionRPC,
 				historicalAccessRPCs,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				node.Storage.Collections,
-				node.Storage.Transactions,
-				node.Storage.Receipts,
-				node.RootChainID,
+				node.Storage().Blocks,
+				node.Storage().Headers,
+				node.Storage().Collections,
+				node.Storage().Transactions,
+				node.Storage().Receipts,
+				node.rootChainID,
 				transactionMetrics,
 				collectionGRPCPort,
 				executionGRPCPort,
@@ -226,13 +226,13 @@ func main() {
 			)
 			return rpcEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			requestEng, err = requester.New(
-				node.Logger,
-				node.Metrics.Engine,
+				node.Logger(),
+				node.Metrics().Engine,
 				node.Network,
 				node.Me,
-				node.State,
+				node.ProtocolState(),
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
@@ -240,25 +240,25 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, transactionMetrics,
+			ingestEng, err = ingestion.New(node.Logger(), node.Network, node.ProtocolState(), node.Me, requestEng, node.Storage().Blocks, node.Storage().Headers, node.Storage().Collections, node.Storage().Transactions, node.Storage().Receipts, transactionMetrics,
 				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return requestEng, nil
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger(), node.DB(), metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB(), node.Storage().Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -268,7 +268,7 @@ func main() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me.NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -276,7 +276,7 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
 
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalized, pending, err := recovery.FindLatest(node.ProtocolState(), node.Storage().Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
@@ -286,20 +286,20 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.rootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
 
 			followerEng, err = followereng.New(
-				node.Logger,
+				node.Logger(),
 				node.Network,
 				node.Me,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
 				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				node.Storage().Headers,
+				node.Storage().Payloads,
 				followerState,
 				conCache,
 				followerCore,
@@ -311,14 +311,14 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
-				node.Logger,
-				node.Metrics.Engine,
+				node.Logger(),
+				node.Metrics().Engine,
 				node.Network,
 				node.Me,
-				node.State,
-				node.Storage.Blocks,
+				node.ProtocolState(),
+				node.Storage().Blocks,
 				followerEng,
 				syncCore,
 			)
@@ -333,10 +333,10 @@ func main() {
 
 	// the ping engine is only needed for the staked access node
 	if anb.staked {
-		anb.Component("ping engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		anb.Component("ping engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			ping, err := pingeng.New(
-				node.Logger,
-				node.State,
+				node.Logger(),
+				node.ProtocolState(),
 				node.Me,
 				pingMetrics,
 				pingEnabled,

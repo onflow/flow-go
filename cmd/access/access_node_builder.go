@@ -22,7 +22,7 @@ import (
 // AccessNodeBuilder is initializes and runs an Access node either as a staked node or an unstaked node
 // It is composed of the FlowNodeBuilder
 type AccessNodeBuilder struct {
-	*cmd.FlowNodeBuilder
+	cmd.NodeBuilder
 	staked                  bool
 	stakedAccessNodeIDHex   string
 	unstakedNetworkBindAddr string
@@ -82,7 +82,7 @@ func (anb *AccessNodeBuilder) validateParams() {
 }
 
 func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
-	anb.Component("unstaked network", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	anb.Component("unstaked network", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 		codec := jsoncodec.NewCodec()
 
 		// setup the Ping provider to return the software version and the finalized block height
@@ -91,7 +91,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 				return build.Semver()
 			},
 			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := node.State.Sealed().Head()
+				head, err := node.ProtocolState().Sealed().Head()
 				if err != nil {
 					return 0, err
 				}
@@ -105,7 +105,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 			node.NetworkKey,
 			node.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
-			node.Metrics.Network,
+			node.Metrics().Network,
 			pingProvider)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
@@ -115,7 +115,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 
 		var msgValidators []network.MessageValidator
 		if anb.staked {
-			msgValidators = p2p.DefaultValidators(node.Logger, node.Me.NodeID())
+			msgValidators = p2p.DefaultValidators(node.Logger(), node.Me.NodeID())
 		} else {
 			// for an unstaked node, use message sender validator but not target validator since the staked AN will
 			// be broadcasting messages to ALL unstaked ANs without knowing their target IDs
@@ -129,13 +129,13 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 		anb.unstakedMiddleware = p2p.NewMiddleware(node.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
 			node.Me.NodeID(),
-			node.Metrics.Network,
+			node.Metrics().Network,
 			node.RootBlock.ID().String(),
 			peerUpdateInterval,
 			p2p.DefaultUnicastTimeout,
 			msgValidators...)
 
-		participants, err := node.State.Final().Identities(p2p.NetworkingSetFilter)
+		participants, err := node.ProtocolState().Final().Identities(p2p.NetworkingSetFilter)
 		if err != nil {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
@@ -157,7 +157,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 		}
 
 		// creates network instance
-		net, err := p2p.NewNetwork(node.Logger,
+		net, err := p2p.NewNetwork(node.Logger(),
 			codec,
 			participants,
 			node.Me,
@@ -165,7 +165,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 			10e6,
 			top,
 			subscriptionManager,
-			node.Metrics.Network)
+			node.Metrics().Network)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
@@ -182,8 +182,8 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 	})
 }
 
-func (anb *AccessNodeBuilder) initUnstakedLocal() func(node *cmd.FlowNodeBuilder) {
-	return func(node *cmd.FlowNodeBuilder) {
+func (anb *AccessNodeBuilder) initUnstakedLocal() func(node cmd.NodeBuilder) {
+	return func(node cmd.NodeBuilder) {
 		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
 			NodeID:        anb.NodeID,
