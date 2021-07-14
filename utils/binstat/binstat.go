@@ -143,7 +143,8 @@ func init() {
 		parts := strings.Split(global.lenWhat, ";")
 		for n, part := range parts { // e.g. "~Code=99"
 			subParts := strings.Split(part, "=")
-			if (len(subParts) != 2) || (subParts[0][0:1] != "~") || (0 == len(subParts[0][1:])) {
+			const leftAndRightParts = 2
+			if (len(subParts) != leftAndRightParts) || (subParts[0][0:1] != "~") || (0 == len(subParts[0][1:])) {
 				panic(fmt.Sprintf("ERROR: BINSTAT: BINSTAT_LEN_WHAT=%s <-- cannot parse <-- format should be ~<what prefix>=<max len>[;...], e.g. ~Code=99;~X=99\n", global.lenWhat))
 			}
 			k := subParts[0][1:]
@@ -214,13 +215,19 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 		fileLine = lineNum
 	}
 
-	whatLen := len(what)
-	if (what[0:1] == "~") && (len(what) >= 3) {
+	whatLen := len(what) // e.g. what = "~3net:wire"
+	const tildaCharLen = 1
+	const lenCharLen = 1
+	const whatCharLenMin = 1
+	if (what[0:1] == "~") && (len(what) >= (tildaCharLen + lenCharLen + whatCharLenMin)) {
 		// come here if what is "~<default len><what>", meaning that BINSTAT_LEN_WHAT may override <default len>
+		//                                     ^^^^^^ 1+ chars; alphanumeric what name which may be longer than default len
+		//                        ^^^^^^^^^^^^^ 1 char; digit means default what len 1-9
+		//                       ^ 1 char; tilda means use next digit as default len unless override len exists in .what2len map
 		whatLenDefault := atoi(what[1:2])
-		whatLen = whatLenDefault + 2
-		if whatLenOverride, keyExists := global.what2len[what[2:2+whatLenDefault]]; keyExists {
-			whatLen = whatLenOverride + 2
+		whatLen = whatLenDefault + tildaCharLen + lenCharLen
+		if whatLenOverride, keyExists := global.what2len[what[tildaCharLen+lenCharLen:tildaCharLen+lenCharLen+whatLenDefault]]; keyExists {
+			whatLen = whatLenOverride + tildaCharLen + lenCharLen
 		}
 		if whatLen > len(what) {
 			whatLen = len(what)
