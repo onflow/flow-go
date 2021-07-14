@@ -8,7 +8,7 @@ import (
 )
 
 // InsertChunkDataPack inserts a chunk data pack keyed by chunk ID.
-func InsertChunkDataPack(c *flow.ChunkDataPack) func(*badger.Txn) error {
+func InsertChunkDataPack(c *storagemodel.StoredChunkDataPack) func(*badger.Txn) error {
 	return insert(makePrefix(codeChunkDataPack, c.ChunkID), c)
 }
 
@@ -18,7 +18,7 @@ func BatchInsertChunkDataPack(c *storagemodel.StoredChunkDataPack) func(batch *b
 }
 
 // RetrieveChunkDataPack retrieves a chunk data pack by chunk ID.
-func RetrieveChunkDataPack(chunkID flow.Identifier, c *flow.ChunkDataPack) func(*badger.Txn) error {
+func RetrieveChunkDataPack(chunkID flow.Identifier, c *storagemodel.StoredChunkDataPack) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeChunkDataPack, chunkID), c)
 }
 
