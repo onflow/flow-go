@@ -13,6 +13,7 @@ import (
 )
 
 type Engine struct {
+	mu      sync.Mutex
 	unit    *engine.Unit               // used to manage concurrency & shutdown
 	log     zerolog.Logger             // used to log relevant actions with context
 	engines map[module.Engine]struct{} // stores registered engines
@@ -34,6 +35,9 @@ func New(
 }
 
 func (e *Engine) RegisterEngine(engine module.Engine) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	if _, ok := e.engines[engine]; ok {
 		return errors.New("engine already registered with splitter")
 	}
