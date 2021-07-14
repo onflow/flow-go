@@ -6,12 +6,12 @@ import "time"
 // Can be used by nodes that don't perform validation of block timestamps.
 type NoopBlockTimestamp struct{}
 
-func NewNoopBlockTimestamp() *NoopBlockTimestamp {
+func NewNoopBlocktimer() *NoopBlocktimer {
 	return &NoopBlockTimestamp{}
 }
 
 func (n NoopBlockTimestamp) Build(time.Time) time.Time {
-	return time.Time{}
+	return time.Now().UTC()
 }
 
 func (n NoopBlockTimestamp) Validate(time.Time, time.Time) error {

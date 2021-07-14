@@ -15,7 +15,7 @@ type Config struct {
 	expiry            uint
 }
 
-func WithBlockTimestamp(blockTimestamp hotstuff.BlockTimestamp) func(*Config) {
+func WithBlocktimer(timer hotstuff.Blocktimer) func(*Config) {
 	return func(cfg *Config) {
 		cfg.blockTimestamp = blockTimestamp
 	}
