@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -35,8 +36,14 @@ var chain = flow.Mainnet.Chain()
 
 func Test_ExecutionMatchesVerification(t *testing.T) {
 
+	noTxFee, err := cadence.NewUFix64("0.0")
+	require.NoError(t, err)
+
 	t.Run("empty block", func(t *testing.T) {
-		executeBlockAndVerify(t, [][]*flow.TransactionBody{})
+		executeBlockAndVerify(t,
+			[][]*flow.TransactionBody{},
+			fvm.DefaultTransactionFees,
+			fvm.DefaultMinimumStorageReservation)
 	})
 
 	t.Run("single transaction event", func(t *testing.T) {
@@ -71,7 +78,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			{
 				deployTx, emitTx,
 			},
-		})
+		}, noTxFee, fvm.DefaultMinimumStorageReservation)
 
 		// ensure event is emitted
 		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
@@ -126,7 +133,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			{
 				&emitTx3,
 			},
-		})
+		}, noTxFee, fvm.DefaultMinimumStorageReservation)
 
 		// ensure event is emitted
 		require.Empty(t, cr.TransactionResults[0].ErrorMessage)
@@ -136,9 +143,98 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 		require.Len(t, cr.Events[0], 2)
 		require.Equal(t, flow.EventType(fmt.Sprintf("A.%s.Foo.FooEvent", chain.ServiceAddress())), cr.Events[0][1].Type)
 	})
+
+	t.Run("with failed storage limit", func(t *testing.T) {
+
+		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
+
+		// this should return the address of newly created account
+		accountAddress, err := chain.AddressAtIndex(5)
+		require.NoError(t, err)
+
+		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
+		require.NoError(t, err)
+
+		addKeyTx := testutil.CreateAddAnAccountKeyMultipleTimesTransaction(t, &accountPrivKey, 100).AddAuthorizer(accountAddress)
+		err = testutil.SignTransaction(addKeyTx, accountAddress, accountPrivKey, 0)
+		require.NoError(t, err)
+
+		minimumStorage, err := cadence.NewUFix64("0.00077610")
+		require.NoError(t, err)
+
+		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+			{
+				createAccountTx,
+			},
+			{
+				addKeyTx,
+			},
+		}, fvm.DefaultTransactionFees, minimumStorage)
+
+		// ensure only events from the first transaction is emitted
+		require.Len(t, cr.Events[0], 10)
+		require.Len(t, cr.Events[1], 0)
+		// storage limit error
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+	})
+
+	t.Run("with failed transaction fee deduction", func(t *testing.T) {
+		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
+
+		// this should return the address of newly created account
+		accountAddress, err := chain.AddressAtIndex(5)
+		require.NoError(t, err)
+
+		err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
+		require.NoError(t, err)
+
+		spamTx := &flow.TransactionBody{
+			Script: []byte(`
+			transaction {
+				prepare() {}
+				execute {
+					var s: Int256 = 1024102410241024
+					var i = 0
+					var a = Int256(7)
+					var b = Int256(5)
+					var c = Int256(2)
+					while i < 150000 {
+						s = s * a
+						s = s / b
+						s = s / c
+						i = i + 1
+					}
+					log(i)
+				}
+			}`),
+		}
+
+		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
+		require.NoError(t, err)
+
+		txFee, err := cadence.NewUFix64("0.01")
+		require.NoError(t, err)
+
+		cr := executeBlockAndVerify(t, [][]*flow.TransactionBody{
+			{
+				createAccountTx,
+				spamTx,
+			},
+		}, txFee, fvm.DefaultMinimumStorageReservation)
+
+		// ensure only events from the first transaction is emitted
+		require.Len(t, cr.Events[0], 10)
+		require.Len(t, cr.Events[1], 0)
+		// tx fee error
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1109")
+	})
+
 }
 
-func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *execution.ComputationResult {
+func executeBlockAndVerify(t *testing.T,
+	txs [][]*flow.TransactionBody,
+	txFees cadence.UFix64,
+	minStorageBalance cadence.UFix64) *execution.ComputationResult {
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
 
@@ -146,7 +242,6 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 
 	fvmContext := fvm.NewContext(logger,
 		fvm.WithChain(chain),
-		//fvm.WithBlocks(blockFinder),
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
 	)
@@ -167,7 +262,8 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 		chain,
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithMinimumStorageReservation(minStorageBalance),
+		fvm.WithTransactionFee(txFees),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
 	)
 
