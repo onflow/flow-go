@@ -34,20 +34,19 @@ func New(
 }
 
 func (e *Engine) RegisterEngine(channel network.Channel, engine network.Engine) error {
-	_, ok := e.chanEngines[channel]
+	engines, ok := e.chanEngines[channel]
 
 	if !ok {
 		// initializes the engine set for the provided channel
-		e.chanEngines[channel] = make(map[network.Engine]struct{})
+		engines = make(map[network.Engine]struct{})
+		e.chanEngines[channel] = engines
 	}
 
-	_, ok = e.chanEngines[channel][engine]
-
-	if ok {
+	if _, ok = engines[engine]; ok {
 		return fmt.Errorf("engine already registered on channel: %s", channel)
 	}
 
-	e.chanEngines[channel][engine] = struct{}{}
+	engines[engine] = struct{}{}
 
 	return nil
 }
