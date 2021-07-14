@@ -301,14 +301,12 @@ tryAgainRaceCondition:
 	}
 	global.rwMutex.RUnlock() // unlock for many readers ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
 
-	if keyExists {
-		// full thru
-	} else {
+	if !keyExists {
+		// come here to create new hash table bucket
 		keyEgLoc := ""
 		if global.verbose {
 			keyEgLoc = fmt.Sprintf(" // e.g. %s:%d", p.callerFunc, p.callerLine)
 		}
-		// come here to create new hash table bucket
 		global.rwMutex.Lock() // lock for single writer v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 		_, keyExists = global.key2index[key]
 		if keyExists { // come here if another func beat us to key creation
