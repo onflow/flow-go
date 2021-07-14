@@ -48,6 +48,9 @@ func (e *Engine) RegisterEngine(engine module.Engine) error {
 }
 
 func (e *Engine) UnregisterEngine(engine module.Engine) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	delete(e.engines, engine)
 }
 
