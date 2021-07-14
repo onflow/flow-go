@@ -180,7 +180,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
 	require.NoError(s.T(), err)
 
-	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
+	err = registerVoterTx.AddArgument(cadence.NewString(publicStakingKey.EncodedHexRepresentation()))
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(registerVoterTx,
