@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	storagemodel "github.com/onflow/flow-go/storage/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -41,7 +42,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
+			Return(&storagemodel.StoredChunkDataPack{ChunkID: chunkID, CollectionID: collectionID}, nil)
 		execState.
 			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
@@ -77,7 +78,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
+			Return(&storagemodel.StoredChunkDataPack{ChunkID: chunkID, CollectionID: collectionID}, nil)
 		execState.
 			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
@@ -113,7 +114,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			Return(nil, protocol.IdentityNotFoundError{})
 		execState.
 			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&flow.ChunkDataPack{CollectionID: collectionID, ChunkID: chunkID}, nil)
+			Return(&storagemodel.StoredChunkDataPack{ChunkID: chunkID, CollectionID: collectionID}, nil)
 		execState.
 			On("GetBlockIDByChunkID", chunkID).
 			Return(blockID, nil)
@@ -170,10 +171,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 		chunkID := unittest.IdentifierFixture()
-		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
-		collectionID := unittest.IdentifierFixture()
-		chunkDataPack.CollectionID = collectionID
 		collection := unittest.CollectionFixture(1)
+		chunkDataPack := unittest.StoredChunkDataPackFixture(chunkID, unittest.WithCollectionID(collection.ID()))
 		blockID := unittest.IdentifierFixture()
 
 		ps.On("AtBlockID", blockID).Return(ss)
@@ -236,8 +235,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 		chunkID := unittest.IdentifierFixture()
-		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 		collection := unittest.CollectionFixture(1)
+		chunkDataPack := unittest.StoredChunkDataPackFixture(chunkID, unittest.WithCollectionID(collection.ID()))
 		blockID := unittest.IdentifierFixture()
 
 		execState.
