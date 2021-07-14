@@ -257,6 +257,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Uint64("block_height", status.BlockHeight).
 		Hex("result_id", logging.ID(resultID)).
 		Uint64("chunk_index", status.ChunkIndex).
+		Bool("system_chunk", IsSystemChunk(status.ChunkIndex, status.ExecutionResult)).
 		Logger()
 
 	processed, err := e.handleChunkDataPackWithTracing(originID, status, chunkDataPack)
@@ -397,12 +398,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	// 3. collection id must match
 	err := e.validateCollectionID(chunkDataPack, result, chunk)
 	if err != nil {
-		return fmt.Errorf("could not validate collection: %x, from sender ID: %x, block ID: %x, resultID: %x, chunk ID: %x",
-			chunkDataPack.Collection.ID(),
-			senderID,
-			blockID,
-			result.ID(),
-			chunk.ID())
+		return fmt.Errorf("could not validate collection: %w", err)
 	}
 
 	return nil
