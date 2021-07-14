@@ -20,7 +20,7 @@ type TestSealingHappyPathTestSuite struct {
 }
 
 // TestSealingAndVerificationHappyPath evaluates the health of the happy path of verification and sealing. It
-//deploys a transaction into the testnet hence causing an execution result with more than
+// deploys a transaction into the testnet hence causing an execution result with more than
 // one chunk, assigns all chunks to the same single verification node in this testnet, and then verifies whether verification node
 // generates a result approval for all chunks of that execution result.
 // It also enables sealing based on result approvals and verifies whether the block of that specific multi-chunk execution result is sealed
