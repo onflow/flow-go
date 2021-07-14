@@ -128,25 +128,37 @@ func GenerateStoredChunkDataPack(
 }
 
 func GenerateChunkDataPack(
-	chunk *flow.Chunk,
+	chunkID flow.Identifier,
+	startState flow.StateCommitment,
 	collection *flow.Collection,
 	proof flow.StorageProof,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
-		ChunkID:    chunk.ID(),
-		StartState: chunk.StartState,
+		ChunkID:    chunkID,
+		StartState: startState,
 		Proof:      proof,
 		Collection: collection,
 	}
 }
 
 func GenerateSystemChunkDataPack(
-	chunk *flow.Chunk,
+	chunkID flow.Identifier,
+	startState flow.StateCommitment,
 	proof flow.StorageProof,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
-		ChunkID:    chunk.ID(),
-		StartState: chunk.StartState,
+		ChunkID:    chunkID,
+		StartState: startState,
 		Proof:      proof,
 	}
+}
+
+func ToChunkDataPack(storedChunkDataPack *storagemodel.StoredChunkDataPack, collection *flow.Collection) *flow.ChunkDataPack {
+	if collection != nil {
+		// non-system chunk
+		return GenerateChunkDataPack(storedChunkDataPack.ChunkID, storedChunkDataPack.StartState, collection, storedChunkDataPack.Proof)
+	}
+
+	// system chunk
+	return GenerateSystemChunkDataPack(storedChunkDataPack.ChunkID, storedChunkDataPack.StartState, storedChunkDataPack.Proof)
 }
