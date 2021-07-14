@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"runtime"
 	"runtime/pprof"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -113,40 +114,29 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 		e.g.         0     0%   100%      0.02s  5.56%  github.com/onflow/flow-go/utils/binstat_test.f2
 		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f3
 		e.g.         0     0%   100%      0.11s 30.56%  github.com/onflow/flow-go/utils/binstat_test.f4
-		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f5
+		e.g.         0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f5 <-- NOTE: sometimes pprof fails to report a line?!
 		e.g.         0     0%   100%      0.03s  8.33%  github.com/onflow/flow-go/utils/binstat_test.f6
-
-		$ # todo: consider workaround: have seen pprof fail on macOS extremely infrequently, e.g. below .f5 completely missing?! how?!
-		$ go tool pprof -top -unit seconds binstat_external_test.loop-1.try-2.gomaxprocs-8.pprof.txt
-		Type: cpu
-		Time: Jun 14, 2021 at 7:37pm (PDT)
-		Duration: 200.55ms, Total samples = 0.36s (179.51%)
-		Showing nodes accounting for 0.36s, 100% of 0.36s total
-				flat  flat%   sum%        cum   cum%
-				0.36s   100%   100%      0.36s   100%  github.com/onflow/flow-go/utils/binstat_test.run.func1
-					0     0%   100%      0.07s 19.44%  github.com/onflow/flow-go/utils/binstat_test.f1
-					0     0%   100%      0.09s 25.00%  github.com/onflow/flow-go/utils/binstat_test.f2
-					0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f3
-					0     0%   100%      0.08s 22.22%  github.com/onflow/flow-go/utils/binstat_test.f4
-					0     0%   100%      0.06s 16.67%  github.com/onflow/flow-go/utils/binstat_test.f6
 	*/
 	command := fmt.Sprintf("go tool pprof -top -unit seconds %s 2>&1 | egrep '(binstat_test.f|cum)'", pprofFileName)
 	out, err := exec.Command("bash", "-c", command).Output()
 	require.NoError(t, err)
-	//debug zlog.Debug().Msg(fmt.Printf("test: output of command: %s\n%s", command, out))
+	//debug zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
 
-	// regex out the (cum)ulative column in pprof output
-	r, _ := regexp.Compile(` ([0-9.]+)s`)
+	// regex out the (cum)ulative column in pprof output, and the f<number>
+	r, _ := regexp.Compile(` ([0-9.]+)s.*\.f([0-9.]+)`)
 	matches := r.FindAllStringSubmatch(string(out), -1)
-	//debug zlog.Debug().Msg(fmt.Printf("test: matches=%#v", matches)) // e.g. debug: matches=[][]string{[]string{" 0.04s", "0.04"}, []string{" 0.06s", "0.06"}, []string{" 0.08s", "0.08"}, []string{" 0.04s", "0.04"}, []string{" 0.09s", "0.09"}, []string{" 0.05s", "0.05"}}
-	expected := funcs
+	//debug zlog.Debug().Msgf("test: matches=%#v", matches) // e.g. matches=[][]string{[]string{\" 0.07s 20.59%  github.com/onflow/flow-go/utils/binstat_test.f1\", \"0.07\", \"1\"}, []string{\" 0.04s 11.76%  github.com/onflow/flow-go/utils/binstat_test.f2\", \"0.04\", \"2\"}, []string{\" 0.06s 17.65%  github.com/onflow/flow-go/utils/binstat_test.f3\", \"0.06\", \"3\"}, []string{\" 0.05s 14.71%  github.com/onflow/flow-go/utils/binstat_test.f4\", \"0.05\", \"4\"}, []string{\" 0.07s 20.59%  github.com/onflow/flow-go/utils/binstat_test.f6\", \"0.07\", \"6\"}}
+	atLeast := funcs - 1
 	actual := len(matches)
-	require.Equal(t, expected, actual)
+	require.Condition(t, func() bool { return actual >= atLeast }, "Unexpectedly few regex results on pprof output")
 
 	// add the regex matches to a table of elapsed times
-	for i := 0; i < funcs; i++ {
-		//debug zlog.Debug().Msg(fmt.Printf("test: matches[%d][1]=%s", i, matches[i][1]))
-		el[loop][try][1][i] = matches[i][1]
+	for i := 0; i < len(matches); i++ {
+		//debug zlog.Debug().Msgf("test: matches[%d][1]=%s matches[%d][2]=%s", i, matches[i][1], i, matches[i][2])
+		fi, err := strconv.Atoi(matches[i][2]) // 0-5 instead of 1-6
+		require.NoError(t, err)
+		require.Condition(t, func() bool { return (fi - 1) < funcs }, "f%d is not a value between 1 and %d", fi, funcs)
+		el[loop][try][1][fi-1] = matches[i][1]
 	}
 }
 
