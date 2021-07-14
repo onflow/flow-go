@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
@@ -15,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
@@ -53,7 +53,7 @@ func NewParticipant(
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
-		BlockTimestamp:             timestamp.DefaultBlockTimestamp,
+		BlockTimer:                 blocktimer.DefaultBlockTimer,
 	}
 
 	// apply the configuration options
@@ -70,7 +70,7 @@ func NewParticipant(
 
 	// initialize the validator
 	var validator hotstuff.Validator
-	validator = validatorImpl.New(committee, forks, signer, cfg.BlockTimestamp)
+	validator = validatorImpl.New(committee, forks, signer, cfg.BlockTimer)
 	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started

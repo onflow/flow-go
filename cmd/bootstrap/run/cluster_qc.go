@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -89,7 +89,7 @@ func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Vali
 		signers[i] = signer
 
 		// create validator
-		v := validator.New(committee, forks, signer, timestamp.NewNoopBlockTimestamp())
+		v := validator.New(committee, forks, signer, blocktimer.DefaultBlockTimer)
 		validators[i] = v
 	}
 	return validators, signers, nil

@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -356,7 +355,6 @@ func main() {
 				node.Me,
 				node.DB,
 				node.State,
-				consensus.WithBlockTimestamp(timestamp.NewNoopBlockTimestamp()),
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),

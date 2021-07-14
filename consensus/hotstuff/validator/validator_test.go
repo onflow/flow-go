@@ -39,7 +39,7 @@ type ProposalSuite struct {
 	forks          *mocks.Forks
 	verifier       *mocks.Verifier
 	validator      *Validator
-	blockTimestamp *mocks.BlockTimestamp
+	blockTimestamp *mocks.BlockTimer
 }
 
 func (ps *ProposalSuite) SetupTest() {
@@ -88,7 +88,7 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(true, nil)
 	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(true, nil)
 
-	ps.blockTimestamp = &mocks.BlockTimestamp{}
+	ps.blockTimestamp = &mocks.BlockTimer{}
 	ps.blockTimestamp.On("Validate", mock.Anything, mock.Anything).Return(nil)
 
 	// set up the validator with the mocked dependencies
@@ -240,7 +240,7 @@ func (ps *ProposalSuite) TestProposalQCError() {
 
 func (ps *ProposalSuite) TestProposalInvalidTimestamp() {
 	// replace with new mock
-	*ps.blockTimestamp = mocks.BlockTimestamp{}
+	*ps.blockTimestamp = mocks.BlockTimer{}
 	ps.blockTimestamp.On("Validate", mock.Anything, mock.Anything).Return(model.NewInvalidBlockTimestamp(""))
 
 	err := ps.validator.ValidateProposal(ps.proposal)
@@ -262,7 +262,7 @@ type VoteSuite struct {
 	verifier       *mocks.Verifier
 	committee      *mocks.Committee
 	validator      *Validator
-	blockTimestamp *mocks.BlockTimestamp
+	blockTimestamp *mocks.BlockTimer
 }
 
 func (vs *VoteSuite) SetupTest() {
@@ -293,7 +293,7 @@ func (vs *VoteSuite) SetupTest() {
 	vs.committee = &mocks.Committee{}
 	vs.committee.On("Identity", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
-	vs.blockTimestamp = &mocks.BlockTimestamp{}
+	vs.blockTimestamp = &mocks.BlockTimer{}
 
 	// set up the validator with the mocked dependencies
 	vs.validator = New(vs.committee, vs.forks, vs.verifier, vs.blockTimestamp)
@@ -354,7 +354,7 @@ type QCSuite struct {
 	committee      *mocks.Committee
 	verifier       *mocks.Verifier
 	validator      *Validator
-	blockTimestamp *mocks.BlockTimestamp
+	blockTimestamp *mocks.BlockTimer
 }
 
 func (qs *QCSuite) SetupTest() {
@@ -385,7 +385,7 @@ func (qs *QCSuite) SetupTest() {
 	qs.verifier = &mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(true, nil)
 
-	qs.blockTimestamp = &mocks.BlockTimestamp{}
+	qs.blockTimestamp = &mocks.BlockTimer{}
 
 	// set up the validator with the mocked dependencies
 	qs.validator = New(qs.committee, nil, qs.verifier, qs.blockTimestamp)

@@ -14,11 +14,11 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
-	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
@@ -92,7 +92,7 @@ func main() {
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
-		blockTimestamp          hotstuff.BlockTimestamp
+		blockTimer              hotstuff.BlockTimer
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -364,7 +364,7 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
-			blockTimestamp = timestamp.NewBlockTimestamp(minInterval, maxInterval)
+			blockTimer = blocktimer.NewBlockTimer(minInterval, maxInterval)
 
 			// initialize the block builder
 			var build module.Builder
@@ -382,7 +382,7 @@ func main() {
 				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
-				builder.WithBlockTimestamp(blockTimestamp),
+				builder.WithBlockTimer(blockTimer),
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
@@ -470,7 +470,7 @@ func main() {
 				node.RootQC,
 				finalized,
 				pending,
-				consensus.WithBlockTimestamp(blockTimestamp),
+				consensus.WithBlockTimer(blockTimer),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),

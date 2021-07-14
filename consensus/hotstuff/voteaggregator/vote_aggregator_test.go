@@ -127,7 +127,7 @@ func (as *AggregatorSuite) SetupTest() {
 		},
 	)
 
-	blockTimestamp := &mocks.BlockTimestamp{}
+	blockTimestamp := &mocks.BlockTimer{}
 
 	as.validator = validator.New(as.committee, as.forks, as.signer, blockTimestamp) // create a real validator
 	as.notifier = &mocks.Consumer{}                                                 // create a mock notification Consumer

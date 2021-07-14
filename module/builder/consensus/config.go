@@ -7,7 +7,7 @@ import (
 )
 
 type Config struct {
-	blockTimestamp hotstuff.BlockTimestamp
+	blockTimer hotstuff.BlockTimer
 	// the max number of seals to be included in a block proposal
 	maxSealCount      uint
 	maxGuaranteeCount uint
@@ -15,9 +15,9 @@ type Config struct {
 	expiry            uint
 }
 
-func WithBlocktimer(timer hotstuff.Blocktimer) func(*Config) {
+func WithBlockTimer(timer hotstuff.BlockTimer) func(*Config) {
 	return func(cfg *Config) {
-		cfg.blockTimestamp = blockTimestamp
+		cfg.blockTimer = timer
 	}
 }
 

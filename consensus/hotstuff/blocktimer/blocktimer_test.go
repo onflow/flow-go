@@ -1,4 +1,4 @@
-package timestamp
+package blocktimer
 
 import (
 	"testing"
@@ -13,7 +13,7 @@ import (
 func TestBlockTimestamp_Build(t *testing.T) {
 	t.Parallel()
 	t.Run("within interval", func(t *testing.T) {
-		builder := NewBlockTimestamp(100*time.Millisecond, 10*time.Second)
+		builder := NewBlockTimer(100*time.Millisecond, 10*time.Second)
 		parentTime := time.Now().UTC()
 		// wait a bit
 		time.Sleep(time.Millisecond * 200)
@@ -22,13 +22,13 @@ func TestBlockTimestamp_Build(t *testing.T) {
 		require.True(t, blockTime.Before(parentTime.Add(builder.maxInterval)))
 	})
 	t.Run("before interval", func(t *testing.T) {
-		builder := NewBlockTimestamp(100*time.Millisecond, 10*time.Second)
+		builder := NewBlockTimer(100*time.Millisecond, 10*time.Second)
 		parentTime := time.Now().UTC()
 		blockTime := builder.Build(parentTime)
 		require.True(t, blockTime.Equal(parentTime.Add(builder.minInterval)))
 	})
 	t.Run("after interval", func(t *testing.T) {
-		builder := NewBlockTimestamp(100*time.Millisecond, 10*time.Second)
+		builder := NewBlockTimer(100*time.Millisecond, 10*time.Second)
 		parentTime := time.Now().UTC()
 		// adjust time so generate time will always be smaller than maxInterval
 		parentTime = parentTime.Add(-builder.maxInterval)
@@ -40,7 +40,7 @@ func TestBlockTimestamp_Build(t *testing.T) {
 // TestBlockTimestamp_Validate tests that validation accepts valid time and rejects invalid
 func TestBlockTimestamp_Validate(t *testing.T) {
 	t.Parallel()
-	builder := NewBlockTimestamp(10*time.Millisecond, 1*time.Second)
+	builder := NewBlockTimer(10*time.Millisecond, 1*time.Second)
 	t.Run("valid time", func(t *testing.T) {
 		parentTime := time.Now().UTC()
 		blockTime := parentTime.Add(time.Millisecond * 100)

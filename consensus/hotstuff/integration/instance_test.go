@@ -2,7 +2,6 @@ package integration
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
 	"os"
 	"sync"
 	"time"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
+	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
@@ -315,7 +315,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier,
-		timestamp.NewBlockTimestamp(1*time.Millisecond, 90*time.Second))
+		blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second))
 
 	// initialize the vote aggregator
 	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)

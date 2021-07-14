@@ -4,10 +4,11 @@ package consensus
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/timestamp"
+	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
@@ -58,7 +59,7 @@ func NewBuilder(
 
 	// initialize default config
 	cfg := Config{
-		blockTimestamp:    timestamp.DefaultBlockTimestamp,
+		blockTimer:        blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second),
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
@@ -606,7 +607,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
-	timestamp := b.cfg.blockTimestamp.Build(parent.Timestamp)
+	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{

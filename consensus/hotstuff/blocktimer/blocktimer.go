@@ -1,4 +1,4 @@
-package timestamp
+package blocktimer
 
 import (
 	"time"
@@ -19,9 +19,9 @@ type BlockTimestamp struct {
 	maxInterval time.Duration
 }
 
-var DefaultBlockTimestamp = NewBlockTimestamp(500*time.Millisecond, 10*time.Second)
+var DefaultBlockTimer = NewNoopBlockTimer()
 
-func NewBlockTimestamp(minInterval, maxInterval time.Duration) *BlockTimestamp {
+func NewBlockTimer(minInterval, maxInterval time.Duration) *BlockTimestamp {
 	return &BlockTimestamp{
 		minInterval: minInterval,
 		maxInterval: maxInterval,
