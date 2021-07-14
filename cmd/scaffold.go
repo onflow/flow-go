@@ -808,6 +808,7 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	return &info, err
 }
 
+// IsValidNetworkAddressFormat ...
 func IsValidNetworkAddressFormat(str string) bool {
 	url, err := url.ParseRequestURI(str)
 	if err != nil {
