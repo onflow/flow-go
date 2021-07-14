@@ -1,10 +1,11 @@
-package splitter
+package network
 
 import (
 	"errors"
 	"fmt"
 	"sync"
 
+	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/rs/zerolog"
@@ -14,19 +15,22 @@ type Network struct {
 	mu        sync.RWMutex
 	net       module.Network
 	log       zerolog.Logger
-	splitters map[network.Channel]*Engine         // stores splitters for each channel
-	conduits  map[network.Channel]network.Conduit // stores conduits for all registered channels
+	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
+	conduits  map[network.Channel]network.Conduit        // stores conduits for all registered channels
+	subMngr   network.SubscriptionManager
 }
 
 func NewNetwork(
 	net module.Network,
 	log zerolog.Logger,
+	subMngr network.SubscriptionManager,
 ) (*Network, error) {
 	e := &Network{
 		net:       net,
-		splitters: make(map[network.Channel]*Engine),
+		splitters: make(map[network.Channel]*splitterEngine.Engine),
 		conduits:  make(map[network.Channel]network.Conduit),
 		log:       log,
+		subMngr:   subMngr,
 	}
 
 	return e, nil
@@ -45,29 +49,43 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
-	splitter, ok := n.splitters[channel]
+	splitterEng, err := n.subMngr.GetEngine(channel)
 
-	if !ok {
-		splitter := New(
+	if err != nil {
+		// create new splitter for the channel
+		splitterEng = splitterEngine.New(
 			n.log,
 			channel,
 		)
 
-		n.splitters[channel] = splitter
+		// register it with subscription manager
+		if err = n.subMngr.Register(channel, splitterEng); err != nil {
+			return nil, fmt.Errorf("failed to register splitter for channel %s: %w", channel, err)
+		}
 	}
 
-	if err := splitter.RegisterEngine(engine); err != nil {
+	splitter, ok := splitterEng.(*splitterEngine.Engine)
+
+	if !ok {
+		return nil, errors.New("got unexpected engine type from subscription manager")
+	}
+
+	// register engine with splitter
+	if err = splitter.RegisterEngine(engine); err != nil {
+		n.subMngr.Unregister(channel)
 		return nil, fmt.Errorf("failed to register engine with splitter: %w", err)
 	}
 
 	conduit, ok := n.conduits[channel]
 
 	if !ok {
-		conduit, err := n.net.Register(channel, splitter)
+		conduit, err = n.net.Register(channel, splitter)
 
 		if err != nil {
+			// undo previous steps
 			splitter.UnregisterEngine(engine)
-			delete(n.splitters, channel)
+			n.subMngr.Unregister(channel)
+
 			return nil, fmt.Errorf("failed to register splitter engine on channel %s: %w", channel, err)
 		}
 
@@ -75,17 +93,4 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	}
 
 	return conduit, nil
-}
-
-// Channels returns all the channels registered on this network.
-func (n *Network) Channels() network.ChannelList {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	channels := make(network.ChannelList, 0)
-	for channel := range n.conduits {
-		channels = append(channels, channel)
-	}
-
-	return channels
 }
