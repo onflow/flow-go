@@ -486,8 +486,10 @@ func dump() {
 	}
 	err = os.Rename(fileTmp, fileNew) // atomically rename / move on Linux :-)
 	if err != nil {
-		global.log.Fatal().Msgf("ERROR: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err)
-		panic(fmt.Sprintf("ERROR: BINSTAT: .Rename(%s, %s)=%s", fileTmp, fileNew, err))
+		// sometimes -- very infrequently -- we come here with the error: "no such file or directory"
+		// in theory only one go-routine should write this uniquely named per second file, so how can the file 'disappear' for renaming?
+		// therefore this error results in a warning and not an error / panic, and the next second we just write the file again hopefuly :-)
+		global.log.Warn().Msgf("WARN: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err)
 	}
 }
 
