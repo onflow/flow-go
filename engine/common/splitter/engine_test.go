@@ -1,4 +1,4 @@
-package multiplexer_test
+package splitter_test
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/engine/common/multiplexer"
+	"github.com/onflow/flow-go/engine/common/splitter"
 	"github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -33,7 +33,7 @@ type Suite struct {
 	con *mocknetwork.Conduit
 	me  *mockmodule.Local
 
-	engine *multiplexer.Engine
+	engine *splitter.Engine
 }
 
 func (suite *Suite) SetupTest() {
@@ -43,13 +43,13 @@ func (suite *Suite) SetupTest() {
 
 	suite.net.On("Register", mock.Anything, mock.Anything).Return(suite.con, nil)
 
-	eng, err := multiplexer.New(zerolog.Logger{}, suite.net, suite.me)
+	eng, err := splitter.New(zerolog.Logger{}, suite.net, suite.me)
 	require.NoError(suite.T(), err)
 
 	suite.engine = eng
 }
 
-func TestMultiplexer(t *testing.T) {
+func TestSplitter(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
@@ -141,7 +141,7 @@ func (suite *Suite) TestHappyPath() {
 }
 
 // TestDownstreamEngineFailure tests the case where one of the engines registered with
-// the multiplexer encounters an error while processing a message.
+// the splitter encounters an error while processing a message.
 func (suite *Suite) TestDownstreamEngineFailure() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
@@ -222,7 +222,7 @@ func (suite *Suite) TestDuplicateRegistrations() {
 	suite.Assert().Error(err)
 }
 
-// TestReady tests that the multiplexer's Ready channel closes once all
+// TestReady tests that the splitter's Ready channel closes once all
 // registered engines are ready.
 func (suite *Suite) TestReady() {
 	chan1 := network.Channel("test-chan-1")
@@ -261,12 +261,12 @@ func (suite *Suite) TestReady() {
 	rda1.On("Ready").Return((<-chan struct{})(ready1)).Once()
 	rda2.On("Ready").Return((<-chan struct{})(ready2)).Once()
 
-	multiplexerReady := suite.engine.Ready()
+	splitterReady := suite.engine.Ready()
 	<-time.After(100 * time.Millisecond)
 
 	select {
-	case <-multiplexerReady:
-		suite.FailNow("Multiplexer should not be ready until all registered engines are.")
+	case <-splitterReady:
+		suite.FailNow("Splitter should not be ready until all registered engines are.")
 	default:
 	}
 
@@ -274,14 +274,14 @@ func (suite *Suite) TestReady() {
 	<-time.After(100 * time.Millisecond)
 
 	select {
-	case <-multiplexerReady:
-		suite.FailNow("Multiplexer should not be ready until all registered engines are.")
+	case <-splitterReady:
+		suite.FailNow("Splitter should not be ready until all registered engines are.")
 	default:
 	}
 
 	close(ready2)
 
-	_, ok := <-multiplexerReady
+	_, ok := <-splitterReady
 	suite.Assert().False(ok)
 
 	rda1.AssertExpectations(suite.T())
