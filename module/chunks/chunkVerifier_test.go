@@ -210,7 +210,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	col := unittest.CollectionFixture(0)
-	vch.Collection = &col
+	vch.ChunkDataPack.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
 	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
@@ -338,6 +338,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		ChunkID:    chunk.ID(),
 		StartState: flow.StateCommitment(startState),
 		Proof:      proof,
+		Collection: &coll,
 	}
 
 	// ExecutionResult setup
@@ -352,7 +353,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		Chunk:         &chunk,
 		Header:        &header,
 		Result:        &result,
-		Collection:    &coll,
 		ChunkDataPack: &chunkDataPack,
 		EndState:      flow.StateCommitment(endState),
 	}
