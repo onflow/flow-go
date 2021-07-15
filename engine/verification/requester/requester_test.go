@@ -108,7 +108,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
-	err := e.Process(originID, response)
+	err := e.Process(engine.RequestChunks, originID, response)
 	require.Nil(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
@@ -136,7 +136,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
 	for _, response := range responses {
-		err := e.Process(originID, response)
+		err := e.Process(engine.RequestChunks, originID, response)
 		require.Nil(t, err)
 	}
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler, s.metrics)
@@ -160,7 +160,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
-	err := e.Process(originID, response)
+	err := e.Process(engine.RequestChunks, originID, response)
 	require.Nil(t, err)
 
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
@@ -233,14 +233,14 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 
 	// we wait till the engine submits the chunk request to the network, and receive the response
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, 1, func(request *messages.ChunkDataRequest) {
-		err := e.Process(requests[0].Agrees[0], response)
+		err := e.Process(engine.RequestChunks, requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
 }
 
 // TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
@@ -288,7 +288,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
@@ -334,7 +334,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
 }
 
 // TestDispatchingRequests_Hybrid evaluates the behavior of requester when it has different request dispatch timelines, i.e.,
@@ -394,6 +394,8 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not request and handle chunks on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
 }
 
 // chunkToCollectionIdMap is a test helper that extracts a chunkID -> collectionID map from chunk data responses.
@@ -441,35 +443,34 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 	mutex := &sync.Mutex{}
 	wg.Add(count * len(reqList))
 
-	con.On("Publish", testifymock.Anything, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		mutex.Lock()
-		defer mutex.Unlock()
+	con.On("Publish", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			mutex.Lock()
+			defer mutex.Unlock()
 
-		// requested chunk id from network should belong to list of chunk id requests the engine received.
-		// also, it should not be repeated below a maximum threshold
-		req, ok := args[0].(*messages.ChunkDataRequest)
-		require.True(t, ok)
-		require.Contains(t, flow.GetIDs(reqList), req.ChunkID)
-		require.LessOrEqual(t, reqCount[req.ChunkID], count)
-		reqCount[req.ChunkID]++
+			// requested chunk id from network should belong to list of chunk id requests the engine received.
+			// also, it should not be repeated below a maximum threshold
+			req, ok := args[0].(*messages.ChunkDataRequest)
+			require.True(t, ok)
+			require.Contains(t, flow.GetIDs(reqList), req.ChunkID)
+			require.LessOrEqual(t, reqCount[req.ChunkID], count)
+			reqCount[req.ChunkID]++
 
-		// requested chunk ids should only be passed to agreed execution nodes
-		target1, ok := args[1].(flow.Identifier)
-		require.True(t, ok)
-		require.Contains(t, reqMap[req.ChunkID].Agrees, target1)
+			// requested chunk ids should only be passed to agreed execution nodes
+			target1, ok := args[1].(flow.Identifier)
+			require.True(t, ok)
+			require.Contains(t, reqMap[req.ChunkID].Agrees, target1)
 
-		target2, ok := args[2].(flow.Identifier)
-		require.True(t, ok)
-		require.Contains(t, reqMap[req.ChunkID].Agrees, target2)
+			target2, ok := args[2].(flow.Identifier)
+			require.True(t, ok)
+			require.Contains(t, reqMap[req.ChunkID].Agrees, target2)
 
-		go func() {
-			requestHandler(req)
-			wg.Done()
-		}()
+			go func() {
+				requestHandler(req)
+				wg.Done()
+			}()
 
-	}).
-		Return(nil).
-		Times(count * len(reqList)) // each chunk requested count time.
+		}).Return(nil)
 
 	return wg
 }
@@ -481,22 +482,23 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 	chunkIDs := toChunkIDs(chunkToCollectionIDs)
 	handledChunks := make(map[flow.Identifier]struct{})
 
-	handler.On("HandleChunkDataPack", testifymock.Anything, testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunk, ok := args[1].(*flow.ChunkDataPack)
-		require.True(t, ok)
-		collection, ok := args[2].(*flow.Collection)
-		require.True(t, ok)
+	handler.On("HandleChunkDataPack", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			chunk, ok := args[1].(*flow.ChunkDataPack)
+			require.True(t, ok)
+			collection, ok := args[2].(*flow.Collection)
+			require.True(t, ok)
 
-		// we should have already requested this chunk data pack, and collection ID should be the same.
-		chunkID := chunk.ID()
-		require.Contains(t, chunkIDs, chunkID)
-		require.Equal(t, chunkToCollectionIDs[chunkID], collection.ID())
+			// we should have already requested this chunk data pack, and collection ID should be the same.
+			chunkID := chunk.ID()
+			require.Contains(t, chunkIDs, chunkID)
+			require.Equal(t, chunkToCollectionIDs[chunkID], collection.ID())
 
-		// invocation should be distinct per chunk ID
-		_, ok = handledChunks[chunkID]
-		require.False(t, ok)
-		handledChunks[chunkID] = struct{}{}
-	}).Return().Times(len(chunkIDs))
+			// invocation should be distinct per chunk ID
+			_, ok = handledChunks[chunkID]
+			require.False(t, ok)
+			handledChunks[chunkID] = struct{}{}
+		}).Return().Times(len(chunkIDs))
 }
 
 // mockChunkDataPackHandler mocks chunk data pack handler for being notified that a set of chunk IDs are sealed.
@@ -507,20 +509,21 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 	wg := &sync.WaitGroup{}
 	wg.Add(len(chunkIDs))
 	sealedChunks := make(map[flow.Identifier]struct{})
-	handler.On("NotifyChunkDataPackSealed", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
+	handler.On("NotifyChunkDataPackSealed", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			chunkID, ok := args[0].(flow.Identifier)
+			require.True(t, ok)
 
-		// we should have already requested this chunk data pack, and collection ID should be the same.
-		require.Contains(t, chunkIDs, chunkID)
+			// we should have already requested this chunk data pack, and collection ID should be the same.
+			require.Contains(t, chunkIDs, chunkID)
 
-		// invocation should be distinct per chunk ID
-		_, ok = sealedChunks[chunkID]
-		require.False(t, ok)
-		sealedChunks[chunkID] = struct{}{}
+			// invocation should be distinct per chunk ID
+			_, ok = sealedChunks[chunkID]
+			require.False(t, ok)
+			sealedChunks[chunkID] = struct{}{}
 
-		wg.Done()
-	}).Return().Times(len(chunkIDs))
+			wg.Done()
+		}).Return()
 
 	return wg
 }
@@ -531,17 +534,18 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 	removedRequests := make(map[flow.Identifier]struct{})
 
 	// we remove pending request on receiving this response
-	pendingRequests.On("Rem", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
-		// we should have already requested this chunk data pack
-		require.Contains(t, chunkIDs, chunkID)
+	pendingRequests.On("Rem", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			chunkID, ok := args[0].(flow.Identifier)
+			require.True(t, ok)
+			// we should have already requested this chunk data pack
+			require.Contains(t, chunkIDs, chunkID)
 
-		// invocation should be distinct per chunk ID
-		_, ok = removedRequests[chunkID]
-		require.False(t, ok)
-		removedRequests[chunkID] = struct{}{}
-	}).
+			// invocation should be distinct per chunk ID
+			_, ok = removedRequests[chunkID]
+			require.False(t, ok)
+			removedRequests[chunkID] = struct{}{}
+		}).
 		Return(true).
 		Times(len(chunkIDs))
 }
@@ -568,20 +572,21 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 	total := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
 	wg.Add(total)
 
-	pendingRequests.On("RequestHistory", testifymock.Anything).Run(func(args testifymock.Arguments) {
-		// type assertion of input.
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
+	pendingRequests.On("RequestHistory", testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			// type assertion of input.
+			chunkID, ok := args[0].(flow.Identifier)
+			require.True(t, ok)
 
-		// chunk ID should be one of the expected ones.
-		require.True(t,
-			instantQualifiedReqs.Contains(chunkID) ||
-				lateQualifiedReqs.Contains(chunkID) ||
-				disQualifiedReqs.Contains(chunkID))
+			// chunk ID should be one of the expected ones.
+			require.True(t,
+				instantQualifiedReqs.Contains(chunkID) ||
+					lateQualifiedReqs.Contains(chunkID) ||
+					disQualifiedReqs.Contains(chunkID))
 
-		wg.Done()
+			wg.Done()
 
-	}).Return(
+		}).Return(
 		// number of attempts
 		func(chunkID flow.Identifier) uint64 {
 			if instantQualifiedReqs.Contains(chunkID) || lateQualifiedReqs.Contains(chunkID) {
@@ -624,23 +629,24 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 			return false
 		},
-	).Times(total)
+	)
 
-	pendingRequests.On("UpdateRequestHistory", testifymock.Anything, testifymock.Anything).Run(func(args testifymock.Arguments) {
-		// type assertion of inputs.
-		chunkID, ok := args[0].(flow.Identifier)
-		require.True(t, ok)
+	pendingRequests.On("UpdateRequestHistory", testifymock.Anything, testifymock.Anything).
+		Run(func(args testifymock.Arguments) {
+			// type assertion of inputs.
+			chunkID, ok := args[0].(flow.Identifier)
+			require.True(t, ok)
 
-		_, ok = args[1].(flowmempool.ChunkRequestHistoryUpdaterFunc)
-		require.True(t, ok)
+			_, ok = args[1].(flowmempool.ChunkRequestHistoryUpdaterFunc)
+			require.True(t, ok)
 
-		// checks only instantly qualified chunk requests should reach to this step,
-		// i.e., invocation of UpdateRequestHistory
-		require.Contains(t, instantQualifiedReqs, chunkID)
-		require.NotContains(t, lateQualifiedReqs, chunkID)
-		require.NotContains(t, disQualifiedReqs, chunkID)
+			// checks only instantly qualified chunk requests should reach to this step,
+			// i.e., invocation of UpdateRequestHistory
+			require.Contains(t, instantQualifiedReqs, chunkID)
+			require.NotContains(t, lateQualifiedReqs, chunkID)
+			require.NotContains(t, disQualifiedReqs, chunkID)
 
-	}). // makes chunk request instantly qualified for retry, i.e., can be
+		}). // makes chunk request instantly qualified for retry, i.e., can be
 		// retried anytime after on.
 		Return(uint64(1), time.Now(), 1*time.Millisecond, true).
 		Times(attempts * len(instantQualifiedReqs))
