@@ -2,18 +2,15 @@ package epochs
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state/protocol"
-	state "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/storage/badger"
 )
 
 func TestEpochs(t *testing.T) {
@@ -27,12 +24,11 @@ func (s *Suite) TestViewsProgress() {
 	defer cancel()
 
 	// phaseCheck is a utility struct that contains information about the
-	// final view and final block for epoch phases.
+	// final view of each epoch/phase.
 	type phaseCheck struct {
-		epoch      uint64
-		phase      flow.EpochPhase
-		finalView  uint64          // the final view of the phase as defined by the EpochSetup
-		finalBlock flow.Identifier // the parent of the first sealed block that has a view greater or equal than finalView
+		epoch     uint64
+		phase     flow.EpochPhase
+		finalView uint64 // the final view of the phase as defined by the EpochSetup
 	}
 
 	phaseChecks := []*phaseCheck{}
@@ -71,8 +67,7 @@ func (s *Suite) TestViewsProgress() {
 		}
 
 		for _, v := range epochViews {
-			proposal := s.BlockState.WaitForSealedView(s.T(), v.finalView)
-			v.finalBlock = proposal.Header.ParentID
+			s.BlockState.WaitForSealedView(s.T(), v.finalView)
 		}
 
 		phaseChecks = append(phaseChecks, epochViews...)
@@ -88,53 +83,44 @@ func (s *Suite) TestViewsProgress() {
 	}
 
 	for _, c := range consensusContainers {
-		containerState, err := openContainerState(c)
+		containerState, err := c.OpenState()
 		require.NoError(s.T(), err)
 
-		for _, v := range phaseChecks {
-			snapshot := containerState.AtBlockID(v.finalBlock)
+		// create a map of [view] => {epoch-counter, phase}
+		lookup := map[uint64]struct {
+			epochCounter uint64
+			phase        flow.EpochPhase
+		}{}
+
+		final, err := containerState.Final().Head()
+		require.NoError(s.T(), err)
+
+		var h uint64
+		for h = 0; h <= final.Height; h++ {
+			snapshot := containerState.AtHeight(h)
+
+			head, err := snapshot.Head()
+			require.NoError(s.T(), err)
 
 			epoch := snapshot.Epochs().Current()
-
 			currentEpochCounter, err := epoch.Counter()
 			require.NoError(s.T(), err)
-			require.Equal(s.T(), v.epoch, currentEpochCounter, fmt.Sprintf("wrong epoch at view %d", v.finalView))
-
 			currentPhase, err := snapshot.Phase()
 			require.NoError(s.T(), err)
-			require.Equal(s.T(), v.phase, currentPhase, fmt.Sprintf("wrong phase at view %d", v.finalView))
+
+			lookup[head.View] = struct {
+				epochCounter uint64
+				phase        flow.EpochPhase
+			}{
+				currentEpochCounter,
+				currentPhase,
+			}
+		}
+
+		for _, v := range phaseChecks {
+			item := lookup[v.finalView]
+			assert.Equal(s.T(), v.epoch, item.epochCounter, "wrong epoch at view %d", v.finalView)
+			assert.Equal(s.T(), v.phase, item.phase, "wrong phase at view %d", v.finalView)
 		}
 	}
-}
-
-func openContainerState(container *testnet.Container) (*state.State, error) {
-	db, err := container.DB()
-	if err != nil {
-		return nil, err
-	}
-
-	metrics := metrics.NewNoopCollector()
-	index := badger.NewIndex(metrics, db)
-	headers := badger.NewHeaders(metrics, db)
-	seals := badger.NewSeals(metrics, db)
-	results := badger.NewExecutionResults(metrics, db)
-	receipts := badger.NewExecutionReceipts(metrics, db, results)
-	guarantees := badger.NewGuarantees(metrics, db)
-	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
-	blocks := badger.NewBlocks(db, headers, payloads)
-	setups := badger.NewEpochSetups(metrics, db)
-	commits := badger.NewEpochCommits(metrics, db)
-	statuses := badger.NewEpochStatuses(metrics, db)
-
-	return state.OpenState(
-		metrics,
-		db,
-		headers,
-		seals,
-		results,
-		blocks,
-		setups,
-		commits,
-		statuses,
-	)
 }

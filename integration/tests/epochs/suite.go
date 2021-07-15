@@ -31,8 +31,6 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		// TODO replace these with actual values
-		testnet.WithAdditionalFlag("--access-address=null"),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
