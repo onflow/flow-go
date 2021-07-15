@@ -257,7 +257,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		// setup the Ping provider to return the software version and the finalized block height
+		// setup the Ping provider to return the software version and the sealed block height
 		pingProvider := p2p.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
