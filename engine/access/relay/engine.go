@@ -48,13 +48,12 @@ func New(
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
-// started. For the relay engine, ... TODO
+// started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// For the relay engine, ... TODO
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
@@ -101,11 +100,10 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	conduit, ok := e.conduits[channel]
 
 	if !ok {
-		return fmt.Errorf("could not find unstaked network conduit for channel %s", channel)
+		return fmt.Errorf("received message on unknown channel %s", channel)
 	}
 
-	err := conduit.Publish(event)
-	if err != nil {
+	if err := conduit.Publish(event); err != nil {
 		return fmt.Errorf("could not relay message: %w", err)
 	}
 
