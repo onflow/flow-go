@@ -1110,7 +1110,7 @@ var epochCommitFixtureJSON = `
                                         }
                                     },
                                     {
-                                        "name": "votes",
+                                        "name": "voteSignatures",
                                         "value": {
                                             "type": "Array",
                                             "value": [
@@ -1125,6 +1125,13 @@ var epochCommitFixtureJSON = `
                                             ]
                                         }
                                     },
+									{
+										"name": "voteMessage",
+										"value": {
+											"type": "String",
+											"value": "irrelevant_for_these_purposes"
+										}
+									},
 									{
                                         "name": "voterIDs",
                                         "value": {
@@ -1157,7 +1164,7 @@ var epochCommitFixtureJSON = `
                                         }
                                     },
                                     {
-                                        "name": "votes",
+                                        "name": "voteSignatures",
                                         "value": {
                                             "type": "Array",
                                             "value": [
@@ -1172,6 +1179,13 @@ var epochCommitFixtureJSON = `
                                             ]
                                         }
                                     },
+									{
+										"name": "voteMessage",
+										"value": {
+											"type": "String",
+											"value": "irrelevant_for_these_purposes"
+										}
+									},
 									{
                                         "name": "voterIDs",
                                         "value": {

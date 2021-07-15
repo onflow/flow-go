@@ -346,7 +346,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 		}
 		cdcClusterQCFields := cdcClusterQCStruct.Fields
 
-		expectedFields := 3
+		expectedFields := 4
 		if len(cdcClusterQCFields) < expectedFields {
 			return nil, fmt.Errorf("insufficient fields (%d < %d)", len(cdcClusterQCFields), expectedFields)
 		}
@@ -363,7 +363,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 			return nil, fmt.Errorf("duplicate cluster QC index (%d)", index)
 		}
 
-		cdcVoterIDs, ok := cdcClusterQCFields[2].(cadence.Array)
+		cdcVoterIDs, ok := cdcClusterQCFields[3].(cadence.Array)
 		if !ok {
 			return nil, invalidCadenceTypeError("clusterQC.voterIDs", cdcClusterQCFields[2], cadence.Array{})
 		}
