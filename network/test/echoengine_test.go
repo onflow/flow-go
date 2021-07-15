@@ -17,7 +17,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // EchoEngineTestSuite tests the correctness of the entire pipeline of network -> middleware -> libp2p
@@ -465,16 +467,7 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 		require.NotNil(suite.Suite.T(), receiver.event)
 		assert.Equal(suite.Suite.T(), suite.ids[sndID].NodeID, receiver.originID)
 
-		// evaluates proper reception of event
-		// casts the received event at the receiver side
-		rcvEvent, ok := (<-receiver.event).(*message.TestMessage)
-		// evaluates correctness of casting
-		require.True(suite.Suite.T(), ok)
-		// evaluates content of received message
-		assert.Equal(suite.Suite.T(), event, rcvEvent)
-
-		// evaluates channel that message was received on
-		assert.Equal(suite.Suite.T(), engine.TestNetwork, <-receiver.channel)
+		assertMessageReceived(suite.T(), receiver, event, engine.TestNetwork)
 
 	case <-time.After(10 * time.Second):
 		assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
@@ -491,19 +484,10 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 			require.NotNil(suite.Suite.T(), sender.event)
 			assert.Equal(suite.Suite.T(), suite.ids[rcvID].NodeID, sender.originID)
 
-			// evaluates proper reception of event
-			// casts the received event at the receiver side
-			rcvEvent, ok := (<-sender.event).(*message.TestMessage)
-			// evaluates correctness of casting
-			require.True(suite.Suite.T(), ok)
-			// evaluates content of received message
 			echoEvent := &message.TestMessage{
 				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 			}
-			assert.Equal(suite.Suite.T(), echoEvent, rcvEvent)
-
-			// evaluates channel that message was received on
-			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-sender.channel)
+			assertMessageReceived(suite.T(), sender, echoEvent, engine.TestNetwork)
 
 		case <-time.After(10 * time.Second):
 			assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -545,16 +529,7 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 			require.NotNil(suite.Suite.T(), receiver.event)
 			assert.Equal(suite.Suite.T(), suite.ids[sndID].NodeID, receiver.originID)
 
-			// evaluates proper reception of event
-			// casts the received event at the receiver side
-			rcvEvent, ok := (<-receiver.event).(*message.TestMessage)
-			// evaluates correctness of casting
-			require.True(suite.Suite.T(), ok)
-			// evaluates content of received message
-			assert.Equal(suite.Suite.T(), event, rcvEvent)
-
-			// evaluates channel that message was received on
-			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-receiver.channel)
+			assertMessageReceived(suite.T(), receiver, event, engine.TestNetwork)
 
 		case <-time.After(2 * time.Second):
 			assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
@@ -571,19 +546,10 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 				require.NotNil(suite.Suite.T(), sender.event)
 				assert.Equal(suite.Suite.T(), suite.ids[rcvID].NodeID, sender.originID)
 
-				// evaluates proper reception of event
-				// casts the received event at the receiver side
-				rcvEvent, ok := (<-sender.event).(*message.TestMessage)
-				// evaluates correctness of casting
-				require.True(suite.Suite.T(), ok)
-				// evaluates content of received message
 				echoEvent := &message.TestMessage{
 					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 				}
-				assert.Equal(suite.Suite.T(), echoEvent, rcvEvent)
-
-				// evaluates channel that message was received on
-				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-sender.channel)
+				assertMessageReceived(suite.T(), sender, echoEvent, engine.TestNetwork)
 
 			case <-time.After(10 * time.Second):
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -635,21 +601,24 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 			require.NotNil(suite.Suite.T(), receiver.event)
 			assert.Equal(suite.Suite.T(), suite.ids[0].NodeID, receiver.originID)
 
-			// evaluates proper reception of event
-			// casts the received event at the receiver side
-			rcvEvent, ok := (<-receiver.event).(*message.TestMessage)
-			// evaluates correctness of casting
-			require.True(suite.Suite.T(), ok)
+			// wrap blocking channel reads with a timeout
+			unittest.AssertReturnsBefore(suite.T(), func() {
+				// evaluates proper reception of event
+				// casts the received event at the receiver side
+				rcvEvent, ok := (<-receiver.event).(*message.TestMessage)
+				// evaluates correctness of casting
+				require.True(suite.T(), ok)
 
-			// evaluates content of received message
-			// the content should not yet received and be unique
-			_, rcv := received[rcvEvent.Text]
-			assert.False(suite.Suite.T(), rcv)
-			// marking event as received
-			received[rcvEvent.Text] = struct{}{}
+				// evaluates content of received message
+				// the content should not yet received and be unique
+				_, rcv := received[rcvEvent.Text]
+				assert.False(suite.T(), rcv)
+				// marking event as received
+				received[rcvEvent.Text] = struct{}{}
 
-			// evaluates channel that message was received on
-			assert.Equal(suite.Suite.T(), engine.TestNetwork, <-receiver.channel)
+				// evaluates channel that message was received on
+				assert.Equal(suite.T(), engine.TestNetwork, <-receiver.channel)
+			}, 100*time.Millisecond)
 
 		case <-time.After(2 * time.Second):
 			assert.Fail(suite.Suite.T(), "sender failed to send a message to receiver")
@@ -668,22 +637,25 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 				require.NotNil(suite.Suite.T(), sender.event)
 				assert.Equal(suite.Suite.T(), suite.ids[rcvID].NodeID, sender.originID)
 
-				// evaluates proper reception of event
-				// casts the received event at the receiver side
-				rcvEvent, ok := (<-sender.event).(*message.TestMessage)
-				// evaluates correctness of casting
-				require.True(suite.Suite.T(), ok)
-				// evaluates content of received echo message
-				// the content should not yet received and be unique
-				_, rcv := received[rcvEvent.Text]
-				assert.False(suite.Suite.T(), rcv)
-				// echo messages should start with prefix msg of receiver that echos back
-				assert.True(suite.Suite.T(), strings.HasPrefix(rcvEvent.Text, receiver.echomsg))
-				// marking echo event as received
-				received[rcvEvent.Text] = struct{}{}
+				// wrap blocking channel reads with a timeout
+				unittest.AssertReturnsBefore(suite.T(), func() {
+					// evaluates proper reception of event
+					// casts the received event at the receiver side
+					rcvEvent, ok := (<-sender.event).(*message.TestMessage)
+					// evaluates correctness of casting
+					require.True(suite.T(), ok)
+					// evaluates content of received echo message
+					// the content should not yet received and be unique
+					_, rcv := received[rcvEvent.Text]
+					assert.False(suite.T(), rcv)
+					// echo messages should start with prefix msg of receiver that echos back
+					assert.True(suite.T(), strings.HasPrefix(rcvEvent.Text, receiver.echomsg))
+					// marking echo event as received
+					received[rcvEvent.Text] = struct{}{}
 
-				// evaluates channel that message was received on
-				assert.Equal(suite.Suite.T(), engine.TestNetwork, <-sender.channel)
+					// evaluates channel that message was received on
+					assert.Equal(suite.T(), engine.TestNetwork, <-sender.channel)
+				}, 100*time.Millisecond)
 
 			case <-time.After(10 * time.Second):
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -696,4 +668,22 @@ func (suite *EchoEngineTestSuite) skipTest(reason string) {
 	if _, found := os.LookupEnv("AllNetworkTest"); !found {
 		suite.T().Skip(reason)
 	}
+}
+
+// assertMessageReceived asserts that the given message was received on the given channel
+// for the given engine
+func assertMessageReceived(t *testing.T, e *EchoEngine, m *message.TestMessage, c network.Channel) {
+	// wrap blocking channel reads with a timeout
+	unittest.AssertReturnsBefore(t, func() {
+		// evaluates proper reception of event
+		// casts the received event at the receiver side
+		rcvEvent, ok := (<-e.event).(*message.TestMessage)
+		// evaluates correctness of casting
+		require.True(t, ok)
+		// evaluates content of received message
+		assert.Equal(t, m, rcvEvent)
+
+		// evaluates channel that message was received on
+		assert.Equal(t, c, <-e.channel)
+	}, 100*time.Millisecond)
 }

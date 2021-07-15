@@ -125,60 +125,60 @@ func main() {
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 		}).
 		Initialize().
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(node cmd.NodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.ProtocolState())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
+				node.Storage().Index,
+				node.Storage().Payloads,
+				node.Tracer(),
+				node.ProtocolEvents(),
 			)
 			return err
 		}).
-		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
+		Module("execution metrics", func(node cmd.NodeBuilder) error {
+			collector = metrics.NewExecutionCollector(node.Tracer(), node.MetricsRegisterer())
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
-			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
+		Module("sync core", func(node cmd.NodeBuilder) error {
+			syncCore, err = chainsync.New(node.Logger(), chainsync.DefaultConfig())
 			return err
 		}).
-		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
-			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
-			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
+		Module("execution receipts storage", func(node cmd.NodeBuilder) error {
+			results = storage.NewExecutionResults(node.Metrics().Cache, node.DB())
+			receipts = storage.NewExecutionReceipts(node.Metrics().Cache, node.DB(), results)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics().Cache, node.DB(), receipts)
 			return nil
 		}).
-		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(node cmd.NodeBuilder) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
-		Module("state deltas mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("state deltas mempool", func(node cmd.NodeBuilder) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
-		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
+		Module("stake checking function", func(node cmd.NodeBuilder) error {
 			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
-				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
+				return protocol.IsNodeStakedAt(node.ProtocolState().AtBlockID(blockID), node.Me().NodeID())
 			}
 			return nil
 		}).
-		Component("Write-Ahead Log", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer, collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
+		Component("Write-Ahead Log", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+			diskWAL, err = wal.NewDiskWAL(node.Logger().With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer(), collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 			return diskWAL, err
 		}).
-		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("execution state ledger", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
-			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
+			bootstrapper := bootstrap.NewBootstrapper(node.Logger())
 
-			commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB)
+			commit, bootstrapped, err := bootstrapper.IsBootstrapped(node.DB())
 			if err != nil {
 				return nil, fmt.Errorf("could not query database to know whether database has been bootstrapped: %w", err)
 			}
@@ -187,31 +187,31 @@ func main() {
 			if !bootstrapped {
 				// when bootstrapping, the bootstrap folder must have a checkpoint file
 				// we need to cover this file to the trie folder to restore the trie to restore the execution state.
-				err = copyBootstrapState(node.BaseConfig.BootstrapDir, triedir)
+				err = copyBootstrapState(node.Config().BootstrapDir, triedir)
 				if err != nil {
 					return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 				}
 
 				// TODO: check that the checkpoint file contains the root block's statecommit hash
 
-				err = bootstrapper.BootstrapExecutionDatabase(node.DB, node.RootSeal.FinalState, node.RootBlock.Header)
+				err = bootstrapper.BootstrapExecutionDatabase(node.DB(), node.RootSeal().FinalState, node.RootBlock().Header)
 				if err != nil {
 					return nil, fmt.Errorf("could not bootstrap execution database: %w", err)
 				}
 			} else {
 				// if execution database has been bootstrapped, then the root statecommit must equal to the one
 				// in the bootstrap folder
-				if commit != node.RootSeal.FinalState {
+				if commit != node.RootSeal().FinalState {
 					return nil, fmt.Errorf("mismatching root statecommitment. database has state commitment: %x, "+
 						"bootstap has statecommitment: %x",
-						commit, node.RootSeal.FinalState)
+						commit, node.RootSeal().FinalState)
 				}
 			}
 
-			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
+			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger().With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
-		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("execution state ledger WAL compactor", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			checkpointer, err := ledgerStorage.Checkpointer()
 			if err != nil {
@@ -221,7 +221,7 @@ func main() {
 
 			return compactor, nil
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
 			if err != nil {
@@ -233,15 +233,15 @@ func main() {
 			rt := fvm.NewInterpreterRuntime()
 
 			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			vmCtx := fvm.NewContext(node.Logger(), node.FvmOptions()...)
 
-			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer)
+			committer := committer.NewLedgerViewCommitter(ledgerStorage, node.Tracer())
 			manager, err := computation.New(
-				node.Logger,
+				node.Logger(),
 				collector,
-				node.Tracer,
-				node.Me,
-				node.State,
+				node.Tracer(),
+				node.Me(),
+				node.ProtocolState(),
 				vm,
 				vmCtx,
 				cadenceExecutionCache,
@@ -253,20 +253,20 @@ func main() {
 			}
 			computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, chdpCacheSize)
-			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics().Cache, node.DB(), chdpCacheSize)
+			stateCommitments := storage.NewCommits(node.Metrics().Cache, node.DB())
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
-			events = storage.NewEvents(node.Metrics.Cache, node.DB)
-			serviceEvents = storage.NewServiceEvents(node.Metrics.Cache, node.DB)
-			txResults = storage.NewTransactionResults(node.Metrics.Cache, node.DB, transactionResultsCacheSize)
+			events = storage.NewEvents(node.Metrics().Cache, node.DB())
+			serviceEvents = storage.NewServiceEvents(node.Metrics().Cache, node.DB())
+			txResults = storage.NewTransactionResults(node.Metrics().Cache, node.DB(), transactionResultsCacheSize)
 
 			executionState = state.NewExecutionState(
 				ledgerStorage,
 				stateCommitments,
-				node.Storage.Blocks,
-				node.Storage.Headers,
-				node.Storage.Collections,
+				node.Storage().Blocks,
+				node.Storage().Headers,
+				node.Storage().Collections,
 				chunkDataPacks,
 				results,
 				receipts,
@@ -274,16 +274,16 @@ func main() {
 				events,
 				serviceEvents,
 				txResults,
-				node.DB,
-				node.Tracer,
+				node.DB(),
+				node.Tracer(),
 			)
 
 			providerEngine, err = exeprovider.New(
-				node.Logger,
-				node.Tracer,
-				node.Network,
-				node.State,
-				node.Me,
+				node.Logger(),
+				node.Tracer(),
+				node.Network(),
+				node.ProtocolState(),
+				node.Me(),
 				executionState,
 				collector,
 				checkStakedAtBlock,
@@ -293,17 +293,17 @@ func main() {
 
 			return providerEngine, err
 		}).
-		Component("checker engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("checker engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			checkerEng = checker.New(
-				node.Logger,
-				node.State,
+				node.Logger(),
+				node.ProtocolState(),
 				executionState,
-				node.Storage.Seals,
+				node.Storage().Seals,
 			)
 			return checkerEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+		Component("ingestion engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+			collectionRequester, err = requester.New(node.Logger(), node.Metrics().Engine, node.Network(), node.Me(), node.ProtocolState(),
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
 				func() flow.Entity { return &flow.Collection{} },
@@ -313,21 +313,22 @@ func main() {
 
 			preferredExeFilter := filter.Any
 			preferredExeNodeID, err := flow.HexStringToIdentifier(preferredExeNodeIDStr)
+			logger := node.Logger()
 			if err == nil {
-				node.Logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
+				logger.Info().Hex("prefered_exe_node_id", preferredExeNodeID[:]).Msg("starting with preferred exe sync node")
 				preferredExeFilter = filter.HasNodeID(preferredExeNodeID)
 			} else if err != nil && preferredExeNodeIDStr != "" {
-				node.Logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
+				logger.Debug().Str("prefered_exe_node_id_string", preferredExeNodeIDStr).Msg("could not parse exe node id, starting WITHOUT preferred exe sync node")
 			}
 
 			ingestionEng, err = ingestion.New(
-				node.Logger,
-				node.Network,
-				node.Me,
+				logger,
+				node.Network(),
+				node.Me(),
 				collectionRequester,
-				node.State,
-				node.Storage.Blocks,
-				node.Storage.Collections,
+				node.ProtocolState(),
+				node.Storage().Blocks,
+				node.Storage().Collections,
 				events,
 				serviceEvents,
 				txResults,
@@ -335,7 +336,7 @@ func main() {
 				providerEngine,
 				executionState,
 				collector,
-				node.Tracer,
+				node.Tracer(),
 				extensiveLog,
 				preferredExeFilter,
 				deltas,
@@ -349,18 +350,18 @@ func main() {
 			// => https://github.com/dapperlabs/flow-go/issues/4360
 			collectionRequester = collectionRequester.WithHandle(ingestionEng.OnCollection)
 
-			node.ProtocolEvents.AddConsumer(ingestionEng)
+			node.ProtocolEvents().AddConsumer(ingestionEng)
 
 			return ingestionEng, err
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger(), node.DB(), metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB(), node.Storage().Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -369,8 +370,8 @@ func main() {
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			// Note: node.Me().NodeID() is not part of the consensus committee
+			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me().NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -378,7 +379,7 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
 
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalized, pending, err := recovery.FindLatest(node.ProtocolState(), node.Storage().Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
@@ -388,20 +389,20 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.RootBlock().Header, node.RootQC(), finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			followerEng, err = followereng.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
+				node.Logger(),
+				node.Network(),
+				node.Me(),
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
 				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				node.Storage().Headers,
+				node.Storage().Payloads,
 				followerState,
 				pendingBlocks,
 				followerCore,
@@ -413,35 +414,35 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("collection requester engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return collectionRequester, nil
 		}).
-		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt provider engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			retrieve := func(blockID flow.Identifier) (flow.Entity, error) { return myReceipts.MyReceipt(blockID) }
 			eng, err := provider.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
+				node.ProtocolState(),
 				engine.ProvideReceiptsByBlockID,
 				filter.HasRole(flow.RoleConsensus),
 				retrieve,
 			)
 			return eng, err
 		}).
-		Component("synchronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("synchronization engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
+				node.ProtocolState(),
+				node.Storage().Blocks,
 				followerEng,
 				syncCore,
 			)
@@ -453,8 +454,8 @@ func main() {
 
 			return syncEngine, nil
 		}).
-		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
+		Component("grpc server", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+			rpcEng := rpc.New(node.Logger(), rpcConf, ingestionEng, node.Storage().Blocks, events, results, txResults, node.RootChainID())
 			return rpcEng, nil
 		}).Run()
 }

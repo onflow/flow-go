@@ -20,6 +20,8 @@ import (
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 
+const DefaultCacheSize = 10e6
+
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {

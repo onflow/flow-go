@@ -90,103 +90,104 @@ func main() {
 
 		}).
 		Initialize().
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(node cmd.NodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.ProtocolState())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
+				node.Storage().Index,
+				node.Storage().Payloads,
+				node.Tracer(),
+				node.ProtocolEvents(),
 			)
 			return err
 		}).
-		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
-			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
+		Module("verification metrics", func(node cmd.NodeBuilder) error {
+			collector = metrics.NewVerificationCollector(node.Tracer(), node.MetricsRegisterer())
 			return nil
 		}).
-		Module("chunk status memory pool", func(node *cmd.FlowNodeBuilder) error {
+		Module("chunk status memory pool", func(node cmd.NodeBuilder) error {
 			chunkStatuses = stdmap.NewChunkStatuses(chunkLimit)
-			err = node.Metrics.Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("chunk requests memory pool", func(node *cmd.FlowNodeBuilder) error {
+		Module("chunk requests memory pool", func(node cmd.NodeBuilder) error {
 			chunkRequests = stdmap.NewChunkRequests(chunkLimit)
-			err = node.Metrics.Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("processed chunk index consumer progress", func(node *cmd.FlowNodeBuilder) error {
-			processedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+		Module("processed chunk index consumer progress", func(node cmd.NodeBuilder) error {
+			processedChunkIndex = storage.NewConsumerProgress(node.DB(), module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(node *cmd.FlowNodeBuilder) error {
-			processedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+		Module("processed block height consumer progress", func(node cmd.NodeBuilder) error {
+			processedBlockHeight = storage.NewConsumerProgress(node.DB(), module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
-		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
-			chunkQueue = storage.NewChunkQueue(node.DB)
+		Module("chunks queue", func(node cmd.NodeBuilder) error {
+			chunkQueue = storage.NewChunkQueue(node.DB())
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
 				return fmt.Errorf("could not initialize default index in chunks queue: %w", err)
 			}
 
-			node.Logger.Info().
+			logger := node.Logger()
+			logger.Info().
 				Str("component", "node-builder").
 				Bool("init_to_default", ok).
 				Msg("chunks queue index has been initialized")
 
 			return nil
 		}).
-		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(node cmd.NodeBuilder) error {
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
 
 			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
-			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+		Module("sync core", func(node cmd.NodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger(), synchronization.DefaultConfig())
 			return err
 		}).
-		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("verifier engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
-			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
+			vmCtx := fvm.NewContext(node.Logger(), node.FvmOptions()...)
 			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
-			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
+			approvalStorage := storage.NewResultApprovals(node.Metrics().Cache, node.DB())
 			verifierEng, err = verifier.New(
-				node.Logger,
+				node.Logger(),
 				collector,
-				node.Tracer,
-				node.Network,
-				node.State,
-				node.Me,
+				node.Tracer(),
+				node.Network(),
+				node.ProtocolState(),
+				node.Me(),
 				chunkVerifier,
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("chunk consumer, requester, and fetcher engines", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			requesterEngine, err = vereq.New(
-				node.Logger,
-				node.State,
-				node.Network,
-				node.Tracer,
+				node.Logger(),
+				node.ProtocolState(),
+				node.Network(),
+				node.Tracer(),
 				collector,
 				chunkRequests,
 				requestInterval,
@@ -195,62 +196,62 @@ func main() {
 				requestTargets)
 
 			fetcherEngine = fetcher.New(
-				node.Logger,
+				node.Logger(),
 				collector,
-				node.Tracer,
+				node.Tracer(),
 				verifierEng,
-				node.State,
+				node.ProtocolState(),
 				chunkStatuses,
-				node.Storage.Headers,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				node.Storage.Receipts,
+				node.Storage().Headers,
+				node.Storage().Blocks,
+				node.Storage().Results,
+				node.Storage().Receipts,
 				requesterEngine)
 
 			// requester and fetcher engines are started by chunk consumer
 			chunkConsumer = chunkconsumer.NewChunkConsumer(
-				node.Logger,
+				node.Logger(),
 				collector,
 				processedChunkIndex,
 				chunkQueue,
 				fetcherEngine,
 				chunkWorkers)
 
-			err = node.Metrics.Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourceChunkConsumer, chunkConsumer.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register backend metric: %w", err)
 			}
 
 			return chunkConsumer, nil
 		}).
-		Component("assigner engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("assigner engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
-			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
+			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.ProtocolState())
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize chunk assigner: %w", err)
 			}
 
 			assignerEngine = assigner.New(
-				node.Logger,
+				node.Logger(),
 				collector,
-				node.Tracer,
-				node.Me,
-				node.State,
+				node.Tracer(),
+				node.Me(),
+				node.ProtocolState(),
 				chunkAssigner,
 				chunkQueue,
 				chunkConsumer)
 
 			return assignerEngine, nil
 		}).
-		Component("block consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("block consumer", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			var initBlockHeight uint64
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
-				node.Logger,
+				node.Logger(),
 				collector,
 				processedBlockHeight,
-				node.Storage.Blocks,
-				node.State,
+				node.Storage().Blocks,
+				node.ProtocolState(),
 				assignerEngine,
 				blockWorkers)
 
@@ -258,26 +259,27 @@ func main() {
 				return nil, fmt.Errorf("could not initialize block consumer: %w", err)
 			}
 
-			err = node.Metrics.Mempool.Register(metrics.ResourceBlockConsumer, blockConsumer.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourceBlockConsumer, blockConsumer.Size)
 			if err != nil {
 				return nil, fmt.Errorf("could not register backend metric: %w", err)
 			}
 
-			node.Logger.Info().
+			logger := node.Logger()
+			logger.Info().
 				Str("component", "node-builder").
 				Uint64("init_height", initBlockHeight).
 				Msg("block consumer initialized")
 
 			return blockConsumer, nil
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger(), node.DB(), metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB(), node.Storage().Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -287,7 +289,7 @@ func main() {
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			committee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me().NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -295,7 +297,7 @@ func main() {
 			// initialize the verifier for the protocol consensus
 			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
 
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalized, pending, err := recovery.FindLatest(node.ProtocolState(), node.Storage().Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
@@ -305,21 +307,21 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header,
-				node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger(), committee, node.Storage().Headers, final, verifier, finalizationDistributor, node.RootBlock().Header,
+				node.RootQC(), finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
 			}
 
 			followerEng, err = followereng.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
+				node.Logger(),
+				node.Network(),
+				node.Me(),
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
 				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				node.Storage().Headers,
+				node.Storage().Payloads,
 				followerState,
 				pendingBlocks,
 				followerCore,
@@ -331,14 +333,14 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
+				node.ProtocolState(),
+				node.Storage().Blocks,
 				followerEng,
 				syncCore,
 			)

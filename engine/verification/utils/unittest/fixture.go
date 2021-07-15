@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -16,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/messages"
@@ -289,26 +289,20 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
 
-		for i, stateSnapshot := range computationResult.StateSnapshots {
+		startState := startStateCommitment
 
-			ids, values := view.Delta().RegisterUpdates()
-			keys := state.RegisterIDSToKeys(ids)
-			flowValues := state.RegisterValuesToValues(values)
-
-			update, err := ledger.NewUpdate(ledger.State(startStateCommitment), keys, flowValues)
-			require.NoError(t, err)
-
-			// TODO: update CommitDelta to also return proofs
-			endStateCommitment, err := led.Set(update)
-			require.NoError(t, err, "error updating registers")
+		for i := range computationResult.StateCommitments {
+			endState := computationResult.StateCommitments[i]
 
 			var collectionID flow.Identifier
 
+			txNumber := 1 //default for system chunk
 			// account for system chunk being last
-			if i < len(computationResult.StateSnapshots)-1 {
+			if i < len(computationResult.StateCommitments)-1 {
 				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 				collectionID = completeCollection.Collection().ID()
+				txNumber = len(completeCollection.Transactions)
 			} else {
 				collectionID = flow.ZeroID
 			}
@@ -316,46 +310,13 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
 			require.NoError(t, err)
 
-			chunk := &flow.Chunk{
-				ChunkBody: flow.ChunkBody{
-					CollectionIndex: uint(i),
-					StartState:      startStateCommitment,
-					// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
-					// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
-					// startState stays the same if blocks are empty
-					EventCollection: eventsHash,
-					BlockID:         executableBlock.ID(),
-					// TODO: record gas used
-					TotalComputationUsed: 0,
-					// TODO: record number of txs
-					NumberOfTransactions: 0,
-				},
-				Index:    uint64(i),
-				EndState: flow.StateCommitment(endStateCommitment),
-			}
-
-			// chunkDataPack
-			allRegisters := view.Interactions().AllRegisters()
-			allKeys := state.RegisterIDSToKeys(allRegisters)
-
-			query, err := ledger.NewQuery(ledger.State(chunk.StartState), allKeys)
-			require.NoError(t, err)
-
-			//values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
-			proof, err := led.Prove(query)
-			require.NoError(t, err, "error reading registers with proofs from ledger")
-
-			chunkDataPack := &flow.ChunkDataPack{
-				ChunkID:      chunk.ID(),
-				StartState:   chunk.StartState,
-				Proof:        proof,
-				CollectionID: collectionID,
-			}
+			chunk := execution.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID(), eventsHash, uint16(txNumber))
+			chunkDataPack := execution.GenerateChunkDataPack(chunk, collectionID, computationResult.Proofs[i])
 
 			chunks = append(chunks, chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
-			spockSecrets = append(spockSecrets, stateSnapshot.SpockSecret)
-			startStateCommitment = flow.StateCommitment(endStateCommitment)
+			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
+			startState = endState
 		}
 
 	})
