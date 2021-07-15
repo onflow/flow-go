@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -135,11 +136,15 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			fvm.WithAccountStorageLimit(true),
 			fvm.WithBlocks(&fvm.NoopBlockFinder{}),
 		}
+		// set 0 clusters to pass n_collectors >= n_clusters check
+		epochConfig := epochs.DefaultEpochConfig()
+		epochConfig.NumCollectorClusters = 0
 		bootstrapOptions := []fvm.BootstrapProcedureOption{
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			fvm.WithEpochConfig(epochConfig),
 		}
 
 		rt := fvm.NewInterpreterRuntime()
