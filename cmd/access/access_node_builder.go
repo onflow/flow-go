@@ -24,7 +24,7 @@ type AccessNodeBuilder interface {
 	IsStaked() bool
 }
 
-// FlowAccessNodeBuilder provides the common functionality needed to bootstrao a Flow staked and unstaked access node
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
 // It is composed of the FlowNodeBuilder
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
@@ -132,7 +132,7 @@ func (anb *FlowAccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 			participants,
 			node.Me(),
 			anb.unstakedMiddleware,
-			10e6,
+			p2p.DefaultCacheSize,
 			top,
 			subscriptionManager,
 			node.Metrics().Network)

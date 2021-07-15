@@ -85,13 +85,15 @@ type namedDoneObject struct {
 	name string
 }
 
-// FlowNodeBuilder is the builder struct used for all flow nodes
+// FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
+// The initialization can be proceeded and succeeded with  PreInit and PostInit functions that allow customization
+// of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	BaseConfig        BaseConfig
 	nodeID            flow.Identifier
@@ -295,10 +297,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		// creates topology, topology manager, and subscription managers
-		//
-		// topology
-		// subscription manager
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.middleware)
 		top, err := topology.NewTopicBasedTopology(fnb.nodeID, fnb.logger, fnb.state)
 		if err != nil {
@@ -312,7 +310,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			participants,
 			fnb.me,
 			fnb.middleware,
-			10e6,
+			p2p.DefaultCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.metrics.Network)
