@@ -9,7 +9,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -135,9 +134,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
 	// execute script to read if voted
-	arg := jsoncdc.MustEncode(cadence.String(c.nodeID.String()))
 	template := templates.GenerateGetNodeHasVotedScript(c.env)
-	hasVoted, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(arg)})
+	hasVoted, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(c.nodeID.String())})
 	if err != nil {
 		return false, fmt.Errorf("could not execute voted script: %w", err)
 	}
