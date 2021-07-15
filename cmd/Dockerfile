@@ -20,7 +20,7 @@ COPY crypto ./crypto
 # Build Relic (this places build artifacts in /build/relic/build)
 # NOTE: The Relic build script uses Bash-specific features, so we explicitly run
 # it with bash rather than the default shell.
-RUN cd crypto/ && go generate
+RUN cd ./crypto/ && go generate
 
 ## (2) Build the app binary
 FROM build-setup AS build-env
@@ -36,7 +36,7 @@ ARG VERSION
 COPY . .
 
 # Copy over Relic build artifacts
-COPY --from=build-relic /build/relic/build ./crypto/relic/build
+COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
 
 FROM build-env as build-production
 WORKDIR /app
