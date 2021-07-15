@@ -118,16 +118,16 @@ func main() {
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		}).
 		Initialize().
-		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
-			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
+		Module("consensus node metrics", func(node cmd.NodeBuilder) error {
+			conMetrics = metrics.NewConsensusCollector(node.Tracer(), node.MetricsRegisterer())
 			return nil
 		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(node cmd.NodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.ProtocolState())
 			}
 
 			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
@@ -138,27 +138,27 @@ func main() {
 				return fmt.Errorf("invalid consensus parameters: requiredApprovalsForSealConstruction > chunkAlpha")
 			}
 
-			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.State)
+			chunkAssigner, err = chmodule.NewChunkAssigner(chunkAlpha, node.ProtocolState())
 			if err != nil {
 				return fmt.Errorf("could not instantiate assignment algorithm for chunk verification: %w", err)
 			}
 
 			receiptValidator = validation.NewReceiptValidator(
-				node.State,
-				node.Storage.Headers,
-				node.Storage.Index,
-				node.Storage.Results,
-				node.Storage.Seals,
+				node.ProtocolState(),
+				node.Storage().Headers,
+				node.Storage().Index,
+				node.Storage().Results,
+				node.Storage().Seals,
 				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
 			sealValidator, err := validation.NewSealValidator(
-				node.State,
-				node.Storage.Headers,
-				node.Storage.Index,
-				node.Storage.Results,
-				node.Storage.Seals,
+				node.ProtocolState(),
+				node.Storage().Headers,
+				node.Storage().Index,
+				node.Storage().Results,
+				node.Storage().Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
 				requiredApprovalsForSealConstruction,
@@ -170,81 +170,81 @@ func main() {
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
+				node.Storage().Index,
+				node.Storage().Payloads,
+				node.Tracer(),
+				node.ProtocolEvents(),
 				receiptValidator,
 				sealValidator)
 			return err
 		}).
-		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
-			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
+		Module("random beacon key", func(node cmd.NodeBuilder) error {
+			privateDKGData, err = loadDKGPrivateData(node.Config().BootstrapDir, node.NodeID())
 			return err
 		}).
-		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection guarantees mempool", func(node cmd.NodeBuilder) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
 		}).
-		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("execution receipts mempool", func(node cmd.NodeBuilder) error {
 			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
-			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourceReceipt, receipts.Size)
 			if err != nil {
 				return fmt.Errorf("could not register backend metric: %w", err)
 			}
 			return nil
 		}).
-		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("block seals mempool", func(node cmd.NodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger()), node.DB(), node.Logger(), sealLimit)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
-			err = node.Metrics.Mempool.Register(metrics.ResourcePendingIncorporatedSeal, seals.Size)
+			err = node.Metrics().Mempool.Register(metrics.ResourcePendingIncorporatedSeal, seals.Size)
 			return nil
 		}).
-		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendingReceiptsLimit)
+		Module("pending receipts mempool", func(node cmd.NodeBuilder) error {
+			pendingReceipts = stdmap.NewPendingReceipts(node.Storage().Headers, pendingReceiptsLimit)
 			return nil
 		}).
-		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
-			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
+		Module("hotstuff main metrics", func(node cmd.NodeBuilder) error {
+			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID())
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
-			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+		Module("sync core", func(node cmd.NodeBuilder) error {
+			syncCore, err = synchronization.New(node.Logger(), synchronization.DefaultConfig())
 			return err
 		}).
-		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
+		Module("finalization distributor", func(node cmd.NodeBuilder) error {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
-		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sealing engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
-			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
+			sealingTracker := tracker.NewSealingTracker(node.Logger(), node.Storage().Headers, node.Storage().Receipts, seals)
 
 			config := sealing.DefaultConfig()
 			config.EmergencySealingActive = emergencySealing
 			config.RequiredApprovalsForSealConstruction = requiredApprovalsForSealConstruction
 
 			e, err := sealing.NewEngine(
-				node.Logger,
-				node.Tracer,
+				node.Logger(),
+				node.Tracer(),
 				conMetrics,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
 				sealingTracker,
-				node.Network,
-				node.Me,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				node.Storage.Results,
-				node.Storage.Index,
-				node.State,
-				node.Storage.Seals,
+				node.Network(),
+				node.Me(),
+				node.Storage().Headers,
+				node.Storage().Payloads,
+				node.Storage().Results,
+				node.Storage().Index,
+				node.ProtocolState(),
+				node.Storage().Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
 				seals,
@@ -257,13 +257,13 @@ func main() {
 
 			return e, err
 		}).
-		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("matching engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
+				node.ProtocolState(),
 				engine.RequestReceiptsByBlockID,
 				filter.HasRole(flow.RoleExecution),
 				func() flow.Entity { return &flow.ExecutionReceipt{} },
@@ -275,13 +275,13 @@ func main() {
 			}
 
 			core := matching.NewCore(
-				node.Logger,
-				node.Tracer,
+				node.Logger(),
+				node.Tracer(),
 				conMetrics,
-				node.Metrics.Mempool,
-				node.State,
-				node.Storage.Headers,
-				node.Storage.Receipts,
+				node.Metrics().Mempool,
+				node.ProtocolState(),
+				node.Storage().Headers,
+				node.Storage().Receipts,
 				receipts,
 				pendingReceipts,
 				seals,
@@ -291,14 +291,14 @@ func main() {
 			)
 
 			e, err := matching.NewEngine(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
-				node.State,
-				node.Storage.Receipts,
-				node.Storage.Index,
+				node.Logger(),
+				node.Network(),
+				node.Me(),
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
+				node.ProtocolState(),
+				node.Storage().Receipts,
+				node.Storage().Index,
 				core,
 			)
 			if err != nil {
@@ -312,50 +312,50 @@ func main() {
 
 			return e, err
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Network,
-				node.State,
-				node.Me,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Tracer(),
+				node.Network(),
+				node.ProtocolState(),
+				node.Me(),
 			)
 			return prov, err
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
-				node.Logger,
-				node.Tracer,
-				node.Metrics.Engine,
+				node.Logger(),
+				node.Tracer(),
+				node.Metrics().Engine,
 				conMetrics,
-				node.Metrics.Mempool,
-				node.Network,
-				node.State,
-				node.Storage.Headers,
-				node.Me,
+				node.Metrics().Mempool,
+				node.Network(),
+				node.ProtocolState(),
+				node.Storage().Headers,
+				node.Me(),
 				guarantees,
 			)
 			return ing, err
 		}).
-		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("consensus components", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := bstorage.NewCleaner(node.Logger(), node.DB(), metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
 
-			core, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
+			core, err := compliance.NewCore(node.Logger(),
+				node.Metrics().Engine,
+				node.Tracer(),
+				node.Metrics().Mempool,
+				node.Metrics().Compliance,
 				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				node.Storage().Headers,
+				node.Storage().Payloads,
 				mutableState,
 				proposals,
 				syncCore)
@@ -364,7 +364,7 @@ func main() {
 			}
 
 			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
+			comp, err = compliance.NewEngine(node.Logger(), node.Network(), node.Me(), prov, core)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
@@ -372,19 +372,19 @@ func main() {
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
-				node.Metrics.Mempool,
-				node.DB,
+				node.Metrics().Mempool,
+				node.DB(),
 				mutableState,
-				node.Storage.Headers,
-				node.Storage.Seals,
-				node.Storage.Index,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				node.Storage.Receipts,
+				node.Storage().Headers,
+				node.Storage().Seals,
+				node.Storage().Index,
+				node.Storage().Blocks,
+				node.Storage().Results,
+				node.Storage().Receipts,
 				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage().Receipts),
 				receipts,
-				node.Tracer,
+				node.Tracer(),
 				builder.WithMinInterval(minInterval),
 				builder.WithMaxInterval(maxInterval),
 				builder.WithMaxSealCount(maxSealPerBlock),
@@ -398,20 +398,20 @@ func main() {
 
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
-				node.DB,
-				node.Storage.Headers,
+				node.DB(),
+				node.Storage().Headers,
 				mutableState,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
-					node.Metrics.Mempool,
+					node.Metrics().Mempool,
 					conMetrics,
-					node.Storage.Payloads,
+					node.Storage().Payloads,
 					guarantees,
 					seals,
 				)),
 			)
 
 			// initialize the aggregating signature module for staking signatures
-			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
+			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me())
 
 			// initialize the threshold signature module for random beacon signatures
 			beacon := signature.NewThresholdProvider(encoding.RandomBeaconTag, privateDKGData.RandomBeaconPrivKey)
@@ -421,7 +421,7 @@ func main() {
 
 			// initialize Main consensus committee's state
 			var committee hotstuff.Committee
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			committee, err = committees.NewConsensusCommittee(node.ProtocolState(), node.Me().NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -434,44 +434,44 @@ func main() {
 				staking,
 				beacon,
 				merger,
-				node.NodeID,
+				node.NodeID(),
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
 			// initialize a logging notifier for hotstuff
 			notifier := createNotifier(
-				node.Logger,
+				node.Logger(),
 				mainMetrics,
-				node.Tracer,
-				node.Storage.Index,
-				node.RootChainID,
+				node.Tracer(),
+				node.Storage().Index,
+				node.RootChainID(),
 			)
 
 			notifier.AddConsumer(finalizationDistributor)
 
 			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
+			persist := persister.New(node.DB(), node.RootChainID())
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalized, pending, err := recovery.FindLatest(node.ProtocolState(), node.Storage().Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
-				node.Logger,
+				node.Logger(),
 				notifier,
 				mainMetrics,
-				node.Storage.Headers,
+				node.Storage().Headers,
 				committee,
 				build,
 				finalize,
 				persist,
 				signer,
 				comp,
-				node.RootBlock.Header,
-				node.RootQC,
+				node.RootBlock().Header,
+				node.RootQC(),
 				finalized,
 				pending,
 				consensus.WithInitialTimeout(hotstuffTimeout),
@@ -488,14 +488,14 @@ func main() {
 			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
+				node.ProtocolState(),
+				node.Storage().Blocks,
 				comp,
 				syncCore,
 			)
@@ -507,7 +507,7 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			// created with sealing engine
 			return receiptRequester, nil
 		}).

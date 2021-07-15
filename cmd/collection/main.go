@@ -127,48 +127,48 @@ func main() {
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
 		Initialize().
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(node cmd.NodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
+			state, ok := node.ProtocolState().(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.ProtocolState())
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
+				node.Storage().Index,
+				node.Storage().Payloads,
+				node.Tracer(),
+				node.ProtocolEvents(),
 			)
 			return err
 		}).
-		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("transactions mempool", func(node cmd.NodeBuilder) error {
 			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
 			pools = epochpool.NewTransactionPools(create)
-			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
+			err := node.Metrics().Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
-		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(node cmd.NodeBuilder) error {
 			followerBuffer = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("metrics", func(node *cmd.FlowNodeBuilder) error {
-			colMetrics = metrics.NewCollectionCollector(node.Tracer)
+		Module("metrics", func(node cmd.NodeBuilder) error {
+			colMetrics = metrics.NewCollectionCollector(node.Tracer())
 			return nil
 		}).
-		Module("main chain sync core", func(node *cmd.FlowNodeBuilder) error {
-			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+		Module("main chain sync core", func(node cmd.NodeBuilder) error {
+			mainChainSyncCore, err = synchronization.New(node.Logger(), synchronization.DefaultConfig())
 			return err
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storagekv.NewCleaner(node.Logger(), node.DB(), metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			finalizer := confinalizer.NewFinalizer(node.DB(), node.Storage().Headers, followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -177,8 +177,8 @@ func main() {
 
 			// initialize consensus committee's membership state
 			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			mainConsensusCommittee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+			// Note: node.Me().NodeID() is not part of the consensus committee
+			mainConsensusCommittee, err := committees.NewConsensusCommittee(node.ProtocolState(), node.Me().NodeID())
 			if err != nil {
 				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
@@ -188,21 +188,21 @@ func main() {
 
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalized, pending, err := recovery.FindLatest(node.ProtocolState(), node.Storage().Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
 			// creates a consensus follower with noop consumer as the notifier
 			followerCore, err := consensus.NewFollower(
-				node.Logger,
+				node.Logger(),
 				mainConsensusCommittee,
-				node.Storage.Headers,
+				node.Storage().Headers,
 				finalizer,
 				verifier,
 				finalizationDistributor,
-				node.RootBlock.Header,
-				node.RootQC,
+				node.RootBlock().Header,
+				node.RootQC(),
 				finalized,
 				pending,
 			)
@@ -211,14 +211,14 @@ func main() {
 			}
 
 			followerEng, err = followereng.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
+				node.Logger(),
+				node.Network(),
+				node.Me(),
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
 				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
+				node.Storage().Headers,
+				node.Storage().Payloads,
 				followerState,
 				followerBuffer,
 				followerCore,
@@ -230,16 +230,16 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("main chain sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("main chain sync engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.State,
-				node.Storage.Blocks,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
+				node.ProtocolState(),
+				node.Storage().Blocks,
 				followerEng,
 				mainChainSyncCore,
 			)
@@ -251,53 +251,53 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
-				node.Logger,
-				node.Network,
-				node.State,
-				node.Metrics.Engine,
+				node.Logger(),
+				node.Network(),
+				node.ProtocolState(),
+				node.Metrics().Engine,
 				colMetrics,
-				node.Me,
-				node.RootChainID.Chain(),
+				node.Me(),
+				node.RootChainID().Chain(),
 				pools,
 				ingestConf,
 			)
 			return ing, err
 		}).
-		Component("transaction ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-			server := ingress.New(ingressConf, ing, node.RootChainID)
+		Component("transaction ingress server", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+			server := ingress.New(ingressConf, ing, node.RootChainID())
 			return server, nil
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
-				coll, err := node.Storage.Collections.ByID(collID)
+				coll, err := node.Storage().Collections.ByID(collID)
 				return coll, err
 			}
-			return provider.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
+			return provider.New(node.Logger(), node.Metrics().Engine, node.Network(), node.Me(), node.ProtocolState(),
 				engine.ProvideCollections,
 				filter.HasRole(flow.RoleAccess, flow.RoleExecution),
 				retrieve,
 			)
 		}).
-		Component("pusher engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("pusher engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
-				node.Logger,
-				node.Network,
-				node.State,
-				node.Metrics.Engine,
+				node.Logger(),
+				node.Network(),
+				node.ProtocolState(),
+				node.Metrics().Engine,
 				colMetrics,
-				node.Me,
-				node.Storage.Collections,
-				node.Storage.Transactions,
+				node.Me(),
+				node.Storage().Collections,
+				node.Storage().Transactions,
 			)
 			return push, err
 		}).
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
-		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("epoch manager", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
-			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
+			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB(), node.Metrics().Cache, node.Tracer())
 			if err != nil {
 				return nil, err
 			}
@@ -310,9 +310,9 @@ func main() {
 			}
 
 			builderFactory, err := factories.NewBuilderFactory(
-				node.DB,
-				node.Storage.Headers,
-				node.Tracer,
+				node.DB(),
+				node.Storage().Headers,
+				node.Tracer(),
 				colMetrics,
 				push,
 				builder.WithMaxCollectionSize(maxCollectionSize),
@@ -327,24 +327,24 @@ func main() {
 			}
 
 			proposalFactory, err := factories.NewProposalEngineFactory(
-				node.Logger,
-				node.Network,
-				node.Me,
+				node.Logger(),
+				node.Network(),
+				node.Me(),
 				colMetrics,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
-				node.State,
-				node.Storage.Transactions,
+				node.Metrics().Engine,
+				node.Metrics().Mempool,
+				node.ProtocolState(),
+				node.Storage().Transactions,
 			)
 			if err != nil {
 				return nil, err
 			}
 
 			syncFactory, err := factories.NewSyncEngineFactory(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
+				node.Logger(),
+				node.Metrics().Engine,
+				node.Network(),
+				node.Me(),
 				synchronization.DefaultConfig(),
 			)
 			if err != nil {
@@ -352,10 +352,10 @@ func main() {
 			}
 
 			hotstuffFactory, err := factories.NewHotStuffFactory(
-				node.Logger,
-				node.Me,
-				node.DB,
-				node.State,
+				node.Logger(),
+				node.Me(),
+				node.DB(),
+				node.ProtocolState(),
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
@@ -367,18 +367,18 @@ func main() {
 				return nil, err
 			}
 
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
-			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me())
+			signer := verification.NewSingleSigner(staking, node.Me().NodeID())
 			rootQCVoter := epochs.NewRootQCVoter(
-				node.Logger,
-				node.Me,
+				node.Logger(),
+				node.Me(),
 				signer,
-				node.State,
+				node.ProtocolState(),
 				nil, // TODO
 			)
 
 			factory := factories.NewEpochComponentsFactory(
-				node.Me,
+				node.Me(),
 				pools,
 				builderFactory,
 				clusterStateFactory,
@@ -388,12 +388,12 @@ func main() {
 			)
 
 			heightEvents := gadgets.NewHeights()
-			node.ProtocolEvents.AddConsumer(heightEvents)
+			node.ProtocolEvents().AddConsumer(heightEvents)
 
 			manager, err := epochmgr.New(
-				node.Logger,
-				node.Me,
-				node.State,
+				node.Logger(),
+				node.Me(),
+				node.ProtocolState(),
 				pools,
 				rootQCVoter,
 				factory,
@@ -404,7 +404,7 @@ func main() {
 			}
 
 			// register the manager for protocol events
-			node.ProtocolEvents.AddConsumer(manager)
+			node.ProtocolEvents().AddConsumer(manager)
 
 			return manager, err
 		}).
