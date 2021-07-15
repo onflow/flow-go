@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
-	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
@@ -125,8 +124,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		// submit the vote - this call will block until the transaction has
 		// either succeeded or we are able to retry
 		log.Info().Msg("submitting vote...")
-		voteMessage := hotstuffver.MakeVoteMessage(vote.View, vote.BlockID)
-		err = voter.client.SubmitVote(ctx, vote, voteMessage)
+		err = voter.client.SubmitVote(ctx, vote)
 		if err != nil {
 			log.Error().Err(err).Msg("could not submit vote - retrying...")
 			continue

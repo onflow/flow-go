@@ -14,13 +14,13 @@ type QCContractClient struct {
 	mock.Mock
 }
 
-// SubmitVote provides a mock function with given fields: ctx, vote, voteMessage
-func (_m *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote, voteMessage []byte) error {
-	ret := _m.Called(ctx, vote, voteMessage)
+// SubmitVote provides a mock function with given fields: ctx, vote
+func (_m *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) error {
+	ret := _m.Called(ctx, vote)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, *model.Vote, []byte) error); ok {
-		r0 = rf(ctx, vote, voteMessage)
+	if rf, ok := ret.Get(0).(func(context.Context, *model.Vote) error); ok {
+		r0 = rf(ctx, vote)
 	} else {
 		r0 = ret.Error(0)
 	}

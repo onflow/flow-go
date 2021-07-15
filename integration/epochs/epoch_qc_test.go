@@ -1,7 +1,6 @@
 package epochs
 
 import (
-	// "context"
 	"context"
 	"math/rand"
 	"testing"
@@ -28,7 +27,7 @@ import (
 	protomock "github.com/onflow/flow-go/state/protocol/mock"
 )
 
-func TestClusterEpoch(t *testing.T) {
+func TestEmulatorBackedClusterQC(t *testing.T) {
 	suite.Run(t, new(Suite))
 }
 
@@ -53,6 +52,11 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	s.PublishVoter()
 	s.StartVoting(clustering, clusterCount, nodesPerCluster)
 
+	// vote message to be signed with staking key
+	blockID := unittest.IdentifierFixture()
+	view := uint64(rand.Uint32())
+	voteMessage := hotstuffver.MakeVoteMessage(view, blockID)
+
 	// create cluster nodes with voter resource
 	for _, node := range nodes {
 		nodeID := node.NodeID
@@ -74,10 +78,6 @@ func (s *Suite) TestEpochQuorumCertificate() {
 
 		local := &modulemock.Local{}
 		local.On("NodeID").Return(nodeID)
-
-		blockID := unittest.IdentifierFixture()
-		view := uint64(rand.Uint32())
-		voteMessage := hotstuffver.MakeVoteMessage(view, blockID)
 
 		// create valid signature
 		hasher := crypto.NewBLSKMAC(encoding.CollectorVoteTag)

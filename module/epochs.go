@@ -30,7 +30,7 @@ type QCContractClient interface {
 	// contract. This function returns only once the transaction has been
 	// processed by the network. An error is returned if the transaction has
 	// failed and should be re-submitted.
-	SubmitVote(ctx context.Context, vote *model.Vote, voteMessage []byte) error
+	SubmitVote(ctx context.Context, vote *model.Vote) error
 
 	// Voted returns true if we have successfully submitted a vote to the
 	// cluster QC aggregator smart contract for the current epoch.
