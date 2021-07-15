@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
@@ -19,9 +17,16 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 )
 
-// AccessNodeBuilder is initializes and runs an Access node either as a staked node or an unstaked node
+// AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
+type AccessNodeBuilder interface {
+	cmd.NodeBuilder
+	EnqueueUnstakedNetworkInit()
+	IsStaked() bool
+}
+
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrao a Flow staked and unstaked access node
 // It is composed of the FlowNodeBuilder
-type AccessNodeBuilder struct {
+type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	staked                  bool
 	stakedAccessNodeIDHex   string
@@ -30,13 +35,16 @@ type AccessNodeBuilder struct {
 	unstakedMiddleware      *p2p.Middleware
 }
 
-func FlowAccessNode() *AccessNodeBuilder {
-	return &AccessNodeBuilder{
+func FlowAccessNode() *FlowAccessNodeBuilder {
+	return &FlowAccessNodeBuilder{
 		FlowNodeBuilder: cmd.FlowNode(flow.RoleAccess.String()),
 	}
 }
+func (anb *FlowAccessNodeBuilder) IsStaked() bool {
+	return anb.staked
+}
 
-func (anb *AccessNodeBuilder) Initialize() *AccessNodeBuilder {
+func (anb *FlowAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	anb.PrintBuildVersionDetails()
 
@@ -44,45 +52,10 @@ func (anb *AccessNodeBuilder) Initialize() *AccessNodeBuilder {
 
 	anb.ParseAndPrintFlags()
 
-	anb.validateParams()
-
-	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
-	if anb.staked {
-		anb.EnqueueNetworkInit()
-	}
-
-	// if an unstaked bind address is provided, initialize the network to communicate on the unstaked network
-	if anb.unstakedNetworkBindAddr != cmd.NotSet {
-		anb.EnqueueUnstakedNetworkInit()
-	}
-
-	anb.EnqueueMetricsServerInit()
-
-	anb.RegisterBadgerMetrics()
-
-	anb.EnqueueTracer()
-
 	return anb
 }
 
-func (anb *AccessNodeBuilder) validateParams() {
-	if anb.staked {
-		return
-	}
-
-	logger := anb.Logger()
-	// for an unstaked access node, the staked access node ID must be provided
-	if strings.TrimSpace(anb.stakedAccessNodeIDHex) == "" {
-		logger.Fatal().Msg("staked access node ID not specified")
-	}
-
-	// and also the unstaked bind address
-	if anb.unstakedNetworkBindAddr == cmd.NotSet {
-		logger.Fatal().Msg("unstaked bind address not set")
-	}
-}
-
-func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
+func (anb *FlowAccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 	anb.Component("unstaked network", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 		codec := jsoncodec.NewCodec()
 
@@ -141,10 +114,6 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		// creates topology, topology manager, and subscription managers
-		//
-		// topology
-		// subscription manager
 		subscriptionManager := p2p.NewChannelSubscriptionManager(anb.unstakedMiddleware)
 		var top network.Topology
 		if anb.staked {
@@ -182,21 +151,4 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 		logger.Info().Msgf("unstaked network will run on address: %s", anb.unstakedNetworkBindAddr)
 		return net, err
 	})
-}
-
-func (anb *AccessNodeBuilder) initUnstakedLocal() func(node cmd.NodeBuilder) {
-	return func(node cmd.NodeBuilder) {
-		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
-			NodeID:        anb.NodeID(),
-			NetworkPubKey: anb.NetworkKey().PublicKey(),
-			StakingPubKey: nil,             // no staking key needed for the unstaked node
-			Role:          flow.RoleAccess, // unstaked node can only run as an access node
-			Address:       anb.unstakedNetworkBindAddr,
-		}
-
-		me, err := local.New(self, nil)
-		anb.MustNot(err).Msg("could not initialize local")
-		anb.SetMe(me)
-	}
 }

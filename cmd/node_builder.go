@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
+// NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
 	BaseFlags()
 	ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder
@@ -28,11 +29,11 @@ type NodeBuilder interface {
 	EnqueueTracer()
 	ParseAndPrintFlags()
 	PrintBuildVersionDetails()
-	InitLocal()
 	Module(name string, f func(builder NodeBuilder) error) NodeBuilder
 	MustNot(err error) *zerolog.Event
 	Component(name string, f func(NodeBuilder) (module.ReadyDoneAware, error)) NodeBuilder
 	Run()
+	PreInit(f func(node NodeBuilder)) NodeBuilder
 	PostInit(f func(node NodeBuilder)) NodeBuilder
 	RegisterBadgerMetrics()
 

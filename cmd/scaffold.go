@@ -113,8 +113,8 @@ type FlowNodeBuilder struct {
 	components        []namedComponentFunc
 	doneObject        []namedDoneObject
 	sig               chan os.Signal
-	postInitFns       []func(NodeBuilder)
 	preInitFns        []func(NodeBuilder)
+	postInitFns       []func(NodeBuilder)
 	stakingKey        crypto.PrivateKey
 	networkKey        crypto.PrivateKey
 
@@ -597,9 +597,9 @@ func (fnb *FlowNodeBuilder) initState() {
 			Msg("genesis state bootstrapped")
 	}
 
-	// skip initializing Local if already set
-	if fnb.me == nil {
-		fnb.InitLocal()
+	// initialize local if it hasn't been initialized yet
+	if fnb.Me() == nil {
+		fnb.initLocal()
 	}
 
 	lastFinalized, err := fnb.state.Final().Head()
@@ -610,7 +610,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		Msg("last finalized block")
 }
 
-func (fnb *FlowNodeBuilder) InitLocal() {
+func (fnb *FlowNodeBuilder) initLocal() {
 	// Verify that my ID (as given in the configuration) is known to the network
 	// (i.e. protocol state). There are two cases that will cause the following error:
 	// 1) used the wrong node id, which is not part of the identity list of the finalized state
@@ -865,11 +865,11 @@ func (fnb *FlowNodeBuilder) Run() {
 	os.Exit(0)
 }
 
-func (fnb *FlowNodeBuilder) handlePostInit(f func(node NodeBuilder)) {
+func (fnb *FlowNodeBuilder) handlePreInit(f func(node NodeBuilder)) {
 	f(fnb)
 }
 
-func (fnb *FlowNodeBuilder) handlePreInit(f func(node NodeBuilder)) {
+func (fnb *FlowNodeBuilder) handlePostInit(f func(node NodeBuilder)) {
 	f(fnb)
 }
 

@@ -79,7 +79,7 @@ func main() {
 		rpcMetricsEnabled            bool
 	)
 
-	anb := FlowAccessNode()
+	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
 	anb.ExtraFlags(func(flags *pflag.FlagSet) {
 		flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 		flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
@@ -109,7 +109,20 @@ func main() {
 		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", "", "the node ID of the upstream staked access node if this is an unstaked access node")
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
 	})
-	anb.Initialize().
+
+	// initialize the node builder to parse the command line args
+	anb.Initialize()
+
+	// choose a staked or an unstaked node builder based on anb.staked
+	var nodeBuilder AccessNodeBuilder
+	if anb.staked {
+		nodeBuilder = StakedAccessNode(anb)
+	} else {
+		nodeBuilder = UnstakedAccessNode(anb)
+	}
+
+	nodeBuilder.
+		Initialize().
 		Module("mutable follower state", func(node cmd.NodeBuilder) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -334,8 +347,8 @@ func main() {
 		})
 
 	// the ping engine is only needed for the staked access node
-	if anb.staked {
-		anb.Component("ping engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+	if nodeBuilder.IsStaked() {
+		nodeBuilder.Component("ping engine", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 			ping, err := pingeng.New(
 				node.Logger(),
 				node.ProtocolState(),
@@ -352,9 +365,5 @@ func main() {
 		})
 	}
 
-	// initialize the unstaked node's identity
-	if !anb.staked {
-		anb.PreInit(anb.initUnstakedLocal())
-	}
-	anb.Run()
+	nodeBuilder.Run()
 }
