@@ -58,13 +58,63 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 
 		totalWeight := cadence.NewUInt64(uint64(len(cluster)))
 
-		votes := cadence.NewArray([]cadence.Value{})
+		generatedVotes := []cadence.KeyValuePair{}
+		for _, id := range cluster {
+			voteStructFields := []cadence.Value{
+				// nodeid
+				cadence.NewString(id.String()),
+				// signature
+				cadence.NewOptional(nil),
+				// message
+				cadence.NewOptional(nil),
+				// cluster index
+				clusterIndex,
+				// node weight
+				cadence.NewUInt64(1),
+			}
+
+			value := cadence.NewStruct(voteStructFields).WithType(&cadence.StructType{
+				Location: common.AddressLocation{
+					Address: common.BytesToAddress(service.Bytes()),
+					Name:    "Service",
+				},
+				QualifiedIdentifier: "FlowClusterQC.Vote",
+				Fields: []cadence.Field{
+					{
+						Identifier: "nodeID",
+						Type:       cadence.StringType{},
+					},
+					{
+						Identifier: "signature",
+						Type:       cadence.OptionalType{Type: cadence.StringType{}},
+					},
+					{
+						Identifier: "message",
+						Type:       cadence.OptionalType{Type: cadence.StringType{}},
+					},
+					{
+						Identifier: "clusterIndex",
+						Type:       cadence.UInt16Type{},
+					},
+					{
+						Identifier: "weight",
+						Type:       cadence.UInt64Type{},
+					},
+				},
+			})
+
+			kvp := cadence.KeyValuePair{
+				Key:   cadence.NewString(id.String()),
+				Value: value,
+			}
+			generatedVotes = append(generatedVotes, kvp)
+		}
 
 		fields := []cadence.Value{
 			clusterIndex,
 			cadence.NewDictionary(weightsByNodeID),
 			totalWeight,
-			votes,
+			cadence.NewDictionary(generatedVotes),
 		}
 
 		clusterStruct := cadence.NewStruct(fields).
@@ -73,7 +123,7 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 					Address: common.BytesToAddress(service.Bytes()),
 					Name:    "Service",
 				},
-				QualifiedIdentifier: "FlowEpochClusterQC.Cluster",
+				QualifiedIdentifier: "FlowClusterQC.Cluster",
 				Fields: []cadence.Field{
 					{
 						Identifier: "index",
@@ -91,8 +141,9 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 						Type:       cadence.UInt64Type{},
 					},
 					{
-						Identifier: "votes",
-						Type: cadence.ConstantSizedArrayType{
+						Identifier: "generatedVotes",
+						Type: cadence.DictionaryType{
+							KeyType:     cadence.StringType{},
 							ElementType: cadence.AnyStructType{},
 						},
 					},
@@ -139,7 +190,7 @@ func EncodeClusterQCs(qcs []*flow.QuorumCertificate, service flow.Address) []byt
 					Address: common.BytesToAddress(service.Bytes()),
 					Name:    "Service",
 				},
-				QualifiedIdentifier: "FlowEpochClusterQC.ClusterQC",
+				QualifiedIdentifier: "FlowClusterQC.ClusterQC",
 				Fields: []cadence.Field{
 					{
 						Identifier: "index",

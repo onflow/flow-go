@@ -932,7 +932,7 @@ var epochSetupFixtureJSON = `
             {
               "type": "Struct",
               "value": {
-                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.Cluster",
+                "id": "A.01cf0e2f2f715450.FlowClusterQC.Cluster",
                 "fields": [
                   {
                     "name": "index",
@@ -989,7 +989,7 @@ var epochSetupFixtureJSON = `
             {
               "type": "Struct",
               "value": {
-                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.Cluster",
+                "id": "A.01cf0e2f2f715450.FlowClusterQC.Cluster",
                 "fields": [
                   {
                     "name": "index",
@@ -1100,7 +1100,7 @@ var epochCommitFixtureJSON = `
                         {
                             "type": "Struct",
                             "value": {
-                                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.ClusterQC",
+                                "id": "A.01cf0e2f2f715450.FlowClusterQC.ClusterQC",
                                 "fields": [
                                     {
                                         "name": "index",
@@ -1147,7 +1147,7 @@ var epochCommitFixtureJSON = `
                         {
                             "type": "Struct",
                             "value": {
-                                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.ClusterQC",
+                                "id": "A.01cf0e2f2f715450.FlowClusterQC.ClusterQC",
                                 "fields": [
                                     {
                                         "name": "index",
