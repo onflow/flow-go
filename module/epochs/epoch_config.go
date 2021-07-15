@@ -3,7 +3,6 @@ package epochs
 import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -39,13 +38,18 @@ func DefaultEpochConfig() EpochConfig {
 	}
 }
 
-// EncodeClusterAssignments encodes an AssigmentList into a byte array that can
-// be used as a transaction argument when deploying the epochs contract.
-func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service flow.Address) []byte {
-	collectorClusterValues := []cadence.Value{}
+// EncodeClusterAssignments encodes a slice of QuorumCertificates into an encoded
+// transaction argument for the deployEpoch transaction used during execution
+// state bootstrapping.
+//
+// The resulting argument has type [{String: UInt64}] which represents a list
+// of weight mappings for each cluster. The full Cluster struct is constructed
+// within the transaction in Cadence for simplicity here.
+//
+func EncodeClusterAssignments(clusterAssignments flow.AssignmentList) []byte {
 
-	for i, cluster := range clusterAssignments {
-		clusterIndex := cadence.UInt16(i)
+	weightMappingPerCluster := []cadence.Value{}
+	for _, cluster := range clusterAssignments {
 
 		weightsByNodeID := []cadence.KeyValuePair{}
 		for _, id := range cluster {
@@ -56,176 +60,9 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList, service fl
 			weightsByNodeID = append(weightsByNodeID, kvp)
 		}
 
-		totalWeight := cadence.NewUInt64(uint64(len(cluster)))
-
-		generatedVotes := []cadence.KeyValuePair{}
-		for _, id := range cluster {
-			voteStructFields := []cadence.Value{
-				// nodeid
-				cadence.NewString(id.String()),
-				// signature
-				cadence.NewOptional(nil),
-				// message
-				cadence.NewOptional(nil),
-				// cluster index
-				clusterIndex,
-				// node weight
-				cadence.NewUInt64(1),
-			}
-
-			value := cadence.NewStruct(voteStructFields).WithType(&cadence.StructType{
-				Location: common.AddressLocation{
-					Address: common.BytesToAddress(service.Bytes()),
-					Name:    "Service",
-				},
-				QualifiedIdentifier: "FlowClusterQC.Vote",
-				Fields: []cadence.Field{
-					{
-						Identifier: "nodeID",
-						Type:       cadence.StringType{},
-					},
-					{
-						Identifier: "signature",
-						Type:       cadence.OptionalType{Type: cadence.StringType{}},
-					},
-					{
-						Identifier: "message",
-						Type:       cadence.OptionalType{Type: cadence.StringType{}},
-					},
-					{
-						Identifier: "clusterIndex",
-						Type:       cadence.UInt16Type{},
-					},
-					{
-						Identifier: "weight",
-						Type:       cadence.UInt64Type{},
-					},
-				},
-			})
-
-			kvp := cadence.KeyValuePair{
-				Key:   cadence.NewString(id.String()),
-				Value: value,
-			}
-			generatedVotes = append(generatedVotes, kvp)
-		}
-
-		fields := []cadence.Value{
-			clusterIndex,
-			cadence.NewDictionary(weightsByNodeID),
-			totalWeight,
-			cadence.NewDictionary(generatedVotes),
-		}
-
-		clusterStruct := cadence.NewStruct(fields).
-			WithType(&cadence.StructType{
-				Location: common.AddressLocation{
-					Address: common.BytesToAddress(service.Bytes()),
-					Name:    "Service",
-				},
-				QualifiedIdentifier: "FlowClusterQC.Cluster",
-				Fields: []cadence.Field{
-					{
-						Identifier: "index",
-						Type:       cadence.UInt16Type{},
-					},
-					{
-						Identifier: "nodeWeights",
-						Type: cadence.DictionaryType{
-							KeyType:     cadence.StringType{},
-							ElementType: cadence.UInt64Type{},
-						},
-					},
-					{
-						Identifier: "totalWeight",
-						Type:       cadence.UInt64Type{},
-					},
-					{
-						Identifier: "generatedVotes",
-						Type: cadence.DictionaryType{
-							KeyType:     cadence.StringType{},
-							ElementType: cadence.AnyStructType{},
-						},
-					},
-				},
-			})
-
-		collectorClusterValues = append(collectorClusterValues, clusterStruct)
+		weightMappingPerCluster = append(weightMappingPerCluster, cadence.NewDictionary(weightsByNodeID))
 	}
 
-	collectorClusters := cadence.NewArray(collectorClusterValues)
-
-	return jsoncdc.MustEncode(collectorClusters)
-}
-
-// EncodeClusterQCs encodes a slice of QuorumCertificates into a byte array that
-// can be used as a transaction argument when deploying the epochs contract.
-func EncodeClusterQCs(qcs []*flow.QuorumCertificate, service flow.Address) []byte {
-	qcValues := []cadence.Value{}
-
-	for i, qc := range qcs {
-		qcIndex := cadence.UInt16(i)
-
-		// Here we are adding signer IDs rather than votes. It doesn't matter
-		// because these initial values aren't used by the contract.
-		qcVotes := []cadence.Value{}
-		for _, voterID := range qc.SignerIDs {
-			qcVotes = append(qcVotes, cadence.NewString(voterID.String()))
-		}
-
-		qcVoterIDs := []cadence.Value{}
-		for _, voterID := range qc.SignerIDs {
-			qcVoterIDs = append(qcVoterIDs, cadence.NewString(voterID.String()))
-		}
-
-		fields := []cadence.Value{
-			qcIndex,
-			cadence.NewArray(qcVotes),
-			cadence.NewArray(qcVoterIDs),
-		}
-
-		qcStruct := cadence.NewStruct(fields).
-			WithType(&cadence.StructType{
-				Location: common.AddressLocation{
-					Address: common.BytesToAddress(service.Bytes()),
-					Name:    "Service",
-				},
-				QualifiedIdentifier: "FlowClusterQC.ClusterQC",
-				Fields: []cadence.Field{
-					{
-						Identifier: "index",
-						Type:       cadence.UInt16Type{},
-					},
-					{
-						Identifier: "votes",
-						Type: cadence.ConstantSizedArrayType{
-							ElementType: cadence.StringType{},
-						},
-					},
-					{
-						Identifier: "voterIDs",
-						Type: cadence.ConstantSizedArrayType{
-							ElementType: cadence.StringType{},
-						},
-					},
-				},
-			})
-
-		qcValues = append(qcValues, qcStruct)
-	}
-
-	quorumCertificates := cadence.NewArray(qcValues)
-
-	return jsoncdc.MustEncode(quorumCertificates)
-}
-
-// EncodePubKeys encodes a slice of public keys into a byte array that can be
-// used as a transaction argument when deploying the epochs contract.
-func EncodePubKeys(pubKeys []crypto.PublicKey, service flow.Address) []byte {
-	pubKeyValues := []cadence.Value{}
-	for _, pk := range pubKeys {
-		pubKeyValues = append(pubKeyValues, cadence.NewString(pk.String()))
-	}
-	res := cadence.NewArray(pubKeyValues)
-	return jsoncdc.MustEncode(res)
+	asArray := cadence.NewArray(weightMappingPerCluster)
+	return jsoncdc.MustEncode(asArray)
 }
