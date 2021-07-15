@@ -71,7 +71,8 @@ func (suite *Suite) TestHappyPath() {
 
 		conduit.On("Publish", event).Return(nil).Once()
 
-		suite.engine.Process(channel, id, event)
+		err := suite.engine.Process(channel, id, event)
+		suite.Assert().Nil(err)
 
 		conduit.AssertNumberOfCalls(suite.T(), "Publish", 1)
 		conduit.AssertExpectations(suite.T())
