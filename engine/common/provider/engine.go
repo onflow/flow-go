@@ -90,15 +90,20 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an message originating on the local node.
 func (e *Engine) SubmitLocal(message interface{}) {
-	e.Submit(e.me.NodeID(), message)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), message)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given message from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, message)
+		err := e.Process(channel, originID, message)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -107,12 +112,14 @@ func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
 
 // ProcessLocal processes an message originating on the local node.
 func (e *Engine) ProcessLocal(message interface{}) error {
-	return e.Process(e.me.NodeID(), message)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), message)
+	})
 }
 
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, message interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, message)
 	})

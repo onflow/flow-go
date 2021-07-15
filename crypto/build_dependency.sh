@@ -1,8 +1,9 @@
-
 #!/bin/bash
 
+set -euo pipefail
+
 # relic version or tag
-relic_version="7a9bba7f"
+relic_version="9206ae50"
 
 rm -rf relic
 
