@@ -59,7 +59,7 @@ func (anb *FlowAccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 	anb.Component("unstaked network", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 		codec := jsoncodec.NewCodec()
 
-		// setup the Ping provider to return the software version and the finalized block height
+		// setup the Ping provider to return the software version and the sealed block height
 		pingProvider := p2p.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
