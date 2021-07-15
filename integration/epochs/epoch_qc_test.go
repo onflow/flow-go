@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	hotstuffmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
 	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"

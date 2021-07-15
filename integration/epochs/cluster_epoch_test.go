@@ -1,7 +1,7 @@
 package epochs
 
 import (
-	"crypto"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go-sdk/test"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -180,7 +181,7 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
 	require.NoError(s.T(), err)
 
-	err = registerVoterTx.AddArgument(cadence.NewString(publicStakingKey.EncodedHexRepresentation()))
+	err = registerVoterTx.AddArgument(cadence.NewString(hex.EncodeToString(publicStakingKey.Encode())))
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(registerVoterTx,
