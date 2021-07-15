@@ -91,7 +91,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	pingInfoProvider PingInfoProvider,
 	psOption ...pubsub.Option) (*Node, error) {
 
-	libp2pKey, err := privKey(key)
+	libp2pKey, err := PrivKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}
