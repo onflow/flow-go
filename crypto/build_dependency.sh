@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 PKG_DIR="./"
@@ -11,7 +10,7 @@ fi
 rm -rf relic
 
 # relic version or tag
-relic_version="7a9bba7f"
+relic_version="9206ae50"
 
 # clone a specific version of Relic without history if it's tagged.
 # git clone --branch $(relic_version) --single-branch --depth 1 git@github.com:relic-toolkit/relic.git

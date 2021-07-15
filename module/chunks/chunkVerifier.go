@@ -37,6 +37,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 		vmCtx: vmCtx,
 		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithTransactionFeesEnabled(false),
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
@@ -74,7 +75,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 
 	// transaction body of system chunk
 	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
-	tx := fvm.Transaction(txBody, uint32(0))
+	tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
 	systemChunkContext := fvm.NewContextFromParent(fcv.systemChunkCtx,

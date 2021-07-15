@@ -20,12 +20,12 @@ If you wish to only import the Flow cryptography package to your Go project, ple
 go get github.com/onflow/flow-go/crypto
 ```
 
-This isn't enough to run the package code as the code is relying on an extrnal C library ([Relic](https://github.com/relic-toolkit/relic)) for lower level mathematical operations. An extra step is required to compile the external dependency locally. 
+This isn't enough to run the package code as it relies on an extrnal C library ([Relic](https://github.com/relic-toolkit/relic)) for lower level mathematical operations. An extra step is required to compile the external dependency locally. 
 
 - Install [CMake](https://cmake.org/install/), which is used for building the package.
 - From the Go package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. For instance:
 ```
-cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.12.0/
+cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.18.0/
 go generate
 ```
 

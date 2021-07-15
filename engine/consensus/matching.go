@@ -11,9 +11,10 @@ type MatchingCore interface {
 	// * exception in case of unexpected error
 	// * nil - successfully processed receipt
 	ProcessReceipt(receipt *flow.ExecutionReceipt) error
-	// ProcessFinalizedBlock processes finalization events in blocking way.
+	// OnBlockFinalization notifies the engine that a (potentially new) block was finalized.
+	// Implementations are non-blocking.
 	// Returns:
 	// * exception in case of unexpected error
 	// * nil - successfully processed finalized block
-	ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error
+	OnBlockFinalization() error
 }
