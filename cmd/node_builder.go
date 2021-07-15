@@ -21,20 +21,62 @@ import (
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
+
+	// BaseFlags reads the command line arguments common to all nodes
 	BaseFlags()
+
+	// ExtraFlags reads the node specific command line arguments and adds it to the FlagSet
 	ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder
-	Initialize() NodeBuilder
-	EnqueueNetworkInit()
-	EnqueueMetricsServerInit()
-	EnqueueTracer()
+
+	// ParseAndPrintFlags parses all the command line arguments
 	ParseAndPrintFlags()
+
+	// Initialize performs all the initialization needed at the very start of a node
+	Initialize() NodeBuilder
+
+	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
+
+	// EnqueueNetworkInit enqueues the default network component
+	EnqueueNetworkInit()
+
+	// EnqueueMetricsServerInit enqueues the metrics component
+	EnqueueMetricsServerInit()
+
+	// Enqueues the Tracer component
+	EnqueueTracer()
+
+	// Module enables setting up dependencies of the engine with the builder context
 	Module(name string, f func(builder NodeBuilder) error) NodeBuilder
-	MustNot(err error) *zerolog.Event
+
+	// Component adds a new component to the node that conforms to the ReadyDone
+	// interface.
+	//
+	// When the node is run, this component will be started with `Ready`. When the
+	// node is stopped, we will wait for the component to exit gracefully with
+	// `Done`.
 	Component(name string, f func(NodeBuilder) (module.ReadyDoneAware, error)) NodeBuilder
+
+	// MustNot asserts that the given error must not occur.
+	// If the error is nil, returns a nil log event (which acts as a no-op).
+	// If the error is not nil, returns a fatal log event containing the error.
+	MustNot(err error) *zerolog.Event
+
+	// Run initiates all common components (logger, database, protocol state etc.)
+	// then starts each component. It also sets up a channel to gracefully shut
+	// down each component if a SIGINT is received.
 	Run()
+
+	// PreInit registers a new PreInit function.
+	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
 	PreInit(f func(node NodeBuilder)) NodeBuilder
+
+	// PostInit registers a new PreInit function.
+	// PostInit functions run after the protocol state has been initialized but before any other modules or components
+	// are initialized
 	PostInit(f func(node NodeBuilder)) NodeBuilder
+
+	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics()
 
 	// getters
