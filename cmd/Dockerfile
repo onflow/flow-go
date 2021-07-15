@@ -18,8 +18,6 @@ WORKDIR /build
 COPY crypto ./crypto
 
 # Build Relic (this places build artifacts in /build/relic/build)
-# NOTE: The Relic build script uses Bash-specific features, so we explicitly run
-# it with bash rather than the default shell.
 RUN cd ./crypto/ && go generate
 
 ## (2) Build the app binary

@@ -10,7 +10,7 @@ fi
 rm -rf relic
 
 # relic version or tag
-relic_version="9206ae50"
+relic_version="9206ae50b667de160fcc385ba3dc2c920143ab0a"
 
 # clone a specific version of Relic without history if it's tagged.
 # git clone --branch $(relic_version) --single-branch --depth 1 git@github.com:relic-toolkit/relic.git
