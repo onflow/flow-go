@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/mempool"
@@ -384,7 +385,7 @@ func (suite *Suite) TestRoutingLocalClusterFromOtherNode() {
 	// should not route to any node
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)
 
-	err := suite.engine.Process(sender.NodeID, &tx)
+	err := suite.engine.Process(engine.ReceiveTransactions, sender.NodeID, &tx)
 	suite.Assert().NoError(err)
 
 	// should be added to local mempool for current epoch
