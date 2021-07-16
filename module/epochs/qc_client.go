@@ -15,6 +15,7 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -95,8 +96,15 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
-	// add signature data to the transaction and submit to node
+	// add signature to the transaction
 	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
+	if err != nil {
+		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
+	}
+
+	// add message to the transaction
+	voteMessage := hotstuffver.MakeVoteMessage(vote.View, vote.BlockID)
+	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(voteMessage)))
 	if err != nil {
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}

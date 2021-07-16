@@ -319,12 +319,12 @@ func RunTestCase(tc *ClusterSwitchoverTestCase) {
 	expectedGuaranteesPerEpoch := int(tc.conf.collectors)
 	waitForGuarantees := new(sync.WaitGroup)
 	waitForGuarantees.Add(expectedGuaranteesPerEpoch)
-	tc.sn.On("Submit", mock.Anything, mock.Anything).
+	tc.sn.On("Submit", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
-			id, ok := args[0].(flow.Identifier)
+			id, ok := args[1].(flow.Identifier)
 			require.True(tc.T(), ok)
-			_, ok = args[1].(*flow.CollectionGuarantee)
+			_, ok = args[2].(*flow.CollectionGuarantee)
 			tc.T().Log("got guarantee from", id.String())
 			require.True(tc.T(), ok)
 			waitForGuarantees.Done()

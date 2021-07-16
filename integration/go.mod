@@ -17,12 +17,12 @@ require (
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.18.1-0.20210629025749-ffe98816b2f1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210602203947-82cffc9c55ed
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210602203947-82cffc9c55ed
+	github.com/onflow/cadence v0.18.1-0.20210621164449-25b6135332eb
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
+	github.com/onflow/flow-go-sdk v0.20.0
 	github.com/onflow/flow-go/crypto v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1

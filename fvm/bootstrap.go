@@ -349,7 +349,7 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	contract := contracts.FlowQC()
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
-		deployContractTransaction(service, contract, "FlowEpochClusterQC"),
+		deployContractTransaction(service, contract, "FlowClusterQC"),
 		b.sth,
 		b.programs,
 	)
@@ -550,13 +550,19 @@ transaction {
 `
 
 const deployEpochTransactionTemplate = `
-import FlowEpochClusterQC from 0x%s
+import FlowClusterQC from 0x%s
 
-transaction(collectorClusters: [FlowEpochClusterQC.Cluster],
-			clusterQCs: [FlowEpochClusterQC.ClusterQC],
-			dkgPubKeys: [String], 
-	) {
+transaction(clusterWeights: [{String: UInt64}]) {
   prepare(serviceAccount: AuthAccount)	{
+
+    // first, construct Cluster objects from cluster weights
+    let clusters: [FlowClusterQC.Cluster] = []
+    var clusterIndex: UInt16 = 0
+    for weightMapping in clusterWeights {
+      let cluster = FlowClusterQC.Cluster(clusterIndex, weightMapping)
+      clusterIndex = clusterIndex + 1
+    }
+
 	serviceAccount.contracts.add(
 		name: "FlowEpoch",
 		code: "%s".decodeHex(),
@@ -567,9 +573,10 @@ transaction(collectorClusters: [FlowEpochClusterQC.Cluster],
 		numCollectorClusters: UInt16(%d),
 		FLOWsupplyIncreasePercentage: UFix64(%d),
 		randomSource: %s,
-		collectorClusters: collectorClusters,
-		clusterQCs: clusterQCs,
-		dkgPubKeys: dkgPubKeys,
+		collectorClusters: clusters,
+        // NOTE: clusterQCs and dkgPubKeys are empty because these initial values are not used
+		clusterQCs: [],
+		dkgPubKeys: [],
 	)
   }
 }
@@ -667,9 +674,7 @@ func deployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				epochConfig.FLOWsupplyIncreasePercentage,
 				epochConfig.RandomSource,
 			))).
-			AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters, service)).
-			AddArgument(epochs.EncodeClusterQCs(epochConfig.ClusterQCs, service)).
-			AddArgument(epochs.EncodePubKeys(epochConfig.DKGPubKeys, service)).
+			AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
 			AddAuthorizer(service),
 		0,
 	)
