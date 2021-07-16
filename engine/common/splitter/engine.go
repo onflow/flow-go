@@ -13,7 +13,7 @@ import (
 )
 
 type Engine struct {
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	unit    *engine.Unit               // used to manage concurrency & shutdown
 	log     zerolog.Logger             // used to log relevant actions with context
 	engines map[module.Engine]struct{} // stores registered engines
@@ -59,8 +59,12 @@ func (e *Engine) UnregisterEngine(engine module.Engine) {
 // registered engines have started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
+		e.mu.RLock()
+		defer e.mu.RUnlock()
 		for engine := range e.engines {
+			e.mu.RUnlock()
 			<-engine.Ready()
+			e.mu.RLock()
 		}
 	})
 }
@@ -70,8 +74,12 @@ func (e *Engine) Ready() <-chan struct{} {
 // have stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
+		e.mu.RLock()
+		defer e.mu.RUnlock()
 		for engine := range e.engines {
+			e.mu.RUnlock()
 			<-engine.Done()
+			e.mu.RLock()
 		}
 	})
 }
@@ -131,7 +139,11 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 func (e *Engine) process(f func(module.Engine) error) {
 	var wg sync.WaitGroup
 
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
 	for eng := range e.engines {
+		e.mu.RUnlock()
 		wg.Add(1)
 
 		go func(downstream module.Engine, log zerolog.Logger) {
@@ -143,6 +155,8 @@ func (e *Engine) process(f func(module.Engine) error) {
 				engine.LogErrorWithMsg(log, "processing failed for downstream engine", err)
 			}
 		}(eng, e.log)
+
+		e.mu.RLock()
 	}
 
 	wg.Wait()
