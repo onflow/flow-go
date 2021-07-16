@@ -6,7 +6,7 @@ import "github.com/onflow/flow-go/model/flow"
 type Events interface {
 
 	// BatchStore will store events for the given block ID in a given batch
-	BatchStore(blockID flow.Identifier, events []flow.Event, batch BatchStorage) error
+	BatchStore(blockID flow.Identifier, events []flow.EventsList, batch BatchStorage) error
 
 	// ByBlockID returns the events for the given block ID
 	ByBlockID(blockID flow.Identifier) ([]flow.Event, error)

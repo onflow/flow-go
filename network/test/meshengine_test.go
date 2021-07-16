@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -181,6 +182,10 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.event)))
 		}
 
+		for i := 0; i < count-1; i++ {
+			assertChannelReceived(suite.T(), e, engine.TestNetwork)
+		}
+
 		// extracts failed messages
 		receivedIndices, err := extractSenderID(count, e.event, "hello from node")
 		require.NoError(suite.Suite.T(), err)
@@ -246,6 +251,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	for index, e := range engs {
 		if index < len(engs)/2 {
 			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
+			assertChannelReceived(suite.T(), e, engine.TestNetwork)
 		} else {
 			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
@@ -294,6 +300,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	// evaluates that all messages are received
 	for index, e := range engs[1:] {
 		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
+		assertChannelReceived(suite.T(), e, engine.TestNetwork)
 	}
 }
 
@@ -364,6 +371,13 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	// assert that the unregistered engine did not receive the message
 	unregisteredEng := engs[unregisterIndex]
 	assert.Emptyf(suite.T(), unregisteredEng.received, "unregistered engine received the topic message")
+}
+
+// assertChannelReceived asserts that the given channel was received on the given engine
+func assertChannelReceived(t *testing.T, e *MeshEngine, channel network.Channel) {
+	unittest.AssertReturnsBefore(t, func() {
+		assert.Equal(t, channel, <-e.channel)
+	}, 100*time.Millisecond)
 }
 
 // extractSenderID returns a bool array with the index i true if there is a message from node i in the provided messages.

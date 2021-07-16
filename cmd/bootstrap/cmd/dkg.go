@@ -18,7 +18,7 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	var dkgData dkg.DKGData
 	var err error
 	if flagFastKG {
-		dkgData, err = run.RunFastKG(n, generateRandomSeed())
+		dkgData, err = run.RunFastKG(n, flagBootstrapRandomSeed)
 	} else {
 		dkgData, err = run.RunDKG(n, generateRandomSeeds(n))
 	}
@@ -29,8 +29,6 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 
 	for i, privKey := range dkgData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
-
-		log.Debug().Int("i", i).Str("nodeId", nodeID.String()).Msg("assembling dkg data")
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
 		privParticpant := dkg.DKGParticipantPriv{

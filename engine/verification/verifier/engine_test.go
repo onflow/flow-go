@@ -120,14 +120,13 @@ func (suite *VerifierEngineTestSuite) TestInvalidSender() {
 	eng := suite.TestNewEngine()
 
 	myID := unittest.IdentifierFixture()
-	invalidID := unittest.IdentifierFixture()
 
 	// mocks NodeID method of the local
 	suite.me.MockNodeID(myID)
 
 	completeRA := vertestutils.LightExecutionResultFixture(1)
 
-	err := eng.Process(invalidID, &completeRA)
+	err := eng.ProcessLocal(&completeRA)
 	assert.Error(suite.T(), err)
 }
 
@@ -155,7 +154,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 	// reception of verifiable chunk
 	suite.metrics.On("OnVerifiableChunkReceivedAtVerifierEngine").Return()
 	// emission of result approval
-	suite.metrics.On("OnResultApprovalDispatchedInNetwork").Return()
+	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
 
 	suite.pushCon.
 		On("Publish", testifymock.Anything, testifymock.Anything).
@@ -177,7 +176,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyHappyPath() {
 		}).
 		Once()
 
-	err := eng.Process(myID, vChunk)
+	err := eng.ProcessLocal(vChunk)
 	suite.Assert().NoError(err)
 	suite.ss.AssertExpectations(suite.T())
 	suite.pushCon.AssertExpectations(suite.T())
@@ -204,8 +203,12 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		Run(func(args testifymock.Arguments) {
 			// TODO change this to check challeneges
 			_, ok := args[0].(*flow.ResultApproval)
-			suite.Assert().False(ok)
+			// TODO change this to false when missing register is rolled back
+			suite.Assert().True(ok)
 		})
+
+	// emission of result approval
+	suite.metrics.On("OnResultApprovalDispatchedInNetworkByVerifier").Return()
 
 	var tests = []struct {
 		vc          *verification.VerifiableChunkData
@@ -216,7 +219,7 @@ func (suite *VerifierEngineTestSuite) TestVerifyUnhappyPaths() {
 		{unittest.VerifiableChunkDataFixture(uint64(3)), nil},
 	}
 	for _, test := range tests {
-		err := eng.Process(myID, test.vc)
+		err := eng.ProcessLocal(test.vc)
 		suite.Assert().NoError(err)
 	}
 }
@@ -237,7 +240,8 @@ func (v ChunkVerifierMock) Verify(vc *verification.VerifiableChunkData) ([]byte,
 		return nil, chmodel.NewCFMissingRegisterTouch(
 			[]string{"test missing register touch"},
 			vc.Chunk.Index,
-			vc.Result.ID()), nil
+			vc.Result.ID(),
+			unittest.TransactionFixture().ID()), nil
 
 	case 2:
 		return nil, chmodel.NewCFInvalidVerifiableChunk(

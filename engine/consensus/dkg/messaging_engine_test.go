@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
@@ -76,7 +77,7 @@ func TestForwardOutgoingMessages(t *testing.T) {
 // messages from the conduit to the tunnel's In channel.
 func TestForwardIncomingMessages(t *testing.T) {
 	// sender engine
-	engine := createTestEngine(t)
+	e := createTestEngine(t)
 
 	originID := unittest.IdentifierFixture()
 	expectedMsg := msg.PrivDKGMessageIn{
@@ -88,12 +89,12 @@ func TestForwardIncomingMessages(t *testing.T) {
 	// In channel
 	doneCh := make(chan struct{})
 	go func() {
-		receivedMsg := <-engine.tunnel.MsgChIn
+		receivedMsg := <-e.tunnel.MsgChIn
 		require.Equal(t, expectedMsg, receivedMsg)
 		close(doneCh)
 	}()
 
-	err := engine.Process(originID, &expectedMsg.DKGMessage)
+	err := e.Process(engine.DKGCommittee, originID, &expectedMsg.DKGMessage)
 	require.NoError(t, err)
 
 	unittest.RequireCloseBefore(t, doneCh, time.Second, "message not received")
