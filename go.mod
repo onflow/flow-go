@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go
 
-go 1.13
+go 1.13.15
 
 require (
 	cloud.google.com/go/storage v1.10.0
