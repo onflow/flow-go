@@ -30,7 +30,6 @@ func init() {
 }
 
 func addDeployCmdFlags() {
-	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout eg. 10000.0")
 }
 
 // deployRun ...
