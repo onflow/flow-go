@@ -2,10 +2,15 @@ package main
 
 import (
 	"strings"
+	"time"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/topology"
 )
 
 type UnstakedAccessNodeBuilder struct {
@@ -22,7 +27,7 @@ func (uanb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	uanb.validateParams()
 
-	uanb.EnqueueUnstakedNetworkInit()
+	uanb.enqueueUnstakedNetworkInit()
 
 	uanb.EnqueueMetricsServerInit()
 
@@ -64,4 +69,57 @@ func (uanb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node cmd.NodeBui
 		node.MustNot(err).Msg("could not initialize local")
 		node.SetMe(me)
 	}
+}
+
+// enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
+func (uanb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+
+	uanb.Component("unstaked network", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+
+		// NodeID for the unstaked node on the unstaked network
+		unstakedNodeID := uanb.NodeID()
+
+		// Networking key
+		unstakedNetworkKey := uanb.NetworkKey()
+
+		// Network Metrics
+		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
+		unstakedNetworkMetrics := metrics.NewNoopCollector()
+
+		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
+		// network metrics
+		libP2PFactory, err := uanb.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
+		uanb.MustNot(err)
+
+		// use the default validators for the staked access node unstaked networks
+		msgValidators := p2p.DefaultValidators(uanb.Logger(), unstakedNodeID)
+
+		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
+		peerUpdateInterval := time.Hour
+
+		middleware := uanb.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+
+		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
+		participants := flow.IdentityList{}
+
+		upstreamANIdentifier, err := flow.HexStringToIdentifier(uanb.stakedAccessNodeIDHex)
+		uanb.MustNot(err)
+
+		// topology only consist of the upsteam staked AN
+		top := topology.NewFixedListTopology(upstreamANIdentifier)
+
+		network, err := uanb.initNetwork(uanb.Me(), unstakedNetworkMetrics, middleware, participants, top)
+		uanb.MustNot(err)
+
+		uanb.unstakedNetwork = network
+
+		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
+		uanb.SetNetwork(network)
+		uanb.SetMiddleware(middleware)
+
+		logger := uanb.Logger()
+		logger.Info().Msgf("unstaked network will run on address: %s", uanb.unstakedNetworkBindAddr)
+
+		return uanb.unstakedNetwork, err
+	})
 }

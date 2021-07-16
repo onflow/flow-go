@@ -80,6 +80,9 @@ func main() {
 	)
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
+
+	anb.PrintBuildVersionDetails()
+
 	anb.ExtraFlags(func(flags *pflag.FlagSet) {
 		flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 		flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
@@ -110,8 +113,8 @@ func main() {
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
 	})
 
-	// initialize the node builder to parse the command line args
-	anb.Initialize()
+	// parse all the command line args
+	anb.parseFlags()
 
 	// choose a staked or an unstaked node builder based on anb.staked
 	var nodeBuilder AccessNodeBuilder
