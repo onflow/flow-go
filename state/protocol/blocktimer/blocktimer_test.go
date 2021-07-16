@@ -1,11 +1,12 @@
 package blocktimer
 
 import (
-	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // TestBlockTimestamp_Build tests that builder correctly generates new block time

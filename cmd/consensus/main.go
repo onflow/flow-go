@@ -92,7 +92,7 @@ func main() {
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
-		blockTimer              hotstuff.BlockTimer
+		blockTimer              protocol.BlockTimer
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -169,12 +169,14 @@ func main() {
 				return fmt.Errorf("could not instantiate seal validator: %w", err)
 			}
 
+			blockTimer = blocktimer.NewBlockTimer(minInterval, maxInterval)
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blockTimer,
 				receiptValidator,
 				sealValidator)
 			return err
@@ -370,8 +372,6 @@ func main() {
 				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
-			blockTimer = blocktimer.NewBlockTimer(minInterval, maxInterval)
-
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -476,7 +476,6 @@ func main() {
 				node.RootQC,
 				finalized,
 				pending,
-				consensus.WithBlockTimer(blockTimer),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
 				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),

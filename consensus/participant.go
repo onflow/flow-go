@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -53,7 +52,6 @@ func NewParticipant(
 		TimeoutIncreaseFactor:      defTimeout.TimeoutIncrease,
 		TimeoutDecreaseFactor:      defTimeout.TimeoutDecrease,
 		BlockRateDelay:             time.Duration(defTimeout.BlockRateDelayMS) * time.Millisecond,
-		BlockTimer:                 blocktimer.DefaultBlockTimer,
 	}
 
 	// apply the configuration options

@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/blocktimer"
 )
 
 func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {

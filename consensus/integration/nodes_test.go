@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -131,7 +132,8 @@ func createNode(
 	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer,
+		blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second), util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()

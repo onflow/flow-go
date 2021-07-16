@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/model/flow"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
