@@ -136,7 +136,8 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 }
 
 // convertResetEpochArgs converts the arguments required by `resetEpoch` to cadence representations
-// Ref: https://github.com/onflow/flow-core-contracts/blob/feature/epochs/contracts/epochs/FlowEpoch.cdc#L370-L410
+// Contract Method: https://github.com/onflow/flow-core-contracts/blob/master/contracts/epochs/FlowEpoch.cdc#L423-L432
+// Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/reset_epoch.cdc
 func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout string, firstView, finalView uint64) []cadence.Value {
 
 	args := make([]cadence.Value, 0)
