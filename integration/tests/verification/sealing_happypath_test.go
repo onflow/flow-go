@@ -26,8 +26,8 @@ type TestSealingHappyPathTestSuite struct {
 // It also enables sealing based on result approvals and verifies whether the block of that specific multi-chunk execution result is sealed
 // affected by the emitted result approvals.
 func (s *TestSealingHappyPathTestSuite) TestSealingAndVerificationHappyPath() {
-	// captures one finalized block called blockA, just to make sure that the finalization progresses.
-	blockA := s.BlockState.WaitForFirstFinalized(s.T())
+	// wait for next height finalized (potentially first height), called blockA, just to make sure consensus progresses.
+	blockA := s.BlockState.WaitForLatestFinalizedProgress(s.T())
 	s.T().Logf("blockA generated, height: %v ID: %v", blockA.Header.Height, blockA.Header.ID())
 
 	// sends a transaction
