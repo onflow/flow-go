@@ -39,7 +39,6 @@ type ProposalSuite struct {
 	forks        *mocks.Forks
 	verifier     *mocks.Verifier
 	validator    *Validator
-	blockTimer   *mocks.BlockTimer
 }
 
 func (ps *ProposalSuite) SetupTest() {
@@ -88,11 +87,8 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.verifier.On("VerifyQC", ps.voters, ps.block.QC.SigData, ps.parent).Return(true, nil)
 	ps.verifier.On("VerifyVote", ps.voter, ps.vote.SigData, ps.block).Return(true, nil)
 
-	ps.blockTimer = &mocks.BlockTimer{}
-	ps.blockTimer.On("Validate", mock.Anything, mock.Anything).Return(nil)
-
 	// set up the validator with the mocked dependencies
-	ps.validator = New(ps.committee, ps.forks, ps.verifier, ps.blockTimer)
+	ps.validator = New(ps.committee, ps.forks, ps.verifier)
 }
 
 func (ps *ProposalSuite) TestProposalOK() {
@@ -238,31 +234,19 @@ func (ps *ProposalSuite) TestProposalQCError() {
 	assert.False(ps.T(), model.IsInvalidBlockError(err), "if we can't verify the QC, we should not generate a invalid error")
 }
 
-func (ps *ProposalSuite) TestProposalInvalidTimestamp() {
-	// replace with new mock
-	*ps.blockTimer = mocks.BlockTimer{}
-	ps.blockTimer.On("Validate", mock.Anything, mock.Anything).Return(model.NewInvalidBlockTimestamp(""))
-
-	err := ps.validator.ValidateProposal(ps.proposal)
-	assert.Error(ps.T(), err, "a proposal with invalid timestamp has to be rejected")
-
-	assert.True(ps.T(), model.IsInvalidBlockError(err), "if timestamp is invalid it should return invalid block error")
-}
-
 func TestValidateVote(t *testing.T) {
 	suite.Run(t, new(VoteSuite))
 }
 
 type VoteSuite struct {
 	suite.Suite
-	signer     *flow.Identity
-	block      *model.Block
-	vote       *model.Vote
-	forks      *mocks.Forks
-	verifier   *mocks.Verifier
-	committee  *mocks.Committee
-	validator  *Validator
-	blockTimer *mocks.BlockTimer
+	signer    *flow.Identity
+	block     *model.Block
+	vote      *model.Vote
+	forks     *mocks.Forks
+	verifier  *mocks.Verifier
+	committee *mocks.Committee
+	validator *Validator
 }
 
 func (vs *VoteSuite) SetupTest() {
@@ -293,10 +277,8 @@ func (vs *VoteSuite) SetupTest() {
 	vs.committee = &mocks.Committee{}
 	vs.committee.On("Identity", mock.Anything, vs.signer.NodeID).Return(vs.signer, nil)
 
-	vs.blockTimer = &mocks.BlockTimer{}
-
 	// set up the validator with the mocked dependencies
-	vs.validator = New(vs.committee, vs.forks, vs.verifier, vs.blockTimer)
+	vs.validator = New(vs.committee, vs.forks, vs.verifier)
 }
 
 func (vs *VoteSuite) TestVoteOK() {
@@ -354,7 +336,6 @@ type QCSuite struct {
 	committee    *mocks.Committee
 	verifier     *mocks.Verifier
 	validator    *Validator
-	blockTimer   *mocks.BlockTimer
 }
 
 func (qs *QCSuite) SetupTest() {
@@ -385,10 +366,8 @@ func (qs *QCSuite) SetupTest() {
 	qs.verifier = &mocks.Verifier{}
 	qs.verifier.On("VerifyQC", qs.signers, qs.qc.SigData, qs.block).Return(true, nil)
 
-	qs.blockTimer = &mocks.BlockTimer{}
-
 	// set up the validator with the mocked dependencies
-	qs.validator = New(qs.committee, nil, qs.verifier, qs.blockTimer)
+	qs.validator = New(qs.committee, nil, qs.verifier)
 }
 
 func (qs *QCSuite) TestQCOK() {

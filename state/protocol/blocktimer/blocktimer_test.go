@@ -1,12 +1,11 @@
 package blocktimer
 
 import (
+	"github.com/onflow/flow-go/state/protocol"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // TestBlockTimestamp_Build tests that builder correctly generates new block time
@@ -51,7 +50,7 @@ func TestBlockTimestamp_Validate(t *testing.T) {
 		blockTime := parentTime.Add(time.Millisecond * 1)
 		err := builder.Validate(parentTime, blockTime)
 		require.Error(t, err)
-		require.True(t, model.IsInvalidBlockTimestampError(err))
+		require.True(t, protocol.IsInvalidBlockTimestampError(err))
 	})
 	t.Run("valid min interval", func(t *testing.T) {
 		parentTime := time.Now().UTC()

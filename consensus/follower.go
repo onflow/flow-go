@@ -6,7 +6,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/follower"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/recovery"
@@ -27,7 +26,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers stora
 	}
 
 	// initialize the validator
-	validator := validator.New(committee, finalizer, verifier, blocktimer.DefaultBlockTimer)
+	validator := validator.New(committee, finalizer, verifier)
 
 	// recover the hotstuff state as a follower
 	err = recovery.Follower(log, finalizer, validator, finalized, pending)

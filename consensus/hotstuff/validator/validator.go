@@ -13,10 +13,9 @@ import (
 
 // Validator is responsible for validating QC, Block and Vote
 type Validator struct {
-	committee  hotstuff.Committee
-	forks      hotstuff.ForksReader
-	verifier   hotstuff.Verifier
-	blockTimer hotstuff.BlockTimer
+	committee hotstuff.Committee
+	forks     hotstuff.ForksReader
+	verifier  hotstuff.Verifier
 }
 
 // New creates a new Validator instance
@@ -24,13 +23,11 @@ func New(
 	committee hotstuff.Committee,
 	forks hotstuff.ForksReader,
 	verifier hotstuff.Verifier,
-	blockTimer hotstuff.BlockTimer,
 ) *Validator {
 	return &Validator{
-		committee:  committee,
-		forks:      forks,
-		verifier:   verifier,
-		blockTimer: blockTimer,
+		committee: committee,
+		forks:     forks,
+		verifier:  verifier,
 	}
 }
 
@@ -118,15 +115,6 @@ func (v *Validator) ValidateProposal(proposal *model.Proposal) error {
 		// block's fork cannot keep growing anymore because it conflicts with a finalized block.
 		// TODO: note other components will expect Validator has validated, and might re-validate it,
 		return model.ErrUnverifiableBlock
-	}
-
-	// check validity of block timestamp using parent's timestamp
-	err = v.blockTimer.Validate(parent.Timestamp, block.Timestamp)
-	if err != nil {
-		if model.IsInvalidBlockTimestampError(err) {
-			return newInvalidBlockError(block, err)
-		}
-		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
 	// validate QC - keep the most expensive the last to check

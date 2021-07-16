@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 )
 
 func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
@@ -89,7 +89,7 @@ func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Vali
 		signers[i] = signer
 
 		// create validator
-		v := validator.New(committee, forks, signer, blocktimer.DefaultBlockTimer)
+		v := validator.New(committee, forks, signer)
 		validators[i] = v
 	}
 	return validators, signers, nil

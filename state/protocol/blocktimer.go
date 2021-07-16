@@ -1,4 +1,4 @@
-package hotstuff
+package protocol
 
 import (
 	"time"

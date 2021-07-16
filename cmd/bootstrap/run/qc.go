@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/blocktimer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -108,7 +107,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		signers[i] = signer
 
 		// create validator
-		v := validator.New(committee, forks, signer, blocktimer.DefaultBlockTimer)
+		v := validator.New(committee, forks, signer)
 		validators[i] = v
 	}
 
