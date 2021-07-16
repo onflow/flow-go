@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,8 +10,7 @@ import (
 
 	"github.com/onflow/cadence"
 
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-
+	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -28,10 +26,12 @@ var (
 
 // resetCmd represents a command to reset epoch data in the Epoch smart contract
 var resetCmd = &cobra.Command{
-	Use:   "reset",
+	Use:   "reset-tx-args",
 	Short: "Generates `resetEpoch` JSON transaction arguments",
-	Long:  "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file",
-	Run:   resetRun,
+	Long: "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file." +
+		"If the epoch setup phase fails (either the DKG, QC voting, or smart contract bug)," +
+		"manual intervention is needed to transition to the next epoch.",
+	Run: resetRun,
 }
 
 func init() {
@@ -87,7 +87,10 @@ func resetRun(cmd *cobra.Command, args []string) {
 	log.Info().Msg("extracted resetEpoch transaction arguments from snapshot")
 
 	// ancode to JSON
-	enc := encodeArgs(txArgs)
+	enc, err := epochcmdutil.EncodeArgs(txArgs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not encode epoch transaction arguments")
+	}
 
 	// write JSON args to file
 	err = io.WriteFile(argsPath, enc)
@@ -170,35 +173,6 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	args = append(args, cadence.NewUInt64(finalView))
 
 	return args
-}
-
-// encodeArgs JSON encodes `resetEpoch` transaction arguments
-func encodeArgs(args []cadence.Value) []byte {
-
-	arguments := make([]interface{}, len(args))
-
-	for index, cdcVal := range args {
-
-		encoded, err := jsoncdc.Encode(cdcVal)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not encode cadence arguments")
-		}
-
-		var arg interface{}
-		err = json.Unmarshal(encoded, &arg)
-		if err != nil {
-			log.Fatal().Err(err).Msg("could not unmarshal cadence arguments")
-		}
-
-		arguments[index] = arg
-	}
-
-	bz, err := json.Marshal(arguments)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not marshal interface")
-	}
-
-	return bz
 }
 
 // TODO: unify methods from transit, bootstrap and here
