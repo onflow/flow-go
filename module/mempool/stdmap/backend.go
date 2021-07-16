@@ -214,27 +214,13 @@ func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit.
 func (b *Backend) reduce() {
-
 	// we keep reducing the cache size until we are at limit again
 	// this was a loop, but the loop is now in EjectTrueRandomFast()
 	if len(b.entities) > int(b.limit) {
-
 		// get the key from the eject function
-		key, entity, ok := b.eject(b)
-
-		// if the key is not actually part of the map, use stupid fallback eject
-		if !ok {
-			// this will eject multiple entities, return values are unused
-			_, _, _ = EjectTrueRandomFast(b)
-		} else {
-
-			// remove the key
-			delete(b.entities, key)
-
-			// notify callback
-			for _, callback := range b.ejectionCallbacks {
-				callback(entity)
-			}
-		}
+		// revert to prior commits if this eject function is not
+		// EjectTrueRandomFast
+		// we don't do anything if there is an error
+		_, _, _ = b.eject(b)
 	}
 }

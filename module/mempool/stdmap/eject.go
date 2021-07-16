@@ -54,19 +54,24 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 // ideal size, and will iterate through them and eject unneeded
 // entries if that is the case.
 func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
-	// 64 in batch plus a buffer of 64 to prevent boundary conditions from
-	// rounding errors
-	const threshold = 128
 
+	// this is 64 for performance reasons - modulus 64 is a bit shift
 	const batchSize = 64
+
+	// 64 in batch plus a buffer of 64 to prevent boundary conditions from
+	// rounding errors.  The buffer is also here because the max index
+	// decreases as items are deleted
+	const threshold = batchSize * 2
 
 	var entities = b.entities
 
 	// an empty, invalid, id for the return value
 	var retval flow.Identifier
 
+	// 'len' returns a uint.  This map is assumed to be < sizeof(uint)
 	mapSize := len(entities)
 
+	// this should never happen, and is just for a quick check
 	if b.limit > uint(mapSize) {
 		return retval, nil, false
 	}
@@ -82,22 +87,35 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	var entityID flow.Identifier
 	var entity flow.Entity
 
-	maxInterval := mapSize / batchSize
+	// mapSize is at LEAST 128 over the desired size. We want to eject
+	// up to 64 items (so index is not OOB), so remove 64 from map size
+	maxInterval := (mapSize - batchSize) / batchSize
 
 	// this array will store 64 indexes into the map
 	var mapIndexes [batchSize]int64
 
 	// starting point, create 64 random, sequentially increasing, values
 	var index int64 = 0
-	for i := 0; i < batchSize; i++ {
-		// get a random number between 0 and maxInterval
-		index += int64(rand.Intn(maxInterval))
+
+	var i uint = 0
+	for ; i < batchSize-1; i++ {
+		// get a random number (zero-based) between 0 and maxInterval
+		index += int64(rand.Intn(maxInterval - 1))
+
 		mapIndexes[i] = index
+
+		// increment so we're not looking at the same element if rnd is 0
+		index++
 	}
 
+	// for the last item in 'batchSize', the random number should use the
+	// remaining count as the parameter for the random value
+	index += int64(rand.Intn(mapSize - 1 - int(index)))
+	mapIndexes[i] = index
+
 	// Now, mapIndexes has a sequentially sorted set of indexes to remove.
-	// remove them in a loop
-	i := 0
+	// Remove them in a loop
+	i = 0
 	idx := 0 // index into mapIndexes
 	for entityID, entity = range entities {
 		if int64(i) == mapIndexes[idx] {
