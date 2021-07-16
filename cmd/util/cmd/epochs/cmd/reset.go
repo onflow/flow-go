@@ -19,11 +19,6 @@ import (
 
 const resetArgsFileName = "reset-epoch-args.json"
 
-var (
-	flagBootDir string
-	flagPayout  string
-)
-
 // resetCmd represents a command to reset epoch data in the Epoch smart contract
 var resetCmd = &cobra.Command{
 	Use:   "reset-tx-args",
@@ -40,9 +35,6 @@ func init() {
 }
 
 func addResetCmdFlags() {
-	resetCmd.Flags().StringVar(&flagBootDir, "boot-dir", "", "path to the directory containing the bootstrap files")
-	_ = resetCmd.MarkFlagRequired("boot-dir")
-
 	resetCmd.Flags().StringVar(&flagPayout, "payout", "", "the payout eg. 10000.0")
 }
 

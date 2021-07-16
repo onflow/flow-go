@@ -29,6 +29,8 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&flagBootDir, "boot-dir", "b", "", "path to the directory containing the bootstrap files")
+
 	cobra.OnInitialize(initConfig)
 	log = zerolog.New(zerolog.NewConsoleWriter())
 }
