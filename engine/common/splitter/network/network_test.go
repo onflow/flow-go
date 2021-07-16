@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
+	"github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -28,17 +29,23 @@ type Suite struct {
 
 	con     *mocknetwork.Conduit
 	net     *splitternetwork.Network
-	subMngr *splitternetwork.SubscriptionManager
+	engines map[network.Channel]module.Engine
 }
 
 func (suite *Suite) SetupTest() {
 	net := new(mockmodule.Network)
 	suite.con = new(mocknetwork.Conduit)
+	suite.engines = make(map[network.Channel]module.Engine)
 
-	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Return(suite.con, nil)
+	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Run(func(args mock.Arguments) {
+		channel, _ := args.Get(0).(network.Channel)
+		engine, ok := args.Get(1).(module.Engine)
+		suite.Assert().True(ok)
 
-	suite.subMngr = splitternetwork.NewSubscriptionManager()
-	splitterNet, err := splitternetwork.NewNetwork(net, zerolog.Logger{}, suite.subMngr)
+		suite.engines[channel] = engine
+	}).Return(suite.con, nil)
+
+	splitterNet, err := splitternetwork.NewNetwork(net, zerolog.Logger{})
 	require.NoError(suite.T(), err)
 
 	suite.net = splitterNet
@@ -90,8 +97,8 @@ func (suite *Suite) TestHappyPath() {
 	engine1.On("Process", chan1, id, event).Return(nil).Once()
 	engine2.On("Process", chan1, id, event).Return(nil).Once()
 
-	splitter, err := suite.subMngr.GetEngine(chan1)
-	suite.Assert().Nil(err)
+	splitter, ok := suite.engines[chan1]
+	suite.Assert().True(ok)
 
 	err = splitter.Process(chan1, id, event)
 	suite.Assert().Nil(err)
@@ -109,8 +116,8 @@ func (suite *Suite) TestHappyPath() {
 	engine2.On("Process", chan2, id, event).Return(nil).Once()
 	engine3.On("Process", chan2, id, event).Return(nil).Once()
 
-	splitter, err = suite.subMngr.GetEngine(chan2)
-	suite.Assert().Nil(err)
+	splitter, ok = suite.engines[chan2]
+	suite.Assert().True(ok)
 
 	err = splitter.Process(chan2, id, event)
 	suite.Assert().Nil(err)
@@ -129,8 +136,8 @@ func (suite *Suite) TestHappyPath() {
 	engine2.On("Process", chan3, id, event).Return(nil).Once()
 	engine3.On("Process", chan3, id, event).Return(nil).Once()
 
-	splitter, err = suite.subMngr.GetEngine(chan3)
-	suite.Assert().Nil(err)
+	splitter, ok = suite.engines[chan3]
+	suite.Assert().True(ok)
 
 	err = splitter.Process(chan3, id, event)
 	suite.Assert().Nil(err)
