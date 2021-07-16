@@ -33,6 +33,18 @@ export DOCKER_BUILDKIT := 1
 crypto/relic/build:
 	cd ./crypto &&	go generate
 
+# relic versions in script and submodule
+export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
+export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]' ./crypto/build_dependency.sh| cut -c 16-55)
+
+.PHONY: crypto/relic/check
+crypto/relic/check:
+ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
+	@echo "local relic version matches the version required by the crypto package"
+else
+	$(error local relic version doesn't match the version required by the crypto package)
+endif
+
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
 
@@ -126,7 +138,7 @@ generate-mocks:
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
-tidy:
+tidy: crypto/relic/check
 	go mod tidy
 	cd integration; go mod tidy
 	cd crypto; go mod tidy
