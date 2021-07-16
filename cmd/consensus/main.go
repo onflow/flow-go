@@ -626,11 +626,7 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
-			// make sure access address has a valid network address format
-			if ok := cmd.IsValidNetworkAddressFormat(accessAddress); !ok {
-				return nil, fmt.Errorf("--access-address provided is not a valid address format")
-			}
-
+			// construct DKG contract client
 			dkgContractClient, err := createDKGContractClient(node, accessAddress)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)

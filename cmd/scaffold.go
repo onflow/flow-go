@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net"
-	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -806,17 +804,4 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
-}
-
-// IsValidNetworkAddressFormat ...
-func IsValidNetworkAddressFormat(str string) bool {
-	url, err := url.ParseRequestURI(str)
-	if err != nil {
-		return false
-	}
-	address := net.ParseIP(url.Host)
-	if address == nil {
-		return strings.Contains(url.Host, ".")
-	}
-	return true
 }
