@@ -932,7 +932,7 @@ var epochSetupFixtureJSON = `
             {
               "type": "Struct",
               "value": {
-                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.Cluster",
+                "id": "A.01cf0e2f2f715450.FlowClusterQC.Cluster",
                 "fields": [
                   {
                     "name": "index",
@@ -989,7 +989,7 @@ var epochSetupFixtureJSON = `
             {
               "type": "Struct",
               "value": {
-                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.Cluster",
+                "id": "A.01cf0e2f2f715450.FlowClusterQC.Cluster",
                 "fields": [
                   {
                     "name": "index",
@@ -1100,7 +1100,7 @@ var epochCommitFixtureJSON = `
                         {
                             "type": "Struct",
                             "value": {
-                                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.ClusterQC",
+                                "id": "A.01cf0e2f2f715450.FlowClusterQC.ClusterQC",
                                 "fields": [
                                     {
                                         "name": "index",
@@ -1110,7 +1110,7 @@ var epochCommitFixtureJSON = `
                                         }
                                     },
                                     {
-                                        "name": "votes",
+                                        "name": "voteSignatures",
                                         "value": {
                                             "type": "Array",
                                             "value": [
@@ -1125,6 +1125,13 @@ var epochCommitFixtureJSON = `
                                             ]
                                         }
                                     },
+									{
+										"name": "voteMessage",
+										"value": {
+											"type": "String",
+											"value": "irrelevant_for_these_purposes"
+										}
+									},
 									{
                                         "name": "voterIDs",
                                         "value": {
@@ -1147,7 +1154,7 @@ var epochCommitFixtureJSON = `
                         {
                             "type": "Struct",
                             "value": {
-                                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.ClusterQC",
+                                "id": "A.01cf0e2f2f715450.FlowClusterQC.ClusterQC",
                                 "fields": [
                                     {
                                         "name": "index",
@@ -1157,7 +1164,7 @@ var epochCommitFixtureJSON = `
                                         }
                                     },
                                     {
-                                        "name": "votes",
+                                        "name": "voteSignatures",
                                         "value": {
                                             "type": "Array",
                                             "value": [
@@ -1172,6 +1179,13 @@ var epochCommitFixtureJSON = `
                                             ]
                                         }
                                     },
+									{
+										"name": "voteMessage",
+										"value": {
+											"type": "String",
+											"value": "irrelevant_for_these_purposes"
+										}
+									},
 									{
                                         "name": "voterIDs",
                                         "value": {

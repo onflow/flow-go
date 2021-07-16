@@ -119,7 +119,6 @@ func (suite *Suite) TestAlreadyVoted() {
 
 // should succeed and exit if voting succeeds
 func (suite *Suite) TestVoting() {
-
 	err := suite.voter.Vote(context.Background(), suite.epoch)
 	suite.Assert().Nil(err)
 }
