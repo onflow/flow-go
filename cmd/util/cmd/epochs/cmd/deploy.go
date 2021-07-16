@@ -31,6 +31,8 @@ func addDeployCmdFlags() {
 }
 
 // deployRun ...
+// Contract: https://github.com/onflow/flow-core-contracts/blob/master/contracts/epochs/FlowEpoch.cdc
+// Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/deploy_epoch.cdc
 func deployRun(cmd *cobra.Command, args []string) {
 
 	// path to the root protocol snapshot json file
