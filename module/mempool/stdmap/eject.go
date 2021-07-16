@@ -50,7 +50,7 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	return entityID, entity, bFound
 }
 
-// this function will check to see if the map size is beyond the
+// EjectTrueRandomFast checks if the map size is beyond the
 // ideal size, and will iterate through them and eject unneeded
 // entries if that is the case.
 func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
