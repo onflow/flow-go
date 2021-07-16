@@ -62,8 +62,7 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 
 	var entities = b.entities
 
-	// an empty, invalid, id for the return value
-	var retval flow.Identifier
+	var retval flow.Identifier 	// dummy value 
 
 	mapSize := len(entities)
 
