@@ -132,8 +132,11 @@ func createNode(
 	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
+	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
+	require.NoError(t, err)
+
 	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer,
-		blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second), util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()

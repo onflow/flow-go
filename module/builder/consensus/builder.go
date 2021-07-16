@@ -57,9 +57,14 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
+	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not create default block timer: %w", err)
+	}
+
 	// initialize default config
 	cfg := Config{
-		blockTimer:        blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second),
+		blockTimer:        blockTimer,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
@@ -88,7 +93,7 @@ func NewBuilder(
 		cfg:        cfg,
 	}
 
-	err := b.repopulateExecutionTree()
+	err = b.repopulateExecutionTree()
 	if err != nil {
 		return nil, fmt.Errorf("could not repopulate execution tree: %w", err)
 	}

@@ -169,7 +169,11 @@ func main() {
 				return fmt.Errorf("could not instantiate seal validator: %w", err)
 			}
 
-			blockTimer = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			if err != nil {
+				return err
+			}
+
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
 				node.Storage.Index,
