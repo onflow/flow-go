@@ -151,7 +151,7 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 		} else {
 			upstreamANIdentifier, err := flow.HexStringToIdentifier(anb.stakedAccessNodeIDHex)
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %v", anb.stakedAccessNodeIDHex, err)
+				return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", anb.stakedAccessNodeIDHex, err)
 			}
 			top = topology.NewFixedListTopology(upstreamANIdentifier)
 		}
