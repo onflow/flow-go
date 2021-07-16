@@ -95,10 +95,10 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 	}
 }
 
-// WaitForLatestFinalizedProgress waits until last finalized height progresses, e.g., if
+// WaitForHighestFinalizedProgress waits until last finalized height progresses, e.g., if
 // latest finalized block is 10, this will wait until any block height higher than 10 is finalized, and
 // returns that block.
-func (bs *BlockState) WaitForLatestFinalizedProgress(t *testing.T) *messages.BlockProposal {
+func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.BlockProposal {
 	currentFinalized := bs.highestFinalized
 	require.Eventually(t, func() bool {
 		return bs.highestFinalized > currentFinalized

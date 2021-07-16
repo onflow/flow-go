@@ -27,7 +27,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	s.T().Skip("disable state sync")
 
 	// wait for next height finalized (potentially first height), called blockA
-	blockA := s.BlockState.WaitForLatestFinalizedProgress(s.T())
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
