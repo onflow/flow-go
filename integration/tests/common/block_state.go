@@ -114,7 +114,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T) *messages.BlockProposal {
 	currentProposed := bs.highestProposed
 	require.Eventually(t, func() bool {
-		return bs.highestFinalized > currentProposed && bs.finalizedByHeight[currentProposed+1] != nil
+		return bs.finalizedByHeight[currentProposed+1] != nil
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive finalized block for next block height (%v) within %v seconds", currentProposed+1,
 			blockStateTimeout))
