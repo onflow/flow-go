@@ -31,6 +31,7 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.4.1
 	github.com/libp2p/go-libp2p-swarm v0.5.0
+	github.com/libp2p/go-libp2p-tls v0.1.3
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.2
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
