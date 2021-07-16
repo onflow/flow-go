@@ -35,7 +35,7 @@ crypto/relic/build:
 
 # relic versions in script and submodule
 export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
-export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]' ./crypto/build_dependency.sh| cut -c 16-55)
+export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{40}"' ./crypto/build_dependency.sh | cut -c 16-55)
 
 .PHONY: crypto/relic/check
 crypto/relic/check:
