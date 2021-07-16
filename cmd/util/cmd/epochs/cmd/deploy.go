@@ -16,12 +16,10 @@ const deployArgsFileName = "deploy-epoch-args.json"
 
 // deployCmd represents a command to ...
 var deployCmd = &cobra.Command{
-	Use:   "reset-tx-args",
-	Short: "Generates `resetEpoch` JSON transaction arguments",
-	Long: "Generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file." +
-		"If the epoch setup phase fails (either the DKG, QC voting, or smart contract bug)," +
-		"manual intervention is needed to transition to the next epoch.",
-	Run: deployRun,
+	Use:   "deploy-tx-args",
+	Short: "",
+	Long:  "",
+	Run:   deployRun,
 }
 
 func init() {
