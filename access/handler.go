@@ -481,7 +481,7 @@ func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResul
 
 func serviceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, error) {
 
-	bytes, err := json.Marshal(event.Type)
+	bytes, err := json.Marshal(event.Event)
 	if err != nil {
 		return nil, fmt.Errorf("cannot marshal service event: %w", err)
 	}

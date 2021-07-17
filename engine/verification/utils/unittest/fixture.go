@@ -310,7 +310,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
 			require.NoError(t, err)
 
-			chunk := execution.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID(), eventsHash, uint16(txNumber))
+			chunk := execution.GenerateChunk(i, startState, endState, collectionID, executableBlock.ID(), eventsHash, uint64(txNumber))
 			chunkDataPack := execution.GenerateChunkDataPack(chunk, collectionID, computationResult.Proofs[i])
 
 			chunks = append(chunks, chunk)

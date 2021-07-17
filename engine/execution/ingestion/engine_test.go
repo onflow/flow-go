@@ -367,7 +367,7 @@ func TestChunkIndexIsSet(t *testing.T) {
 
 func TestChunkNumberOfTxsIsSet(t *testing.T) {
 
-	i := uint16(mathRand.Uint32())
+	i := mathRand.Uint64()
 	chunk := execution.GenerateChunk(3, unittest.StateCommitmentFixture(), unittest.StateCommitmentFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), unittest.IdentifierFixture(), i)
 
 	assert.Equal(t, i, chunk.NumberOfTransactions)

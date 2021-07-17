@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -449,6 +450,16 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 				assert.Equal(suite.T(), chunk.TotalComputationUsed, er.Chunks[i].TotalComputationUsed)
 				assert.Equal(suite.T(), uint32(chunk.NumberOfTransactions), er.Chunks[i].NumberOfTransactions)
 				assert.Equal(suite.T(), chunk.EndState[:], er.Chunks[i].EndState)
+			}
+
+			for i, serviceEvent := range executionResult.ServiceEvents {
+				assert.Equal(suite.T(), serviceEvent.Type, er.ServiceEvents[i].Type)
+				event := serviceEvent.Event
+
+				marshalledEvent, err := json.Marshal(event)
+				require.NoError(suite.T(), err)
+
+				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
 			}
 		}
 
