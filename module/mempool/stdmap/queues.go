@@ -54,14 +54,20 @@ func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {
-	p1 := binstat.EnterTime("~4lock:w:Backend.Run(Queues)", "")
-	b.Lock()
-	binstat.Leave(p1)
-	p2 := binstat.EnterTime("~7Backend.Run(Queues)", "")
-	defer binstat.Leave(p2)
-	defer b.Unlock()
+	bs1 := binstat.EnterTime("~4lock:w:Backend.Run(Queues)")
+	bs1.Run(func() {
+		b.Lock()
+	})
+	bs1.Leave()
 
-	err := f(&QueuesBackdata{&b.Backdata})
+	var err error
+	bs2 := binstat.EnterTime("~7Backend.Run(Queues)")
+	bs2.Run(func() {
+		defer b.Unlock()
+		err = f(&QueuesBackdata{&b.Backdata})
+	})
+	bs2.Leave()
+
 	if err != nil {
 		return err
 	}

@@ -410,9 +410,13 @@ func (m *Middleware) processMessage(msg *message.Message) {
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 
 	// convert the message to bytes to be put on the wire.
-	p := binstat.EnterTime("~3net:wire<4message2protobuf", "")
-	data, err := msg.Marshal()
-	binstat.LeaveVal(p, int64(len(data)))
+	var data []byte
+	var err error
+	bs := binstat.EnterTime("~3net:wire<4message2protobuf")
+	bs.Run(func() {
+		data, err = msg.Marshal()
+	})
+	bs.LeaveVal(int64(len(data)))
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}

@@ -79,9 +79,11 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 		var msg message.Message
 		// convert the incoming raw message payload to Message type
-		p := binstat.EnterTimeVal("~3net:wire>1protobuf2message", "", int64(len(rawMsg.Data)))
-		err = msg.Unmarshal(rawMsg.Data)
-		binstat.Leave(p)
+		bs := binstat.EnterTimeVal("~3net:wire>1protobuf2message", int64(len(rawMsg.Data)))
+		bs.Run(func() {
+			err = msg.Unmarshal(rawMsg.Data)
+		})
+		bs.Leave()
 		if err != nil {
 			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
 			return

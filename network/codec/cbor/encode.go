@@ -203,11 +203,15 @@ func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 	}
 
 	// encode the payload
-	p := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code), "")
-	data, err := cborEncMode.Marshal(v)
-	binstat.LeaveVal(p, int64(len(data)))
-	if err != nil {
-		return nil, 0, fmt.Errorf("could not encode payload: %w", err)
+	var data []byte
+	var err3 error
+	bs := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code))
+	bs.Run(func() {
+		data, err3 = cborEncMode.Marshal(v)
+	})
+	bs.LeaveVal(int64(len(data)))
+	if err3 != nil {
+		return nil, 0, fmt.Errorf("could not encode payload: %w", err3)
 	}
 
 	return data, code, nil

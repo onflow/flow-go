@@ -89,14 +89,14 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
-	p1 := binstat.EnterTime("~6MakeID/Fingerprint", "")
+	bs1 := binstat.EnterTime("~6MakeID/Fingerprint")
 	data := fingerprint.Fingerprint(entity)
-	binstat.LeaveVal(p1, int64(len(data)))
-	p2 := binstat.EnterTimeVal("~6MakeID/ComputeHash", "", int64(len(data)))
+	bs1.LeaveVal(int64(len(data)))
+	bs2 := binstat.EnterTimeVal("~6MakeID/ComputeHash", int64(len(data)))
 	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash(data)
 	id := HashToID(hash)
-	binstat.Leave(p2)
+	bs2.Leave()
 	return id
 }
 

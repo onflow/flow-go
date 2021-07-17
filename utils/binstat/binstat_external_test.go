@@ -81,16 +81,18 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 
 	// this function is purely for chewing CPU
 	f := func(outerFuncName string) time.Duration {
-		p := binstat.EnterTime(outerFuncName, "")
-		var sum int
-		for i := 0; i < 10000000; i++ {
-			sum -= i / 2
-			sum *= i
-			sum /= i/3 + 1
-			sum -= i / 4
-		}
-		binstat.Debug(p, fmt.Sprintf("%s() = %d", outerFuncName, sum))
-		return binstat.Leave(p)
+		bs := binstat.EnterTime(outerFuncName)
+		bs.Run(func() {
+			var sum int
+			for i := 0; i < 10000000; i++ {
+				sum -= i / 2
+				sum *= i
+				sum /= i/3 + 1
+				sum -= i / 4
+			}
+			bs.Debug(fmt.Sprintf("%s() = %d", outerFuncName, sum))
+		})
+		return bs.Leave()
 	}
 
 	runtime.GOMAXPROCS(gomaxprocs)
@@ -163,12 +165,14 @@ func TestWithPprof(t *testing.T) {
 		if 0 == loop {
 			gomaxprocs = 1
 		}
-		p := binstat.EnterTime(fmt.Sprintf("loop-%d", loop), "")
-		for try := 0; try < tries; try++ {
-			zlog.Debug().Msgf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs)
-			run(t, loop, try, gomaxprocs)
-		}
-		binstat.Leave(p)
+		bs := binstat.EnterTime(fmt.Sprintf("loop-%d", loop))
+		bs.Run(func() {
+			for try := 0; try < tries; try++ {
+				zlog.Debug().Msgf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs)
+				run(t, loop, try, gomaxprocs)
+			}
+		})
+		bs.Leave()
 	}
 
 	// output a table of results similar to this

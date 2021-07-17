@@ -188,11 +188,14 @@ func env2vDecode(data []byte, code uint8, via string) (interface{}, error) {
 	}
 
 	// unmarshal the payload
-	p := binstat.EnterTimeVal(fmt.Sprintf("%s%s:%d", via, what, code), "", int64(len(data)))
-	err := cbor.Unmarshal(data, v)
-	binstat.Leave(p)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode payload: %w", err)
+	var err3 error
+	bs := binstat.EnterTimeVal(fmt.Sprintf("%s%s:%d", via, what, code), int64(len(data)))
+	bs.Run(func() {
+		err3 = cbor.Unmarshal(data, v)
+	})
+	bs.Leave()
+	if err3 != nil {
+		return nil, fmt.Errorf("could not decode payload: %w", err3)
 	}
 
 	return v, nil

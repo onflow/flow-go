@@ -253,7 +253,8 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	p := binstat.EnterTimeVal("~3net:wire<3payload2message", "", int64(len(payload)))
+	bs := binstat.EnterTimeVal("~3net:wire<3payload2message", int64(len(payload)))
+	defer bs.Leave()
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
@@ -291,8 +292,6 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 		Payload:   payload,
 		Type:      msgType,
 	}
-
-	binstat.Leave(p)
 
 	return msg, nil
 }

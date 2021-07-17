@@ -189,9 +189,13 @@ func v2envEncode(v interface{}, via string) (*Envelope, error) {
 	}
 
 	// encode the payload
-	p := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code), "")
-	data, err := json.Marshal(v)
-	binstat.LeaveVal(p, int64(len(data)))
+	var data []byte
+	var err error
+	bs := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code))
+	bs.Run(func() {
+		data, err = json.Marshal(v)
+	})
+	bs.LeaveVal(int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not encode payload: %w", err)
 	}

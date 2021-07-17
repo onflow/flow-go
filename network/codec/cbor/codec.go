@@ -44,12 +44,11 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	}
 
 	// encode the envelope
-	p := binstat.EnterTime("~3net:wire<2(cbor)envelope2payload", "")
-	data = append(data, code)
-	binstat.LeaveVal(p, int64(len(data)))
-	if err != nil {
-		return nil, fmt.Errorf("could not encode value: %w", err)
-	}
+	bs := binstat.EnterTime("~3net:wire<2(cbor)envelope2payload")
+	bs.Run(func() {
+		data = append(data, code)
+	})
+	bs.LeaveVal(int64(len(data)))
 
 	return data, nil
 }
@@ -58,9 +57,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
-	p := binstat.EnterTime("~3net:wire>3(cbor)payload2envelope", "")
-	code := data[len(data)-1] // only last byte
-	binstat.LeaveVal(p, int64(len(data)))
+	var code uint8
+	bs := binstat.EnterTime("~3net:wire>3(cbor)payload2envelope")
+	bs.Run(func() {
+		code = data[len(data)-1] // only last byte
+	})
+	bs.LeaveVal(int64(len(data)))
 
 	// decode the value
 	v, err := env2vDecode(data[:len(data)-1], code, "~3net:wire>4(cbor)") // all but last byte

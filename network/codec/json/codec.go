@@ -45,9 +45,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// TODO: consider eliminating envelope / double .Marshal as implemented in sibling codec CBOR using append()?
 
 	// encode the envelope
-	p := binstat.EnterTime("~3net:wire<2(json)envelope2payload", "")
-	data, err := json.Marshal(env)
-	binstat.LeaveVal(p, int64(len(data)))
+	var data []byte
+	bs := binstat.EnterTime("~3net:wire<2(json)envelope2payload")
+	bs.Run(func() {
+		data, err = json.Marshal(env)
+	})
+	bs.LeaveVal(int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not encode value: %w", err)
 	}
@@ -60,9 +63,12 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
 	var env Envelope
-	p := binstat.EnterTime("~3net:wire>3(json)payload2envelope", "")
-	err := json.Unmarshal(data, &env)
-	binstat.LeaveVal(p, int64(len(env.Data)))
+	var err error
+	bs := binstat.EnterTime("~3net:wire>3(json)payload2envelope")
+	bs.Run(func() {
+		err = json.Unmarshal(data, &env)
+	})
+	bs.LeaveVal(int64(len(env.Data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}

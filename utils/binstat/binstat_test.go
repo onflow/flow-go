@@ -3,6 +3,7 @@ package binstat
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -14,16 +15,37 @@ func init() {
 }
 
 func TestBinstatInternal(t *testing.T) {
-	p1 := Enter("~2egEnter", "")
-	LeaveVal(p1, 123)
+	global.enable = false
+	tick(100 * time.Millisecond)
+	enterGeneric("", false, 0, 0, false)
+	pointGeneric(nil, "", 0, 0, false)
+	debugGeneric(nil, "", false)
+	bs0 := Enter("~2egEnter").DebugParams("foo")
+	bs0.Run(func() {
+	})
+	bs0.LeaveVal(123)
+	global.enable = true
 
-	p2 := EnterTimeVal("~2egEnterTimeVal", "", 123)
-	Point(p2, "myPoint")
-	LeaveVal(p2, 123)
+	bs1 := Enter("~2egEnter").DebugParams("foo")
+	bs1.Run(func() {
+	})
+	bs1.LeaveVal(123)
 
-	p3 := enterTimeValInternal("~2egenterTimeValInternal", 123)
-	pointInternal(p3, "myPoint")
-	leaveInternal(p3)
+	bs2 := EnterTimeVal("~2egEnterTimeVal", 123)
+	bs2.Run(func() {
+	})
+	bs2.Point("myPoint")
+	bs2.Run(func() {
+	})
+	bs2.LeaveVal(123)
+
+	bs3 := enterTimeValInternal("~2egenterTimeValInternal", 123)
+	bs3.Run(func() {
+	})
+	bs3.pointInternal("myPoint")
+	bs3.Run(func() {
+	})
+	bs3.leaveInternal()
 
 	var isIntIsFalse bool = false
 

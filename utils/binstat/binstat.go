@@ -197,9 +197,9 @@ func Fin() {
 	// todo: consider closing down more somehow?
 }
 
-func enterGeneric(what string, callerParams string, callerTime bool, callerSize int64, callerSizeWhen int, verbose bool) *BinStat {
+func enterGeneric(what string, callerTime bool, callerSize int64, callerSizeWhen int, verbose bool) *BinStat {
 	if !global.enable {
-		return nil
+		return &BinStat{} // so that chained functions can be called even if binstat globally disabled
 	}
 
 	t := runtimeNanoAsTimeDuration()
@@ -234,7 +234,8 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 		}
 	}
 
-	p := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
+	callerParams := ""
+	bs := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
 
 	t2 := runtimeNanoAsTimeDuration()
 
@@ -242,28 +243,28 @@ func enterGeneric(what string, callerParams string, callerTime bool, callerSize 
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedThisFunc := time.Duration(t2 - t).Seconds()
 		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // enter in %f // what[%s] .NumCPU()=%d .GOMAXPROCS(0)=%d .NumGoroutine()=%d",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine())
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), bs.callerFunc, bs.callerLine, bs.callerParams, elapsedThisFunc, what, runtime.NumCPU(), runtime.GOMAXPROCS(0), runtime.NumGoroutine())
 	}
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
 	atomic.AddUint64(&global.frequencyShadow[internalEnter], 1)
 	atomic.AddUint64(&global.accumMonoShadow[internalEnter], uint64(t2-t))
 
-	return &p
+	return &bs
 }
 
-func pointGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWhen int, verbose bool) time.Duration {
+func pointGeneric(bs *BinStat, pointUnique string, callerSize int64, callerSizeWhen int, verbose bool) time.Duration {
 	// if binstat disabled, or <what> disabled; "~#" == "~<default len><what>"
-	if (!global.enable) || (2 == len(p.what)) {
+	if (!global.enable) || (2 == len(bs.what)) {
 		return time.Duration(0)
 	}
 
 	t := runtimeNanoAsTimeDuration()
 
-	elapsedNanoAsTimeDuration := t - p.enterTime
+	elapsedNanoAsTimeDuration := t - bs.enterTime
 	if sizeAtLeave == callerSizeWhen {
-		p.callerSizeWhen = callerSizeWhen
-		p.callerSize = callerSize
+		bs.callerSizeWhen = callerSizeWhen
+		bs.callerSize = callerSize
 	}
 	var keySizeRange string
 	var keyTimeRange string
@@ -271,24 +272,24 @@ func pointGeneric(p *BinStat, pointUnique string, callerSize int64, callerSizeWh
 	switch pointUnique {
 	case "Leave":
 		pointType = "leave"
-		switch p.callerSizeWhen {
+		switch bs.callerSizeWhen {
 		case sizeAtEnter:
-			keySizeRange = fmt.Sprintf("/size[enter:%s]", x_2_y(float64(p.callerSize), true))
+			keySizeRange = fmt.Sprintf("/size[%s]", x_2_y(float64(bs.callerSize), true))
 		case sizeNotUsed:
 			keySizeRange = ""
 		case sizeAtLeave:
-			keySizeRange = fmt.Sprintf("/size[leave:%s]", x_2_y(float64(p.callerSize), true))
+			keySizeRange = fmt.Sprintf("/size[%s]", x_2_y(float64(bs.callerSize), true))
 		}
 	case "":
 	default:
 		pointType = "point"
-		keySizeRange = fmt.Sprintf("/size[point:%s]", pointUnique)
+		keySizeRange = fmt.Sprintf("/size[%s]", pointUnique)
 	}
-	if p.callerTime {
+	if bs.callerTime {
 		elapsedSeconds := elapsedNanoAsTimeDuration.Seconds()
 		keyTimeRange = fmt.Sprintf("/time[%s]", x_2_y(elapsedSeconds, false))
 	}
-	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), p.what, keySizeRange, keyTimeRange)
+	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), bs.what, keySizeRange, keyTimeRange)
 
 tryAgainRaceCondition:
 	var frequency uint64
@@ -305,7 +306,7 @@ tryAgainRaceCondition:
 		// come here to create new hash table bucket
 		keyEgLoc := ""
 		if global.verbose {
-			keyEgLoc = fmt.Sprintf(" // e.g. %s:%d", p.callerFunc, p.callerLine)
+			keyEgLoc = fmt.Sprintf(" // e.g. %s:%d", bs.callerFunc, bs.callerLine)
 		}
 		global.rwMutex.Lock() // lock for single writer v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 		_, keyExists = global.key2index[key]
@@ -341,7 +342,7 @@ tryAgainRaceCondition:
 		elapsedThisProc := time.Duration(t2 - global.startTimeMono).Seconds()
 		elapsedSinceNew := elapsedNanoAsTimeDuration.Seconds()
 		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // %s in %f // %s=[%d]=%d %f%s",
-			elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint)
+			elapsedThisProc, os.Getpid(), int64(C.gettid()), bs.callerFunc, bs.callerLine, bs.callerParams, pointType, elapsedSinceNew, key, index, frequency, time.Duration(accumMono).Seconds(), hint)
 	}
 
 	// for internal accounting, atomically increment counters in (never appended to) shadow array; saving additional lock
@@ -398,7 +399,7 @@ foundFirstNonZeroNonDot:
 	return returnString
 }
 
-func debugGeneric(p *BinStat, debugText string, verbose bool) {
+func debugGeneric(bs *BinStat, debugText string, verbose bool) {
 	if !global.enable {
 		return
 	}
@@ -407,7 +408,7 @@ func debugGeneric(p *BinStat, debugText string, verbose bool) {
 
 	if verbose && global.verbose {
 		elapsedThisProc := time.Duration(t - global.startTimeMono).Seconds()
-		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // debug %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), p.callerFunc, p.callerLine, p.callerParams, debugText)
+		global.log.Debug().Msgf("%f %d=pid %d=tid %s:%d(%s) // debug %s", elapsedThisProc, os.Getpid(), int64(C.gettid()), bs.callerFunc, bs.callerLine, bs.callerParams, debugText)
 	}
 
 	t2 := runtimeNanoAsTimeDuration()
@@ -424,9 +425,14 @@ func tick(t time.Duration) {
 
 	ticker := time.NewTicker(t)
 	for range ticker.C {
-		p := enterInternal("internal-NumG")
-		leaveValInternal(p, int64(runtime.NumGoroutine()))
+		bs := enterInternal("internal-NumG")
+		bs.leaveValInternal(int64(runtime.NumGoroutine()))
 	}
+}
+
+func fatalPanic(err string) {
+	global.log.Fatal().Msg(err)
+	panic(err)
 }
 
 // todo: would a different format, like CSV or JSON, be useful and how would it be used?
@@ -436,8 +442,8 @@ func tick(t time.Duration) {
 // [1] https://github.com/golang/go/issues/17089 "runtime: expose number of running/runnable goroutines #17089"
 // [2] https://github.com/golang/go/issues/15490 "proposal: runtime: add SchedStats API #15490"
 func dump() {
-	p := enterTimeInternal("internal-dump")
-	defer leaveInternal(p)
+	bs := enterTimeInternal("internal-dump")
+	defer bs.leaveInternal()
 
 	var gcStats debug.GCStats
 	debug.ReadGCStats(&gcStats)
@@ -466,8 +472,7 @@ func dump() {
 	fileNew := fmt.Sprintf("%s/%s", global.dmpPath, global.dmpName)
 	f, err := os.Create(fileTmp)
 	if err != nil {
-		global.log.Fatal().Msgf("ERROR: .Create(%s)=%s", fileTmp, err)
-		panic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
+		fatalPanic(fmt.Sprintf("ERROR: BINSTAT: .Create(%s)=%s", fileTmp, err))
 	}
 	for i := range global.keysArray {
 		// grab these atomically (because they may be atomically updated in parallel) so as not to trigger Golang's "WARNING: DATA RACE"
@@ -475,14 +480,12 @@ func dump() {
 		u2 := atomic.LoadUint64(&global.accumMono[i])
 		_, err := fmt.Fprintf(f, "%s=%d %f%s\n", global.keysArray[i], u1, time.Duration(u2).Seconds(), global.keysEgLoc[i])
 		if err != nil {
-			global.log.Fatal().Msgf("ERROR: .Fprintf()=%s", err)
-			panic(fmt.Sprintf("ERROR: BINSTAT: .Fprintf()=%s", err))
+			fatalPanic(fmt.Sprintf("ERROR: BINSTAT: .Fprintf()=%s", err))
 		}
 	}
 	err = f.Close()
 	if err != nil {
-		global.log.Fatal().Msgf("ERROR: .Close()=%s", err)
-		panic(fmt.Sprintf("ERROR: BINSTAT: .Close()=%s", err))
+		fatalPanic(fmt.Sprintf("ERROR: BINSTAT: .Close()=%s", err))
 	}
 	err = os.Rename(fileTmp, fileNew) // atomically rename / move on Linux :-)
 	if err != nil {
@@ -496,57 +499,60 @@ func dump() {
 // functions BEFORE go fmt v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 
 /*
-func Enter               (what string, callerParams string                  ) *BinStat      { return enterGeneric(what, callerParams, false, 0         , sizeNotUsed, true ) }
-func enterInternal       (what string                                       ) *BinStat      { return enterGeneric(what, ""          , false, 0         , sizeNotUsed, false) }
-func EnterTime           (what string, callerParams string                  ) *BinStat      { return enterGeneric(what, callerParams, true , 0         , sizeNotUsed, true ) }
-func enterTimeInternal   (what string                                       ) *BinStat      { return enterGeneric(what, ""          , true , 0         , sizeNotUsed, false) }
-func EnterTimeVal        (what string, callerParams string, callerSize int64) *BinStat      { return enterGeneric(what, callerParams, true , callerSize, sizeAtEnter, true ) }
-func enterTimeValInternal(what string,                      callerSize int64) *BinStat      { return enterGeneric(what, ""          , true , callerSize, sizeAtEnter, false) }
+func               Enter               (what         string,                 ) *BinStat      { return enterGeneric(what, false       , 0         , sizeNotUsed, true ) }
+func               enterInternal       (what         string                  ) *BinStat      { return enterGeneric(what, false       , 0         , sizeNotUsed, false) }
+func               EnterTime           (what         string,                 ) *BinStat      { return enterGeneric(what, true        , 0         , sizeNotUsed, true ) }
+func               enterTimeInternal   (what         string                  ) *BinStat      { return enterGeneric(what, true        , 0         , sizeNotUsed, false) }
+func               EnterTimeVal        (what         string, callerSize int64) *BinStat      { return enterGeneric(what, true        , callerSize, sizeAtEnter, true ) }
+func               enterTimeValInternal(what         string, callerSize int64) *BinStat      { return enterGeneric(what, true        , callerSize, sizeAtEnter, false) }
 
-func Point               (p  *BinStat, pointUnique  string                  ) time.Duration { return pointGeneric(p   , pointUnique        , 0         , sizeNotUsed, true ) }
-func pointInternal       (p  *BinStat, pointUnique  string                  ) time.Duration { return pointGeneric(p   , pointUnique        , 0         , sizeNotUsed, false) }
-func Leave               (p  *BinStat                                       ) time.Duration { return pointGeneric(p   , "Leave"            , 0         , sizeNotUsed, true ) }
-func leaveInternal       (p  *BinStat                                       ) time.Duration { return pointGeneric(p   , "Leave"            , 0         , sizeNotUsed, false) }
-func LeaveVal            (p  *BinStat,                      callerSize int64) time.Duration { return pointGeneric(p   , "Leave"            , callerSize, sizeAtLeave, true ) }
-func leaveValInternal    (p  *BinStat,                      callerSize int64) time.Duration { return pointGeneric(p   , "Leave"            , callerSize, sizeAtLeave, false) }
+func (bs *BinStat) DebugParams         (callerParams string                  ) *BinStat      {        bs.callerParams  = callerParams; return bs                       }
+func (bs *BinStat) Debug               (text         string                  )               {        debugGeneric(bs  , text                                 , true ) }
+func (bs *BinStat) Run                 (f            func()                  )               {        f           (                                                  ) }
 
-func Debug               (p  *BinStat, debugText    string                  )               {        debugGeneric(p   , debugText                                   , true ) }
+func (bs *BinStat) Point               (pointUnique  string                  ) time.Duration { return pointGeneric(bs  , pointUnique , 0         , sizeNotUsed, true ) }
+func (bs *BinStat) pointInternal       (pointUnique  string                  ) time.Duration { return pointGeneric(bs  , pointUnique , 0         , sizeNotUsed, false) }
+func (bs *BinStat) Leave               (                                     ) time.Duration { return pointGeneric(bs  , "Leave"     , 0         , sizeNotUsed, true ) }
+func (bs *BinStat) leaveInternal       (                                     ) time.Duration { return pointGeneric(bs  , "Leave"     , 0         , sizeNotUsed, false) }
+func (bs *BinStat) LeaveVal            (                     callerSize int64) time.Duration { return pointGeneric(bs  , "Leave"     , callerSize, sizeAtLeave, true ) }
+func (bs *BinStat) leaveValInternal    (                     callerSize int64) time.Duration { return pointGeneric(bs  , "Leave"     , callerSize, sizeAtLeave, false) }
 */
 
 // functions W/&W/O go fmt ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
-func Enter(what string, callerParams string) *BinStat {
-	return enterGeneric(what, callerParams, false, 0, sizeNotUsed, true)
-}
-func enterInternal(what string) *BinStat { return enterGeneric(what, "", false, 0, sizeNotUsed, false) }
-func EnterTime(what string, callerParams string) *BinStat {
-	return enterGeneric(what, callerParams, true, 0, sizeNotUsed, true)
-}
-func enterTimeInternal(what string) *BinStat {
-	return enterGeneric(what, "", true, 0, sizeNotUsed, false)
-}
-func EnterTimeVal(what string, callerParams string, callerSize int64) *BinStat {
-	return enterGeneric(what, callerParams, true, callerSize, sizeAtEnter, true)
+func Enter(what string) *BinStat             { return enterGeneric(what, false, 0, sizeNotUsed, true) }
+func enterInternal(what string) *BinStat     { return enterGeneric(what, false, 0, sizeNotUsed, false) }
+func EnterTime(what string) *BinStat         { return enterGeneric(what, true, 0, sizeNotUsed, true) }
+func enterTimeInternal(what string) *BinStat { return enterGeneric(what, true, 0, sizeNotUsed, false) }
+func EnterTimeVal(what string, callerSize int64) *BinStat {
+	return enterGeneric(what, true, callerSize, sizeAtEnter, true)
 }
 func enterTimeValInternal(what string, callerSize int64) *BinStat {
-	return enterGeneric(what, "", true, callerSize, sizeAtEnter, false)
+	return enterGeneric(what, true, callerSize, sizeAtEnter, false)
 }
 
-func Point(p *BinStat, pointUnique string) time.Duration {
-	return pointGeneric(p, pointUnique, 0, sizeNotUsed, true)
+func (bs *BinStat) DebugParams(callerParams string) *BinStat {
+	bs.callerParams = callerParams
+	return bs
 }
-func pointInternal(p *BinStat, pointUnique string) time.Duration {
-	return pointGeneric(p, pointUnique, 0, sizeNotUsed, false)
-}
-func Leave(p *BinStat) time.Duration         { return pointGeneric(p, "Leave", 0, sizeNotUsed, true) }
-func leaveInternal(p *BinStat) time.Duration { return pointGeneric(p, "Leave", 0, sizeNotUsed, false) }
-func LeaveVal(p *BinStat, callerSize int64) time.Duration {
-	return pointGeneric(p, "Leave", callerSize, sizeAtLeave, true)
-}
-func leaveValInternal(p *BinStat, callerSize int64) time.Duration {
-	return pointGeneric(p, "Leave", callerSize, sizeAtLeave, false)
-}
+func (bs *BinStat) Debug(text string) { debugGeneric(bs, text, true) }
+func (bs *BinStat) Run(f func())      { f() }
 
-func Debug(p *BinStat, debugText string) { debugGeneric(p, debugText, true) }
+func (bs *BinStat) Point(pointUnique string) time.Duration {
+	return pointGeneric(bs, pointUnique, 0, sizeNotUsed, true)
+}
+func (bs *BinStat) pointInternal(pointUnique string) time.Duration {
+	return pointGeneric(bs, pointUnique, 0, sizeNotUsed, false)
+}
+func (bs *BinStat) Leave() time.Duration { return pointGeneric(bs, "Leave", 0, sizeNotUsed, true) }
+func (bs *BinStat) leaveInternal() time.Duration {
+	return pointGeneric(bs, "Leave", 0, sizeNotUsed, false)
+}
+func (bs *BinStat) LeaveVal(callerSize int64) time.Duration {
+	return pointGeneric(bs, "Leave", callerSize, sizeAtLeave, true)
+}
+func (bs *BinStat) leaveValInternal(callerSize int64) time.Duration {
+	return pointGeneric(bs, "Leave", callerSize, sizeAtLeave, false)
+}
 
 // functions AFTER  go fmt ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^

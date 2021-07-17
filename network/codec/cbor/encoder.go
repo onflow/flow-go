@@ -32,9 +32,11 @@ func (e *Encoder) Encode(v interface{}) error {
 	data = append(data, code)
 
 	// write the envelope to network
-	p := binstat.EnterTimeVal("~3net:strm<2", "", int64(len(data)))
-	err = e.enc.Encode(data)
-	binstat.Leave(p)
+	bs := binstat.EnterTimeVal("~3net:strm<2", int64(len(data)))
+	bs.Run(func() {
+		err = e.enc.Encode(data)
+	})
+	bs.Leave()
 	if err != nil {
 		return fmt.Errorf("could not encode envelope: %w", err)
 	}

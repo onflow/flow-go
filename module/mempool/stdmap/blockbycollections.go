@@ -36,14 +36,20 @@ func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollec
 }
 
 func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) error) error {
-	p1 := binstat.EnterTime("~4lock:w:Backend.Run(BlockByCollections)", "")
-	b.Lock()
-	binstat.Leave(p1)
-	p2 := binstat.EnterTime("~7Backend.Run(BlockByCollections)", "")
-	defer binstat.Leave(p2)
-	defer b.Unlock()
+	bs1 := binstat.EnterTime("~4lock:w:Backend.Run(BlockByCollections)")
+	bs1.Run(func() {
+		b.Lock()
+	})
+	bs1.Leave()
 
-	err := f(&BlockByCollectionBackdata{&b.Backdata})
+	var err error
+	bs2 := binstat.EnterTime("~7Backend.Run(BlockByCollections)")
+	bs2.Run(func() {
+		defer b.Unlock()
+		err = f(&BlockByCollectionBackdata{&b.Backdata})
+	})
+	bs2.Leave()
+
 	if err != nil {
 		return err
 	}
