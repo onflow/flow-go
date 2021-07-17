@@ -182,7 +182,7 @@ func configureTransactionValidator(state protocol.State, chainID flow.ChainID) *
 			ExpiryBuffer:                 flow.DefaultTransactionExpiryBuffer,
 			AllowEmptyReferenceBlockID:   false,
 			AllowUnknownReferenceBlockID: false,
-			CheckScriptsParse:            true,
+			CheckScriptsParse:            false,
 			MaxGasLimit:                  flow.DefaultMaxTransactionGasLimit,
 			MaxTransactionByteSize:       flow.DefaultMaxTransactionByteSize,
 			MaxCollectionByteSize:        flow.DefaultMaxCollectionByteSize,
