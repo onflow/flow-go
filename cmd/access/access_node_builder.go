@@ -140,9 +140,6 @@ func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		// creates topology, topology manager, and subscription managers
-		//
-		// topology
 		// subscription manager
 		subscriptionManager := p2p.NewChannelSubscriptionManager(anb.unstakedMiddleware)
 		var top network.Topology
