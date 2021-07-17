@@ -12,9 +12,7 @@ func init() {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
 	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
-}
 
-func TestBinstatInternal(t *testing.T) {
 	global.enable = false
 	tick(100 * time.Millisecond)
 	enterGeneric("", false, 0, 0, false)
@@ -24,8 +22,9 @@ func TestBinstatInternal(t *testing.T) {
 	bs0.Run(func() {
 	})
 	bs0.LeaveVal(123)
-	global.enable = true
+}
 
+func TestBinstatInternal(t *testing.T) {
 	bs1 := Enter("~2egEnter").DebugParams("foo")
 	bs1.Run(func() {
 	})
