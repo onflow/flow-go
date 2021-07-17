@@ -26,7 +26,7 @@ func toHex(bs []byte) string {
 func fromJSONHex(b []byte) ([]byte, error) {
 	var x string
 	if err := json.Unmarshal(b, &x); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -34,7 +34,7 @@ func fromJSONHex(b []byte) ([]byte, error) {
 func fromMsgPackHex(b []byte) ([]byte, error) {
 	var x string
 	if err := msgpack.Unmarshal(b, &x); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -42,7 +42,7 @@ func fromMsgPackHex(b []byte) ([]byte, error) {
 func fromCBORPackHex(b []byte) ([]byte, error) {
 	var x string
 	if err := cbor.Unmarshal(b, &x); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
 	}
 	return hex.DecodeString(x)
 }
