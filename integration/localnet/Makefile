@@ -3,6 +3,7 @@ CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
 ACCESS = 1
+UNSTAKED_ACCESS = 0
 NCLUSTERS=1
 PROFILER=false
 CONSENSUS_DELAY=800ms
@@ -22,6 +23,7 @@ init:
 		-execution=$(EXECUTION) \
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
+		-unstaked-access=$(UNSTAKED_ACCESS) \
 		-nclusters=$(NCLUSTERS) \
 		-profiler=$(PROFILER) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
@@ -49,18 +51,3 @@ stop:
 load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
 
-unstaked-an:
-	go run -tags relic \
-		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
-		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
-		bootstrap.go \
-		-collection=1 \
-		-consensus=1 \
-		-execution=1 \
-		-verification=1 \
-		-access=1 \
-		-unstaked-access=1 \
-		-nclusters=$(NCLUSTERS) \
-		-profiler=$(PROFILER) \
-		-consensus-delay=$(CONSENSUS_DELAY) \
-		-collection-delay=$(COLLECTION_DELAY)
