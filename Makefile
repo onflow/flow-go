@@ -62,7 +62,7 @@ install-tools: crypto/relic/build check-go-version
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
 
 .PHONY: unittest
-unittest: crypto/relic/check
+unittest:
 	# test some packages with Relic library and data race detection enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) -race --tags relic ./access/... ./consensus/... ./model/... ./state/... ./storage/... ./utils/...
 	# test all packages with Relic library enabled
@@ -74,7 +74,7 @@ unittest: crypto/relic/check
 test: generate-mocks unittest
 
 .PHONY: integration-test
-integration-test: crypto/relic/check docker-build-flow 
+integration-test: docker-build-flow 
 	$(MAKE) -C integration integration-test
 
 .PHONY: benchmark
