@@ -980,8 +980,7 @@ func (e *Engine) matchOrRequestCollections(
 			ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
 		}
 
-		blocksNeedingCollectionID := blocksNeedingCollection.ID()
-		added := collectionsBackdata.Add(blocksNeedingCollectionID, blocksNeedingCollection)
+		added := collectionsBackdata.Add(blocksNeedingCollection.ID(), blocksNeedingCollection)
 		if !added {
 			// sanity check, should not happen, unless mempool implementation has a bug
 			return fmt.Errorf("collection already mapped to block")
