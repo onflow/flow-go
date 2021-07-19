@@ -18,7 +18,7 @@ relic_version="9206ae50b667de160fcc385ba3dc2c920143ab0a"
 # git clone --branch $(relic_version) --single-branch --depth 1 git@github.com:relic-toolkit/relic.git
 
 # clone all the history if the version is only defined by a commit hash.
-git clone --branch main --single-branch https://github.com/relic-toolkit/relic.git || { echo "git clone failed"; exit 1; }
+git -c http.sslVerify=true clone --branch main --single-branch https://github.com/relic-toolkit/relic.git || { echo "git clone failed"; exit 1; }
 
 if [ -d ${PKG_DIR}/relic ]
 then
