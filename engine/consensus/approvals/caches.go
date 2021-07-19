@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// ApprovalsCache encapsulates a map for storing result approvals
+// ApprovalsCache encapsulates a map for storing result approvals indexed by approval partial ID
 // to provide concurrent access.
 type ApprovalsCache struct {
 	cache map[flow.Identifier]*flow.ResultApproval
@@ -21,7 +21,9 @@ func NewApprovalsCache(sizeHint uint) *ApprovalsCache {
 }
 
 // Put saves approval into cache; returns true iff approval was newly added
-func (c *ApprovalsCache) Put(key flow.Identifier, approval *flow.ResultApproval) bool {
+// the approvalID should be calculated as `approval.Body.PartialID()`
+// it is taken as an input so that the caller can optimize by reusing the calculated approvalID.
+func (c *ApprovalsCache) Put(approvalID flow.Identifier, approval *flow.ResultApproval) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if _, found := c.cache[key]; !found {
@@ -32,7 +34,7 @@ func (c *ApprovalsCache) Put(key flow.Identifier, approval *flow.ResultApproval)
 }
 
 // Get returns ResultApproval for the given ID (or nil if none is stored)
-func (c *ApprovalsCache) Get(key flow.Identifier) *flow.ResultApproval {
+func (c *ApprovalsCache) Get(approvalID flow.Identifier) *flow.ResultApproval {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 	return c.cache[key]
