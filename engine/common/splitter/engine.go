@@ -178,7 +178,7 @@ func (e *Engine) process(processFunc func(module.Engine) error) error {
 	var multiErr *multierror.Error
 
 	for err := range errors {
-		multierror.Append(multiErr, err)
+		multiErr = multierror.Append(multiErr, err)
 	}
 
 	return multiErr
