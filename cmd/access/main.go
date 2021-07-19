@@ -88,7 +88,7 @@ func main() {
 			flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
 			flags.UintVar(&executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
 			flags.StringVarP(&rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the gRPC server listens on")
-			flags.StringVarP(&rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "r", "localhost:9001", "the address the gRPC server listens on")
+			flags.StringVarP(&rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "r", "localhost:9001", "the address the secure gRPC server listens on")
 			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
 			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
 			flags.StringVarP(&executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
