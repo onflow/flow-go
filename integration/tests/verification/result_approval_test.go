@@ -22,7 +22,7 @@ func (r *ResultApprovalTestSuite) TestVerificationNodeHappyPath() {
 	r.T().Logf("blockA generated, height: %v ID: %v", blockA.Header.Height, blockA.Header.ID())
 
 	// waits for execution receipt for blockA from execution node, called receiptA
-	receiptA := r.ReceiptState.WaitForReceiptFrom(r.T(), blockA.Header.ID(), r.exeID)
+	receiptA := r.ReceiptState.WaitForReceiptFrom(r.T(), blockA.Header.ID(), r.exe1ID)
 	resultID := receiptA.ExecutionResult.ID()
 	r.T().Logf("receipt for blockA generated: result ID: %x", resultID)
 
