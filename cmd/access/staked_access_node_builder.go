@@ -57,13 +57,16 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 	sanb.Component("unstaked network", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
 
 		// NodeID for the staked node on the unstaked network
+		// TODO: set a different node ID of the staked access node on the unstaked network
 		unstakedNodeID := sanb.NodeID() // currently set the same as the staked NodeID
 
 		// Networking key
+		// TODO: set a different networking key of the staked access node on the unstaked network
 		unstakedNetworkKey := sanb.NetworkKey()
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
+		// TODO: define new network metrics for the unstaked network
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
 		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
