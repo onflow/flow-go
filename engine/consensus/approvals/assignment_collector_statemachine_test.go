@@ -50,19 +50,32 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_CachingToVerifying() {
 	require.Equal(s.T(), CachingApprovals, s.collector.ProcessingStatus())
 	results := make([]*flow.IncorporatedResult, 0, 3)
+
+	for i := range results {
+		block := unittest.BlockHeaderWithParentFixture(&s.Block)
+		s.blocks[block.ID()] = &block
+		result := unittest.IncorporatedResult.Fixture(
+			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
+		)
+		results[i] = result
+	}
+
 	approvals := make([]*flow.ResultApproval, 0, s.Chunks.Len())
+
+	for i := range approvals {
+		approval := unittest.ResultApprovalFixture(
+			unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()),
+			unittest.WithChunk(uint64(i)),
+			unittest.WithBlockID(s.Block.ID()),
+		)
+		approvals[i] = approval
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		for i := range results {
-			block := unittest.BlockHeaderWithParentFixture(&s.Block)
-			s.blocks[block.ID()] = &block
-			result := unittest.IncorporatedResult.Fixture(
-				unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
-				unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),
-			)
-			results[i] = result
+		for _, result := range results {
 			require.NoError(s.T(), s.collector.ProcessIncorporatedResult(result))
 		}
 		wg.Done()
@@ -70,13 +83,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 
 	wg.Add(1)
 	go func() {
-		for i := range approvals {
-			approval := unittest.ResultApprovalFixture(
-				unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()),
-				unittest.WithChunk(uint64(i)),
-				unittest.WithBlockID(s.Block.ID()),
-			)
-			approvals[i] = approval
+		for _, approval := range approvals {
 			require.NoError(s.T(), s.collector.ProcessApproval(approval))
 		}
 		wg.Done()

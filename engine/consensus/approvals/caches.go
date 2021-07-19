@@ -26,8 +26,8 @@ func NewApprovalsCache(sizeHint uint) *ApprovalsCache {
 func (c *ApprovalsCache) Put(approvalID flow.Identifier, approval *flow.ResultApproval) bool {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if _, found := c.cache[key]; !found {
-		c.cache[key] = approval
+	if _, found := c.cache[approvalID]; !found {
+		c.cache[approvalID] = approval
 		return true
 	}
 	return false
@@ -37,7 +37,7 @@ func (c *ApprovalsCache) Put(approvalID flow.Identifier, approval *flow.ResultAp
 func (c *ApprovalsCache) Get(approvalID flow.Identifier) *flow.ResultApproval {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	return c.cache[key]
+	return c.cache[approvalID]
 }
 
 // All returns all stored approvals

@@ -263,6 +263,9 @@ func (ac *VerifyingAssignmentCollector) validateApproval(approval *flow.ResultAp
 //  * any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	// we have this approval cached already, no need to process it again
+	// here we need to use PartialID to have a hash over Attestation + ApproverID
+	// there is no need to use hash over full approval since it contains extra information
+	// and we are only interested in approval body.
 	approvalCacheID := approval.Body.PartialID()
 	if cached := ac.verifiedApprovalsCache.Get(approvalCacheID); cached != nil {
 		return nil

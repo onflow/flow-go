@@ -26,7 +26,7 @@ type base struct {
 	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
 }
 
-// AssignmentCollector has three different states. During state transition, there are some 
+// AssignmentCollectorBase has three different states. During state transition, there are some
 // common dependencies and immutable values to shared:
 // - `base` holds common dependencies
 // - `AssignmentCollectorBase` in addition holds extra immutable values.
