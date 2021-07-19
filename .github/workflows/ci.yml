@@ -32,12 +32,18 @@ jobs:
         ignore: 'relic'
   unit-test:
     name: Unit Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+          - 1.15
+          - 1.16
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: '1.15'
+        go-version: ${{ matrix.go-version }}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
@@ -50,12 +56,18 @@ jobs:
         name: codecov-umbrella
   integration-test:
     name: Integration Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version:
+          - 1.15
+          - 1.16
     runs-on: ubuntu-latest
     steps:
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
-        go-version: '1.15'
+        go-version: ${{ matrix.go-version}}
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Build relic
