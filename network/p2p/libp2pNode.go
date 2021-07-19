@@ -91,7 +91,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	pingInfoProvider PingInfoProvider,
 	psOption ...pubsub.Option) (*Node, error) {
 
-	libp2pKey, err := privKey(key)
+	libp2pKey, err := PrivKey(key)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}
@@ -309,6 +309,10 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 
 		s, err = n.host.NewStream(ctx, peerID, n.flowLibP2PProtocolID)
 		if err != nil {
+			// if the stream creation failed due to invalid protocol id, skip the re-attempt
+			if strings.Contains(err.Error(), "protocol not supported") {
+				return nil, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, n.flowLibP2PProtocolID)
+			}
 			errs = multierror.Append(errs, err)
 			continue
 		}

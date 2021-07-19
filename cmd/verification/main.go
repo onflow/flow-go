@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -34,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -60,14 +62,15 @@ func main() {
 		processedBlockHeight *storage.ConsumerProgress // used in block consumer
 		chunkQueue           *storage.ChunksQueue      // used in chunk consumer
 
-		syncCore        *synchronization.Core // used in follower engine
-		pendingBlocks   *buffer.PendingBlocks // used in follower engine
-		assignerEngine  *assigner.Engine      // the assigner engine
-		fetcherEngine   *fetcher.Engine       // the fetcher engine
-		requesterEngine *vereq.Engine         // the requester engine
-		verifierEng     *verifier.Engine      // the verifier engine
-		chunkConsumer   *chunkconsumer.ChunkConsumer
-		blockConsumer   *blockconsumer.BlockConsumer
+		syncCore                *synchronization.Core // used in follower engine
+		pendingBlocks           *buffer.PendingBlocks // used in follower engine
+		assignerEngine          *assigner.Engine      // the assigner engine
+		fetcherEngine           *fetcher.Engine       // the fetcher engine
+		requesterEngine         *vereq.Engine         // the requester engine
+		verifierEng             *verifier.Engine      // the verifier engine
+		chunkConsumer           *chunkconsumer.ChunkConsumer
+		blockConsumer           *blockconsumer.BlockConsumer
+		finalizationDistributor *pubsub.FinalizationDistributor
 
 		followerEng *followereng.Engine        // the follower engine
 		collector   module.VerificationMetrics // used to collect metrics of all engines
@@ -100,6 +103,7 @@ func main() {
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blocktimer.DefaultBlockTimer,
 			)
 			return err
 		}).
@@ -297,9 +301,12 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
+			finalizationDistributor = pubsub.NewFinalizationDistributor()
+			finalizationDistributor.AddConsumer(blockConsumer)
+
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, blockConsumer, node.RootBlock.Header,
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header,
 				node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower core logic: %w", err)
@@ -339,6 +346,9 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+
 			return sync, nil
 		}).
 		Run()

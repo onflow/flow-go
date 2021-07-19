@@ -212,7 +212,8 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	col := unittest.CollectionFixture(0)
 	vch.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
-	emptyListHash, _ := flow.EventsList{}.Hash()
+	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
+	assert.NoError(s.T(), err)
 	vch.Chunk.EventCollection = emptyListHash //empty collection emits no events
 	spockSecret, chFaults, err := s.verifier.Verify(vch)
 	assert.Nil(s.T(), err)
@@ -319,7 +320,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		}
 	}
 
-	eventsListHash, err := chunkEvents.Hash()
+	eventsListHash, err := flow.EventsListHash(chunkEvents)
 	require.NoError(t, err)
 
 	// Chunk setup

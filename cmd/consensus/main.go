@@ -48,6 +48,7 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -59,7 +60,7 @@ func main() {
 		resultLimit                            uint
 		approvalLimit                          uint
 		sealLimit                              uint
-		pendngReceiptsLimit                    uint
+		pendingReceiptsLimit                   uint
 		minInterval                            time.Duration
 		maxInterval                            time.Duration
 		maxSealPerBlock                        uint
@@ -91,6 +92,7 @@ func main() {
 		receiptValidator        module.ReceiptValidator
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
+		blockTimer              protocol.BlockTimer
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -98,8 +100,10 @@ func main() {
 			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
 			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
 			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
-			flags.UintVar(&sealLimit, "seal-limit", 10000, "maximum number of block seals in the memory pool")
-			flags.UintVar(&pendngReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
+			// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
+			// ever gets full, the node will simply crash instead of employing complex ejection logic.
+			flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
+			flags.UintVar(&pendingReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
 			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
 			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
 			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
@@ -150,7 +154,7 @@ func main() {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 
-			sealValidator := validation.NewSealValidator(
+			sealValidator, err := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
 				node.Storage.Index,
@@ -158,8 +162,17 @@ func main() {
 				node.Storage.Seals,
 				chunkAssigner,
 				resultApprovalSigVerifier,
+				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
+			if err != nil {
+				return fmt.Errorf("could not instantiate seal validator: %w", err)
+			}
+
+			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			if err != nil {
+				return err
+			}
 
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
@@ -167,6 +180,7 @@ func main() {
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blockTimer,
 				receiptValidator,
 				sealValidator)
 			return err
@@ -191,15 +205,15 @@ func main() {
 		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
-			resultSeals := stdmap.NewIncorporatedResultSeals(sealLimit)
-			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), resultSeals, node.DB, node.Logger)
+			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
 			if err != nil {
 				return fmt.Errorf("failed to wrap seals mempool into ExecStateForkSuppressor: %w", err)
 			}
+			err = node.Metrics.Mempool.Register(metrics.ResourcePendingIncorporatedSeal, seals.Size)
 			return nil
 		}).
 		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
-			pendingReceipts = stdmap.NewPendingReceipts(pendngReceiptsLimit)
+			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendingReceiptsLimit)
 			return nil
 		}).
 		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
@@ -234,6 +248,8 @@ func main() {
 				node.Me,
 				node.Storage.Headers,
 				node.Storage.Payloads,
+				node.Storage.Results,
+				node.Storage.Index,
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
@@ -287,6 +303,9 @@ func main() {
 				node.Me,
 				node.Metrics.Engine,
 				node.Metrics.Mempool,
+				node.State,
+				node.Storage.Receipts,
+				node.Storage.Index,
 				core,
 			)
 			if err != nil {
@@ -296,6 +315,7 @@ func main() {
 			// subscribe engine to inputs from other node-internal components
 			receiptRequester.WithHandle(e.HandleReceipt)
 			finalizationDistributor.AddOnBlockFinalizedConsumer(e.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockIncorporatedConsumer(e.OnBlockIncorporated)
 
 			return e, err
 		}).
@@ -372,8 +392,7 @@ func main() {
 				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
-				builder.WithMinInterval(minInterval),
-				builder.WithMaxInterval(maxInterval),
+				builder.WithBlockTimer(blockTimer),
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
@@ -489,6 +508,8 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		}).
