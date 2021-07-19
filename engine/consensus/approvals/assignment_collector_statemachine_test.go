@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gammazero/workerpool"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -49,7 +50,9 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 // VerifyingApprovals state. After transition all caches approvals and results need to be applied to new state.
 func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_CachingToVerifying() {
 	require.Equal(s.T(), CachingApprovals, s.collector.ProcessingStatus())
-	results := make([]*flow.IncorporatedResult, 0, 3)
+	results := make([]*flow.IncorporatedResult, 3)
+
+	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for i := range results {
 		block := unittest.BlockHeaderWithParentFixture(&s.Block)
@@ -61,12 +64,13 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 		results[i] = result
 	}
 
-	approvals := make([]*flow.ResultApproval, 0, s.Chunks.Len())
+	approvals := make([]*flow.ResultApproval, s.Chunks.Len())
 
 	for i := range approvals {
 		approval := unittest.ResultApprovalFixture(
 			unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()),
 			unittest.WithChunk(uint64(i)),
+			unittest.WithApproverID(s.VerID),
 			unittest.WithBlockID(s.Block.ID()),
 		)
 		approvals[i] = approval
@@ -75,18 +79,18 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for _, result := range results {
 			require.NoError(s.T(), s.collector.ProcessIncorporatedResult(result))
 		}
-		wg.Done()
 	}()
 
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for _, approval := range approvals {
 			require.NoError(s.T(), s.collector.ProcessApproval(approval))
 		}
-		wg.Done()
 	}()
 
 	err := s.collector.ChangeProcessingStatus(CachingApprovals, VerifyingApprovals)
