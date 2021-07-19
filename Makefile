@@ -29,6 +29,10 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
+# relic versions in script and submodule
+export LOCAL_VERSION := $(shell git submodule status | egrep '\s[0-9a-f]' | cut -c 2-9)
+export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{8}"' ./crypto/build_dependency.sh| cut -c 16-23)
+
 .PHONY: crypto/relic
 crypto/relic:
 	rm -rf crypto/relic
@@ -37,6 +41,15 @@ crypto/relic:
 .PHONY: crypto/relic/build
 crypto/relic/build: crypto/relic
 	./crypto/relic_build.sh
+
+.PHONY: crypto/relic/check
+crypto/relic/check:
+ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
+	@echo "Relic submodule version matches script, good!"
+else
+	$(error Mismatch between relic submodule commit and the version in ./crypto/build_dependency.sh)
+endif
+
 
 crypto/relic/update:
 	git submodule update --recursive
@@ -59,8 +72,10 @@ install-tools: crypto/relic/build check-go-version
 
 .PHONY: unittest
 unittest:
+	# test some packages with Relic library and data race detection enabled
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) -race --tags relic ./access/... ./consensus/... ./model/... ./state/... ./storage/... ./utils/...
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./cmd...  ./engine/... ./fvm/... ./ledger/... ./module/... ./network/...
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
@@ -132,7 +147,7 @@ generate-mocks:
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
-tidy:
+tidy: crypto/relic/check
 	go mod tidy
 	cd integration; go mod tidy
 	cd crypto; go mod tidy

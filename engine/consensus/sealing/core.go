@@ -107,7 +107,7 @@ func NewCore(
 		seals:                      sealsDB,
 		sealsMempool:               sealsMempool,
 		config:                     config,
-		requestTracker:             approvals.NewRequestTracker(10, 30),
+		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
 	}
 
 	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
@@ -144,12 +144,6 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 	latestSealedBlock, err := c.headers.ByBlockID(latestSealedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSealedBlockID, err)
-	}
-
-	// usually we start with empty collectors tree, prune it to minimum height
-	_, err = c.collectorTree.PruneUpToHeight(latestSealedBlock.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealedBlock.Height, err)
 	}
 
 	blocksProcessed := uint64(0)
@@ -541,11 +535,11 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 	if err != nil {
 		return fmt.Errorf("AssignmentCollectorTree failed to update its finalization state: %w", err)
 	}
-	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height) // prune AssignmentCollectorTree
-	if err != nil {
-		return fmt.Errorf("could not prune collectorTree up to height %d: %w", lastSealed.Height, err)
+
+	err = c.requestTracker.PruneUpToHeight(lastSealed.Height)
+	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+		return fmt.Errorf("could not request tracker at block up to height %d: %w", lastSealed.Height, err)
 	}
-	c.requestTracker.Remove(pruned...) // drop any approval requests for pruned assignments
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune candidate seals mempool
 	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {

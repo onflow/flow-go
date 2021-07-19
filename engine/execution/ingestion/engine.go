@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/utils"
-	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -156,13 +155,18 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -176,7 +180,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -325,9 +329,20 @@ func (e *Engine) reloadUnexecutedBlocks() error {
 
 		isRoot := rootBlock.ID() == last.ID()
 		if !isRoot {
-			err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
+			executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, lastExecutedID)
 			if err != nil {
-				return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
+				return fmt.Errorf("cannot check is last exeucted final block has been executed %v: %w", lastExecutedID, err)
+			}
+			if !executed {
+				// this should not happen, but if it does, execution should still work
+				e.log.Warn().
+					Hex("block_id", lastExecutedID[:]).
+					Msg("block marked as highest executed one, but not executable - internal inconsistency")
+
+				err = e.reloadBlock(blockByCollection, executionQueues, lastExecutedID)
+				if err != nil {
+					return fmt.Errorf("could not reload the last executed final block: %v, %w", lastExecutedID, err)
+				}
 			}
 		}
 
@@ -462,12 +477,13 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		Logger()
 
 	// adding the block to the queue,
-	queue, added := enqueue(executableBlock, executionQueues)
+	queue, added, head := enqueue(executableBlock, executionQueues)
 
 	// if it's not added, it means the block is not a new block, it already
 	// exists in the queue, then bail
 	if !added {
 		log.Debug().Hex("block_id", logging.Entity(executableBlock)).
+			Int("block_height", int(executableBlock.Height())).
 			Msg("block already exists in the execution queue")
 		return nil
 	}
@@ -515,14 +531,21 @@ func (e *Engine) enqueueBlockAndCheckExecutable(
 		return fmt.Errorf("cannot send collection requests: %w", err)
 	}
 
-	// execute the block if the block is ready to be executed
-	completed := e.executeBlockIfComplete(executableBlock)
+	complete := false
+
+	// if newly enqueued block is inside any existing queue, we should skip now and wait
+	// for parent to finish execution
+	if head {
+		// execute the block if the block is ready to be executed
+		complete = e.executeBlockIfComplete(executableBlock)
+	}
 
 	lg.Info().
 		// if the execution is halt, but the queue keeps growing, we could check which block
 		// hasn't been executed.
 		Uint64("first_unexecuted_in_queue", firstUnexecutedHeight).
-		Bool("completed", completed).
+		Bool("complete", complete).
+		Bool("head_of_queue", head).
 		Msg("block is enqueued")
 
 	return nil
@@ -844,9 +867,11 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 	return q, queues.Add(q)
 }
 
-// enqueue adds a block to the queues, return the queue that includes the block and a bool
-// indicating whether the block was a new block.
-// queues are chained blocks. Since a block can't be executable until its parent has been
+// enqueue adds a block to the queues, return the queue that includes the block and booleans
+// * is block new one (it's not already enqueued, not a duplicate)
+// * is head of the queue (new queue has been created)
+//
+// Queues are chained blocks. Since a block can't be executable until its parent has been
 // executed, the chained structure allows us to only check the head of each queue to see if
 // any block becomes executable.
 // for instance we have one queue whose head is A:
@@ -856,18 +881,19 @@ func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Qu
 // A <- B <- C
 //   ^- D <- E <- F
 // Even through there are 6 blocks, we only need to check if block A becomes executable.
-// when the parent block isn't in the queue, we add it as a new queue. for instace, if
+// when the parent block isn't in the queue, we add it as a new queue. for instance, if
 // we receive H <- G, then the queues will become:
 // A <- B <- C
 //   ^- D <- E
 // G
-func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
+func enqueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool, bool) {
 	for _, queue := range queues.All() {
 		if stored, isNew := queue.TryAdd(blockify); stored {
-			return queue, isNew
+			return queue, isNew, false
 		}
 	}
-	return newQueue(blockify, queues)
+	queue, isNew := newQueue(blockify, queues)
+	return queue, isNew, true
 }
 
 // check if the block's collections have been received,
@@ -1063,45 +1089,17 @@ func (e *Engine) saveExecutionResults(
 	defer span.Finish()
 
 	originalState := startState
-	blockID := result.ExecutableBlock.ID()
 
-	// no need to persist the state interactions, since they are used only by state
-	// syncing, which is currently disabled
-
-	chunks := make([]*flow.Chunk, len(result.StateCommitments))
-	chdps := make([]*flow.ChunkDataPack, len(result.StateCommitments))
-
-	// TODO: check current state root == startState
-	var endState flow.StateCommitment = startState
-
-	for i := range result.StateCommitments {
-		// TODO: deltas should be applied to a particular state
-
-		endState = result.StateCommitments[i]
-		var collectionID flow.Identifier
-
-		// account for system chunk being last
-		if i < len(result.StateCommitments)-1 {
-			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
-			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
-			collectionID = completeCollection.Collection().ID()
-		} else {
-			collectionID = flow.ZeroID
-		}
-
-		eventsHash := result.EventsHashes[i]
-		chunk := generateChunk(i, startState, endState, collectionID, blockID, eventsHash)
-
-		// chunkDataPack
-		chdps[i] = generateChunkDataPack(chunk, collectionID, result.Proofs[i])
-		// TODO use view.SpockSecret() as an input to spock generator
-		chunks[i] = chunk
-		startState = endState
+	block := result.ExecutableBlock.Block
+	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
+			block.Header.ParentID, err)
 	}
 
-	executionResult, err := e.generateExecutionResultForBlock(childCtx, result.ExecutableBlock.Block, chunks, endState, result.ServiceEvents)
+	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(previousErID, startState, result)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate execution result: %w", err)
+		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
 	}
 
 	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
@@ -1109,7 +1107,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, result.ExecutableBlock.Block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents, result.TransactionResults)
+	err = e.execState.PersistExecutionState(childCtx, block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents, result.TransactionResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
@@ -1153,62 +1151,6 @@ func (e *Engine) logExecutableBlock(eb *entity.ExecutableBlock) {
 	}
 }
 
-// generateChunk creates a chunk from the provided computation data.
-func generateChunk(colIndex int,
-	startState, endState flow.StateCommitment,
-	colID, blockID, eventsCollection flow.Identifier) *flow.Chunk {
-	return &flow.Chunk{
-		ChunkBody: flow.ChunkBody{
-			CollectionIndex: uint(colIndex),
-			StartState:      startState,
-			EventCollection: eventsCollection,
-			BlockID:         blockID,
-			// TODO: record gas used
-			TotalComputationUsed: 0,
-			// TODO: record number of txs
-			NumberOfTransactions: 0,
-		},
-		Index:    uint64(colIndex),
-		EndState: endState,
-	}
-}
-
-// generateExecutionResultForBlock creates new ExecutionResult for a block from
-// the provided chunk results.
-func (e *Engine) generateExecutionResultForBlock(
-	ctx context.Context,
-	block *flow.Block,
-	chunks []*flow.Chunk,
-	endState flow.StateCommitment,
-	serviceEvents []flow.Event,
-) (*flow.ExecutionResult, error) {
-
-	previousErID, err := e.execState.GetExecutionResultID(ctx, block.Header.ParentID)
-	if err != nil {
-		return nil, fmt.Errorf("could not get execution result ID for parent block (%v): %w",
-			block.Header.ParentID, err)
-	}
-
-	// convert Cadence service event representation to flow-go representation
-	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
-	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(event)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert service event: %w", err)
-		}
-		convertedServiceEvents = append(convertedServiceEvents, *converted)
-	}
-
-	er := &flow.ExecutionResult{
-		PreviousResultID: previousErID,
-		BlockID:          block.ID(),
-		Chunks:           chunks,
-		ServiceEvents:    convertedServiceEvents,
-	}
-
-	return er, nil
-}
-
 func (e *Engine) generateExecutionReceipt(
 	ctx context.Context,
 	result *flow.ExecutionResult,
@@ -1243,44 +1185,4 @@ func (e *Engine) generateExecutionReceipt(
 	receipt.ExecutorSignature = sig
 
 	return receipt, nil
-}
-
-// ChunkifyEvents breaks an slice of events into smaller chunks
-func ChunkifyEvents(events []flow.Event, chunkSize uint) [][]flow.Event {
-	res := make([][]flow.Event, 0)
-	if len(events) == 0 {
-		return res
-	}
-	// if chunkSize zero, return all as one chunk
-	if chunkSize < 1 {
-		res = append(res, events[:])
-		return res
-	}
-
-	for i := 0; i < len(events); i += int(chunkSize) {
-		end := i + int(chunkSize)
-		if end > len(events) {
-			end = len(events)
-		}
-		res = append(res, events[i:end])
-	}
-	return res
-}
-
-// generateChunkDataPack creates a chunk data pack from the given inputs.
-//
-// `proof` includes proofs for all registers read to execute the chunck.
-// Register proofs order must not be correlated to the order of register reads during
-// the chunk execution in order to enforce the SPoCK secret high entropy.
-func generateChunkDataPack(
-	chunk *flow.Chunk,
-	collectionID flow.Identifier,
-	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
-		ChunkID:      chunk.ID(),
-		StartState:   chunk.StartState,
-		Proof:        proof,
-		CollectionID: collectionID,
-	}
 }

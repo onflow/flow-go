@@ -172,7 +172,10 @@ func (ac *AssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flo
 		return fmt.Errorf("failed to retrieve header of incorporatedResult %s: %w",
 			incorporatedResult.Result.BlockID, err)
 	}
-	collector := NewApprovalCollector(ac.log, incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
+	collector, err := NewApprovalCollector(ac.log, incorporatedResult, incorporatedBlock, executedBlock, assignment, ac.seals, ac.requiredApprovalsForSealConstruction)
+	if err != nil {
+		return fmt.Errorf("instantiation of ApprovalCollector failed: %w", err)
+	}
 
 	// Now, we add the ApprovalCollector to the AssignmentCollector:
 	// no-op if an ApprovalCollector has already been added by a different routine
@@ -328,12 +331,19 @@ func (ac *AssignmentCollector) RequestMissingApprovals(observation consensus.Sea
 			// Retrieve information about requests made for this chunk. Skip
 			// requesting if the blackout period hasn't expired. Otherwise,
 			// update request count and reset blackout period.
-			requestTrackerItem := ac.requestTracker.Get(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex)
-			if requestTrackerItem.IsBlackout() {
+			requestTrackerItem, updated, err := ac.requestTracker.TryUpdate(ac.result, collector.IncorporatedBlockID(), chunkIndex)
+			if err != nil {
+				// it could happen that other gorotuine will prune request tracker because of sealing progress
+				// in this case we should just stop requesting approvals as block was already sealed
+				if mempool.IsDecreasingPruningHeightError(err) {
+					return 0, nil
+				}
+				return 0, err
+			}
+
+			if !updated {
 				continue
 			}
-			requestTrackerItem.Update()
-			ac.requestTracker.Set(ac.ResultID, collector.IncorporatedBlockID(), chunkIndex, requestTrackerItem)
 
 			// for monitoring/debugging purposes, log requests if we start
 			// making more than 10
@@ -354,7 +364,7 @@ func (ac *AssignmentCollector) RequestMissingApprovals(observation consensus.Sea
 			}
 
 			requestCount++
-			err := ac.approvalConduit.Publish(req, verifiers...)
+			err = ac.approvalConduit.Publish(req, verifiers...)
 			if err != nil {
 				log.Error().Err(err).
 					Msgf("could not publish approval request for chunk %d", chunkIndex)

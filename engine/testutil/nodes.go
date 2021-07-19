@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
@@ -63,6 +64,7 @@ import (
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -163,7 +165,8 @@ func CompleteStateFixture(t testing.TB, metric *metrics.NoopCollector, tracer mo
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
 	require.NoError(t, err)
 
-	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
+	mutableState, err := badgerstate.NewFullConsensusState(state, s.Index, s.Payloads, tracer, consumer,
+		util.MockBlockTimer(), util.MockReceiptValidator(), util.MockSealValidator(s.Seals))
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
@@ -238,7 +241,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receipts := consensusMempools.NewExecutionTree()
 
 	seals := stdmap.NewIncorporatedResultSeals(1000)
-	pendingReceipts := stdmap.NewPendingReceipts(1000)
+	pendingReceipts := stdmap.NewPendingReceipts(node.Headers, 1000)
 
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
@@ -270,6 +273,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.Headers,
 		node.Payloads,
+		resultsDB,
+		node.Index,
 		node.State,
 		node.Seals,
 		assigner,
@@ -301,6 +306,9 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Me,
 		node.Metrics,
 		node.Metrics,
+		node.State,
+		receiptsDB,
+		node.Index,
 		matchingCore,
 	)
 	require.NoError(t, err)
@@ -359,7 +367,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	protoState, ok := node.State.(*badgerstate.MutableState)
 	require.True(t, ok)
 
-	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer, node.ProtocolEvents)
+	followerState, err := badgerstate.NewFollowerState(protoState.State, node.Index, node.Payloads, node.Tracer,
+		node.ProtocolEvents, blocktimer.DefaultBlockTimer)
 	require.NoError(t, err)
 
 	pendingBlocks := buffer.NewPendingBlocks() // for following main chain consensus
@@ -443,7 +452,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	deltas, err := ingestion.NewDeltas(1000)
 	require.NoError(t, err)
 
-	checkerEngine := &CheckerMock{}
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
 
 	rootHead, rootQC := getRoot(t, &node)
 	ingestionEngine, err := ingestion.New(
@@ -475,7 +484,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node.ProtocolEvents.AddConsumer(ingestionEngine)
 
-	followerCore, finalizer := createFollowerCore(t, &node, followerState, checkerEngine, rootHead, rootQC)
+	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
 
 	// initialize cleaner for DB
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
@@ -496,6 +505,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
+
+	finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,
