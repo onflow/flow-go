@@ -16,7 +16,7 @@
 *.log
 
 # Output from binstat
-*.binstat.txt
+*.binstat.txt*
 
 # Output from pprof
 *.pprof.txt

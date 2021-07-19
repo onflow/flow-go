@@ -145,7 +145,7 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 func init() {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
-	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
+	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99;~example=99")
 }
 
 func TestWithPprof(t *testing.T) {
@@ -153,7 +153,7 @@ func TestWithPprof(t *testing.T) {
 
 	// delete any files hanging around from previous test run
 	{
-		command := "ls -al ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt ./*gomaxprocs*.pprof.txt"
+		command := "ls -al ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt"
 		out, err := exec.Command("bash", "-c", command).Output()
 		require.NoError(t, err)
 		zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
@@ -220,11 +220,11 @@ func TestWithPprof(t *testing.T) {
 	}
 
 	// tell binstat to close down and write its stats file one last time
-	binstat.Fin()
+	binstat.Dump(".test-external.txt")
 
 	// cat and sort binstat stats file
 	{
-		command := "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt | sort --version-sort"
+		command := "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt.test-external.txt | sort --version-sort"
 		out, err := exec.Command("bash", "-c", command).Output()
 		require.NoError(t, err)
 		zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
@@ -233,4 +233,88 @@ func TestWithPprof(t *testing.T) {
 	// todo: add more tests? which tests?
 
 	// if we get here then no require.NoError() calls kicked in :-)
+}
+
+func grepOutputFileAndSanatize(file string, what string) []byte {
+	binstat.Dump(file) // skip waiting for dump at next wallclock second
+	cmd := fmt.Sprintf("cat ./binstat.test.pid-*.binstat.txt%s | egrep '%s' | perl -lane 's~\\d[\\d\\.]*~<num>~g; print;'", file, what)
+	out, err := exec.Command("bash", "-c", cmd).CombinedOutput()
+	if err != nil {
+		panic(err)
+	}
+	return out
+}
+
+func ExampleEnter() {
+	bs := binstat.Enter("~7exampleEnter")                                                  // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })                              // optionlly make it more obvious which code to generate stats for
+	bs.Leave()                                                                             // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter.txt", "exampleEnter")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnter]=<num> <num> // e.g. utils/binstat_test.ExampleEnter:<num>
+}
+
+func ExampleEnterVal() {
+	bs := binstat.EnterVal("~7exampleEnterVal", 123)                                              // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })                                     // optionlly make it more obvious which code to generate stats for
+	bs.Leave()                                                                                    // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/size[<num>-<num>]=<num>" bin section
+	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter-val.txt", "exampleEnterVal")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnterVal]/size[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleEnterVal:<num>
+}
+
+func ExampleEnterTime() {
+	bs := binstat.EnterTime("~7exampleEnterTime")                                                   // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })                                       // optionlly make it more obvious which code to generate stats for
+	bs.Leave()                                                                                      // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/time[<num>-<num>]" bin section
+	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter-time.txt", "exampleEnterTime")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnterTime]/time[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleEnterTime:<num>
+}
+
+func ExampleEnterTimeVal() {
+	bs := binstat.EnterTimeVal("~7exampleEnterTimeVal", 123)                                               // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })                                              // optionlly make it more obvious which code to generate stats for
+	bs.Leave()                                                                                             // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/time[<num>-<num>]" bin section, (d) creates "/size[<num>-<num>]=<num>" bin section
+	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter-time-val.txt", "exampleEnterTimeVal")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnterTimeVal]/size[<num>-<num>]/time[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleEnterTimeVal:<num>
+}
+
+func ExampleBinStat_LeaveVal() {
+	bs := binstat.Enter("~7exampleLeaveVal")                                                      // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })                                     // optionlly make it more obvious which code to generate stats for
+	bs.LeaveVal(123)                                                                              // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/size[<num>-<num>]=<num>" bin section
+	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-leave-val.txt", "exampleLeaveVal")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleLeaveVal]/size[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleBinStat_LeaveVal:<num>
+}
+
+// .Debug() only used for debugging binstat
+func ExampleBinStat_Debug() {
+	bs := binstat.Enter("~7exampleDebug")                     // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ }) // optionlly make it more obvious which code to generate stats for
+	bs.Debug("hello world")                                   // only for binstat debbuging, and enabled if env var BINSTAT_VERBOSE set
+	bs.Leave()                                                // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+	// e.g. STDOUT: {"level":"debug","message":"2.918396 71372=pid 18143200=tid utils/binstat_test.ExampleBinStat_Debug:301() // enter in 0.000044 // what[~7exampleDebug] .NumCPU()=8 .GOMAXPROCS(0)=8 .NumGoroutine()=3"}
+	// e.g. STDOUT: {"level":"debug","message":"2.918504 71372=pid 18143200=tid utils/binstat_test.ExampleBinStat_Debug:301() // debug hello world"}
+	// e.g. STDOUT: {"level":"debug","message":"2.918523 71372=pid 18143200=tid utils/binstat_test.ExampleBinStat_Debug:301() // leave in 0.000168 // /GOMAXPROCS=8,CPUS=8/what[~7exampleDebug]=[47]=1 0.000053"}
+	fmt.Printf("debug via STDOUT only")
+	// Output: debug via STDOUT only
+}
+
+// .DebugParams() only used for debugging binstat
+func ExampleBinStat_DebugParams() {
+	bs := binstat.Enter("~7exampleDebug").DebugParams("foo=1") // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })  // optionlly make it more obvious which code to generate stats for
+	bs.Debug("hello world")                                    // only for debbuging, and enabled if env var BINSTAT_VERBOSE set
+	bs.Leave()                                                 // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+	// e.g. STDOUT: {"level":"debug","message":"2.758196 72784=pid 18162115=tid utils/binstat_test.ExampleBinStat_DebugParams:314() // enter in 0.000015 // what[~7exampleDebug] .NumCPU()=8 .GOMAXPROCS(0)=8 .NumGoroutine()=3"}
+	// e.g. STDOUT: {"level":"debug","message":"2.758255 72784=pid 18162119=tid utils/binstat_test.ExampleBinStat_DebugParams:314(foo=1) // debug hello world"}
+	// e.g. STDOUT: {"level":"debug","message":"2.758447 72784=pid 18162119=tid utils/binstat_test.ExampleBinStat_DebugParams:314(foo=1) // leave in 0.000256 // /GOMAXPROCS=8,CPUS=8/what[~7exampleDebug]=[51]=2 0.000306"}
+	fmt.Printf("debug via STDOUT only")
+	// Output: debug via STDOUT only
+}
+
+func ExampleBinStat_Run() {
+	bs := binstat.Enter("~7exampleRun")                                                // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	bs.Run(func() { /* place code to generate stats for */ })                          // optionlly make it more obvious which code to generate stats for
+	bs.Leave()                                                                         // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-run.txt", "exampleRun")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleRun]=<num> <num> // e.g. utils/binstat_test.ExampleBinStat_Run:<num>
 }

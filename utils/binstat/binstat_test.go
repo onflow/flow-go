@@ -11,7 +11,7 @@ import (
 func init() {
 	os.Setenv("BINSTAT_ENABLE", "1")
 	os.Setenv("BINSTAT_VERBOSE", "1")
-	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99")
+	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99;~example=99")
 
 	global.enable = false
 	tick(100 * time.Millisecond)
@@ -22,6 +22,7 @@ func init() {
 	bs0.Run(func() {
 	})
 	bs0.LeaveVal(123)
+	enterVal("~2egEnterVal", 123)
 }
 
 func TestBinstatInternal(t *testing.T) {
@@ -38,13 +39,13 @@ func TestBinstatInternal(t *testing.T) {
 	})
 	bs2.LeaveVal(123)
 
-	bs3 := enterTimeValInternal("~2egenterTimeValInternal", 123)
+	bs3 := enterTimeVal("~2egenterTimeValInternal", 123)
 	bs3.Run(func() {
 	})
-	bs3.pointInternal("myPoint")
+	bs3.point("myPoint")
 	bs3.Run(func() {
 	})
-	bs3.leaveInternal()
+	bs3.leave()
 
 	var isIntIsFalse bool = false
 
