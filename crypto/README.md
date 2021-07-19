@@ -22,7 +22,7 @@ go get github.com/onflow/flow-go/crypto
 
 This isn't enough to run the package code as it relies on an extrnal C library ([Relic](https://github.com/relic-toolkit/relic)) for lower level mathematical operations. An extra step is required to compile the external dependency locally. 
 
-- Install [CMake](https://cmake.org/install/), which is used for building the package.
+- Install [CMake](https://cmake.org/install/), which is used for building the package. The build also requires [Git](http://git-scm.com/) and bash scripting.  
 - From the Go package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. For instance:
 ```
 cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.18.0/

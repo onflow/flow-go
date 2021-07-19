@@ -5,8 +5,6 @@ FROM golang:1.15-buster AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
-# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
-RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
 
 ## (1) Build Relic first to maximize caching
 FROM build-setup AS build-relic

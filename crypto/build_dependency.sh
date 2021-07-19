@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euo pipefail
+
 PKG_DIR="./"
 
 # grant permissions if not existant
