@@ -23,6 +23,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/procedure"
 	sutil "github.com/onflow/flow-go/storage/util"
@@ -97,7 +98,7 @@ func (suite *BuilderSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer)
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, util.MockBlockTimer())
 	require.NoError(suite.T(), err)
 
 	// add some transactions to transaction pool
