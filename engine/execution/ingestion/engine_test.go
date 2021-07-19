@@ -33,6 +33,7 @@ import (
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storageerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mocks"
+	storagemodel "github.com/onflow/flow-go/storage/model"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
@@ -233,7 +234,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 			mock.Anything,
 			executableBlock.Block.Header,
 			newStateCommitment,
-			mock.MatchedBy(func(fs []*flow.ChunkDataPack) bool {
+			mock.MatchedBy(func(fs []*storagemodel.StoredChunkDataPack) bool {
 				for _, f := range fs {
 					if f.StartState != *executableBlock.StartState {
 						return false
