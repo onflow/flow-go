@@ -27,16 +27,19 @@ require (
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.4
 	github.com/jrick/bitset v1.0.0
+	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-addr-util v0.0.2
 	github.com/libp2p/go-libp2p v0.14.1
 	github.com/libp2p/go-libp2p-core v0.8.5
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.4.1
 	github.com/libp2p/go-libp2p-swarm v0.5.0
+	github.com/libp2p/go-libp2p-tls v0.1.3
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.2
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/marten-seemann/qtls-go1-15 v0.1.4 // indirect
+	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.18.1-0.20210713172546-80594609fc55
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
@@ -44,6 +47,7 @@ require (
 	github.com/onflow/flow-go/crypto v0.18.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
+	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/zerolog v1.19.0

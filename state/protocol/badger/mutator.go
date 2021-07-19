@@ -33,11 +33,12 @@ import (
 type FollowerState struct {
 	*State
 
-	index    storage.Index
-	payloads storage.Payloads
-	tracer   module.Tracer
-	consumer protocol.Consumer
-	cfg      Config
+	index      storage.Index
+	payloads   storage.Payloads
+	tracer     module.Tracer
+	consumer   protocol.Consumer
+	blockTimer protocol.BlockTimer
+	cfg        Config
 }
 
 // MutableState implements a mutable protocol state. When extending the
@@ -56,14 +57,16 @@ func NewFollowerState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:    state,
-		index:    index,
-		payloads: payloads,
-		tracer:   tracer,
-		consumer: consumer,
-		cfg:      DefaultConfig(),
+		State:      state,
+		index:      index,
+		payloads:   payloads,
+		tracer:     tracer,
+		consumer:   consumer,
+		blockTimer: blockTimer,
+		cfg:        DefaultConfig(),
 	}
 	return followerState, nil
 }
@@ -78,10 +81,11 @@ func NewFullConsensusState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer)
+	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
@@ -194,6 +198,15 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	if header.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
 			header.Height, parent.Height)
+	}
+
+	// check validity of block timestamp using parent's timestamp
+	err = m.blockTimer.Validate(parent.Timestamp, candidate.Header.Timestamp)
+	if err != nil {
+		if protocol.IsInvalidBlockTimestampError(err) {
+			return state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
+		}
+		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
 	// THIRD: Once we have established the block is valid within itself, and the
