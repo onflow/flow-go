@@ -113,7 +113,7 @@ func GenerateChunk(colIndex int,
 	}
 }
 
-// generateChunkDataPack creates a chunk data pack
+// GenerateStoredChunkDataPack generates a stored chunk data pack for persisting in storage.
 func GenerateStoredChunkDataPack(
 	chunk *flow.Chunk,
 	collectionID flow.Identifier,
@@ -153,6 +153,7 @@ func GenerateSystemChunkDataPack(
 	}
 }
 
+// ToChunkDataPack converts a chunk data pack from its storage model to the form that can be sent over wire.
 func ToChunkDataPack(storedChunkDataPack *storagemodel.StoredChunkDataPack, collection *flow.Collection) *flow.ChunkDataPack {
 	if collection != nil {
 		// non-system chunk
