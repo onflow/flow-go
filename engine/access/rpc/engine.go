@@ -42,7 +42,9 @@ type Config struct {
 	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
 }
 
-// Engine implements a gRPC server with a simplified version of the Observation API.
+// Engine exposes the server with a simplified version of the Access API.
+// An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
+// port 8000) are brought up.
 type Engine struct {
 	unit                *engine.Unit
 	log                 zerolog.Logger
@@ -113,7 +115,7 @@ func New(log zerolog.Logger,
 	// create an unsecured grpc server
 	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
 
-	// create a secure server server by using the secure grpc credentials
+	// create a secure server server by using the secure grpc credentials that are passed in as part of config
 	grpcOpts = append(grpcOpts, grpc.Creds(config.TransportCredentials))
 	secureGrpcServer := grpc.NewServer(grpcOpts...)
 
@@ -178,7 +180,6 @@ func New(log zerolog.Logger,
 		eng.unsecureGrpcServer,
 		legacyaccess.NewHandler(backend, chainID.Chain()),
 	)
-	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(
 		eng.secureGrpcServer,
 		legacyaccess.NewHandler(backend, chainID.Chain()),
