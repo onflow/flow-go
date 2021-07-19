@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 	"os"
 	"path"
 	"runtime"
@@ -22,28 +23,21 @@ import (
 // iterates through registers keeping a map of register sizes
 // reports on storage metrics
 type BalanceReporter struct {
-	Log       zerolog.Logger
-	OutputDir string
+	Log         zerolog.Logger
+	OutputDir   string
+	totalSupply uint64
 }
 
 func (r *BalanceReporter) filename() string {
 	return path.Join(r.OutputDir, fmt.Sprintf("balance_report_%d.csv", int32(time.Now().Unix())))
 }
 
-type balanceDataBatch struct {
-	PathBalance map[string]uint64
-}
-
-func newBalanceDataBatch() *balanceDataBatch {
-	return &balanceDataBatch{
-		PathBalance: make(map[string]uint64),
-	}
-}
-
-func (d *balanceDataBatch) Join(data *balanceDataBatch) {
-	for s, u := range data.PathBalance {
-		d.PathBalance[s] = d.PathBalance[s] + u
-	}
+type balanceDataPoint struct {
+	Path           string
+	Address        string
+	LastComposite  string
+	FirstComposite string
+	Balance        uint64
 }
 
 func (r *BalanceReporter) Report(payload []ledger.Payload) error {
@@ -71,15 +65,24 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	}()
 
 	wg := &sync.WaitGroup{}
+	resultsWG := &sync.WaitGroup{}
 	jobs := make(chan ledger.Payload)
+	resultsChan := make(chan balanceDataPoint, 100)
 
 	workerCount := runtime.NumCPU()
 
-	data := make([]*balanceDataBatch, workerCount)
+	results := make([]balanceDataPoint, 0)
+
+	go func() {
+		resultsWG.Add(1)
+		for point := range resultsChan {
+			results = append(results, point)
+		}
+		resultsWG.Done()
+	}()
 
 	for i := 0; i < workerCount; i++ {
-		data[i] = newBalanceDataBatch()
-		go r.balanceReporterWorker(jobs, wg, data[i])
+		go r.balanceReporterWorker(jobs, wg, resultsChan)
 	}
 
 	go func() {
@@ -94,13 +97,17 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 
 	wg.Wait()
 
-	totalData := newBalanceDataBatch()
+	//drain results chan
+	close(resultsChan)
+	resultsWG.Wait()
 
-	for i := 0; i < workerCount; i++ {
-		totalData.Join(data[i])
-	}
-
-	tc, err := json.Marshal(totalData)
+	tc, err := json.Marshal(struct {
+		Data        []balanceDataPoint
+		TotalSupply uint64
+	}{
+		Data:        results,
+		TotalSupply: r.totalSupply,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -112,11 +119,11 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	return nil
 }
 
-func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sync.WaitGroup, data *balanceDataBatch) {
+func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sync.WaitGroup, dataChan chan balanceDataPoint) {
 	wg.Add(1)
 
 	for payload := range jobs {
-		err := r.HandlePayload(payload, data)
+		err := r.HandlePayload(payload, dataChan)
 		if err != nil {
 			r.Log.Err(err).Msg("Error handling payload")
 		}
@@ -125,7 +132,7 @@ func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sy
 	wg.Done()
 }
 
-func (r *BalanceReporter) HandlePayload(p ledger.Payload, data *balanceDataBatch) error {
+func (r *BalanceReporter) HandlePayload(p ledger.Payload, dataChan chan balanceDataPoint) error {
 	id, err := keyToRegisterID(p.Key)
 	if err != nil {
 		return err
@@ -167,19 +174,39 @@ func (r *BalanceReporter) HandlePayload(p ledger.Payload, data *balanceDataBatch
 		return nil
 	}
 
-	firstCompositeName := ""
+	if id.Key == "contract\u001fFlowToken" {
+		tokenSupply := uint64(interpreterValue.(*interpreter.CompositeValue).GetField("totalSupply").(interpreter.UFix64Value))
+		r.Log.Info().Uint64("tokenSupply", tokenSupply).Msg("total token supply")
+		r.totalSupply = tokenSupply
+	}
+
+	lastComposite := "none"
+	firstComposite := ""
 
 	balanceVisitor := &interpreter.EmptyVisitor{
 		CompositeValueVisitor: func(inter *interpreter.Interpreter, value *interpreter.CompositeValue) bool {
-			if firstCompositeName == "" {
-				firstCompositeName = string(value.TypeID())
+			if firstComposite == "" {
+				firstComposite = string(value.TypeID())
 			}
 
 			if string(value.TypeID()) == "A.1654653399040a61.FlowToken.Vault" {
 				b := uint64(value.GetField("balance").(interpreter.UFix64Value))
-				data.PathBalance[id.Key] += b
+				if b == 0 {
+					// ignore 0 balance results
+					return false
+				}
+
+				dataChan <- balanceDataPoint{
+					Path:           id.Key,
+					Address:        flow.BytesToAddress([]byte(id.Owner)).Hex(),
+					LastComposite:  lastComposite,
+					FirstComposite: firstComposite,
+					Balance:        b,
+				}
+
 				return false
 			}
+			lastComposite = string(value.TypeID())
 			return true
 		},
 		DictionaryValueVisitor: func(interpreter *interpreter.Interpreter, value *interpreter.DictionaryValue) bool {
