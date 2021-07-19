@@ -373,13 +373,13 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	require.Equal(s.T(), int(requestCount), s.Chunks.Len()*len(s.collector.collectors))
 	require.Len(s.T(), requests, s.Chunks.Len()*len(s.collector.collectors))
 
-	resultID := s.IncorporatedResult.Result.ID()
+	result := s.IncorporatedResult.Result
 	for _, chunk := range s.Chunks {
 		for _, incorporatedResult := range incorporatedResults {
-			requestItem := s.requestTracker.Get(resultID, incorporatedResult.IncorporatedBlockID, chunk.Index)
+			requestItem, _, err := s.requestTracker.TryUpdate(result, incorporatedResult.IncorporatedBlockID, chunk.Index)
+			require.NoError(s.T(), err)
 			require.Equal(s.T(), uint(1), requestItem.Requests)
 		}
-
 	}
 }
 

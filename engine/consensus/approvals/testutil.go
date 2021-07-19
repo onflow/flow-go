@@ -94,7 +94,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.conduit = &mocknetwork.Conduit{}
 	s.headers = &storage.Headers{}
 
-	s.requestTracker = NewRequestTracker(1, 3)
+	s.requestTracker = NewRequestTracker(s.headers, 1, 3)
 
 	// setup blocks cache for protocol state
 	s.blocks = make(map[flow.Identifier]*flow.Header)
