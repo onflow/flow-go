@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Relay engine relays all the messages that are received to the given network for the corresponding channel
 type Engine struct {
 	unit     *engine.Unit   // used to manage concurrency & shutdown
 	log      zerolog.Logger // used to log relevant actions with context
