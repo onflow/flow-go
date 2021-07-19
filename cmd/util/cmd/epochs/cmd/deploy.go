@@ -108,7 +108,7 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
 	// calculate numViewInEpoch
 	numViewsInEpoch := (finalView + 1) - head.View
 
-	// TODO: numViewsInStakingAuction, numViewsInDKGPhase
+	// TODO: numViewsInStakingAuction, numViewsInDKGPhase, calcuate the DKG views in DKG phase.
 
 	// number of collectors clusters
 	clustering, err := currentEpoch.Clustering()
@@ -123,5 +123,5 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
 		log.Fatal().Err(err).Msgf("could not get randomSource for current epoch from snapshot")
 	}
 
-	// TODO: collector clusters, DKG, cluster QC
+	// TODO: clustering needs to be done, DKG keys and Cluster QC can be ignored
 }
