@@ -3,6 +3,7 @@ package grpcutils
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"fmt"
 
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
@@ -50,6 +51,7 @@ func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 // DefaultServerTLSConfig returns the default TLS server config with the given cert for a secure GRPC server
 func DefaultServerTLSConfig(cert *tls.Certificate) *tls.Config {
 	tlsConfig := &tls.Config{
+		MinVersion:   tls.VersionTLS13,
 		Certificates: []tls.Certificate{*cert},
 		ClientAuth:   tls.NoClientCert,
 	}
@@ -142,9 +144,9 @@ func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCert
 }
 
 func libP2PKeyToHexString(key lcrypto.PubKey) (string, *ServerAuthError) {
-	keyHex, err := key.Raw()
+	keyRaw, err := key.Raw()
 	if err != nil {
 		return "", newServerAuthError(err.Error())
 	}
-	return fmt.Sprintf("%#x", keyHex), nil
+	return hex.EncodeToString(keyRaw), nil
 }

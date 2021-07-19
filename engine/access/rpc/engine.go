@@ -27,6 +27,8 @@ import (
 )
 
 // Config defines the configurable options for the access node server
+// A secure GRPC server here implies a server that presents a self-signed TLS certificate and a client that authenticates
+// the server via a pre-shared public key
 type Config struct {
 	UnsecureGRPCListenAddr    string                           // the non-secure GRPC server address as ip:port
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port

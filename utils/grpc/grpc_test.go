@@ -69,7 +69,7 @@ func TestPeerCertificateVerification(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("certificate validation fails", func(t *testing.T) {
+	t.Run("certificate validation fails for a different public key", func(t *testing.T) {
 		// generate another key and certificate
 		key2, err := unittest.NetworkingKey()
 		require.NoError(t, err)
