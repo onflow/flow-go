@@ -5,14 +5,12 @@ on:
     branches:
       - master
       - feature/epochs
-      - feature/dkg
-      - 'auto-cadence-upgrade/*'
+      - 'auto-cadence-upgrade/**'
   pull_request:
     branches:
       - master
       - feature/epochs
-      - feature/dkg
-      - 'auto-cadence-upgrade/*'
+      - 'auto-cadence-upgrade/**'
 
 jobs:
   golangci:

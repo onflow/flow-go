@@ -59,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
@@ -107,6 +108,7 @@ func main() {
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
+		blockTimer              protocol.BlockTimer
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -184,12 +186,18 @@ func main() {
 				return fmt.Errorf("could not instantiate seal validator: %w", err)
 			}
 
+			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			if err != nil {
+				return err
+			}
+
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blockTimer,
 				receiptValidator,
 				sealValidator)
 			return err
@@ -482,8 +490,7 @@ func main() {
 				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
-				builder.WithMinInterval(minInterval),
-				builder.WithMaxInterval(maxInterval),
+				builder.WithBlockTimer(blockTimer),
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)

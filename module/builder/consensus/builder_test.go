@@ -425,7 +425,6 @@ func (bs *BuilderSuite) SetupTest() {
 	require.NoError(bs.T(), err)
 
 	bs.build.cfg.expiry = 11
-
 }
 
 func (bs *BuilderSuite) TearDownTest() {
