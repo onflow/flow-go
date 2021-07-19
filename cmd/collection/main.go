@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -28,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -49,7 +46,6 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 func main() {
@@ -389,43 +385,11 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
-			// check if required fields are left empty
-			if accessAddress == "" {
-				return nil, fmt.Errorf("flag `access-address` required")
-			}
-
-			// loads the private account info for this node from disk for use in the QCContractClient.
-			accountInfo, err := loadEpochQCPrivateData(node)
+			// construct QC contract client
+			qcContractClient, err := createQCContractClient(node, accessAddress)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("could not create qc contract client %w", err)
 			}
-
-			// construct signer from private key
-			sk, err := sdkcrypto.DecodePrivateKey(accountInfo.SigningAlgorithm, accountInfo.EncodedPrivateKey)
-			if err != nil {
-				return nil, fmt.Errorf("could not decode private key from hex: %v", err)
-			}
-			txSigner := sdkcrypto.NewInMemorySigner(sk, accountInfo.HashAlgorithm)
-
-			// create QC vote client
-			flowClient, err := client.New(accessAddress, grpc.WithInsecure())
-			if err != nil {
-				return nil, err
-			}
-
-			contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
-			if err != nil {
-				return nil, err
-			}
-			qcContractClient := epochs.NewQCContractClient(
-				node.Logger,
-				flowClient,
-				node.Me.NodeID(),
-				accountInfo.Address,
-				accountInfo.KeyIndex,
-				contracts.ClusterQC.Address.HexWithPrefix(),
-				txSigner,
-			)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
@@ -469,12 +433,46 @@ func main() {
 		Run()
 }
 
-func loadEpochQCPrivateData(node *cmd.FlowNodeBuilder) (*bootstrap.NodeMachineAccountInfo, error) {
-	data, err := io.ReadFile(filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID())))
+// TEMPORARY: The functionality to allow starting up a node without a properly configured
+// machine account is very much intended to be temporary.
+// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
+// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
+func createQCContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (module.QCContractClient, error) {
+
+	var qcContractClient module.QCContractClient
+
+	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
 	if err != nil {
 		return nil, err
 	}
-	var info bootstrap.NodeMachineAccountInfo
-	err = json.Unmarshal(data, &info)
-	return &info, err
+	qcContractAddress := contracts.ClusterQC.Address.Hex()
+
+	// if not valid return a mock qc contract client
+	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
+		return epochs.NewMockQCContractClient(node.Logger), nil
+	}
+
+	// attempt to read NodeMachineAccountInfo
+	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.Me.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
+	}
+
+	// construct signer from private key
+	sk, err := sdkcrypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
+	}
+	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
+
+	// create flow client
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	// create actual qc contract client, all flags and machine account info file found
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), info.Address, info.KeyIndex, qcContractAddress, txSigner)
+
+	return qcContractClient, nil
 }

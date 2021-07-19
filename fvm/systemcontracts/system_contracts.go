@@ -30,7 +30,7 @@ const (
 	// Unqualified names of service events (not including address prefix or contract name)
 
 	EventNameEpochSetup  = "EpochSetup"
-	EventNameEpochCommit = "EpochCommitted"
+	EventNameEpochCommit = "EpochCommit"
 )
 
 // SystemContract represents a system contract on a particular chain.

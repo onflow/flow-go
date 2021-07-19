@@ -83,6 +83,13 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 	for {
 		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
 
+		// check for a cancelled/expired context
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
 			log.Error().Err(err).Msg("could not get transaction result")
@@ -103,6 +110,12 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 		}
 
 		attempts++
-		time.Sleep(TransactionStatusRetryTimeout)
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(TransactionStatusRetryTimeout):
+			// re-enter the top of the for loop
+		}
 	}
 }

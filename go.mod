@@ -31,16 +31,17 @@ require (
 	github.com/libp2p/go-libp2p-discovery v0.5.0
 	github.com/libp2p/go-libp2p-pubsub v0.4.1
 	github.com/libp2p/go-libp2p-swarm v0.5.0
+	github.com/libp2p/go-libp2p-tls v0.1.3
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.2
 	github.com/libp2p/go-tcp-transport v0.2.1
 	github.com/m4ksio/wal v1.0.0
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.18.1-0.20210629025749-ffe98816b2f1
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210602203947-82cffc9c55ed
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.3-0.20210602203947-82cffc9c55ed
+	github.com/onflow/cadence v0.18.1-0.20210621164449-25b6135332eb
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
-	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
+	github.com/onflow/flow-go-sdk v0.20.0
 	github.com/onflow/flow-go/crypto v0.18.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0

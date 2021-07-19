@@ -9,13 +9,13 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotstuffver "github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -96,8 +96,15 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		SetPayer(account.Address).
 		AddAuthorizer(account.Address)
 
-	// add signature data to the transaction and submit to node
+	// add signature to the transaction
 	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
+	if err != nil {
+		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
+	}
+
+	// add message to the transaction
+	voteMessage := hotstuffver.MakeVoteMessage(vote.View, vote.BlockID)
+	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(voteMessage)))
 	if err != nil {
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}
@@ -127,9 +134,8 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 func (c *QCContractClient) Voted(ctx context.Context) (bool, error) {
 
 	// execute script to read if voted
-	arg := jsoncdc.MustEncode(cadence.String(c.nodeID.String()))
 	template := templates.GenerateGetNodeHasVotedScript(c.env)
-	hasVoted, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(arg)})
+	hasVoted, err := c.FlowClient.ExecuteScriptAtLatestBlock(ctx, template, []cadence.Value{cadence.String(c.nodeID.String())})
 	if err != nil {
 		return false, fmt.Errorf("could not execute voted script: %w", err)
 	}
