@@ -88,13 +88,11 @@ func (e *Engine) Done() <-chan struct{} {
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
 	e.unit.Launch(func() {
-		err := e.process(func(wg *sync.WaitGroup, errors chan<- error, downstream module.Engine) {
-			downstream.SubmitLocal(event)
-			wg.Done()
-		})
+		e.enginesMu.RLock()
+		defer e.enginesMu.RUnlock()
 
-		if err != nil {
-			engine.LogError(e.log, err)
+		for eng := range e.engines {
+			eng.SubmitLocal(event)
 		}
 	})
 }
@@ -104,13 +102,11 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.process(func(wg *sync.WaitGroup, errors chan<- error, downstream module.Engine) {
-			downstream.Submit(channel, originID, event)
-			wg.Done()
-		})
+		e.enginesMu.RLock()
+		defer e.enginesMu.RUnlock()
 
-		if err != nil {
-			engine.LogError(e.log, err)
+		for eng := range e.engines {
+			eng.Submit(channel, originID, event)
 		}
 	})
 }
@@ -118,14 +114,8 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(func(wg *sync.WaitGroup, errors chan<- error, downstream module.Engine) {
-			go func() {
-				defer wg.Done()
-
-				if err := downstream.ProcessLocal(event); err != nil {
-					errors <- err
-				}
-			}()
+		return e.process(func(downstream module.Engine) error {
+			return downstream.ProcessLocal(event)
 		})
 	})
 }
@@ -139,33 +129,30 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 			return fmt.Errorf("received event on unknown channel %s", channel)
 		}
 
-		return e.process(func(wg *sync.WaitGroup, errors chan<- error, downstream module.Engine) {
-			go func() {
-				defer wg.Done()
-
-				if err := downstream.Process(channel, originID, event); err != nil {
-					errors <- err
-				}
-			}()
+		return e.process(func(downstream module.Engine) error {
+			return downstream.Process(channel, originID, event)
 		})
 	})
 }
 
 // process calls the given function in parallel for all the engines that have
 // registered with this splitter.
-func (e *Engine) process(f func(*sync.WaitGroup, chan<- error, module.Engine)) error {
+func (e *Engine) process(f func(module.Engine) error) error {
 	var wg sync.WaitGroup
 	errors := make(chan error)
 
 	e.enginesMu.RLock()
 
 	for eng := range e.engines {
-		e.enginesMu.RUnlock()
 		wg.Add(1)
 
-		f(&wg, errors, eng)
+		go func(downstream module.Engine) {
+			defer wg.Done()
 
-		e.enginesMu.RLock()
+			if err := f(downstream); err != nil {
+				errors <- err
+			}
+		}(eng)
 	}
 
 	e.enginesMu.RUnlock()
