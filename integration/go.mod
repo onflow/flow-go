@@ -9,9 +9,9 @@ require (
 	github.com/docker/go-connections v0.4.0
 	github.com/go-openapi/strfmt v0.20.0 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
-	github.com/onflow/cadence v0.18.1-0.20210714032128-c731dbb327c2
+	github.com/onflow/cadence v0.18.1-0.20210714172510-d02b98453e02
 	github.com/onflow/flow-go v0.11.1 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
+	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1
