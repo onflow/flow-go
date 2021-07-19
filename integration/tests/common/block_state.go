@@ -61,31 +61,37 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 	for ancestor.Header.Height > bs.highestFinalized {
 		h := ancestor.Header.Height
 
-		// Since we are running on a trusted setup on localnet, when we receive block height b.Header.Height,
-		// it can finalize all ancestor blocks at height < confirmsHeight given the following conditions both satisfied:
-		// (1) we already received ancestor block.
-		// (2) there is no fork: the view distance between received block and ancestor block is the same as their height distance.
-		// for instance, if we have received block 10, 11, 12, 13, and they have 3 views apart and 3 heights apart. We can say block 10 is finalized, without receiving any blocks prior to block 10
-		heightDiff := b.Header.Height - h
-		viewDiff := b.Header.View - ancestor.Header.View
-		if h <= confirmsHeight && viewDiff == heightDiff {
-			finalized := ancestor
-			bs.finalizedByHeight[h] = finalized
-			if h > bs.highestFinalized { // updates highestFinalized height
-				bs.highestFinalized = h
-			}
-
-			// update last sealed height
-			for _, seal := range finalized.Payload.Seals {
-				sealed, ok := bs.blocksByID[seal.BlockID]
-				if !ok {
-					continue
+		heightDistance := b.Header.Height - h
+		viewDistance := b.Header.View - ancestor.Header.View
+		if h <= confirmsHeight {
+			// Since we are running on a trusted setup on localnet, when we receive block height b.Header.Height,
+			// it can finalize all ancestor blocks at height < confirmsHeight given the following conditions both satisfied:
+			// (1) we already received ancestor block.
+			// (2) there is no fork: the view distance between received block and ancestor block is the same as their height distance.
+			// for instance, if we have received block 10, 11, 12, 13, and they have 3 views apart and 3 heights apart.
+			// We can say block 10 is finalized, without receiving any blocks prior to block 10.
+			if viewDistance == heightDistance {
+				finalized := ancestor
+				bs.finalizedByHeight[h] = finalized
+				if h > bs.highestFinalized { // updates highestFinalized height
+					bs.highestFinalized = h
 				}
 
-				if bs.highestSealed == nil ||
-					sealed.Header.Height > bs.highestSealed.Header.Height {
-					bs.highestSealed = sealed
+				// update last sealed height
+				for _, seal := range finalized.Payload.Seals {
+					sealed, ok := bs.blocksByID[seal.BlockID]
+					if !ok {
+						continue
+					}
+
+					if bs.highestSealed == nil ||
+						sealed.Header.Height > bs.highestSealed.Header.Height {
+						bs.highestSealed = sealed
+					}
 				}
+			} else {
+				fmt.Printf("fork detected: view distance (%d) between received block and ancestor is not same as their height distance (%d)\n",
+					viewDistance, heightDistance)
 			}
 
 		}
