@@ -60,6 +60,10 @@ func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporat
 		if err != nil {
 			return err
 		}
+		// since the results and approvals are processed concurrently, if the currentState has
+		// changed, it means we let the wrong collect process the result. In this case, we just
+		// re-process the result again, until there was no state transition during the process,
+		// which ensured the result has been processed by the correct collector.
 		if currentState != asm.ProcessingStatus() {
 			continue
 		}
@@ -149,13 +153,23 @@ func (asm *AssignmentCollectorStateMachine) ChangeProcessingStatus(expectedCurre
 			return fmt.Errorf("failed to transistion AssignmentCollector from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), err)
 		}
 
-		// re-ingest IncorporatedResults and Approvals that were stored in the cachingCollector
+		// let the Verifying collector to re-process IncorporatedResults and Approvals that were stored 
+		// in the cachingCollector.
+		// if meanwhile there are other incorporated results or approvals added to the caching collector,
+		// there are checks to ensure they will be reprocessed again. By that time, it would be the verifying
+		// collector to process them.
 		for _, ir := range cachingCollector.GetIncorporatedResults() {
 			task := asm.reIngestIncorporatedResultTask(ir)
 			asm.workerPool.Submit(task)
 		}
 		for _, approval := range cachingCollector.GetApprovals() {
 			task := asm.reIngestApprovalTask(approval)
+			// if we process the cached approvals one after another, it would be too slow. 
+			// we would like to process the approvals concurrently here, but if there are 1000
+			// approvals cached, we would create 1000 go routine to process those approvals, 
+			// which might create a CPU spike and congestion on locking. 
+			// Instead, we use a workerPool to buffer all approvals and process at most a certain
+			// number of them concurrently.
 			asm.workerPool.Submit(task)
 		}
 		return nil
