@@ -13,11 +13,11 @@ import (
 )
 
 type Engine struct {
-	mu      sync.RWMutex
-	unit    *engine.Unit               // used to manage concurrency & shutdown
-	log     zerolog.Logger             // used to log relevant actions with context
-	engines map[module.Engine]struct{} // stores registered engines
-	channel network.Channel            // the channel that this splitter listens on
+	enginesMu sync.RWMutex
+	unit      *engine.Unit               // used to manage concurrency & shutdown
+	log       zerolog.Logger             // used to log relevant actions with context
+	engines   map[module.Engine]struct{} // stores registered engines
+	channel   network.Channel            // the channel that this splitter listens on
 }
 
 func New(
@@ -35,8 +35,8 @@ func New(
 }
 
 func (e *Engine) RegisterEngine(engine module.Engine) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.enginesMu.Lock()
+	defer e.enginesMu.Unlock()
 
 	if _, ok := e.engines[engine]; ok {
 		return errors.New("engine already registered with splitter")
@@ -48,8 +48,8 @@ func (e *Engine) RegisterEngine(engine module.Engine) error {
 }
 
 func (e *Engine) UnregisterEngine(engine module.Engine) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+	e.enginesMu.Lock()
+	defer e.enginesMu.Unlock()
 
 	delete(e.engines, engine)
 }
@@ -59,12 +59,12 @@ func (e *Engine) UnregisterEngine(engine module.Engine) {
 // registered engines have started.
 func (e *Engine) Ready() <-chan struct{} {
 	return e.unit.Ready(func() {
-		e.mu.RLock()
-		defer e.mu.RUnlock()
+		e.enginesMu.RLock()
+		defer e.enginesMu.RUnlock()
 		for engine := range e.engines {
-			e.mu.RUnlock()
+			e.enginesMu.RUnlock()
 			<-engine.Ready()
-			e.mu.RLock()
+			e.enginesMu.RLock()
 		}
 	})
 }
@@ -74,12 +74,12 @@ func (e *Engine) Ready() <-chan struct{} {
 // have stopped.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(func() {
-		e.mu.RLock()
-		defer e.mu.RUnlock()
+		e.enginesMu.RLock()
+		defer e.enginesMu.RUnlock()
 		for engine := range e.engines {
-			e.mu.RUnlock()
+			e.enginesMu.RUnlock()
 			<-engine.Done()
-			e.mu.RLock()
+			e.enginesMu.RLock()
 		}
 	})
 }
@@ -139,11 +139,11 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 func (e *Engine) process(f func(module.Engine) error) {
 	var wg sync.WaitGroup
 
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+	e.enginesMu.RLock()
+	defer e.enginesMu.RUnlock()
 
 	for eng := range e.engines {
-		e.mu.RUnlock()
+		e.enginesMu.RUnlock()
 		wg.Add(1)
 
 		go func(downstream module.Engine, log zerolog.Logger) {
@@ -156,7 +156,7 @@ func (e *Engine) process(f func(module.Engine) error) {
 			}
 		}(eng, e.log)
 
-		e.mu.RLock()
+		e.enginesMu.RLock()
 	}
 
 	wg.Wait()
