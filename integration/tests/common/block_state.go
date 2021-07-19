@@ -65,6 +65,7 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 		// it can finalize all ancestor blocks at height < confirmsHeight given the following conditions both satisfied:
 		// (1) we already received ancestor block.
 		// (2) there is no fork: the view distance between received block and ancestor block is the same as their height distance.
+		// for instance, if we have received block 10, 11, 12, 13, and they have 3 views apart and 3 heights apart. We can say block 10 is finalized, without receiving any blocks prior to block 10
 		heightDiff := b.Header.Height - h
 		viewDiff := b.Header.View - ancestor.Header.View
 		if h <= confirmsHeight && viewDiff == heightDiff {
