@@ -34,3 +34,26 @@ func IsIdentityNotFound(err error) bool {
 	var errIdentityNotFound IdentityNotFoundError
 	return errors.As(err, &errIdentityNotFound)
 }
+
+type InvalidBlockTimestampError struct {
+	err error
+}
+
+func (e InvalidBlockTimestampError) Unwrap() error {
+	return e.err
+}
+
+func (e InvalidBlockTimestampError) Error() string {
+	return e.err.Error()
+}
+
+func IsInvalidBlockTimestampError(err error) bool {
+	var errInvalidTimestampError InvalidBlockTimestampError
+	return errors.As(err, &errInvalidTimestampError)
+}
+
+func NewInvalidBlockTimestamp(msg string, args ...interface{}) error {
+	return InvalidBlockTimestampError{
+		err: fmt.Errorf(msg, args...),
+	}
+}

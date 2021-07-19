@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -56,10 +57,14 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
+	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not create default block timer: %w", err)
+	}
+
 	// initialize default config
 	cfg := Config{
-		minInterval:       500 * time.Millisecond,
-		maxInterval:       10 * time.Second,
+		blockTimer:        blockTimer,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
@@ -88,7 +93,7 @@ func NewBuilder(
 		cfg:        cfg,
 	}
 
-	err := b.repopulateExecutionTree()
+	err = b.repopulateExecutionTree()
 	if err != nil {
 		return nil, fmt.Errorf("could not repopulate execution tree: %w", err)
 	}
@@ -606,18 +611,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
-	// calculate the timestamp and cutoffs
-	timestamp := time.Now().UTC()
-	from := parent.Timestamp.Add(b.cfg.minInterval)
-	to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-	// adjust timestamp if outside of cutoffs
-	if timestamp.Before(from) {
-		timestamp = from
-	}
-	if timestamp.After(to) {
-		timestamp = to
-	}
+	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{
