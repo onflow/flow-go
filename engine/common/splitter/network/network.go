@@ -11,6 +11,12 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Network is the splitter network. It is a wrapper around the default network implementation
+// and should be passed in to engine constructors that require a network to register with.
+// When an engine is registered with the splitter network, a splitter engine is created for
+// the given channel (if one doesn't already exist) and the engine is registered with that
+// splitter engine. As a result, multiple engines can register with the splitter network on
+// the same channel and will each receive all events on that channel.
 type Network struct {
 	mu        sync.RWMutex
 	net       module.Network
@@ -19,6 +25,7 @@ type Network struct {
 	conduits  map[network.Channel]network.Conduit        // stores conduits for all registered channels
 }
 
+// NewNetwork returns a new splitter network.
 func NewNetwork(
 	net module.Network,
 	log zerolog.Logger,

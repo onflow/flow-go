@@ -13,6 +13,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// Engine is the splitter engine, which maintains a list of registered engines
+// and passes every event it receives to each of these engines in parallel.
 type Engine struct {
 	enginesMu sync.RWMutex
 	unit      *engine.Unit               // used to manage concurrency & shutdown
@@ -21,6 +23,7 @@ type Engine struct {
 	channel   network.Channel            // the channel that this splitter listens on
 }
 
+// New creates a new splitter engine.
 func New(
 	log zerolog.Logger,
 	channel network.Channel,
@@ -35,6 +38,9 @@ func New(
 	return e
 }
 
+// RegisterEngine registers a new engine with the splitter. Events
+// that are received by the splitter after the engine has registered
+// will be passed down to it.
 func (e *Engine) RegisterEngine(engine module.Engine) error {
 	e.enginesMu.Lock()
 	defer e.enginesMu.Unlock()
@@ -48,6 +54,10 @@ func (e *Engine) RegisterEngine(engine module.Engine) error {
 	return nil
 }
 
+// UnregisterEngine unregisters an engine with the splitter. After
+// the engine has been unregistered, the splitter will stop passing
+// events to it. If the given engine was never registered, this is
+// a noop.
 func (e *Engine) UnregisterEngine(engine module.Engine) {
 	e.enginesMu.Lock()
 	defer e.enginesMu.Unlock()
