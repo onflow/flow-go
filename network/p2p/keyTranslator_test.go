@@ -45,7 +45,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// convert it to a LibP2P private key
-			lpk, err := privKey(fpk)
+			lpk, err := PrivKey(fpk)
 			require.NoError(k.T(), err)
 
 			// get the raw bytes of both the keys
