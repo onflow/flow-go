@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -28,6 +29,14 @@ func MockReceiptValidator() module.ReceiptValidator {
 	validator.On("Validate", mock.Anything).Return(nil)
 	validator.On("ValidatePayload", mock.Anything).Return(nil)
 	return validator
+}
+
+// MockBlockTimer returns BlockTimer that accepts all timestamps
+// without performing any checks.
+func MockBlockTimer() protocol.BlockTimer {
+	blockTimer := &mockprotocol.BlockTimer{}
+	blockTimer.On("Validate", mock.Anything, mock.Anything).Return(nil)
+	return blockTimer
 }
 
 // MockSealValidator returns a SealValidator that accepts
@@ -73,7 +82,8 @@ func RunWithFullProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, f fu
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(seals)
-		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		mockTimer := MockBlockTimer()
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -88,7 +98,8 @@ func RunWithFullProtocolStateAndValidator(t testing.TB, rootSnapshot protocol.Sn
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		sealValidator := MockSealValidator(seals)
-		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, validator, sealValidator)
+		mockTimer := MockBlockTimer()
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, mockTimer, validator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -102,7 +113,8 @@ func RunWithFollowerProtocolState(t testing.TB, rootSnapshot protocol.Snapshot, 
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
-		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer)
+		mockTimer := MockBlockTimer()
+		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer, mockTimer)
 		require.NoError(t, err)
 		f(db, followerState)
 	})
@@ -117,7 +129,8 @@ func RunWithFullProtocolStateAndConsumer(t testing.TB, rootSnapshot protocol.Sna
 		require.NoError(t, err)
 		receiptValidator := MockReceiptValidator()
 		sealValidator := MockSealValidator(seals)
-		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		mockTimer := MockBlockTimer()
+		fullState, err := pbadger.NewFullConsensusState(state, index, payloads, tracer, consumer, mockTimer, receiptValidator, sealValidator)
 		require.NoError(t, err)
 		f(db, fullState)
 	})
@@ -131,7 +144,8 @@ func RunWithFollowerProtocolStateAndHeaders(t testing.TB, rootSnapshot protocol.
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
-		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer)
+		mockTimer := MockBlockTimer()
+		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer, mockTimer)
 		require.NoError(t, err)
 		f(db, followerState, headers, index)
 	})
