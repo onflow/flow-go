@@ -66,7 +66,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 
 	mu := &sync.Mutex{} // making testify Run thread-safe
 
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+	exeEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -181,7 +181,7 @@ func SetupMockConsensusNode(t *testing.T,
 
 	mu := &sync.Mutex{} // making testify mock thread-safe
 
-	conEngine.On("Process", testifymock.Anything, testifymock.Anything, testifymock.Anything).
+	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			mu.Lock()
 			defer mu.Unlock()

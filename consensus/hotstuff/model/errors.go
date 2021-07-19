@@ -3,7 +3,6 @@ package model
 import (
 	"errors"
 	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
