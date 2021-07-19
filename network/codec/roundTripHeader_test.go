@@ -1,7 +1,5 @@
 package codec_test
 
-// pushd network ; BINSTAT_LEN_WHAT="~net=99;~lock=99;~Backend=99" BINSTAT_ENABLE=1 GO111MODULE=on go test -v -coverprofile=coverage.txt -covermode=atomic --tags relic ./codec/roundTripHeader_test.go ; popd
-
 import (
 	"fmt"
 	"testing"
@@ -15,6 +13,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// roundTripHeaderViaCodec tests encoding and then decoding (AKA round-
+// trip) an example message to see if the decoded message matches the
+// original encoded message. Why? Both JSON and CBOR require helper
+// functions (i.e. MarshalJSON() & MarshalCBOR()) which properly export
+// time in the proper format and zone, otherwise running nodes will fail
+// due to signature validation failures due to using the incorrectly
+// serialized time. When CBOR was first added without the assicated
+// helper function then all the unit tests passed but the nodes failed
+// as described above. Therefore these functions were added to help the
+// next developer who wants to add a new serialization format :-)
 func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	block := unittest.BlockFixture()
 	message := &messages.BlockProposal{Header: block.Header, Payload: block.Payload}
