@@ -43,7 +43,7 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/onflow/cadence v0.18.1-0.20210714172510-d02b98453e02
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
-	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
+	github.com/onflow/flow-go-sdk v0.20.1-0.20210719155209-c45d5f07109c
 	github.com/onflow/flow-go/crypto v0.18.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0
@@ -51,6 +51,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/zerolog v1.19.0
+	github.com/segmentio/fasthash v1.0.2 // indirect
 	github.com/spf13/cobra v0.0.6
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
