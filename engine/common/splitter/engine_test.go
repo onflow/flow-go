@@ -2,6 +2,7 @@ package splitter_test
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -109,6 +110,48 @@ func (suite *Suite) TestDuplicateRegistrations() {
 
 	err = suite.engine.RegisterEngine(engine)
 	suite.Assert().Error(err)
+}
+
+// TestConcurrentEvents tests that sending multiple messages concurrently, results in each engine
+// receiving every message.
+func (suite *Suite) TestConcurrentEvents() {
+	id := unittest.IdentifierFixture()
+	const numEvents = 10
+	const numEngines = 5
+
+	var engines [numEngines]*mockmodule.Engine
+
+	for i := 0; i < numEngines; i++ {
+		engine := new(mockmodule.Engine)
+		err := suite.engine.RegisterEngine(engine)
+		suite.Assert().Nil(err)
+		engines[i] = engine
+	}
+
+	for i := 0; i < numEvents; i++ {
+		for _, engine := range engines {
+			engine.On("Process", suite.channel, id, i).Return(nil).Once()
+		}
+	}
+
+	var wg sync.WaitGroup
+
+	for i := 0; i < numEvents; i++ {
+		wg.Add(1)
+
+		go func(value int) {
+			defer wg.Done()
+			err := suite.engine.Process(suite.channel, id, value)
+			suite.Assert().Nil(err)
+		}(i)
+	}
+
+	wg.Wait()
+
+	for _, engine := range engines {
+		engine.AssertNumberOfCalls(suite.T(), "Process", numEvents)
+		engine.AssertExpectations(suite.T())
+	}
 }
 
 // TestReady tests that the splitter's Ready channel closes once all
