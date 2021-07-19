@@ -83,6 +83,7 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		middleware := sanb.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
+		// TODO: this list should be the unstaked addresses of all the staked AN that participate in the unstaked network
 		participants := flow.IdentityList{}
 
 		// topology returns empty list since peers are not known upfront
