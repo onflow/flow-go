@@ -1247,16 +1247,17 @@ func WithStartState(startState flow.StateCommitment) func(*flow.ChunkDataPack) {
 
 func WithCollectionID(collID flow.Identifier) func(*storagemodel.StoredChunkDataPack) {
 	return func(storedChunkDataPack *storagemodel.StoredChunkDataPack) {
-		storedChunkDataPack.CollectionID = collID
+		storedChunkDataPack.CollectionID = &collID
 	}
 }
 
 func StoredChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*storagemodel.StoredChunkDataPack)) *storagemodel.StoredChunkDataPack {
+	collectionID := IdentifierFixture()
 	cdp := &storagemodel.StoredChunkDataPack{
 		ChunkID:      chunkID,
 		StartState:   StateCommitmentFixture(),
 		Proof:        []byte{'p'},
-		CollectionID: IdentifierFixture(),
+		CollectionID: &collectionID,
 	}
 
 	for _, opt := range opts {
