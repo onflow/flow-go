@@ -15,6 +15,21 @@ import (
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
+// These functions are shared by staked and unstaked access node builders.
+// The Staked network allows the staked nodes to communicate among themselves, while the unstaked network allows the
+// unstaked nodes and a staked Access node to communicate.
+//
+//                                 unstaked network                           staked network
+//  +------------------------+
+//  | Unstaked Access Node 1 |<--------------------------|
+//  +------------------------+                           v
+//  +------------------------+                         +--------------------+                 +------------------------+
+//  | Unstaked Access Node 2 |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
+//  +------------------------+                         +--------------------+                 +------------------------+
+//  +------------------------+                           ^
+//  | Unstaked Access Node 3 |<--------------------------|
+//  +------------------------+
+
 type AccessNodeBuilder interface {
 	cmd.NodeBuilder
 
@@ -29,7 +44,7 @@ type FlowAccessNodeBuilder struct {
 	staked                  bool
 	stakedAccessNodeIDHex   string
 	unstakedNetworkBindAddr string
-	unstakedNetwork         *p2p.Network
+	UnstakedNetwork         *p2p.Network
 	unstakedMiddleware      *p2p.Middleware
 }
 
@@ -49,6 +64,8 @@ func (anb *FlowAccessNodeBuilder) parseFlags() {
 	anb.ParseAndPrintFlags()
 }
 
+// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
+// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
 func (anb *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
@@ -82,6 +99,8 @@ func (anb *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
 	return libP2PNodeFactory, nil
 }
 
+// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
+// interval, and validators. The network.Middleware is then passed into the initNetwork function.
 func (anb *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
@@ -98,6 +117,9 @@ func (anb *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	return anb.unstakedMiddleware
 }
 
+// initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
+// participants and topology used to choose peers from the list of participants. The list of participants can later be
+// updated by calling network.SetIDs.
 func (anb *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware *p2p.Middleware,

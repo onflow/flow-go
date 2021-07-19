@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/network/topology"
 )
 
+// StakedAccessNodeBuilder builds a staked access node. The staked access node can optionally participate in the
+// unstaked network publishing data for the unstaked access node downstream.
 type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
@@ -86,10 +88,10 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		network, err := sanb.initNetwork(sanb.Me(), unstakedNetworkMetrics, middleware, participants, top)
 		sanb.MustNot(err)
 
-		sanb.unstakedNetwork = network
+		sanb.UnstakedNetwork = network
 
 		logger := sanb.Logger()
 		logger.Info().Msgf("unstaked network will run on address: %s", sanb.unstakedNetworkBindAddr)
-		return sanb.unstakedNetwork, err
+		return sanb.UnstakedNetwork, err
 	})
 }

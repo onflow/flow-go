@@ -111,7 +111,7 @@ func (uanb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		network, err := uanb.initNetwork(uanb.Me(), unstakedNetworkMetrics, middleware, participants, top)
 		uanb.MustNot(err)
 
-		uanb.unstakedNetwork = network
+		uanb.UnstakedNetwork = network
 
 		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
 		uanb.SetNetwork(network)
@@ -120,6 +120,6 @@ func (uanb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		logger := uanb.Logger()
 		logger.Info().Msgf("unstaked network will run on address: %s", uanb.unstakedNetworkBindAddr)
 
-		return uanb.unstakedNetwork, err
+		return uanb.UnstakedNetwork, err
 	})
 }
