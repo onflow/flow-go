@@ -54,6 +54,9 @@ func (uanb *UnstakedAccessNodeBuilder) validateParams() {
 	}
 }
 
+// initUnstakedLocal initializes the unstaked node ID, network key and network address
+// Currently, it reads a node-info.priv.json like any other node.
+// TODO: read the node ID from the special bootstrap files
 func (uanb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node cmd.NodeBuilder) {
 	return func(node cmd.NodeBuilder) {
 		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
