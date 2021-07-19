@@ -61,9 +61,13 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 	for ancestor.Header.Height > bs.highestFinalized {
 		h := ancestor.Header.Height
 
-		// if ancestor is confirmed put it into the finalized map
-		if h <= confirmsHeight {
-
+		// Since we are running on a trusted setup on localnet, when we receive block height b.Header.Height,
+		// it can finalize all ancestor blocks at height < confirmsHeight given the following conditions both satisfied:
+		// (1) we received ancestor block.
+		// (2) there is no fork: their view distance is the same as their height distance.
+		heightDiff := b.Header.Height - h
+		viewDiff := b.Header.View - ancestor.Header.View
+		if h <= confirmsHeight && viewDiff == heightDiff {
 			finalized := ancestor
 			bs.finalizedByHeight[h] = finalized
 			if h > bs.highestFinalized { // updates highestFinalized height
