@@ -137,7 +137,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // process calls the given function in parallel for all the engines that have
 // registered with this splitter.
-func (e *Engine) process(f func(module.Engine) error) error {
+func (e *Engine) process(processFunc func(module.Engine) error) error {
 	var wg sync.WaitGroup
 	errors := make(chan error)
 
@@ -149,7 +149,7 @@ func (e *Engine) process(f func(module.Engine) error) error {
 		go func(downstream module.Engine) {
 			defer wg.Done()
 
-			if err := f(downstream); err != nil {
+			if err := processFunc(downstream); err != nil {
 				errors <- err
 			}
 		}(eng)
