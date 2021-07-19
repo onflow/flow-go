@@ -87,7 +87,6 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get head from snapshot")
 	}
-	cu
 
 	// root chain id and system contractsRegister
 	chainID := head.ChainID
