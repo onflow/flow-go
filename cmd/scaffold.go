@@ -134,7 +134,7 @@ type FlowNodeBuilder struct {
 	sig               chan os.Signal
 	postInitFns       []func(*FlowNodeBuilder)
 	stakingKey        crypto.PrivateKey
-	networkKey        crypto.PrivateKey
+	NetworkKey        crypto.PrivateKey
 
 	// root state information
 	RootBlock   *flow.Block
@@ -195,7 +195,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
-			fnb.networkKey,
+			fnb.NetworkKey,
 			fnb.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
@@ -305,7 +305,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 
 	fnb.NodeID = nodeID
 	fnb.stakingKey = info.StakingPrivKey.PrivateKey
-	fnb.networkKey = info.NetworkPrivKey.PrivateKey
+	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
 }
 
 func (fnb *FlowNodeBuilder) initLogger() {
@@ -547,7 +547,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
-	if !self.NetworkPubKey.Equals(fnb.networkKey.PublicKey()) {
+	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
 		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
 	}
 	if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
