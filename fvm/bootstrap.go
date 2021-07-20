@@ -219,10 +219,10 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	b.deployStakingProxyContract(service)
 
 	// deploy locked tokens contract to the service account
-	b.deployLockedTokensContract(service, fungibleToken, flowToken, feeContract)
+	b.deployLockedTokensContract(service, fungibleToken, flowToken)
 
 	// deploy staking collection contract to the service account
-	b.deployStakingCollection(service, fungibleToken, flowToken, feeContract)
+	b.deployStakingCollection(service, fungibleToken, flowToken)
 
 	b.registerNodes(service, fungibleToken, flowToken)
 
@@ -554,7 +554,7 @@ func (b *BootstrapProcedure) deployStakingProxyContract(service flow.Address) {
 }
 
 func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fungibleTokenAddress,
-	flowTokenAddress, storageFeesAddress flow.Address) {
+	flowTokenAddress flow.Address) {
 
 	publicKeys := make([]cadence.Value, 1)
 	publicKeys[0] = bytesToCadenceArray(b.serviceAccountPublicKey.PublicKey.Encode())
@@ -564,7 +564,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 		flowTokenAddress.Hex(),
 		service.Hex(),
 		service.Hex(),
-		storageFeesAddress.Hex())
+		service.Hex())
 
 	txError, err := b.vm.invokeMetaTransaction(
 		b.ctx,
@@ -576,14 +576,14 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 	panicOnMetaInvokeErrf("failed to deploy LockedTokens contract: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungibleTokenAddress, flowTokenAddress, storageFeesAddress flow.Address) {
+func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungibleTokenAddress, flowTokenAddress flow.Address) {
 	contract := contracts.FlowStakingCollection(
 		fungibleTokenAddress.Hex(),
 		flowTokenAddress.Hex(),
 		service.Hex(),
 		service.Hex(),
 		service.Hex(),
-		storageFeesAddress.Hex(),
+		service.Hex(),
 		service.Hex(),
 		service.Hex(),
 		service.Hex())
