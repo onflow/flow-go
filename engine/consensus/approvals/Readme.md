@@ -94,6 +94,22 @@ In the future, we will also add further states for 'Extensive Checking Mode':
   verifiers to check.
 
 
+# Implementation Comments
+
+In multiple places we employ the **`Compare And Repeat Pattern`**. This pattern is applicable when we have:
+* an atomically-updatable state value
+* some business logic that requires an up-to-date value of the state 
+
+With the `Compare And Repeat Pattern`, we guarantee that the business logic was executed with the most
+recent state. 
+
+### Compare And Repeat Pattern
+
+1. Atomically read the state _before_ the operation. 
+2. Execute the operation on the retrieved state. 
+3. Atomically read the state _after_ the operation. 
+    - If the state changed, we updated a stale state. In this case we go back to step 1.
+    - If the state remained unchanged, we updated the most recent state. Hence, we are done.
 
 
 
