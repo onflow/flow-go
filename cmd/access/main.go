@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -19,10 +20,12 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/relay"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
@@ -125,8 +128,23 @@ func main() {
 		nodeBuilder = UnstakedAccessNode(anb)
 	}
 
+	nodeBuilder.Initialize()
+
+	if nodeBuilder.IsStaked() && nodeBuilder.ParticipatesInUnstakedNetwork() {
+		nodeBuilder.Component("splitter network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			splitterNet, err := splitternetwork.NewNetwork(node.Network, node.Logger)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create splitter network: %w", err)
+			}
+
+			node.Network = splitterNet
+
+			return splitterNet, nil
+		})
+	}
+
 	nodeBuilder.
-		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -367,6 +385,25 @@ func main() {
 			}
 			return ping, nil
 		})
+
+		if nodeBuilder.ParticipatesInUnstakedNetwork() {
+			// create relay engine
+			nodeBuilder.Component("relay engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				accessNodeBuilder, ok := builder.(FlowAccessNodeBuilder)
+
+				if !ok {
+					return nil, errors.New("node builder was of unexpected type")
+				}
+
+				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, accessNodeBuilder.UnstakedNetwork, node.Me)
+
+				if err != nil {
+					return nil, fmt.Errorf("could not create relay engine: %w", err)
+				}
+
+				return relayEngine, nil
+			})
+		}
 	}
 
 	nodeBuilder.Run()

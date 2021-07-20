@@ -35,6 +35,10 @@ type AccessNodeBuilder interface {
 
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
+
+	// ParticipatesInUnstakedNetwork returns True if this an Access Node which articipates in the unstaked network,
+	// False otherwise
+	ParticipatesInUnstakedNetwork() bool
 }
 
 // FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
@@ -44,7 +48,7 @@ type FlowAccessNodeBuilder struct {
 	staked                  bool
 	stakedAccessNodeIDHex   string
 	unstakedNetworkBindAddr string
-	UnstakedNetwork         *p2p.Network
+	UnstakedNetwork         p2p.ReadyDoneAwareNetwork
 	unstakedMiddleware      *p2p.Middleware
 }
 
@@ -53,8 +57,13 @@ func FlowAccessNode() *FlowAccessNodeBuilder {
 		FlowNodeBuilder: cmd.FlowNode(flow.RoleAccess.String()),
 	}
 }
+
 func (anb *FlowAccessNodeBuilder) IsStaked() bool {
 	return anb.staked
+}
+
+func (anb *FlowAccessNodeBuilder) ParticipatesInUnstakedNetwork() bool {
+	return anb.unstakedNetworkBindAddr != cmd.NotSet
 }
 
 func (anb *FlowAccessNodeBuilder) parseFlags() {

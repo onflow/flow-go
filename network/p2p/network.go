@@ -20,6 +20,8 @@ import (
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 
+const DefaultCacheSize = 10e6
+
 type ReadyDoneAwareNetwork interface {
 	module.Network
 	module.ReadyDoneAware

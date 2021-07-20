@@ -104,22 +104,23 @@ type BaseConfig struct {
 // NodeBuilder functions as a node is bootstrapped.
 type NodeConfig struct {
 	BaseConfig
-	Logger            zerolog.Logger
-	NodeID            flow.Identifier
-	Me                *local.Local
-	Tracer            module.Tracer
-	MetricsRegisterer prometheus.Registerer
-	Metrics           Metrics
-	DB                *badger.DB
-	Storage           Storage
-	ProtocolEvents    *events.Distributor
-	State             protocol.State
-	Middleware        *p2p.Middleware
-	Network           *p2p.Network
-	MsgValidators     []network.MessageValidator
-	FvmOptions        []fvm.Option
-	StakingKey        crypto.PrivateKey
-	NetworkKey        crypto.PrivateKey
+	Logger              zerolog.Logger
+	NodeID              flow.Identifier
+	Me                  *local.Local
+	Tracer              module.Tracer
+	MetricsRegisterer   prometheus.Registerer
+	Metrics             Metrics
+	DB                  *badger.DB
+	Storage             Storage
+	ProtocolEvents      *events.Distributor
+	State               protocol.State
+	Middleware          network.Middleware
+	Network             p2p.ReadyDoneAwareNetwork
+	SubscriptionManager network.SubscriptionManager
+	MsgValidators       []network.MessageValidator
+	FvmOptions          []fvm.Option
+	StakingKey          crypto.PrivateKey
+	NetworkKey          crypto.PrivateKey
 
 	// root state information
 	RootBlock   *flow.Block
