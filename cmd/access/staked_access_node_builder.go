@@ -30,7 +30,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	builder.EnqueueNetworkInit()
 
 	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
-	if builder.supportUnstakedNodes() {
+	if builder.ParticipatesInUnstakedNetwork() {
 		builder.enqueueUnstakedNetworkInit()
 	}
 

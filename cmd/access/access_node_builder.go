@@ -35,6 +35,10 @@ type AccessNodeBuilder interface {
 
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
+
+	// ParticipatesInUnstakedNetwork returns True if this is a staked Access node which also participates
+	// in the unstaked network acting as an upstream for other unstaked access nodes, False otherwise.
+	ParticipatesInUnstakedNetwork() bool
 }
 
 // FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
@@ -57,9 +61,7 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-// supportUnstakedNodes returns True if this a staked Access Node which also participates in the unstaked network,
-// False otherwise
-func (builder *FlowAccessNodeBuilder) supportUnstakedNodes() bool {
+func (builder *FlowAccessNodeBuilder) ParticipatesInUnstakedNetwork() bool {
 	// unstaked access nodes can't be upstream of other unstaked access nodes for now
 	if !builder.IsStaked() {
 		return false
