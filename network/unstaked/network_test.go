@@ -46,6 +46,8 @@ func (suite *Suite) SetupTest() {
 	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Return(suite.con, nil)
 }
 
+// TestUnicast tests that the Unicast method is translated to a unicast to the staked node
+// on the underlying network instance.
 func (suite *Suite) TestUnicast() {
 	channel := network.Channel("test-channel")
 	targetID := unittest.IdentifierFixture()
@@ -63,6 +65,8 @@ func (suite *Suite) TestUnicast() {
 	suite.con.AssertExpectations(suite.T())
 }
 
+// TestPublish tests that the Publish method is translated to a unicast to the staked node
+// on the underlying network instance.
 func (suite *Suite) TestPublish() {
 	channel := network.Channel("test-channel")
 	targetIDs := make([]flow.Identifier, 10)
@@ -85,6 +89,8 @@ func (suite *Suite) TestPublish() {
 	suite.con.AssertExpectations(suite.T())
 }
 
+// TestUnicast tests that the Multicast method is translated to a unicast to the staked node
+// on the underlying network instance.
 func (suite *Suite) TestMulticast() {
 	channel := network.Channel("test-channel")
 	targetIDs := make([]flow.Identifier, 10)
@@ -107,6 +113,7 @@ func (suite *Suite) TestMulticast() {
 	suite.con.AssertExpectations(suite.T())
 }
 
+// TestClose tests that closing the unstaked conduit closes the wrapped conduit.
 func (suite *Suite) TestClose() {
 	channel := network.Channel("test-channel")
 
