@@ -1,7 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
+	"io/ioutil"
 	"sync"
 
 	"github.com/onflow/cadence/runtime"
@@ -48,8 +51,15 @@ func (h *ContractHandler) GetContractNames(address runtime.Address) (names []str
 }
 
 func (h *ContractHandler) GetContract(address runtime.Address, name string) (code []byte, err error) {
-	code, err = h.accounts.GetContract(name, flow.Address(address))
-	return
+	encodedCode, err := h.accounts.GetContract(name, flow.Address(address))
+	if err != nil {
+		return nil, err
+	}
+	code, err = decodeGzip(encodedCode)
+	if err != nil {
+		return nil, errors.NewContractCompressionError(flow.Address(address), name)
+	}
+	return code, nil
 }
 
 func (h *ContractHandler) SetContract(address runtime.Address, name string, code []byte, signingAccounts []runtime.Address) (err error) {
@@ -61,8 +71,14 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 	add := flow.Address(address)
 	h.lock.Lock()
 	defer h.lock.Unlock()
+
+	encodedCode, err := encodeToGzip(code)
+	if err != nil {
+		return errors.NewContractCompressionError(flow.Address(address), name)
+	}
+
 	uk := programs.ContractUpdateKey{Address: add, Name: name}
-	u := programs.ContractUpdate{ContractUpdateKey: uk, Code: code}
+	u := programs.ContractUpdate{ContractUpdateKey: uk, Code: encodedCode}
 	h.draftUpdates[uk] = u
 
 	return nil
@@ -149,4 +165,26 @@ func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
 		return false
 	}
 	return true
+}
+
+func encodeToGzip(code []byte) ([]byte, error) {
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	if _, err := gz.Write(code); err != nil {
+		return nil, err
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
+func decodeGzip(encoded []byte) ([]byte, error) {
+	reader := bytes.NewReader(encoded)
+	gzreader, err := gzip.NewReader(reader)
+	if err != nil {
+		return nil, err
+	}
+	defer gzreader.Close()
+	return ioutil.ReadAll(gzreader)
 }

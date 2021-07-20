@@ -70,4 +70,5 @@ const (
 	// ErrCodeContractError          ErrorCode = 1250 - reserved
 	ErrCodeContractNotFoundError      ErrorCode = 1251
 	ErrCodeContractNamesNotFoundError ErrorCode = 1252
+	ErrCodeContractCompressionError   ErrorCode = 1253
 )
