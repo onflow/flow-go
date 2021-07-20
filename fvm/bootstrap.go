@@ -754,15 +754,35 @@ func registerNodeTransaction(
 		panic(err)
 	}
 
+	cdcNodeID, err := cadence.NewString(id.NodeID.String())
+	if err != nil {
+		panic(err)
+	}
+
+	cdcAddress, err := cadence.NewString(id.Address)
+	if err != nil {
+		panic(err)
+	}
+
+	cdcNetworkPubKey, err := cadence.NewString(id.NetworkPubKey.String()[2:])
+	if err != nil {
+		panic(err)
+	}
+
+	cdcStakingPubKey, err := cadence.NewString(id.StakingPubKey.String()[2:])
+	if err != nil {
+		panic(err)
+	}
+
 	// register node
 	return Transaction(
 		flow.NewTransactionBody().
 			SetScript(templates.GenerateEpochRegisterNodeScript(env)).
-			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NodeID.String()))).
+			AddArgument(jsoncdc.MustEncode(cdcNodeID)).
 			AddArgument(jsoncdc.MustEncode(cadence.NewUInt8(uint8(id.Role)))).
-			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.Address))).
-			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.NetworkPubKey.String()[2:]))).
-			AddArgument(jsoncdc.MustEncode(cadence.NewString(id.StakingPubKey.String()[2:]))).
+			AddArgument(jsoncdc.MustEncode(cdcAddress)).
+			AddArgument(jsoncdc.MustEncode(cdcNetworkPubKey)).
+			AddArgument(jsoncdc.MustEncode(cdcStakingPubKey)).
 			AddArgument(jsoncdc.MustEncode(cdcAmount)).
 			AddArgument(jsoncdc.MustEncode(cadencePublicKeys)).
 			AddAuthorizer(nodeAddress),
