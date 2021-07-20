@@ -15,6 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -129,12 +131,26 @@ func extractResetEpochArgs(snapshot *inmem.Snapshot) []cadence.Value {
 		log.Fatal().Err(err).Msg("could not get final view from epoch")
 	}
 
-	return convertResetEpochArgs(epochCounter, randomSource, flagPayout, firstView, finalView)
+	// read cluster assignment
+	clustering, err := epoch.Clustering()
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not get clustering from epoch")
+	}
+	assignments := clustering.Assignments()
+
+	return convertResetEpochArgs(epochCounter, randomSource, flagPayout, firstView, finalView, assignments)
 }
 
 // convertResetEpochArgs converts the arguments required by `resetEpoch` to cadence representations
 // Ref: https://github.com/onflow/flow-core-contracts/blob/feature/epochs/contracts/epochs/FlowEpoch.cdc#L370-L410
-func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout string, firstView, finalView uint64) []cadence.Value {
+func convertResetEpochArgs(
+	epochCounter uint64,
+	randomSource []byte,
+	payout string,
+	firstView,
+	finalView uint64,
+	assignments flow.AssignmentList,
+) []cadence.Value {
 
 	args := make([]cadence.Value, 0)
 
@@ -170,6 +186,11 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 
 	// add final view
 	args = append(args, cadence.NewUInt64(finalView))
+
+	// add clustering
+	// full cluster objects are created within the transactions
+	// the transaction accepts a mapping from node ID to weight for each cluster
+	args = append(args, epochs.ConvertClusterAssignments(assignments))
 
 	return args
 }

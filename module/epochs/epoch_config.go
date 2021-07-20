@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,15 +37,16 @@ func DefaultEpochConfig() EpochConfig {
 	}
 }
 
-// EncodeClusterAssignments encodes a slice of QuorumCertificates into an encoded
-// transaction argument for the deployEpoch transaction used during execution
-// state bootstrapping.
+// ConvertClusterAssignments converts an assignment list into a cadence value
+// representing the clusterWeights transaction argument for the deployEpoch
+// transaction used during execution state bootstrapping and for the resetEpoch
+// transaction used to manually transition between epochs.
 //
 // The resulting argument has type [{String: UInt64}] which represents a list
 // of weight mappings for each cluster. The full Cluster struct is constructed
 // within the transaction in Cadence for simplicity here.
 //
-func EncodeClusterAssignments(clusterAssignments flow.AssignmentList) []byte {
+func ConvertClusterAssignments(clusterAssignments flow.AssignmentList) cadence.Value {
 
 	weightMappingPerCluster := []cadence.Value{}
 	for _, cluster := range clusterAssignments {
@@ -67,6 +67,5 @@ func EncodeClusterAssignments(clusterAssignments flow.AssignmentList) []byte {
 		weightMappingPerCluster = append(weightMappingPerCluster, cadence.NewDictionary(weightsByNodeID))
 	}
 
-	asArray := cadence.NewArray(weightMappingPerCluster)
-	return jsoncdc.MustEncode(asArray)
+	return cadence.NewArray(weightMappingPerCluster)
 }

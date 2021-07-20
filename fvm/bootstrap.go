@@ -674,7 +674,7 @@ func deployEpochTransaction(service flow.Address, contract []byte, epochConfig e
 				epochConfig.FLOWsupplyIncreasePercentage,
 				epochConfig.RandomSource,
 			))).
-			AddArgument(epochs.EncodeClusterAssignments(epochConfig.CollectorClusters)).
+			AddArgument(jsoncdc.MustEncode(epochs.ConvertClusterAssignments(epochConfig.CollectorClusters))).
 			AddAuthorizer(service),
 		0,
 	)
