@@ -80,7 +80,7 @@ type NodeBuilder interface {
 	RegisterBadgerMetrics()
 }
 
-// BaseConfig is the general config for the NodeBuilder
+// BaseConfig is the general config for the NodeBuilder and the command line params
 type BaseConfig struct {
 	nodeIDHex             string
 	bindAddr              string
@@ -99,7 +99,9 @@ type BaseConfig struct {
 	tracerEnabled         bool
 }
 
-// NodeConfig
+// NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
+// structs such as DB, Network etc. The NodeConfig is composed of the BaseConfig and is updated in the
+// NodeBuilder functions as a node is bootstrapped.
 type NodeConfig struct {
 	BaseConfig
 	Logger            zerolog.Logger
