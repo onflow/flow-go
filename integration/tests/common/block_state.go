@@ -114,7 +114,7 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.BlockProposal {
 	currentFinalized := bs.highestFinalized
 	require.Eventually(t, func() bool {
-		fmt.Printf("=> checking highest finalized: %d \n", bs.highestFinalized)
+		fmt.Printf("=> highest finalized: %d, highest proposed: %d\n", bs.highestFinalized, bs.highestProposed)
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds",
