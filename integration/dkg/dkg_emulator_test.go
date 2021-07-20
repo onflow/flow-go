@@ -79,7 +79,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	// views
 	view := 0
 	for view < 300 {
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// if we are testing situations where the DKG smart-contract is not
 		// reachable, disable the DKG client for intervals of 10 views
