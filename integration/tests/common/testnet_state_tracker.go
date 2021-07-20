@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type TestnetStateTracker struct {
@@ -55,12 +54,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 	// continue with processing of messages in the background
 	go func() {
 		for {
-			var sender flow.Identifier
-			var msg interface{}
-			var err error
-			unittest.RequireReturnsBefore(t, func() {
-				sender, msg, err = reader.Next()
-			}, 1000*time.Millisecond, "could not read any message from network within timeout")
+			sender, msg, err := reader.Next()
 
 			select {
 			// don't error if container shuts down
