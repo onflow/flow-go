@@ -117,7 +117,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 		fmt.Sprintf("did not receive next finalizedblock (height %v) within %v seconds", currentFinalized+1,
 			blockStateTimeout))
 
-	return bs.finalizedByHeight[currentFinalized+1]
+	return bs.finalizedByHeight[bs.highestFinalized]
 }
 
 // WaitUntilNextHeightFinalized waits until the next block height that will be proposed is finalized: If the latest
