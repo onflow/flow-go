@@ -60,11 +60,9 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 	fmt.Printf("new height arrived: %d \n", b.Header.Height)
 	ancestor, ok := b, true
 	for ancestor.Header.Height > bs.highestFinalized {
-		h := ancestor.Header.Height
-
-		heightDistance := b.Header.Height - h
+		heightDistance := b.Header.Height - ancestor.Header.Height
 		viewDistance := b.Header.View - ancestor.Header.View
-		if h <= confirmsHeight {
+		if ancestor.Header.Height <= confirmsHeight {
 			// Since we are running on a trusted setup on localnet, when we receive block height b.Header.Height,
 			// it can finalize all ancestor blocks at height < confirmsHeight given the following conditions both satisfied:
 			// (1) we already received ancestor block.
@@ -74,11 +72,14 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 			if viewDistance == heightDistance {
 				finalized := ancestor
 
-				bs.finalizedByHeight[h] = finalized
-				if h > bs.highestFinalized { // updates highestFinalized height
-					bs.highestFinalized = h
+				bs.finalizedByHeight[finalized.Header.Height] = finalized
+				if finalized.Header.Height > bs.highestFinalized { // updates highestFinalized height
+					bs.highestFinalized = finalized.Header.Height
 				}
-				fmt.Printf("height %d finalized %d, highest finalized %d \n", b.Header.Height, h, bs.highestFinalized)
+				fmt.Printf("height %d finalized %d, highest finalized %d \n",
+					b.Header.Height,
+					finalized.Header.Height,
+					bs.highestFinalized)
 				// update last sealed height
 				for _, seal := range finalized.Payload.Seals {
 					sealed, ok := bs.blocksByID[seal.BlockID]
