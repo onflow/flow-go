@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type TestnetStateTracker struct {
@@ -54,7 +55,12 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 	// continue with processing of messages in the background
 	go func() {
 		for {
-			sender, msg, err := reader.Next()
+			var sender flow.Identifier
+			var msg interface{}
+			var err error
+			unittest.RequireReturnsBefore(t, func() {
+				sender, msg, err = reader.Next()
+			}, 1000*time.Millisecond, "could not read any message from network within timeout")
 
 			select {
 			// don't error if container shuts down
@@ -81,12 +87,8 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					m.Header.Height,
 					m.Header.ID())
 			case *flow.ResultApproval:
-				t.Logf("addding result approval received from %s for execution result ID %x and chunk index %v",
-					sender,
-					m.Body.ExecutionResultID,
-					m.Body.ChunkIndex)
 				tst.ApprovalState.Add(sender, m)
-				t.Logf("added result approval received from %s for execution result ID %x and chunk index %v",
+				t.Logf("result approval received from %s for execution result ID %x and chunk index %v",
 					sender,
 					m.Body.ExecutionResultID,
 					m.Body.ChunkIndex)
