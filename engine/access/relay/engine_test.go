@@ -70,7 +70,7 @@ func (suite *Suite) TestHappyPath() {
 		id := unittest.IdentifierFixture()
 		event := getEvent()
 
-		conduit.On("Publish", event).Return(nil).Once()
+		conduit.On("Publish", event, mock.AnythingOfType("flow.Identifier")).Return(nil).Once()
 
 		err := suite.engine.Process(channel, id, event)
 		suite.Assert().Nil(err)
