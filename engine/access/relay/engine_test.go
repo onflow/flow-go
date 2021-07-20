@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
@@ -70,7 +71,7 @@ func (suite *Suite) TestHappyPath() {
 		id := unittest.IdentifierFixture()
 		event := getEvent()
 
-		conduit.On("Publish", event, mock.AnythingOfType("flow.Identifier")).Return(nil).Once()
+		conduit.On("Publish", event, flow.ZeroID).Return(nil).Once()
 
 		err := suite.engine.Process(channel, id, event)
 		suite.Assert().Nil(err)
