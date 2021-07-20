@@ -35,7 +35,7 @@ func (ps ProcessingStatus) String() string {
 // An AssignmentCollector can be in different states (enumerated by ProcessingStatus). State
 // transitions are atomic and concurrency safe. The high-level AssignmentCollector implements the
 // logic for state transitions, while it delegates the state-specific portion of the logic to
-// AssignmentCollectorState
+// `AssignmentCollectorState`.
 type AssignmentCollector interface {
 	AssignmentCollectorState
 
@@ -91,6 +91,6 @@ type AssignmentCollectorState interface {
 	// during normal operations.
 	RequestMissingApprovals(observer consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error)
 
-	// ProcessingStatus returns the AssignmentCollector's ProcessingStatus
+	// ProcessingStatus returns the AssignmentCollector's ProcessingStatus (state descriptor).
 	ProcessingStatus() ProcessingStatus
 }

@@ -29,20 +29,18 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
 	s.collector = NewAssignmentCollectorStateMachine(AssignmentCollectorBase{
-		base: base{
-			workerPool:                           workerpool.New(4),
-			assigner:                             s.assigner,
-			state:                                s.state,
-			headers:                              s.headers,
-			verifier:                             s.sigVerifier,
-			seals:                                s.sealsPL,
-			approvalConduit:                      s.conduit,
-			requestTracker:                       s.requestTracker,
-			requiredApprovalsForSealConstruction: 5,
-		},
-		executedBlock: &s.Block,
-		result:        s.IncorporatedResult.Result,
-		resultID:      s.IncorporatedResult.Result.ID(),
+		workerPool:                           workerpool.New(4),
+		assigner:                             s.assigner,
+		state:                                s.state,
+		headers:                              s.headers,
+		verifier:                             s.sigVerifier,
+		seals:                                s.sealsPL,
+		approvalConduit:                      s.conduit,
+		requestTracker:                       s.requestTracker,
+		requiredApprovalsForSealConstruction: 5,
+		executedBlock:                        &s.Block,
+		result:                               s.IncorporatedResult.Result,
+		resultID:                             s.IncorporatedResult.Result.ID(),
 	})
 }
 

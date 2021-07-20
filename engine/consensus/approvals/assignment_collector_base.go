@@ -12,7 +12,12 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-type base struct {
+// AssignmentCollectorBase holds the shared data and functionality for
+// implementations of the
+// AssignmentCollectorBase holds common dependencies and immutable values that are shared
+// by the different states of an AssignmentCollector. It is indented as the base struct
+// for the different `AssignmentCollectorState` implementations.
+type AssignmentCollectorBase struct {
 	log zerolog.Logger
 
 	workerPool                           *workerpool.WorkerPool
@@ -24,14 +29,7 @@ type base struct {
 	approvalConduit                      network.Conduit                 // used to request missing approvals from verification nodes
 	requestTracker                       *RequestTracker                 // used to keep track of number of approval requests, and blackout periods, by chunk
 	requiredApprovalsForSealConstruction uint                            // number of approvals that are required for each chunk to be sealed
-}
 
-// AssignmentCollectorBase has three different states. During state transition, there are some
-// common dependencies and immutable values to shared:
-// - `base` holds common dependencies
-// - `AssignmentCollectorBase` in addition holds extra immutable values.
-type AssignmentCollectorBase struct {
-	base
 	result        *flow.ExecutionResult // execution result
 	resultID      flow.Identifier       // ID of execution result
 	executedBlock *flow.Header          // header of the executed block
@@ -47,28 +45,27 @@ func NewAssignmentCollectorBase(logger zerolog.Logger,
 	sigVerifier module.Verifier,
 	approvalConduit network.Conduit,
 	requestTracker *RequestTracker,
-	requiredApprovalsForSealConstruction uint) (AssignmentCollectorBase, error) {
+	requiredApprovalsForSealConstruction uint,
+) (AssignmentCollectorBase, error) {
 	executedBlock, err := headers.ByBlockID(result.BlockID)
 	if err != nil {
 		return AssignmentCollectorBase{}, err
 	}
 
 	return AssignmentCollectorBase{
-		base: base{
-			log:                                  logger,
-			workerPool:                           workerPool,
-			assigner:                             assigner,
-			state:                                state,
-			headers:                              headers,
-			verifier:                             sigVerifier,
-			seals:                                seals,
-			approvalConduit:                      approvalConduit,
-			requestTracker:                       requestTracker,
-			requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
-		},
-		result:        result,
-		resultID:      result.ID(),
-		executedBlock: executedBlock,
+		log:                                  logger,
+		workerPool:                           workerPool,
+		assigner:                             assigner,
+		state:                                state,
+		headers:                              headers,
+		verifier:                             sigVerifier,
+		seals:                                seals,
+		approvalConduit:                      approvalConduit,
+		requestTracker:                       requestTracker,
+		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
+		result:                               result,
+		resultID:                             result.ID(),
+		executedBlock:                        executedBlock,
 	}, nil
 }
 
