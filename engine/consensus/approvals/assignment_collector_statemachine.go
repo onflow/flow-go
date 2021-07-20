@@ -17,11 +17,28 @@ var (
 	ErrDifferentCollectorState         = errors.New("different state")
 )
 
+// AssignmentCollectorStateMachine implements the `AssignmentCollector` interface.
+// It wraps the current `AssignmentCollectorState` and provides logic for state transitions.
+// Any state-specific logic is delegated to the state-specific instance.
+// AssignmentCollectorStateMachine is fully concurrent.
+//
+// Comment on concurrency safety for state-specific business logic:
+//  * AssignmentCollectorStateMachine processes state updates concurrently with
+//    state-specific business logic. Hence, it can happen that that we update a stale
+//    state.
+//  * To guarantee that we hand inputs to the latest state, we employ a
+//    "Compare And Repeat Pattern": we atomically read the state before and after the
+//    operation. If the state changed, we updated a stale state. We repeat until
+//    we confirm that the latest state was updated.
 type AssignmentCollectorStateMachine struct {
 	AssignmentCollectorBase
 
-	sync.Mutex
+	// collector references the assignment collector in its current state. The value is
+	// frequently read, but infrequently updated. Reads are atomic and therefore concurrency
+	// safe. For state updates (write), we use a mutex to guarantee that a state update is
+	// always based on the most recent value.
 	collector atomic.Value
+	sync.Mutex
 }
 
 func (asm *AssignmentCollectorStateMachine) atomicLoadCollector() AssignmentCollectorState {
@@ -53,23 +70,18 @@ func NewAssignmentCollectorStateMachine(collectorBase AssignmentCollectorBase) *
 //  * no errors expected during normal operation;
 //    errors might be symptoms of bugs or internal state corruption (fatal)
 func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
-	for {
+	for { // Compare And Repeat if state update occurred concurrently
 		collector := asm.atomicLoadCollector()
 		currentState := collector.ProcessingStatus()
 		err := collector.ProcessIncorporatedResult(incorporatedResult)
 		if err != nil {
 			return fmt.Errorf("could not process incorporated result %v: %w", incorporatedResult.ID(), err)
 		}
-		// since the results and approvals are processed concurrently, if the currentState has
-		// changed, it means we let the wrong collect process the result. In this case, we just
-		// re-process the result again, until there was no state transition during the process,
-		// which ensured the result has been processed by the correct collector.
 		if currentState != asm.ProcessingStatus() {
 			continue
 		}
-		break
+		return nil
 	}
-	return nil
 }
 
 // ProcessApproval ingests Result Approvals and triggers sealing of execution result
@@ -79,7 +91,7 @@ func (asm *AssignmentCollectorStateMachine) ProcessIncorporatedResult(incorporat
 //  * engine.InvalidInputError if the result approval is invalid
 //  * any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (asm *AssignmentCollectorStateMachine) ProcessApproval(approval *flow.ResultApproval) error {
-	for {
+	for { // Compare And Repeat if state update occurred concurrently
 		collector := asm.atomicLoadCollector()
 		currentState := collector.ProcessingStatus()
 		err := collector.ProcessApproval(approval)
@@ -89,21 +101,27 @@ func (asm *AssignmentCollectorStateMachine) ProcessApproval(approval *flow.Resul
 		if currentState != asm.ProcessingStatus() {
 			continue
 		}
-		break
+		return nil
 	}
-	return nil
 }
 
+// CheckEmergencySealing checks whether this AssignmentCollector can be emergency
+// sealed. If this is the case, the AssignmentCollector produces a candidate seal
+// as part of this method call. No errors are expected during normal operations.
 func (asm *AssignmentCollectorStateMachine) CheckEmergencySealing(observer consensus.SealingObservation, finalizedBlockHeight uint64) error {
 	collector := asm.atomicLoadCollector()
 	return collector.CheckEmergencySealing(observer, finalizedBlockHeight)
 }
 
+// RequestMissingApprovals sends requests for missing approvals to the respective
+// verification nodes. Returns number of requests made. No errors are expected
+// during normal operations.
 func (asm *AssignmentCollectorStateMachine) RequestMissingApprovals(observer consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error) {
 	collector := asm.atomicLoadCollector()
 	return collector.RequestMissingApprovals(observer, maxHeightForRequesting)
 }
 
+// ProcessingStatus returns the AssignmentCollector's ProcessingStatus (state descriptor).
 func (asm *AssignmentCollectorStateMachine) ProcessingStatus() ProcessingStatus {
 	collector := asm.atomicLoadCollector()
 	return collector.ProcessingStatus()
@@ -113,10 +131,10 @@ func (asm *AssignmentCollectorStateMachine) ProcessingStatus() ProcessingStatus 
 // status. The operation is implemented as an atomic compare-and-swap, i.e. the
 // state transition is only executed if AssignmentCollector's internal state is
 // equal to `expectedValue`. The return indicates whether the state was updated.
-// The implementation only allows the transitions
+// The implementation only allows the following transitions:
 //         CachingApprovals   -> VerifyingApprovals
 //         CachingApprovals   -> Orphaned
-//    and  VerifyingApprovals -> Orphaned
+//         VerifyingApprovals -> Orphaned
 // Error returns:
 // * nil if the state transition was successfully executed
 // * ErrDifferentCollectorState if the AssignmentCollector's state is different than expectedCurrentStatus
@@ -153,23 +171,25 @@ func (asm *AssignmentCollectorStateMachine) ChangeProcessingStatus(expectedCurre
 			return fmt.Errorf("failed to transistion AssignmentCollector from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), err)
 		}
 
-		// let the Verifying collector to re-process IncorporatedResults and Approvals that were stored
-		// in the cachingCollector.
-		// if meanwhile there are other incorporated results or approvals added to the caching collector,
-		// there are checks to ensure they will be reprocessed again. By that time, it would be the verifying
-		// collector to process them.
+		// From this goroutine's perspective, the "Compare And Repeat Pattern" guarantees
+		// that any IncorporatedResult or ResultApproval is
+		//  * either already stored in the old state (i.e. the CachingAssignmentCollector)
+		//    when this goroutine retrieves it
+		//  * or the incorporated result / approval is subsequently added to updated state
+		//    (i.e. the VerifyingAssignmentCollector) after this goroutine stored it
+		// Hence, this goroutine only needs to hand the IncorporatedResults and ResultApprovals
+		// that are stored in the CachingAssignmentCollector to the VerifyingAssignmentCollector.
+		//
+		// Generally, we would like to process the cached data concurrently here, because
+		// sequential processing is too slow. However, we should only allocate limited resources
+		// to avoid other components being starved. Therefore, we use a workerPool to queue
+		// the processing tasks and work through a limited number of them concurrently.
 		for _, ir := range cachingCollector.GetIncorporatedResults() {
 			task := asm.reIngestIncorporatedResultTask(ir)
 			asm.workerPool.Submit(task)
 		}
 		for _, approval := range cachingCollector.GetApprovals() {
 			task := asm.reIngestApprovalTask(approval)
-			// if we process the cached approvals one after another, it would be too slow.
-			// we would like to process the approvals concurrently here, but if there are 1000
-			// approvals cached, we would create 1000 go routine to process those approvals,
-			// which might create a CPU spike and congestion on locking.
-			// Instead, we use a workerPool to buffer all approvals and process at most a certain
-			// number of them concurrently.
 			asm.workerPool.Submit(task)
 		}
 		return nil
@@ -187,10 +207,10 @@ func (asm *AssignmentCollectorStateMachine) ChangeProcessingStatus(expectedCurre
 func (asm *AssignmentCollectorStateMachine) caching2Orphaned() (*CachingAssignmentCollector, error) {
 	asm.Lock()
 	defer asm.Unlock()
-	cachingCollector, ok := asm.atomicLoadCollector().(*CachingAssignmentCollector)
+	clr := asm.atomicLoadCollector()
+	cachingCollector, ok := clr.(*CachingAssignmentCollector)
 	if !ok {
-		return nil, fmt.Errorf("collectors current state is %s: %w",
-			cachingCollector.ProcessingStatus().String(), ErrDifferentCollectorState)
+		return nil, fmt.Errorf("collector's current state is %s: %w", clr.ProcessingStatus().String(), ErrDifferentCollectorState)
 	}
 	asm.collector.Store(&atomicValueWrapper{collector: NewOrphanAssignmentCollector(asm.AssignmentCollectorBase)})
 	return cachingCollector, nil
@@ -205,10 +225,10 @@ func (asm *AssignmentCollectorStateMachine) caching2Orphaned() (*CachingAssignme
 func (asm *AssignmentCollectorStateMachine) verifying2Orphaned() (*VerifyingAssignmentCollector, error) {
 	asm.Lock()
 	defer asm.Unlock()
-	verifyingCollector, ok := asm.atomicLoadCollector().(*VerifyingAssignmentCollector)
+	clr := asm.atomicLoadCollector()
+	verifyingCollector, ok := clr.(*VerifyingAssignmentCollector)
 	if !ok {
-		return nil, fmt.Errorf("collectors current state is %s: %w",
-			verifyingCollector.ProcessingStatus().String(), ErrDifferentCollectorState)
+		return nil, fmt.Errorf("collector's current state is %s: %w", clr.ProcessingStatus().String(), ErrDifferentCollectorState)
 	}
 	asm.collector.Store(&atomicValueWrapper{collector: NewOrphanAssignmentCollector(asm.AssignmentCollectorBase)})
 	return verifyingCollector, nil
@@ -223,10 +243,10 @@ func (asm *AssignmentCollectorStateMachine) verifying2Orphaned() (*VerifyingAssi
 func (asm *AssignmentCollectorStateMachine) caching2Verifying() (*CachingAssignmentCollector, error) {
 	asm.Lock()
 	defer asm.Unlock()
-	cachingCollector, ok := asm.atomicLoadCollector().(*CachingAssignmentCollector)
+	clr := asm.atomicLoadCollector()
+	cachingCollector, ok := clr.(*CachingAssignmentCollector)
 	if !ok {
-		return nil, fmt.Errorf("collectors current state is %s: %w",
-			cachingCollector.ProcessingStatus().String(), ErrDifferentCollectorState)
+		return nil, fmt.Errorf("collector's current state is %s: %w", clr.ProcessingStatus().String(), ErrDifferentCollectorState)
 	}
 
 	verifyingCollector, err := NewVerifyingAssignmentCollector(asm.AssignmentCollectorBase)
@@ -238,8 +258,8 @@ func (asm *AssignmentCollectorStateMachine) caching2Verifying() (*CachingAssignm
 	return cachingCollector, nil
 }
 
-// reIngestApprovalTask returns a functor for re-ingesting the specified incorporated result;
-// functor handles all potential error returned by business logic.
+// reIngestIncorporatedResultTask returns a functor for re-ingesting the specified
+// IncorporatedResults; functor handles all potential business logic errors.
 func (asm *AssignmentCollectorStateMachine) reIngestIncorporatedResultTask(incResult *flow.IncorporatedResult) func() {
 	task := func() {
 		err := asm.ProcessIncorporatedResult(incResult)
@@ -255,8 +275,8 @@ func (asm *AssignmentCollectorStateMachine) reIngestIncorporatedResultTask(incRe
 	return task
 }
 
-// reIngestApprovalTask returns a functor for re-ingesting the specified approval;
-// functor handles all potential error returned by business logic.
+// reIngestApprovalTask returns a functor for re-ingesting the specified
+// ResultApprovals; functor handles all potential business logic errors.
 func (asm *AssignmentCollectorStateMachine) reIngestApprovalTask(approval *flow.ResultApproval) func() {
 	task := func() {
 		err := asm.ProcessApproval(approval)

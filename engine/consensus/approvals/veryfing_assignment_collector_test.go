@@ -48,7 +48,8 @@ func newVerifyingAssignmentCollector(logger zerolog.Logger,
 	sigVerifier realmodule.Verifier,
 	approvalConduit network.Conduit,
 	requestTracker *RequestTracker,
-	requiredApprovalsForSealConstruction uint) (*VerifyingAssignmentCollector, error) {
+	requiredApprovalsForSealConstruction uint,
+) (*VerifyingAssignmentCollector, error) {
 	b, err := NewAssignmentCollectorBase(logger, workerPool, result, state, headers, assigner, seals, sigVerifier,
 		approvalConduit, requestTracker, requiredApprovalsForSealConstruction)
 	if err != nil {
