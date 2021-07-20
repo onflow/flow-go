@@ -557,7 +557,7 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 	flowTokenAddress, storageFeesAddress flow.Address) {
 
 	publicKeys := make([]cadence.Value, 1)
-	publicKeys[0] = cadence.NewString(hex.EncodeToString(b.serviceAccountPublicKey.PublicKey.Encode()))
+	publicKeys[0] = bytesToCadenceArray(b.serviceAccountPublicKey.PublicKey.Encode())
 
 	contract := contracts.FlowLockedTokens(
 		fungibleTokenAddress.Hex(),
