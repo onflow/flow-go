@@ -91,7 +91,7 @@ func (e *Engine) Done() <-chan struct{} {
 		for engine := range e.engines {
 			e.enginesMu.RUnlock()
 			<-engine.Done()
-
+			e.enginesMu.RLock()
 		}
 	})
 }
