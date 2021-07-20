@@ -61,13 +61,15 @@ func (e *ContractNamesNotFoundError) Code() ErrorCode {
 
 // ContractCompressionError is returned when de/compressing contract codes fails
 type ContractCompressionError struct {
+	err     error
 	address flow.Address
 	name    string
 }
 
 // NewContractCompressionError constructs a new ContractCompressionError
-func NewContractCompressionError(address flow.Address, name string) error {
+func NewContractCompressionError(address flow.Address, name string, err error) error {
 	return &ContractCompressionError{
+		err:     err,
 		address: address,
 		name:    name,
 	}
@@ -75,14 +77,20 @@ func NewContractCompressionError(address flow.Address, name string) error {
 
 func (e *ContractCompressionError) Error() string {
 	return fmt.Sprintf(
-		"%s cannot compress or decompress contract code with name %s for account %s",
+		"%s cannot compress or decompress contract code with name %s for account %s: %s",
 		e.Code().String(),
 		e.name,
 		e.address,
+		e.err.Error(),
 	)
 }
 
 // Code returns the error code for this error type
 func (e *ContractCompressionError) Code() ErrorCode {
 	return ErrCodeContractCompressionError
+}
+
+// Unwrap unwraps the error
+func (e ContractCompressionError) Unwrap() error {
+	return e.err
 }

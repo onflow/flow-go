@@ -57,7 +57,7 @@ func (h *ContractHandler) GetContract(address runtime.Address, name string) (cod
 	}
 	code, err = decodeGzip(encodedCode)
 	if err != nil {
-		return nil, errors.NewContractCompressionError(flow.Address(address), name)
+		return nil, errors.NewContractCompressionError(flow.Address(address), name, err)
 	}
 	return code, nil
 }
@@ -74,7 +74,7 @@ func (h *ContractHandler) SetContract(address runtime.Address, name string, code
 
 	encodedCode, err := encodeToGzip(code)
 	if err != nil {
-		return errors.NewContractCompressionError(flow.Address(address), name)
+		return errors.NewContractCompressionError(flow.Address(address), name, err)
 	}
 
 	uk := programs.ContractUpdateKey{Address: add, Name: name}
@@ -168,9 +168,15 @@ func (h *ContractHandler) isAuthorized(signingAccounts []runtime.Address) bool {
 }
 
 func encodeToGzip(code []byte) ([]byte, error) {
+	if len(code) == 0 {
+		return code, nil
+	}
 	var b bytes.Buffer
 	gz := gzip.NewWriter(&b)
 	if _, err := gz.Write(code); err != nil {
+		return nil, err
+	}
+	if err := gz.Flush(); err != nil {
 		return nil, err
 	}
 	if err := gz.Close(); err != nil {
@@ -180,6 +186,9 @@ func encodeToGzip(code []byte) ([]byte, error) {
 }
 
 func decodeGzip(encoded []byte) ([]byte, error) {
+	if len(encoded) == 0 {
+		return encoded, nil
+	}
 	reader := bytes.NewReader(encoded)
 	gzreader, err := gzip.NewReader(reader)
 	if err != nil {
