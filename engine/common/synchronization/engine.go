@@ -348,7 +348,7 @@ func (e *Engine) requestProcessingLoop() {
 		case <-notifier:
 			err := e.processAvailableRequests()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				e.log.Fatal().Err(err).Msg("internal error processing queued requests")
 			}
 		}
 	}
@@ -380,7 +380,7 @@ func (e *Engine) responseProcessingLoop() {
 		case <-notifier:
 			err := e.processAvailableResponses()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				e.log.Fatal().Err(err).Msg("internal error processing queued responses")
 			}
 		}
 	}
@@ -397,21 +397,15 @@ func (e *Engine) processAvailableResponses() error {
 
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
-			err := e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
+			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
-			if err != nil {
-				return fmt.Errorf("could not process sync response")
-			}
 			continue
 		}
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
-			err := e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
+			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
-			if err != nil {
-				return fmt.Errorf("could not process block response")
-			}
 			continue
 		}
 
@@ -435,7 +429,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
 			if err != nil {
-				return fmt.Errorf("could not process sync request")
+				engine.LogError(e.log, err)
 			}
 			continue
 		}
@@ -444,7 +438,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
 			if err != nil {
-				return fmt.Errorf("could not process range request")
+				engine.LogError(e.log, err)
 			}
 			continue
 		}
@@ -453,7 +447,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
 			if err != nil {
-				return fmt.Errorf("could not process batch request")
+				engine.LogError(e.log, err)
 			}
 			continue
 		}
@@ -495,11 +489,10 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 }
 
 // onSyncResponse processes a synchronization response.
-func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) error {
+func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
 
 	final := e.finalSnapshot().head
 	e.core.HandleHeight(final, res.Height)
-	return nil
 }
 
 // onRangeRequest processes a request for a range of blocks by height.
@@ -598,7 +591,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) error {
+func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
@@ -610,7 +603,6 @@ func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockRe
 		}
 		e.comp.SubmitLocal(synced)
 	}
-	return nil
 }
 
 // checkLoop will regularly scan for items that need requesting.
