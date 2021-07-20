@@ -1,6 +1,7 @@
 package approvals
 
 import (
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -115,4 +116,17 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 			require.True(s.T(), signed)
 		}
 	}
+}
+
+// TestChangeProcessingStatus_InvalidTransition tries to perform transition from caching to verifying status
+// but with underlying orphan status. This should result in sentinel error ErrInvalidCollectorStateTransition.
+func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_InvalidTransition() {
+	// first change status to orphan
+	err := s.collector.ChangeProcessingStatus(CachingApprovals, Orphaned)
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), Orphaned, s.collector.ProcessingStatus())
+	// then try to perform transition from caching to verifying
+	err = s.collector.ChangeProcessingStatus(CachingApprovals, VerifyingApprovals)
+	require.Error(s.T(), err)
+	require.True(s.T(), errors.Is(err, ErrDifferentCollectorState))
 }

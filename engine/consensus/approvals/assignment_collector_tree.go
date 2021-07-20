@@ -263,7 +263,8 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	newStatus := CachingApprovals
 	if parentFound {
 		newStatus = parent.(*assignmentCollectorVertex).collector.ProcessingStatus()
-	} else if executedBlock.ParentID == t.lastSealedID {
+	}
+	if executedBlock.ParentID == t.lastSealedID {
 		newStatus = VerifyingApprovals
 	}
 
