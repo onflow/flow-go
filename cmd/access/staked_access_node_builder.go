@@ -23,14 +23,6 @@ func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	}
 }
 
-// SupportUnstakedNodes returns True if this a staked Access Node which also participates in the unstaked network,
-// False otherwise
-func (builder *StakedAccessNodeBuilder) supportUnstakedNodes() bool {
-	// if an unstaked network bind address is provided, then this staked access node will act as the upstream for
-	// unstaked access nodes
-	return builder.FlowAccessNodeBuilder.unstakedNetworkBindAddr != cmd.NotSet
-}
-
 func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
