@@ -557,7 +557,10 @@ func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fu
 	flowTokenAddress flow.Address) {
 
 	publicKeys := make([]cadence.Value, 1)
-	encodedPublicKey, _ := flow.EncodeRuntimeAccountPublicKey(b.serviceAccountPublicKey)
+	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(b.serviceAccountPublicKey)
+	if err != nil {
+		panic(err)
+	}
 	publicKeys[0] = bytesToCadenceArray(encodedPublicKey)
 
 	contract := contracts.FlowLockedTokens(
@@ -832,7 +835,12 @@ func registerNodeTransaction(
 		HashAlgo:  hash.SHA3_256,
 		Weight:    1000,
 	}
-	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+
+	encAccountKey, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	if err != nil {
+		panic(err)
+	}
+
 	cadencePublicKeys := cadence.NewArray(
 		[]cadence.Value{
 			bytesToCadenceArray(encAccountKey),
