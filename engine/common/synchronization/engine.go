@@ -435,7 +435,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
 			if err != nil {
-				return fmt.Errorf("could not process sync request")
+				return fmt.Errorf("could not process sync request: %w", err)
 			}
 			continue
 		}
@@ -444,7 +444,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
 			if err != nil {
-				return fmt.Errorf("could not process range request")
+				return fmt.Errorf("could not process range request: %w", err)
 			}
 			continue
 		}
@@ -453,7 +453,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
 			if err != nil {
-				return fmt.Errorf("could not process batch request")
+				return fmt.Errorf("could not process batch request: %w", err)
 			}
 			continue
 		}
