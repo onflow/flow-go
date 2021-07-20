@@ -142,12 +142,14 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	args = append(args, cadence.NewUInt64(epochCounter))
 
 	// add random source
-	args = append(args, cadence.NewString(hex.EncodeToString(randomSource)))
+	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not convert random source to cadence type")
+	}
+	args = append(args, cdcRandomSource)
 
 	// add payout
 	var cdcPayout cadence.Value
-	var err error
-
 	if payout != "" {
 		index := strings.Index(payout, ".")
 		if index == -1 {

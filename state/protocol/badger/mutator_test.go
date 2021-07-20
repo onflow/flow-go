@@ -23,6 +23,7 @@ import (
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	st "github.com/onflow/flow-go/state"
+	realprotocol "github.com/onflow/flow-go/state/protocol"
 	protocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -98,7 +99,7 @@ func TestExtendValid(t *testing.T) {
 		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 
-		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, util.MockBlockTimer(),
 			util.MockReceiptValidator(), util.MockSealValidator(seals))
 		require.NoError(t, err)
 
@@ -475,7 +476,8 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 		receiptValidator := util.MockReceiptValidator()
 		sealValidator := util.MockSealValidator(seals)
-		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer, receiptValidator, sealValidator)
+		state, err := protocol.NewFullConsensusState(protoState, index, payloads, tracer, consumer,
+			util.MockBlockTimer(), receiptValidator, sealValidator)
 		require.NoError(t, err)
 
 		head, err := rootSnapshot.Head()
@@ -1227,7 +1229,7 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			Times(3)
 
 		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer,
-			util.MockReceiptValidator(), sealValidator)
+			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
 		require.NoError(t, err)
 
 		err = fullState.Extend(&block1)
@@ -1516,4 +1518,41 @@ func TestCacheAtomicity(t *testing.T) {
 			require.NoError(t, err)
 			wg.Wait()
 		})
+}
+
+// TestHeaderInvalidTimestamp tests that extending header with invalid timestamp results in sentinel error
+func TestHeaderInvalidTimestamp(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		tracer := trace.NewNoopTracer()
+		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
+
+		// create a event consumer to test epoch transition events
+		distributor := events.NewDistributor()
+		consumer := new(mockprotocol.Consumer)
+		distributor.AddConsumer(consumer)
+
+		block, result, seal := unittest.BootstrapFixture(participants)
+		qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(block.ID()))
+		rootSnapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, qc)
+		require.NoError(t, err)
+
+		state, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
+		require.NoError(t, err)
+
+		blockTimer := &mockprotocol.BlockTimer{}
+		blockTimer.On("Validate", mock.Anything, mock.Anything).Return(realprotocol.NewInvalidBlockTimestamp(""))
+
+		fullState, err := protocol.NewFullConsensusState(state, index, payloads, tracer, consumer, blockTimer,
+			util.MockReceiptValidator(), util.MockSealValidator(seals))
+		require.NoError(t, err)
+
+		extend := unittest.BlockWithParentFixture(block.Header)
+		extend.Payload.Guarantees = nil
+		extend.Header.PayloadHash = extend.Payload.Hash()
+
+		err = fullState.Extend(&extend)
+		assert.Error(t, err, "a proposal with invalid timestamp has to be rejected")
+		assert.True(t, st.IsInvalidExtensionError(err), "if timestamp is invalid it should return invalid block error")
+	})
 }

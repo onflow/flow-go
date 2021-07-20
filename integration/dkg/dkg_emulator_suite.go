@@ -280,7 +280,9 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 	// convert node identifiers to candece.Value to be passed in as TX argument
 	valueNodeIDs := make([]cadence.Value, 0, len(accounts))
 	for _, account := range accounts {
-		valueNodeIDs = append(valueNodeIDs, cadence.NewString(account.accountID))
+		valueAccountID, err := cadence.NewString(account.accountID)
+		s.Require().NoError(err)
+		valueNodeIDs = append(valueNodeIDs, valueAccountID)
 	}
 
 	// start DKG using admin resource
@@ -322,7 +324,9 @@ func (s *DKGSuite) claimDKGParticipant(node *node) {
 
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
-	err = createParticipantTx.AddArgument(cadence.NewString(node.account.accountKey.PublicKey.String()))
+	valueAccountPubKey, err := cadence.NewString(node.account.accountKey.PublicKey.String())
+	require.NoError(s.T(), err)
+	err = createParticipantTx.AddArgument(valueAccountPubKey)
 	require.NoError(s.T(), err)
 
 	_, err = s.prepareAndSubmit(createParticipantTx,

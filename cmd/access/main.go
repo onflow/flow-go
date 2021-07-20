@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
@@ -119,6 +120,7 @@ func main() {
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blocktimer.DefaultBlockTimer,
 			)
 			return err
 		}).
@@ -282,7 +284,8 @@ func main() {
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier, finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
+			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier,
+				finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
