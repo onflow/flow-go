@@ -2,196 +2,147 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"time"
-
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/network/validator"
 )
 
-// AccessNodeBuilder is initializes and runs an Access node either as a staked node or an unstaked node
+// AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
+// These functions are shared by staked and unstaked access node builders.
+// The Staked network allows the staked nodes to communicate among themselves, while the unstaked network allows the
+// unstaked nodes and a staked Access node to communicate.
+//
+//                                 unstaked network                           staked network
+//  +------------------------+
+//  | Unstaked Access Node 1 |<--------------------------|
+//  +------------------------+                           v
+//  +------------------------+                         +--------------------+                 +------------------------+
+//  | Unstaked Access Node 2 |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
+//  +------------------------+                         +--------------------+                 +------------------------+
+//  +------------------------+                           ^
+//  | Unstaked Access Node 3 |<--------------------------|
+//  +------------------------+
+
+type AccessNodeBuilder interface {
+	cmd.NodeBuilder
+
+	// IsStaked returns True is this is a staked Access Node, False otherwise
+	IsStaked() bool
+}
+
+// FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
 // It is composed of the FlowNodeBuilder
-type AccessNodeBuilder struct {
+type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	staked                  bool
 	stakedAccessNodeIDHex   string
 	unstakedNetworkBindAddr string
-	unstakedNetwork         *p2p.Network
+	UnstakedNetwork         *p2p.Network
 	unstakedMiddleware      *p2p.Middleware
 }
 
-func FlowAccessNode() *AccessNodeBuilder {
-	return &AccessNodeBuilder{
+func FlowAccessNode() *FlowAccessNodeBuilder {
+	return &FlowAccessNodeBuilder{
 		FlowNodeBuilder: cmd.FlowNode(flow.RoleAccess.String()),
 	}
 }
+func (anb *FlowAccessNodeBuilder) IsStaked() bool {
+	return anb.staked
+}
 
-func (anb *AccessNodeBuilder) Initialize() *AccessNodeBuilder {
-
-	anb.PrintBuildVersionDetails()
+func (anb *FlowAccessNodeBuilder) parseFlags() {
 
 	anb.BaseFlags()
 
 	anb.ParseAndPrintFlags()
-
-	anb.validateParams()
-
-	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
-	if anb.staked {
-		anb.EnqueueNetworkInit()
-	}
-
-	// if an unstaked bind address is provided, initialize the network to communicate on the unstaked network
-	if anb.unstakedNetworkBindAddr != cmd.NotSet {
-		anb.EnqueueUnstakedNetworkInit()
-	}
-
-	anb.EnqueueMetricsServerInit()
-
-	anb.RegisterBadgerMetrics()
-
-	anb.EnqueueTracer()
-
-	return anb
 }
 
-func (anb *AccessNodeBuilder) validateParams() {
-	if anb.staked {
-		return
-	}
+// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
+// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+func (anb *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
+	networkMetrics module.NetworkMetrics,
+	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
-	// for an unstaked access node, the staked access node ID must be provided
-	if strings.TrimSpace(anb.stakedAccessNodeIDHex) == "" {
-		anb.Logger.Fatal().Msg("staked access node ID not specified")
-	}
-
-	// and also the unstaked bind address
-	if anb.unstakedNetworkBindAddr == cmd.NotSet {
-		anb.Logger.Fatal().Msg("unstaked bind address not set")
-	}
-}
-
-func (anb *AccessNodeBuilder) EnqueueUnstakedNetworkInit() {
-	anb.Component("unstaked network", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-		codec := jsoncodec.NewCodec()
-
-		// setup the Ping provider to return the software version and the sealed block height
-		pingProvider := p2p.PingInfoProviderImpl{
-			SoftwareVersionFun: func() string {
-				return build.Semver()
-			},
-			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := node.State.Sealed().Head()
-				if err != nil {
-					return 0, err
-				}
-				return head.Height, nil
-			},
-		}
-
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(node.Logger.Level(zerolog.ErrorLevel),
-			node.Me.NodeID(),
-			anb.unstakedNetworkBindAddr,
-			node.NetworkKey,
-			node.RootBlock.ID().String(),
-			p2p.DefaultMaxPubSubMsgSize,
-			node.Metrics.Network,
-			pingProvider)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-		}
-
-		peerUpdateInterval := time.Hour // pretty much not needed for the unstaked access node
-
-		var msgValidators []network.MessageValidator
-		if anb.staked {
-			msgValidators = p2p.DefaultValidators(node.Logger, node.Me.NodeID())
-		} else {
-			// for an unstaked node, use message sender validator but not target validator since the staked AN will
-			// be broadcasting messages to ALL unstaked ANs without knowing their target IDs
-			msgValidators = []network.MessageValidator{
-				// filter out messages sent by this node itself
-				validator.NewSenderValidator(node.Me.NodeID()),
-				// but retain all the 1-k messages even if they are not intended for this node
-			}
-		}
-
-		anb.unstakedMiddleware = p2p.NewMiddleware(node.Logger.Level(zerolog.ErrorLevel),
-			libP2PNodeFactory,
-			node.Me.NodeID(),
-			node.Metrics.Network,
-			node.RootBlock.ID().String(),
-			peerUpdateInterval,
-			p2p.DefaultUnicastTimeout,
-			msgValidators...)
-
-		participants, err := node.State.Final().Identities(p2p.NetworkingSetFilter)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
-
-		// subscription manager
-		subscriptionManager := p2p.NewChannelSubscriptionManager(anb.unstakedMiddleware)
-		var top network.Topology
-		if anb.staked {
-			top = topology.EmptyListTopology{}
-		} else {
-			upstreamANIdentifier, err := flow.HexStringToIdentifier(anb.stakedAccessNodeIDHex)
+	// setup the Ping provider to return the software version and the sealed block height
+	pingProvider := p2p.PingInfoProviderImpl{
+		SoftwareVersionFun: func() string {
+			return build.Semver()
+		},
+		SealedBlockHeightFun: func() (uint64, error) {
+			head, err := anb.State.Sealed().Head()
 			if err != nil {
-				return nil, fmt.Errorf("failed to convert node id string %s to Flow Identifier: %w", anb.stakedAccessNodeIDHex, err)
+				return 0, err
 			}
-			top = topology.NewFixedListTopology(upstreamANIdentifier)
-		}
+			return head.Height, nil
+		},
+	}
 
-		// creates network instance
-		net, err := p2p.NewNetwork(node.Logger,
-			codec,
-			participants,
-			node.Me,
-			anb.unstakedMiddleware,
-			10e6,
-			top,
-			subscriptionManager,
-			node.Metrics.Network)
-		if err != nil {
-			return nil, fmt.Errorf("could not initialize network: %w", err)
-		}
+	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(anb.Logger,
+		nodeID,
+		anb.unstakedNetworkBindAddr,
+		networkKey,
+		anb.RootBlock.ID().String(),
+		p2p.DefaultMaxPubSubMsgSize,
+		networkMetrics,
+		pingProvider)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
+	}
 
-		anb.unstakedNetwork = net
-
-		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network
-		if !anb.staked {
-			anb.Network = anb.unstakedNetwork
-			anb.Middleware = anb.unstakedMiddleware
-		}
-		anb.Logger.Info().Msgf("unstaked network will run on address: %s", anb.unstakedNetworkBindAddr)
-		return net, err
-	})
+	return libP2PNodeFactory, nil
 }
 
-func (anb *AccessNodeBuilder) initUnstakedLocal() func(node *cmd.FlowNodeBuilder) {
-	return func(node *cmd.FlowNodeBuilder) {
-		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
-		self := &flow.Identity{
-			NodeID:        anb.NodeID,
-			NetworkPubKey: anb.NetworkKey.PublicKey(),
-			StakingPubKey: nil,             // no staking key needed for the unstaked node
-			Role:          flow.RoleAccess, // unstaked node can only run as an access node
-			Address:       anb.unstakedNetworkBindAddr,
-		}
+// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
+// interval, and validators. The network.Middleware is then passed into the initNetwork function.
+func (anb *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
+	networkMetrics module.NetworkMetrics,
+	factoryFunc p2p.LibP2PFactoryFunc,
+	peerUpdateInterval time.Duration,
+	validators ...network.MessageValidator) *p2p.Middleware {
+	anb.unstakedMiddleware = p2p.NewMiddleware(anb.Logger,
+		factoryFunc,
+		nodeID,
+		networkMetrics,
+		anb.RootBlock.ID().String(),
+		peerUpdateInterval,
+		p2p.DefaultUnicastTimeout,
+		validators...)
+	return anb.unstakedMiddleware
+}
 
-		me, err := local.New(self, nil)
-		anb.MustNot(err).Msg("could not initialize local")
-		anb.Me = me
+// initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
+// participants and topology used to choose peers from the list of participants. The list of participants can later be
+// updated by calling network.SetIDs.
+func (anb *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
+	networkMetrics module.NetworkMetrics,
+	middleware *p2p.Middleware,
+	participants flow.IdentityList,
+	topology network.Topology) (*p2p.Network, error) {
+
+	codec := jsoncodec.NewCodec()
+
+	subscriptionManager := p2p.NewChannelSubscriptionManager(middleware)
+
+	// creates network instance
+	net, err := p2p.NewNetwork(anb.Logger,
+		codec,
+		participants,
+		nodeID,
+		anb.unstakedMiddleware,
+		p2p.DefaultCacheSize,
+		topology,
+		subscriptionManager,
+		networkMetrics)
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}
+
+	return net, nil
 }

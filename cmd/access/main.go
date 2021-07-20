@@ -80,7 +80,10 @@ func main() {
 		rpcMetricsEnabled            bool
 	)
 
-	anb := FlowAccessNode()
+	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
+
+	anb.PrintBuildVersionDetails()
+
 	anb.ExtraFlags(func(flags *pflag.FlagSet) {
 		flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
 		flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
@@ -110,8 +113,21 @@ func main() {
 		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", "", "the node ID of the upstream staked access node if this is an unstaked access node")
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
 	})
-	anb.Initialize().
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+
+	// parse all the command line args
+	anb.parseFlags()
+
+	// choose a staked or an unstaked node builder based on anb.staked
+	var nodeBuilder AccessNodeBuilder
+	if anb.staked {
+		nodeBuilder = StakedAccessNode(anb)
+	} else {
+		nodeBuilder = UnstakedAccessNode(anb)
+	}
+
+	nodeBuilder.
+		Initialize().
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -128,7 +144,7 @@ func main() {
 			)
 			return err
 		}).
-		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
 				node.Logger.Info().Msg("using a dynamic collection node address")
@@ -150,13 +166,13 @@ func main() {
 			collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
-		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
+		Module("historical access node clients", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
 					continue
 				}
-				node.Logger.Info().Err(err).Msgf("Historical access node Addr: %s", addr)
+				node.Logger.Err(err).Msgf("Historical access node Addr: %s", addr)
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
@@ -169,15 +185,15 @@ func main() {
 			}
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("transaction timing mempools", func(node *cmd.FlowNodeBuilder) error {
+		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
 				return err
@@ -196,16 +212,16 @@ func main() {
 			blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 			return err
 		}).
-		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("transaction metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
 			return nil
 		}).
-		Module("ping metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("ping metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -228,7 +244,7 @@ func main() {
 			)
 			return rpcEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			requestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -247,13 +263,13 @@ func main() {
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return requestEng, nil
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
@@ -314,7 +330,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -335,8 +351,8 @@ func main() {
 		})
 
 	// the ping engine is only needed for the staked access node
-	if anb.staked {
-		anb.Component("ping engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	if nodeBuilder.IsStaked() {
+		nodeBuilder.Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ping, err := pingeng.New(
 				node.Logger,
 				node.State,
@@ -353,9 +369,5 @@ func main() {
 		})
 	}
 
-	// initialize the unstaked node's identity
-	if !anb.staked {
-		anb.PreInit(anb.initUnstakedLocal())
-	}
-	anb.Run()
+	nodeBuilder.Run()
 }
