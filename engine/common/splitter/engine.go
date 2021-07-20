@@ -149,33 +149,27 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // process calls the given function in parallel for all the engines that have
 // registered with this splitter.
 func (e *Engine) process(processFunc func(module.Engine) error) error {
-	var wg sync.WaitGroup
-
 	e.enginesMu.RLock()
 
-	errors := make(chan error, len(e.engines))
+	numEngines := len(e.engines)
+	errors := make(chan error, numEngines)
+
 	for eng := range e.engines {
-		wg.Add(1)
+		eng := eng // https://golang.org/doc/faq#closures_and_goroutines
 
-		go func(downstream module.Engine) {
-			defer wg.Done()
-
-			if err := processFunc(downstream); err != nil {
-				errors <- err
-			}
-		}(eng)
+		go func() {
+			errors <- processFunc(eng)
+		}()
 	}
 
 	e.enginesMu.RUnlock()
 
-	wg.Wait()
-
-	close(errors)
-
 	var multiErr *multierror.Error
 
-	for err := range errors {
-		multiErr = multierror.Append(multiErr, err)
+	for i := 0; i < numEngines; i++ {
+		if err := <-errors; err != nil {
+			multiErr = multierror.Append(multiErr, err)
+		}
 	}
 
 	return multiErr.ErrorOrNil()
