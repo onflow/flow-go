@@ -73,12 +73,12 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 			// We can say block 10 is finalized, without receiving any blocks prior to block 10.
 			if viewDistance == heightDistance {
 				finalized := ancestor
-				fmt.Printf("=> height %d finalized %d \n", b.Header.Height, ancestor.Header.Height)
+
 				bs.finalizedByHeight[h] = finalized
 				if h > bs.highestFinalized { // updates highestFinalized height
 					bs.highestFinalized = h
 				}
-
+				fmt.Printf("=> height %d finalized %d, highest finalized %d \n", b.Header.Height, h, bs.highestFinalized)
 				// update last sealed height
 				for _, seal := range finalized.Payload.Seals {
 					sealed, ok := bs.blocksByID[seal.BlockID]
@@ -116,7 +116,9 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 	require.Eventually(t, func() bool {
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive next finalizedblock (height %v) within %v seconds", currentFinalized+1,
+		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds",
+			bs.highestFinalized,
+			currentFinalized,
 			blockStateTimeout))
 
 	return bs.finalizedByHeight[bs.highestFinalized]
