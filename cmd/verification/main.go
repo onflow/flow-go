@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
 )
 
@@ -103,6 +104,7 @@ func main() {
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blocktimer.DefaultBlockTimer,
 			)
 			return err
 		}).
