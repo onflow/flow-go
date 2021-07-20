@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
 )
 
 // Engine is the splitter engine, which maintains a list of registered engines

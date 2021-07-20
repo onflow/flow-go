@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
 )
 
 // Network is the splitter network. It is a wrapper around the default network implementation
