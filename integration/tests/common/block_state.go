@@ -57,6 +57,7 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 // It also processes the seals of blocks being finalized.
 func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight uint64) {
 	// puts this block proposal and all ancestors into `finalizedByHeight`
+	fmt.Printf("=> height arrived: %d \n", b.Header.Height)
 	ancestor, ok := b, true
 	for ancestor.Header.Height > bs.highestFinalized {
 		h := ancestor.Header.Height
@@ -72,6 +73,7 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 			// We can say block 10 is finalized, without receiving any blocks prior to block 10.
 			if viewDistance == heightDistance {
 				finalized := ancestor
+				fmt.Printf("=> height %d finalized %d \n", b.Header.Height, ancestor.Header.Height)
 				bs.finalizedByHeight[h] = finalized
 				if h > bs.highestFinalized { // updates highestFinalized height
 					bs.highestFinalized = h
