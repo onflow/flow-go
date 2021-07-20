@@ -191,43 +191,6 @@ func (m *Middleware) Stop() {
 	m.wg.Wait()
 }
 
-// Send sends the message to the set of target ids
-// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.SendDirect
-// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
-//
-// Deprecated: Send exists for historical compatibility, and should not be used on new
-// developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
-// Publish are recommended instead.
-func (m *Middleware) Send(channel network.Channel, msg *message.Message, targetIDs ...flow.Identifier) error {
-	var err error
-	mode := m.chooseMode(channel, msg, targetIDs...)
-	// decide what mode of communication to use
-	switch mode {
-	case NoOp:
-		// NOTE: we can't error on this at the moment, because single nodes of
-		// a role in tests will attempt to send messages like this, which should
-		// be a no-op, but not an error
-		m.log.Debug().Msg("send to no-one")
-		return nil
-	case OneToOne:
-		if targetIDs[0] == m.me {
-			// to avoid self dial by the underlay
-			m.log.Debug().Msg("send to self")
-			return nil
-		}
-		err = m.SendDirect(msg, targetIDs[0])
-	case OneToK:
-		err = m.Publish(msg, channel)
-	default:
-		err = fmt.Errorf("invalid communcation mode: %d", mode)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to send message to %s:%w", targetIDs, err)
-	}
-	return nil
-}
-
 // chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
 func (m *Middleware) chooseMode(_ network.Channel, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
 	switch len(targetIDs) {
