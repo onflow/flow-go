@@ -101,7 +101,7 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	ejectionTrigger             uint
+	ejectionTrigger   uint
 	eject             EjectFunc
 	ejectionCallbacks []mempool.OnEjection
 }
@@ -111,7 +111,7 @@ type Backend struct {
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
 		Backdata:          NewBackdata(),
-		ejectionTrigger:             uint(math.MaxUint32),
+		ejectionTrigger:   uint(math.MaxUint32),
 		eject:             EjectTrueRandomFast,
 		ejectionCallbacks: nil,
 	}
