@@ -705,8 +705,7 @@ const deployLockedTokensTemplate = `
 transaction(publicKeys: [[UInt8]]) {
     
     prepare(admin: AuthAccount) {
-        let lockedTokens = AuthAccount(payer: admin)
-        lockedTokens.contracts.add(name: "LockedTokens", code: "%s".decodeHex(), admin)
+        admin.contracts.add(name: "LockedTokens", code: "%s".decodeHex(), admin)
 
         for key in publicKeys {
             lockedTokens.addPublicKey(key)
