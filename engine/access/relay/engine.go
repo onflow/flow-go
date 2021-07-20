@@ -3,11 +3,12 @@ package relay
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
-	"github.com/rs/zerolog"
 )
 
 // Relay engine relays all the messages that are received to the given network for the corresponding channel
