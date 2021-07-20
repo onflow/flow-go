@@ -716,6 +716,10 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		DKGParticipantKeys: dkg.PubKeyShares,
 	}
 
+	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
+	}
 	epochConfig := epochs.EpochConfig{
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
@@ -725,7 +729,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		NumViewsInDKGPhase:           cadence.UInt64(networkConf.ViewsInDKGPhase),
 		NumCollectorClusters:         cadence.UInt16(len(clusterQCs)),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
-		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
+		RandomSource:                 cdcRandomSource,
 		CollectorClusters:            clusterAssignments,
 		ClusterQCs:                   clusterQCs,
 		DKGPubKeys:                   dkg.PubKeyShares,

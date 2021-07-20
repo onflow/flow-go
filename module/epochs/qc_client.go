@@ -97,14 +97,22 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		AddAuthorizer(account.Address)
 
 	// add signature to the transaction
-	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(vote.SigData)))
+	sigDataHex, err := cadence.NewString(hex.EncodeToString(vote.SigData))
+	if err != nil {
+		return fmt.Errorf("could not convert vote sig data: %w", err)
+	}
+	err = tx.AddArgument(sigDataHex)
 	if err != nil {
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}
 
 	// add message to the transaction
 	voteMessage := hotstuffver.MakeVoteMessage(vote.View, vote.BlockID)
-	err = tx.AddArgument(cadence.NewString(hex.EncodeToString(voteMessage)))
+	voteMessageHex, err := cadence.NewString(hex.EncodeToString(voteMessage))
+	if err != nil {
+		return fmt.Errorf("could not convert vote message: %w", err)
+	}
+	err = tx.AddArgument(voteMessageHex)
 	if err != nil {
 		return fmt.Errorf("could not add raw vote data to transaction: %w", err)
 	}

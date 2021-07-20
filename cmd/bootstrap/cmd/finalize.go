@@ -481,9 +481,14 @@ func generateEmptyExecutionState(
 		log.Fatal().Err(err).Msg("unable to parse the service account public key json")
 	}
 
-	value, err := cadence.NewUFix64(flagGenesisTokenSupply)
+	cdcInitialTokenSupply, err := cadence.NewUFix64(flagGenesisTokenSupply)
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid genesis token supply")
+	}
+
+	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
+	if err != nil {
+		log.Fatal().Err(err).Msg("invalid random source")
 	}
 
 	epochConfig := epochs.EpochConfig{
@@ -495,7 +500,7 @@ func generateEmptyExecutionState(
 		NumViewsInDKGPhase:           cadence.UInt64(flagNumViewsInDKGPhase),
 		NumCollectorClusters:         cadence.UInt16(flagCollectionClusters),
 		FLOWsupplyIncreasePercentage: cadence.UFix64(0),
-		RandomSource:                 cadence.NewString(hex.EncodeToString(randomSource)),
+		RandomSource:                 cdcRandomSource,
 		CollectorClusters:            assignments,
 		ClusterQCs:                   clusterQCs,
 		DKGPubKeys:                   dkg.PubKeyShares,
@@ -505,7 +510,7 @@ func generateEmptyExecutionState(
 		filepath.Join(flagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
 		parseChainID(flagRootChain).Chain(),
-		fvm.WithInitialTokenSupply(value),
+		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
