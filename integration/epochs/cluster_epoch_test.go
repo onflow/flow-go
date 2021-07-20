@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	emulator "github.com/onflow/flow-emulator"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -19,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go-sdk/test"
 
 	"github.com/onflow/flow-go/crypto"
@@ -139,7 +141,9 @@ func (s *Suite) StartVoting(clustering flow.ClusterList, clusterCount, nodesPerC
 		nodeWeights := make([]cadence.Value, 0, nodesPerCluster)
 
 		for _, node := range cluster {
-			nodeIDs = append(nodeIDs, cadence.NewString(node.NodeID.String()))
+			cdcNodeID, err := cadence.NewString(node.NodeID.String())
+			require.NoError(s.T(), err)
+			nodeIDs = append(nodeIDs, cdcNodeID)
 			nodeWeights = append(nodeWeights, cadence.NewUInt64(node.Stake))
 		}
 
@@ -178,10 +182,14 @@ func (s *Suite) CreateVoterResource(address sdk.Address, nodeID flow.Identifier,
 	err := registerVoterTx.AddArgument(cadence.NewAddress(s.qcAddress))
 	require.NoError(s.T(), err)
 
-	err = registerVoterTx.AddArgument(cadence.NewString(nodeID.String()))
+	cdcNodeID, err := cadence.NewString(nodeID.String())
+	require.NoError(s.T(), err)
+	err = registerVoterTx.AddArgument(cdcNodeID)
 	require.NoError(s.T(), err)
 
-	err = registerVoterTx.AddArgument(cadence.NewString(hex.EncodeToString(publicStakingKey.Encode())))
+	cdcStakingPubKey, err := cadence.NewString(hex.EncodeToString(publicStakingKey.Encode()))
+	require.NoError(s.T(), err)
+	err = registerVoterTx.AddArgument(cdcStakingPubKey)
 	require.NoError(s.T(), err)
 
 	s.SignAndSubmit(registerVoterTx,
@@ -257,8 +265,11 @@ func initClusters(clusterNodeIDStrings [][]string, numberOfClusters, numberOfNod
 
 		for j := 0; j < numberOfNodesPerCluster; j++ {
 			nodeID := fmt.Sprintf("%064d", i*numberOfNodesPerCluster+j)
-
-			nodeIDs[j] = cadence.NewString(nodeID)
+			cdcNodeID, err := cadence.NewString(nodeID)
+			if err != nil {
+				panic(err)
+			}
+			nodeIDs[j] = cdcNodeID
 
 			// default weight per node
 			nodeWeights[j] = cadence.NewUInt64(uint64(100))
