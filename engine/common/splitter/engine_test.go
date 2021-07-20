@@ -4,7 +4,6 @@ import (
 	"errors"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
@@ -161,48 +160,4 @@ func (suite *Suite) TestConcurrentEvents() {
 		engine.AssertNumberOfCalls(suite.T(), "Process", numEvents)
 		engine.AssertExpectations(suite.T())
 	}
-}
-
-// TestReady tests that the splitter's Ready channel closes once all
-// registered engines are ready.
-func (suite *Suite) TestReady() {
-	engine1 := new(mockmodule.Engine)
-	engine2 := new(mockmodule.Engine)
-
-	err := suite.engine.RegisterEngine(engine1)
-	suite.Assert().Nil(err)
-	err = suite.engine.RegisterEngine(engine2)
-	suite.Assert().Nil(err)
-
-	ready1 := make(chan struct{})
-	ready2 := make(chan struct{})
-
-	engine1.On("Ready").Return((<-chan struct{})(ready1)).Once()
-	engine2.On("Ready").Return((<-chan struct{})(ready2)).Once()
-
-	splitterReady := suite.engine.Ready()
-	<-time.After(100 * time.Millisecond)
-
-	select {
-	case <-splitterReady:
-		suite.FailNow("Splitter should not be ready until all registered engines are.")
-	default:
-	}
-
-	close(ready1)
-	<-time.After(100 * time.Millisecond)
-
-	select {
-	case <-splitterReady:
-		suite.FailNow("Splitter should not be ready until all registered engines are.")
-	default:
-	}
-
-	close(ready2)
-
-	_, ok := <-splitterReady
-	suite.Assert().False(ok)
-
-	engine1.AssertExpectations(suite.T())
-	engine2.AssertExpectations(suite.T())
 }

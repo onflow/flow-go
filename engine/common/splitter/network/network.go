@@ -10,6 +10,7 @@ import (
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // Network is the splitter network. It is a wrapper around the default network implementation
@@ -19,7 +20,7 @@ import (
 // splitter engine. As a result, multiple engines can register with the splitter network on
 // the same channel and will each receive all events on that channel.
 type Network struct {
-	module.Network
+	p2p.ReadyDoneAwareNetwork
 	mu        sync.RWMutex
 	log       zerolog.Logger
 	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
@@ -28,14 +29,14 @@ type Network struct {
 
 // NewNetwork returns a new splitter network.
 func NewNetwork(
-	net module.Network,
+	net p2p.ReadyDoneAwareNetwork,
 	log zerolog.Logger,
 ) (*Network, error) {
 	e := &Network{
-		Network:   net,
-		splitters: make(map[network.Channel]*splitterEngine.Engine),
-		conduits:  make(map[network.Channel]network.Conduit),
-		log:       log,
+		ReadyDoneAwareNetwork: net,
+		splitters:             make(map[network.Channel]*splitterEngine.Engine),
+		conduits:              make(map[network.Channel]network.Conduit),
+		log:                   log,
 	}
 
 	return e, nil
@@ -86,7 +87,7 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	}
 
 	if !channelRegistered {
-		conduit, err = n.Network.Register(channel, splitter)
+		conduit, err = n.ReadyDoneAwareNetwork.Register(channel, splitter)
 
 		if err != nil {
 			// undo previous steps
@@ -100,4 +101,27 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	}
 
 	return conduit, nil
+}
+
+// Ready returns a ready channel that is closed once the network has fully
+// started. For the splitter network, this is true once the wrapped network
+// has started.
+func (n *Network) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	go func() {
+		<-n.ReadyDoneAwareNetwork.Ready()
+		close(ready)
+	}()
+	return ready
+}
+
+// Done returns a done channel that is closed once the network has fully stopped.
+// For the splitter network, this is true once the wrapped network has stopped.
+func (n *Network) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		<-n.ReadyDoneAwareNetwork.Done()
+		close(done)
+	}()
+	return done
 }

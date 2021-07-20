@@ -67,33 +67,14 @@ func (e *Engine) UnregisterEngine(engine module.Engine) {
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
-// started. For the splitter engine, this is true once all of the
-// registered engines have started.
+// started.
 func (e *Engine) Ready() <-chan struct{} {
-	return e.unit.Ready(func() {
-		e.enginesMu.RLock()
-		defer e.enginesMu.RUnlock()
-		for engine := range e.engines {
-			e.enginesMu.RUnlock()
-			<-engine.Ready()
-			e.enginesMu.RLock()
-		}
-	})
+	return e.unit.Ready()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
-// For the splitter engine, this is true once all of the registered engines
-// have stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
-		e.enginesMu.RLock()
-		defer e.enginesMu.RUnlock()
-		for engine := range e.engines {
-			e.enginesMu.RUnlock()
-			<-engine.Done()
-			e.enginesMu.RLock()
-		}
-	})
+	return e.unit.Done()
 }
 
 // SubmitLocal submits an event originating on the local node.

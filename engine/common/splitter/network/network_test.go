@@ -33,7 +33,7 @@ type Suite struct {
 }
 
 func (suite *Suite) SetupTest() {
-	net := new(mockmodule.Network)
+	net := new(mocknetwork.ReadyDoneAwareNetwork)
 	suite.con = new(mocknetwork.Conduit)
 	suite.engines = make(map[network.Channel]module.Engine)
 
