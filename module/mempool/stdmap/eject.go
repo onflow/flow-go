@@ -16,21 +16,6 @@ import (
 // to clean up auxiliary data and/or to change the strategy of eviction.
 type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 
-// EjectFakeRandom relies on the random map iteration in Go to pick the entity we eject
-// from the entity set. It picks the first entity upon iteration, thus being the fastest
-// way to pick an entity to be evicted; at the same time, it conserves the random bias
-// of the Go map iteration.
-func EjectFakeRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
-	var entityID flow.Identifier
-	var entity flow.Entity
-	var bFound bool = false
-	for entityID, entity = range b.entities {
-		bFound = true
-		break
-	}
-	return entityID, entity, bFound
-}
-
 // EjectTrueRandom relies on a random generator to pick a random entity to eject from the
 // entity set. It will, on average, iterate through half the entities of the set. However,
 // it provides us with a truly evenly distributed random selection.
@@ -52,7 +37,8 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 
 // EjectTrueRandomFast checks if the map size is beyond the
 // ideal size, and will iterate through them and eject unneeded
-// entries if that is the case.
+// entries if that is the case.  Return values are unused, but
+// necessary because the LRUEjector is using the EjectTrueRandom
 func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 
 	// this is 64 for performance reasons - modulus 64 is a bit shift
@@ -65,59 +51,57 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 
 	var entities = b.entities
 
-	var retval flow.Identifier 	// dummy value 
+	// dummy value
+	var retval flow.Identifier
 
 	// 'len' returns a uint.  This map is assumed to be < sizeof(uint)
 	mapSize := len(entities)
 
 	// this should never happen, and is just for a quick check
-	if b.limit > uint(mapSize) {
+	if b.ejectionTrigger > uint(mapSize) {
 		return retval, nil, false
 	}
 
-	if (uint(mapSize) - b.limit) <= threshold {
+	if (uint(mapSize) - b.ejectionTrigger) <= threshold {
 		// nothing to do, yet
 		return retval, nil, false
 	}
 
-	// generate 64 random numbers (the additional 64 is so that we don't
-	// go outside the boundary once the elements are ejected)
-
-	var entityID flow.Identifier
-	var entity flow.Entity
-
-	// mapSize is at LEAST 128 over the desired size. We want to eject
-	// up to 64 items (so index is not OOB), so remove 64 from map size
-	maxInterval := (mapSize - batchSize) / batchSize
+	// generate 64 random numbers
 
 	// this array will store 64 indexes into the map
 	var mapIndexes [batchSize]int64
 
 	// starting point, create 64 random, sequentially increasing, values
-	var index int64 = 0
-
 	var i uint = 0
-	for ; i < batchSize-1; i++ {
-		// get a random number (zero-based) between 0 and maxInterval
-		index += int64(rand.Intn(maxInterval - 1))
 
-		mapIndexes[i] = index
-
-		// increment so we're not looking at the same element if rnd is 0
-		index++
+	for ; i < batchSize; i++ {
+		// get a random number (zero-based)
+		mapIndexes[i] = int64(rand.Intn(mapSize))
 	}
 
-	// for the last item in 'batchSize', the random number should use the
-	// remaining count as the parameter for the random value
-	index += int64(rand.Intn(mapSize - 1 - int(index)))
-	mapIndexes[i] = index
+	// this is the sort from golang/sort for small arrays
+	for i = 1; i < batchSize; i++ {
+		for j := i; mapIndexes[j] < mapIndexes[j-1]; j-- {
+			tmp := mapIndexes[j]
+			mapIndexes[j] = mapIndexes[j-1]
+			mapIndexes[j-1] = tmp
+		}
+	}
+
+	var entityID flow.Identifier
+	var entity flow.Entity
 
 	// Now, mapIndexes has a sequentially sorted set of indexes to remove.
-	// Remove them in a loop
+	// Remove them in a loop.  If there are duplicate random indexes to remove,
+	// they are ignored.  If a random index is over the limit, it is ignored,
+	// the next call will make up for it.
 	i = 0
 	idx := 0 // index into mapIndexes
+
 	for entityID, entity = range entities {
-		if int64(i) == mapIndexes[idx] {
+		// if the map index is a duplicate, 'i' could be greater
+		if int64(i) >= mapIndexes[idx] {
 			// remove this entry here
 			delete(entities, entityID)
 
@@ -134,6 +118,7 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 		}
 		i++
 	}
+
 	return retval, nil, false
 }
 
