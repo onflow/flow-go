@@ -292,7 +292,8 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) SubmitLocal(event interface{}) {
 	err := e.process(e.me.NodeID(), event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		// receiving an input of incompatible type from a trusted internal component is fatal
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -302,7 +303,15 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	err := e.process(originID, event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		lg := e.log.With().
+			Err(err).
+			Str("channel", channel.String()).
+			Str("origin", originID.String()).
+			Logger()
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			lg.Error().Msg("received message with incompatible type")
+		}
+		lg.Fatal().Msg("internal error processing message")
 	}
 }
 
@@ -318,6 +327,9 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 }
 
 // process processes events for the synchronization engine.
+// Error returns:
+//  * IncompatibleInputTypeError if input has unexpected type
+//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -325,7 +337,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.SyncResponse, *messages.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
 	}
 }
 
@@ -348,7 +360,7 @@ func (e *Engine) requestProcessingLoop() {
 		case <-notifier:
 			err := e.processAvailableRequests()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				e.log.Fatal().Err(err).Msg("internal error processing queued request")
 			}
 		}
 	}
@@ -380,7 +392,7 @@ func (e *Engine) responseProcessingLoop() {
 		case <-notifier:
 			err := e.processAvailableResponses()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued message")
+				e.log.Fatal().Err(err).Msg("internal error processing queued response")
 			}
 		}
 	}
@@ -400,7 +412,7 @@ func (e *Engine) processAvailableResponses() error {
 			err := e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 			if err != nil {
-				return fmt.Errorf("could not process sync response")
+				return fmt.Errorf("processing sync response failed: %w", err)
 			}
 			continue
 		}
@@ -410,7 +422,7 @@ func (e *Engine) processAvailableResponses() error {
 			err := e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
 			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 			if err != nil {
-				return fmt.Errorf("could not process block response")
+				return fmt.Errorf("processing block response failed: %w", err)
 			}
 			continue
 		}
@@ -435,7 +447,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
 			if err != nil {
-				return fmt.Errorf("could not process sync request: %w", err)
+				return fmt.Errorf("processing sync request failed: %w", err)
 			}
 			continue
 		}
@@ -444,7 +456,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
 			if err != nil {
-				return fmt.Errorf("could not process range request: %w", err)
+				return fmt.Errorf("processing range request failed: %w", err)
 			}
 			continue
 		}
@@ -453,7 +465,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
 			if err != nil {
-				return fmt.Errorf("could not process batch request: %w", err)
+				return fmt.Errorf("processing batch request failed: %w", err)
 			}
 			continue
 		}
