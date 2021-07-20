@@ -98,17 +98,16 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	})
 }
 
-func (e *Engine) process(channel network.Channel, _ flow.Identifier, event interface{}) error {
+func (e *Engine) process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	conduit, ok := e.conduits[channel]
 
 	if !ok {
-		e.log.Trace().Str("channel", channel.String()).Msg("unknown channel")
+		e.log.Trace().Interface("event", event).Str("channel", channel.String()).Str("originID", originID.String()).Msg("unknown channel")
 		return fmt.Errorf("received message on unknown channel %s", channel)
 	}
 
 	// We use a dummy target ID here so that events are broadcast to the entire network
 	if err := conduit.Publish(event, flow.ZeroID); err != nil {
-		e.log.Trace().AnErr("error", err).Msg("relay failed")
 		return fmt.Errorf("could not relay message: %w", err)
 	}
 
