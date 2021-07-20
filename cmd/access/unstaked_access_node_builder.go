@@ -23,48 +23,48 @@ func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 	}
 }
 
-func (uanb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
-	uanb.validateParams()
+	builder.validateParams()
 
-	uanb.enqueueUnstakedNetworkInit()
+	builder.enqueueUnstakedNetworkInit()
 
-	uanb.EnqueueMetricsServerInit()
+	builder.EnqueueMetricsServerInit()
 
-	uanb.RegisterBadgerMetrics()
+	builder.RegisterBadgerMetrics()
 
-	uanb.EnqueueTracer()
+	builder.EnqueueTracer()
 
-	uanb.PreInit(uanb.initUnstakedLocal())
+	builder.PreInit(builder.initUnstakedLocal())
 
-	return uanb
+	return builder
 }
 
-func (uanb *UnstakedAccessNodeBuilder) validateParams() {
+func (builder *UnstakedAccessNodeBuilder) validateParams() {
 
 	// for an unstaked access node, the staked access node ID must be provided
-	if strings.TrimSpace(uanb.stakedAccessNodeIDHex) == "" {
-		uanb.Logger.Fatal().Msg("staked access node ID not specified")
+	if strings.TrimSpace(builder.stakedAccessNodeIDHex) == "" {
+		builder.Logger.Fatal().Msg("staked access node ID not specified")
 	}
 
 	// and also the unstaked bind address
-	if uanb.unstakedNetworkBindAddr == cmd.NotSet {
-		uanb.Logger.Fatal().Msg("unstaked bind address not set")
+	if builder.unstakedNetworkBindAddr == cmd.NotSet {
+		builder.Logger.Fatal().Msg("unstaked bind address not set")
 	}
 }
 
 // initUnstakedLocal initializes the unstaked node ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (uanb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeBuilder, node *cmd.NodeConfig) {
-	return func(builder cmd.NodeBuilder, node *cmd.NodeConfig) {
+func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeBuilder, node *cmd.NodeConfig) {
+	return func(_ cmd.NodeBuilder, node *cmd.NodeConfig) {
 		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
 			NodeID:        node.NodeID,
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the unstaked node
 			Role:          flow.RoleAccess, // unstaked node can only run as an access node
-			Address:       uanb.unstakedNetworkBindAddr,
+			Address:       builder.unstakedNetworkBindAddr,
 		}
 
 		me, err := local.New(self, nil)
@@ -74,9 +74,9 @@ func (uanb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.Node
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
-func (uanb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	uanb.Component("unstaked network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		// NodeID for the unstaked node on the unstaked network
 		unstakedNodeID := node.NodeID
@@ -90,38 +90,38 @@ func (uanb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
 		// network metrics
-		libP2PFactory, err := uanb.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
-		uanb.MustNot(err)
+		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
+		builder.MustNot(err)
 
 		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(uanb.Logger, unstakedNodeID)
+		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
 
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
 
-		middleware := uanb.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		participants := flow.IdentityList{}
 
-		upstreamANIdentifier, err := flow.HexStringToIdentifier(uanb.stakedAccessNodeIDHex)
-		uanb.MustNot(err)
+		upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
+		builder.MustNot(err)
 
 		// topology only consist of the upsteam staked AN
 		top := topology.NewFixedListTopology(upstreamANIdentifier)
 
-		network, err := uanb.initNetwork(uanb.Me, unstakedNetworkMetrics, middleware, participants, top)
-		uanb.MustNot(err)
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
+		builder.MustNot(err)
 
-		uanb.UnstakedNetwork = network
-		uanb.unstakedMiddleware = middleware
+		builder.UnstakedNetwork = network
+		builder.unstakedMiddleware = middleware
 
 		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
-		uanb.Network = network
-		uanb.Middleware = middleware
+		builder.Network = network
+		builder.Middleware = middleware
 
-		uanb.Logger.Info().Msgf("unstaked network will run on address: %s", uanb.unstakedNetworkBindAddr)
+		builder.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
 
-		return uanb.UnstakedNetwork, err
+		return builder.UnstakedNetwork, err
 	})
 }

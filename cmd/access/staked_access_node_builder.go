@@ -25,44 +25,44 @@ func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 
 // SupportUnstakedNodes returns True if this a staked Access Node which also participates in the unstaked network,
 // False otherwise
-func (sanb *StakedAccessNodeBuilder) supportUnstakedNodes() bool {
+func (builder *StakedAccessNodeBuilder) supportUnstakedNodes() bool {
 	// if an unstaked network bind address is provided, then this staked access node will act as the upstream for
 	// unstaked access nodes
-	return sanb.FlowAccessNodeBuilder.unstakedNetworkBindAddr != cmd.NotSet
+	return builder.FlowAccessNodeBuilder.unstakedNetworkBindAddr != cmd.NotSet
 }
 
-func (sanb *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
-	sanb.EnqueueNetworkInit()
+	builder.EnqueueNetworkInit()
 
 	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
-	if sanb.supportUnstakedNodes() {
-		sanb.enqueueUnstakedNetworkInit()
+	if builder.supportUnstakedNodes() {
+		builder.enqueueUnstakedNetworkInit()
 	}
 
-	sanb.EnqueueMetricsServerInit()
+	builder.EnqueueMetricsServerInit()
 
-	sanb.RegisterBadgerMetrics()
+	builder.RegisterBadgerMetrics()
 
-	sanb.EnqueueTracer()
+	builder.EnqueueTracer()
 
-	return sanb
+	return builder
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
-func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	sanb.Component("unstaked network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		// NodeID for the staked node on the unstaked network
 		// TODO: set a different node ID of the staked access node on the unstaked network
-		unstakedNodeID := sanb.NodeID // currently set the same as the staked NodeID
+		unstakedNodeID := builder.NodeID // currently set the same as the staked NodeID
 
 		// Networking key
 		// TODO: set a different networking key of the staked access node on the unstaked network
-		unstakedNetworkKey := sanb.NetworkKey
+		unstakedNetworkKey := builder.NetworkKey
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -71,16 +71,16 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
 		// network metrics
-		libP2PFactory, err := sanb.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
-		sanb.MustNot(err)
+		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
+		builder.MustNot(err)
 
 		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(sanb.Logger, unstakedNodeID)
+		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
 
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
 
-		middleware := sanb.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		// TODO: this list should be the unstaked addresses of all the staked AN that participate in the unstaked network
@@ -89,13 +89,13 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		network, err := sanb.initNetwork(sanb.Me, unstakedNetworkMetrics, middleware, participants, top)
-		sanb.MustNot(err)
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
+		builder.MustNot(err)
 
-		sanb.UnstakedNetwork = network
-		sanb.unstakedMiddleware = middleware
+		builder.UnstakedNetwork = network
+		builder.unstakedMiddleware = middleware
 
-		node.Logger.Info().Msgf("unstaked network will run on address: %s", sanb.unstakedNetworkBindAddr)
-		return sanb.UnstakedNetwork, err
+		node.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
+		return builder.UnstakedNetwork, err
 	})
 }
