@@ -20,6 +20,11 @@ import (
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 
+type ReadyDoneAwareNetwork interface {
+	module.Network
+	module.ReadyDoneAware
+}
+
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
@@ -36,7 +41,7 @@ type Network struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	subMngr network.SubscriptionManager // used to keep track of subscribed channels
-
+	ReadyDoneAwareNetwork
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
