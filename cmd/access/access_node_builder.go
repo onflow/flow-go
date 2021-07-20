@@ -76,7 +76,7 @@ func (anb *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
 			return build.Semver()
 		},
 		SealedBlockHeightFun: func() (uint64, error) {
-			head, err := anb.ProtocolState().Sealed().Head()
+			head, err := anb.State.Sealed().Head()
 			if err != nil {
 				return 0, err
 			}
@@ -84,11 +84,11 @@ func (anb *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
 		},
 	}
 
-	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(anb.Logger(),
+	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(anb.Logger,
 		nodeID,
 		anb.unstakedNetworkBindAddr,
 		networkKey,
-		anb.RootBlock().ID().String(),
+		anb.RootBlock.ID().String(),
 		p2p.DefaultMaxPubSubMsgSize,
 		networkMetrics,
 		pingProvider)
@@ -106,11 +106,11 @@ func (anb *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	peerUpdateInterval time.Duration,
 	validators ...network.MessageValidator) *p2p.Middleware {
-	anb.unstakedMiddleware = p2p.NewMiddleware(anb.Logger(),
+	anb.unstakedMiddleware = p2p.NewMiddleware(anb.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		anb.RootBlock().ID().String(),
+		anb.RootBlock.ID().String(),
 		peerUpdateInterval,
 		p2p.DefaultUnicastTimeout,
 		validators...)
@@ -131,7 +131,7 @@ func (anb *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	subscriptionManager := p2p.NewChannelSubscriptionManager(middleware)
 
 	// creates network instance
-	net, err := p2p.NewNetwork(anb.Logger(),
+	net, err := p2p.NewNetwork(anb.Logger,
 		codec,
 		participants,
 		nodeID,

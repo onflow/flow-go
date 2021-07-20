@@ -54,15 +54,15 @@ func (sanb *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	sanb.Component("unstaked network", func(node cmd.NodeBuilder) (module.ReadyDoneAware, error) {
+	sanb.Component("unstaked network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		// NodeID for the staked node on the unstaked network
 		// TODO: set a different node ID of the staked access node on the unstaked network
-		unstakedNodeID := sanb.NodeID() // currently set the same as the staked NodeID
+		unstakedNodeID := sanb.NodeID // currently set the same as the staked NodeID
 
 		// Networking key
 		// TODO: set a different networking key of the staked access node on the unstaked network
-		unstakedNetworkKey := sanb.NetworkKey()
+		unstakedNetworkKey := sanb.NetworkKey
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -75,7 +75,7 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		sanb.MustNot(err)
 
 		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(sanb.Logger(), unstakedNodeID)
+		msgValidators := p2p.DefaultValidators(sanb.Logger, unstakedNodeID)
 
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
@@ -89,13 +89,13 @@ func (sanb *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		network, err := sanb.initNetwork(sanb.Me(), unstakedNetworkMetrics, middleware, participants, top)
+		network, err := sanb.initNetwork(sanb.Me, unstakedNetworkMetrics, middleware, participants, top)
 		sanb.MustNot(err)
 
 		sanb.UnstakedNetwork = network
+		sanb.unstakedMiddleware = middleware
 
-		logger := sanb.Logger()
-		logger.Info().Msgf("unstaked network will run on address: %s", sanb.unstakedNetworkBindAddr)
+		node.Logger.Info().Msgf("unstaked network will run on address: %s", sanb.unstakedNetworkBindAddr)
 		return sanb.UnstakedNetwork, err
 	})
 }

@@ -47,7 +47,7 @@ type NodeBuilder interface {
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
-	Module(name string, f func(builder NodeBuilder) error) NodeBuilder
+	Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder
 
 	// Component adds a new component to the node that conforms to the ReadyDone
 	// interface.
@@ -55,7 +55,7 @@ type NodeBuilder interface {
 	// When the node is run, this component will be started with `Ready`. When the
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
-	Component(name string, f func(NodeBuilder) (module.ReadyDoneAware, error)) NodeBuilder
+	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
 
 	// MustNot asserts that the given error must not occur.
 	// If the error is nil, returns a nil log event (which acts as a no-op).
@@ -69,43 +69,15 @@ type NodeBuilder interface {
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
-	PreInit(f func(node NodeBuilder)) NodeBuilder
+	PreInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
 
 	// PostInit registers a new PreInit function.
 	// PostInit functions run after the protocol state has been initialized but before any other modules or components
 	// are initialized
-	PostInit(f func(node NodeBuilder)) NodeBuilder
+	PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics()
-
-	// getters
-	Config() BaseConfig
-	NodeID() flow.Identifier
-	Logger() zerolog.Logger
-	Me() *local.Local
-	Tracer() module.Tracer
-	MetricsRegisterer() prometheus.Registerer
-	Metrics() Metrics
-	DB() *badger.DB
-	Storage() Storage
-	ProtocolEvents() *events.Distributor
-	ProtocolState() protocol.State
-	Middleware() *p2p.Middleware
-	Network() *p2p.Network
-	MsgValidators() []network.MessageValidator
-	FvmOptions() []fvm.Option
-	NetworkKey() crypto.PrivateKey
-	RootBlock() *flow.Block
-	RootQC() *flow.QuorumCertificate
-	RootSeal() *flow.Seal
-	RootChainID() flow.ChainID
-
-	// setters
-	SetMsgValidators(validators []network.MessageValidator)
-	SetMe(me *local.Local)
-	SetMiddleware(m *p2p.Middleware)
-	SetNetwork(n *p2p.Network)
 }
 
 // BaseConfig is the general config for the NodeBuilder
@@ -125,4 +97,32 @@ type BaseConfig struct {
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
+}
+
+// NodeConfig
+type NodeConfig struct {
+	BaseConfig
+	Logger            zerolog.Logger
+	NodeID            flow.Identifier
+	Me                *local.Local
+	Tracer            module.Tracer
+	MetricsRegisterer prometheus.Registerer
+	Metrics           Metrics
+	DB                *badger.DB
+	Storage           Storage
+	ProtocolEvents    *events.Distributor
+	State             protocol.State
+	Middleware        *p2p.Middleware
+	Network           *p2p.Network
+	MsgValidators     []network.MessageValidator
+	FvmOptions        []fvm.Option
+	StakingKey        crypto.PrivateKey
+	NetworkKey        crypto.PrivateKey
+
+	// root state information
+	RootBlock   *flow.Block
+	RootQC      *flow.QuorumCertificate
+	RootResult  *flow.ExecutionResult
+	RootSeal    *flow.Seal
+	RootChainID flow.ChainID
 }
