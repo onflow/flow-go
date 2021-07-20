@@ -708,7 +708,7 @@ transaction(publicKeys: [[UInt8]]) {
         admin.contracts.add(name: "LockedTokens", code: "%s".decodeHex(), admin)
 
         for key in publicKeys {
-            lockedTokens.addPublicKey(key)
+            admin.addPublicKey(key)
         }
     }
 }
