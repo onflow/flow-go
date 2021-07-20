@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 
@@ -53,13 +54,18 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	err = suite.engine.RegisterEngine(engine2)
 	suite.Assert().Nil(err)
 
+	processError := errors.New("Process Error!")
+
 	// engine1 processing error should not impact engine2
 
-	engine1.On("Process", suite.channel, id, event).Return(errors.New("Process Error!")).Once()
+	engine1.On("Process", suite.channel, id, event).Return(processError).Once()
 	engine2.On("Process", suite.channel, id, event).Return(nil).Once()
 
 	err = suite.engine.Process(suite.channel, id, event)
-	suite.Assert().Nil(err)
+	merr, ok := err.(*multierror.Error)
+	suite.Assert().True(ok)
+	suite.Assert().Len(merr.Errors, 1)
+	suite.Assert().ErrorIs(merr.Errors[0], processError)
 
 	engine1.AssertNumberOfCalls(suite.T(), "Process", 1)
 	engine2.AssertNumberOfCalls(suite.T(), "Process", 1)
@@ -70,10 +76,13 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	// engine2 processing error should not impact engine1
 
 	engine1.On("Process", suite.channel, id, event).Return(nil).Once()
-	engine2.On("Process", suite.channel, id, event).Return(errors.New("Process Error!")).Once()
+	engine2.On("Process", suite.channel, id, event).Return(processError).Once()
 
 	err = suite.engine.Process(suite.channel, id, event)
-	suite.Assert().Nil(err)
+	merr, ok = err.(*multierror.Error)
+	suite.Assert().True(ok)
+	suite.Assert().Len(merr.Errors, 1)
+	suite.Assert().ErrorIs(merr.Errors[0], processError)
 
 	engine1.AssertNumberOfCalls(suite.T(), "Process", 2)
 	engine2.AssertNumberOfCalls(suite.T(), "Process", 2)

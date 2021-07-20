@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -150,10 +150,10 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // registered with this splitter.
 func (e *Engine) process(processFunc func(module.Engine) error) error {
 	var wg sync.WaitGroup
-	errors := make(chan error)
 
 	e.enginesMu.RLock()
 
+	errors := make(chan error, len(e.engines))
 	for eng := range e.engines {
 		wg.Add(1)
 
@@ -172,15 +172,11 @@ func (e *Engine) process(processFunc func(module.Engine) error) error {
 
 	close(errors)
 
-	if len(errors) == 0 {
-		return nil
-	}
-
 	var multiErr *multierror.Error
 
 	for err := range errors {
 		multiErr = multierror.Append(multiErr, err)
 	}
 
-	return multiErr
+	return multiErr.ErrorOrNil()
 }
