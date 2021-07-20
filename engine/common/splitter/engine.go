@@ -91,7 +91,7 @@ func (e *Engine) Done() <-chan struct{} {
 		for engine := range e.engines {
 			e.enginesMu.RUnlock()
 			<-engine.Done()
-			e.enginesMu.RLock()
+
 		}
 	})
 }
@@ -101,9 +101,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 	e.unit.Launch(func() {
 		e.enginesMu.RLock()
 		defer e.enginesMu.RUnlock()
-
 		for eng := range e.engines {
+			e.enginesMu.RUnlock()
 			eng.SubmitLocal(event)
+			e.enginesMu.RLock()
 		}
 	})
 }
@@ -115,9 +116,10 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 	e.unit.Launch(func() {
 		e.enginesMu.RLock()
 		defer e.enginesMu.RUnlock()
-
 		for eng := range e.engines {
+			e.enginesMu.RUnlock()
 			eng.Submit(channel, originID, event)
+			e.enginesMu.RLock()
 		}
 	})
 }
@@ -149,27 +151,26 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 // process calls the given function in parallel for all the engines that have
 // registered with this splitter.
 func (e *Engine) process(processFunc func(module.Engine) error) error {
+	count := 0
+	errors := make(chan error)
+
 	e.enginesMu.RLock()
-
-	numEngines := len(e.engines)
-	errors := make(chan error, numEngines)
-
 	for eng := range e.engines {
-		eng := eng // https://golang.org/doc/faq#closures_and_goroutines
+		e.enginesMu.RUnlock()
 
-		go func() {
-			errors <- processFunc(eng)
-		}()
+		count += 1
+		go func(downstream module.Engine) {
+			errors <- processFunc(downstream)
+		}(eng)
+
+		e.enginesMu.RLock()
 	}
-
 	e.enginesMu.RUnlock()
 
 	var multiErr *multierror.Error
 
-	for i := 0; i < numEngines; i++ {
-		if err := <-errors; err != nil {
-			multiErr = multierror.Append(multiErr, err)
-		}
+	for i := 0; i < count; i++ {
+		multiErr = multierror.Append(multiErr, <-errors)
 	}
 
 	return multiErr.ErrorOrNil()
