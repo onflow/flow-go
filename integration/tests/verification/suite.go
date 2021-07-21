@@ -55,13 +55,13 @@ func (s *Suite) MetricsPort() string {
 	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
 }
 
-// SetupTest runs a bare minimum Flow network to function correctly with the following roles:
+// SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes
 // - Four consensus nodes
 // - One execution node
 // - One verification node
-// - One ghost node (as another verification node)
-func (s *Suite) SetupTest() {
+// - One ghost node (as an access node)
+func (s *Suite) SetupSuite() {
 	blockRateFlag := "--block-rate-delay=1ms"
 
 	// generates one access node
@@ -137,8 +137,8 @@ func (s *Suite) SetupTest() {
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownTest tears down the test network of Flow
-func (s *Suite) TearDownTest() {
+// TearDownSuite tears down the test network of Flow
+func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	if s.cancel != nil {
 		s.cancel()
