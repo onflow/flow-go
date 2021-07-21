@@ -102,6 +102,7 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	conduit, ok := e.conduits[channel]
 
 	if !ok {
+		e.log.Trace().Interface("event", event).Str("channel", channel.String()).Str("originID", originID.String()).Msg("unknown channel")
 		return fmt.Errorf("received message on unknown channel %s", channel)
 	}
 
