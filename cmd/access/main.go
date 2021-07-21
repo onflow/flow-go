@@ -80,35 +80,55 @@ func main() {
 		rpcMetricsEnabled            bool
 	)
 
-	cmd.FlowNode(flow.RoleAccess.String()).
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
-			flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
-			flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
-			flags.UintVar(&executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
-			flags.StringVarP(&rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the unsecured gRPC server listens on")
-			flags.StringVar(&rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "localhost:9001", "the address the secure gRPC server listens on")
-			flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
-			flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
-			flags.StringVarP(&executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
-			flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
-			flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
-			flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
-			flags.UintVar(&rpcConf.MaxHeightRange, "rpc-max-height-range", backend.DefaultMaxHeightRange, "maximum size for height range requests")
-			flags.StringSliceVar(&rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-			flags.StringSliceVar(&rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-			flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
-			flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
-			flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
-			flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
-			flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
-			flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-			flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
-			flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
-			flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
+
+	anb.PrintBuildVersionDetails()
+
+	anb.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+		flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
+		flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
+		flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
+		flags.UintVar(&executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
+		flags.StringVarP(&rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the unsecured gRPC server listens on")
+		flags.StringVar(&rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "localhost:9001", "the address the secure gRPC server listens on")
+		flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
+		flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
+		flags.StringVarP(&executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+		flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
+		flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
+		flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
+		flags.UintVar(&rpcConf.MaxHeightRange, "rpc-max-height-range", backend.DefaultMaxHeightRange, "maximum size for height range requests")
+		flags.StringSliceVar(&rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
+		flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
+		flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
+		flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
+		flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+		flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
+		flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
+		flags.BoolVar(&anb.staked, "staked", true, "whether this node is a staked access node or not")
+		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", "", "the node ID of the upstream staked access node if this is an unstaked access node")
+		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
+	})
+
+	// parse all the command line args
+	anb.parseFlags()
+
+	// choose a staked or an unstaked node builder based on anb.staked
+	var nodeBuilder AccessNodeBuilder
+	if anb.staked {
+		nodeBuilder = StakedAccessNode(anb)
+	} else {
+		nodeBuilder = UnstakedAccessNode(anb)
+	}
+
+	nodeBuilder.
+		Initialize().
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -125,7 +145,7 @@ func main() {
 			)
 			return err
 		}).
-		Module("collection node client", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
 				node.Logger.Info().Msg("using a dynamic collection node address")
@@ -147,13 +167,13 @@ func main() {
 			collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
-		Module("historical access node clients", func(node *cmd.FlowNodeBuilder) error {
+		Module("historical access node clients", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
 					continue
 				}
-				node.Logger.Info().Err(err).Msgf("Historical access node Addr: %s", addr)
+				node.Logger.Err(err).Msgf("Historical access node Addr: %s", addr)
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
@@ -166,15 +186,15 @@ func main() {
 			}
 			return nil
 		}).
-		Module("block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("transaction timing mempools", func(node *cmd.FlowNodeBuilder) error {
+		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
 				return err
@@ -193,16 +213,16 @@ func main() {
 			blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 			return err
 		}).
-		Module("transaction metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("transaction metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
 				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
 			return nil
 		}).
-		Module("ping metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("ping metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
-		Module("server certificate", func(node *cmd.FlowNodeBuilder) error {
+		Module("server certificate", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// generate the server certificate that will be served by the GRPC server
 			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
 			if err != nil {
@@ -212,8 +232,7 @@ func main() {
 			rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
-
+		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -236,7 +255,7 @@ func main() {
 			)
 			return rpcEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			requestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -255,13 +274,13 @@ func main() {
 			requestEng.WithHandle(ingestEng.OnCollection)
 			return ingestEng, err
 		}).
-		Component("requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return requestEng, nil
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
@@ -322,7 +341,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -340,8 +359,11 @@ func main() {
 			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
-		}).
-		Component("ping engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		})
+
+	// the ping engine is only needed for the staked access node
+	if nodeBuilder.IsStaked() {
+		nodeBuilder.Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ping, err := pingeng.New(
 				node.Logger,
 				node.State,
@@ -355,6 +377,8 @@ func main() {
 				return nil, fmt.Errorf("could not create ping engine: %w", err)
 			}
 			return ping, nil
-		}).
-		Run()
+		})
+	}
+
+	nodeBuilder.Run()
 }

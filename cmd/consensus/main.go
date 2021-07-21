@@ -119,11 +119,12 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		}).
-		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
+		Initialize().
+		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -185,15 +186,15 @@ func main() {
 				sealValidator)
 			return err
 		}).
-		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
-			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
+		Module("random beacon key", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			privateDKGData, err = loadDKGPrivateData(node.BootstrapDir, node.NodeID)
 			return err
 		}).
-		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection guarantees mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
 		}).
-		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("execution receipts mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
@@ -202,7 +203,7 @@ func main() {
 			}
 			return nil
 		}).
-		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("block seals mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
@@ -212,23 +213,23 @@ func main() {
 			err = node.Metrics.Mempool.Register(metrics.ResourcePendingIncorporatedSeal, seals.Size)
 			return nil
 		}).
-		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending receipts mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendingReceiptsLimit)
 			return nil
 		}).
-		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("hotstuff main metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
+		Module("finalization distributor", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
-		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
@@ -264,7 +265,7 @@ func main() {
 
 			return e, err
 		}).
-		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("matching engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -319,7 +320,7 @@ func main() {
 
 			return e, err
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -330,7 +331,7 @@ func main() {
 			)
 			return prov, err
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Tracer,
@@ -345,7 +346,7 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("consensus components", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
@@ -494,7 +495,7 @@ func main() {
 			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -513,7 +514,7 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// created with sealing engine
 			return receiptRequester, nil
 		}).
