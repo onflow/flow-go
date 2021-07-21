@@ -48,7 +48,7 @@ func NewVerifyingAssignmentCollector(collectorBase AssignmentCollectorBase) (*Ve
 	// pre-select all authorized verifiers at the block that is being sealed
 	authorizedApprovers, err := authorizedVerifiersAtBlock(collectorBase.state, collectorBase.BlockID())
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("could not determine authorized verifiers for sealing candidate: %w", err)
+		return nil, fmt.Errorf("could not determine authorized verifiers for sealing candidate: %w", err)
 	}
 	numberChunks := collectorBase.result.Chunks.Len()
 
