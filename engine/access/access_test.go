@@ -99,7 +99,6 @@ func (suite *Suite) RunTest(
 		headers, _, _, _, _, blocks, _, _, _, results := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
-		//results := storage.NewExecutionResults(suite.metrics, db)
 		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
 
 		suite.backend = backend.New(
