@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,10 +43,13 @@ func (suite *PubSubTestSuite) SetupTest() {
 }
 
 type mockDiscovery struct {
-	peers []peer.AddrInfo
+	peerLock sync.Mutex
+	peers    []peer.AddrInfo
 }
 
 func (s *mockDiscovery) SetPeers(peers []peer.AddrInfo) {
+	s.peerLock.Lock()
+	defer s.peerLock.Unlock()
 	s.peers = peers
 }
 
@@ -54,6 +58,8 @@ func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Op
 }
 
 func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+	defer s.peerLock.Unlock()
+	s.peerLock.Lock()
 	count := len(s.peers)
 	ch := make(chan peer.AddrInfo, count)
 	for _, reg := range s.peers {

@@ -18,7 +18,7 @@ import (
 // driving the engines with libp2p, in addition to receiving and storing incoming messages
 // it also echos them back
 type EchoEngine struct {
-	sync.Mutex
+	sync.RWMutex
 	t        *testing.T
 	con      network.Conduit        // used to directly communicate with the network
 	originID flow.Identifier        // used to keep track of the id of the sender of the messages

@@ -18,9 +18,14 @@ import (
 	"github.com/onflow/flow-go/network/queue"
 )
 
+const DefaultCacheSize = 10e6
+
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 
-const DefaultCacheSize = 10e6
+type ReadyDoneAwareNetwork interface {
+	module.Network
+	module.ReadyDoneAware
+}
 
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
@@ -38,7 +43,7 @@ type Network struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	subMngr network.SubscriptionManager // used to keep track of subscribed channels
-
+	ReadyDoneAwareNetwork
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
