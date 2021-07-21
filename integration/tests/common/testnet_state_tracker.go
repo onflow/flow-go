@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -54,6 +55,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 	// continue with processing of messages in the background
 	go func() {
 		for {
+			fmt.Printf("re-started reader loop \n")
 			sender, msg, err := reader.Next()
 
 			select {
