@@ -220,7 +220,6 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 			s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
-		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 }
 
@@ -246,7 +245,6 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
-		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 
 	s.Run("verifier-ejected", func() {
@@ -267,7 +265,6 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
-		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 	s.Run("verifier-invalid-role", func() {
 		// invalid role
@@ -287,7 +284,6 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			s.sigVerifier, s.conduit, s.requestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
-		require.True(s.T(), engine.IsInvalidInputError(err))
 	})
 }
 
