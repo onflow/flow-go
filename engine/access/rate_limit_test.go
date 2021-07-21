@@ -90,8 +90,9 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	suite.metrics = metrics.NewNoopCollector()
 
 	config := rpc.Config{
-		GRPCListenAddr: ":0", // :0 to let the OS pick a free port
-		HTTPListenAddr: ":0",
+		UnsecureGRPCListenAddr: ":0", // :0 to let the OS pick a free port
+		SecureGRPCListenAddr:   ":0",
+		HTTPListenAddr:         ":0",
 	}
 
 	// set the rate limit to test with
@@ -113,12 +114,12 @@ func (suite *RateLimitTestSuite) SetupTest() {
 
 	// wait for the server to startup
 	assert.Eventually(suite.T(), func() bool {
-		return suite.rpcEng.GRPCAddress() != nil
+		return suite.rpcEng.UnsecureGRPCAddress() != nil
 	}, 5*time.Second, 10*time.Millisecond)
 
 	// create the access api client
 	var err error
-	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.GRPCAddress().String())
+	suite.client, suite.closer, err = accessAPIClient(suite.rpcEng.UnsecureGRPCAddress().String())
 	assert.NoError(suite.T(), err)
 }
 
