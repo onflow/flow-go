@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// CachingAssignmentCollector is an AssignmentCollectorState with the fixed `ProcessingStatus` of `CachingApprovals`.
 type CachingAssignmentCollector struct {
 	AssignmentCollectorBase
 
@@ -42,6 +43,8 @@ func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(incorporatedResu
 		return fmt.Errorf("this VerifyingAssignmentCollector manages result %x but got %x", ac.ResultID(), resID)
 	}
 
+	// In case the result is already cached, we first read the cache.
+	// This is much cheaper than attempting to write right away.
 	irID := incorporatedResult.ID()
 	if cached := ac.incResCache.Get(irID); cached != nil {
 		return nil
@@ -67,7 +70,7 @@ func (ac *CachingAssignmentCollector) ProcessApproval(approval *flow.ResultAppro
 			ac.BlockID(), approval.Body.BlockID)
 	}
 
-	// we have this approval cached already, no need to process it again
+	// if we have this approval cached already, no need to process it again
 	approvalCacheID := approval.Body.PartialID()
 	if cached := ac.approvalsCache.Get(approvalCacheID); cached != nil {
 		return nil

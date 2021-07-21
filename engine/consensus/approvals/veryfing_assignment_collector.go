@@ -122,7 +122,7 @@ func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedRe
 	// multiple threads simultaneously compute the verifier assignment. Nevertheless, the implementation is safe in
 	// that only one of the instantiated ApprovalCollectors will be stored in the cache. In terms of locking duration,
 	// it's better to perform extra computation in edge cases than lock this logic with a mutex,
-	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously
+	// since it's quite unlikely that same incorporated result will be processed by multiple goroutines simultaneously.
 	assignment, err := ac.assigner.Assign(incorporatedResult.Result, incorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not determine chunk assignment: %w", err)
@@ -161,6 +161,9 @@ func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedRe
 	return nil
 }
 
+// putCollector stores the collector if it is not already present in the collectors map
+// and returns false (no duplicate). NoOp if a collector for the incorporatedBlockID is
+// already stored, in which case true is returned (indicating a duplicate).
 func (ac *VerifyingAssignmentCollector) putCollector(incorporatedBlockID flow.Identifier, collector *ApprovalCollector) bool {
 	ac.lock.Lock()
 	defer ac.lock.Unlock()
@@ -292,8 +295,8 @@ func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApp
 	return nil
 }
 
-// RequestMissingApprovals traverses all collectors and requests missing approval for every chunk that didn't get enough
-// approvals from verifiers.
+// RequestMissingApprovals traverses all collectors and requests missing approval
+// for every chunk that didn't get enough approvals from verifiers.
 // Returns number of requests made and error in case something goes wrong.
 func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation consensus.SealingObservation, maxHeightForRequesting uint64) (uint, error) {
 	overallRequestCount := uint(0) // number of approval requests for all different assignments for this result
@@ -318,7 +321,6 @@ func (ac *VerifyingAssignmentCollector) RequestMissingApprovals(observation cons
 				}
 				return 0, err
 			}
-
 			if !updated {
 				continue
 			}

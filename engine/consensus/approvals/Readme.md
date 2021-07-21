@@ -96,6 +96,9 @@ In the future, we will also add further states for 'Extensive Checking Mode':
 
 # Implementation Comments
 
+
+### Compare And Repeat Pattern
+
 In multiple places we employ the **`Compare And Repeat Pattern`**. This pattern is applicable when we have:
 * an atomically-updatable state value
 * some business logic that requires an up-to-date value of the state 
@@ -103,7 +106,7 @@ In multiple places we employ the **`Compare And Repeat Pattern`**. This pattern 
 With the `Compare And Repeat Pattern`, we guarantee that the business logic was executed with the most
 recent state. 
 
-### Compare And Repeat Pattern
+#### Pattern Details
 
 1. Atomically read the state _before_ the operation. 
 2. Execute the operation on the retrieved state. 
@@ -111,7 +114,16 @@ recent state.
     - If the state changed, we updated a stale state. In this case we go back to step 1.
     - If the state remained unchanged, we updated the most recent state. Hence, we are done.
 
+### Key for caching `ResultApproval`s
 
+In case we don't process a `ResultApproval` right away, we generally cache it.
+If done naively, the caching could be exploited by byzantine nodes: they could send lots of approvals for the
+same chunk but vary some field in their approvals that is not validated right away (e.g. the SPoCK proof). 
+If consensus nodes used the `ID` of the full approval as key for the cache, the malicious approvals would have
+all different keys, which would allow a malicious node to flood the cache. 
+
+Instead, we only want to cache _one_ approval per Verification node for each specific chunk. Therefore, we use
+`ResultApproval.PartialID()`, which is only computed over the chunk-identifier plus the verifier's node ID.  
 
 
 

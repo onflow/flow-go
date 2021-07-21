@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// OrphanAssignmentCollector is an AssignmentCollectorState with the fixed `ProcessingStatus` of `Orphaned`.
 type OrphanAssignmentCollector struct {
 	AssignmentCollectorBase
 }
