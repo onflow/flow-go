@@ -58,7 +58,8 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	mapSize := len(entities)
 
 	// this should never happen, and is just for a quick check
-	if b.ejectionTrigger > uint(mapSize) {
+	if b.ejectionTrigger > uint(mapSize) ||
+		threshold > uint(mapSize) {
 		return retval, nil, false
 	}
 
@@ -86,6 +87,11 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 			tmp := mapIndexes[j]
 			mapIndexes[j] = mapIndexes[j-1]
 			mapIndexes[j-1] = tmp
+
+			// stop when 'j-2' is less than 0 -- OOB
+			if j == 1 {
+				break
+			}
 		}
 	}
 
