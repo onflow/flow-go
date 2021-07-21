@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -54,24 +53,18 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 	// continue with processing of messages in the background
 	go func() {
-		count := uint64(0)
 		for {
-			count++
-			fmt.Printf("re-started reader loop: %d \n", count)
 			sender, msg, err := reader.Next()
-			fmt.Printf("read next message: %d \n", count)
 
 			select {
 			// don't error if container shuts down
 			case <-ctx.Done():
-				fmt.Printf("context done: %d \n", count)
 				return
 			default:
 				// continue with this iteration of the loop
 			}
 
 			if err != nil && strings.Contains(err.Error(), "transport is closing") {
-				fmt.Printf("error occured: %d error: %s \n", count, err.Error())
 				return
 			}
 
@@ -79,33 +72,26 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			require.NoError(t, err, "could not read next message")
 
 			tst.MsgState.Add(sender, msg)
-			fmt.Printf("message added to message state: %d \n", count)
 
 			switch m := msg.(type) {
 			case *messages.BlockProposal:
 				start := time.Now()
-				fmt.Printf("adding message to block state: %d \n", count)
 				tst.BlockState.Add(m)
-				fmt.Printf("added message to block state: %d \n", count)
 				t.Logf("block proposal received from %s at height %v: %x, took: %d",
 					sender,
 					m.Header.Height,
 					m.Header.ID(), time.Since(start).Milliseconds())
 			case *flow.ResultApproval:
-				fmt.Printf("adding message to result approval: %d \n", count)
 				tst.ApprovalState.Add(sender, m)
-				fmt.Printf("added message to result approval: %d \n", count)
 				t.Logf("result approval received from %s for execution result ID %x and chunk index %v",
 					sender,
 					m.Body.ExecutionResultID,
 					m.Body.ChunkIndex)
 			case *flow.ExecutionReceipt:
-				fmt.Printf("adding message to receipt state: %d \n", count)
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
 
 				tst.ReceiptState.Add(m)
-				fmt.Printf("added message to receipt state: %d \n", count)
 				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x resultID %x",
 					sender,
 					m.ExecutionResult.BlockID,
@@ -113,7 +99,6 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					finalState,
 					m.ExecutionResult.ID())
 			default:
-				fmt.Printf("other message, continuing loop: %d \n", count)
 				t.Logf("other msg received from %s: %#v", sender, msg)
 				continue
 			}
