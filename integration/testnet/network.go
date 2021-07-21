@@ -327,6 +327,12 @@ func AsGhost() func(config *NodeConfig) {
 	}
 }
 
+func AsUnstaked() func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.Unstaked = true
+	}
+}
+
 // WithAdditionalFlag adds additional flags to the command
 func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	return func(config *NodeConfig) {
