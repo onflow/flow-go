@@ -360,7 +360,7 @@ func (e *Engine) requestProcessingLoop() {
 		case <-notifier:
 			err := e.processAvailableRequests()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued request")
+				e.log.Fatal().Err(err).Msg("internal error processing queued requests")
 			}
 		}
 	}
@@ -392,7 +392,7 @@ func (e *Engine) responseProcessingLoop() {
 		case <-notifier:
 			err := e.processAvailableResponses()
 			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued response")
+				e.log.Fatal().Err(err).Msg("internal error processing queued responses")
 			}
 		}
 	}
