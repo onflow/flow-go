@@ -249,7 +249,9 @@ type NodeConfig struct {
 	Ghost           bool
 	AdditionalFlags []string
 	Debug           bool
-	Unstaked        bool
+	// Unstaked - only applicable to Access Node. Access nodes can be staked or unstaked.
+	// Unstaked nodes are not part of the identity table
+	Unstaked bool // only applicable to Access node
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
