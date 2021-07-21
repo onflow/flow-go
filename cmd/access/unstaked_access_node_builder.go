@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/network/unstaked"
 )
 
 type UnstakedAccessNodeBuilder struct {
@@ -114,13 +113,11 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
 		builder.MustNot(err)
 
-		unstakedNetwork := unstaked.NewUnstakedNetwork(network, upstreamANIdentifier)
-
-		builder.UnstakedNetwork = unstakedNetwork
+		builder.UnstakedNetwork = network
 		builder.unstakedMiddleware = middleware
 
 		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
-		builder.Network = unstakedNetwork
+		builder.Network = network
 		builder.Middleware = middleware
 
 		builder.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
