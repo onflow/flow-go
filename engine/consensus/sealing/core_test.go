@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -43,6 +44,7 @@ const RequiredApprovalsForSealConstructionTestingValue = 1
 type ApprovalProcessingCoreTestSuite struct {
 	approvals.BaseApprovalsTestSuite
 
+	workerPool        *workerpool.WorkerPool
 	blocks            map[flow.Identifier]*flow.Header
 	headers           *storage.Headers
 	state             *protocol.State
@@ -56,9 +58,17 @@ type ApprovalProcessingCoreTestSuite struct {
 	core              *Core
 }
 
+func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
+	// Without this line we are risking running into weird situations where one test has finished but there are active workers
+	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
+	// starting next test.
+	s.workerPool.StopWait()
+}
+
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
+	s.workerPool = workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity)
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
 	s.state = &protocol.State{}
 	s.assigner = &module.ChunkAssigner{}
@@ -146,7 +156,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.workerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.headers, s.state, s.sealsDB, s.assigner, s.sigVerifier, s.sealsPL, s.conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -476,7 +486,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
 
 	// try submitting approvals for each result
-	for forkIndex, results := range forkResults {
+	for _, results := range forkResults {
 		for _, result := range results {
 			executedBlockID := result.BlockID
 			resultID := result.ID()
@@ -487,15 +497,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 				unittest.WithExecutionResultID(resultID))
 
 			err := s.core.processApproval(approval)
-
-			// for first fork all results should be valid, since it's a finalized fork
-			// all others forks are orphans and approvals for those should be outdated
-			if forkIndex == 0 {
-				require.NoError(s.T(), err)
-			} else {
-				require.Error(s.T(), err)
-				require.True(s.T(), engine.IsOutdatedInputError(err))
-			}
+			require.NoError(s.T(), err)
 		}
 	}
 }
@@ -542,16 +544,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ExtendingUnproces
 				unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 				unittest.IncorporatedResult.WithResult(result))
 			err := s.core.processIncorporatedResult(IR)
-			_, processable := s.core.collectorTree.GetCollector(result.ID())
+			collector := s.core.collectorTree.GetCollector(result.ID())
 			if forkIndex > 0 {
 				require.NoError(s.T(), err)
-				require.True(s.T(), processable)
+				require.Equal(s.T(), approvals.VerifyingApprovals, collector.ProcessingStatus())
 			} else {
 				if blockIndex == 0 {
 					require.Error(s.T(), err)
 					require.True(s.T(), engine.IsOutdatedInputError(err))
 				} else {
-					require.False(s.T(), processable)
+					require.Equal(s.T(), approvals.CachingApprovals, collector.ProcessingStatus())
 				}
 			}
 		}
@@ -795,16 +797,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		collector, err := s.core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
 		require.NoError(s.T(), err)
 		require.False(s.T(), collector.Created)
-		require.True(s.T(), collector.Processable)
+		require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
 	}
 }
 
 // TestProcessFinalizedBlock_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
 // after parent block gets sealed. More specifically this case:
-// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
-//               <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
-//                     |
-//                 finalized
+// P <- A <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
+//        <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
+//               |
+//           finalized
 // Initially P was executed,  B is finalized and incorporates ER for A, C incorporates ER for B, D was forked from
 // A but wasn't finalized, E incorporates ER for D.
 // Let's take a case where we have collectors for ER incorporated in blocks B, C, D, E. Since we don't
@@ -844,8 +846,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_ProcessableA
 			err := s.core.ProcessIncorporatedResult(IR)
 			require.NoError(s.T(), err)
 
-			_, processable := s.core.collectorTree.GetCollector(IR.Result.ID())
-			require.False(s.T(), processable)
+			collector := s.core.collectorTree.GetCollector(IR.Result.ID())
+			require.Equal(s.T(), approvals.CachingApprovals, collector.ProcessingStatus())
 
 			prevResult = result
 		}
@@ -868,11 +870,11 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_ProcessableA
 	// at this point collectors for forks[0] should be processable and for forks[1] not
 	for forkIndex := range forks {
 		for _, result := range results[forkIndex][1:] {
-			_, processable := s.core.collectorTree.GetCollector(result.Result.ID())
+			collector := s.core.collectorTree.GetCollector(result.Result.ID())
 			if forkIndex == 0 {
-				require.True(s.T(), processable)
+				require.Equal(s.T(), approvals.VerifyingApprovals, collector.ProcessingStatus())
 			} else {
-				require.False(s.T(), processable)
+				require.Equal(s.T(), approvals.Orphaned, collector.ProcessingStatus())
 			}
 		}
 	}
