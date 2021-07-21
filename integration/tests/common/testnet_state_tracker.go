@@ -75,12 +75,11 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 			switch m := msg.(type) {
 			case *messages.BlockProposal:
-				start := time.Now()
 				tst.BlockState.Add(m)
-				t.Logf("block proposal received from %s at height %v: %x, took: %d",
+				t.Logf("block proposal received from %s at height %v: %x",
 					sender,
 					m.Header.Height,
-					m.Header.ID(), time.Since(start).Milliseconds())
+					m.Header.ID())
 			case *flow.ResultApproval:
 				tst.ApprovalState.Add(sender, m)
 				t.Logf("result approval received from %s for execution result ID %x and chunk index %v",
