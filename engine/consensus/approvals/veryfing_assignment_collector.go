@@ -30,9 +30,6 @@ const DefaultEmergencySealingThreshold = 400
 // approvals at least one incorporated result has to be processed.
 // VerifyingAssignmentCollector takes advantage of internal caching to speed up processing approvals for different assignments
 // VerifyingAssignmentCollector is responsible for validating approvals on result-level (checking signature, identity).
-// TODO: currently VerifyingAssignmentCollector doesn't cleanup collectorTree when blocks that incorporate results get orphaned
-// For BFT milestone we need to ensure that this cleanup is properly implemented and all orphan collectorTree are pruned by height
-// when fork gets orphaned
 type VerifyingAssignmentCollector struct {
 	AssignmentCollectorBase
 
