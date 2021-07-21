@@ -56,16 +56,10 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 //  * IncompatibleInputTypeError if no matching processor was found
 //  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) error {
-
 	msg := &Message{
 		OriginID: originID,
 		Payload:  payload,
 	}
-
-	log := e.log.
-		Warn().
-		Str("msg_type", logging.Type(payload)).
-		Hex("origin_id", originID[:])
 
 	for _, pattern := range e.patterns {
 		if pattern.Match(msg) {
@@ -79,7 +73,10 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 
 			ok := pattern.Store.Put(msg)
 			if !ok {
-				log.Msg("failed to store message - discarding")
+				e.log.Warn().
+					Str("msg_type", logging.Type(payload)).
+					Hex("origin_id", originID[:]).
+					Msg("failed to store message - discarding")
 				return nil
 			}
 			e.notifier.Notify()
