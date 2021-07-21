@@ -45,7 +45,7 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
 	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
 	github.com/onflow/flow-go/crypto v0.18.0
-	github.com/onflow/flow/protobuf/go/flow v0.2.0
+	github.com/onflow/flow/protobuf/go/flow v0.2.2
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pkg/errors v0.9.1
@@ -75,6 +75,3 @@ require (
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
-
-// TODO - remove once proper version of Go protobufs are released
-replace github.com/onflow/flow/protobuf/go/flow => ../flow/protobuf/go/flow
