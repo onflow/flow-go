@@ -18,8 +18,8 @@ type SystemChunkTestSuite struct {
 // TestSystemChunkIDsShouldBeDifferent evaluates that system chunk of consecutive blocks that
 // do not cause state change have different chunk Ids.
 func (st *SystemChunkTestSuite) TestSystemChunkIDsShouldBeDifferent() {
-	// waits for first finalized block, called blockA.
-	blockA := st.BlockState.WaitForFirstFinalized(st.T())
+	// // wait for next height finalized (potentially first height), called blockA
+	blockA := st.BlockState.WaitForHighestFinalizedProgress(st.T())
 	st.T().Logf("blockA generated, height: %v ID: %v", blockA.Header.Height, blockA.Header.ID())
 
 	// waits for the next finalized block after blockA, called blockB.

@@ -28,8 +28,8 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
 	chain := s.net.Root().Header.ChainID.Chain()
 
-	// wait for first finalized block, called blockA
-	blockA := s.BlockState.WaitForFirstFinalized(s.T())
+	// wait for next height finalized (potentially first height), called blockA
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction

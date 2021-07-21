@@ -17,8 +17,8 @@ type ResultApprovalTestSuite struct {
 // TestVerificationNodeHappyPath verifies the integration of verification and execution nodes over the
 // happy path of successfully issuing a result approval for the first chunk of the first block of the testnet.
 func (r *ResultApprovalTestSuite) TestVerificationNodeHappyPath() {
-	// waits for first finalized block, called blockA
-	blockA := r.BlockState.WaitForFirstFinalized(r.T())
+	// wait for next height finalized (potentially first height), called blockA
+	blockA := r.BlockState.WaitForHighestFinalizedProgress(r.T())
 	r.T().Logf("blockA generated, height: %v ID: %v", blockA.Header.Height, blockA.Header.ID())
 
 	// waits for execution receipt for blockA from execution node, called receiptA
