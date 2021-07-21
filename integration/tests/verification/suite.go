@@ -87,7 +87,7 @@ func (s *Suite) SetupTest() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel))
+		testnet.WithLogLevel(zerolog.DebugLevel))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
 
 	// generates two execution nodes

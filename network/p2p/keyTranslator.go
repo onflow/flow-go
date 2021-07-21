@@ -65,8 +65,8 @@ func PrivKey(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 	return um(bytes)
 }
 
-// publicKey converts a Flow public key to a LibP2P public key
-func publicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
+// PublicKey converts a Flow public key to a LibP2P public key
+func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 	keyType, err := keyType(fpk.Algorithm())
 	if err != nil {
 		return nil, err
