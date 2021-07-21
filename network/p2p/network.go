@@ -18,6 +18,8 @@ import (
 	"github.com/onflow/flow-go/network/queue"
 )
 
+const DefaultCacheSize = 10e6
+
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
 
 type ReadyDoneAwareNetwork interface {
