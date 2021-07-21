@@ -71,7 +71,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			}
 
 			if err != nil && strings.Contains(err.Error(), "transport is closing") {
-				fmt.Printf("error occured: %d error: %w \n", count, err)
+				fmt.Printf("error occured: %d error: %s \n", count, err.Error())
 				return
 			}
 
