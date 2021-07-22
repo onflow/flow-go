@@ -43,13 +43,15 @@ typedef uint8_t byte;
 #define MEMBERSHIP_CHECK_G1 BOWE
 #define MEMBERSHIP_CHECK_G2 EXP_ORDER
 
-// Structure of precomputed data
+
+// constants used in the optimized SWU hash to curve
 #define ELLP_Nx_LEN 12
 #define ELLP_Dx_LEN 10
 #define ELLP_Ny_LEN 16
 #define ELLP_Dy_LEN 15
 
 
+// Structure of precomputed data
 typedef struct prec_ {
     bn_st p_3div4;
     fp_st fp_p_1div2; 
