@@ -141,6 +141,14 @@ func writePointG2(dest []byte, a *pointG2) {
 	)
 }
 
+// writePointG1 writes a G1 point in a slice of bytes
+func writePointG1(dest []byte, a *pointG1) {
+	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
+		(*C.ep_st)(a),
+		(C.int)(signatureLengthBLSBLS12381),
+	)
+}
+
 // readVerifVector reads a G2 point from a slice of bytes
 func readPointG2(a *pointG2, src []byte) error {
 	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
@@ -153,6 +161,20 @@ func readPointG2(a *pointG2, src []byte) error {
 	default:
 		return errors.New("reading a G2 point has failed")
 	}
+}
+
+// This is only a TEST function.
+// It wraps calls to the relic hash-to-G1 map since cgo can't be used
+// in go test files.
+//
+// This map uses, by default, XMD:SH256 for hash-to-field, and can be
+// configured to use several XMD:(SHA|BS) variants, see:
+// https://github.com/relic-toolkit/relic/blob/43f2cd4695ff29a35dfab5bbf368439d4ff20d14/include/relic_md.h
+//
+// TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
+// ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
+func mapToG1RelicTest(dest *pointG1, msg, dst []byte) {
+	C.ep_map_dst((*C.ep_st)(dest), (*C.uchar)(&msg[0]), (C.int)(len(msg)), (*C.uchar)(&dst[0]), (C.int)(len(dst)))
 }
 
 // This is only a TEST function.
