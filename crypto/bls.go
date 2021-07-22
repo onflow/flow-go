@@ -415,3 +415,21 @@ func OpSwUUnitTest(output []byte, input []byte) {
 		(*C.uchar)(&input[0]),
 		(C.int)(len(input)))
 }
+
+// This is only a TEST function.
+// It wraps a call to signing using Relic to get a curve point, internally using XMD:SHA256
+//
+// (since cgo can't be used in go test files)
+func (sk *PrKeyBLSBLS12381) signWithRelicMapTest(data []byte) (Signature, error) {
+	var point pointG1
+	mapToG1RelicTest(&point, data, []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_"))
+
+	// set BLS context
+	blsInstance.reInit()
+
+	s := make([]byte, SignatureLenBLSBLS12381)
+	C.bls_sign_nomap((*C.uchar)(&s[0]),
+		(*C.bn_st)(&sk.scalar),
+		(*C.ep_st)(&point))
+	return s, nil
+}
