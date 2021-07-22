@@ -215,6 +215,15 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployEpoch(service, fungibleToken, flowToken)
 
+	// deploy staking proxy contract to the service account
+	b.deployStakingProxyContract(service)
+
+	// deploy locked tokens contract to the service account
+	b.deployLockedTokensContract(service, fungibleToken, flowToken)
+
+	// deploy staking collection contract to the service account
+	b.deployStakingCollection(service, fungibleToken, flowToken)
+
 	b.registerNodes(service, fungibleToken, flowToken)
 
 	return nil
@@ -533,6 +542,64 @@ func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flo
 	}
 }
 
+func (b *BootstrapProcedure) deployStakingProxyContract(service flow.Address) {
+	contract := contracts.FlowStakingProxy()
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployContractTransaction(service, contract, "StakingProxy"),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy StakingProxy contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) deployLockedTokensContract(service flow.Address, fungibleTokenAddress,
+	flowTokenAddress flow.Address) {
+
+	publicKeys := make([]cadence.Value, 1)
+	encodedPublicKey, err := flow.EncodeRuntimeAccountPublicKey(b.serviceAccountPublicKey)
+	if err != nil {
+		panic(err)
+	}
+	publicKeys[0] = bytesToCadenceArray(encodedPublicKey)
+
+	contract := contracts.FlowLockedTokens(
+		fungibleTokenAddress.Hex(),
+		flowTokenAddress.Hex(),
+		service.Hex(),
+		service.Hex(),
+		service.Hex())
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployLockedTokensTransaction(service, contract, publicKeys),
+		b.sth,
+		b.programs,
+	)
+
+	panicOnMetaInvokeErrf("failed to deploy LockedTokens contract: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) deployStakingCollection(service flow.Address, fungibleTokenAddress, flowTokenAddress flow.Address) {
+	contract := contracts.FlowStakingCollection(
+		fungibleTokenAddress.Hex(),
+		flowTokenAddress.Hex(),
+		service.Hex(),
+		service.Hex(),
+		service.Hex(),
+		service.Hex(),
+		service.Hex(),
+		service.Hex(),
+		service.Hex())
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		deployContractTransaction(service, contract, "FlowStakingCollection"),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy FlowStakingCollection contract: %s", txError, err)
+}
+
 const deployContractTransactionTemplate = `
 transaction {
   prepare(signer: AuthAccount) {
@@ -636,6 +703,29 @@ transaction(amount: UFix64, recipient: Address) {
 	}
 }
 `
+
+const deployLockedTokensTemplate = `
+transaction(publicKeys: [[UInt8]]) {
+    
+    prepare(admin: AuthAccount) {
+        admin.contracts.add(name: "LockedTokens", code: "%s".decodeHex(), admin)
+
+    }
+}
+`
+
+func deployLockedTokensTransaction(service flow.Address, contract []byte, publicKeys []cadence.Value) *TransactionProcedure {
+	return Transaction(
+		flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(
+				deployLockedTokensTemplate,
+				hex.EncodeToString(contract),
+			))).
+			AddArgument(jsoncdc.MustEncode(cadence.NewArray(publicKeys))).
+			AddAuthorizer(service),
+		0,
+	)
+}
 
 func deployContractTransaction(address flow.Address, contract []byte, contractName string) *TransactionProcedure {
 	return Transaction(
@@ -742,7 +832,12 @@ func registerNodeTransaction(
 		HashAlgo:  hash.SHA3_256,
 		Weight:    1000,
 	}
-	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+
+	encAccountKey, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	if err != nil {
+		panic(err)
+	}
+
 	cadencePublicKeys := cadence.NewArray(
 		[]cadence.Value{
 			bytesToCadenceArray(encAccountKey),
