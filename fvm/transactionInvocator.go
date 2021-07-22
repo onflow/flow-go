@@ -163,17 +163,23 @@ func (i *TransactionInvocator) Process(
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
+	// try to deduct fees even if there is an error, bot do not hide the original error
+	feesError := i.deductTransactionFees(env, proc)
+	if feesError != nil {
+		if txError == nil {
+			txError = feesError
+		} else {
+			// combine the two errors so none of them gets lost.
+			txError = fmt.Errorf("%w and %v", txError, feesError)
+		}
+	}
+
+	//if there is still no error check if all account storage limits are ok
 	if txError == nil {
 		txError = i.checkAccountStorageLimit(vm, ctx, proc, sth, programs)
 	}
 
-	if txError == nil {
-		txError = i.deductTransactionFees(env, proc)
-	}
-
-	proc.Logs = append(proc.Logs, env.getLogs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
-
+	// it there was a transaction error clear changes and try to deduct fees again
 	if txError != nil {
 		// drop delta
 		childState.View().DropDelta()
@@ -184,8 +190,36 @@ func (i *TransactionInvocator) Process(
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
-		return txError
+
+		// reset env
+		env = newEnvironment(*ctx, vm, sth, programs)
+		env.setTransaction(proc.Transaction, proc.TxIndex)
+		env.setTraceSpan(span)
+
+		// try to deduct fees again, to get the fe deduction events
+		feesError = i.deductTransactionFees(env, proc)
+		if feesError != nil {
+			// combine the two errors so none of them gets lost.
+			txError = fmt.Errorf("%w and %v", txError, feesError)
+		}
+
+		// if fees tx fails just do clean up and exit
+		if feesError != nil {
+			// drop delta
+			childState.View().DropDelta()
+			programs.Cleanup(nil)
+			i.logger.Info().
+				Str("txHash", proc.ID.String()).
+				Uint64("blockHeight", blockHeight).
+				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+				Msg("transaction executed with error")
+
+			return txError
+		}
 	}
+
+	proc.Logs = append(proc.Logs, env.getLogs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -202,7 +236,7 @@ func (i *TransactionInvocator) Process(
 		Int("retried", proc.Retried).
 		Msg("transaction executed successfully")
 
-	return nil
+	return txError
 }
 
 func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *TransactionProcedure) error {
