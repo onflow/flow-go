@@ -118,7 +118,6 @@ func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
 	bothFail := (err != nil && res == nil)
 	bothPass := (err == nil && res != nil)
 	if !(bothFail || bothPass) {
-		// TODO(fga): BLST does not check for non-canonical scalars, though we do => open go bindings to blst_scalar_fr_check in blst?
 		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
 	}
 

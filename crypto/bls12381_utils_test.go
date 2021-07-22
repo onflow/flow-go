@@ -117,7 +117,7 @@ func TestMapToG1Relic(t *testing.T) {
 		expected, err := hex.DecodeString(expectedStr)
 		require.NoError(t, err)
 
-		// we compare only the first byte (see comment above)
+		// we compare only past the first byte (see comment above)
 		assert.True(t, bytes.Equal(pointBytes[i][1:], expected[1:]), "Relic's map to G1 should match the RFC test vector, expected:\n%v, received:\n%v", expected[1:], pointBytes[i][1:])
 	}
 }
