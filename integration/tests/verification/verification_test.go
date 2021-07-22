@@ -68,6 +68,11 @@ func (suite *VerificationTestSuite) TestSealingAndVerificationHappyPath() {
 	require.Greater(suite.T(), len(resultB.Chunks), 1)
 	suite.T().Logf("receipt for blockB generated: result ID: %x with %d chunks", resultBId, len(resultB.Chunks))
 
+	// waits till result approval emits for all chunks of resultB
+	for i := 0; i < len(resultB.Chunks); i++ {
+		suite.ApprovalState.WaitForResultApproval(suite.T(), suite.verID, resultBId, uint64(i))
+	}
+
 	// waits until blockB is sealed by consensus nodes after result approvals for all of its chunks emitted.
 	suite.BlockState.WaitForSealed(suite.T(), blockB.Header.Height)
 }
