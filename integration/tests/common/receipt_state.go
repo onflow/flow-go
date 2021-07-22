@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,16 +16,22 @@ import (
 const receiptStateTimeout = 60 * time.Second
 
 type ReceiptState struct {
+	sync.RWMutex
+
 	// receipts contains execution receipts are indexed by blockID, then by executorID
-	// TODO add lock to prevent concurrent map access bugs
 	receipts map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt
 }
 
-func (rs *ReceiptState) Add(er *flow.ExecutionReceipt) {
-	if rs.receipts == nil {
-		// TODO: initialize this map in constructor
-		rs.receipts = make(map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt)
+func NewReceiptState() *ReceiptState {
+	return &ReceiptState{
+		RWMutex:  sync.RWMutex{},
+		receipts: make(map[flow.Identifier]map[flow.Identifier]*flow.ExecutionReceipt),
 	}
+}
+
+func (rs *ReceiptState) Add(er *flow.ExecutionReceipt) {
+	rs.Lock() // avoiding concurrent map access
+	defer rs.Unlock()
 
 	if rs.receipts[er.ExecutionResult.BlockID] == nil {
 		rs.receipts[er.ExecutionResult.BlockID] = make(map[flow.Identifier]*flow.ExecutionReceipt)
@@ -36,6 +43,9 @@ func (rs *ReceiptState) Add(er *flow.ExecutionReceipt) {
 // WaitForReceiptFromAny waits for an execution receipt for the given blockID from any execution node and returns it
 func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identifier) *flow.ExecutionReceipt {
 	require.Eventually(t, func() bool {
+		rs.RLock() // avoiding concurrent map access
+		defer rs.RUnlock()
+
 		return len(rs.receipts[blockID]) > 0
 	}, receiptStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
@@ -50,6 +60,9 @@ func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identif
 func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flow.Identifier) *flow.ExecutionReceipt {
 	var r *flow.ExecutionReceipt
 	require.Eventually(t, func() bool {
+		rs.RLock() // avoiding concurrent map access
+		defer rs.RUnlock()
+
 		var ok bool
 		r, ok = rs.receipts[blockID][executorID]
 		return ok
