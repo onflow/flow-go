@@ -115,12 +115,11 @@ func (s *Suite) SetupSuite() {
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
 	// Ghost Node
-	// adds one access node as ghost node
 	// the ghost node's objective is to observe the messages exchanged on the
 	// system and decide to terminate the test.
 	// By definition, ghost node is subscribed to all channels.
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess,
+	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.FatalLevel))
@@ -128,7 +127,9 @@ func (s *Suite) SetupSuite() {
 
 	// generates, initializes, and starts the Flow network
 	netConfig := testnet.NewNetworkConfig("verification_tests", s.nodeConfigs)
+
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.net.Start(ctx)
