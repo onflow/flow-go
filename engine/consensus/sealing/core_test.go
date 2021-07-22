@@ -805,7 +805,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
 	s.state.On("Final").Return(finalSnapShot)
 
-	core, err := NewCore(unittest.Logger(), tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
+	core, err := NewCore(unittest.Logger(), s.workerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
 		s.headers, s.state, s.sealsDB, assigner, s.sigVerifier, s.sealsPL, s.conduit, s.core.config)
 	require.NoError(s.T(), err)
 
