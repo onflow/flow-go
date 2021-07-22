@@ -235,11 +235,17 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-func (l *Ledger) ExportCheckpointAt(state ledger.State,
+func (l *Ledger) ExportCheckpointAt(
+	state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
-	outputDir, outputFile string) (ledger.State, error) {
+	outputDir string,
+	outputFile string,
+) (
+	ledger.State,
+	error,
+) {
 
 	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
 
@@ -296,6 +302,10 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
 		}
+	}
+
+	if len(migrations) == 0 {
+		return state, nil
 	}
 
 	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))

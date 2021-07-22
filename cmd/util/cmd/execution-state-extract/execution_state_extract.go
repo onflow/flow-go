@@ -1,8 +1,12 @@
 package extract
 
 import (
+	"encoding/hex"
 	"fmt"
+	"sync/atomic"
 
+	"github.com/aead/siphash"
+	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -20,12 +24,22 @@ func getStateCommitment(commits storage.Commits, blockHash flow.Identifier) (flo
 	return commits.ByBlockID(blockHash)
 }
 
-func extractExecutionState(dir string,
+func fromHex(s string) (b []byte) {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
+	return
+}
+
+func extractExecutionState(
+	dir string,
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
 	migrate bool,
-	report bool) error {
+	report bool,
+) error {
 
 	diskWal, err := wal.NewDiskWAL(
 		zerolog.Nop(),
@@ -53,19 +67,49 @@ func extractExecutionState(dir string,
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	migrations := []ledger.Migration{}
-	reporters := []ledger.Reporter{}
+	var migrations []ledger.Migration
+	var reporters []ledger.Reporter
 	if migrate {
-		migrations = []ledger.Migration{
-			mgr.PruneMigration,
-		}
+		migrations = []ledger.Migration{}
 	}
+
+	var hashCollisions uint64
+
 	if report {
+
+		var sipHashKey [siphash.KeySize]byte
+		copy(sipHashKey[:], fromHex("000102030405060708090a0b0c0d0e0f"))
+
 		reporters = []ledger.Reporter{
-			mgr.ContractReporter{Log: log, OutputDir: outputDir},
-			mgr.StorageReporter{Log: log, OutputDir: outputDir},
+			mgr.DataAnalyzer{
+				Log: log,
+				AnalyzeValue: func(value interpreter.Value) (bool, error) {
+
+					dictionary, ok := value.(*interpreter.DictionaryValue)
+					if !ok {
+						return true, nil
+					}
+
+					keys := dictionary.Keys().Elements()
+
+					hashes := make(map[uint64]struct{}, len(keys))
+
+					for _, key := range keys {
+						// TODO: use Cadence Value KeyString?
+						keyString := key.String()
+						hash := siphash.Sum64([]byte(keyString), &sipHashKey)
+						if _, ok := hashes[hash]; ok {
+							atomic.AddUint64(&hashCollisions, 1)
+						}
+						hashes[hash] = struct{}{}
+					}
+
+					return true, nil
+				},
+			},
 		}
 	}
+
 	newState, err := led.ExportCheckpointAt(
 		ledger.State(targetHash),
 		migrations,
@@ -78,11 +122,15 @@ func extractExecutionState(dir string,
 		return fmt.Errorf("cannot generate the output checkpoint: %w", err)
 	}
 
-	log.Info().Msgf(
-		"New state commitment for the exported state is: %s (base64: %s)",
-		newState.String(),
-		newState.Base64(),
-	)
+	if migrate {
+		log.Info().Msgf(
+			"New state commitment for the exported state is: %s (base64: %s)",
+			newState.String(),
+			newState.Base64(),
+		)
+	}
+
+	log.Info().Msgf("hash collisions: %d", hashCollisions)
 
 	return nil
 }
