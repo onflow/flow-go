@@ -163,6 +163,29 @@ func readPointG2(a *pointG2, src []byte) error {
 	}
 }
 
+// readPointG1 reads a G2 point from a slice of bytes
+func readPointG1(a *pointG1, src []byte) error {
+	switch C.ep_read_bin_compact((*C.ep_st)(a),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("input is not a G1 point")
+	default:
+		return errors.New("reading a G1 point has failed")
+	}
+}
+
+// This is only a TEST function.
+// It wraps calls to subgroup checks since cgo can't be used
+// in go test files.
+//
+// This wraps a subgroup check in G1
+func checkInG1Test(pt *pointG1) bool {
+	return C.bowe_subgroup_check_G1((*C.ep_st)(pt)) == valid
+}
+
 // This is only a TEST function.
 // It wraps calls to the relic hash-to-G1 map since cgo can't be used
 // in go test files.
