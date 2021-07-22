@@ -26,7 +26,6 @@ void bn_new_wrapper(bn_t a) {
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
-#if (hashToPoint == OPSWU)
 extern const uint64_t p_3div4_data[Fp_DIGITS];
 extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
 extern const uint64_t a1_data[Fp_DIGITS];
@@ -35,7 +34,6 @@ extern const uint64_t iso_Nx_data[ELLP_Nx_LEN][Fp_DIGITS];
 extern const uint64_t iso_Dx_data[ELLP_Dx_LEN][Fp_DIGITS];
 extern const uint64_t iso_Ny_data[ELLP_Ny_LEN][Fp_DIGITS];
 extern const uint64_t iso_Dy_data[ELLP_Dy_LEN][Fp_DIGITS];
-#endif
 
 #if (MEMBERSHIP_CHECK_G1 == BOWE)
 extern const uint64_t beta_data[Fp_DIGITS];
@@ -61,8 +59,6 @@ void precomputed_data_set(const prec_st* p) {
 prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
 
-    #if (hashToPoint == OPSWU)
-
     fp_read_raw(bls_prec->a1, a1_data);
     fp_read_raw(bls_prec->b1, b1_data);
     // (p-3)/4
@@ -78,7 +74,6 @@ prec_st* init_precomputed_data_BLS12_381() {
         fp_read_raw(bls_prec->iso_Dy[i], iso_Dy_data[i]);
     for (int i=0; i<ELLP_Ny_LEN; i++)  
         fp_read_raw(bls_prec->iso_Ny[i], iso_Ny_data[i]);
-    #endif
 
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_new(&bls_prec->beta);
