@@ -5,6 +5,8 @@
 
 extern prec_st* bls_prec;
 
+#if (hashToPoint==OPSWU)
+
 const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xEE7FBFFFFFFFEAAA, 0x07AAFFFFAC54FFFF, 0xD9CC34A83DAC3D89,
     0xD91DD2E13CE144AF, 0x92C6E9ED90D2EB35, 0x0680447A8E5FF9A6,
@@ -407,6 +409,7 @@ void opswu_test(uint8_t *out, const uint8_t *msg, int len){
 void map_to_G1(ep_t h, const byte* data, const int len) {
     // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
     map_to_G1_opswu(h, data, len);
+    #endif
 }
 
 
