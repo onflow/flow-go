@@ -1,4 +1,4 @@
-package common
+package receiptstate
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/integration/tests/common/blockstate"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -74,7 +75,7 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 
 // WaitUntilFinalizedStateCommitmentChanged waits until a different state commitment for a finalized block is received
 // compared to the latest one from any execution node and returns the corresponding block and execution receipt
-func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *ReceiptState,
+func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *blockstate.BlockState, rs *ReceiptState,
 	qualifiers ...func(receipt flow.ExecutionReceipt) bool) (*messages.BlockProposal,
 	*flow.ExecutionReceipt) {
 
@@ -96,7 +97,7 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *BlockState, rs *
 	var r2 *flow.ExecutionReceipt
 	require.Eventually(t, func() bool {
 		var ok bool
-		b2, ok = bs.finalizedByHeight[currentHeight]
+		b2, ok = bs.FinalizedHeight(currentHeight)
 		if !ok {
 			return false
 		}
