@@ -4,12 +4,10 @@ on:
   push:
     branches:
       - master
-      - feature/epochs
       - 'auto-cadence-upgrade/**'
   pull_request:
     branches:
       - master
-      - feature/epochs
       - 'auto-cadence-upgrade/**'
 
 jobs:
