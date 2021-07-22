@@ -24,7 +24,6 @@
 #define MEMBERSHIP_CHECK 1
 
 // algorithm choice for the hashing to G1 
-#define HASHCHECK 1
 #define OPSWU 2
 #define hashToPoint OPSWU
 
