@@ -48,3 +48,37 @@ func TestCertificateGeneration(t *testing.T) {
 	require.True(t, now.After(cert.NotBefore))
 	require.True(t, cert.NotAfter.After(now.Add(year)))
 }
+
+// TestPeerCertificateVerification tests that the verifyPeerCertificate function correctly verifies a server cert
+func TestPeerCertificateVerification(t *testing.T) {
+	// test key
+	key, err := unittest.NetworkingKey()
+	require.NoError(t, err)
+
+	// generate the certificate from the key
+	certs, err := X509Certificate(key)
+	require.NoError(t, err)
+
+	// derive the verification function
+	verifyFunc, err := verifyPeerCertificateFunc(key.PublicKey())
+	require.NoError(t, err)
+
+	t.Run("happy path - certificate validation passes", func(t *testing.T) {
+		// call the verify function and assert that the certificate is validated
+		err = verifyFunc(certs.Certificate, nil)
+		require.NoError(t, err)
+	})
+
+	t.Run("certificate validation fails for a different public key", func(t *testing.T) {
+		// generate another key and certificate
+		key2, err := unittest.NetworkingKey()
+		require.NoError(t, err)
+		certs2, err := X509Certificate(key2)
+		require.NoError(t, err)
+
+		// call the verify function again and assert that the certificate with a different public key is not validated
+		// and a ServerAuthError is thrown
+		err = verifyFunc(certs2.Certificate, nil)
+		require.True(t, IsServerAuthError(err))
+	})
+}
