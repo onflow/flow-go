@@ -85,7 +85,7 @@ void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
     ep_free(h);
 }
 
-// For testing only, computes a BLS signature from a point representing the point embedding of a message
+// For testing only, computes a BLS signature from a point representing the embedding of a message
 void bls_sign_nomap(byte* s, const bn_t sk, const ep_t pt) {
     ep_t p;
     ep_new(p);

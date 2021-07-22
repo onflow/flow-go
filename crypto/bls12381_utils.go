@@ -134,6 +134,8 @@ func readScalar(x *scalar, src []byte) {
 }
 
 // writePointG2 writes a G2 point in a slice of bytes
+// The slice should be of size PubKeyLenBLSBLS12381 and the serialization will
+// follow follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG2(dest []byte, a *pointG2) {
 	C.ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
@@ -142,6 +144,8 @@ func writePointG2(dest []byte, a *pointG2) {
 }
 
 // writePointG1 writes a G1 point in a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the serialization will
+// follow follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG1(dest []byte, a *pointG1) {
 	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep_st)(a),
@@ -149,7 +153,9 @@ func writePointG1(dest []byte, a *pointG1) {
 	)
 }
 
-// readVerifVector reads a G2 point from a slice of bytes
+// readPointG2 reads a G2 point from a slice of bytes
+// The slice is expexted to be of size PubKeyLenBLSBLS12381 and the deserialization will
+// follow follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func readPointG2(a *pointG2, src []byte) error {
 	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
@@ -164,6 +170,8 @@ func readPointG2(a *pointG2, src []byte) error {
 }
 
 // readPointG1 reads a G2 point from a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the deserialization will
+// follow follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func readPointG1(a *pointG1, src []byte) error {
 	switch C.ep_read_bin_compact((*C.ep_st)(a),
 		(*C.uchar)(&src[0]),
