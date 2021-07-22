@@ -186,10 +186,44 @@ func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
 
 }
 
+func testBLSWithRelicSignCrossBLST(t *rapid.T) {
+	blsCipher := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	var msgBytes []byte = rapid.SliceOfN(rapid.Byte(), 1, 1000).Example().([]byte)
+
+	var skBytes []byte = rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381).Example().([]byte)
+	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
+
+	var skBLST blst.Scalar
+	res := skBLST.Deserialize(skBytes)
+
+	bothFail := (err != nil && res == nil)
+	bothPass := (err == nil && res != nil)
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
+	}
+	if bothPass {
+		var sigBLST blst.P1Affine
+		sigBLST.Sign(&skBLST, msgBytes, blsCipher)
+		sigBytesBLST := sigBLST.Compress()
+
+		skBLS, ok := sk.(*PrKeyBLSBLS12381)
+		if !ok {
+			panic("incoherent sk interpretation")
+		}
+		sig, err := skBLS.signWithRelicMapTest(msgBytes)
+		require.NoError(t, err)
+		sigBytesBLS := sig.Bytes()
+		assert.Equal(t, sigBytesBLST, sigBytesBLS)
+
+	}
+
+}
+
 func TestBLSCross(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodeSigCrossBLST)
+	rapid.Check(t, testBLSWithRelicSignCrossBLST)
 }
 
 // TestBLSEquals tests equal for BLS keys
