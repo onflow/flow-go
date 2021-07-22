@@ -58,6 +58,8 @@ const (
 	AccessNodeAPIPort = "access-api-port"
 	// AccessNodeAPIProxyPort is the name used for the access node API HTTP proxy port.
 	AccessNodeAPIProxyPort = "access-api-http-proxy-port"
+	// UnstakedNetworkPort is the name used for the access node unstaked libp2p network port.
+	UnstakedNetworkPort = "access-unstaked-network-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
 
@@ -251,7 +253,8 @@ type NodeConfig struct {
 	Debug           bool
 	// Unstaked - only applicable to Access Node. Access nodes can be staked or unstaked.
 	// Unstaked nodes are not part of the identity table
-	Unstaked bool // only applicable to Access node
+	Unstaked                      bool // only applicable to Access node
+	ParticipatesInUnstakedNetwork bool
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -330,6 +333,13 @@ func AsGhost() func(config *NodeConfig) {
 func AsUnstaked() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
 		config.Unstaked = true
+		config.ParticipatesInUnstakedNetwork = true
+	}
+}
+
+func AsUnstakedNetworkParticipant() func(config *NodeConfig) {
+	return func(config *NodeConfig) {
+		config.ParticipatesInUnstakedNetwork = true
 	}
 }
 
@@ -510,24 +520,35 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			hostGRPCPort := testingdock.RandomPort(t)
-			hostHTTPProxyPort := testingdock.RandomPort(t)
-			containerGRPCPort := "9000/tcp"
-			containerHTTPProxyPort := "8000/tcp"
+			if !nodeConf.Unstaked {
+				hostGRPCPort := testingdock.RandomPort(t)
+				hostHTTPProxyPort := testingdock.RandomPort(t)
+				containerGRPCPort := "9000/tcp"
+				containerHTTPProxyPort := "8000/tcp"
 
-			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
-			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
+				nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
+				nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
-			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
-			// uncomment line below to point the access node exclusively to a single collection node
-			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
-			nodeContainer.addFlag("collection-ingress-port", "9000")
-			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
-			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
-			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
-			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
-			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+				nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+				nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+				// uncomment line below to point the access node exclusively to a single collection node
+				// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
+				nodeContainer.addFlag("collection-ingress-port", "9000")
+				nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+				nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
+				nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+				net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+				net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+			}
+
+			if nodeConf.ParticipatesInUnstakedNetwork {
+				hostUnstakedPort := testingdock.RandomPort(t)
+				containerUnstakedPort := "9876/tcp"
+				nodeContainer.bindPort(hostUnstakedPort, containerUnstakedPort)
+				nodeContainer.addFlag("unstaked-bind-addr", fmt.Sprintf("%s:9876", nodeContainer.Name()))
+				nodeContainer.Ports[UnstakedNetworkPort] = hostUnstakedPort
+				net.AccessPorts[UnstakedNetworkPort] = hostUnstakedPort
+			}
 
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
@@ -769,13 +790,14 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		)
 
 		containerConf := ContainerConfig{
-			NodeInfo:        info,
-			ContainerName:   name,
-			LogLevel:        conf.LogLevel,
-			Ghost:           conf.Ghost,
-			AdditionalFlags: conf.AdditionalFlags,
-			Debug:           conf.Debug,
-			Unstaked:        conf.Unstaked,
+			NodeInfo:                      info,
+			ContainerName:                 name,
+			LogLevel:                      conf.LogLevel,
+			Ghost:                         conf.Ghost,
+			AdditionalFlags:               conf.AdditionalFlags,
+			Debug:                         conf.Debug,
+			Unstaked:                      conf.Unstaked,
+			ParticipatesInUnstakedNetwork: conf.ParticipatesInUnstakedNetwork,
 		}
 
 		confs = append(confs, containerConf)

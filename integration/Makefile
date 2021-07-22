@@ -8,11 +8,15 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: common-tests execution-tests verification-tests collection-tests consensus-tests
+integration-test: common-tests execution-tests verification-tests collection-tests consensus-tests access-tests
 
 # NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
 .PHONY: ci-integration-test
 ci-integration-test: common-tests execution-tests verification-tests # collection-tests # consensus-tests
+
+.PHONY: access-tests
+access-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/access
 
 .PHONY: collection-tests
 collection-tests:
