@@ -89,8 +89,7 @@ void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
 void bls_sign_nomap(byte* s, const bn_t sk, const ep_t pt) {
     ep_t p;
     ep_new(p);
-    ep_copy(p, pt);
-    ep_mult(p, p, sk);
+    ep_mult(p, pt, sk);
     ep_write_bin_compact(s, p, SIGNATURE_LEN);
     ep_free(p);
 }

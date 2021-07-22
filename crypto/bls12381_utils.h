@@ -109,6 +109,8 @@ int bowe_subgroup_check_G1(const ep_t);
 #endif
 int subgroup_check_G1_test(int, int);
 int subgroup_check_G1_bench();
+int check_membership_G1(const ep_t p);
+
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);

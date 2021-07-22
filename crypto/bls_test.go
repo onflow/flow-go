@@ -4,7 +4,6 @@ package crypto
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
 	"testing"
@@ -108,43 +107,75 @@ func TestBLSEncodeDecode(t *testing.T) {
 	assert.IsType(t, expectedError, err)
 }
 
+func genScalarBLST(t *rapid.T) []byte {
+	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
+	ikm := randomSlice.Draw(t, "ikm").([]byte)
+	return blst.KeyGen(ikm).Serialize()
+}
+
+func testKeyGenDecodePrivateCrossBLST(t *rapid.T) {
+	skBytes := rapid.Custom(genScalarBLST).Example().([]byte)
+	_, err := DecodePrivateKey(BLSBLS12381, skBytes)
+	require.NoError(t, err)
+}
+
+func genScalarBLS(t *rapid.T) []byte {
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
+	sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+	return sk.Encode()
+}
+
+func testGenKeyDeserializeScalarCrossBLST(t *rapid.T) {
+	skBytes := rapid.Custom(genScalarBLS).Example().([]byte)
+	var skBLST blst.Scalar
+	res := skBLST.Deserialize(skBytes)
+
+	assert.True(t, res != nil)
+}
+
 func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
-	var skBytes []byte = rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381).Example().([]byte)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381)
+	validSlice := rapid.Custom(genScalarBLS)
+	var skBytes []byte = rapid.OneOf(randomSlice, validSlice).Example().([]byte)
 	skBLS, err := DecodePrivateKey(BLSBLS12381, skBytes)
 
 	var skBLST blst.Scalar
 	res := skBLST.Deserialize(skBytes)
 
-	bothFail := (err != nil && res == nil)
-	bothPass := (err == nil && res != nil)
-	if !(bothFail || bothPass) {
-		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
-	}
+	blsPass := err == nil
+	blstPass := res != nil
+	require.Equal(t, blsPass, blstPass, "deserialization of privkey %x differs, internal finds validity %v, blst finds validity %v", skBytes, blsPass, blstPass)
 
-	if bothPass {
+	if blstPass && blsPass {
 		skBLSOutBytes := skBLS.Encode()
 		skBLSTOutBytes := skBLST.Serialize()
 		assert.Equal(t, skBLSOutBytes, skBLSTOutBytes)
 	}
+}
 
+func validPointG2BLST(t *rapid.T) []byte {
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
+	blstS := blst.KeyGen(ikm[:])
+	blstG2 := new(blst.P2Affine).From(blstS)
+	return blstG2.Compress()
 }
 
 func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
-	var pkBytes []byte = rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381).Example().([]byte)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
+	validSliceBLST := rapid.Custom(validPointG2BLST)
+
+	var pkBytes []byte = rapid.OneOf(randomSlice, validSliceBLST).Example().([]byte)
 	pkBLS, err := DecodePublicKey(BLSBLS12381, pkBytes)
 
 	var pkBLST blst.P2Affine
-	res := pkBLST.Uncompress(pkBytes)
+	res := pkBLST.Deserialize(pkBytes)
 	pkValidBLST := pkBLST.KeyValidate()
 
-	bothFail := (err != nil && (res == nil || !pkValidBLST))
-	bothPass := (err == nil && res != nil && pkValidBLST)
+	blsPass := err == nil
+	blstPass := res != nil && pkValidBLST
+	require.Equal(t, blsPass, blstPass, "deserialization of pubkey %x differs, internal finds validity %v, blst finds validity %v", pkBytes, blsPass, blstPass)
 
-	if !(bothFail || bothPass) {
-		t.Fatalf("Deserialization of %v differs, internal finds pubkey validity %v, blst finds pubkey validity %v ", hex.EncodeToString(pkBytes), (err == nil), (res != nil && pkValidBLST))
-	}
-
-	if bothPass {
+	if blsPass && blstPass {
 		pkBLSOutBytes := pkBLS.Encode()
 		pkBLSTOutBytes := pkBLST.Compress()
 
@@ -152,8 +183,17 @@ func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
 	}
 }
 
+func validSigG1BLST(t *rapid.T) []byte {
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
+	blstS := blst.KeyGen(ikm[:])
+	blstG1 := new(blst.P1Affine).From(blstS)
+	return blstG1.Compress()
+}
+
 func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
-	var sigBytes []byte = rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381).Example().([]byte)
+	randomSlice := rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381)
+	validSigG1 := rapid.Custom(validSigG1BLST)
+	var sigBytes []byte = rapid.OneOf(randomSlice, validSigG1).Example().([]byte)
 	// here we test readPointG1 rather than the simple Signature type alias
 	var sigBLSPt pointG1
 	err := readPointG1(&sigBLSPt, sigBytes)
@@ -167,14 +207,12 @@ func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
 	// our validation has no infinity rejection for G1
 	sigValidBLST := sigBLST.SigValidate(false)
 
-	bothFail := (!sigValidBLS && (res == nil || !sigValidBLST))
-	bothPass := (sigValidBLS && res != nil && sigValidBLST)
+	blsPass := sigValidBLS
+	blstPass := res != nil && sigValidBLST
 
-	if !(bothFail || bothPass) {
-		t.Fatalf("Deserialization of sig %v differs, internal finds signature validity %v, blst finds signature validity %v", hex.EncodeToString(sigBytes), sigValidBLS, (res != nil && sigValidBLST))
-	}
+	require.Equal(t, blsPass, blstPass, "deserialization of signature %x differs, internal finds validity %v, blst finds validity %v", sigBytes, blsPass, blstPass)
 
-	if bothPass {
+	if blsPass && blstPass {
 		sigBLSOutBytes := make([]byte, signatureLengthBLSBLS12381)
 		writePointG1(sigBLSOutBytes, &sigBLSPt)
 
@@ -189,28 +227,25 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 	blsCipher := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
 	var msgBytes []byte = rapid.SliceOfN(rapid.Byte(), 1, 1000).Example().([]byte)
 
-	var skBytes []byte = rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381).Example().([]byte)
+	var skBytes []byte = rapid.Custom(genScalarBLS).Example().([]byte)
 	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
 
 	var skBLST blst.Scalar
 	res := skBLST.Deserialize(skBytes)
 
-	bothFail := (err != nil && res == nil)
-	bothPass := (err == nil && res != nil)
-	if !(bothFail || bothPass) {
-		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
-	}
-	if bothPass {
+	blsPass := err == nil
+	blstPass := res != nil
+	require.Equal(t, blsPass, blstPass, "deserialization of privkey %x differs, internal finds validity %v, blst finds validity %v", skBytes, blsPass, blstPass)
+
+	if blsPass && blstPass {
 		var sigBLST blst.P1Affine
 		sigBLST.Sign(&skBLST, msgBytes, blsCipher)
 		sigBytesBLST := sigBLST.Compress()
 
 		skBLS, ok := sk.(*PrKeyBLSBLS12381)
-		if !ok {
-			panic("incoherent sk interpretation")
-		}
-		sig, err := skBLS.signWithRelicMapTest(msgBytes)
-		require.NoError(t, err)
+		require.True(t, ok, "incoherent key type assertion")
+
+		sig := skBLS.signWithRelicMapTest(msgBytes)
 		sigBytesBLS := sig.Bytes()
 		assert.Equal(t, sigBytesBLST, sigBytesBLS)
 
@@ -218,7 +253,9 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 
 }
 
-func TestBLSCross(t *testing.T) {
+func TestBLSCrossBLST(t *testing.T) {
+	rapid.Check(t, testKeyGenDecodePrivateCrossBLST)
+	rapid.Check(t, testGenKeyDeserializeScalarCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodeSigCrossBLST)
