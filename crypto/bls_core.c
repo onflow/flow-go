@@ -73,7 +73,7 @@ int check_membership_G2(const ep2_t p){
     return VALID;
 }
 
-// Computes a BLS signature
+// Computes a BLS signature from a hash
 void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
     ep_t h;
     ep_new(h);
