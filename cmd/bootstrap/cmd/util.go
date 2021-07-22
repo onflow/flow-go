@@ -15,7 +15,7 @@ import (
 )
 
 // GenerateRandomSeeds exported wrapper around func to generate seed values used for key generation.
-func GenerateRandomSeeds(n int) [][]byte  {
+func GenerateRandomSeeds(n int) [][]byte {
 	return generateRandomSeeds(n)
 }
 
@@ -28,7 +28,7 @@ func generateRandomSeeds(n int) [][]byte {
 }
 
 // GenerateRandomSeed exported wrapper around func to generate seed value used for key generation.
-func GenerateRandomSeed() []byte  {
+func GenerateRandomSeed() []byte {
 	return generateRandomSeed()
 }
 
