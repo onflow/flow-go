@@ -22,7 +22,7 @@ import (
 )
 
 func TestCreateDKGContractClient(t *testing.T) {
-	cmd := cmd.FlowNode(flow.RoleConsensus.String())
+	cmd := &cmd.NodeConfig{}
 
 	// consensus local
 	identity := unittest.IdentityFixture()
