@@ -1,4 +1,4 @@
-package common
+package blockstate
 
 import (
 	"fmt"
@@ -196,4 +196,12 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 		return nil, false
 	}
 	return bs.highestSealed, true
+}
+
+func (bs *BlockState) FinalizedHeight(currentHeight uint64) (*messages.BlockProposal, bool) {
+	bs.RLock()
+	defer bs.RUnlock()
+
+	blk, ok := bs.finalizedByHeight[currentHeight]
+	return blk, ok
 }
