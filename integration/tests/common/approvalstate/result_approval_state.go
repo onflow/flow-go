@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const resultApprovalTimeout = 100 * time.Second
+const resultApprovalTimeout = 120 * time.Second
 
 // ResultApprovalState keeps track of the result approval messages getting disseminated through
 // test net network.
