@@ -44,15 +44,13 @@ typedef uint8_t byte;
 #define MEMBERSHIP_CHECK_G2 EXP_ORDER
 
 // Structure of precomputed data
-#if (hashToPoint == OPSWU)
-    #define ELLP_Nx_LEN 12
-    #define ELLP_Dx_LEN 10
-    #define ELLP_Ny_LEN 16
-    #define ELLP_Dy_LEN 15
-#endif
+#define ELLP_Nx_LEN 12
+#define ELLP_Dx_LEN 10
+#define ELLP_Ny_LEN 16
+#define ELLP_Dy_LEN 15
+
 
 typedef struct prec_ {
-    #if (hashToPoint == OPSWU)
     bn_st p_3div4;
     fp_st fp_p_1div2; 
     // coefficients of E1(Fp)
@@ -63,7 +61,6 @@ typedef struct prec_ {
     fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
     fp_st iso_Dy[ELLP_Dy_LEN];
-    #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;
