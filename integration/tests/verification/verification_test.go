@@ -52,7 +52,7 @@ func (suite *VerificationTestSuite) TestSealingAndVerificationHappyPath() {
 
 	// waits until for a different state commitment for a finalized block, call that block blockB,
 	// which has more than one chunk on its execution result.
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(suite.T(), suite.BlockState, &suite.ReceiptState, common.WithMinimumChunks(2))
+	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(suite.T(), suite.BlockState, suite.ReceiptState, common.WithMinimumChunks(2))
 	suite.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// waits for the execution receipt of blockB from both execution nodes, and makes sure that there is no execution fork.
