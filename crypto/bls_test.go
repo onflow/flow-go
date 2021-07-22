@@ -4,10 +4,14 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	mrand "math/rand"
 	"testing"
 	"time"
+
+	blst "github.com/supranational/blst/bindings/go"
+	"pgregory.net/rapid"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,6 +106,32 @@ func TestBLSEncodeDecode(t *testing.T) {
 	_, err = DecodePublicKey(BLSBLS12381, pkBytes)
 	require.Error(t, err, "the key decoding should fail - key value is identity")
 	assert.IsType(t, expectedError, err)
+}
+
+func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
+	var skBytes []byte = rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381).Example().([]byte)
+	skBLS, err := DecodePrivateKey(BLSBLS12381, skBytes)
+
+	var skBLST blst.Scalar
+	res := skBLST.Deserialize(skBytes)
+
+	bothFail := (err != nil && res == nil)
+	bothPass := (err == nil && res != nil)
+	if !(bothFail || bothPass) {
+		// TODO(fga): BLST does not check for non-canonical scalars, though we do => open go bindings to blst_scalar_fr_check in blst?
+		t.Fatalf("Deserialization of %v differs, internal finds scalar validity %v, blst finds scalar validity %v", hex.EncodeToString(skBytes), (err == nil), (res != nil))
+	}
+
+	if bothPass {
+		skBLSOutBytes := skBLS.Encode()
+		skBLSTOutBytes := skBLST.Serialize()
+		assert.Equal(t, skBLSOutBytes, skBLSTOutBytes)
+	}
+
+}
+
+func TestBLSCross(t *testing.T) {
+	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
 }
 
 // TestBLSEquals tests equal for BLS keys
