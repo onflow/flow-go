@@ -67,7 +67,8 @@ type WriteJSONFileFunc func(relativePath string, value interface{}) error
 
 // WriteMachineAccountFiles writes machine account key files for a set of nodeInfos.
 // Assumes that machine accounts have been created using the default execution state
-// bootstrapping.
+// bootstrapping. Further assumes that the order of nodeInfos is the same order that
+// nodes were staked during execution state bootstrapping.
 //
 // Only applicable for transient test networks.
 func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {

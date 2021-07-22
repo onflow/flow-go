@@ -22,7 +22,7 @@ import (
 )
 
 func TestCreateQCContractClient(t *testing.T) {
-	cmd := cmd.FlowNode(flow.RoleCollection.String())
+	cmd := &cmd.NodeConfig{}
 
 	// collection local
 	identity := unittest.IdentityFixture()

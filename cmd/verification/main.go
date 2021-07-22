@@ -90,7 +90,8 @@ func main() {
 			flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 
 		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Initialize().
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -107,11 +108,11 @@ func main() {
 			)
 			return err
 		}).
-		Module("verification metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("verification metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("chunk status memory pool", func(node *cmd.FlowNodeBuilder) error {
+		Module("chunk status memory pool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			chunkStatuses = stdmap.NewChunkStatuses(chunkLimit)
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
 			if err != nil {
@@ -119,7 +120,7 @@ func main() {
 			}
 			return nil
 		}).
-		Module("chunk requests memory pool", func(node *cmd.FlowNodeBuilder) error {
+		Module("chunk requests memory pool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			chunkRequests = stdmap.NewChunkRequests(chunkLimit)
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
 			if err != nil {
@@ -127,15 +128,15 @@ func main() {
 			}
 			return nil
 		}).
-		Module("processed chunk index consumer progress", func(node *cmd.FlowNodeBuilder) error {
+		Module("processed chunk index consumer progress", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			processedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(node *cmd.FlowNodeBuilder) error {
+		Module("processed block height consumer progress", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			processedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
-		Module("chunks queue", func(node *cmd.FlowNodeBuilder) error {
+		Module("chunks queue", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			chunkQueue = storage.NewChunkQueue(node.DB)
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
@@ -149,7 +150,7 @@ func main() {
 
 			return nil
 		}).
-		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
 
@@ -161,11 +162,11 @@ func main() {
 
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Component("verifier engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("verifier engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -182,7 +183,7 @@ func main() {
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("chunk consumer, requester, and fetcher engines", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
@@ -224,7 +225,7 @@ func main() {
 
 			return chunkConsumer, nil
 		}).
-		Component("assigner engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("assigner engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
 			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
@@ -243,7 +244,7 @@ func main() {
 
 			return assignerEngine, nil
 		}).
-		Component("block consumer", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("block consumer", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var initBlockHeight uint64
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
@@ -271,7 +272,7 @@ func main() {
 
 			return blockConsumer, nil
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
@@ -332,7 +333,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
