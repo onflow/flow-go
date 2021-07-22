@@ -61,7 +61,7 @@ var DefaultMinimumStorageReservation = func() cadence.UFix64 {
 }()
 
 var DefaultStorageMBPerFLOW = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("10.00000000")
+	value, err := cadence.NewUFix64("100.00000000")
 	if err != nil {
 		panic(fmt.Errorf("invalid default minimum storage reservation: %w", err))
 	}
