@@ -153,9 +153,43 @@ func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
 	}
 }
 
+func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
+	var sigBytes []byte = rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381).Example().([]byte)
+	// here we test readPointG1 rather than the simple Signature type alias
+	var sigBLSPt pointG1
+	err := readPointG1(&sigBLSPt, sigBytes)
+	sigValidBLS := (err == nil)
+	if sigValidBLS {
+		sigValidBLS = checkInG1Test(&sigBLSPt)
+	}
+
+	var sigBLST blst.P1Affine
+	res := sigBLST.Uncompress(sigBytes)
+	// our validation has no infinity rejection for G1
+	sigValidBLST := sigBLST.SigValidate(false)
+
+	bothFail := (!sigValidBLS && (res == nil || !sigValidBLST))
+	bothPass := (sigValidBLS && res != nil && sigValidBLST)
+
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of sig %v differs, internal finds signature validity %v, blst finds signature validity %v", hex.EncodeToString(sigBytes), sigValidBLS, (res != nil && sigValidBLST))
+	}
+
+	if bothPass {
+		sigBLSOutBytes := make([]byte, signatureLengthBLSBLS12381)
+		writePointG1(sigBLSOutBytes, &sigBLSPt)
+
+		sigBLSTOutBytes := sigBLST.Compress()
+
+		assert.Equal(t, sigBLSOutBytes, sigBLSTOutBytes)
+	}
+
+}
+
 func TestBLSCross(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
+	rapid.Check(t, testBLSEncodeDecodeSigCrossBLST)
 }
 
 // TestBLSEquals tests equal for BLS keys
