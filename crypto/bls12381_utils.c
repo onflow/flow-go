@@ -284,12 +284,21 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
+    // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
     if (len!=G1_size) {
         return RLC_ERR;
     }
+
+    // check the compression bit
+    int compressed = bin[0] >> 7;
+    if ((compressed == 1) != (G1_SERIALIZATION == COMPRESSED)) {
+        return RLC_ERR;
+    } 
+
     // check if the point is infinity
-    if (bin[0] & 0x40) {
+    int is_infinity = bin[0] & 0x40;
+    if (is_infinity) {
         // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
             return RLC_ERR;
@@ -303,14 +312,8 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 		return RLC_OK;
 	} 
 
-    int compressed = bin[0] >> 7;
+    // read the sign bit and check for consistency
     int y_sign = (bin[0] >> 5) & 1;
-
-    // bad compressed bit for this deserialization context
-    if (compressed ^ G1_SERIALIZATION) {
-        return RLC_ERR;
-    }
-
     if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
@@ -338,6 +341,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     }
     return RLC_ERR;
 }
+
 
 // returns the sign of y.
 // sign(y_0) if y_1 = 0, else sign(y_1)
@@ -393,13 +397,21 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
+    // check the length
     const int G2size = (G2_BYTES/(G2_SERIALIZATION+1));
     if (len!=G2size) {
         return RLC_ERR;
     }
 
+    // check the compression bit
+    int compressed = bin[0] >> 7;
+    if ((compressed == 1) != (G2_SERIALIZATION == COMPRESSED)) {
+        return RLC_ERR;
+    } 
+
     // check if the point in infinity
-    if (bin[0] & 0x40) {
+    int is_infinity = bin[0] & 0x40;
+    if (is_infinity) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
             return RLC_ERR;
@@ -412,16 +424,13 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 		ep2_set_infty(a);
 		return RLC_OK;
 	} 
-    byte compressed = bin[0] >> 7;
-    byte y_sign = (bin[0] >> 5) & 1;
 
-    // bad compressed bit for this deserialization context
-    if (compressed ^ G2_SERIALIZATION) {
-        return RLC_ERR;
-    }
+    // read the sign bit and check for consistency
+    int y_sign = (bin[0] >> 5) & 1;
     if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
+    
 	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
