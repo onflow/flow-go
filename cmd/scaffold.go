@@ -17,7 +17,6 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -25,11 +24,9 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
-	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -43,26 +40,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const notSet = "not set"
-
-// BaseConfig is the general config for the FlowNodeBuilder
-type BaseConfig struct {
-	nodeIDHex             string
-	bindAddr              string
-	nodeRole              string
-	timeout               time.Duration
-	datadir               string
-	level                 string
-	metricsPort           uint
-	BootstrapDir          string
-	peerUpdateInterval    time.Duration
-	unicastMessageTimeout time.Duration
-	profilerEnabled       bool
-	profilerDir           string
-	profilerInterval      time.Duration
-	profilerDuration      time.Duration
-	tracerEnabled         bool
-}
+const NotSet = "not set"
 
 type Metrics struct {
 	Network    module.NetworkMetrics
@@ -90,12 +68,12 @@ type Storage struct {
 }
 
 type namedModuleFunc struct {
-	fn   func(*FlowNodeBuilder) error
+	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) error
 	name string
 }
 
 type namedComponentFunc struct {
-	fn   func(*FlowNodeBuilder) (module.ReadyDoneAware, error)
+	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) (module.ReadyDoneAware, error)
 	name string
 }
 
@@ -104,52 +82,32 @@ type namedDoneObject struct {
 	name string
 }
 
-// FlowNodeBuilder is the builder struct used for all flow nodes
+// FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
 //   PostInit handlers, if any
 // Components handlers, if any, wait sequentially
 // Run() <- main loop
 // Components destructors, if any
+// The initialization can be proceeded and succeeded with  PreInit and PostInit functions that allow customization
+// of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
-	BaseConfig        BaseConfig
-	NodeID            flow.Identifier
-	flags             *pflag.FlagSet
-	Logger            zerolog.Logger
-	Me                *local.Local
-	Tracer            module.Tracer
-	MetricsRegisterer prometheus.Registerer
-	Metrics           Metrics
-	DB                *badger.DB
-	Storage           Storage
-	ProtocolEvents    *events.Distributor
-	State             protocol.State
-	Middleware        *p2p.Middleware
-	Network           *p2p.Network
-	MsgValidators     []network.MessageValidator
-	FvmOptions        []fvm.Option
-	modules           []namedModuleFunc
-	components        []namedComponentFunc
-	doneObject        []namedDoneObject
-	sig               chan os.Signal
-	postInitFns       []func(*FlowNodeBuilder)
-	stakingKey        crypto.PrivateKey
-	NetworkKey        crypto.PrivateKey
-
-	// root state information
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
+	*NodeConfig
+	flags       *pflag.FlagSet
+	modules     []namedModuleFunc
+	components  []namedComponentFunc
+	doneObject  []namedDoneObject
+	sig         chan os.Signal
+	preInitFns  []func(NodeBuilder, *NodeConfig)
+	postInitFns []func(NodeBuilder, *NodeConfig)
 }
 
-func (fnb *FlowNodeBuilder) baseFlags() {
+func (fnb *FlowNodeBuilder) BaseFlags() {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
-	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", notSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", notSet, "address to bind on")
+	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", NotSet, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", NotSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
@@ -165,20 +123,19 @@ func (fnb *FlowNodeBuilder) baseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
 		"whether to enable tracer")
-
 }
 
-func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
-	fnb.Component("network", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
 		codec := jsoncodec.NewCodec()
 
-		myAddr := fnb.Me.Address()
-		if fnb.BaseConfig.bindAddr != notSet {
+		myAddr := fnb.NodeConfig.Me.Address()
+		if fnb.BaseConfig.bindAddr != NotSet {
 			myAddr = fnb.BaseConfig.bindAddr
 		}
 
-		// setup the Ping provider to return the software version and the finalized block height
+		// setup the Ping provider to return the software version and the sealed block height
 		pingProvider := p2p.PingInfoProviderImpl{
 			SoftwareVersionFun: func() string {
 				return build.Semver()
@@ -218,10 +175,6 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			return nil, fmt.Errorf("could not get network identities: %w", err)
 		}
 
-		// creates topology, topology manager, and subscription managers
-		//
-		// topology
-		// subscription manager
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State)
 		if err != nil {
@@ -235,7 +188,7 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 			participants,
 			fnb.Me,
 			fnb.Middleware,
-			10e6,
+			p2p.DefaultCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network)
@@ -253,24 +206,24 @@ func (fnb *FlowNodeBuilder) enqueueNetworkInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) enqueueMetricsServerInit() {
-	fnb.Component("metrics server", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
+	fnb.Component("metrics server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
 }
 
-func (fnb *FlowNodeBuilder) registerBadgerMetrics() {
+func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() {
 	metrics.RegisterBadgerMetrics()
 }
 
-func (fnb *FlowNodeBuilder) enqueueTracer() {
-	fnb.Component("tracer", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+func (fnb *FlowNodeBuilder) EnqueueTracer() {
+	fnb.Component("tracer", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		return fnb.Tracer, nil
 	})
 }
 
-func (fnb *FlowNodeBuilder) parseAndPrintFlags() {
+func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
 	// parse configuration parameters
 	pflag.Parse()
 
@@ -284,12 +237,12 @@ func (fnb *FlowNodeBuilder) parseAndPrintFlags() {
 	log.Msg("flags loaded")
 }
 
-func (fnb *FlowNodeBuilder) printBuildVersionDetails() {
+func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
 }
 
 func (fnb *FlowNodeBuilder) initNodeInfo() {
-	if fnb.BaseConfig.nodeIDHex == notSet {
+	if fnb.BaseConfig.nodeIDHex == NotSet {
 		fnb.Logger.Fatal().Msg("cannot start without node ID")
 	}
 
@@ -304,8 +257,8 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 	}
 
 	fnb.NodeID = nodeID
-	fnb.stakingKey = info.StakingPrivKey.PrivateKey
 	fnb.NetworkKey = info.NetworkPrivKey.PrivateKey
+	fnb.StakingKey = info.StakingPrivKey.PrivateKey
 }
 
 func (fnb *FlowNodeBuilder) initLogger() {
@@ -313,11 +266,11 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
 	log := fnb.Logger.With().
 		Timestamp().
-		Str("node_role", fnb.BaseConfig.nodeRole).
+		Str("node_role", fnb.BaseConfig.NodeRole).
 		Str("node_id", fnb.BaseConfig.nodeIDHex).
 		Logger()
 
-	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.nodeRole)
+	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
 
 	// parse config log level and apply to logger
 	lvl, err := zerolog.ParseLevel(strings.ToLower(fnb.BaseConfig.level))
@@ -333,7 +286,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.nodeRole)
+		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.NodeRole)
 		fnb.MustNot(err).Msg("could not initialize tracer")
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
@@ -351,7 +304,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 
 	// registers mempools as a Component so that its Ready method is invoked upon startup
-	fnb.Component("mempools metrics", func(builder *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	fnb.Component("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		return mempools, nil
 	})
 }
@@ -367,7 +320,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDuration,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
-	fnb.Component("profiler", func(node *FlowNodeBuilder) (module.ReadyDoneAware, error) {
+	fnb.Component("profiler", func(node NodeBuilder, nodeConfig *NodeConfig) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	})
 }
@@ -520,42 +473,10 @@ func (fnb *FlowNodeBuilder) initState() {
 			Msg("genesis state bootstrapped")
 	}
 
-	// Verify that my ID (as given in the configuration) is known to the network
-	// (i.e. protocol state). There are two cases that will cause the following error:
-	// 1) used the wrong node id, which is not part of the identity list of the finalized state
-	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
-	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
-	fnb.MustNot(err).Msg("could not parse node identifier")
-	self, err := fnb.State.Final().Identity(myID)
-	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
-
-	// Verify that my role (as given in the configuration) is consistent with the protocol state.
-	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
-	// are lenient, to allow ghost node to run as any role.
-	if self.Role.String() != fnb.BaseConfig.nodeRole {
-		rootBlockHeader, err := fnb.State.Params().Root()
-		fnb.MustNot(err).Msg("could not get root block from protocol state")
-		if rootBlockHeader.ChainID == flow.Mainnet {
-			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
-				self.Role.String(),
-				fnb.BaseConfig.nodeRole)
-		} else {
-			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
-				self.Role.String(),
-				fnb.BaseConfig.nodeRole)
-		}
+	// initialize local if it hasn't been initialized yet
+	if fnb.Me == nil {
+		fnb.initLocal()
 	}
-
-	// ensure that the configured staking/network keys are consistent with the protocol state
-	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
-		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
-	}
-	if !self.StakingPubKey.Equals(fnb.stakingKey.PublicKey()) {
-		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
-	}
-
-	fnb.Me, err = local.New(self, fnb.stakingKey)
-	fnb.MustNot(err).Msg("could not initialize local")
 
 	lastFinalized, err := fnb.State.Final().Head()
 	fnb.MustNot(err).Msg("could not get last finalized block header")
@@ -563,6 +484,46 @@ func (fnb *FlowNodeBuilder) initState() {
 		Hex("block_id", logging.Entity(lastFinalized)).
 		Uint64("height", lastFinalized.Height).
 		Msg("last finalized block")
+}
+
+func (fnb *FlowNodeBuilder) initLocal() {
+	// Verify that my ID (as given in the configuration) is known to the network
+	// (i.e. protocol state). There are two cases that will cause the following error:
+	// 1) used the wrong node id, which is not part of the identity list of the finalized state
+	// 2) the node id is a new one for a new spork, but the bootstrap data has not been updated.
+	myID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
+	fnb.MustNot(err).Msg("could not parse node identifier")
+
+	self, err := fnb.State.Final().Identity(myID)
+	fnb.MustNot(err).Msgf("node identity not found in the identity list of the finalized state: %v", myID)
+
+	// Verify that my role (as given in the configuration) is consistent with the protocol state.
+	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
+	// are lenient, to allow ghost node to run as any role.
+	if self.Role.String() != fnb.BaseConfig.NodeRole {
+		rootBlockHeader, err := fnb.State.Params().Root()
+		fnb.MustNot(err).Msg("could not get root block from protocol state")
+		if rootBlockHeader.ChainID == flow.Mainnet {
+			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
+				self.Role.String(),
+				fnb.BaseConfig.NodeRole)
+		} else {
+			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
+				self.Role.String(),
+				fnb.BaseConfig.NodeRole)
+		}
+	}
+
+	// ensure that the configured staking/network keys are consistent with the protocol state
+	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured networking key does not match protocol state")
+	}
+	if !self.StakingPubKey.Equals(fnb.StakingKey.PublicKey()) {
+		fnb.Logger.Fatal().Msg("configured staking key does not match protocol state")
+	}
+
+	fnb.Me, err = local.New(self, fnb.StakingKey)
+	fnb.MustNot(err).Msg("could not initialize local")
 }
 
 func (fnb *FlowNodeBuilder) initFvmOptions() {
@@ -582,7 +543,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 }
 
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
-	err := v.fn(fnb)
+	err := v.fn(fnb, fnb.NodeConfig)
 	if err != nil {
 		fnb.Logger.Fatal().Err(err).Str("module", v.name).Msg("module initialization failed")
 	} else {
@@ -594,7 +555,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 
 	log := fnb.Logger.With().Str("component", v.name).Logger()
 
-	readyAware, err := v.fn(fnb)
+	readyAware, err := v.fn(fnb, fnb.NodeConfig)
 	if err != nil {
 		log.Fatal().Err(err).Msg("component initialization failed")
 	} else {
@@ -632,13 +593,13 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 }
 
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
-func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) *FlowNodeBuilder {
+func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder {
 	f(fnb.flags)
 	return fnb
 }
 
 // Module enables setting up dependencies of the engine with the builder context.
-func (fnb *FlowNodeBuilder) Module(name string, f func(builder *FlowNodeBuilder) error) *FlowNodeBuilder {
+func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder {
 	fnb.modules = append(fnb.modules, namedModuleFunc{
 		fn:   f,
 		name: name,
@@ -663,7 +624,7 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 // When the node is run, this component will be started with `Ready`. When the
 // node is stopped, we will wait for the component to exit gracefully with
 // `Done`.
-func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (module.ReadyDoneAware, error)) *FlowNodeBuilder {
+func (fnb *FlowNodeBuilder) Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder {
 	fnb.components = append(fnb.components, namedComponentFunc{
 		fn:   f,
 		name: name,
@@ -672,7 +633,12 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(*FlowNodeBuilder) (mod
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBuilder {
+func (fnb *FlowNodeBuilder) PreInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder {
+	fnb.preInitFns = append(fnb.preInitFns, f)
+	return fnb
+}
+
+func (fnb *FlowNodeBuilder) PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
 }
@@ -681,24 +647,34 @@ func (fnb *FlowNodeBuilder) PostInit(f func(node *FlowNodeBuilder)) *FlowNodeBui
 func FlowNode(role string) *FlowNodeBuilder {
 
 	builder := &FlowNodeBuilder{
-		BaseConfig: BaseConfig{
-			nodeRole: role,
+		NodeConfig: &NodeConfig{
+			BaseConfig: BaseConfig{
+				NodeRole: role,
+			},
+			Logger: zerolog.New(os.Stderr),
 		},
-		Logger: zerolog.New(os.Stderr),
-		flags:  pflag.CommandLine,
+		flags: pflag.CommandLine,
 	}
-
-	builder.baseFlags()
-
-	builder.enqueueNetworkInit()
-
-	builder.enqueueMetricsServerInit()
-
-	builder.registerBadgerMetrics()
-
-	builder.enqueueTracer()
-
 	return builder
+}
+
+func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
+
+	fnb.PrintBuildVersionDetails()
+
+	fnb.BaseFlags()
+
+	fnb.ParseAndPrintFlags()
+
+	fnb.EnqueueNetworkInit()
+
+	fnb.EnqueueMetricsServerInit()
+
+	fnb.RegisterBadgerMetrics()
+
+	fnb.EnqueueTracer()
+
+	return fnb
 }
 
 // Run initiates all common components (logger, database, protocol state etc.)
@@ -709,10 +685,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)
 	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
-
-	fnb.printBuildVersionDetails()
-
-	fnb.parseAndPrintFlags()
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -728,6 +700,10 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.initMetrics()
 
 	fnb.initStorage()
+
+	for _, f := range fnb.preInitFns {
+		fnb.handlePreInit(f)
+	}
 
 	fnb.initState()
 
@@ -747,11 +723,11 @@ func (fnb *FlowNodeBuilder) Run() {
 		fnb.handleComponent(f)
 	}
 
-	fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.nodeRole)
+	fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
 
 	<-fnb.sig
 
-	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.nodeRole)
+	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.NodeRole)
 
 	for i := len(fnb.doneObject) - 1; i >= 0; i-- {
 		doneObject := fnb.doneObject[i]
@@ -761,13 +737,17 @@ func (fnb *FlowNodeBuilder) Run() {
 
 	fnb.closeDatabase()
 
-	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.nodeRole)
+	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
 
 	os.Exit(0)
 }
 
-func (fnb *FlowNodeBuilder) handlePostInit(f func(node *FlowNodeBuilder)) {
-	f(fnb)
+func (fnb *FlowNodeBuilder) handlePreInit(f func(builder NodeBuilder, node *NodeConfig)) {
+	f(fnb, fnb.NodeConfig)
+}
+
+func (fnb *FlowNodeBuilder) handlePostInit(f func(builder NodeBuilder, node *NodeConfig)) {
+	f(fnb, fnb.NodeConfig)
 }
 
 func (fnb *FlowNodeBuilder) closeDatabase() {

@@ -127,7 +127,8 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
 		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Initialize().
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -144,25 +145,25 @@ func main() {
 			)
 			return err
 		}).
-		Module("transactions mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("transactions mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
-		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			followerBuffer = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
-		Module("main chain sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("main chain sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
@@ -231,7 +232,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("main chain sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("main chain sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
@@ -252,7 +253,7 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
 				node.Logger,
 				node.Network,
@@ -266,11 +267,11 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("transaction ingress server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("transaction ingress server", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			server := ingress.New(ingressConf, ing, node.RootChainID)
 			return server, nil
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
@@ -281,7 +282,7 @@ func main() {
 				retrieve,
 			)
 		}).
-		Component("pusher engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("pusher engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
 				node.Logger,
 				node.Network,
@@ -296,7 +297,7 @@ func main() {
 		}).
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
-		Component("epoch manager", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("epoch manager", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
