@@ -130,8 +130,32 @@ func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
 
 }
 
+func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
+	var pkBytes []byte = rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381).Example().([]byte)
+	pkBLS, err := DecodePublicKey(BLSBLS12381, pkBytes)
+
+	var pkBLST blst.P2Affine
+	res := pkBLST.Uncompress(pkBytes)
+	pkValidBLST := pkBLST.KeyValidate()
+
+	bothFail := (err != nil && (res == nil || !pkValidBLST))
+	bothPass := (err == nil && res != nil && pkValidBLST)
+
+	if !(bothFail || bothPass) {
+		t.Fatalf("Deserialization of %v differs, internal finds pubkey validity %v, blst finds pubkey validity %v ", hex.EncodeToString(pkBytes), (err == nil), (res != nil && pkValidBLST))
+	}
+
+	if bothPass {
+		pkBLSOutBytes := pkBLS.Encode()
+		pkBLSTOutBytes := pkBLST.Compress()
+
+		assert.Equal(t, pkBLSOutBytes, pkBLSTOutBytes)
+	}
+}
+
 func TestBLSCross(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
+	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
 }
 
 // TestBLSEquals tests equal for BLS keys
