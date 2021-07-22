@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go
 
-go 1.13
+go 1.15
 
 require (
 	cloud.google.com/go/storage v1.10.0
@@ -14,6 +14,7 @@ require (
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fxamacker/cbor/v2 v2.2.1-0.20210510192846-c3f3c69e7bc8
+	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
@@ -41,9 +42,9 @@ require (
 	github.com/marten-seemann/qtls-go1-15 v0.1.4 // indirect
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.18.1-0.20210629025749-ffe98816b2f1
+	github.com/onflow/cadence v0.18.1-0.20210715170431-cd7a7a483000
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3
-	github.com/onflow/flow-go-sdk v0.20.0-alpha.1
+	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.18.0
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/opentracing/opentracing-go v1.2.0

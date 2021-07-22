@@ -333,8 +333,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageSequential(send ConduitSendWra
 
 	// receiver should only see the message once, and the rest should be dropped due to
 	// duplication
+	receiver.RLock()
 	require.Equal(suite.Suite.T(), 1, receiver.seen[event.Text])
 	require.Len(suite.Suite.T(), receiver.seen, 1)
+	receiver.RUnlock()
 }
 
 // duplicateMessageParallel is a helper function that sends duplicate messages concurrent;u
@@ -371,8 +373,10 @@ func (suite *EchoEngineTestSuite) duplicateMessageParallel(send ConduitSendWrapp
 
 	// receiver should only see the message once, and the rest should be dropped due to
 	// duplication
+	receiver.RLock()
 	require.Equal(suite.Suite.T(), 1, receiver.seen[event.Text])
 	require.Len(suite.Suite.T(), receiver.seen, 1)
+	receiver.RUnlock()
 }
 
 // duplicateMessageDifferentChan is a helper function that sends the same message from two distinct
@@ -428,11 +432,15 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 
 	// each receiver should only see the message once, and the rest should be dropped due to
 	// duplication
+	receiver1.RLock()
+	receiver2.RLock()
 	require.Equal(suite.Suite.T(), 1, receiver1.seen[event.Text])
 	require.Equal(suite.Suite.T(), 1, receiver2.seen[event.Text])
 
 	require.Len(suite.Suite.T(), receiver1.seen, 1)
 	require.Len(suite.Suite.T(), receiver2.seen, 1)
+	receiver1.RUnlock()
+	receiver2.RUnlock()
 }
 
 // singleMessage sends a single message from one network instance to the other one
@@ -463,9 +471,11 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 	case <-receiver.received:
 		// evaluates reception of message at the other side
 		// does not evaluate the content
+		receiver.RLock()
 		require.NotNil(suite.Suite.T(), receiver.originID)
 		require.NotNil(suite.Suite.T(), receiver.event)
 		assert.Equal(suite.Suite.T(), suite.ids[sndID].NodeID, receiver.originID)
+		receiver.RUnlock()
 
 		assertMessageReceived(suite.T(), receiver, event, engine.TestNetwork)
 
@@ -480,9 +490,11 @@ func (suite *EchoEngineTestSuite) singleMessage(echo bool, send ConduitSendWrapp
 		case <-sender.received:
 			// evaluates reception of message at the other side
 			// does not evaluate the content
+			sender.RLock()
 			require.NotNil(suite.Suite.T(), sender.originID)
 			require.NotNil(suite.Suite.T(), sender.event)
 			assert.Equal(suite.Suite.T(), suite.ids[rcvID].NodeID, sender.originID)
+			sender.RUnlock()
 
 			echoEvent := &message.TestMessage{
 				Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
@@ -525,9 +537,11 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 		case <-receiver.received:
 			// evaluates reception of message at the other side
 			// does not evaluate the content
+			receiver.RLock()
 			require.NotNil(suite.Suite.T(), receiver.originID)
 			require.NotNil(suite.Suite.T(), receiver.event)
 			assert.Equal(suite.Suite.T(), suite.ids[sndID].NodeID, receiver.originID)
+			receiver.RUnlock()
 
 			assertMessageReceived(suite.T(), receiver, event, engine.TestNetwork)
 
@@ -542,14 +556,18 @@ func (suite *EchoEngineTestSuite) multiMessageSync(echo bool, count int, send Co
 			case <-sender.received:
 				// evaluates reception of message at the other side
 				// does not evaluate the content
+				sender.RLock()
 				require.NotNil(suite.Suite.T(), sender.originID)
 				require.NotNil(suite.Suite.T(), sender.event)
 				assert.Equal(suite.Suite.T(), suite.ids[rcvID].NodeID, sender.originID)
 
+				receiver.RLock()
 				echoEvent := &message.TestMessage{
 					Text: fmt.Sprintf("%s: %s", receiver.echomsg, event.Text),
 				}
 				assertMessageReceived(suite.T(), sender, echoEvent, engine.TestNetwork)
+				receiver.RUnlock()
+				sender.RUnlock()
 
 			case <-time.After(10 * time.Second):
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
@@ -597,9 +615,11 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 		case <-receiver.received:
 			// evaluates reception of message at the other side
 			// does not evaluate the content
+			receiver.RLock()
 			require.NotNil(suite.Suite.T(), receiver.originID)
 			require.NotNil(suite.Suite.T(), receiver.event)
 			assert.Equal(suite.Suite.T(), suite.ids[0].NodeID, receiver.originID)
+			receiver.RUnlock()
 
 			// wrap blocking channel reads with a timeout
 			unittest.AssertReturnsBefore(suite.T(), func() {
@@ -633,9 +653,11 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 			case <-sender.received:
 				// evaluates reception of message at the other side
 				// does not evaluate the content
+				sender.RLock()
 				require.NotNil(suite.Suite.T(), sender.originID)
 				require.NotNil(suite.Suite.T(), sender.event)
 				assert.Equal(suite.Suite.T(), suite.ids[rcvID].NodeID, sender.originID)
+				sender.RUnlock()
 
 				// wrap blocking channel reads with a timeout
 				unittest.AssertReturnsBefore(suite.T(), func() {
