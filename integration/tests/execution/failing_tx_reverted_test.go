@@ -25,7 +25,6 @@ type FailingTxRevertedSuite struct {
 }
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
-
 	chain := s.net.Root().Header.ChainID.Chain()
 
 	// wait for next height finalized (potentially first height), called blockA

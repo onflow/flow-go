@@ -157,10 +157,10 @@ func WaitUntilFinalizedStateCommitmentChanged(t *testing.T, bs *blockstate.Block
 		}
 
 		return true
-	}, receiptstate.Timeout, 100*time.Millisecond,
+	}, receiptstate.StateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive an execution receipt with a different state commitment from %x within %v seconds,"+
 			" initial finalized height: %v "+
-			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptstate.Timeout,
+			" last block checked height %v, last block checked ID %x", initialFinalizedSC, receiptstate.ReceiptTimeout,
 			initFinalizedheight,
 			currentHeight, currentID))
 
