@@ -9,14 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/tests/common/blockstate"
+	"github.com/onflow/flow-go/integration/tests/common/receiptstate"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 )
 
 type TestnetStateTracker struct {
 	ghostTracking bool
-	BlockState    *BlockState
-	ReceiptState  ReceiptState
+	BlockState    *blockstate.BlockState
+	ReceiptState  *receiptstate.ReceiptState
 	ApprovalState ResultApprovalState
 	MsgState      MsgState
 }
@@ -25,8 +27,8 @@ type TestnetStateTracker struct {
 // be used to stop tracking
 func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *client.GhostClient) {
 	// reset the state for in between tests
-	tst.BlockState = NewBlockState()
-	tst.ReceiptState = ReceiptState{}
+	tst.BlockState = blockstate.NewBlockState()
+	tst.ReceiptState = receiptstate.NewReceiptState()
 
 	var reader *client.FlowMessageStreamReader
 
