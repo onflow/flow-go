@@ -119,7 +119,7 @@ func (s *Suite) SetupSuite() {
 	// system and decide to terminate the test.
 	// By definition, ghost node is subscribed to all channels.
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification,
+	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.FatalLevel))
