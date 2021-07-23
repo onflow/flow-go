@@ -1,9 +1,10 @@
-package cmd
+package utils
 
 import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/cmd"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,74 +15,65 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
-// GenerateRandomSeeds exported wrapper around func to generate seed values used for key generation.
 func GenerateRandomSeeds(n int) [][]byte {
-	return generateRandomSeeds(n)
-}
-
-func generateRandomSeeds(n int) [][]byte {
 	seeds := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
-		seeds = append(seeds, generateRandomSeed())
+		seeds = append(seeds, GenerateRandomSeed())
 	}
 	return seeds
 }
 
-// GenerateRandomSeed exported wrapper around func to generate seed value used for key generation.
 func GenerateRandomSeed() []byte {
-	return generateRandomSeed()
-}
-
-func generateRandomSeed() []byte {
-	seed := make([]byte, randomSeedBytes)
-	if n, err := rand.Read(seed); err != nil || n != randomSeedBytes {
-		log.Fatal().Err(err).Msg("cannot generate random seeds")
+	seed := make([]byte, RandomSeedBytes)
+	if n, err := rand.Read(seed); err != nil || n != RandomSeedBytes {
+		Logger.Fatal().Err(err).Msg("cannot generate random seeds")
 	}
 	return seed
 }
 
-func readJSON(path string, target interface{}) {
+func ReadJSON(path string, target interface{}) {
 	dat, err := io.ReadFile(path)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot read json")
+		Logger.Fatal().Err(err).Msg("cannot read json")
 	}
 	err = json.Unmarshal(dat, target)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
+		Logger.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
 	}
 }
 
-func writeJSON(path string, data interface{}) {
+func WriteJSON(path string, data interface{}) {
 	bz, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot marshal json")
+		Logger.Fatal().Err(err).Msg("cannot marshal json")
 	}
 
-	writeText(path, bz)
+	WriteText(path, bz)
 }
 
-func writeText(path string, data []byte) {
-	path = filepath.Join(flagOutdir, path)
+func WriteText(path string, data []byte) {
+	// FlagOutdir should be moved to func argument
+	path = filepath.Join(cmd.FlagOutdir, path)
 
 	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not create output dir")
+		Logger.Fatal().Err(err).Msg("could not create output dir")
 	}
 
 	err = ioutil.WriteFile(path, data, 0644)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not write file")
+		Logger.Fatal().Err(err).Msg("could not write file")
 	}
 
-	log.Info().Msgf("wrote file %v", path)
+	Logger.Info().Msgf("wrote file %v", path)
 }
 
-func pubKeyToString(key crypto.PublicKey) string {
+func PubKeyToString(key crypto.PublicKey) string {
 	return fmt.Sprintf("%x", key.Encode())
 }
 
-func filesInDir(dir string) ([]string, error) {
-	exists, err := pathExists(dir)
+func FilesInDir(dir string) ([]string, error) {
+	exists, err := PathExists(dir)
 	if err != nil {
 		return nil, fmt.Errorf("could not check if dir exists: %w", err)
 	}
@@ -100,8 +92,8 @@ func filesInDir(dir string) ([]string, error) {
 	return files, err
 }
 
-// pathExists
-func pathExists(path string) (bool, error) {
+// PathExists
+func PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -112,7 +104,7 @@ func pathExists(path string) (bool, error) {
 	return false, err
 }
 
-func nodeCountByRole(nodes []model.NodeInfo) map[flow.Role]uint16 {
+func NodeCountByRole(nodes []model.NodeInfo) map[flow.Role]uint16 {
 	roleCounts := map[flow.Role]uint16{
 		flow.RoleCollection:   0,
 		flow.RoleConsensus:    0,

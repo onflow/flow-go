@@ -2,9 +2,9 @@ package cmd
 
 import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/model/flow/order"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
@@ -17,7 +17,7 @@ import (
 func genNetworkAndStakingKeys() []model.NodeInfo {
 
 	var nodeConfigs []model.NodeConfig
-	readJSON(flagConfig, &nodeConfigs)
+	utils.ReadJSON(flagConfig, &nodeConfigs)
 	nodes := len(nodeConfigs)
 	log.Info().Msgf("read %v node configurations", nodes)
 
@@ -25,14 +25,14 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	log.Debug().Msg("all node addresses are unique")
 
 	log.Debug().Msgf("will generate %v networking keys for nodes in config", nodes)
-	networkKeys, err := run.GenerateNetworkingKeys(nodes, generateRandomSeeds(nodes))
+	networkKeys, err := utils.GenerateNetworkingKeys(nodes, utils.GenerateRandomSeeds(nodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate networking keys")
 	}
 	log.Info().Msgf("generated %v networking keys for nodes in config", nodes)
 
 	log.Debug().Msgf("will generate %v staking keys for nodes in config", nodes)
-	stakingKeys, err := run.GenerateStakingKeys(nodes, generateRandomSeeds(nodes))
+	stakingKeys, err := utils.GenerateStakingKeys(nodes, utils.GenerateRandomSeeds(nodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate staking keys")
 	}
@@ -59,8 +59,8 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	}
 
 	log.Debug().
-		Str("networkPubKey", pubKeyToString(networkKey.PublicKey())).
-		Str("stakingPubKey", pubKeyToString(stakingKey.PublicKey())).
+		Str("networkPubKey", utils.PubKeyToString(networkKey.PublicKey())).
+		Str("stakingPubKey", utils.PubKeyToString(stakingKey.PublicKey())).
 		Msg("encoded public staking and network keys")
 
 	nodeInfo := model.NewPrivateNodeInfo(
@@ -81,7 +81,7 @@ func AssembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress
 }
 
 func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress string) model.NodeMachineAccountInfo {
-	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	log.Debug().Str("machineAccountPubKey", utils.PubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
 	machineNodeInfo := model.NodeMachineAccountInfo{
 		EncodedPrivateKey: machineKey.Encode(),
 		KeyIndex:          0,
@@ -93,7 +93,7 @@ func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress
 }
 
 func assembleNodeMachineAccountKey(machineKey crypto.PrivateKey) model.NodeMachineAccountKey {
-	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	log.Debug().Str("machineAccountPubKey", utils.PubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
 	key := model.NodeMachineAccountKey{
 		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
 	}

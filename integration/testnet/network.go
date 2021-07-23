@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -666,12 +667,12 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	writeFile := func(relativePath string, val interface{}) error {
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
 	}
-	err = run.WriteStakingNetworkingKeyFiles(allNodeInfos, writeFile)
+	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeFile)
 
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
-	err = run.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeFile)
+	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeFile)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}

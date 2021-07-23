@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/spf13/cobra"
 
@@ -39,7 +40,7 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 		configs = append(configs, createConf(flow.RoleVerification, i))
 	}
 
-	writeJSON(flagConfig, configs)
+	utils.WriteJSON(flagConfig, configs)
 }
 
 // genconfigCmd represents the genconfig command

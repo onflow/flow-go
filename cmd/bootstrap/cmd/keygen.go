@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -20,7 +20,7 @@ var keygenCmd = &cobra.Command{
 	Long:  `Generate Staking and Networking keys for a list of nodes provided by the flag '--config'`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// check if out directory exists
-		exists, err := pathExists(flagOutdir)
+		exists, err := utils.PathExists(FlagOutdir)
 		if err != nil {
 			log.Error().Msg("could not check if directory exists")
 			return
@@ -28,7 +28,7 @@ var keygenCmd = &cobra.Command{
 
 		// check if the out directory is empty or has contents
 		if exists {
-			empty, err := isEmptyDir(flagOutdir)
+			empty, err := isEmptyDir(FlagOutdir)
 			if err != nil {
 				log.Error().Msg("could not check if directory as empty")
 				return
@@ -47,11 +47,11 @@ var keygenCmd = &cobra.Command{
 
 		// write key files
 		writeFile := func(relativePath string, val interface{}) error {
-			writeJSON(relativePath, val)
+			utils.WriteJSON(relativePath, val)
 			return nil
 		}
 		log.Info().Msg("writing internal private key files")
-		err = run.WriteStakingNetworkingKeyFiles(nodes, writeFile)
+		err = utils.WriteStakingNetworkingKeyFiles(nodes, writeFile)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write internal private key files")
 		}
@@ -63,7 +63,7 @@ var keygenCmd = &cobra.Command{
 		if flagDefaultMachineAccount {
 			chainID := parseChainID(flagRootChain)
 			log.Info().Msg("writing default machine account files")
-			err = run.WriteMachineAccountFiles(chainID, nodes, writeFile)
+			err = utils.WriteMachineAccountFiles(chainID, nodes, writeFile)
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to write machine account key files")
 			}
@@ -71,7 +71,7 @@ var keygenCmd = &cobra.Command{
 		}
 
 		// count roles
-		roleCounts := nodeCountByRole(nodes)
+		roleCounts := utils.NodeCountByRole(nodes)
 		for role, count := range roleCounts {
 			log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", count, role.String()))
 		}
@@ -113,5 +113,5 @@ func genNodePubInfo(nodes []model.NodeInfo) {
 	for _, node := range nodes {
 		pubNodes = append(pubNodes, node.Public())
 	}
-	writeJSON(model.PathInternalNodeInfosPub, pubNodes)
+	utils.WriteJSON(model.PathInternalNodeInfosPub, pubNodes)
 }

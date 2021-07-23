@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"path"
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -22,7 +22,7 @@ var machineAccountKeyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(machineAccountKeyCmd)
 
-	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", utils.GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", utils.MinSeedBytes))
 }
 
 // machineAccountKeyRun generate a machine account key and writes it to a default file path.
@@ -36,7 +36,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-key.priv.json path exists
 	machineAccountKeyPath := fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID)
-	keyExists, err := pathExists(path.Join(flagOutdir, machineAccountKeyPath))
+	keyExists, err := utils.PathExists(path.Join(FlagOutdir, machineAccountKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
@@ -46,7 +46,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	}
 
 	machineSeed := validateSeed(flagMachineSeed)
-	machineKey, err := run.GenerateMachineAccountKey(machineSeed)
+	machineKey, err := utils.GenerateMachineAccountKey(machineSeed)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate machine key")
 	}
@@ -55,6 +55,6 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	// construct object to write to file
 	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 
-	writeJSON(machineAccountKeyPath, machineAccountPriv)
+	utils.WriteJSON(machineAccountKeyPath, machineAccountPriv)
 	log.Info().Msgf("machine account public key: %s", machineKey.PublicKey().String())
 }

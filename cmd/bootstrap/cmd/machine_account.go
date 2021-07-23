@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"path/filepath"
 	"strings"
 
@@ -43,7 +44,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-key.priv.json path exists
 	machineAccountKeyPath := fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID)
-	keyExists, err := pathExists(filepath.Join(flagOutdir, machineAccountKeyPath))
+	keyExists, err := utils.PathExists(filepath.Join(FlagOutdir, machineAccountKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
@@ -54,7 +55,7 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 
 	// check if node-machine-account-info.priv.json file exists in boostrap dir
 	machineAccountInfoPath := fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID)
-	infoExists, err := pathExists(filepath.Join(flagOutdir, machineAccountInfoPath))
+	infoExists, err := utils.PathExists(filepath.Join(FlagOutdir, machineAccountInfoPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-info.priv.json exists")
 	}
@@ -71,22 +72,22 @@ func machineAccountRun(_ *cobra.Command, _ []string) {
 	machineAccountInfo := assembleNodeMachineAccountInfo(machinePrivKey, flagMachineAccountAddress)
 
 	// write machine account info
-	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), machineAccountInfo)
+	utils.WriteJSON(fmt.Sprintf(model.PathNodeMachineAccountInfoPriv, nodeID), machineAccountInfo)
 }
 
 // readMachineAccountPriv reads the machine account private key files in the bootstrap dir
 func readMachineAccountKey(nodeID string) crypto.PrivateKey {
 	var machineAccountPriv model.NodeMachineAccountKey
 
-	path := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
-	readJSON(path, &machineAccountPriv)
+	path := filepath.Join(FlagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+	utils.ReadJSON(path, &machineAccountPriv)
 
 	return machineAccountPriv.PrivateKey.PrivateKey
 }
 
 // readNodeID reads the NodeID file written by `bootstrap key` command
 func readNodeID() (string, error) {
-	path := filepath.Join(flagOutdir, model.PathNodeID)
+	path := filepath.Join(FlagOutdir, model.PathNodeID)
 
 	data, err := ioutils.ReadFile(path)
 	if err != nil {

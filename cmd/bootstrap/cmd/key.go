@@ -2,13 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"net"
 	"strconv"
 
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,9 +41,9 @@ func init() {
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", utils.GenerateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", utils.MinSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", utils.GenerateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", utils.MinSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", utils.GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", utils.MinSeedBytes))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -76,19 +76,19 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 
 	// write files
-	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
-	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
-	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
+	utils.WriteText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
+	utils.WriteJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+	utils.WriteJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
-	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
+	utils.WriteJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
 }
 
 func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
 
 	log.Debug().Msg("will generate networking key")
 	networkSeed := validateSeed(flagNetworkSeed)
-	networkKey, err := run.GenerateNetworkingKey(networkSeed)
+	networkKey, err := utils.GenerateNetworkingKey(networkSeed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
@@ -96,7 +96,7 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, er
 
 	log.Debug().Msg("will generate staking key")
 	stakingSeed := validateSeed(flagStakingSeed)
-	stakingKey, err := run.GenerateStakingKey(stakingSeed)
+	stakingKey, err := utils.GenerateStakingKey(stakingSeed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
@@ -104,7 +104,7 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, er
 
 	log.Debug().Msg("will generate machine account key")
 	machineSeed := validateSeed(flagMachineSeed)
-	machineKey, err := run.GenerateMachineAccountKey(machineSeed)
+	machineKey, err := utils.GenerateMachineAccountKey(machineSeed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not generate machine key: %w", err)
 	}
@@ -123,8 +123,8 @@ func validateRole(role string) flow.Role {
 }
 
 func validateSeed(seed []byte) []byte {
-	if len(seed) < minSeedBytes {
-		log.Fatal().Int("len(seed)", len(seed)).Msgf("seed too short, needs to be at least %v bytes long", minSeedBytes)
+	if len(seed) < utils.MinSeedBytes {
+		log.Fatal().Int("len(seed)", len(seed)).Msgf("seed too short, needs to be at least %v bytes long", utils.MinSeedBytes)
 	}
 	return seed
 }

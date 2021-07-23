@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -20,7 +21,7 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	if flagFastKG {
 		dkgData, err = run.RunFastKG(n, flagBootstrapRandomSeed)
 	} else {
-		dkgData, err = run.RunDKG(n, generateRandomSeeds(n))
+		dkgData, err = run.RunDKG(n, utils.GenerateRandomSeeds(n))
 	}
 	if err != nil {
 		log.Fatal().Err(err).Msg("error running DKG")
@@ -37,7 +38,7 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 			GroupIndex:          i,
 		}
 
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
+		utils.WriteJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
 	}
 
 	return dkgData

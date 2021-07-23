@@ -63,7 +63,7 @@ func pull(cmd *cobra.Command, args []string) {
 
 	for _, file := range files {
 		if strings.Contains(file, "node-info.pub") {
-			fullOutpath := filepath.Join(flagOutdir, file)
+			fullOutpath := filepath.Join(FlagOutdir, file)
 			log.Printf("downloading %s", file)
 
 			err = bucket.DownloadFile(ctx, client, fullOutpath, file)

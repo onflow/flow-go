@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	flagOutdir string
+	FlagOutdir string
 	log        zerolog.Logger
 )
 
@@ -27,7 +27,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&flagOutdir, "outdir", "o", "bootstrap",
+	rootCmd.PersistentFlags().StringVarP(&FlagOutdir, "outdir", "o", "bootstrap",
 		"output directory for generated files")
 
 	log = zerolog.New(zerolog.NewConsoleWriter())

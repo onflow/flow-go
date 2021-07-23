@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -67,10 +68,10 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 
 	// ensure we have enough total collectors
 	totalCollectors := partnerCOLCount + internalCOLCount
-	if totalCollectors < flagCollectionClusters*minNodesPerCluster {
+	if totalCollectors < flagCollectionClusters*utils.MinNodesPerCluster {
 		log.Fatal().Msgf(
 			"will not bootstrap configuration with insufficient # of collectors for cluster count: "+
 				"(total_collectors=%d, clusters=%d, min_total_collectors=%d)",
-			totalCollectors, flagCollectionClusters, flagCollectionClusters*minNodesPerCluster)
+			totalCollectors, flagCollectionClusters, flagCollectionClusters*utils.MinNodesPerCluster)
 	}
 }

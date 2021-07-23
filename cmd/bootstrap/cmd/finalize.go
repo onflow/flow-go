@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"path/filepath"
 	"strings"
 	"time"
@@ -101,7 +102,7 @@ func addFinalizeCmdFlags() {
 	_ = finalizeCmd.MarkFlagRequired("epoch-staking-phase-length")
 	_ = finalizeCmd.MarkFlagRequired("epoch-dkg-phase-length")
 
-	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", generateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", utils.GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
 
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
@@ -118,8 +119,8 @@ func addFinalizeCmdFlags() {
 func finalize(cmd *cobra.Command, args []string) {
 
 	actualSeedLength := len(flagBootstrapRandomSeed)
-	if actualSeedLength != randomSeedBytes {
-		log.Error().Int("expected", randomSeedBytes).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
+	if actualSeedLength != utils.RandomSeedBytes {
+		log.Error().Int("expected", utils.RandomSeedBytes).Int("actual", actualSeedLength).Msg("random seed provided length is not valid")
 		return
 	}
 
@@ -140,7 +141,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("assembling network and staking keys")
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
+	utils.WriteJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
@@ -199,7 +200,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	}
 
 	// write snapshot to disk
-	writeJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
+	utils.WriteJSON(model.PathRootProtocolStateSnapshot, snapshot.Encodable())
 	log.Info().Msg("")
 
 	// read snapshot and verify consistency
@@ -228,10 +229,10 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("saved result and seal are matching")
 
 	// copy files only if the directories differ
-	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", flagOutdir).Msg("attempting to copy private key files")
-	if flagInternalNodePrivInfoDir != flagOutdir {
+	log.Info().Str("private_dir", flagInternalNodePrivInfoDir).Str("output_dir", FlagOutdir).Msg("attempting to copy private key files")
+	if flagInternalNodePrivInfoDir != FlagOutdir {
 		log.Info().Msg("copying internal private keys to output folder")
-		err := copyDir(flagInternalNodePrivInfoDir, filepath.Join(flagOutdir, model.DirPrivateRoot))
+		err := copyDir(flagInternalNodePrivInfoDir, filepath.Join(FlagOutdir, model.DirPrivateRoot))
 		if err != nil {
 			log.Error().Err(err).Msg("could not copy private key files")
 		}
@@ -241,7 +242,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	// print count of all nodes
-	roleCounts := nodeCountByRole(stakingNodes)
+	roleCounts := utils.NodeCountByRole(stakingNodes)
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleConsensus], flow.RoleConsensus.String()))
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleCollection], flow.RoleCollection.String()))
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleVerification], flow.RoleVerification.String()))
@@ -258,7 +259,7 @@ func assemblePartnerNodes() []model.NodeInfo {
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
 	var stakes PartnerStakes
-	readJSON(flagPartnerStakes, &stakes)
+	utils.ReadJSON(flagPartnerStakes, &stakes)
 	log.Info().Msgf("read %v stakes for partner nodes", len(stakes))
 
 	var nodes []model.NodeInfo
@@ -290,7 +291,7 @@ func assemblePartnerNodes() []model.NodeInfo {
 // readParnterNodes reads the partner node information
 func readPartnerNodes() []model.NodeInfoPub {
 	var partners []model.NodeInfoPub
-	files, err := filesInDir(flagPartnerNodeInfoDir)
+	files, err := utils.FilesInDir(flagPartnerNodeInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read partner node infos")
 	}
@@ -302,7 +303,7 @@ func readPartnerNodes() []model.NodeInfoPub {
 
 		// read file and append to partners
 		var p model.NodeInfoPub
-		readJSON(f, &p)
+		utils.ReadJSON(f, &p)
 		partners = append(partners, p)
 	}
 	return partners
@@ -351,7 +352,7 @@ func readInternalNodes() []model.NodeInfoPriv {
 	var internalPrivInfos []model.NodeInfoPriv
 
 	// get files in internal priv node infos directory
-	files, err := filesInDir(flagInternalNodePrivInfoDir)
+	files, err := utils.FilesInDir(flagInternalNodePrivInfoDir)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read partner node infos")
 	}
@@ -365,7 +366,7 @@ func readInternalNodes() []model.NodeInfoPriv {
 
 		// read file and append to partners
 		var p model.NodeInfoPriv
-		readJSON(f, &p)
+		utils.ReadJSON(f, &p)
 		internalPrivInfos = append(internalPrivInfos, p)
 	}
 
@@ -376,7 +377,7 @@ func readInternalNodes() []model.NodeInfoPriv {
 func internalStakesByAddress() map[string]uint64 {
 	// read json
 	var configs []model.NodeConfig
-	readJSON(flagConfig, &configs)
+	utils.ReadJSON(flagConfig, &configs)
 	log.Info().Interface("config", configs).Msgf("read internal node configurations")
 
 	stakes := make(map[string]uint64)
@@ -450,7 +451,7 @@ func validateStake(stake uint64) (uint64, bool) {
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
 func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
-	data, err := io.ReadFile(filepath.Join(flagOutdir, path))
+	data, err := io.ReadFile(filepath.Join(FlagOutdir, path))
 	if err != nil {
 		return nil, err
 	}
@@ -507,7 +508,7 @@ func generateEmptyExecutionState(
 	}
 
 	commit, err = run.GenerateExecutionState(
-		filepath.Join(flagOutdir, model.DirnameExecutionState),
+		filepath.Join(FlagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
 		parseChainID(flagRootChain).Chain(),
 		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),

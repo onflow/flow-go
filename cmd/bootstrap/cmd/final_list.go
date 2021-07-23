@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/spf13/cobra"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -63,7 +64,7 @@ func finalList(cmd *cobra.Command, args []string) {
 	validateNodes(mixedNodeInfos, stakingNodes)
 
 	// write node-config.json with the new list of nodes to be used for the `finalize` command
-	writeJSON(model.PathFinallist, model.ToPublicNodeInfoList(mixedNodeInfos))
+	utils.WriteJSON(model.PathFinallist, model.ToPublicNodeInfoList(mixedNodeInfos))
 }
 
 func validateNodes(nodes []model.NodeInfo, stakingNodes []model.NodeInfo) {
@@ -242,7 +243,7 @@ func assemblePartnerNodesWithoutStake() []model.NodeInfo {
 
 func readStakingContractDetails() []model.NodeInfo {
 	var stakingNodes []model.NodeInfoPub
-	readJSON(flagStakingNodesPath, &stakingNodes)
+	utils.ReadJSON(flagStakingNodesPath, &stakingNodes)
 	return createPublicNodeInfo(stakingNodes)
 }
 

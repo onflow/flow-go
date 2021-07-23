@@ -33,7 +33,7 @@ var happyPathRegex = `^will generate networking key` +
 func TestHappyPath(t *testing.T) {
 	dirName := strconv.FormatInt(time.Now().UnixNano(), 10)
 	regex := regexp.MustCompile(fmt.Sprintf(happyPathRegex, dirName, dirName, dirName, dirName))
-	flagOutdir = "/tmp/" + dirName
+	FlagOutdir = "/tmp/" + dirName
 	flagRole = "consensus"
 	flagAddress = "189.123.123.42:3869"
 	hook := zeroLoggerHook{
@@ -43,9 +43,9 @@ func TestHappyPath(t *testing.T) {
 	keyCmdRun(nil, nil)
 
 	require.Regexp(t, regex, hook.logs.String())
-	require.DirExists(t, flagOutdir+"/public-root-information")
-	require.FileExists(t, flagOutdir+"/public-root-information/node-id", "node-id file not created")
-	require.DirExists(t, flagOutdir+"/private-root-information")
+	require.DirExists(t, FlagOutdir+"/public-root-information")
+	require.FileExists(t, FlagOutdir+"/public-root-information/node-id", "node-id file not created")
+	require.DirExists(t, FlagOutdir+"/private-root-information")
 }
 
 func TestInvalidAddress(t *testing.T) {
@@ -81,7 +81,7 @@ func TestInvalidAddress(t *testing.T) {
 func TestInvalidAddressSubprocess(t *testing.T) {
 	// Run the crashing code when FLAG is set
 	if os.Getenv("FLAG") == "1" {
-		flagOutdir = "/tmp"
+		FlagOutdir = "/tmp"
 		flagRole = "consensus"
 		flagAddress = os.Getenv("address")
 		keyCmdRun(nil, nil)

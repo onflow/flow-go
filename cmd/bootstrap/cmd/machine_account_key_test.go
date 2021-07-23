@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"os"
 
 	"path/filepath"
@@ -24,7 +25,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 		var keyFileExistsRegex = regexp.MustCompile(`^machine account private key already exists`)
 
 		// command flags
-		flagOutdir = bootDir
+		FlagOutdir = bootDir
 		flagRole = "consensus"
 		flagAddress = "189.123.123.42:3869"
 
@@ -35,22 +36,22 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 		keyCmdRun(nil, nil)
 		hook.logs.Reset()
 
-		require.DirExists(t, filepath.Join(flagOutdir, bootstrap.DirnamePublicBootstrap))
-		require.DirExists(t, filepath.Join(flagOutdir, bootstrap.DirPrivateRoot))
+		require.DirExists(t, filepath.Join(FlagOutdir, bootstrap.DirnamePublicBootstrap))
+		require.DirExists(t, filepath.Join(FlagOutdir, bootstrap.DirPrivateRoot))
 
-		nodeIDPath := filepath.Join(flagOutdir, bootstrap.PathNodeID)
+		nodeIDPath := filepath.Join(FlagOutdir, bootstrap.PathNodeID)
 		require.FileExists(t, nodeIDPath)
 		b, err := ioutils.ReadFile(nodeIDPath)
 		require.NoError(t, err)
 		nodeID := strings.TrimSpace(string(b))
 
 		// make sure file exists
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(FlagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
 		require.FileExists(t, machineKeyFilePath)
 
 		// read file priv key file before command
 		var machineAccountPrivBefore model.NodeMachineAccountKey
-		readJSON(machineKeyFilePath, &machineAccountPrivBefore)
+		utils.ReadJSON(machineKeyFilePath, &machineAccountPrivBefore)
 
 		// run command with flags
 		machineAccountKeyRun(nil, nil)
@@ -60,7 +61,7 @@ func TestMachineAccountKeyFileExists(t *testing.T) {
 
 		// read machine account key file again
 		var machineAccountPrivAfter model.NodeMachineAccountKey
-		readJSON(machineKeyFilePath, &machineAccountPrivAfter)
+		utils.ReadJSON(machineKeyFilePath, &machineAccountPrivAfter)
 
 		// check if key was modified
 		assert.Equal(t, machineAccountPrivBefore, machineAccountPrivAfter)
@@ -77,7 +78,7 @@ func TestMachineAccountKeyFileCreated(t *testing.T) {
 		regex := regexp.MustCompile(fmt.Sprintf(keyFileCreatedRegex, bootDir))
 
 		// command flags
-		flagOutdir = bootDir
+		FlagOutdir = bootDir
 		flagRole = "consensus"
 		flagAddress = "189.123.123.42:3869"
 
@@ -89,18 +90,18 @@ func TestMachineAccountKeyFileCreated(t *testing.T) {
 		hook.logs.Reset()
 
 		// require log regex to match
-		require.DirExists(t, filepath.Join(flagOutdir, bootstrap.DirnamePublicBootstrap))
-		require.DirExists(t, filepath.Join(flagOutdir, bootstrap.DirPrivateRoot))
+		require.DirExists(t, filepath.Join(FlagOutdir, bootstrap.DirnamePublicBootstrap))
+		require.DirExists(t, filepath.Join(FlagOutdir, bootstrap.DirPrivateRoot))
 
 		// read in node ID
-		nodeIDPath := filepath.Join(flagOutdir, bootstrap.PathNodeID)
+		nodeIDPath := filepath.Join(FlagOutdir, bootstrap.PathNodeID)
 		require.FileExists(t, nodeIDPath)
 		b, err := ioutils.ReadFile(nodeIDPath)
 		require.NoError(t, err)
 		nodeID := strings.TrimSpace(string(b))
 
 		// delete machine account key file
-		machineKeyFilePath := filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
+		machineKeyFilePath := filepath.Join(FlagOutdir, fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeID))
 		err = os.Remove(machineKeyFilePath)
 		require.NoError(t, err)
 
