@@ -75,6 +75,11 @@ func assembleNodeInfo(nodeConfig model.NodeConfig, networkKey, stakingKey crypto
 	return nodeInfo
 }
 
+// AssembleNodeMachineAccountInfo exported wrapper for use in other projects
+func AssembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress string) model.NodeMachineAccountInfo {
+	return assembleNodeMachineAccountInfo(machineKey, accountAddress)
+}
+
 func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress string) model.NodeMachineAccountInfo {
 	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
 	machineNodeInfo := model.NodeMachineAccountInfo{
