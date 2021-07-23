@@ -158,12 +158,12 @@ func (e *Engine) onChunkDataRequest(
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
 
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkID)).
 		Logger()
 
-	log.Debug().Msg("received chunk data pack request")
+	lg.Debug().Msg("received chunk data pack request")
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
@@ -172,7 +172,7 @@ func (e *Engine) onChunkDataRequest(
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
-		log.Warn().Msg("chunk not found")
+		lg.Warn().Msg("chunk not found")
 		return nil
 	}
 
@@ -207,10 +207,10 @@ func (e *Engine) onChunkDataRequest(
 
 	sinceProcess := time.Since(processStart)
 
-	log = log.With().Dur("sinceProcess", sinceProcess).Logger()
+	lg = lg.With().Dur("sinceProcess", sinceProcess).Logger()
 
 	if sinceProcess > e.chdpQueryTimeout {
-		log.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
+		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
 
 	// sends requested chunk data pack to the requester
@@ -220,20 +220,24 @@ func (e *Engine) onChunkDataRequest(
 		err := e.chunksConduit.Unicast(response, originID)
 
 		sinceDeliver := time.Since(deliveryStart)
-		log = log.With().Dur("since_deliver", sinceDeliver).Logger()
+		lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
 
 		if sinceDeliver > e.chdpDeliveryTimeout {
-			log.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
+			lg.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
 		}
 
 		if err != nil {
-			log.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
+			lg.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
 			return
 		}
 
-		log.Debug().
-			Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
-			Msg("chunk data pack request successfully replied")
+		if response.ChunkDataPack.Collection != nil { // system chunk has a nil chunk data pack
+			lg = lg.With().
+				Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
+				Logger()
+		}
+
+		lg.Debug().Msg("chunk data pack request successfully replied")
 	})
 
 	return nil
