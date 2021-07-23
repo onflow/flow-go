@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"io"
 	"os"
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -51,7 +51,7 @@ var keygenCmd = &cobra.Command{
 			return nil
 		}
 		log.Info().Msg("writing internal private key files")
-		err = run.WriteStakingNetworkingKeyFiles(nodes, writeFile)
+		err = utils.WriteStakingNetworkingKeyFiles(nodes, writeFile)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write internal private key files")
 		}
@@ -63,7 +63,7 @@ var keygenCmd = &cobra.Command{
 		if flagDefaultMachineAccount {
 			chainID := parseChainID(flagRootChain)
 			log.Info().Msg("writing default machine account files")
-			err = run.WriteMachineAccountFiles(chainID, nodes, writeFile)
+			err = utils.WriteMachineAccountFiles(chainID, nodes, writeFile)
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to write machine account key files")
 			}

@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"path"
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
 
@@ -46,7 +46,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	}
 
 	machineSeed := validateSeed(flagMachineSeed)
-	machineKey, err := run.GenerateMachineAccountKey(machineSeed)
+	machineKey, err := utils.GenerateMachineAccountKey(machineSeed)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate machine key")
 	}
