@@ -13,7 +13,7 @@ type ProxyConduit struct {
 }
 
 func (c *ProxyConduit) Publish(event interface{}, targetIDs ...flow.Identifier) error {
-	return c.Conduit.Unicast(event, c.targetNodeID)
+	return c.Conduit.Publish(event, c.targetNodeID)
 }
 
 func (c *ProxyConduit) Unicast(event interface{}, targetID flow.Identifier) error {
@@ -21,5 +21,5 @@ func (c *ProxyConduit) Unicast(event interface{}, targetID flow.Identifier) erro
 }
 
 func (c *ProxyConduit) Multicast(event interface{}, num uint, targetIDs ...flow.Identifier) error {
-	return c.Conduit.Unicast(event, c.targetNodeID)
+	return c.Conduit.Multicast(event, 1, c.targetNodeID)
 }
