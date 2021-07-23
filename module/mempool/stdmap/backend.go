@@ -101,19 +101,19 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	ejectionTrigger   uint
-	eject             EjectFunc
-	ejectionCallbacks []mempool.OnEjection
+	guaranteedCapacity uint
+	eject              EjectFunc
+	ejectionCallbacks  []mempool.OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
 // This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata:          NewBackdata(),
-		ejectionTrigger:   uint(math.MaxUint32),
-		eject:             EjectTrueRandomFast,
-		ejectionCallbacks: nil,
+		Backdata:           NewBackdata(),
+		guaranteedCapacity: uint(math.MaxUint32),
+		eject:              EjectTrueRandomFast,
+		ejectionCallbacks:  nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -178,9 +178,9 @@ func (b *Backend) Size() uint {
 	return b.Backdata.Size()
 }
 
-// Limit returns the maximum number of items allowed in the backend.
+// Limit returns the number of items that this mempool will always hold.
 func (b *Backend) Limit() uint {
-	return b.ejectionTrigger
+	return b.guaranteedCapacity
 }
 
 // All returns all entities from the pool.
@@ -214,15 +214,19 @@ func (b *Backend) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
 // reduce will reduce the size of the kept entities until we are within the
 // configured memory pool size limit.
 func (b *Backend) reduce() {
-	// we keep reducing the cache size until we are at limit again
-	// this was a loop, but the loop is now in EjectTrueRandomFast()
-	// the ejections are batched, so this call to eject() may not actually
-	// do anything until the batch threshold is reached (currently 128)
-	if len(b.entities) > int(b.ejectionTrigger) {
+	// CAUTION: updated logic
+	//  * The ejector function now has the freedom to eject _multiple_ elements.
+	//  * In a single `eject` call, it must eject as many elements to statistically
+	//    keep the mempool size within the desired limit.
+	//  * The ejector _might_ (for performance reasons) retain more elements in the
+	//    mempool than the targeted capacity.
+	//  * The ejector _must_ call the `ejectionCallbacks` for _each_ element it
+	//    removes from the mempool.
+	if len(b.entities) > int(b.guaranteedCapacity) {
 		// get the key from the eject function
 		// revert to prior commits if this eject function is not
 		// EjectTrueRandomFast
 		// we don't do anything if there is an error
-		_, _, _ = b.eject(b)
+		b.eject(b)
 	}
 }
