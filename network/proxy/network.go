@@ -6,32 +6,32 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-type UnstakedNetwork struct {
+type ProxyNetwork struct {
 	module.Network
-	stakedNodeID flow.Identifier
+	targetNodeID flow.Identifier
 }
 
-// NewUnstakedNetwork creates a new unstaked network. All messages sent on this network are
-// sent only to the staked node identified by the given node ID.
-func NewUnstakedNetwork(net module.Network, stakedNodeID flow.Identifier) *UnstakedNetwork {
-	return &UnstakedNetwork{
+// NewProxyNetwork creates a new proxy network. All messages sent on this network are
+// sent only to the node identified by the given target ID.
+func NewProxyNetwork(net module.Network, targetNodeID flow.Identifier) *ProxyNetwork {
+	return &ProxyNetwork{
 		net,
-		stakedNodeID,
+		targetNodeID,
 	}
 }
 
-// Register registers an engine with the unstaked network.
-func (n *UnstakedNetwork) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+// Register registers an engine with the proxy network.
+func (n *ProxyNetwork) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
 	con, err := n.Network.Register(channel, engine)
 
 	if err != nil {
 		return nil, err
 	}
 
-	unstakedCon := UnstakedConduit{
+	proxyCon := ProxyConduit{
 		con,
-		n.stakedNodeID,
+		n.targetNodeID,
 	}
 
-	return &unstakedCon, nil
+	return &proxyCon, nil
 }
