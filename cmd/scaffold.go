@@ -107,7 +107,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", NotSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", NotSet, "address to bind on")
+	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", NotSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
@@ -131,8 +131,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		codec := jsoncodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.bindAddr != NotSet {
-			myAddr = fnb.BaseConfig.bindAddr
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
 		}
 
 		// setup the Ping provider to return the software version and the sealed block height
@@ -502,17 +502,9 @@ func (fnb *FlowNodeBuilder) initLocal() {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		rootBlockHeader, err := fnb.State.Params().Root()
-		fnb.MustNot(err).Msg("could not get root block from protocol state")
-		if rootBlockHeader.ChainID == flow.Mainnet {
-			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
-				self.Role.String(),
-				fnb.BaseConfig.NodeRole)
-		} else {
-			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
-				self.Role.String(),
-				fnb.BaseConfig.NodeRole)
-		}
+		fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
+			self.Role.String(),
+			fnb.BaseConfig.NodeRole)
 	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state

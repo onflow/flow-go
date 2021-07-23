@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -65,7 +64,6 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	unstakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.AsUnstaked(),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--staked-access-node-id=%#v", suite.stakedID)),
 		testnet.WithID(suite.unstakedID),
 		testnet.AsGhost(),
 	)
@@ -122,9 +120,10 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	// or just send directly to AN
 	// Second: check that unstaked node received it
 	// This can be either calling the unstaked node api directly, or
-	// Third: check that staked node has it
+	// Third: check that staked node has it (can do this by generate a block with reference block equal to root?)
+	// Can access this via FlowNetwork.root
 
-	// TODO: need to know that consensus node gets it
+	// TODO: add a test to MVP-test
 
 	block := unittest.BlockFixture()
 

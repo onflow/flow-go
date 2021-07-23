@@ -520,26 +520,28 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			if !nodeConf.Unstaked {
-				hostGRPCPort := testingdock.RandomPort(t)
-				hostHTTPProxyPort := testingdock.RandomPort(t)
-				containerGRPCPort := "9000/tcp"
-				containerHTTPProxyPort := "8000/tcp"
+			hostGRPCPort := testingdock.RandomPort(t)
+			hostHTTPProxyPort := testingdock.RandomPort(t)
+			containerGRPCPort := "9000/tcp"
+			containerHTTPProxyPort := "8000/tcp"
 
-				nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
-				nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
+			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
+			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
-				nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-				nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
-				// uncomment line below to point the access node exclusively to a single collection node
-				// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
-				nodeContainer.addFlag("collection-ingress-port", "9000")
-				nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
-				nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
-				nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
-				net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
-				net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
-			}
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+			// uncomment line below to point the access node exclusively to a single collection node
+			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("collection-ingress-port", "9000")
+			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
+			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
+			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
+
+			fmt.Println("PORTS") // TODO: remove
+			fmt.Println(hostGRPCPort)
+			fmt.Println(hostHTTPProxyPort)
 
 			if nodeConf.ParticipatesInUnstakedNetwork {
 				hostUnstakedPort := testingdock.RandomPort(t)
@@ -568,6 +570,23 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
+
+		if nodeConf.ParticipatesInUnstakedNetwork {
+			hostUnstakedPort := testingdock.RandomPort(t)
+			containerUnstakedPort := "9876/tcp"
+
+			if nodeConf.Unstaked {
+				nodeContainer.addFlag("bind", fmt.Sprintf("%s:9876", nodeContainer.Name()))
+			} else {
+				// TODO: Currently, it is not possible to create a staked ghost AN which
+				// participates on the unstaked network, because the ghost node only initializes
+				// a single network. The ghost node needs to support an unstaked bind address
+				// flag to enable this.
+			}
+
+			nodeContainer.bindPort(hostUnstakedPort, containerUnstakedPort)
+			nodeContainer.Ports[UnstakedNetworkPort] = hostUnstakedPort
+		}
 	}
 
 	if nodeConf.Debug {

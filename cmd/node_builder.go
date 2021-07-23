@@ -83,7 +83,7 @@ type NodeBuilder interface {
 // BaseConfig is the general config for the NodeBuilder and the command line params
 type BaseConfig struct {
 	nodeIDHex             string
-	bindAddr              string
+	BindAddr              string
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
