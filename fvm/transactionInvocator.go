@@ -163,15 +163,10 @@ func (i *TransactionInvocator) Process(
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
-	// try to deduct fees even if there is an error, bot do not hide the original error
+	// try to deduct fees even if there is an error.
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {
-		if txError == nil {
-			txError = feesError
-		} else {
-			// combine the two errors so none of them gets lost.
-			txError = fmt.Errorf("%w and %v", txError, feesError)
-		}
+		txError = feesError
 	}
 
 	//if there is still no error check if all account storage limits are ok
@@ -198,12 +193,8 @@ func (i *TransactionInvocator) Process(
 
 		// try to deduct fees again, to get the fe deduction events
 		feesError = i.deductTransactionFees(env, proc)
-		if feesError != nil {
-			// combine the two errors so none of them gets lost.
-			txError = fmt.Errorf("%w and %v", txError, feesError)
-		}
 
-		// if fees tx fails just do clean up and exit
+		// if fees fail just do clean up and exit
 		if feesError != nil {
 			// drop delta
 			childState.View().DropDelta()
@@ -214,7 +205,7 @@ func (i *TransactionInvocator) Process(
 				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction executed with error")
 
-			return txError
+			return feesError
 		}
 	}
 

@@ -2276,20 +2276,13 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			},
 		},
 		{
-			name:          "If no balance, transaction fails",
-			fundWith:      txFees - 1,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
-				require.IsType(t, tx.Err, &errors.TransactionFeeDeductionFailedError{})
-				require.Equal(t, txFees-1, balanceAfter)
-			},
-		},
-		{
-			name:          "If not enough balance, transaction fails and fees are deducted",
+			// this is an edge case that is not applicable to any network.
+			// If storage limits were on this would fail due to storage limits
+			name:          "If not enough balance, transaction succeeds and fees are deducted to 0",
 			fundWith:      txFees,
 			tryToTransfer: 1,
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
-				require.IsType(t, tx.Err, &errors.TransactionFeeDeductionFailedError{})
+				require.NoError(t, tx.Err)
 				require.Equal(t, uint64(0), balanceAfter)
 			},
 		},
