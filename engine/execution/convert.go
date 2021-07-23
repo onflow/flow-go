@@ -33,25 +33,24 @@ func GenerateExecutionResultAndChunkDataPacks(
 		// TODO: deltas should be applied to a particular state
 
 		endState = result.StateCommitments[i]
-		var collectionID flow.Identifier
-
-		txNumber := 1 //default for system chunk
-
+		var chunk *flow.Chunk
 		// account for system chunk being last
 		if i < len(result.StateCommitments)-1 {
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
-			collectionID = completeCollection.Collection().ID()
-			txNumber = len(completeCollection.Transactions)
+			collectionID := completeCollection.Collection().ID()
+			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint16(len(completeCollection.Transactions)))
+			chdps[i] = GenerateStoredChunkDataPack(chunk, &collectionID, result.Proofs[i])
 		} else {
-			collectionID = flow.ZeroID
+			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1) // for system chunk
+			chdps[i] = GenerateStoredChunkDataPack(chunk, nil, result.Proofs[i])
 		}
 
-		eventsHash := result.EventsHashes[i]
-		chunk := GenerateChunk(i, startState, endState, blockID, eventsHash, uint16(txNumber))
+		// eventsHash := result.EventsHashes[i]
+		// chunk := GenerateChunk(i, startState, endState, blockID, eventsHash, uint16(txNumber))
 
 		// chunkDataPack
-		chdps[i] = GenerateStoredChunkDataPack(chunk, collectionID, result.Proofs[i])
+		// chdps[i] = GenerateStoredChunkDataPack(chunk, &collectionID, result.Proofs[i])
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
@@ -116,7 +115,7 @@ func GenerateChunk(colIndex int,
 // GenerateStoredChunkDataPack generates a stored chunk data pack for persisting in storage.
 func GenerateStoredChunkDataPack(
 	chunk *flow.Chunk,
-	collectionID flow.Identifier,
+	collectionID *flow.Identifier,
 	proof flow.StorageProof,
 ) *storagemodel.StoredChunkDataPack {
 	return &storagemodel.StoredChunkDataPack{

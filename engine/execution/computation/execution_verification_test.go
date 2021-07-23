@@ -199,7 +199,7 @@ func executeBlockAndVerify(t *testing.T, txs [][]*flow.TransactionBody) *executi
 		isSystemChunk := i == er.Chunks.Len()-1
 		var cdp *flow.ChunkDataPack
 		if !isSystemChunk {
-			coll := executableBlock.CompleteCollections[chdps[i].CollectionID].Collection()
+			coll := executableBlock.CompleteCollections[*chdps[i].CollectionID].Collection()
 			cdp = execution.ToChunkDataPack(chdps[i], &coll)
 		} else {
 			// system chunk has a nil collection

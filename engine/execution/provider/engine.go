@@ -186,9 +186,9 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	var collection *flow.Collection
-	if cdp.CollectionID != flow.ZeroID {
+	if cdp.CollectionID != nil {
 		// retrieves collection of non-zero chunks
-		coll, err := e.execState.GetCollection(cdp.CollectionID)
+		coll, err := e.execState.GetCollection(*cdp.CollectionID)
 		if err != nil {
 			return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
 		}
