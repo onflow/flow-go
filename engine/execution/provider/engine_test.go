@@ -194,7 +194,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
 			Return(chunkDataPack, nil)
 
-		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
+		execState.On("GetCollection", *chunkDataPack.CollectionID).Return(&collection, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -260,7 +260,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
 			Return(chunkDataPack, nil).Twice()
 
-		execState.On("GetCollection", chunkDataPack.CollectionID).Return(&collection, nil)
+		execState.On("GetCollection", *chunkDataPack.CollectionID).Return(&collection, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
