@@ -289,7 +289,6 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 
 	// expect one message to be received by the target
 	ch := make(chan struct{})
-	fmt.Println(time.Now().String())
 	m.ov[targetIndex].On("Receive", sourceNode, msg).Return(nil).Once().
 		Run(func(args mockery.Arguments) {
 			close(ch)
@@ -301,7 +300,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	require.NoError(m.Suite.T(), err)
 
 	// check message reception on target
-	unittest.RequireCloseBefore(m.T(), ch, 30*time.Second, "source node failed to send large message to target")
+	unittest.RequireCloseBefore(m.T(), ch, 15*time.Second, "source node failed to send large message to target")
 
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
