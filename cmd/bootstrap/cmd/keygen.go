@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"io"
 	"os"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/spf13/cobra"
 
