@@ -84,9 +84,7 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	// this is the sort from golang/sort for small arrays
 	for i = 1; i < batchSize; i++ {
 		for j := i; mapIndexes[j] < mapIndexes[j-1]; j-- {
-			tmp := mapIndexes[j]
-			mapIndexes[j] = mapIndexes[j-1]
-			mapIndexes[j-1] = tmp
+			mapIndexes[j], mapIndexes[j-1] = mapIndexes[j-1], mapIndexes[j] 
 
 			// stop when 'j-2' is less than 0 -- OOB
 			if j == 1 {
