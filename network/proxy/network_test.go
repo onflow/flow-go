@@ -1,4 +1,4 @@
-package unstaked_test
+package proxy_test
 
 import (
 	"testing"

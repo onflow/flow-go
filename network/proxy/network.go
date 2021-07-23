@@ -1,4 +1,4 @@
-package unstaked
+package proxy
 
 import (
 	"github.com/onflow/flow-go/model/flow"
