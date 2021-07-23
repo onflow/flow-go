@@ -60,7 +60,7 @@ func (s *Suite) MetricsPort() string {
 // - Four consensus nodes
 // - One execution node
 // - One verification node
-// - One ghost node (as an access node)
+// - One ghost node (as an execution node)
 func (s *Suite) SetupSuite() {
 	blockRateFlag := "--block-rate-delay=1ms"
 
