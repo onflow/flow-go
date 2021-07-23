@@ -130,10 +130,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		codec := jsoncodec.NewCodec()
 
+		fnb.Logger.Warn().Msg("MY ADDRESSSSS")
 		myAddr := fnb.NodeConfig.Me.Address()
+		fnb.Logger.Warn().Msg(myAddr)
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
+		fnb.Logger.Warn().Msg(myAddr)
 
 		// setup the Ping provider to return the software version and the sealed block height
 		pingProvider := p2p.PingInfoProviderImpl{
@@ -502,9 +505,17 @@ func (fnb *FlowNodeBuilder) initLocal() {
 	// We enforce this strictly for MainNet. For other networks (e.g. TestNet or BenchNet), we
 	// are lenient, to allow ghost node to run as any role.
 	if self.Role.String() != fnb.BaseConfig.NodeRole {
-		fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
-			self.Role.String(),
-			fnb.BaseConfig.NodeRole)
+		rootBlockHeader, err := fnb.State.Params().Root()
+		fnb.MustNot(err).Msg("could not get root block from protocol state")
+		if rootBlockHeader.ChainID == flow.Mainnet {
+			fnb.Logger.Fatal().Msgf("running as incorrect role, expected: %v, actual: %v, exiting",
+				self.Role.String(),
+				fnb.BaseConfig.NodeRole)
+		} else {
+			fnb.Logger.Warn().Msgf("running as incorrect role, expected: %v, actual: %v, continuing",
+				self.Role.String(),
+				fnb.BaseConfig.NodeRole)
+		}
 	}
 
 	// ensure that the configured staking/network keys are consistent with the protocol state

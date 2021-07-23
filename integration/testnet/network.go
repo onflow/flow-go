@@ -577,6 +577,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			if nodeConf.Unstaked {
 				nodeContainer.addFlag("bind", fmt.Sprintf("%s:9876", nodeContainer.Name()))
+				nodeContainer.addFlag("staked", "false")
 			} else {
 				// TODO: Currently, it is not possible to create a staked ghost AN which
 				// participates on the unstaked network, because the ghost node only initializes
