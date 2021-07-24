@@ -71,11 +71,11 @@ func EjectTrueRandomFast(b *Backend) {
 	}
 	sort.Ints(mapIndices) // inplace
 
-	// Now, mapIndexes is a sequentially sorted list of indexes to remove.
-	// Remove them in a loop.  If there are duplicate random indexes to remove,
-	// they are ignored (subsequent ejection calls will make up for it).
-	idx := 0 // index into mapIndexes
-	next2Remove := mapIndices[0]
+	// Now, mapIndices is a sequentially sorted list of indices to remove.
+	// Remove them in a loop. Repeated indices are idempotent (subsequent
+	// ejection calls will make up for it).
+	idx := 0                     // index into mapIndexes
+	next2Remove := mapIndices[0] // index of the element to be removed next
 	i := 0
 	for entityID, entity := range b.entities {
 		if i == next2Remove {
