@@ -191,23 +191,22 @@ var cborEncMode = func() cbor.EncMode {
 func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 
 	// determine the message type
-	code, err1 := switchv2code(v)
-	what, err2 := switchv2what(v)
-
-	if nil != err1 {
-		return nil, 0, err1
+	code, err := switchv2code(v)
+	if nil != err {
+		return nil, 0, err
 	}
 
-	if nil != err2 {
-		return nil, 0, err2
+	what, err := switchv2what(v)
+	if nil != err {
+		return nil, 0, err
 	}
 
 	// encode the payload
 	//bs := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, code)) // e.g. ~3net::wire<1(cbor)CodeEntityRequest:23
-	data, err3 := cborEncMode.Marshal(v)
+	data, err := cborEncMode.Marshal(v)
 	//binstat.LeaveVal(bs, int64(len(data)))
-	if err3 != nil {
-		return nil, 0, fmt.Errorf("could not encode cbor payload of type %s: %w", what, err3)
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not encode cbor payload of type %s: %w", what, err)
 	}
 
 	return data, code, nil

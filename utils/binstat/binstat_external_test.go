@@ -146,16 +146,17 @@ func init() {
 	os.Setenv("BINSTAT_LEN_WHAT", "~f=99;~eg=99;~example=99")
 }
 
+func backTicks(t *testing.T, command string) {
+	out, err := exec.Command("bash", "-c", command).Output()
+	require.NoError(t, err)
+	zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
+}
+
 func TestWithPprof(t *testing.T) {
 	zlog = unittest.Logger()
 
 	// delete any files hanging around from previous test run
-	{
-		command := "ls -al ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt"
-		out, err := exec.Command("bash", "-c", command).Output()
-		require.NoError(t, err)
-		zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
-	}
+	backTicks(t, "ls -al ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt ; rm -f ./binstat.test.pid-*.binstat.txt* ./*gomaxprocs*.pprof.txt")
 
 	// run the test; loops of several tries running groups of go-routines
 	for loop := 0; loop < loops; loop++ {
@@ -219,12 +220,7 @@ func TestWithPprof(t *testing.T) {
 	binstat.Dump(".test-external.txt")
 
 	// cat and sort binstat stats file
-	{
-		command := "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt.test-external.txt | sort --version-sort"
-		out, err := exec.Command("bash", "-c", command).Output()
-		require.NoError(t, err)
-		zlog.Debug().Msgf("test: output of command: %s\n%s", command, out)
-	}
+	backTicks(t, "ls -al ./binstat.test.pid-*.binstat.txt ; cat ./binstat.test.pid-*.binstat.txt.test-external.txt | sort --version-sort")
 
 	// todo: add more tests? which tests?
 

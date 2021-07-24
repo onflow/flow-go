@@ -176,23 +176,22 @@ func switchenv2what(code uint8) (string, error) {
 func env2vDecode(data []byte, code uint8, via string) (interface{}, error) {
 
 	// create the desired message
-	v, err1 := switchenv2v(code)
-	what, err2 := switchenv2what(code)
-
-	if nil != err1 {
-		return nil, err1
+	v, err := switchenv2v(code)
+	if nil != err {
+		return nil, err
 	}
 
-	if nil != err2 {
-		return nil, err2
+	what, err := switchenv2what(code)
+	if nil != err {
+		return nil, err
 	}
 
 	// unmarshal the payload
 	//bs := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err3 := cbor.Unmarshal(data, v)
+	err = cbor.Unmarshal(data, v)
 	//binstat.Leave(bs)
-	if err3 != nil {
-		return nil, fmt.Errorf("could not decode cbor payload of type %s: %w", what, err3)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode cbor payload of type %s: %w", what, err)
 	}
 
 	return v, nil

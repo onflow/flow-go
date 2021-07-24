@@ -176,23 +176,22 @@ func switchenv2what(env Envelope) (string, error) {
 func env2vDecode(env Envelope, via string) (interface{}, error) {
 
 	// create the desired message
-	v, err1 := switchenv2v(env)
-	what, err2 := switchenv2what(env)
-
-	if nil != err1 {
-		return nil, err1
+	v, err := switchenv2v(env)
+	if nil != err {
+		return nil, err
 	}
 
-	if nil != err2 {
-		return nil, err2
+	what, err := switchenv2what(env)
+	if nil != err {
+		return nil, err
 	}
 
 	// unmarshal the payload
 	//bs := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, env.Code), int64(len(env.Data))) // e.g. ~3net:wire>4(json)CodeEntityRequest:23
-	err3 := json.Unmarshal(env.Data, v)
+	err = json.Unmarshal(env.Data, v)
 	//binstat.Leave(bs)
-	if err3 != nil {
-		return nil, fmt.Errorf("could not decode json payload of type %s: %w", what, err3)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode json payload of type %s: %w", what, err)
 	}
 
 	return v, nil

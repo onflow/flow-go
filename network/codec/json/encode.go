@@ -177,15 +177,14 @@ func switchv2what(v interface{}) (string, error) {
 func v2envEncode(v interface{}, via string) (*Envelope, error) {
 
 	// determine the message type
-	code, err1 := switchv2code(v)
-	what, err2 := switchv2what(v)
-
-	if nil != err1 {
-		return nil, err1
+	code, err := switchv2code(v)
+	if nil != err {
+		return nil, err
 	}
 
-	if nil != err2 {
-		return nil, err2
+	what, err := switchv2what(v)
+	if nil != err {
+		return nil, err
 	}
 
 	// encode the payload
