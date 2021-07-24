@@ -30,7 +30,7 @@ type UnstakedAccessSuite struct {
 	unstakedReader *ghostclient.FlowMessageStreamReader
 	stakedID       flow.Identifier
 	unstakedID     flow.Identifier
-	conIDs         []flow.Identifier
+	conID          flow.Identifier
 }
 
 func TestUnstakedAccessSuite(t *testing.T) {
@@ -70,13 +70,9 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	nodeConfigs = append(nodeConfigs, unstakedConfig)
 
 	// consensus node (ghost)
-	suite.conIDs = make([]flow.Identifier, 3)
-	for i := 0; i < 3; i++ {
-		conID := unittest.IdentifierFixture()
-		suite.conIDs = append(suite.conIDs, conID)
-		conConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(conID), testnet.AsGhost())
-		nodeConfigs = append(nodeConfigs, conConfig)
-	}
+	suite.conID = unittest.IdentifierFixture()
+	conConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(suite.conID), testnet.AsGhost())
+	nodeConfigs = append(nodeConfigs, conConfig)
 
 	// execution node (unused)
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.AsGhost())
@@ -102,7 +98,7 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	require.NoError(suite.T(), err, "could not get ghost client")
 	suite.unstakedGhost = client
 
-	conGhost := suite.net.ContainerByID(suite.conIDs[0])
+	conGhost := suite.net.ContainerByID(suite.conID)
 	client, err = common.GetGhostClient(conGhost)
 	require.NoError(suite.T(), err, "could not get ghost client")
 	suite.conGhost = client
@@ -127,8 +123,6 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	// Third: check that staked node has it (can do this by generate a block with reference block equal to root?)
 	// Can access this via FlowNetwork.root
 
-	// TODO: add a test to MVP-test
-
 	block := unittest.BlockFixture()
 
 	proposal := &messages.BlockProposal{
@@ -138,20 +132,20 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 
 	suite.conGhost.Send(suite.ctx, engine.PushBlocks, proposal, suite.stakedID)
 
-	waitFor := 10 * time.Second
-	deadline := time.Now().Add(waitFor)
-	for time.Now().Before(deadline) {
-
+	m := make(chan interface{})
+	go func() {
 		_, msg, err := suite.unstakedReader.Next()
 		suite.Require().Nil(err, "could not read next message")
 		suite.T().Logf("unstaked ghost recv: %T", msg)
 
-		suite.Assert().Equal(msg, proposal)
+		m <- msg
+	}()
 
-		// switch val := msg.(type) {
-		// case *messages.BlockProposal:
-		// 	suite.Assert().Equal(msg, proposal)
-		// }
+	select {
+	case msg := <-m:
+		suite.Assert().Equal(msg, proposal)
+	case <-time.After(5 * time.Second):
+		suite.T().Fatal("timed out waiting for next message")
 	}
 
 	// chain := suite.net.Root().Header.ChainID.Chain()

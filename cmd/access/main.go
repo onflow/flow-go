@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -38,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -81,6 +81,7 @@ func main() {
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
 		rpcMetricsEnabled            bool
+		unstakedNetwork              p2p.ReadyDoneAwareNetwork
 	)
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
@@ -400,13 +401,18 @@ func main() {
 		if nodeBuilder.ParticipatesInUnstakedNetwork() {
 			// create relay engine
 			nodeBuilder.Component("relay engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				accessNodeBuilder, ok := builder.(FlowAccessNodeBuilder)
+				var unstakedNetwork p2p.ReadyDoneAwareNetwork
 
-				if !ok {
-					return nil, errors.New("node builder was of unexpected type")
+				switch accessNodeBuilder := nodeBuilder.(type) {
+				case *StakedAccessNodeBuilder:
+					unstakedNetwork = accessNodeBuilder.UnstakedNetwork
+				case *UnstakedAccessNodeBuilder:
+					unstakedNetwork = accessNodeBuilder.UnstakedNetwork
+				default:
+					return nil, fmt.Errorf("node builder was of unexpected type %T", accessNodeBuilder)
 				}
 
-				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, accessNodeBuilder.UnstakedNetwork, node.Me)
+				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, unstakedNetwork, node.Me)
 
 				if err != nil {
 					return nil, fmt.Errorf("could not create relay engine: %w", err)
