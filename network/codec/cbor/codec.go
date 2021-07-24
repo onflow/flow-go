@@ -9,7 +9,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Codec represents a JSON codec for our network.
@@ -38,17 +38,15 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	data, code, err := v2envEncode(v, "~3net:wire<1(cbor)")
+	data, code, err := v2envEncode(v, ":wire<1(cbor)")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
 	// encode the envelope
-	bs := binstat.EnterTime("~3net:wire<2(cbor)envelope2payload")
-	bs.Run(func() {
-		data = append(data, code)
-	})
-	bs.LeaveVal(int64(len(data)))
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire<2(cbor)envelope2payload")
+	data = append(data, code)
+	//binstat.LeaveVal(bs, int64(len(data)))
 
 	return data, nil
 }
@@ -57,15 +55,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
-	var code uint8
-	bs := binstat.EnterTime("~3net:wire>3(cbor)payload2envelope")
-	bs.Run(func() {
-		code = data[len(data)-1] // only last byte
-	})
-	bs.LeaveVal(int64(len(data)))
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
+	code := data[len(data)-1] // only last byte
+	//binstat.LeaveVal(bs, int64(len(data)))
 
 	// decode the value
-	v, err := env2vDecode(data[:len(data)-1], code, "~3net:wire>4(cbor)") // all but last byte
+	v, err := env2vDecode(data[:len(data)-1], code, ":wire>4(cbor)") // all but last byte
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}

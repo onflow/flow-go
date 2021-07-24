@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
@@ -79,11 +79,9 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 		var msg message.Message
 		// convert the incoming raw message payload to Message type
-		bs := binstat.EnterTimeVal("~3net:wire>1protobuf2message", int64(len(rawMsg.Data)))
-		bs.Run(func() {
-			err = msg.Unmarshal(rawMsg.Data)
-		})
-		bs.Leave()
+		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
+		err = msg.Unmarshal(rawMsg.Data)
+		//binstat.Leave(bs)
 		if err != nil {
 			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
 			return

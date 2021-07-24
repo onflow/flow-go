@@ -9,21 +9,26 @@
 
 ## `binstat` goals
 
-* Be able to instrument arbitrary code points without worrying about reducing run-time performance.
-* Run instrumented code points arbitrary times without worrying about reducing run-time performance.
-* Allow collected stats to be managed and compared programmatically; is this worse/better than last run?
+* `binstat` is disabled at compile time by default resulting in zero production code overhead.
+* `binstat` may be enabled at compile time on a stat by stat basis without enabling all stats.
+* `binstat` aims to be efficient at collecting small stats very fast, e.g. measuring lock time.
+* `binstat` aims to allow stats to be compared programmatically; is this worse/better than last run?
 
 ## How `binstat` works?
 
-* Sprinkle `binstat.Enter*(<what>)` and `.Leave*()` into Golang source code, e.g.:
+* Sprinkle `binstat.Enter*(<what>)` and `binstat.Leave*()` into Golang source code, e.g.:
 
 ```
+import (
+...
+	"github.com/onflow/flow-go/utils/binstat"
+...
+)
+...
 	for loop := 0; loop < 2; loop++ {
 		bs := binstat.EnterTime(fmt.Sprintf("loop-%d", loop))
-		bs.Run(func() { // consider .Run() to highlight code being timed
-			myFunc()
-		})
-		bs.Leave()
+		myFunc() // code to generate stats for
+		binstat.Leave(bs)
 	}
 ```
 
@@ -47,6 +52,32 @@ $ #                                         name & line of instrumented file ^^^
 * If `<what>` has the format `~<default len><what>`, then `~4RootL1L2` only uses `~4Root` in the bin name, unless env var `BINSTAT_LEN_WHAT="~Root=6"` in which case the bin name uses `~4RootL1`.
 * In this way, the bin quantity for a particular `<what>` defaults to fewer bins, but may be enlarged using the env var.
 
+## Disable AKA 'hide' `binstat` instrumentation before pushing code
+
+```
+$ utils/binstat/binstat                     
+utils/binstat/binstat: Please specifiy a command line option: (list|hide|unhide)-instrumentation [regex='binstat.Bin(Net|MakeID)']
+$ utils/binstat/binstat hide-instrumentation
+- hide instrumentation found 17 files to examine <-- source files containing binstat instrumentation
+- hide instrumentation wrote 0 files             <-- source files rewritten with commented binstat
+```
+
+* Auto commented `binstat` code looks like this:
+
+```
+import (
+...
+	_ "github.com/onflow/flow-go/utils/binstat"
+...
+)
+...
+	for loop := 0; loop < 2; loop++ {
+		//bs := binstat.EnterTime(fmt.Sprintf("loop-%d", loop))
+		myFunc() // code to generate stats for
+		//binstat.Leave(bs)
+	}
+```
+
 ## What makes `binstat` efficient?
 
 * The number of bins is relatively small, regardless of the number of function calls.
@@ -54,6 +85,9 @@ $ #                                         name & line of instrumented file ^^^
 * A lock per stat collection is eliminated using a `sync.RWMutex{}` reader/writer mutual exclusion lock:
   * Usual case: If the bin already exists, any 'reader' can *concurrently* update it via atomic operations.
   * Rare event: Else a single 'writer' blocks all 'readers' to add the new bin.
+* `binstat` instrumentation can be disabled in two different ways:
+  * At compile time via source code commenting of instrumentation.
+  * At run-time if `BINSTAT_ENABLE` does not exist.
 
 ## Example comparison with `pprof`
 

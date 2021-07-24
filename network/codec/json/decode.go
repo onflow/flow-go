@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 func switchenv2v(env Envelope) (interface{}, error) {
@@ -188,14 +188,11 @@ func env2vDecode(env Envelope, via string) (interface{}, error) {
 	}
 
 	// unmarshal the payload
-	var err3 error
-	bs := binstat.EnterTimeVal(fmt.Sprintf("%s%s:%d", via, what, env.Code), int64(len(env.Data)))
-	bs.Run(func() {
-		err3 = json.Unmarshal(env.Data, v)
-	})
-	bs.Leave()
+	//bs := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, env.Code), int64(len(env.Data))) // e.g. ~3net:wire>4(json)CodeEntityRequest:23
+	err3 := json.Unmarshal(env.Data, v)
+	//binstat.Leave(bs)
 	if err3 != nil {
-		return nil, fmt.Errorf("could not decode payload: %w", err3)
+		return nil, fmt.Errorf("could not decode json payload of type %s: %w", what, err3)
 	}
 
 	return v, nil

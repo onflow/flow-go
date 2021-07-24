@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
@@ -253,8 +253,8 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
 
-	bs := binstat.EnterTimeVal("~3net:wire<3payload2message", int64(len(payload)))
-	defer bs.Leave()
+	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
+	//defer binstat.Leave(bs)
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()

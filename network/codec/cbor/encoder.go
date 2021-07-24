@@ -7,7 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Encoder is an encoder to write serialized JSON to a writer.
@@ -20,7 +20,7 @@ type Encoder struct {
 func (e *Encoder) Encode(v interface{}) error {
 
 	// encode the value
-	data, code, err := v2envEncode(v, "~3net:strm<1")
+	data, code, err := v2envEncode(v, ":strm<1(cbor)")
 	if err != nil {
 		return fmt.Errorf("could not encode value: %w", err)
 	}
@@ -32,11 +32,9 @@ func (e *Encoder) Encode(v interface{}) error {
 	data = append(data, code)
 
 	// write the envelope to network
-	bs := binstat.EnterTimeVal("~3net:strm<2", int64(len(data)))
-	bs.Run(func() {
-		err = e.enc.Encode(data)
-	})
-	bs.Leave()
+	//bs := binstat.EnterTimeVal(binstat.BinNet+":strm<2(cbor)", int64(len(data)))
+	err = e.enc.Encode(data)
+	//binstat.Leave(bs)
 	if err != nil {
 		return fmt.Errorf("could not encode envelope: %w", err)
 	}

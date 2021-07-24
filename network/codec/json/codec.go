@@ -8,7 +8,7 @@ import (
 	"io"
 
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Codec represents a JSON codec for our network.
@@ -37,7 +37,7 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	env, err := v2envEncode(v, "~3net:wire<1(json)")
+	env, err := v2envEncode(v, ":wire<1(json)")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
@@ -45,12 +45,9 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	// TODO: consider eliminating envelope / double .Marshal as implemented in sibling codec CBOR using append()?
 
 	// encode the envelope
-	var data []byte
-	bs := binstat.EnterTime("~3net:wire<2(json)envelope2payload")
-	bs.Run(func() {
-		data, err = json.Marshal(env)
-	})
-	bs.LeaveVal(int64(len(data)))
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire<2(json)envelope2payload")
+	data, err := json.Marshal(env)
+	//binstat.LeaveVal(bs, int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not encode value: %w", err)
 	}
@@ -63,18 +60,15 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
 	var env Envelope
-	var err error
-	bs := binstat.EnterTime("~3net:wire>3(json)payload2envelope")
-	bs.Run(func() {
-		err = json.Unmarshal(data, &env)
-	})
-	bs.LeaveVal(int64(len(env.Data)))
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire>3(json)payload2envelope")
+	err := json.Unmarshal(data, &env)
+	//binstat.LeaveVal(bs, int64(len(env.Data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}
 
 	// decode the value
-	v, err := env2vDecode(env, "~3net:wire>4(json)")
+	v, err := env2vDecode(env, ":wire>4(json)")
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}

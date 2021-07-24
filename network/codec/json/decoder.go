@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Decoder implements a stream decoder for JSON.
@@ -19,18 +19,15 @@ func (d *Decoder) Decode() (interface{}, error) {
 
 	// decode the next envelope
 	var env Envelope
-	var err error
-	bs := binstat.EnterTime("~3net:strm>1")
-	bs.Run(func() {
-		err = d.dec.Decode(&env)
-	})
-	bs.LeaveVal(int64(len(env.Data)))
+	//bs := binstat.EnterTime(binstat.BinNet + ":strm>1(json)")
+	err := d.dec.Decode(&env)
+	//binstat.LeaveVal(bs, int64(len(env.Data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}
 
 	// decode the embedded value
-	v, err := env2vDecode(env, "~3net:strm>2")
+	v, err := env2vDecode(env, ":strm>2(json)")
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}

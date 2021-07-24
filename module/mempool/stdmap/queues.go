@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/queue"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 type Queues struct {
@@ -54,19 +54,14 @@ func (b *Queues) Get(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *Queues) Run(f func(backdata *QueuesBackdata) error) error {
-	bs1 := binstat.EnterTime("~4lock:w:Backend.Run(Queues)")
-	bs1.Run(func() {
-		b.Lock()
-	})
-	bs1.Leave()
+	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Queues)Run")
+	b.Lock()
+	//binstat.Leave(bs1)
 
-	var err error
-	bs2 := binstat.EnterTime("~7Backend.Run(Queues)")
-	bs2.Run(func() {
-		defer b.Unlock()
-		err = f(&QueuesBackdata{&b.Backdata})
-	})
-	bs2.Leave()
+	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Queues)Run")
+	defer b.Unlock()
+	err := f(&QueuesBackdata{&b.Backdata})
+	//binstat.Leave(bs2)
 
 	if err != nil {
 		return err

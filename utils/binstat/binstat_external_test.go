@@ -82,17 +82,15 @@ func run(t *testing.T, loop int, try int, gomaxprocs int) {
 	// this function is purely for chewing CPU
 	f := func(outerFuncName string) time.Duration {
 		bs := binstat.EnterTime(outerFuncName)
-		bs.Run(func() {
-			var sum int
-			for i := 0; i < 10000000; i++ {
-				sum -= i / 2
-				sum *= i
-				sum /= i/3 + 1
-				sum -= i / 4
-			}
-			bs.Debug(fmt.Sprintf("%s() = %d", outerFuncName, sum))
-		})
-		return bs.Leave()
+		var sum int
+		for i := 0; i < 10000000; i++ {
+			sum -= i / 2
+			sum *= i
+			sum /= i/3 + 1
+			sum -= i / 4
+		}
+		binstat.Debug(bs, fmt.Sprintf("%s() = %d", outerFuncName, sum))
+		return binstat.Leave(bs)
 	}
 
 	runtime.GOMAXPROCS(gomaxprocs)
@@ -166,13 +164,11 @@ func TestWithPprof(t *testing.T) {
 			gomaxprocs = 1
 		}
 		bs := binstat.EnterTime(fmt.Sprintf("loop-%d", loop))
-		bs.Run(func() {
-			for try := 0; try < tries; try++ {
-				zlog.Debug().Msgf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs)
-				run(t, loop, try, gomaxprocs)
-			}
-		})
-		bs.Leave()
+		for try := 0; try < tries; try++ {
+			zlog.Debug().Msgf("test: loop=%d try=%d; running 6 identical functions with gomaxprocs=%d", loop, try+1, gomaxprocs)
+			run(t, loop, try, gomaxprocs)
+		}
+		binstat.Leave(bs)
 	}
 
 	// output a table of results similar to this
@@ -247,50 +243,44 @@ func grepOutputFileAndSanatize(file string, what string) []byte {
 
 func ExampleEnter() {
 	bs := binstat.Enter("~7exampleEnter")                                                  // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })                              // optionlly make it more obvious which code to generate stats for
-	bs.Leave()                                                                             // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+	binstat.Leave(bs)                                                                      // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
 	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter.txt", "exampleEnter")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
 	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnter]=<num> <num> // e.g. utils/binstat_test.ExampleEnter:<num>
 }
 
 func ExampleEnterVal() {
 	bs := binstat.EnterVal("~7exampleEnterVal", 123)                                              // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })                                     // optionlly make it more obvious which code to generate stats for
-	bs.Leave()                                                                                    // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/size[<num>-<num>]=<num>" bin section
+	binstat.Leave(bs)                                                                             // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/size[<num>-<num>]=<num>" bin section
 	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter-val.txt", "exampleEnterVal")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
 	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnterVal]/size[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleEnterVal:<num>
 }
 
 func ExampleEnterTime() {
 	bs := binstat.EnterTime("~7exampleEnterTime")                                                   // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })                                       // optionlly make it more obvious which code to generate stats for
-	bs.Leave()                                                                                      // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/time[<num>-<num>]" bin section
+	binstat.Leave(bs)                                                                               // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/time[<num>-<num>]" bin section
 	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter-time.txt", "exampleEnterTime")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
 	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnterTime]/time[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleEnterTime:<num>
 }
 
 func ExampleEnterTimeVal() {
 	bs := binstat.EnterTimeVal("~7exampleEnterTimeVal", 123)                                               // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })                                              // optionlly make it more obvious which code to generate stats for
-	bs.Leave()                                                                                             // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/time[<num>-<num>]" bin section, (d) creates "/size[<num>-<num>]=<num>" bin section
+	binstat.Leave(bs)                                                                                      // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/time[<num>-<num>]" bin section, (d) creates "/size[<num>-<num>]=<num>" bin section
 	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-enter-time-val.txt", "exampleEnterTimeVal")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
 	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleEnterTimeVal]/size[<num>-<num>]/time[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleEnterTimeVal:<num>
 }
 
-func ExampleBinStat_LeaveVal() {
+func ExampleLeaveVal() {
 	bs := binstat.Enter("~7exampleLeaveVal")                                                      // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })                                     // optionlly make it more obvious which code to generate stats for
-	bs.LeaveVal(123)                                                                              // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/size[<num>-<num>]=<num>" bin section
+	binstat.LeaveVal(bs, 123)                                                                     // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here, (c) creates "/size[<num>-<num>]=<num>" bin section
 	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-leave-val.txt", "exampleLeaveVal")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
-	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleLeaveVal]/size[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleBinStat_LeaveVal:<num>
+	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleLeaveVal]/size[<num>-<num>]=<num> <num> // e.g. utils/binstat_test.ExampleLeaveVal:<num>
 }
 
 // .Debug() only used for debugging binstat
-func ExampleBinStat_Debug() {
-	bs := binstat.Enter("~7exampleDebug")                     // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ }) // optionlly make it more obvious which code to generate stats for
-	bs.Debug("hello world")                                   // only for binstat debbuging, and enabled if env var BINSTAT_VERBOSE set
-	bs.Leave()                                                // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+func ExampleDebug() {
+	bs := binstat.Enter("~7exampleDebug") // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	binstat.Debug(bs, "hello world")      // only for binstat debbuging, and enabled if env var BINSTAT_VERBOSE set
+	binstat.Leave(bs)                     // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
 	// e.g. STDOUT: {"level":"debug","message":"2.918396 71372=pid 18143200=tid utils/binstat_test.ExampleBinStat_Debug:301() // enter in 0.000044 // what[~7exampleDebug] .NumCPU()=8 .GOMAXPROCS(0)=8 .NumGoroutine()=3"}
 	// e.g. STDOUT: {"level":"debug","message":"2.918504 71372=pid 18143200=tid utils/binstat_test.ExampleBinStat_Debug:301() // debug hello world"}
 	// e.g. STDOUT: {"level":"debug","message":"2.918523 71372=pid 18143200=tid utils/binstat_test.ExampleBinStat_Debug:301() // leave in 0.000168 // /GOMAXPROCS=8,CPUS=8/what[~7exampleDebug]=[47]=1 0.000053"}
@@ -299,22 +289,14 @@ func ExampleBinStat_Debug() {
 }
 
 // .DebugParams() only used for debugging binstat
-func ExampleBinStat_DebugParams() {
-	bs := binstat.Enter("~7exampleDebug").DebugParams("foo=1") // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })  // optionlly make it more obvious which code to generate stats for
-	bs.Debug("hello world")                                    // only for debbuging, and enabled if env var BINSTAT_VERBOSE set
-	bs.Leave()                                                 // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
+func ExampleDebugParams() {
+	bs := binstat.Enter("~7exampleDebug") // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
+	binstat.DebugParams(bs, "foo=1")      // only for debbuging, and enabled if env var BINSTAT_VERBOSE set; used to add string representing parameters to debug output
+	binstat.Debug(bs, "hello world")      // only for debbuging, and enabled if env var BINSTAT_VERBOSE set
+	binstat.Leave(bs)                     // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
 	// e.g. STDOUT: {"level":"debug","message":"2.758196 72784=pid 18162115=tid utils/binstat_test.ExampleBinStat_DebugParams:314() // enter in 0.000015 // what[~7exampleDebug] .NumCPU()=8 .GOMAXPROCS(0)=8 .NumGoroutine()=3"}
 	// e.g. STDOUT: {"level":"debug","message":"2.758255 72784=pid 18162119=tid utils/binstat_test.ExampleBinStat_DebugParams:314(foo=1) // debug hello world"}
 	// e.g. STDOUT: {"level":"debug","message":"2.758447 72784=pid 18162119=tid utils/binstat_test.ExampleBinStat_DebugParams:314(foo=1) // leave in 0.000256 // /GOMAXPROCS=8,CPUS=8/what[~7exampleDebug]=[51]=2 0.000306"}
 	fmt.Printf("debug via STDOUT only")
 	// Output: debug via STDOUT only
-}
-
-func ExampleBinStat_Run() {
-	bs := binstat.Enter("~7exampleRun")                                                // only 7 chars copied into bin unless env var set to e.g. BINSTAT_LEN_WHAT=~example=99")
-	bs.Run(func() { /* place code to generate stats for */ })                          // optionlly make it more obvious which code to generate stats for
-	bs.Leave()                                                                         // .Enter*()/.Leave*() creates bin and (a) increments its counter, (b) accumulates its time spent executing code here
-	fmt.Printf("%s", grepOutputFileAndSanatize(".test-example-run.txt", "exampleRun")) // force binstat output & grep & sanitize line; digits to <num> so example test passes
-	// Output: /GOMAXPROCS=<num>,CPUS=<num>/what[~<num>exampleRun]=<num> <num> // e.g. utils/binstat_test.ExampleBinStat_Run:<num>
 }

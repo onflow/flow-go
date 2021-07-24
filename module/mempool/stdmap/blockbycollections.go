@@ -5,7 +5,7 @@ package stdmap
 import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Hold all the missing collections.
@@ -36,19 +36,14 @@ func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollec
 }
 
 func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) error) error {
-	bs1 := binstat.EnterTime("~4lock:w:Backend.Run(BlockByCollections)")
-	bs1.Run(func() {
-		b.Lock()
-	})
-	bs1.Leave()
+	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(BlockByCollections).Run")
+	b.Lock()
+	//binstat.Leave(bs1)
 
-	var err error
-	bs2 := binstat.EnterTime("~7Backend.Run(BlockByCollections)")
-	bs2.Run(func() {
-		defer b.Unlock()
-		err = f(&BlockByCollectionBackdata{&b.Backdata})
-	})
-	bs2.Leave()
+	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(BlockByCollections).Run)")
+	defer b.Unlock()
+	err := f(&BlockByCollectionBackdata{&b.Backdata})
+	//binstat.Leave(bs2)
 
 	if err != nil {
 		return err

@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 func switchv2code(v interface{}) (uint8, error) {
@@ -203,15 +203,11 @@ func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 	}
 
 	// encode the payload
-	var data []byte
-	var err3 error
-	bs := binstat.EnterTime(fmt.Sprintf("%s%s:%d", via, what, code))
-	bs.Run(func() {
-		data, err3 = cborEncMode.Marshal(v)
-	})
-	bs.LeaveVal(int64(len(data)))
+	//bs := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, code)) // e.g. ~3net::wire<1(cbor)CodeEntityRequest:23
+	data, err3 := cborEncMode.Marshal(v)
+	//binstat.LeaveVal(bs, int64(len(data)))
 	if err3 != nil {
-		return nil, 0, fmt.Errorf("could not encode payload: %w", err3)
+		return nil, 0, fmt.Errorf("could not encode cbor payload of type %s: %w", what, err3)
 	}
 
 	return data, code, nil

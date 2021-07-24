@@ -18,34 +18,24 @@ func init() {
 	enterGeneric("", false, 0, 0, false)
 	pointGeneric(nil, "", 0, 0, false)
 	debugGeneric(nil, "", false)
-	bs0 := Enter("~2egEnter").DebugParams("foo")
-	bs0.Run(func() {
-	})
-	bs0.LeaveVal(123)
+	bs0 := Enter("~2egEnter")
+	DebugParams(bs0, "foo")
+	LeaveVal(bs0, 123)
 	enterVal("~2egEnterVal", 123)
 }
 
 func TestBinstatInternal(t *testing.T) {
-	bs1 := Enter("~2egEnter").DebugParams("foo")
-	bs1.Run(func() {
-	})
-	bs1.LeaveVal(123)
+	bs1 := Enter("~2egEnter")
+	DebugParams(bs1, "foo")
+	LeaveVal(bs1, 123)
 
 	bs2 := EnterTimeVal("~2egEnterTimeVal", 123)
-	bs2.Run(func() {
-	})
-	bs2.Point("myPoint")
-	bs2.Run(func() {
-	})
-	bs2.LeaveVal(123)
+	Point(bs2, "myPoint")
+	LeaveVal(bs2, 123)
 
 	bs3 := enterTimeVal("~2egenterTimeValInternal", 123)
-	bs3.Run(func() {
-	})
-	bs3.point("myPoint")
-	bs3.Run(func() {
-	})
-	bs3.leave()
+	point(bs3, "myPoint")
+	leave(bs3)
 
 	var isIntIsFalse bool = false
 

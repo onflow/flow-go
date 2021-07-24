@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
-	"github.com/onflow/flow-go/utils/binstat"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Identifier represents a 32-byte unique identifier for an entity.
@@ -89,14 +89,14 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
-	bs1 := binstat.EnterTime("~6MakeID/Fingerprint")
+	//bs1 := binstat.EnterTime(binstat.BinMakeID + ".??lock.Fingerprint")
 	data := fingerprint.Fingerprint(entity)
-	bs1.LeaveVal(int64(len(data)))
-	bs2 := binstat.EnterTimeVal("~6MakeID/ComputeHash", int64(len(data)))
+	//binstat.LeaveVal(bs1, int64(len(data)))
+	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
 	hasher := hash.NewSHA3_256()
 	hash := hasher.ComputeHash(data)
 	id := HashToID(hash)
-	bs2.Leave()
+	//binstat.Leave(bs2)
 	return id
 }
 
