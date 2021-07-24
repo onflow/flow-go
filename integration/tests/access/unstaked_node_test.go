@@ -30,7 +30,7 @@ type UnstakedAccessSuite struct {
 	unstakedReader *ghostclient.FlowMessageStreamReader
 	stakedID       flow.Identifier
 	unstakedID     flow.Identifier
-	conID          flow.Identifier
+	conIDs         []flow.Identifier
 }
 
 func TestUnstakedAccessSuite(t *testing.T) {
@@ -70,9 +70,13 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	nodeConfigs = append(nodeConfigs, unstakedConfig)
 
 	// consensus node (ghost)
-	suite.conID = unittest.IdentifierFixture()
-	conConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(suite.conID), testnet.AsGhost())
-	nodeConfigs = append(nodeConfigs, conConfig)
+	suite.conIDs = make([]flow.Identifier, 3)
+	for i := 0; i < 3; i++ {
+		conID := unittest.IdentifierFixture()
+		suite.conIDs = append(suite.conIDs, conID)
+		conConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(conID), testnet.AsGhost())
+		nodeConfigs = append(nodeConfigs, conConfig)
+	}
 
 	// execution node (unused)
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.AsGhost())
@@ -98,7 +102,7 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	require.NoError(suite.T(), err, "could not get ghost client")
 	suite.unstakedGhost = client
 
-	conGhost := suite.net.ContainerByID(suite.conID)
+	conGhost := suite.net.ContainerByID(suite.conIDs[0])
 	client, err = common.GetGhostClient(conGhost)
 	require.NoError(suite.T(), err, "could not get ghost client")
 	suite.conGhost = client

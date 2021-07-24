@@ -130,13 +130,10 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		codec := jsoncodec.NewCodec()
 
-		fnb.Logger.Warn().Msg("MY ADDRESSSSS")
 		myAddr := fnb.NodeConfig.Me.Address()
-		fnb.Logger.Warn().Msg(myAddr)
 		if fnb.BaseConfig.BindAddr != NotSet {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
-		fnb.Logger.Warn().Msg(myAddr)
 
 		// setup the Ping provider to return the software version and the sealed block height
 		pingProvider := p2p.PingInfoProviderImpl{
