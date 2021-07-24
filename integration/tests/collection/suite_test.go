@@ -312,7 +312,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
 
-	db, err := node.DB
+	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
 	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
