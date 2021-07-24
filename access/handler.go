@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -464,5 +465,130 @@ func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result
 		BlockHeight:    block.BlockHeight,
 		BlockTimestamp: timestamp,
 		Events:         eventMessages,
+	}, nil
+}
+
+type ExecutionAPIHandler struct {
+	accessAPI API
+	chain     flow.Chain
+}
+
+func NewExecutionAPIHandler(api API, chain flow.Chain) *ExecutionAPIHandler {
+	return &ExecutionAPIHandler{
+		accessAPI: api,
+		chain:     chain,
+	}
+}
+
+func (h *ExecutionAPIHandler) Ping(ctx context.Context, _ *execution.PingRequest) (*execution.PingResponse, error) {
+	err := h.accessAPI.Ping(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution.PingResponse{}, nil
+}
+
+func (h *ExecutionAPIHandler) GetAccountAtBlockID(ctx context.Context, req *execution.GetAccountAtBlockIDRequest) (*execution.GetAccountAtBlockIDResponse, error) {
+	address, err := convert.Address(req.GetAddress(), h.chain)
+	if err != nil {
+		return nil, err
+	}
+
+	blockId, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	account, err := h.accessAPI.GetAccountAtBlockID(ctx, address, blockId)
+	if err != nil {
+		return nil, err
+	}
+
+	accountMsg, err := convert.AccountToMessage(account)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &execution.GetAccountAtBlockIDResponse{
+		Account: accountMsg,
+	}, nil
+}
+
+func (h *ExecutionAPIHandler) ExecuteScriptAtBlockID(
+	ctx context.Context,
+	req *execution.ExecuteScriptAtBlockIDRequest,
+) (*execution.ExecuteScriptAtBlockIDResponse, error) {
+	script := req.GetScript()
+	arguments := req.GetArguments()
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+
+	value, err := h.accessAPI.ExecuteScriptAtBlockID(ctx, blockID, script, arguments)
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution.ExecuteScriptAtBlockIDResponse{
+		Value: value,
+	}, nil
+}
+
+func (h *ExecutionAPIHandler) GetEventsForBlockIDs(
+	ctx context.Context,
+	req *execution.GetEventsForBlockIDsRequest,
+) (*execution.GetEventsForBlockIDsResponse, error) {
+	eventType, err := convert.EventType(req.GetType())
+	if err != nil {
+		return nil, err
+	}
+
+	blockIDs, err := convert.BlockIDs(req.GetBlockIds())
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := h.accessAPI.GetEventsForBlockIDs(ctx, eventType, blockIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	resultEvents := make([]*execution.GetEventsForBlockIDsResponse_Result, len(results))
+
+	for i, block := range results {
+		eventMessages := make([]*entities.Event, len(block.Events))
+		for i, event := range block.Events {
+			eventMessages[i] = convert.EventToMessage(event)
+		}
+
+		resultEvents[i] = &execution.GetEventsForBlockIDsResponse_Result{
+			BlockId:     block.BlockID[:],
+			BlockHeight: block.BlockHeight,
+			Events:      eventMessages,
+		}
+	}
+
+	return &execution.GetEventsForBlockIDsResponse{
+		Results: resultEvents,
+	}, nil
+}
+
+func (h *ExecutionAPIHandler) GetTransactionResult(
+	ctx context.Context,
+	req *execution.GetTransactionResultRequest,
+) (*execution.GetTransactionResultResponse, error) {
+	blockId, err := convert.TransactionID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := h.accessAPI.GetTransactionResult(ctx, blockId)
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution.GetTransactionResultResponse{
+		StatusCode:   uint32(result.StatusCode),
+		ErrorMessage: result.ErrorMessage,
+		Events:       convert.EventsToMessages(result.Events),
 	}, nil
 }

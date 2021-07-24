@@ -252,6 +252,7 @@ func main() {
 				rpcMetricsEnabled,
 				apiRatelimits,
 				apiBurstlimits,
+				nodeBuilder.IsStaked() && nodeBuilder.ParticipatesInUnstakedNetwork(),
 			)
 			return rpcEng, nil
 		}).

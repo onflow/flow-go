@@ -39,7 +39,7 @@ func (b *backendAccounts) GetAccountAtLatestBlock(ctx context.Context, address f
 	// get the block id of the latest sealed header
 	latestBlockID := latestHeader.ID()
 
-	account, err := b.getAccountAtBlockID(ctx, address, latestBlockID)
+	account, err := b.GetAccountAtBlockID(ctx, address, latestBlockID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	// get block ID of the header at the given height
 	blockID := header.ID()
 
-	account, err := b.getAccountAtBlockID(ctx, address, blockID)
+	account, err := b.GetAccountAtBlockID(ctx, address, blockID)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func (b *backendAccounts) GetAccountAtBlockHeight(
 	return account, nil
 }
 
-func (b *backendAccounts) getAccountAtBlockID(
+func (b *backendAccounts) GetAccountAtBlockID(
 	ctx context.Context,
 	address flow.Address,
 	blockID flow.Identifier,

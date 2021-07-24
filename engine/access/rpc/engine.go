@@ -10,6 +10,7 @@ import (
 
 	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
@@ -78,6 +79,7 @@ func New(log zerolog.Logger,
 	rpcMetricsEnabled bool,
 	apiRatelimits map[string]int, // the api rate limit (max calls per second) for each of the Access API e.g. Ping->100, GetTransaction->300
 	apiBurstLimits map[string]int, // the api burst limit (max calls at the same time) for each of the Access API e.g. Ping->50, GetTransaction->10
+	enableExecutionAPI bool,
 ) *Engine {
 
 	log = log.With().Str("engine", "rpc").Logger()
@@ -169,6 +171,13 @@ func New(log zerolog.Logger,
 		eng.secureGrpcServer,
 		access.NewHandler(backend, chainID.Chain()),
 	)
+
+	if enableExecutionAPI {
+		execution.RegisterExecutionAPIServer(
+			eng.unsecureGrpcServer,
+			access.NewExecutionAPIHandler(backend, chainID.Chain()),
+		)
+	}
 
 	if rpcMetricsEnabled {
 		// Not interested in legacy metrics, so initialize here
