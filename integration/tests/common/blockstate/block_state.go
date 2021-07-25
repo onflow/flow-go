@@ -1,4 +1,4 @@
-package common
+package blockstate
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ import (
 const blockStateTimeout = 60 * time.Second
 
 type BlockState struct {
-	sync.Mutex
+	sync.RWMutex
 	blocksByID        map[flow.Identifier]*messages.BlockProposal
 	finalizedByHeight map[uint64]*messages.BlockProposal
 	highestFinalized  uint64
@@ -25,7 +25,7 @@ type BlockState struct {
 
 func NewBlockState() *BlockState {
 	return &BlockState{
-		Mutex:             sync.Mutex{},
+		RWMutex:           sync.RWMutex{},
 		blocksByID:        make(map[flow.Identifier]*messages.BlockProposal),
 		finalizedByHeight: make(map[uint64]*messages.BlockProposal),
 	}
@@ -115,6 +115,9 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.BlockProposal {
 	currentFinalized := bs.highestFinalized
 	require.Eventually(t, func() bool {
+		bs.RLock() // avoiding concurrent map access
+		defer bs.RUnlock()
+
 		fmt.Printf("checking highest finalized: %d, highest proposed: %d\n", bs.highestFinalized, bs.highestProposed)
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
@@ -131,6 +134,9 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T) *messages.BlockProposal {
 	currentProposed := bs.highestProposed
 	require.Eventually(t, func() bool {
+		bs.RLock() // avoiding concurrent map access
+		defer bs.RUnlock()
+
 		return bs.finalizedByHeight[currentProposed+1] != nil
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive finalized block for next block height (%v) within %v seconds", currentProposed+1,
@@ -144,6 +150,9 @@ func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T) *messages.Block
 // height 11, this will wait until block height 12 is finalized
 func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.BlockProposal) *messages.BlockProposal {
 	require.Eventually(t, func() bool {
+		bs.RLock() // avoiding concurrent map access
+		defer bs.RUnlock()
+
 		_, ok := bs.finalizedByHeight[parent.Header.Height+1]
 		return ok
 	}, blockStateTimeout, 100*time.Millisecond,
@@ -156,6 +165,9 @@ func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.Block
 // HighestFinalized returns the highest finalized block after genesis and a boolean indicating whether a highest
 // finalized block exists
 func (bs *BlockState) HighestFinalized() (*messages.BlockProposal, bool) {
+	bs.RLock() // avoiding concurrent map access
+	defer bs.RUnlock()
+
 	if bs.highestFinalized == 0 {
 		return nil, false
 	}
@@ -184,4 +196,12 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 		return nil, false
 	}
 	return bs.highestSealed, true
+}
+
+func (bs *BlockState) FinalizedHeight(currentHeight uint64) (*messages.BlockProposal, bool) {
+	bs.RLock()
+	defer bs.RUnlock()
+
+	blk, ok := bs.finalizedByHeight[currentHeight]
+	return blk, ok
 }
