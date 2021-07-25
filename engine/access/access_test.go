@@ -487,7 +487,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, suite.chainID, metrics, 0, 0, false, false, nil, nil)
+			receipts, suite.chainID, metrics, 0, 0, false, false, nil, nil, false)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
