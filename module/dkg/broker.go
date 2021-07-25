@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/utils/hasher"
 )
 
 // RETRY_MAX is the maximum number of times the broker will attempt to broadcast
@@ -251,7 +250,7 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 		b.dkgInstanceID,
 	)
 	sigData := fingerprint.Fingerprint(dkgMessage)
-	signature, err := b.me.Sign(sigData[:], hasher.NewDKGMessageHasher())
+	signature, err := b.me.Sign(sigData[:], NewDKGMessageHasher())
 	if err != nil {
 		return messages.BroadcastDKGMessage{}, err
 	}
@@ -274,7 +273,7 @@ func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (
 	return origin.StakingPubKey.Verify(
 		bcastMsg.Signature,
 		signData[:],
-		hasher.NewDKGMessageHasher(),
+		NewDKGMessageHasher(),
 	)
 }
 

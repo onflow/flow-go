@@ -1,4 +1,4 @@
-package hasher
+package dkg
 
 import (
 	"github.com/onflow/flow-go/crypto"
