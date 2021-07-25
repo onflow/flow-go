@@ -23,7 +23,7 @@ var machineAccountKeyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(machineAccountKeyCmd)
 
-	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
 }
 
 // machineAccountKeyRun generate a machine account key and writes it to a default file path.

@@ -54,7 +54,7 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
 func TestFinalize_HappyPath(t *testing.T) {
-	deterministicSeed := generateRandomSeed()
+	deterministicSeed := GenerateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
@@ -95,7 +95,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 }
 
 func TestFinalize_Deterministic(t *testing.T) {
-	deterministicSeed := generateRandomSeed()
+	deterministicSeed := GenerateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"
@@ -157,7 +157,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 }
 
 func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
-	deterministicSeed := generateRandomSeed()
+	deterministicSeed := GenerateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
 	rootParent := unittest.StateCommitmentFixture()
 	chainName := "main"

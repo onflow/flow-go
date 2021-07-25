@@ -101,7 +101,7 @@ func addFinalizeCmdFlags() {
 	_ = finalizeCmd.MarkFlagRequired("epoch-staking-phase-length")
 	_ = finalizeCmd.MarkFlagRequired("epoch-dkg-phase-length")
 
-	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", generateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
 
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")

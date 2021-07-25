@@ -42,9 +42,9 @@ func init() {
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information

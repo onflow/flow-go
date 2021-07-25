@@ -25,14 +25,14 @@ func genNetworkAndStakingKeys() []model.NodeInfo {
 	log.Debug().Msg("all node addresses are unique")
 
 	log.Debug().Msgf("will generate %v networking keys for nodes in config", nodes)
-	networkKeys, err := utils.GenerateNetworkingKeys(nodes, generateRandomSeeds(nodes))
+	networkKeys, err := utils.GenerateNetworkingKeys(nodes, GenerateRandomSeeds(nodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate networking keys")
 	}
 	log.Info().Msgf("generated %v networking keys for nodes in config", nodes)
 
 	log.Debug().Msgf("will generate %v staking keys for nodes in config", nodes)
-	stakingKeys, err := utils.GenerateStakingKeys(nodes, generateRandomSeeds(nodes))
+	stakingKeys, err := utils.GenerateStakingKeys(nodes, GenerateRandomSeeds(nodes))
 	if err != nil {
 		log.Fatal().Err(err).Msg("cannot generate staking keys")
 	}

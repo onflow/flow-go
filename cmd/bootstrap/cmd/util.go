@@ -14,25 +14,15 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
-// GenerateRandomSeeds exported wrapper around func to generate seed values used for key generation.
 func GenerateRandomSeeds(n int) [][]byte {
-	return generateRandomSeeds(n)
-}
-
-func generateRandomSeeds(n int) [][]byte {
 	seeds := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
-		seeds = append(seeds, generateRandomSeed())
+		seeds = append(seeds, GenerateRandomSeed())
 	}
 	return seeds
 }
 
-// GenerateRandomSeed exported wrapper around func to generate seed value used for key generation.
 func GenerateRandomSeed() []byte {
-	return generateRandomSeed()
-}
-
-func generateRandomSeed() []byte {
 	seed := make([]byte, randomSeedBytes)
 	if n, err := rand.Read(seed); err != nil || n != randomSeedBytes {
 		log.Fatal().Err(err).Msg("cannot generate random seeds")

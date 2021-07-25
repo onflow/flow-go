@@ -7,7 +7,7 @@ import (
 )
 
 func TestRandomSource_Deterministic(t *testing.T) {
-	seed := generateRandomSeed()
+	seed := GenerateRandomSeed()
 
 	randomSource1 := getRandomSource(seed)
 	randomSource2 := getRandomSource(seed)
