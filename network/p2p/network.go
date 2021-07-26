@@ -303,23 +303,24 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
 func (n *Network) unicast(channel network.Channel, message interface{}, targetID flow.Identifier) error {
-	if targetID == n.me.NodeID() {
-		n.logger.Debug().Msg("network skips self unicasting")
-		return nil
-	}
-
-	// generates network message (encoding) based on list of recipients
-	msg, err := n.genNetworkMessage(channel, message, targetID)
-	if err != nil {
-		return fmt.Errorf("unicast could not generate network message: %w", err)
-	}
-
-	err = n.mw.SendDirect(msg, targetID)
-	if err != nil {
-		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
-	}
-
-	return nil
+	//if targetID == n.me.NodeID() {
+	//	n.logger.Debug().Msg("network skips self unicasting")
+	//	return nil
+	//}
+	//
+	//// generates network message (encoding) based on list of recipients
+	//msg, err := n.genNetworkMessage(channel, message, targetID)
+	//if err != nil {
+	//	return fmt.Errorf("unicast could not generate network message: %w", err)
+	//}
+	//
+	//err = n.mw.SendDirect(msg, targetID)
+	//if err != nil {
+	//	return fmt.Errorf("failed to send message to %x: %w", targetID, err)
+	//}
+	//
+	//return nil
+	return n.publish(channel, message, targetID)
 }
 
 // publish sends the message in an unreliable way to the given recipients.
