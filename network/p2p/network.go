@@ -31,23 +31,23 @@ type ReadyDoneAwareNetwork interface {
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	logger          zerolog.Logger
-	codec           network.Codec
-	ids             flow.IdentityList
-	me              module.Local
-	mw              network.Middleware
-	top             network.Topology // used to determine fanout connections
-	metrics         module.NetworkMetrics
-	rcache          *RcvCache // used to deduplicate incoming messages
-	queue           network.MessageQueue
-	ctx             context.Context
-	cancel          context.CancelFunc
-	subMngr         network.SubscriptionManager // used to keep track of subscribed channels
-	stateTransition sync.Mutex
-	ready           chan struct{}
-	done            chan struct{}
-	started         bool
-	stopped         bool
+	logger            zerolog.Logger
+	codec             network.Codec
+	ids               flow.IdentityList
+	me                module.Local
+	mw                network.Middleware
+	top               network.Topology // used to determine fanout connections
+	metrics           module.NetworkMetrics
+	rcache            *RcvCache // used to deduplicate incoming messages
+	queue             network.MessageQueue
+	ctx               context.Context
+	cancel            context.CancelFunc
+	subMngr           network.SubscriptionManager // used to keep track of subscribed channels
+	stateTransition   sync.Mutex
+	ready             chan struct{}
+	done              chan struct{}
+	startupCommenced  bool
+	shutdownCommenced bool
 	ReadyDoneAwareNetwork
 }
 
@@ -73,19 +73,19 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:          log,
-		codec:           codec,
-		me:              me,
-		mw:              mw,
-		rcache:          rcache,
-		top:             top,
-		metrics:         metrics,
-		subMngr:         sm,
-		ready:           make(chan struct{}),
-		done:            make(chan struct{}),
-		stateTransition: sync.Mutex{},
-		started:         false,
-		stopped:         false,
+		logger:            log,
+		codec:             codec,
+		me:                me,
+		mw:                mw,
+		rcache:            rcache,
+		top:               top,
+		metrics:           metrics,
+		subMngr:           sm,
+		ready:             make(chan struct{}),
+		done:              make(chan struct{}),
+		stateTransition:   sync.Mutex{},
+		startupCommenced:  false,
+		shutdownCommenced: false,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
@@ -103,11 +103,11 @@ func NewNetwork(
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
 	n.stateTransition.Lock()
-	if n.stopped || n.started {
+	if n.shutdownCommenced || n.startupCommenced {
 		n.stateTransition.Unlock()
 		return n.ready
 	}
-	n.started = true
+	n.startupCommenced = true
 	n.stateTransition.Unlock()
 
 	go func() {
@@ -121,23 +121,19 @@ func (n *Network) Ready() <-chan struct{} {
 	return n.ready
 }
 
-// call Ready after done was called -> should return something that never closes
-// call Done right after Ready() is called, but before the ready channel is actually closed: -> waits until ready before closing
-// call done before Ready was called -> closes
-
 // Done returns a channel that will close when shutdown is complete.
 func (n *Network) Done() <-chan struct{} {
 	n.stateTransition.Lock()
-	if n.stopped {
+	if n.shutdownCommenced {
 		n.stateTransition.Unlock()
 		return n.done
 	}
-	n.stopped = true
+	n.shutdownCommenced = true
 	n.stateTransition.Unlock()
 
 	go func() {
 		n.cancel()
-		if n.started {
+		if n.startupCommenced {
 			<-n.ready
 			n.mw.Stop()
 		}
