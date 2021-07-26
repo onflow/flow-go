@@ -24,9 +24,11 @@ const deployArgsFileName = "deploy-epoch-args.json"
 // deployCmd represents a command to ...
 var deployCmd = &cobra.Command{
 	Use:   "deploy-tx-args",
-	Short: "",
-	Long:  "",
-	Run:   deployRun,
+	Short: "Generates `deploy_epoch_relative` transaction arguments and writes it to the working directory this command was run",
+	Long: `The Epoch smart contract is deployed after a spork. The spork contains the initial information for the first epoch.
+	 When we deploy the Epoch smart contract for the first time, we need to ensure the epoch length 
+	 and staking auction length are consistent with the protocol state.`,
+	Run: deployRun,
 }
 
 func init() {
@@ -46,7 +48,7 @@ func addDeployCmdFlags() {
 	_ = deployCmd.MarkFlagRequired("flow-supply-increase-percentage")
 }
 
-// deployRun ...
+// deployRun generates `deploy_epoch_relative` transaction arguments from a root protocol state snapshot and writes it to a JSON file
 // Contract: https://github.com/onflow/flow-core-contracts/blob/master/contracts/epochs/FlowEpoch.cdc
 func deployRun(cmd *cobra.Command, args []string) {
 
@@ -84,7 +86,7 @@ func deployRun(cmd *cobra.Command, args []string) {
 	}
 
 	txArgs := getDeployEpochTransactionArguments(snapshot)
-	log.Info().Msg("extracted `deploy_epoch` transaction arguments from snapshot")
+	log.Info().Msg("extracted `deploy_epoch_relative` transaction arguments from snapshot")
 
 	// ancode to JSON
 	enc, err := epochcmdutil.EncodeArgs(txArgs)
@@ -97,14 +99,13 @@ func deployRun(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
-	log.Info().Str("path", argsPath).Msg("wrote `deploy_epoch` transaction arguments")
+	log.Info().Str("path", argsPath).Msg("wrote `deploy_epoch_relative` transaction arguments")
 
 }
 
-// getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch` transaction from the root
+// getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch_relative` transaction from the root
 // protocol snapshot and takes into any required ajustments to align the state of the contract with the protocol state
 // and returns an array of the cadence representations of the arguments.
-// Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/deploy_epoch.cdc
 func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Value {
 
 	// current epoch
@@ -119,7 +120,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	chainID := head.ChainID
 	systemContracts, err := systemcontracts.SystemContractsForChain(chainID)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get system contracts for chainID")
+		log.Fatal().Err(err).Str("chain_id", chainID.String()).Msgf("could not get system contracts for chainID")
 	}
 
 	// current epoch counter
@@ -180,7 +181,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	)
 }
 
-// convertDeployEpochTransactionArguments converts the `deploy_epoch` transaction arguments to cadence representations
+// convertDeployEpochTransactionArguments converts the `deploy_epoch_relative` transaction arguments to cadence representations
 func convertDeployEpochTransactionArguments(contractName string, contractCode []byte, currentCounter uint64,
 	numViewsInEpoch, numViewsInStakingAuction, numViewsInDKGPhase uint64, numCollectorClusters int,
 	FLOWsupplyIncreasePercentage string, randomSource []byte, clustering flow.ClusterList) []cadence.Value {
