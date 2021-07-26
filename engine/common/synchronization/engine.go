@@ -292,7 +292,8 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) SubmitLocal(event interface{}) {
 	err := e.process(e.me.NodeID(), event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		// receiving an input of incompatible type from a trusted internal component is fatal
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -302,7 +303,15 @@ func (e *Engine) SubmitLocal(event interface{}) {
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	err := e.process(originID, event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		lg := e.log.With().
+			Err(err).
+			Str("channel", channel.String()).
+			Str("origin", originID.String()).
+			Logger()
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			lg.Error().Msg("received message with incompatible type")
+		}
+		lg.Fatal().Msg("internal error processing message")
 	}
 }
 
@@ -318,6 +327,9 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 }
 
 // process processes events for the synchronization engine.
+// Error returns:
+//  * IncompatibleInputTypeError if input has unexpected type
+//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -325,7 +337,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	case *messages.SyncResponse, *messages.BlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
 	}
 }
 
@@ -378,20 +390,17 @@ func (e *Engine) responseProcessingLoop() {
 		case <-e.unit.Quit():
 			return
 		case <-notifier:
-			err := e.processAvailableResponses()
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("internal error processing queued responses")
-			}
+			e.processAvailableResponses()
 		}
 	}
 }
 
 // processAvailableResponses is processor of pending events which drives events from networking layer to business logic.
-func (e *Engine) processAvailableResponses() error {
+func (e *Engine) processAvailableResponses() {
 	for {
 		select {
 		case <-e.unit.Quit():
-			return nil
+			return
 		default:
 		}
 
@@ -411,13 +420,12 @@ func (e *Engine) processAvailableResponses() error {
 
 		// when there is no more messages in the queue, back to the loop to wait
 		// for the next incoming message to arrive.
-		return nil
+		return
 	}
 }
 
 // processAvailableRequests is processor of pending events which drives events from networking layer to business logic.
 func (e *Engine) processAvailableRequests() error {
-
 	for {
 		select {
 		case <-e.unit.Quit():
@@ -429,7 +437,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
 			if err != nil {
-				engine.LogError(e.log, err)
+				return fmt.Errorf("processing sync request failed: %w", err)
 			}
 			continue
 		}
@@ -438,7 +446,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
 			if err != nil {
-				engine.LogError(e.log, err)
+				return fmt.Errorf("processing range request failed: %w", err)
 			}
 			continue
 		}
@@ -447,7 +455,7 @@ func (e *Engine) processAvailableRequests() error {
 		if ok {
 			err := e.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
 			if err != nil {
-				engine.LogError(e.log, err)
+				return fmt.Errorf("processing batch request failed: %w", err)
 			}
 			continue
 		}
@@ -480,9 +488,9 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 	}
 	err := e.con.Unicast(res, originID)
 	if err != nil {
-		return fmt.Errorf("could not send sync response: %w", err)
+		e.log.Warn().Err(err).Msg("sending sync response failed")
+		return nil
 	}
-
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
 
 	return nil
@@ -490,14 +498,12 @@ func (e *Engine) onSyncRequest(originID flow.Identifier, req *messages.SyncReque
 
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
-
 	final := e.finalSnapshot().head
 	e.core.HandleHeight(final, res.Height)
 }
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
-
 	// get the latest final state to know if we can fulfill the request
 	head := e.finalSnapshot().head
 
@@ -533,9 +539,9 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	}
 	err := e.con.Unicast(res, originID)
 	if err != nil {
-		return fmt.Errorf("could not send range response: %w", err)
+		e.log.Warn().Err(err).Hex("origin_id", originID).Msg("sending range response failed")
+		return nil
 	}
-
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
 	return nil
@@ -543,7 +549,6 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
-
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
@@ -582,9 +587,9 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	}
 	err := e.con.Unicast(res, originID)
 	if err != nil {
-		return fmt.Errorf("could not send batch response: %w", err)
+		e.log.Warn().Err(err).Hex("origin_id", originID).Msg("sending batch response failed")
+		return nil
 	}
-
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
 	return nil
@@ -628,18 +633,11 @@ CheckLoop:
 		case <-e.unit.Quit():
 			break CheckLoop
 		case <-pollChan:
-			err := e.pollHeight()
-			if err != nil {
-				e.log.Error().Err(err).Msg("could not poll heights")
-			}
-
+			e.pollHeight()
 		case <-scan.C:
 			snapshot := e.finalSnapshot()
 			ranges, batches := e.core.ScanPending(snapshot.head)
-			err := e.sendRequests(snapshot.participants, ranges, batches)
-			if err != nil {
-				e.log.Error().Err(err).Msg("could not send requests")
-			}
+			e.sendRequests(snapshot.participants, ranges, batches)
 		}
 	}
 
@@ -648,8 +646,7 @@ CheckLoop:
 }
 
 // pollHeight will send a synchronization request to three random nodes.
-func (e *Engine) pollHeight() error {
-
+func (e *Engine) pollHeight() {
 	snapshot := e.finalSnapshot()
 
 	// send the request for synchronization
@@ -659,18 +656,16 @@ func (e *Engine) pollHeight() error {
 	}
 	err := e.con.Multicast(req, synccore.DefaultPollNodes, snapshot.participants.NodeIDs()...)
 	if err != nil {
-		return fmt.Errorf("could not send sync request: %w", err)
+		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
+		return
 	}
-
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
-
-	return err
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
-func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Range, batches []flow.Batch) error {
+func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Range, batches []flow.Batch) {
+	var errs *multierror.Error
 
-	var errs error
 	for _, ran := range ranges {
 		req := &messages.RangeRequest{
 			Nonce:      rand.Uint64(),
@@ -705,5 +700,7 @@ func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Rang
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 	}
 
-	return errs
+	if err := errs.ErrorOrNil(); err != nil {
+		e.log.Warn().Err(err).Msg("sending range and batch requests failed")
+	}
 }

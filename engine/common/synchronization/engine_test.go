@@ -216,7 +216,8 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Height)
-	ss.e.onSyncResponse(originID, res)
+	err := ss.e.onSyncResponse(originID, res)
+	ss.Assert().Nil(err)
 	ss.core.AssertExpectations(ss.T())
 }
 
@@ -366,7 +367,8 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	},
 	)
 
-	ss.e.onBlockResponse(originID, res)
+	err := ss.e.onBlockResponse(originID, res)
+	ss.Assert().Nil(err)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
