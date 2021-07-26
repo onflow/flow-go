@@ -79,7 +79,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 	txArgs := extractResetEpochArgs(snapshot)
 	log.Info().Msg("extracted resetEpoch transaction arguments from snapshot")
 
-	// ancode to JSON
+	// encode to JSON
 	enc, err := epochcmdutil.EncodeArgs(txArgs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not encode epoch transaction arguments")
