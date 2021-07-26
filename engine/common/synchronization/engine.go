@@ -587,7 +587,7 @@ func (e *Engine) onBatchRequest(originID flow.Identifier, req *messages.BatchReq
 	}
 	err := e.con.Unicast(res, originID)
 	if err != nil {
-		e.log.Warn().Err(err).Msg("sending batch response failed")
+		e.log.Warn().Err(err).Hex("origin_id", originID).Msg("sending batch response failed")
 		return nil
 	}
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
