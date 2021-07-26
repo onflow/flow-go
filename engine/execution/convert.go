@@ -5,7 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
-	storagemodel "github.com/onflow/flow-go/storage/model"
+	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
@@ -13,7 +13,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	startState flow.StateCommitment,
 	result *ComputationResult) (
 	endState flow.StateCommitment,
-	chdps []*storagemodel.StoredChunkDataPack,
+	chdps []*flow.ChunkDataPack,
 	executionResult *flow.ExecutionResult,
 	err error,
 ) {
@@ -24,7 +24,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 	blockID := block.ID()
 
 	chunks := make([]*flow.Chunk, len(result.StateCommitments))
-	chdps = make([]*storagemodel.StoredChunkDataPack, len(result.StateCommitments))
+	chdps = make([]*flow.ChunkDataPack, len(result.StateCommitments))
 
 	// TODO: check current state root == startState
 	endState = startState
@@ -38,12 +38,13 @@ func GenerateExecutionResultAndChunkDataPacks(
 		if i < len(result.StateCommitments)-1 {
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
-			collectionID := completeCollection.Collection().ID()
+			collection := completeCollection.Collection()
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint16(len(completeCollection.Transactions)))
-			chdps[i] = GenerateStoredChunkDataPack(chunk, &collectionID, result.Proofs[i])
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
 		} else {
+			// system chunk
 			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1) // for system chunk
-			chdps[i] = GenerateStoredChunkDataPack(chunk, nil, result.Proofs[i])
+			chdps[i] = GenerateSystemChunkDataPack(chunk.ID(), startState, result.Proofs[i])
 		}
 
 		// eventsHash := result.EventsHashes[i]
@@ -109,20 +110,6 @@ func GenerateChunk(colIndex int,
 		},
 		Index:    uint64(colIndex),
 		EndState: endState,
-	}
-}
-
-// GenerateStoredChunkDataPack generates a stored chunk data pack for persisting in storage.
-func GenerateStoredChunkDataPack(
-	chunk *flow.Chunk,
-	collectionID *flow.Identifier,
-	proof flow.StorageProof,
-) *storagemodel.StoredChunkDataPack {
-	return &storagemodel.StoredChunkDataPack{
-		ChunkID:      chunk.ID(),
-		StartState:   chunk.StartState,
-		Proof:        proof,
-		CollectionID: collectionID,
 	}
 }
 
