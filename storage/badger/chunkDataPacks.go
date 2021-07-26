@@ -9,9 +9,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
+	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
-	storagemodel "github.com/onflow/flow-go/storage/model"
 )
 
 type ChunkDataPacks struct {
@@ -49,8 +49,9 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCa
 	return &ch
 }
 
-func (ch *ChunkDataPacks) Store(c *storagemodel.StoredChunkDataPack) error {
-	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(c.ChunkID, c))
+func (ch *ChunkDataPacks) Store(c *flow.ChunkDataPack) error {
+	sc := toStoredChunkDataPack(c)
+	err := operation.RetryOnConflictTx(ch.db, transaction.Update, ch.byChunkIDCache.PutTx(sc.ChunkID, sc))
 	if err != nil {
 		return fmt.Errorf("could not store chunk datapack: %w", err)
 	}
@@ -67,12 +68,13 @@ func (ch *ChunkDataPacks) Remove(chunkID flow.Identifier) error {
 	return nil
 }
 
-func (ch *ChunkDataPacks) BatchStore(c *storagemodel.StoredChunkDataPack, batch storage.BatchStorage) error {
+func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchStorage) error {
+	sc := toStoredChunkDataPack(c)
 	writeBatch := batch.GetWriter()
 	batch.OnSucceed(func() {
-		ch.byChunkIDCache.Insert(c.ChunkID, c)
+		ch.byChunkIDCache.Insert(sc.ChunkID, sc)
 	})
-	return operation.BatchInsertChunkDataPack(c)(writeBatch)
+	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*storagemodel.StoredChunkDataPack, error) {
@@ -89,4 +91,20 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 		}
 		return val.(*storagemodel.StoredChunkDataPack), nil
 	}
+}
+
+func toStoredChunkDataPack(c *flow.ChunkDataPack) *storagemodel.StoredChunkDataPack {
+	sc := &storagemodel.StoredChunkDataPack{
+		ChunkID:    c.ChunkID,
+		StartState: c.StartState,
+		Proof:      c.Proof,
+	}
+
+	if c.Collection != nil {
+		// non-system chunks have a non-nil collection
+		collectionID := c.Collection.ID()
+		sc.CollectionID = &collectionID
+	}
+
+	return sc
 }
