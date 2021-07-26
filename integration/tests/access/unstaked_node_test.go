@@ -128,6 +128,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 		Payload: block.Payload,
 	}
 
+	// Send block proposal fron consensus node to staked AN
 	suite.conGhost.Send(suite.ctx, engine.PushBlocks, proposal, suite.stakedID)
 
 	m := make(chan interface{})
@@ -139,6 +140,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 		m <- msg
 	}()
 
+	// Check that the unstaked AN receives the message
 	select {
 	case msg := <-m:
 		suite.Assert().Equal(msg, proposal)
@@ -147,8 +149,9 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	}
 
 	// TODO: Since the staked AN follower engine will perform validation on received blocks,
-	// the following check may not work unless we send a block with ParentID equal to the
-	// root block ID (suite.net.Root().ID())
+	// the following check may not work unless we send a "valid" block. In particular we will
+	// probably at least need to generate a block with ParentID equal to the root block ID
+	// (suite.net.Root().ID())
 
 	// chain := suite.net.Root().Header.ChainID.Chain()
 
