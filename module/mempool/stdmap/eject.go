@@ -64,37 +64,29 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	// Now, mapIndexes is a sequentially sorted list of indexes to remove.
 	...
 
-	var entityID flow.Identifier
-	var entity flow.Entity
-
-	// Now, mapIndexes has a sequentially sorted set of indexes to remove.
-	// Remove them in a loop.  If there are duplicate random indexes to remove,
-	// they are ignored.  If a random index is over the limit, it is ignored,
-	// the next call will make up for it.
-	i = 0
-	idx := 0 // index into mapIndexes
-
-	for entityID, entity = range entities {
-		// if the map index is a duplicate, 'i' could be greater
-		if int64(i) >= mapIndexes[idx] {
-			// remove this entry here
-			delete(entities, entityID)
-
-			// notify callback
+	// Now, mapIndices is a sequentially sorted list of indices to remove.
+	// Remove them in a loop. Repeated indices are idempotent (subsequent
+	// ejection calls will make up for it).
+	idx := 0                     // index into mapIndexes
+	next2Remove := mapIndices[0] // index of the element to be removed next
+	i := 0
+	for entityID, entity := range b.entities {
+		if i == next2Remove {
+			delete(b.entities, entityID) // remove entity
 			for _, callback := range b.ejectionCallbacks {
-				callback(entity)
+				callback(entity) // notify callback
 			}
 
-			// increment the index
-			idx++
-			if idx >= batchSize {
-				break
+			// move to next entry in mapIndices that is _not_ a duplicate
+			for dup := true; dup; dup = next2Remove == mapIndices[idx] {
+				idx++
+				if idx == overcapacity {
+					return
+				}
 			}
+			next2Remove = mapIndices[idx]
 		}
-		i++
 	}
-
-	return retval, nil, false
 }
 
 // EjectPanic simply panics, crashing the program. Useful when cache is not expected
