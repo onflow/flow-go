@@ -27,8 +27,7 @@ transaction(name: String,
     let adjustedNumViewsInEpoch = numViewsInEpoch - currentBlock.view
 
     // The epoch smart contract computes the stakingEndView like currentBlock.view+numViewsInStakingAuction
-    // We adjust the numViewsInStakingAuction value based of the view of the current block when the contract 
-    // is deployed.
+    // We adjust the numViewsInStakingAuction value based of the view of the current block when the contract is deployed.
     // ASSUMPTION: first view after the spork is 0
     let adjustedNumViewsInStakingAuction = numViewsInStakingAuction - currentBlock.view
 

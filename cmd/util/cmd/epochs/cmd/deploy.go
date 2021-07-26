@@ -100,7 +100,6 @@ func deployRun(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
 	log.Info().Str("path", argsPath).Msg("wrote `deploy_epoch_relative` transaction arguments")
-
 }
 
 // getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch_relative` transaction from the root
@@ -233,10 +232,6 @@ func convertDeployEpochTransactionArguments(contractName string, contractCode []
 		log.Fatal().Err(err).Msgf("could not convert `randomSource` to cadence representation")
 	}
 	args = append(args, cdcRandomSource)
-
-	// add collector clusters, note: we don't actually need the exact clusters, an empty list will suffice
-	cdcCollectorClusters := cadence.NewArray([]cadence.Value{})
-	args = append(args, cdcCollectorClusters)
 
 	return args
 }
