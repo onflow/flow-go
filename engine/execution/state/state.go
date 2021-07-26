@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	storagemodel "github.com/onflow/flow-go/storage/model"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -42,7 +41,7 @@ type ReadOnlyExecutionState interface {
 	StateCommitmentByBlockID(context.Context, flow.Identifier) (flow.StateCommitment, error)
 
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
-	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*storagemodel.StoredChunkDataPack, error)
+	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
 
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
@@ -65,7 +64,8 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*storagemodel.StoredChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack,
+		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
 
 const (
@@ -306,8 +306,23 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 	return s.commits.ByBlockID(blockID)
 }
 
-func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*storagemodel.StoredChunkDataPack, error) {
-	return s.chunkDataPacks.ByChunkID(chunkID)
+func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
+	storedChunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
+	}
+
+	collection, err := s.GetCollection(*storedChunkDataPack.CollectionID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve collection for chunk data pack: %w", err)
+	}
+
+	return &flow.ChunkDataPack{
+		ChunkID:    storedChunkDataPack.ChunkID,
+		StartState: storedChunkDataPack.StartState,
+		Proof:      storedChunkDataPack.Proof,
+		Collection: collection,
+	}, nil
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
@@ -321,7 +336,9 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*storagemodel.StoredChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error {
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
