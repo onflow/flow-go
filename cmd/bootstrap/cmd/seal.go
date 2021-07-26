@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"encoding/binary"
 	"encoding/hex"
-	"math/rand"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/dkg"
@@ -71,13 +69,12 @@ func constructRootResultAndSeal(
 // bootstrapping files are deterministic across runs for the same inputs.
 func getRandomSource(seed []byte) []byte {
 
-	seedInt := int64(binary.BigEndian.Uint64(seed))
-	rng := rand.New(rand.NewSource(seedInt))
-	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
-	_, err := rng.Read(randomSource)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not generate random source for epoch setup event")
+	if len(seed) < flow.EpochSetupRandomSourceLength {
+		log.Fatal().Msgf("seed length is smaller than required random source length (%d < %d)", len(seed), flow.EpochSetupRandomSourceLength)
 	}
+
+	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
+	copy(randomSource, seed)
 
 	return randomSource
 }
