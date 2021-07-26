@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -32,22 +31,23 @@ type ReadyDoneAwareNetwork interface {
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	logger  zerolog.Logger
-	codec   network.Codec
-	ids     flow.IdentityList
-	me      module.Local
-	mw      network.Middleware
-	top     network.Topology // used to determine fanout connections
-	metrics module.NetworkMetrics
-	rcache  *RcvCache // used to deduplicate incoming messages
-	queue   network.MessageQueue
-	ctx     context.Context
-	cancel  context.CancelFunc
-	subMngr network.SubscriptionManager // used to keep track of subscribed channels
-	ready   chan struct{}
-	done    chan struct{}
-	started uint32
-	stopped uint32
+	logger            zerolog.Logger
+	codec             network.Codec
+	ids               flow.IdentityList
+	me                module.Local
+	mw                network.Middleware
+	top               network.Topology // used to determine fanout connections
+	metrics           module.NetworkMetrics
+	rcache            *RcvCache // used to deduplicate incoming messages
+	queue             network.MessageQueue
+	ctx               context.Context
+	cancel            context.CancelFunc
+	subMngr           network.SubscriptionManager // used to keep track of subscribed channels
+	stateTransition   sync.Mutex
+	ready             chan struct{}
+	done              chan struct{}
+	startupCommenced  bool
+	shutdownCommenced bool
 	ReadyDoneAwareNetwork
 }
 
@@ -73,18 +73,19 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:  log,
-		codec:   codec,
-		me:      me,
-		mw:      mw,
-		rcache:  rcache,
-		top:     top,
-		metrics: metrics,
-		subMngr: sm,
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		started: 0,
-		stopped: 0,
+		logger:            log,
+		codec:             codec,
+		me:                me,
+		mw:                mw,
+		rcache:            rcache,
+		top:               top,
+		metrics:           metrics,
+		subMngr:           sm,
+		ready:             make(chan struct{}),
+		done:              make(chan struct{}),
+		stateTransition:   sync.Mutex{},
+		startupCommenced:  false,
+		shutdownCommenced: false,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
@@ -101,27 +102,44 @@ func NewNetwork(
 
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
+	n.stateTransition.Lock()
+	if n.shutdownCommenced || n.startupCommenced {
+		n.stateTransition.Unlock()
+		return n.ready
+	}
+	n.startupCommenced = true
+	n.stateTransition.Unlock()
+
 	go func() {
-		if atomic.CompareAndSwapUint32(&n.started, 0, 1) {
-			err := n.mw.Start(n)
-			if err != nil {
-				n.logger.Fatal().Err(err).Msg("failed to start middleware")
-			}
-			close(n.ready)
+		err := n.mw.Start(n)
+		if err != nil {
+			n.logger.Fatal().Err(err).Msg("failed to start middleware")
 		}
+		close(n.ready)
 	}()
+
 	return n.ready
 }
 
 // Done returns a channel that will close when shutdown is complete.
 func (n *Network) Done() <-chan struct{} {
+	n.stateTransition.Lock()
+	if n.shutdownCommenced {
+		n.stateTransition.Unlock()
+		return n.done
+	}
+	n.shutdownCommenced = true
+	n.stateTransition.Unlock()
+
 	go func() {
-		if atomic.CompareAndSwapUint32(&n.stopped, 0, 1) {
-			n.cancel()
+		n.cancel()
+		if n.startupCommenced {
+			<-n.ready
 			n.mw.Stop()
-			close(n.done)
 		}
+		close(n.done)
 	}()
+
 	return n.done
 }
 
