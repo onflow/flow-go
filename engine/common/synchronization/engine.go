@@ -539,7 +539,7 @@ func (e *Engine) onRangeRequest(originID flow.Identifier, req *messages.RangeReq
 	}
 	err := e.con.Unicast(res, originID)
 	if err != nil {
-		e.log.Warn().Err(err).Msg("sending range response failed")
+		e.log.Warn().Err(err).Hex("origin_id", originID).Msg("sending range response failed")
 		return nil
 	}
 	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
