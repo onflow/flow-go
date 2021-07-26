@@ -129,7 +129,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	}
 
 	// epoch contract name and get code for contract
-	epochContractName := "FlowEpoch"
+	epochContractName := systemcontracts.ContractNameEpoch
 	epochContractCode := contracts.FlowEpoch(flagFungibleTokenAddress,
 		flagFlowTokenAddress, flagIDTableAddress,
 		systemContracts.ClusterQC.Address.Hex(), systemContracts.DKG.Address.Hex())
