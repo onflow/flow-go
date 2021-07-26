@@ -69,6 +69,18 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 	return infos
 }
 
+// filterContainerConfigs filters a list of container configs.
+func filterContainerConfigs(confs []ContainerConfig, shouldInclude func(ContainerConfig) bool) []ContainerConfig {
+	filtered := make([]ContainerConfig, 0, len(confs))
+	for _, conf := range confs {
+		if !shouldInclude(conf) {
+			continue
+		}
+		filtered = append(filtered, conf)
+	}
+	return filtered
+}
+
 func getSeed() ([]byte, error) {
 	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLenBLSBLS12381))
 	seed := make([]byte, seedLen)

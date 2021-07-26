@@ -41,16 +41,19 @@ const (
 )
 
 var (
-	collectionCount     int
-	consensusCount      int
-	executionCount      int
-	verificationCount   int
-	accessCount         int
-	unstakedAccessCount int
-	nClusters           uint
-	profiler            bool
-	consensusDelay      time.Duration
-	collectionDelay     time.Duration
+	collectionCount        int
+	consensusCount         int
+	executionCount         int
+	verificationCount      int
+	accessCount            int
+	unstakedAccessCount    int
+	nClusters              uint
+	numViewsInStakingPhase uint64
+	numViewsInDKGPhase     uint64
+	numViewsEpoch          uint64
+	profiler               bool
+	consensusDelay         time.Duration
+	collectionDelay        time.Duration
 )
 
 func init() {
@@ -61,6 +64,9 @@ func init() {
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
 	flag.IntVar(&unstakedAccessCount, "unstaked-access", DefaultUnstakedAccessCount, "number of un-staked access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
+	flag.Uint64Var(&numViewsEpoch, "epoch-length", 0, "number of views in epoch")
+	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 0, "number of views in epoch staking phase")
+	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 0, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -81,7 +87,23 @@ func main() {
 
 	nodes := prepareNodes()
 
-	conf := testnet.NewNetworkConfig("localnet", nodes, testnet.WithClusters(nClusters))
+	opts := []testnet.NetworkConfigOpt{testnet.WithClusters(nClusters)}
+	if numViewsEpoch != 0 {
+		opts = append(opts, testnet.WithViewsInEpoch(numViewsEpoch))
+	}
+	if numViewsInStakingPhase != 0 {
+		opts = append(opts, testnet.WithViewsInStakingAuction(numViewsInStakingPhase))
+	}
+	if numViewsInDKGPhase != 0 {
+		opts = append(opts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
+	}
+	conf := testnet.NewNetworkConfig("localnet", nodes, opts...)
+
+	fmt.Printf("Network config:\n")
+	fmt.Printf("- Clusters: %d\n", conf.NClusters)
+	fmt.Printf("- Epoch Length: %d\n", conf.ViewsInEpoch)
+	fmt.Printf("- Staking Phase Length: %d\n", conf.ViewsInStakingAuction)
+	fmt.Printf("- DKG Phase Length: %d\n", conf.ViewsInDKGPhase)
 
 	err := os.RemoveAll(BootstrapDir)
 	if err != nil && !os.IsNotExist(err) {
@@ -235,10 +257,10 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	for _, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
-			services[container.ContainerName] = prepareConsensusService(container, numConsensus)
+			services[container.ContainerName] = prepareConsensusService(container, numConsensus, "localnet_access_1_1:9000")
 			numConsensus++
 		case flow.RoleCollection:
-			services[container.ContainerName] = prepareCollectionService(container, numCollection)
+			services[container.ContainerName] = prepareCollectionService(container, numCollection, "localnet_access_1_1:9000")
 			numCollection++
 		case flow.RoleExecution:
 			services[container.ContainerName] = prepareExecutionService(container, numExecution)
@@ -315,7 +337,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
+func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -326,6 +348,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
+		fmt.Sprintf("--access-address=%s", accessAddress),
 	)
 
 	return service
@@ -342,7 +365,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
+func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -352,6 +375,7 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--access-address=%s", accessAddress),
 	)
 
 	return service
