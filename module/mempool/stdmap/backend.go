@@ -101,19 +101,19 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	ejectionTrigger   uint
-	eject             EjectFunc
-	ejectionCallbacks []mempool.OnEjection
+	guaranteedCapacity uint
+	eject              EjectFunc
+	ejectionCallbacks  []mempool.OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
 // This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata:          NewBackdata(),
-		ejectionTrigger:   uint(math.MaxUint32),
-		eject:             EjectTrueRandomFast,
-		ejectionCallbacks: nil,
+		Backdata:           NewBackdata(),
+		guaranteedCapacity: uint(math.MaxUint32),
+		eject:              EjectTrueRandomFast,
+		ejectionCallbacks:  nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -180,7 +180,7 @@ func (b *Backend) Size() uint {
 
 // Limit returns the maximum number of items allowed in the backend.
 func (b *Backend) Limit() uint {
-	return b.ejectionTrigger
+	return b.guaranteedCapacity
 }
 
 // All returns all entities from the pool.
@@ -218,7 +218,7 @@ func (b *Backend) reduce() {
 	// this was a loop, but the loop is now in EjectTrueRandomFast()
 	// the ejections are batched, so this call to eject() may not actually
 	// do anything until the batch threshold is reached (currently 128)
-	if len(b.entities) > int(b.ejectionTrigger) {
+	if len(b.entities) > int(b.guaranteedCapacity) {
 		// get the key from the eject function
 		// revert to prior commits if this eject function is not
 		// EjectTrueRandomFast

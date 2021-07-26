@@ -5,10 +5,15 @@ package stdmap
 import (
 	"math"
 	"math/rand"
+	"sort"
 	"sync"
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+// this is the threshold for how much over the guaranteed capacity the
+// collection should be before performing a batch ejection
+const overCapacityThreshold = 128
 
 // EjectFunc is a function used to pick an entity to evict from the memory pool
 // backend when it overflows its limit. A custom eject function can be injected
@@ -40,19 +45,20 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 // entries if that is the case.  Return values are unused, but
 // necessary because the LRUEjector is using the EjectTrueRandom
 func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
+	var identifier flow.Identifier
+	var entity flow.Entity
+
 	currentSize := len(b.entities)
+
 	if b.guaranteedCapacity >= uint(currentSize) {
-		return false
+		return identifier, entity, false
 	}
 	// At this point, we know that currentSize > b.guaranteedCapacity. As
-	// currentSize fits into an int, b.guaranteedCapacity must also fit. 
+	// currentSize fits into an int, b.guaranteedCapacity must also fit.
 	overcapacity := currentSize - int(b.guaranteedCapacity)
-	if overcapacity <= overcapacityThreshold {
-		return false
+	if overcapacity <= overCapacityThreshold {
+		return identifier, entity, false
 	}
-	
-	// Randomly select indices of elements to remove:
-	...
 
 	// Randomly select indices of elements to remove:
 	mapIndices := make([]int, 0, overcapacity)
@@ -60,16 +66,13 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 		mapIndices = append(mapIndices, rand.Intn(currentSize))
 	}
 	sort.Ints(mapIndices) // inplace
-	
-	// Now, mapIndexes is a sequentially sorted list of indexes to remove.
-	...
 
 	// Now, mapIndices is a sequentially sorted list of indices to remove.
 	// Remove them in a loop. Repeated indices are idempotent (subsequent
 	// ejection calls will make up for it).
-	idx := 0                     // index into mapIndexes
+	idx := 0                     // index into mapIndices
 	next2Remove := mapIndices[0] // index of the element to be removed next
-	i := 0
+	i := 0                       // index into the entities map
 	for entityID, entity := range b.entities {
 		if i == next2Remove {
 			delete(b.entities, entityID) // remove entity
@@ -77,16 +80,22 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 				callback(entity) // notify callback
 			}
 
-			// move to next entry in mapIndices that is _not_ a duplicate
-			for dup := true; dup; dup = next2Remove == mapIndices[idx] {
-				idx++
-				if idx == overcapacity {
-					return
-				}
+			idx++
+
+			// There is a (1 in b.guaranteedCapacity) chance that the
+			// next value in mapIndices is a duplicate. If a duplicate is
+			// found, skip it by incrementing 'idx'
+			for ; next2Remove == mapIndices[idx] && idx < overcapacity; idx++ {
+			}
+
+			if idx == overcapacity {
+				return identifier, entity, true
 			}
 			next2Remove = mapIndices[idx]
 		}
+		i++
 	}
+	return identifier, entity, true
 }
 
 // EjectPanic simply panics, crashing the program. Useful when cache is not expected
@@ -123,7 +132,7 @@ func (q *LRUEjector) Track(entityID flow.Identifier) {
 	// TODO current table structure provides O(1) track and untrack features
 	// however, the Eject functionality is asymptotically O(n).
 	// With proper resource cleanups by the mempools, the Eject is supposed
-	// as a very less frequent operation. However, further optimizations on
+	// as a very infrequent operation. However, further optimizations on
 	// Eject efficiency is needed.
 	q.table[entityID] = q.seqNum
 	q.seqNum++
@@ -138,7 +147,7 @@ func (q *LRUEjector) Untrack(entityID flow.Identifier) {
 }
 
 // Eject implements EjectFunc for LRUEjector. It finds the entity with the lowest sequence number (i.e.,
-//the oldest entity). It also untracks
+//the oldest entity). It also untracks.  Warning:  this is using a linear search
 func (q *LRUEjector) Eject(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	q.Lock()
 	defer q.Unlock()

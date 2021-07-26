@@ -11,7 +11,7 @@ type OptionFunc func(*Backend)
 // to rise by the threshold for batch ejection (currently 128)
 func WithLimit(limit uint) OptionFunc {
 	return func(be *Backend) {
-		be.ejectionTrigger = limit
+		be.guaranteedCapacity = limit
 	}
 }
 
