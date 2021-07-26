@@ -27,7 +27,9 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 	for i := 0; i < 10000; i++ {
 		tx.Script = append(tx.Script, '/', '/')
 
-		after(&tx)
+		if after != nil {
+			after(&tx)
+		}
 		routed, ok := clusters.ByTxID(tx.ID())
 		if !ok {
 			panic(fmt.Sprintf("unable to find cluster by txID: %x", tx.ID()))

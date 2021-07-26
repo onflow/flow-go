@@ -80,6 +80,14 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 	}
 }
 
+// NoopBlockFinder implements the Blocks interface. It is used in the
+// bootstrapping process.
+type NoopBlockFinder struct{}
+
+func (f *NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.Header) (*flow.Header, error) {
+	return nil, nil
+}
+
 func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
 	return runtime.Block{
 		Height:    header.Height,
