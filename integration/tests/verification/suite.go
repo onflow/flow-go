@@ -126,7 +126,13 @@ func (s *Suite) SetupSuite() {
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
-	netConfig := testnet.NewNetworkConfig("verification_tests", s.nodeConfigs)
+	netConfig := testnet.NewNetworkConfig(
+		"verification_tests",
+		s.nodeConfigs,
+		// set long staking phase to avoid QC/DKG transactions during test run
+		testnet.WithViewsInStakingAuction(10_000),
+		testnet.WithViewsInEpoch(100_000),
+	)
 
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
 

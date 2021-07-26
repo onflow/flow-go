@@ -73,7 +73,7 @@ func (i ScriptInvocator) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := newEnvironment(ctx, vm, sth, programs)
+	env := NewScriptEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
@@ -91,7 +91,7 @@ func (i ScriptInvocator) Process(
 	}
 
 	proc.Value = value
-	proc.Logs = env.getLogs()
+	proc.Logs = env.Logs()
 	proc.Events = env.Events()
 	proc.GasUsed = env.GetComputationUsed()
 	return nil
