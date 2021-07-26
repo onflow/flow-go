@@ -40,7 +40,7 @@ const (
 const (
 
 	// defines maximum message size in publish and multicast modes
-	DefaultMaxPubSubMsgSize = 5 * mb // 5 mb
+	DefaultMaxPubSubMsgSize = 10 * mb // 5 mb
 
 	// defines maximum message size in unicast mode for most messages
 	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
