@@ -81,7 +81,6 @@ func main() {
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
 		rpcMetricsEnabled            bool
-		unstakedNetwork              p2p.ReadyDoneAwareNetwork
 	)
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
