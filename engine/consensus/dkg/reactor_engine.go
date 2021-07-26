@@ -29,8 +29,8 @@ type dkgInfo struct {
 	phase1FinalView uint64
 	phase2FinalView uint64
 	phase3FinalView uint64
-        // seed must be generated for each DKG instance, using a randomness source that is independent from all other nodes. 
-	seed            []byte
+	// seed must be generated for each DKG instance, using a randomness source that is independent from all other nodes.
+	seed []byte
 }
 
 // ReactorEngine is an engine that reacts to chain events to start new DKG runs,

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -84,14 +83,29 @@ func deployRun(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not convert array of bytes to snapshot")
 	}
 
-	fmt.Printf("%v, %v", argsPath, snapshot)
+	txArgs := getDeployEpochTransactionArguments(snapshot)
+	log.Info().Msg("extracted `deploy_epoch` transaction arguments from snapshot")
+
+	// ancode to JSON
+	enc, err := epochcmdutil.EncodeArgs(txArgs)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not encode epoch transaction arguments")
+	}
+
+	// write JSON args to file
+	err = io.WriteFile(argsPath, enc)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
+	}
+	log.Info().Str("path", argsPath).Msg("wrote `deploy_epoch` transaction arguments")
+
 }
 
 // getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch` transaction from the root
 // protocol snapshot and takes into any required ajustments to align the state of the contract with the protocol state
 // and returns an array of the cadence representations of the arguments.
 // Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/deploy_epoch.cdc
-func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) []cadence.Value {
+func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Value {
 
 	// current epoch
 	currentEpoch := snapshot.Epochs().Current()
