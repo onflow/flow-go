@@ -167,9 +167,10 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	// combining the threshold signature needs to be called with the total
-	// number of nodes
-	groupSignature, err := signature.CombineThresholdShares(uint(len(s.nodes)), signatures, indices)
+	// NOTE: Reconstruction doesn't require a tag or local, but is only accessible
+	// through the broader Provider API, hence the empty arguments.
+	thresholdSigner := signature.NewThresholdProvider("", nil)
+	groupSignature, err := thresholdSigner.Reconstruct(uint(len(s.nodes)), signatures, indices)
 	require.NoError(s.T(), err)
 
 	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)

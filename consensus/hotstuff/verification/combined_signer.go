@@ -106,6 +106,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 
 	// get the DKG group size
 	blockID := votes[0].BlockID
+	view := votes[0].View
 	dkg, err := c.committee.DKG(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG: %w", err)
@@ -152,8 +153,12 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 		return nil, fmt.Errorf("could not aggregate staking signatures: %w", err)
 	}
 
+	beaconSigner, err := c.thresholdSignerStore.GetThresholdSigner(view)
+	if err != nil {
+		return nil, fmt.Errorf("could not get threshold signer for view (%d): %w", view, err)
+	}
 	// construct the threshold signature from the shares
-	beaconThresSig, err := signature.CombineThresholdShares(dkg.Size(), beaconShares, dkgIndices)
+	beaconThresSig, err := beaconSigner.Reconstruct(dkg.Size(), beaconShares, dkgIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct beacon signatures: %w", err)
 	}
