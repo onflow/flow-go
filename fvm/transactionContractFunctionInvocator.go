@@ -41,19 +41,21 @@ func NewTransactionContractFunctionInvocator(
 	}
 }
 
-func (i *TransactionContractFunctionInvocator) Invoke(env *hostEnv, parentTraceSpan opentracing.Span) (cadence.Value, error) {
+func (i *TransactionContractFunctionInvocator) Invoke(env *TransactionEnv, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
-	if env.ctx.Tracer != nil && parentTraceSpan != nil {
-		span = env.ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
+
+	ctx := env.Context()
+	if ctx.Tracer != nil && parentTraceSpan != nil {
+		span = ctx.Tracer.StartSpanFromParent(parentTraceSpan, trace.FVMInvokeContractFunction)
 		span.LogFields(
 			i.logSpanFields...,
 		)
 		defer span.Finish()
 	}
 
-	predeclaredValues := valueDeclarations(&env.ctx, env)
+	predeclaredValues := valueDeclarations(ctx, env)
 
-	value, err := env.vm.Runtime.InvokeContractFunction(
+	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
 		i.arguments,
