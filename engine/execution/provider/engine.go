@@ -168,7 +168,7 @@ func (e *Engine) onChunkDataRequest(
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
+	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
@@ -180,29 +180,14 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
 	}
 
-	origin, err := e.ensureStaked(cdp.ChunkID, originID)
+	origin, err := e.ensureStaked(chunkDataPack.ChunkID, originID)
 	if err != nil {
 		return err
 	}
 
-	var collection *flow.Collection
-	if cdp.CollectionID != nil {
-		// retrieves collection of non-zero chunks
-		coll, err := e.execState.GetCollection(*cdp.CollectionID)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
-		}
-		collection = coll
-	}
-
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: flow.ChunkDataPack{
-			ChunkID:    cdp.ChunkID,
-			StartState: cdp.StartState,
-			Proof:      cdp.Proof,
-			Collection: collection,
-		},
-		Nonce: rand.Uint64(),
+		ChunkDataPack: *chunkDataPack,
+		Nonce:         rand.Uint64(),
 	}
 
 	sinceProcess := time.Since(processStart)
