@@ -116,12 +116,10 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 }
 
 func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
-	// First: send new block from consensus node
-	// or just send directly to AN
-	// Second: check that unstaked node received it
-	// This can be either calling the unstaked node api directly, or
-	// Third: check that staked node has it (can do this by generate a block with reference block equal to root?)
-	// Can access this via FlowNetwork.root
+	// 1. Send new block from consensus node to staked AN
+	// 2. Check that unstaked AN (ghost) receives it
+	// 3. Check that staked AN also processed the block. This can be done by calling the
+	//    Access API on the staked AN.
 
 	block := unittest.BlockFixture()
 
@@ -148,12 +146,16 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 		suite.T().Fatal("timed out waiting for next message")
 	}
 
+	// TODO: Since the staked AN follower engine will perform validation on received blocks,
+	// the following check may not work unless we send a block with ParentID equal to the
+	// root block ID (suite.net.Root().ID())
+
 	// chain := suite.net.Root().Header.ChainID.Chain()
 
 	// stakedContainer := suite.net.ContainerByID(suite.stakedID)
 	// stakedClient, err := testnet.NewClient(stakedContainer.Addr(testnet.AccessNodeAPIPort), chain)
 	// require.NoError(suite.T(), err)
 
-	// stakedClient.client.GetLatestBlock()
+	// suite.Assert().Equal(stakedClient.GetLatestBlockID(suite.ctx), block.ID())
 
 }

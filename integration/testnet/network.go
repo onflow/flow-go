@@ -539,10 +539,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
-			fmt.Println("PORTS") // TODO: remove
-			fmt.Println(hostGRPCPort)
-			fmt.Println(hostHTTPProxyPort)
-
 			if nodeConf.ParticipatesInUnstakedNetwork {
 				hostUnstakedPort := testingdock.RandomPort(t)
 				containerUnstakedPort := "9876/tcp"
