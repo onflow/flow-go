@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime/common"
+	"github.com/opentracing/opentracing-go"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -18,17 +19,19 @@ type TransactionStorageLimiter struct {
 		tp *TransactionProcedure,
 		sth *state.StateHolder,
 		programs *programs.Programs,
+		traceSpan opentracing.Span,
 	) (func(address common.Address) (value uint64, err error), error)
 }
 
 func getStorageCapacityFuncFactory(
 	vm *VirtualMachine,
 	ctx Context,
-	_ *TransactionProcedure,
+	tp *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
+	traceSpan opentracing.Span,
 ) (func(address common.Address) (value uint64, err error), error) {
-	env := newEnvironment(ctx, vm, sth, programs)
+	env := NewTransactionEnvironment(ctx, vm, sth, programs, tp.Transaction, tp.TxIndex, traceSpan)
 	return func(address common.Address) (value uint64, err error) {
 		return env.GetStorageCapacity(common.BytesToAddress(address.Bytes()))
 	}, nil
@@ -46,12 +49,13 @@ func (d *TransactionStorageLimiter) Process(
 	tp *TransactionProcedure,
 	sth *state.StateHolder,
 	programs *programs.Programs,
+	traceSpan opentracing.Span,
 ) error {
 	if !ctx.LimitAccountStorage {
 		return nil
 	}
 
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs)
+	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs, traceSpan)
 
 	if err != nil {
 		return fmt.Errorf("storage limit check failed: %w", err)
