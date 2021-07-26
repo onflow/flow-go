@@ -234,7 +234,9 @@ func convertDeployEpochTransactionArguments(contractName string, contractCode []
 	}
 	args = append(args, cdcRandomSource)
 
-	// TODO: add collector clusters
+	// add collector clusters, note: we don't actually need the exact clusters, an empty list will suffice
+	cdcCollectorClusters := cadence.NewArray([]cadence.Value{})
+	args = append(args, cdcCollectorClusters)
 
 	return args
 }

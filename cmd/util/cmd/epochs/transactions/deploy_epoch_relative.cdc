@@ -1,3 +1,5 @@
+import FlowClusterQC from 0xQCADDRESS
+
 transaction(name: String, 
             code: [UInt8],
             currentEpochCounter: UInt64,
@@ -7,7 +9,7 @@ transaction(name: String,
             numCollectorClusters: UInt16,
             FLOWsupplyIncreasePercentage: UFix64,
             randomSource: String,
-            collectorClusters: [String]) {
+            collectorClusters: [FlowClusterQC.Cluster]) {
 
   prepare(signer: AuthAccount) {
 
