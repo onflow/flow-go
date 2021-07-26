@@ -40,35 +40,19 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 // entries if that is the case.  Return values are unused, but
 // necessary because the LRUEjector is using the EjectTrueRandom
 func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
-
-	// this is 64 for performance reasons - modulus 64 is a bit shift
-	const batchSize = 64
-
-	// 64 in batch plus a buffer of 64 to prevent boundary conditions from
-	// rounding errors.  The buffer is also here because the max index
-	// decreases as items are deleted
-	const threshold = batchSize * 2
-
-	var entities = b.entities
-
-	// dummy value
-	var retval flow.Identifier
-
-	// 'len' returns a uint.  This map is assumed to be < sizeof(uint)
-	mapSize := len(entities)
-
-	// this should never happen, and is just for a quick check
-	if b.ejectionTrigger > uint(mapSize) ||
-		threshold > uint(mapSize) {
-		return retval, nil, false
+	currentSize := len(b.entities)
+	if b.guaranteedCapacity >= uint(currentSize) {
+		return false
 	}
-
-	if (uint(mapSize) - b.ejectionTrigger) <= threshold {
-		// nothing to do, yet
-		return retval, nil, false
+	// At this point, we know that currentSize > b.guaranteedCapacity. As
+	// currentSize fits into an int, b.guaranteedCapacity must also fit. 
+	overcapacity := currentSize - int(b.guaranteedCapacity)
+	if overcapacity <= overcapacityThreshold {
+		return false
 	}
-
-	// generate 64 random numbers
+	
+	// Randomly select indices of elements to remove:
+	...
 
 	// this array will store 64 indexes into the map
 	var mapIndexes [batchSize]int64
