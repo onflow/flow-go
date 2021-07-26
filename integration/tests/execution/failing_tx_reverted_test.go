@@ -25,11 +25,10 @@ type FailingTxRevertedSuite struct {
 }
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
-
 	chain := s.net.Root().Header.ChainID.Chain()
 
-	// wait for first finalized block, called blockA
-	blockA := s.BlockState.WaitForFirstFinalized(s.T())
+	// wait for next height finalized (potentially first height), called blockA
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
@@ -37,7 +36,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, erBlockB := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), &s.BlockState, &s.ReceiptState)
+	blockB, erBlockB := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// final states

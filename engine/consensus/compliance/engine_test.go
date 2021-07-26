@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -163,7 +164,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 			}
 			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
 			// execute the vote submission
-			_ = cs.engine.Process(originID, &vote)
+			_ = cs.engine.Process(engine.ConsensusCommittee, originID, &vote)
 		}
 		wg.Done()
 	}()
@@ -177,7 +178,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
-		_ = cs.engine.Process(originID, proposal)
+		_ = cs.engine.Process(engine.ConsensusCommittee, originID, proposal)
 		wg.Done()
 	}()
 
