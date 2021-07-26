@@ -15,7 +15,7 @@ import (
 // collection should be before performing a batch ejection
 const overCapacityThreshold = 128
 
-// EjectFunc implements an ejection policy to remove elements when the mempool
+// [Batch]EjectFunc implements an ejection policy to remove elements when the mempool
 // exceeds its specified capacity. A custom ejection policy can be injected
 // into the memory pool upon creation to change the strategy of eviction.
 // The ejection policy is executed from within the thread that serves the
@@ -31,6 +31,7 @@ const overCapacityThreshold = 128
 //    concurrency (specifically, it locks the mempool during ejection).
 //  * The implementation should be non-blocking (though, it is allowed to
 //    take a bit of time; the mempool will just be locked during this time).
+type BatchEjectFunc func(b *Backend) bool
 type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 
 // EjectTrueRandom relies on a random generator to pick a random entity to eject from the
@@ -53,23 +54,19 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 }
 
 // EjectTrueRandomFast checks if the map size is beyond the
-// ideal size, and will iterate through them and eject unneeded
-// entries if that is the case.  Return values are unused, but
-// necessary because the LRUEjector is using the EjectTrueRandom
-func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
-	var identifier flow.Identifier
-	var entity flow.Entity
-
+// threshold size, and will iterate through them and eject unneeded
+// entries if that is the case.  Return values are unused
+func EjectTrueRandomFast(b *Backend) bool {
 	currentSize := len(b.entities)
 
 	if b.guaranteedCapacity >= uint(currentSize) {
-		return identifier, entity, false
+		return false
 	}
 	// At this point, we know that currentSize > b.guaranteedCapacity. As
 	// currentSize fits into an int, b.guaranteedCapacity must also fit.
 	overcapacity := currentSize - int(b.guaranteedCapacity)
 	if overcapacity <= overCapacityThreshold {
-		return identifier, entity, false
+		return false
 	}
 
 	// Randomly select indices of elements to remove:
@@ -101,13 +98,13 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 			}
 
 			if idx == overcapacity {
-				return identifier, entity, true
+				return true
 			}
 			next2Remove = mapIndices[idx]
 		}
 		i++
 	}
-	return identifier, entity, true
+	return true
 }
 
 // EjectPanic simply panics, crashing the program. Useful when cache is not expected
@@ -159,7 +156,7 @@ func (q *LRUEjector) Untrack(entityID flow.Identifier) {
 }
 
 // Eject implements EjectFunc for LRUEjector. It finds the entity with the lowest sequence number (i.e.,
-//the oldest entity). It also untracks.  Warning:  this is using a linear search
+//the oldest entity). It also untracks.  This is using a linear search
 func (q *LRUEjector) Eject(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	q.Lock()
 	defer q.Unlock()

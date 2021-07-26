@@ -102,6 +102,7 @@ type Backend struct {
 	sync.RWMutex
 	Backdata
 	guaranteedCapacity uint
+	batchEject         BatchEjectFunc
 	eject              EjectFunc
 	ejectionCallbacks  []mempool.OnEjection
 }
@@ -112,7 +113,8 @@ func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
 		Backdata:           NewBackdata(),
 		guaranteedCapacity: uint(math.MaxUint32),
-		eject:              EjectTrueRandomFast,
+		batchEject:         EjectTrueRandomFast,
+		eject:              nil,
 		ejectionCallbacks:  nil,
 	}
 	for _, option := range options {
@@ -220,9 +222,11 @@ func (b *Backend) reduce() {
 	// do anything until the batch threshold is reached (currently 128)
 	if len(b.entities) > int(b.guaranteedCapacity) {
 		// get the key from the eject function
-		// revert to prior commits if this eject function is not
-		// EjectTrueRandomFast
 		// we don't do anything if there is an error
-		_, _, _ = b.eject(b)
+		if b.batchEject != nil {
+			_ = b.batchEject(b)
+		} else {
+			_, _, _ = b.eject(b)
+		}
 	}
 }

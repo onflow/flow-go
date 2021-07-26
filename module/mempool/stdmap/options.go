@@ -21,5 +21,6 @@ func WithLimit(limit uint) OptionFunc {
 func WithEject(eject EjectFunc) OptionFunc {
 	return func(be *Backend) {
 		be.eject = eject
+		be.batchEject = nil
 	}
 }
