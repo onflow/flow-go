@@ -4,7 +4,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
-	storagemodel "github.com/onflow/flow-go/storage/model"
+	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 )
 
 // InsertChunkDataPack inserts a chunk data pack keyed by chunk ID.
