@@ -54,28 +54,15 @@ func EjectTrueRandomFast(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	// Randomly select indices of elements to remove:
 	...
 
-	// this array will store 64 indexes into the map
-	var mapIndexes [batchSize]int64
-
-	// starting point, create 64 random, sequentially increasing, values
-	var i uint = 0
-
-	for ; i < batchSize; i++ {
-		// get a random number (zero-based)
-		mapIndexes[i] = int64(rand.Intn(mapSize))
+	// Randomly select indices of elements to remove:
+	mapIndices := make([]int, 0, overcapacity)
+	for i := overcapacity; i > 0; i-- {
+		mapIndices = append(mapIndices, rand.Intn(currentSize))
 	}
-
-	// this is the sort from golang/sort for small arrays
-	for i = 1; i < batchSize; i++ {
-		for j := i; mapIndexes[j] < mapIndexes[j-1]; j-- {
-			mapIndexes[j], mapIndexes[j-1] = mapIndexes[j-1], mapIndexes[j]
-
-			// stop when 'j-2' is less than 0 -- OOB
-			if j == 1 {
-				break
-			}
-		}
-	}
+	sort.Ints(mapIndices) // inplace
+	
+	// Now, mapIndexes is a sequentially sorted list of indexes to remove.
+	...
 
 	var entityID flow.Identifier
 	var entity flow.Entity
