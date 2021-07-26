@@ -21,7 +21,8 @@ import (
 
 const deployArgsFileName = "deploy-epoch-args.json"
 
-// deployCmd represents a command to ...
+// deployCmd represents a command to generate `deploy_epoch_relative` transaction arguments and writes it to the
+// working directory this command was run.
 var deployCmd = &cobra.Command{
 	Use:   "deploy-tx-args",
 	Short: "Generates `deploy_epoch_relative` transaction arguments and writes it to the working directory this command was run",

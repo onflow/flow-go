@@ -19,7 +19,8 @@ import (
 
 const resetArgsFileName = "reset-epoch-args.json"
 
-// resetCmd represents a command to reset epoch data in the Epoch smart contract
+// resetCmd represents a command to generate `reset_epoch` transaction arguments and writes it to the
+// working directory this command was run.
 var resetCmd = &cobra.Command{
 	Use:   "reset-tx-args",
 	Short: "Generates `resetEpoch` JSON transaction arguments",
