@@ -332,8 +332,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 
 	// CAUTION: Votes are not validated prior to aggregation. This means a single
 	// invalid vote submission will result in a fully invalid QC for that cluster.
-	// Votes should be validated upon submission by the ClusterQC smart contract.
-	// TODO issue for the above
+	// Votes must be validated by the ClusterQC smart contract.
 	//
 	// NOTE: Aggregation doesn't require a tag or local, but is only accessible
 	// through the broader Provider API, hence the empty arguments.

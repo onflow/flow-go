@@ -291,7 +291,10 @@ func TestWithWhiteboard(t *testing.T) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	groupSignature, err := signature.CombineThresholdShares(uint(len(nodes)), signatures, indices)
+	// NOTE: Reconstruction doesn't require a tag or local, but is only accessible
+	// through the broader Provider API, hence the empty arguments.
+	thresholdSigner := signature.NewThresholdProvider("", nil)
+	groupSignature, err := thresholdSigner.Reconstruct(uint(len(nodes)), signatures, indices)
 	require.NoError(t, err)
 
 	result := whiteboard.resultBySubmitter[nodes[0].Me.NodeID()]
