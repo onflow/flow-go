@@ -15,10 +15,22 @@ import (
 // collection should be before performing a batch ejection
 const overCapacityThreshold = 128
 
-// EjectFunc is a function used to pick an entity to evict from the memory pool
-// backend when it overflows its limit. A custom eject function can be injected
-// into the memory pool upon creation, which allows us to hook into the eject
-// to clean up auxiliary data and/or to change the strategy of eviction.
+// EjectFunc implements an ejection policy to remove elements when the mempool
+// exceeds its specified capacity. A custom ejection policy can be injected
+// into the memory pool upon creation to change the strategy of eviction.
+// The ejection policy is executed from within the thread that serves the
+// mempool. Implementations should adhere to the following convention:
+//  * The ejector function has the freedom to eject _multiple_ elements.
+//  * In a single `eject` call, it must eject as many elements to statistically
+//    keep the mempool size within the desired limit.
+//  * The ejector _might_ (for performance reasons) retain more elements in the
+//    mempool than the targeted capacity.
+//  * The ejector _must_ notify the `Backend.ejectionCallbacks` for _each_
+//    element it removes from the mempool.
+//  * Implementations do _not_ need to be concurrency safe. The Backend handles
+//    concurrency (specifically, it locks the mempool during ejection).
+//  * The implementation should be non-blocking (though, it is allowed to
+//    take a bit of time; the mempool will just be locked during this time).
 type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 
 // EjectTrueRandom relies on a random generator to pick a random entity to eject from the
