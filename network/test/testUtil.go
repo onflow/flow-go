@@ -2,9 +2,6 @@ package test
 
 import (
 	"fmt"
-	"reflect"
-	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -214,10 +211,10 @@ func generateLibP2PNode(t *testing.T,
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
 func optionalSleep(send ConduitSendWrapperFunc) {
-	sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
-	if strings.Contains(sendFuncName, "Multicast") || strings.Contains(sendFuncName, "Publish") {
-		time.Sleep(2 * time.Second)
-	}
+	// sendFuncName := runtime.FuncForPC(reflect.ValueOf(send).Pointer()).Name()
+	// if strings.Contains(sendFuncName, "Multicast") || strings.Contains(sendFuncName, "Publish") {
+	time.Sleep(2 * time.Second)
+	// }
 }
 
 // generateNetworkingKey generates a Flow ECDSA key using the given seed

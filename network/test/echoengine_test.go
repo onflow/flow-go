@@ -421,14 +421,16 @@ func (suite *EchoEngineTestSuite) duplicateMessageDifferentChan(send ConduitSend
 		go func() {
 			defer wg.Done()
 			// sender1 to receiver1 on channel1
-			require.NoError(suite.Suite.T(), send(event, sender1.con, suite.ids[rcvNode].NodeID))
+			err := send(event, sender1.con, suite.ids[rcvNode].NodeID)
+			require.NoError(suite.Suite.T(), err)
 
 			// sender2 to receiver2 on channel2
-			require.NoError(suite.Suite.T(), send(event, sender2.con, suite.ids[rcvNode].NodeID))
+			err = send(event, sender2.con, suite.ids[rcvNode].NodeID)
+			require.NoError(suite.Suite.T(), err)
 		}()
 	}
 	wg.Wait()
-	time.Sleep(1 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	// each receiver should only see the message once, and the rest should be dropped due to
 	// duplication
