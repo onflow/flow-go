@@ -3,6 +3,8 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -82,6 +84,15 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 // bootstrapping process.
 type NoopBlockFinder struct{}
 
-func (f *NoopBlockFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.Header, error) {
+func (f *NoopBlockFinder) ByHeightFrom(_ uint64, _ *flow.Header) (*flow.Header, error) {
 	return nil, nil
+}
+
+func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
+	return runtime.Block{
+		Height:    header.Height,
+		View:      header.View,
+		Hash:      runtime.BlockHash(header.ID()),
+		Timestamp: header.Timestamp.UnixNano(),
+	}
 }
