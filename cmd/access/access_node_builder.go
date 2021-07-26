@@ -36,7 +36,7 @@ type AccessNodeBuilder interface {
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
 
-	// ParticipatesInUnstakedNetwork returns True if this an Access Node which articipates in the unstaked network,
+	// ParticipatesInUnstakedNetwork returns True if this an Access Node which participates in the unstaked network,
 	// False otherwise
 	ParticipatesInUnstakedNetwork() bool
 }
