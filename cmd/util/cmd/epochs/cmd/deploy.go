@@ -150,7 +150,7 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 	}
 
 	// assume the first view after a spork is 0
-	numViewsInEpoch := (finalView + 1) - head.View // 1000
+	numViewsInEpoch := (finalView + 1) - head.View
 	numViewsInDKGPhase := dkgPhase2FinalView - dkgPhase1FinalView + 1
 	numViewsInStakingAuction := dkgPhase1FinalView - numViewsInDKGPhase - head.View + 1
 
