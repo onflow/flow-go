@@ -28,7 +28,7 @@ func AllReady(components ...module.ReadyDoneAware) <-chan struct{} {
 	return ready
 }
 
-// AllReady calls Done on all input components and returns a channel that is
+// AllDone calls Done on all input components and returns a channel that is
 // closed when all input components are done.
 func AllDone(components ...module.ReadyDoneAware) <-chan struct{} {
 	done := make(chan struct{})
