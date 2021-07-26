@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	storagemodel "github.com/onflow/flow-go/storage/model"
+	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
