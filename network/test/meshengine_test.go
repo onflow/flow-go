@@ -148,7 +148,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(10 * time.Second)
+	time.Sleep(20 * time.Second)
 
 	// Each node broadcasting a message to all others
 	for i := range suite.nets {
