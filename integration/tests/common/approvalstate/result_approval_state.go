@@ -1,4 +1,4 @@
-package common
+package approvalstate
 
 import (
 	"bytes"
@@ -12,42 +12,45 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const resultApprovalTimeout = 100 * time.Second
+const resultApprovalTimeout = 120 * time.Second
 
 // ResultApprovalState keeps track of the result approval messages getting disseminated through
 // test net network.
 type ResultApprovalState struct {
-	resultApprovals sync.Map
+	sync.RWMutex
+	resultApprovals map[flow.Identifier][]*flow.ResultApproval
+}
+
+func NewResultApprovalState() *ResultApprovalState {
+	return &ResultApprovalState{
+		RWMutex:         sync.RWMutex{},
+		resultApprovals: make(map[flow.Identifier][]*flow.ResultApproval),
+	}
 }
 
 // Add adds a result approval captured from the testnet to the result approval tracker.
 func (r *ResultApprovalState) Add(sender flow.Identifier, approval *flow.ResultApproval) {
-	var list []*flow.ResultApproval
+	r.Lock()
+	defer r.Unlock()
 
-	// casts value to list if exists
-	if value, ok := r.resultApprovals.Load(sender); ok {
-		list = value.([]*flow.ResultApproval)
+	if _, ok := r.resultApprovals[sender]; !ok {
+		r.resultApprovals[sender] = make([]*flow.ResultApproval, 0)
 	}
-
-	list = append(list, approval)
-	r.resultApprovals.Store(sender, list)
+	r.resultApprovals[sender] = append(r.resultApprovals[sender], approval)
 }
 
 // WaitForResultApproval waits until a result approval for execution result id from the verification node for
 // the chunk index within a timeout. It returns the captured result approval.
-func (r *ResultApprovalState) WaitForResultApproval(t *testing.T,
-	verNodeID, resultID flow.Identifier,
-	chunkIndex uint64) *flow.ResultApproval {
-
+func (r *ResultApprovalState) WaitForResultApproval(t *testing.T, verNodeID, resultID flow.Identifier, chunkIndex uint64) *flow.ResultApproval {
 	var resultApproval *flow.ResultApproval
 	require.Eventually(t, func() bool {
-		list, ok := r.resultApprovals.Load(verNodeID)
+		r.RLock()
+		defer r.RUnlock()
 
+		approvals, ok := r.resultApprovals[verNodeID]
 		if !ok {
 			return false
 		}
-
-		approvals := list.([]*flow.ResultApproval)
 
 		for _, approval := range approvals {
 			if !bytes.Equal(approval.Body.ExecutionResultID[:], resultID[:]) {
@@ -69,5 +72,4 @@ func (r *ResultApprovalState) WaitForResultApproval(t *testing.T,
 			verNodeID))
 
 	return resultApproval
-
 }

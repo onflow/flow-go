@@ -3,6 +3,8 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/onflow/cadence/runtime"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
@@ -75,5 +77,14 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 		//if parent is finalized block, we can just use finalized chain
 		// to get desired height
 		return b.storage.ByHeight(height)
+	}
+}
+
+func runtimeBlockFromHeader(header *flow.Header) runtime.Block {
+	return runtime.Block{
+		Height:    header.Height,
+		View:      header.View,
+		Hash:      runtime.BlockHash(header.ID()),
+		Timestamp: header.Timestamp.UnixNano(),
 	}
 }
