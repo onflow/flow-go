@@ -16,7 +16,7 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "epochs",
-	Short: "This too encapsulates all commands required to interact with Epochs, from recovery to deployment.",
+	Short: "This tool encapsulates all commands required to interact with Epochs, from recovery to deployment.",
 }
 
 var RootCmd = rootCmd
