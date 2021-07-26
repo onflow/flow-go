@@ -5,10 +5,11 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+
 	"github.com/multiformats/go-multiaddr"
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -41,9 +42,9 @@ func init() {
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", generateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", generateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
@@ -88,7 +89,7 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, er
 
 	log.Debug().Msg("will generate networking key")
 	networkSeed := validateSeed(flagNetworkSeed)
-	networkKey, err := run.GenerateNetworkingKey(networkSeed)
+	networkKey, err := utils.GenerateNetworkingKey(networkSeed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
@@ -96,7 +97,7 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, er
 
 	log.Debug().Msg("will generate staking key")
 	stakingSeed := validateSeed(flagStakingSeed)
-	stakingKey, err := run.GenerateStakingKey(stakingSeed)
+	stakingKey, err := utils.GenerateStakingKey(stakingSeed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
@@ -104,7 +105,7 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, er
 
 	log.Debug().Msg("will generate machine account key")
 	machineSeed := validateSeed(flagMachineSeed)
-	machineKey, err := run.GenerateMachineAccountKey(machineSeed)
+	machineKey, err := utils.GenerateMachineAccountKey(machineSeed)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("could not generate machine key: %w", err)
 	}

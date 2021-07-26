@@ -29,6 +29,7 @@ type dkgInfo struct {
 	phase1FinalView uint64
 	phase2FinalView uint64
 	phase3FinalView uint64
+        // seed must be generated for each DKG instance, using a randomness source that is independent from all other nodes. 
 	seed            []byte
 }
 
@@ -58,9 +59,13 @@ func NewReactorEngine(
 	viewEvents events.Views,
 ) *ReactorEngine {
 
+	logger := log.With().
+		Str("engine", "dkg_reactor").
+		Logger()
+
 	return &ReactorEngine{
 		unit:              engine.NewUnit(),
-		log:               log.With().Str("engine", "dkg_reactor").Logger(),
+		log:               logger,
 		me:                me,
 		State:             state,
 		keyStorage:        keyStorage,

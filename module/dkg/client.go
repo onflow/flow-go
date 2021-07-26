@@ -80,13 +80,17 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 		AddAuthorizer(account.Address)
 
 	// json encode the DKG message
-	data, err := json.Marshal(msg)
+	jsonMessage, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("could not marshal DKG messages struct: %v", err)
 	}
 
 	// add dkg message json encoded string to tx args
-	err = tx.AddArgument(cadence.NewString(string(data)))
+	cdcMessage, err := cadence.NewString(string(jsonMessage))
+	if err != nil {
+		return fmt.Errorf("could not convert DKG message to cadence: %w", err)
+	}
+	err = tx.AddArgument(cdcMessage)
 	if err != nil {
 		return fmt.Errorf("could not add whiteboard dkg message to transaction: %w", err)
 	}
@@ -185,7 +189,11 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	// first append group public key
 	if groupPublicKey != nil {
 		trimmedGroupHexString := trim0x(groupPublicKey.String())
-		finalSubmission = append(finalSubmission, cadence.NewOptional(cadence.NewString(trimmedGroupHexString)))
+		cdcGroupString, err := cadence.NewString(trimmedGroupHexString)
+		if err != nil {
+			return fmt.Errorf("could not convert group key to cadence: %w", err)
+		}
+		finalSubmission = append(finalSubmission, cadence.NewOptional(cdcGroupString))
 	} else {
 		finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
 	}
@@ -195,7 +203,11 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 		// append individual public keys
 		if publicKey != nil {
 			trimmedHexString := trim0x(publicKey.String())
-			finalSubmission = append(finalSubmission, cadence.NewOptional(cadence.NewString(trimmedHexString)))
+			cdcPubKey, err := cadence.NewString(trimmedHexString)
+			if err != nil {
+				return fmt.Errorf("could not convert pub keyshare to cadence: %w", err)
+			}
+			finalSubmission = append(finalSubmission, cadence.NewOptional(cdcPubKey))
 		} else {
 			finalSubmission = append(finalSubmission, cadence.NewOptional(nil))
 		}

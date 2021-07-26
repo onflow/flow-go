@@ -59,6 +59,7 @@ import (
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger"
@@ -107,6 +108,7 @@ func main() {
 		chunkAssigner           *chmodule.ChunkAssigner
 		finalizationDistributor *pubsub.FinalizationDistributor
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
+		blockTimer              protocol.BlockTimer
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -134,11 +136,12 @@ func main() {
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 		}).
-		Module("consensus node metrics", func(node *cmd.FlowNodeBuilder) error {
+		Initialize().
+		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -184,17 +187,23 @@ func main() {
 				return fmt.Errorf("could not instantiate seal validator: %w", err)
 			}
 
+			blockTimer, err = blocktimer.NewBlockTimer(minInterval, maxInterval)
+			if err != nil {
+				return err
+			}
+
 			mutableState, err = badgerState.NewFullConsensusState(
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
 				node.Tracer,
 				node.ProtocolEvents,
+				blockTimer,
 				receiptValidator,
 				sealValidator)
 			return err
 		}).
-		Module("random beacon key", func(node *cmd.FlowNodeBuilder) error {
+		Module("random beacon key", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// If this node was a participant in a spork, their DKG key for the
 			// first epoch was generated during the bootstrapping process and is
 			// specified in a private bootstrapping file. We load their key and
@@ -279,11 +288,11 @@ func main() {
 
 			return nil
 		}).
-		Module("collection guarantees mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("collection guarantees mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			guarantees, err = stdmap.NewGuarantees(guaranteeLimit)
 			return err
 		}).
-		Module("execution receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("execution receipts mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			receipts = consensusMempools.NewExecutionTree()
 			// registers size method of backend for metrics
 			err = node.Metrics.Mempool.Register(metrics.ResourceReceipt, receipts.Size)
@@ -292,7 +301,7 @@ func main() {
 			}
 			return nil
 		}).
-		Module("block seals mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("block seals mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// use a custom ejector so we don't eject seals that would break
 			// the chain of seals
 			seals, err = consensusMempools.NewExecStateForkSuppressor(consensusMempools.LogForkAndCrash(node.Logger), node.DB, node.Logger, sealLimit)
@@ -302,23 +311,23 @@ func main() {
 			err = node.Metrics.Mempool.Register(metrics.ResourcePendingIncorporatedSeal, seals.Size)
 			return nil
 		}).
-		Module("pending receipts mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending receipts mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pendingReceipts = stdmap.NewPendingReceipts(node.Storage.Headers, pendingReceiptsLimit)
 			return nil
 		}).
-		Module("hotstuff main metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("hotstuff main metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			mainMetrics = metrics.NewHotstuffCollector(node.RootChainID)
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("finalization distributor", func(node *cmd.FlowNodeBuilder) error {
+		Module("finalization distributor", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
-		Component("sealing engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
@@ -354,7 +363,7 @@ func main() {
 
 			return e, err
 		}).
-		Component("matching engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("matching engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -409,7 +418,7 @@ func main() {
 
 			return e, err
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -420,7 +429,7 @@ func main() {
 			)
 			return prov, err
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Tracer,
@@ -435,7 +444,7 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("consensus components", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("consensus components", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
@@ -482,8 +491,7 @@ func main() {
 				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
 				receipts,
 				node.Tracer,
-				builder.WithMinInterval(minInterval),
-				builder.WithMaxInterval(maxInterval),
+				builder.WithBlockTimer(blockTimer),
 				builder.WithMaxSealCount(maxSealPerBlock),
 				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
 			)
@@ -590,7 +598,7 @@ func main() {
 			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
-		Component("sync engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -609,11 +617,11 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("receipt requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// created with sealing engine
 			return receiptRequester, nil
 		}).
-		Component("DKG messaging engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("DKG messaging engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// brokerTunnel is used to forward messages between the DKG
 			// messaging engine and the DKG broker/controller
@@ -633,7 +641,7 @@ func main() {
 
 			return messagingEngine, nil
 		}).
-		Component("DKG reactor engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("DKG reactor engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// the viewsObserver is used by the reactor engine to subscribe to
 			// new views being finalized
@@ -693,7 +701,7 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 // configured machine account is very much intended to be temporary.
 // Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
 // Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
-func createDKGContractClient(node *cmd.FlowNodeBuilder, accessAddress string) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module.DKGContractClient, error) {
 
 	var dkgClient module.DKGContractClient
 

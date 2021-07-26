@@ -19,7 +19,11 @@ type Validator struct {
 }
 
 // New creates a new Validator instance
-func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
+func New(
+	committee hotstuff.Committee,
+	forks hotstuff.ForksReader,
+	verifier hotstuff.Verifier,
+) *Validator {
 	return &Validator{
 		committee: committee,
 		forks:     forks,

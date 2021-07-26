@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 func TestWithEmulator(t *testing.T) {
@@ -79,7 +80,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	// views
 	view := 0
 	for view < 300 {
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		// if we are testing situations where the DKG smart-contract is not
 		// reachable, disable the DKG client for intervals of 10 views
@@ -182,9 +183,10 @@ func (s *DKGSuite) TestHappyPath() {
 }
 
 // TestNodesDown checks that DKG still works with the maximum number of bad
-// nodes (n/2)
+// nodes.
 func (s *DKGSuite) TestNodesDown() {
-	s.runTest(numberOfNodes/2+1, false)
+	minHonestNodes := numberOfNodes - signature.RandomBeaconThreshold(numberOfNodes)
+	s.runTest(minHonestNodes, false)
 }
 
 // TestEmulatorProblems checks that DKG is resilient to transient problems

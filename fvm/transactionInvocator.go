@@ -180,7 +180,6 @@ func (i *TransactionInvocator) Process(
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		i.logger.Info().
-			Err(txError).
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
