@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	fvmUtils "github.com/onflow/flow-go/fvm/utils"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -252,9 +253,13 @@ func RootBootstrappedLedger(vm *fvm.VirtualMachine, ctx fvm.Context) state.View 
 	view := fvmUtils.NewSimpleView()
 	programs := programs.NewEmptyPrograms()
 
+	// set 0 clusters to pass n_collectors >= n_clusters check
+	epochConfig := epochs.DefaultEpochConfig()
+	epochConfig.NumCollectorClusters = 0
 	bootstrap := fvm.Bootstrap(
 		unittest.ServiceAccountPublicKey,
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithEpochConfig(epochConfig),
 	)
 
 	_ = vm.Run(

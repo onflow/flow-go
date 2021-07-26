@@ -77,7 +77,7 @@ func New(
 
 	e := &Engine{
 		unit:           engine.NewUnit(),
-		log:            log,
+		log:            log.With().Str("engine", "epochmgr").Logger(),
 		me:             me,
 		state:          state,
 		pools:          pools,
