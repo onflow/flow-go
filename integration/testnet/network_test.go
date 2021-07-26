@@ -19,7 +19,7 @@ type nodeInfo struct {
 	address string
 }
 
-func TestNetworkSetupBasic(t *testing.T) { // TODO
+func TestNetworkSetupBasic(t *testing.T) {
 	registry := os.Getenv("CONTAINER_REGISTRY")
 	if len(registry) > 0 {
 		defaultRegistry = registry
