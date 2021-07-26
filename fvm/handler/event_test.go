@@ -3,54 +3,61 @@ package handler_test
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime/common"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/fvm/handler"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 func Test_IsServiceEvent(t *testing.T) {
 
-	chain := flow.Mainnet.Chain()
+	chain := flow.Emulator
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	require.NoError(t, err)
 
 	t.Run("correct", func(t *testing.T) {
-		assert.True(t,
-			handler.IsServiceEvent(cadence.Event{
+		for _, event := range events.All() {
+			isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
 				EventType: &cadence.EventType{
 					Location: common.AddressLocation{
-						Address: common.BytesToAddress(chain.ServiceAddress().Bytes()),
+						Address: common.BytesToAddress(event.Address.Bytes()),
 					},
-					QualifiedIdentifier: "EpochManager.EpochSetup",
+					QualifiedIdentifier: event.QualifiedIdentifier(),
 				},
-			}, chain),
-		)
+			}, chain)
+			require.NoError(t, err)
+			assert.True(t, isServiceEvent)
+		}
 	})
 
 	t.Run("wrong chain", func(t *testing.T) {
-		assert.False(t,
-			handler.IsServiceEvent(cadence.Event{
-				EventType: &cadence.EventType{
-					Location: common.AddressLocation{
-						Address: common.BytesToAddress(append([]byte{1, 2, 3}, chain.ServiceAddress().Bytes()...)),
-					},
+		isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
+			EventType: &cadence.EventType{
+				Location: common.AddressLocation{
+					Address: common.BytesToAddress(flow.Testnet.Chain().ServiceAddress().Bytes()),
 				},
-			}, chain),
-		)
+				QualifiedIdentifier: events.EpochCommit.QualifiedIdentifier(),
+			},
+		}, chain)
+		require.NoError(t, err)
+		assert.False(t, isServiceEvent)
 	})
 
 	t.Run("wrong type", func(t *testing.T) {
-		assert.False(t,
-			handler.IsServiceEvent(cadence.Event{
-				EventType: &cadence.EventType{
-					Location: common.AddressLocation{
-						Address: common.BytesToAddress(chain.ServiceAddress().Bytes()),
-					},
-					QualifiedIdentifier: "SomeContract.SomeEvent",
+		isServiceEvent, err := handler.IsServiceEvent(cadence.Event{
+			EventType: &cadence.EventType{
+				Location: common.AddressLocation{
+					Address: common.BytesToAddress(chain.Chain().ServiceAddress().Bytes()),
 				},
-			}, chain),
-		)
+				QualifiedIdentifier: "SomeContract.SomeEvent",
+			},
+		}, chain)
+		require.NoError(t, err)
+		assert.False(t, isServiceEvent)
 	})
-
 }

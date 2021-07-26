@@ -119,7 +119,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name 'EpochComponentsFactory' -dir=engine/collection/epochmgr -case=underscore -output="engine/collection/epochmgr/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name 'ProviderEngine' -dir=engine/execution/provider -case=underscore -output="engine/execution/provider/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -output="./module/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -tags="relic" -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
