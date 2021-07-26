@@ -64,8 +64,8 @@ func TestProxyExecutionAPI(t *testing.T) {
 
 	// create the factory
 	connectionFactory := new(ConnectionFactoryImpl)
-	// set the collection grpc port
-	connectionFactory.CollectionGRPCPort = en.port
+	// set the execution grpc port
+	connectionFactory.ExecutionGRPCPort = en.port
 
 	proxyConnectionFactory := ProxyConnectionFactory{
 		ConnectionFactory: connectionFactory,
