@@ -7,11 +7,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -32,7 +34,15 @@ func init() {
 }
 
 func addDeployCmdFlags() {
-	// TODO: convert `fungibleTokenAddress`, `flowTokenAddress`, `flowTokenAddress`, `idTableContract`, `FLOWsupplyIncreasePercentage` to flags
+	deployCmd.Flags().StringVar(&flagFungibleTokenAddress, "fungible-token-addr", "", "the hex address of the FungibleToken contract")
+	deployCmd.Flags().StringVar(&flagFlowTokenAddress, "flow-token-addr", "", "the hex address of the FlowToken contract")
+	deployCmd.Flags().StringVar(&flagIDTableAddress, "id-table-addr", "", "the hex address of the IDTable contract")
+	deployCmd.Flags().Float64Var(&flagFlowSupplyIncreasePercentage, "flow-supply-increase-percentage", 0, "the FLOW supply increase percentage")
+
+	_ = deployCmd.MarkFlagRequired("fungible-token-addr")
+	_ = deployCmd.MarkFlagRequired("flow-token-addr")
+	_ = deployCmd.MarkFlagRequired("id-table-addr")
+	_ = deployCmd.MarkFlagRequired("flow-supply-increase-percentage")
 }
 
 // deployRun ...
@@ -76,9 +86,10 @@ func deployRun(cmd *cobra.Command, args []string) {
 }
 
 // getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch` transaction from the root
-// protocol snapshot and takes into any required ajustments to align the state of the contract with the protocol state.
+// protocol snapshot and takes into any required ajustments to align the state of the contract with the protocol state
+// and returns an array of the cadence representations of the arguments.
 // Transaction: https://github.com/onflow/flow-core-contracts/blob/master/transactions/epoch/admin/deploy_epoch.cdc
-func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
+func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) []cadence.Value {
 
 	// current epoch
 	currentEpoch := snapshot.Epochs().Current()
@@ -95,9 +106,17 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
 		log.Fatal().Err(err).Msgf("could not get system contracts for chainID")
 	}
 
+	// current epoch counter
+	currentEpochCounter, err := currentEpoch.Counter()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get current epoch counter from snapshot")
+	}
+
 	// epoch contract name and get code for contract
 	epochContractName := "FlowEpoch"
-	epochContractCode := contracts.FlowEpoch("", "", "", systemContracts.ClusterQC.Address.Hex(), systemContracts.DKG.Address.Hex())
+	epochContractCode := contracts.FlowEpoch(flagFungibleTokenAddress,
+		flagFlowTokenAddress, flagIDTableAddress,
+		systemContracts.ClusterQC.Address.Hex(), systemContracts.DKG.Address.Hex())
 
 	// get final view from snapshot
 	finalView, err := currentEpoch.FinalView()
@@ -105,10 +124,19 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
 		log.Fatal().Err(err).Msgf("could not get finalView for current epoch from snapshot")
 	}
 
-	// calculate numViewInEpoch
-	numViewsInEpoch := (finalView + 1) - head.View
+	dkgPhase1FinalView, err := currentEpoch.DKGPhase1FinalView()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get dkgPhase1FinalView from snapshot")
+	}
+	dkgPhase2FinalView, err := currentEpoch.DKGPhase2FinalView()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get dkgPhase2FinalView from snapshot")
+	}
 
-	// TODO: numViewsInStakingAuction, numViewsInDKGPhase, calcuate the DKG views in DKG phase.
+	// assume the first view after a spork is 0
+	numViewsInEpoch := (finalView + 1) - head.View // 1000
+	numViewsInDKGPhase := dkgPhase2FinalView - dkgPhase1FinalView + 1
+	numViewsInStakingAuction := dkgPhase1FinalView - numViewsInDKGPhase - head.View + 1
 
 	// number of collectors clusters
 	clustering, err := currentEpoch.Clustering()
@@ -123,5 +151,29 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) {
 		log.Fatal().Err(err).Msgf("could not get randomSource for current epoch from snapshot")
 	}
 
-	// TODO: clustering needs to be done, DKG keys and Cluster QC can be ignored
+	return convertDeployEpochTransactionArguments(epochContractName,
+		epochContractCode,
+		currentEpochCounter,
+		numViewsInEpoch,
+		numViewsInStakingAuction,
+		numViewsInDKGPhase,
+		numCollectorClusters,
+		flagFlowSupplyIncreasePercentage,
+		randomSource,
+		clustering,
+	)
+}
+
+// convertDeployEpochTransactionArguments converts the `deploy_epoch` transaction arguments to cadence representations
+func convertDeployEpochTransactionArguments(contractName string, epochContractCode []byte, currentEpochCounter uint64,
+	numViewsInEpoch, numViewsInStakingAuction, numViewsInDKGPhase uint64, numCollectorClusters int,
+	FLOWsupplyIncreasePercentage float64, randomSource []byte, clustering flow.ClusterList) []cadence.Value {
+
+	// arguments array
+	args := make([]cadence.Value, 0)
+
+	// add contractName
+	cdcContractName, err := cadence.NewString(contractName)
+
+	return args
 }
