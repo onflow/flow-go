@@ -310,11 +310,11 @@ func (gs *TransactionsPerSecondSuite) Transfer10Tokens(flowClient *client.Client
 	transferTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript(transferScript).
-		SetProposalKey(fromAddr, fromKey.ID, fromKey.SequenceNumber).
+		SetProposalKey(fromAddr, fromKey.Index, fromKey.SequenceNumber).
 		SetPayer(fromAddr).
 		AddAuthorizer(fromAddr)
 
-	err := transferTx.SignEnvelope(fromAddr, fromKey.ID, gs.signers[fromAddr])
+	err := transferTx.SignEnvelope(fromAddr, fromKey.Index, gs.signers[fromAddr])
 	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *transferTx)
@@ -457,14 +457,14 @@ func (gs *TransactionsPerSecondSuite) AddKeys(flowClient *client.Client) {
 	addKeysTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(gs.ref.ID).
 		SetScript([]byte(script)).
-		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootAcctKey.SequenceNumber).
+		SetProposalKey(gs.rootAcctAddr, gs.rootAcctKey.Index, gs.rootAcctKey.SequenceNumber).
 		SetPayer(gs.rootAcctAddr).
 		AddAuthorizer(gs.rootAcctAddr)
 
 	err := addKeysTx.AddArgument(bytesToCadenceArray(accountKeyBytes))
 	handle(err)
 
-	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.ID, gs.rootSigner)
+	err = addKeysTx.SignEnvelope(gs.rootAcctAddr, gs.rootAcctKey.Index, gs.rootSigner)
 	handle(err)
 
 	err = flowClient.SendTransaction(ctx, *addKeysTx)
