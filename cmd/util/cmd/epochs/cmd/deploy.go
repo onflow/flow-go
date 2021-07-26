@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 
+	epochcmdutil "github.com/onflow/flow-go/cmd/util/cmd/epochs/utils"
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -37,7 +39,7 @@ func addDeployCmdFlags() {
 	deployCmd.Flags().StringVar(&flagFungibleTokenAddress, "fungible-token-addr", "", "the hex address of the FungibleToken contract")
 	deployCmd.Flags().StringVar(&flagFlowTokenAddress, "flow-token-addr", "", "the hex address of the FlowToken contract")
 	deployCmd.Flags().StringVar(&flagIDTableAddress, "id-table-addr", "", "the hex address of the IDTable contract")
-	deployCmd.Flags().Float64Var(&flagFlowSupplyIncreasePercentage, "flow-supply-increase-percentage", 0, "the FLOW supply increase percentage")
+	deployCmd.Flags().StringVar(&flagFlowSupplyIncreasePercentage, "flow-supply-increase-percentage", "0.0", "the FLOW supply increase percentage")
 
 	_ = deployCmd.MarkFlagRequired("fungible-token-addr")
 	_ = deployCmd.MarkFlagRequired("flow-token-addr")
@@ -109,7 +111,7 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) []cadence.Value
 	// current epoch counter
 	currentEpochCounter, err := currentEpoch.Counter()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get current epoch counter from snapshot")
+		log.Fatal().Err(err).Msgf("could not get `currentEpochCounter` from snapshot")
 	}
 
 	// epoch contract name and get code for contract
@@ -121,16 +123,16 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) []cadence.Value
 	// get final view from snapshot
 	finalView, err := currentEpoch.FinalView()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get finalView for current epoch from snapshot")
+		log.Fatal().Err(err).Msgf("could not get `finalView` for current epoch from snapshot")
 	}
 
 	dkgPhase1FinalView, err := currentEpoch.DKGPhase1FinalView()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get dkgPhase1FinalView from snapshot")
+		log.Fatal().Err(err).Msgf("could not get `dkgPhase1FinalView` from snapshot")
 	}
 	dkgPhase2FinalView, err := currentEpoch.DKGPhase2FinalView()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get dkgPhase2FinalView from snapshot")
+		log.Fatal().Err(err).Msgf("could not get `dkgPhase2FinalView` from snapshot")
 	}
 
 	// assume the first view after a spork is 0
@@ -141,14 +143,14 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) []cadence.Value
 	// number of collectors clusters
 	clustering, err := currentEpoch.Clustering()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get clustering for current epoch from snapshot")
+		log.Fatal().Err(err).Msgf("could not get `clustering` for current epoch from snapshot")
 	}
 	numCollectorClusters := len(clustering)
 
 	// random source
 	randomSource, err := currentEpoch.RandomSource()
 	if err != nil {
-		log.Fatal().Err(err).Msgf("could not get randomSource for current epoch from snapshot")
+		log.Fatal().Err(err).Msgf("could not get `randomSource` for current epoch from snapshot")
 	}
 
 	return convertDeployEpochTransactionArguments(epochContractName,
@@ -165,15 +167,60 @@ func getDeployEpochTransactionArguments(snapshot inmem.Snapshot) []cadence.Value
 }
 
 // convertDeployEpochTransactionArguments converts the `deploy_epoch` transaction arguments to cadence representations
-func convertDeployEpochTransactionArguments(contractName string, epochContractCode []byte, currentEpochCounter uint64,
+func convertDeployEpochTransactionArguments(contractName string, contractCode []byte, currentCounter uint64,
 	numViewsInEpoch, numViewsInStakingAuction, numViewsInDKGPhase uint64, numCollectorClusters int,
-	FLOWsupplyIncreasePercentage float64, randomSource []byte, clustering flow.ClusterList) []cadence.Value {
+	FLOWsupplyIncreasePercentage string, randomSource []byte, clustering flow.ClusterList) []cadence.Value {
 
 	// arguments array
 	args := make([]cadence.Value, 0)
 
 	// add contractName
 	cdcContractName, err := cadence.NewString(contractName)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not convert `contractName` to cadence representation")
+	}
+	args = append(args, cdcContractName)
+
+	// add epoch contract code
+	cdcContractCode := epochcmdutil.BytesToCadenceUInt8Array(contractCode)
+	args = append(args, cdcContractCode)
+
+	// add epoch current counter
+	cdcCurrentCounter := cadence.NewUInt64(currentCounter)
+	args = append(args, cdcCurrentCounter)
+
+	// add numViewsInEpoch
+	cdcNumViewsInEpoch := cadence.NewUInt64(numViewsInEpoch)
+	args = append(args, cdcNumViewsInEpoch)
+
+	// add numViewsInStakingAuction
+	cdcNumViewsInStakingAuction := cadence.NewUInt64(numViewsInStakingAuction)
+	args = append(args, cdcNumViewsInStakingAuction)
+
+	// add numViewsInDKGPhase
+	cdcNumViewsInDKGPhase := cadence.NewUInt64(numViewsInDKGPhase)
+	args = append(args, cdcNumViewsInDKGPhase)
+
+	// add numCollectorClusters
+	cdcNumCollectorClusters := cadence.NewUInt16(uint16(numCollectorClusters))
+	args = append(args, cdcNumCollectorClusters)
+
+	// add FLOWSupplyIncreasePercentage
+	// TODO: some sort of validation on the format
+	cdcFlowSupplyIncreasePercentage, err := cadence.NewFix64(FLOWsupplyIncreasePercentage)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not convert `FLOWSupplyIncreasePercentage` to cadence representation")
+	}
+	args = append(args, cdcFlowSupplyIncreasePercentage)
+
+	// add randomSource
+	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not convert `randomSource` to cadence representation")
+	}
+	args = append(args, cdcRandomSource)
+
+	// TODO: add collector clusters
 
 	return args
 }

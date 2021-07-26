@@ -41,3 +41,12 @@ func EncodeArgs(args []cadence.Value) ([]byte, error) {
 
 	return encodedBytes, nil
 }
+
+// BytesToCadenceUInt8Array converts a `[]byte` into the cadence representation of `[Uint8]`
+func BytesToCadenceUInt8Array(b []byte) cadence.Array {
+	values := make([]cadence.Value, len(b))
+	for i, v := range b {
+		values[i] = cadence.NewUInt8(v)
+	}
+	return cadence.NewArray(values)
+}

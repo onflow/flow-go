@@ -5,7 +5,7 @@ var (
 
 	flagPayout string
 
-	flagFlowSupplyIncreasePercentage float64
+	flagFlowSupplyIncreasePercentage string
 
 	// contract address flags
 	flagFungibleTokenAddress string
