@@ -31,23 +31,26 @@ type ReadyDoneAwareNetwork interface {
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	logger            zerolog.Logger
-	codec             network.Codec
-	ids               flow.IdentityList
-	me                module.Local
-	mw                network.Middleware
-	top               network.Topology // used to determine fanout connections
-	metrics           module.NetworkMetrics
-	rcache            *RcvCache // used to deduplicate incoming messages
-	queue             network.MessageQueue
-	ctx               context.Context
-	cancel            context.CancelFunc
-	subMngr           network.SubscriptionManager // used to keep track of subscribed channels
-	stateTransition   sync.Mutex
-	ready             chan struct{}
-	done              chan struct{}
-	startupCommenced  bool
-	shutdownCommenced bool
+	logger  zerolog.Logger
+	codec   network.Codec
+	ids     flow.IdentityList
+	me      module.Local
+	mw      network.Middleware
+	top     network.Topology // used to determine fanout connections
+	metrics module.NetworkMetrics
+	rcache  *RcvCache // used to deduplicate incoming messages
+	queue   network.MessageQueue
+	ctx     context.Context
+	cancel  context.CancelFunc
+	subMngr network.SubscriptionManager // used to keep track of subscribed channels
+
+	// fields for managing the network's start-stop lifecycle
+	stateTransition   sync.Mutex    // lock for preventing concurrent state transitions
+	ready             chan struct{} // used to signal that startup has completed
+	done              chan struct{} // used to signal that shutdown has completed
+	startupCommenced  bool          // indicates whether Ready() has been invoked
+	shutdownCommenced bool          // indicates whether Done() has been invoked
+
 	ReadyDoneAwareNetwork
 }
 
