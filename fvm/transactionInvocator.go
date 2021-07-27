@@ -178,6 +178,7 @@ func (i *TransactionInvocator) Process(
 		programs.Cleanup(nil)
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
+			Err(txError).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
