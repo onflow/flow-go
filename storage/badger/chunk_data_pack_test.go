@@ -31,8 +31,10 @@ func TestChunkDataPack(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve the transaction by ID
-		// Note that ChunkDataPack is stored and retrieved as StoredChunkDataPack.
 		actual, err := store.ByChunkID(chunkID)
+		require.NoError(t, err)
+
+		// Note that ChunkDataPack is stored and retrieved as StoredChunkDataPack.
 		collID := expected.Collection.ID()
 		expectedStored := &storagemodel.StoredChunkDataPack{
 			ChunkID:      expected.ChunkID,
@@ -40,7 +42,6 @@ func TestChunkDataPack(t *testing.T) {
 			Proof:        expected.Proof,
 			CollectionID: &collID,
 		}
-		require.NoError(t, err)
 		assert.Equal(t, expectedStored, actual)
 
 		// re-insert - should be idempotent
