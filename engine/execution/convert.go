@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
-	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 )
 
 func GenerateExecutionResultAndChunkDataPacks(
@@ -137,15 +136,4 @@ func GenerateSystemChunkDataPack(
 		StartState: startState,
 		Proof:      proof,
 	}
-}
-
-// ToChunkDataPack converts a chunk data pack from its storage model to the form that can be sent over wire.
-func ToChunkDataPack(storedChunkDataPack *storagemodel.StoredChunkDataPack, collection *flow.Collection) *flow.ChunkDataPack {
-	if collection != nil {
-		// non-system chunk
-		return GenerateChunkDataPack(storedChunkDataPack.ChunkID, storedChunkDataPack.StartState, collection, storedChunkDataPack.Proof)
-	}
-
-	// system chunk
-	return GenerateSystemChunkDataPack(storedChunkDataPack.ChunkID, storedChunkDataPack.StartState, storedChunkDataPack.Proof)
 }
