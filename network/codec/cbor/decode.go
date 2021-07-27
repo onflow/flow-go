@@ -86,6 +86,10 @@ func switchenv2v(code uint8) (interface{}, error) {
 	case CodeEcho:
 		v = &message.TestMessage{}
 
+	// dkg
+	case CodeDKGMessage:
+		v = &messages.DKGMessage{}
+
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", code)
 	}
@@ -164,6 +168,10 @@ func switchenv2what(code uint8) (string, error) {
 	// testing
 	case CodeEcho:
 		what = "CodeEcho"
+
+	// dkg
+	case CodeDKGMessage:
+		what = "CodeDKGMessage"
 
 	default:
 		return "", errors.Errorf("invalid message code (%d)", code)

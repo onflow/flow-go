@@ -86,6 +86,7 @@ func switchenv2v(env Envelope) (interface{}, error) {
 	case CodeEcho:
 		v = &message.TestMessage{}
 
+	// dkg
 	case CodeDKGMessage:
 		v = &messages.DKGMessage{}
 
@@ -167,6 +168,10 @@ func switchenv2what(env Envelope) (string, error) {
 	// testing
 	case CodeEcho:
 		what = "CodeEcho"
+
+	// dkg
+	case CodeDKGMessage:
+		what = "CodeDKGMessage"
 
 	default:
 		return "", errors.Errorf("invalid message code (%d)", env.Code)
