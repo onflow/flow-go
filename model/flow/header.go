@@ -17,13 +17,18 @@ type Header struct {
 	ChainID        ChainID    // ChainID is a chain-specific value to prevent replay attacks.
 	ParentID       Identifier // ParentID is the ID of this block's parent.
 	Height         uint64
-	PayloadHash    Identifier       // PayloadHash is a hash of the payload of this block.
-	Timestamp      time.Time        // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
-	View           uint64           // View is the view number at which this block was proposed.
-	ParentVoterIDs []Identifier     // list of voters who signed the parent block
-	ParentVoterSig crypto.Signature // aggregated signature over the parent block
-	ProposerID     Identifier       // proposer identifier for the block
-	ProposerSig    crypto.Signature // signature of the proposer over the new block
+	PayloadHash    Identifier   // PayloadHash is a hash of the payload of this block.
+	Timestamp      time.Time    // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
+	View           uint64       // View is the view number at which this block was proposed.
+	ParentVoterIDs []Identifier // list of voters who signed the parent block. This is used as QC.SignerIDs
+	// aggregated signature over the parent block. This is used as QC.SigData
+	// The reason its type is not crypto.Signature is that
+	// the signature could be a serialization of multi sigs
+	ParentVoterSig []byte
+	ProposerID     Identifier // proposer identifier for the block
+	// signature of the proposer over the new block. The reason its type is not crypto.Signature is that
+	// the signature could be a serialization of multi sigs
+	ProposerSig []byte
 }
 
 // Body returns the immutable part of the block header.
