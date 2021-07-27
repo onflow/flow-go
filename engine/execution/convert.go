@@ -35,6 +35,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		var chunk *flow.Chunk
 		// account for system chunk being last
 		if i < len(result.StateCommitments)-1 {
+			// non-system chunks
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collection := completeCollection.Collection()
@@ -42,15 +43,13 @@ func GenerateExecutionResultAndChunkDataPacks(
 			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
 		} else {
 			// system chunk
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1) // for system chunk
-			chdps[i] = GenerateSystemChunkDataPack(chunk.ID(), startState, result.Proofs[i])
+			// note that system chunk does not have a collection.
+			// also, number of transactions is one for system chunk.
+			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
+			// system chunk has a nil collection.
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
 		}
 
-		// eventsHash := result.EventsHashes[i]
-		// chunk := GenerateChunk(i, startState, endState, blockID, eventsHash, uint16(txNumber))
-
-		// chunkDataPack
-		// chdps[i] = GenerateStoredChunkDataPack(chunk, &collectionID, result.Proofs[i])
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
@@ -123,17 +122,5 @@ func GenerateChunkDataPack(
 		StartState: startState,
 		Proof:      proof,
 		Collection: collection,
-	}
-}
-
-func GenerateSystemChunkDataPack(
-	chunkID flow.Identifier,
-	startState flow.StateCommitment,
-	proof flow.StorageProof,
-) *flow.ChunkDataPack {
-	return &flow.ChunkDataPack{
-		ChunkID:    chunkID,
-		StartState: startState,
-		Proof:      proof,
 	}
 }
