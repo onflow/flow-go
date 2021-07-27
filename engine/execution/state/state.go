@@ -312,17 +312,23 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
 	}
 
-	collection, err := s.GetCollection(*storedChunkDataPack.CollectionID)
-	if err != nil {
-		return nil, fmt.Errorf("could not retrieve collection for chunk data pack: %w", err)
-	}
-
-	return &flow.ChunkDataPack{
+	chunkDataPack := &flow.ChunkDataPack{
 		ChunkID:    storedChunkDataPack.ChunkID,
 		StartState: storedChunkDataPack.StartState,
 		Proof:      storedChunkDataPack.Proof,
-		Collection: collection,
-	}, nil
+	}
+
+	if storedChunkDataPack.CollectionID != nil {
+		// non-system chunks have a non-nil collection
+		collection, err := s.GetCollection(*storedChunkDataPack.CollectionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrieve collection for chunk data pack: %w", err)
+		}
+
+		chunkDataPack.Collection = collection
+	}
+
+	return chunkDataPack, nil
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
