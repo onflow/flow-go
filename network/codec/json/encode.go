@@ -171,6 +171,10 @@ func switchv2what(v interface{}) (string, error) {
 	case *message.TestMessage:
 		what = "CodeEcho"
 
+	// dkg
+	case *messages.DKGMessage:
+		what = "CodeDKGMessage"
+
 	default:
 		return "", errors.Errorf("invalid encode type (%T)", v)
 	}
