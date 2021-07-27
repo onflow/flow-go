@@ -309,6 +309,7 @@ func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.Acco
 }
 
 // CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
+// this can be used to exhaust an account's storage.
 func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
 	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
 	require.NoError(t, err)
