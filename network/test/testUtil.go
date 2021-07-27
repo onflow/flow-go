@@ -82,7 +82,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			metrics,
 			rootBlockID,
 			p2p.DefaultPeerUpdateInterval,
-			p2p.DefaultUnicastTimeout)
+			p2p.DefaultUnicastTimeout,
+			true,
+			true)
 	}
 	return mws
 }
