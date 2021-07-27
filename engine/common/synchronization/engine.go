@@ -310,6 +310,7 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 			Logger()
 		if errors.Is(err, engine.IncompatibleInputTypeError) {
 			lg.Error().Msg("received message with incompatible type")
+			return
 		}
 		lg.Fatal().Msg("internal error processing message")
 	}
