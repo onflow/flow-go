@@ -258,6 +258,19 @@ func TestLevelledForest_GetVertex(t *testing.T) {
 	assert.False(t, exists)
 }
 
+// TestLevelledForest_GetSize tests that GetSize returns valid size when adding and pruning vertices
+func TestLevelledForest_GetSize(t *testing.T) {
+	F := NewLevelledForest(0)
+	assert.Equal(t, uint64(0), F.GetSize())
+	F.AddVertex(TestVertices["A"])
+	assert.Equal(t, uint64(1), F.GetSize())
+	F.AddVertex(TestVertices["B"])
+	assert.Equal(t, uint64(2), F.GetSize())
+	err := F.PruneUpToLevel(TestVertices["B"].Level())
+	assert.NoError(t, err)
+	assert.Equal(t, uint64(1), F.GetSize())
+}
+
 // TestLevelledForest_GetVertex tests that Vertex blob is returned properly
 func TestLevelledForest_PruneAtLevel(t *testing.T) {
 	F := populateNewForest(t)

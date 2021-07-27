@@ -16,6 +16,7 @@ import (
 type LevelledForest struct {
 	vertices        VertexSet
 	verticesAtLevel map[uint64]VertexList
+	size            uint64
 	LowestLevel     uint64
 }
 
@@ -57,6 +58,8 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		return nil
 	}
 
+	elementsPruned := 0
+
 	// to optimize the pruning large level-ranges, we compare:
 	//  * the number of levels for which we have stored vertex containers: len(f.verticesAtLevel)
 	//  * the number of levels that need to be pruned: level-f.LowestLevel
@@ -64,6 +67,7 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 	if uint64(len(f.verticesAtLevel)) < level-f.LowestLevel {
 		for l, vertices := range f.verticesAtLevel {
 			if l < level {
+				elementsPruned += len(vertices)
 				for _, v := range vertices {
 					delete(f.vertices, v.id)
 				}
@@ -72,7 +76,9 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		}
 	} else {
 		for l := f.LowestLevel; l < level; l++ {
-			for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
+			verticesAtLevel := f.verticesAtLevel[l]
+			elementsPruned += len(verticesAtLevel)
+			for _, v := range verticesAtLevel { // nil map behaves like empty map when iterating over it
 				delete(f.vertices, v.id)
 			}
 			delete(f.verticesAtLevel, l)
@@ -80,6 +86,7 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		}
 	}
 	f.LowestLevel = level
+	f.size -= uint64(elementsPruned)
 	return nil
 }
 
@@ -102,6 +109,10 @@ func (f *LevelledForest) GetVertex(id flow.Identifier) (Vertex, bool) {
 		return nil, false
 	}
 	return container.vertex, true
+}
+
+func (f *LevelledForest) GetSize() uint64 {
+	return f.size
 }
 
 // GetChildren returns a VertexIterator to iterate over the children
@@ -157,6 +168,7 @@ func (f *LevelledForest) AddVertex(vertex Vertex) {
 	// container is empty, i.e. full vertex is new and should be stored in container
 	container.vertex = vertex // add vertex to container
 	f.registerWithParent(container)
+	f.size += 1
 }
 
 func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {
