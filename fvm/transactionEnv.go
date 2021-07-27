@@ -238,6 +238,15 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 	return len(v) > 0, nil
 }
 
+// AllocateStorageAddress allocates new storage address under the owner accounts to store a new register
+func (e *TransactionEnv) AllocateStorageAddress(owner []byte) (uint64, error) {
+	v, err := e.AllocateStorageAddress(owner)
+	if err != nil {
+		return 0, fmt.Errorf("checking value existence failed: %w", err)
+	}
+	return v, nil
+}
+
 func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
