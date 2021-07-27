@@ -76,6 +76,7 @@ func (lm *LifecycleManager) OnStart(startupFn func()) {
 	lm.stateTransition.Lock()
 	if lm.shutdownCommenced || lm.startupCommenced {
 		lm.stateTransition.Unlock()
+		return
 	}
 	lm.startupCommenced = true
 	lm.stateTransition.Unlock()
@@ -93,6 +94,7 @@ func (lm *LifecycleManager) OnStop(shutdownFn func()) {
 	lm.stateTransition.Lock()
 	if lm.shutdownCommenced {
 		lm.stateTransition.Unlock()
+		return
 	}
 	lm.shutdownCommenced = true
 	lm.stateTransition.Unlock()
