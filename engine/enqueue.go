@@ -50,17 +50,16 @@ func NewMessageHandler(log zerolog.Logger, notifier Notifier, patterns ...Patter
 	}
 }
 
-func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) (err error) {
-
+// Process iterates over the internal processing patterns and determines if the payload matches.
+// The _first_ matching pattern processes the payload.
+// Returns
+//  * IncompatibleInputTypeError if no matching processor was found
+//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
+func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) error {
 	msg := &Message{
 		OriginID: originID,
 		Payload:  payload,
 	}
-
-	log := e.log.
-		Warn().
-		Str("msg_type", logging.Type(payload)).
-		Hex("origin_id", originID[:])
 
 	for _, pattern := range e.patterns {
 		if pattern.Match(msg) {
@@ -68,23 +67,26 @@ func (e *MessageHandler) Process(originID flow.Identifier, payload interface{}) 
 			if pattern.Map != nil {
 				msg, keep = pattern.Map(msg)
 				if !keep {
-					return
+					return nil
 				}
 			}
 
 			ok := pattern.Store.Put(msg)
 			if !ok {
-				log.Msg("failed to store message - discarding")
-				return
+				e.log.Warn().
+					Str("msg_type", logging.Type(payload)).
+					Hex("origin_id", originID[:]).
+					Msg("failed to store message - discarding")
+				return nil
 			}
 			e.notifier.Notify()
 
 			// message can only be matched by one pattern, and processed by one handler
-			return
+			return nil
 		}
 	}
 
-	return fmt.Errorf("no matching processor pattern for message, type: %T, origin: %x", payload, originID[:])
+	return fmt.Errorf("no matching processor for message of type %T from origin %x: %w", payload, originID[:], IncompatibleInputTypeError)
 }
 
 func (e *MessageHandler) GetNotifier() <-chan struct{} {
