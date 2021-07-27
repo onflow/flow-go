@@ -8,7 +8,7 @@ type ReadyDoneAware interface {
 	// startup has completed.
 	// If shutdown has already commenced before this method is called for the first time,
 	// startup will not be performed and the returned channel will never close.
-	// This is an idempotent method.
+	// This should be an idempotent method.
 	Ready() <-chan struct{}
 
 	// Done commences shutdown of the module, and returns a done channel that is closed once
