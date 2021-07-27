@@ -94,7 +94,7 @@ func EjectTrueRandomFast(b *Backend) bool {
 			// There is a (1 in b.guaranteedCapacity) chance that the
 			// next value in mapIndices is a duplicate. If a duplicate is
 			// found, skip it by incrementing 'idx'
-			for ; next2Remove == mapIndices[idx] && idx < overcapacity; idx++ {
+			for ; idx < overcapacity && next2Remove == mapIndices[idx]; idx++ {
 			}
 
 			if idx == overcapacity {
