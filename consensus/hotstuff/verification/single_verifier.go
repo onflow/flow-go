@@ -33,7 +33,7 @@ func NewSingleVerifier(committee hotstuff.Committee, verifier module.Aggregating
 func (s *SingleVerifier) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the message we verify against and check signature
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	valid, err := s.verifier.Verify(msg, sigData, voter.StakingPubKey)
 	if err != nil {
 		return false, fmt.Errorf("could not verify signature: %w", err)
@@ -46,7 +46,7 @@ func (s *SingleVerifier) VerifyVote(voter *flow.Identity, sigData []byte, block 
 func (s *SingleVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the message we verify against and check signature
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// compute the aggregated key of signers
 	aggregatedKey, err := s.keysAggregator.aggregatedStakingKey(signers)

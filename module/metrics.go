@@ -53,6 +53,8 @@ type ComplianceMetrics interface {
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
 	BlockProposalDuration(duration time.Duration)
+	CurrentEpochCounter(counter uint64)
+	CurrentEpochPhase(phase flow.EpochPhase)
 }
 
 type CleanerMetrics interface {

@@ -18,13 +18,14 @@ import (
 
 const ServiceAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
-// Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "ba98d757e63a352dbd555509b5a26014f3fe30ca7770fb37ce831eb1b8f035aa"
+
+const GenesisStateCommitmentHex = "e821d24672039a895babe57ffd4654d9f56a8d1dda61acdaa08254c275674e76"
 
 var GenesisStateCommitment flow.StateCommitment
 
 var GenesisTokenSupply = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("10000000.00000000")
+	//value, err := cadence.NewUFix64("10000000000.0") // 10 billion
+	value, err := cadence.NewUFix64("1000000000.0") // 1 billion
 	if err != nil {
 		panic(fmt.Errorf("invalid genesis token supply: %w", err))
 	}
