@@ -242,7 +242,7 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 func (e *TransactionEnv) AllocateStorageAddress(owner []byte) (uint64, error) {
 	v, err := e.AllocateStorageAddress(owner)
 	if err != nil {
-		return 0, fmt.Errorf("checking value existence failed: %w", err)
+		return 0, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
 }
