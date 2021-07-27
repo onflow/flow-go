@@ -28,6 +28,9 @@ func TestBinstatInternal(t *testing.T) {
 	bs1 := Enter("~2egEnter")
 	DebugParams(bs1, "foo")
 	LeaveVal(bs1, 123)
+	bs1.GetSizeRange()
+	bs1.GetTimeRange()
+	bs1.GetWhat()
 
 	bs2 := EnterTimeVal("~2egEnterTimeVal", 123)
 	Point(bs2, "myPoint")

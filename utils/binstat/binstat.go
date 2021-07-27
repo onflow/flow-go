@@ -129,6 +129,8 @@ type BinStat struct {
 	callerTime     bool
 	callerSize     int64
 	callerSizeWhen int
+	keySizeRange   string
+	keyTimeRange   string
 }
 
 const (
@@ -279,7 +281,7 @@ func enterGeneric(what string, callerTime bool, callerSize int64, callerSizeWhen
 	}
 
 	callerParams := ""
-	bs := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen}
+	bs := BinStat{what[0:whatLen], t, funcName, fileLine, callerParams, callerTime, callerSize, callerSizeWhen, "", ""}
 
 	t2 := runtimeNanoAsTimeDuration()
 
@@ -310,30 +312,28 @@ func pointGeneric(bs *BinStat, pointUnique string, callerSize int64, callerSizeW
 		bs.callerSizeWhen = callerSizeWhen
 		bs.callerSize = callerSize
 	}
-	var keySizeRange string
-	var keyTimeRange string
 	var pointType string
 	switch pointUnique {
 	case "Leave":
 		pointType = "leave"
 		switch bs.callerSizeWhen {
 		case sizeAtEnter:
-			keySizeRange = fmt.Sprintf("/size[%s]", x_2_y(float64(bs.callerSize), true))
+			bs.keySizeRange = fmt.Sprintf("/size[%s]", x_2_y(float64(bs.callerSize), true))
 		case sizeNotUsed:
-			keySizeRange = ""
+			bs.keySizeRange = ""
 		case sizeAtLeave:
-			keySizeRange = fmt.Sprintf("/size[%s]", x_2_y(float64(bs.callerSize), true))
+			bs.keySizeRange = fmt.Sprintf("/size[%s]", x_2_y(float64(bs.callerSize), true))
 		}
 	case "":
 	default:
 		pointType = "point"
-		keySizeRange = fmt.Sprintf("/size[%s]", pointUnique)
+		bs.keySizeRange = fmt.Sprintf("/size[%s]", pointUnique)
 	}
 	if bs.callerTime {
 		elapsedSeconds := elapsedNanoAsTimeDuration.Seconds()
-		keyTimeRange = fmt.Sprintf("/time[%s]", x_2_y(elapsedSeconds, false))
+		bs.keyTimeRange = fmt.Sprintf("/time[%s]", x_2_y(elapsedSeconds, false))
 	}
-	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), bs.what, keySizeRange, keyTimeRange)
+	key := fmt.Sprintf("/GOMAXPROCS=%d,CPUS=%d/what[%s]%s%s", runtime.GOMAXPROCS(0), runtime.NumCPU(), bs.what, bs.keySizeRange, bs.keyTimeRange)
 
 tryAgainRaceCondition:
 	var frequency uint64
@@ -545,6 +545,11 @@ func Dump(dmpNonDefaultName string) {
 		global.log.Warn().Msgf("WARN: .Rename(%s, %s)=%s\n", fileTmp, fileNew, err)
 	}
 }
+
+// functions for exposing binstat internals e.g. for running non-production experiments sampling data, etc
+func (bs *BinStat) GetSizeRange() string { return bs.keySizeRange }
+func (bs *BinStat) GetTimeRange() string { return bs.keyTimeRange }
+func (bs *BinStat) GetWhat() string      { return bs.what }
 
 // functions BEFORE go fmt v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v
 
