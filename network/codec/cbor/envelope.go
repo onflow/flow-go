@@ -49,5 +49,8 @@ const (
 	// testing
 	CodeEcho
 
+	// DKG
+	CodeDKGMessage
+
 	CodeMax
 )
