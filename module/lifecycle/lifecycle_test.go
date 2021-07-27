@@ -6,11 +6,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/suite"
+
 	realmodule "github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/suite"
 )
 
 type LifecycleManagerSuite struct {
