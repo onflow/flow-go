@@ -206,7 +206,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		computedServiceEvents := make(flow.ServiceEventList, len(result.ServiceEvents))
 
 		for i, serviceEvent := range serviceEvents {
-			realServiceEvent, err := convert.ServiceEvent(serviceEvent)
+			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
 			if err != nil {
 				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
 			}

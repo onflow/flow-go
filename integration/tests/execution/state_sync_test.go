@@ -41,7 +41,7 @@ func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, &s.ReceiptState)
+	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1

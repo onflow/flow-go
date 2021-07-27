@@ -203,12 +203,26 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	c.log.Info().Msgf("reloading assignments from %d unfinalized blocks into collector tree", len(validPending))
 
+	// We use AssignmentCollectorTree for collecting approvals for each incorporated result.
+	// In order to verify the received approvals, the verifier assignment for each incorporated result
+	// needs to be known.
+	// The verifier assignment is random, its Source of Randomness (SoR) is only available if a valid
+	// child block exists.
+	// In other words, the parent of a valid block must have the SoR available. Therefore, we traverse
+	// through valid pending blocks which already have a valid child, and load each result in those block
+	// into the AssignmentCollectorTree.
 	for _, blockID := range validPending {
 		block, err := c.headers.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", blockID, err)
 		}
-		err = resultProcessor(block)
+
+		parent, err := c.headers.ByBlockID(block.ParentID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", block.ParentID, err)
+		}
+
+		err = resultProcessor(parent)
 		if err != nil {
 			return fmt.Errorf("failed to process results for unfinalized block %x at height %d: %w", blockID, block.Height, err)
 		}

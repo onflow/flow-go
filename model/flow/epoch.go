@@ -40,7 +40,7 @@ func (p EpochPhase) String() string {
 
 // EpochSetupRandomSourceLength is the required length of the random source
 // included in an EpochSetup service event.
-const EpochSetupRandomSourceLength = crypto.SignatureLenBLSBLS12381
+const EpochSetupRandomSourceLength = 16
 
 // EpochSetup is a service event emitted when the network is ready to set up
 // for the upcoming epoch. It contains the participants in the epoch, the
