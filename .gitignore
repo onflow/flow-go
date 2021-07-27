@@ -5,6 +5,7 @@
 /cmd/verification/verification
 /cmd/testclient/testclient
 /cmd/util/util
+/cmd/bootstrap/bootstrap
 
 # Test binary, build with `go test -c`
 *.test
@@ -48,4 +49,3 @@ language/tools/vscode-extension/out/*
 read-badger
 read-protocol-state
 remove-execution-fork
-bootstrap

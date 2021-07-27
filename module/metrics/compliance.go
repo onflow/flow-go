@@ -20,11 +20,27 @@ type ComplianceCollector struct {
 	lastBlockFinalizedAt     time.Time
 	finalizedBlocksPerSecond prometheus.Summary
 	committedEpochFinalView  prometheus.Gauge
+	currentEpochCounter      prometheus.Gauge
+	currentEpochPhase        prometheus.Gauge
 }
 
 func NewComplianceCollector() *ComplianceCollector {
 
 	cc := &ComplianceCollector{
+
+		currentEpochCounter: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_epoch_counter",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the current epoch's counter",
+		}),
+
+		currentEpochPhase: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_epoch_phase",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the current epoch's phase",
+		}),
 
 		committedEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "committed_epoch_final_view",
@@ -139,4 +155,12 @@ func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
 
 func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
 	cc.committedEpochFinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {
+	cc.currentEpochCounter.Set(float64(counter))
+}
+
+func (cc *ComplianceCollector) CurrentEpochPhase(phase flow.EpochPhase) {
+	cc.currentEpochCounter.Set(float64(phase))
 }
