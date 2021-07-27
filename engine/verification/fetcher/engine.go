@@ -419,8 +419,7 @@ func (e Engine) validateCollectionID(
 	return e.validateNonSystemChunkCollection(chunkDataPack, chunk)
 }
 
-// validateSystemChunkCollection returns nil if the collection is matching the system chunk data pack.
-// A collection is valid against a system chunk if collection is empty of transactions.
+// validateSystemChunkCollection returns nil if the system chunk data pack has a nil collection.
 func (e Engine) validateSystemChunkCollection(chunkDataPack *flow.ChunkDataPack) error {
 	// collection of a system chunk should be nil
 	if chunkDataPack.Collection != nil {
