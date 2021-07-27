@@ -13,7 +13,13 @@ import (
 
 func TestChunkDataPack(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.StoredChunkDataPackFixture(unittest.IdentifierFixture())
+		collectionID := unittest.IdentifierFixture()
+		expected := &storagemodel.StoredChunkDataPack{
+			ChunkID:      unittest.IdentifierFixture(),
+			StartState:   unittest.StateCommitmentFixture(),
+			Proof:        []byte{'p'},
+			CollectionID: &collectionID,
+		}
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
 			var actual storagemodel.StoredChunkDataPack

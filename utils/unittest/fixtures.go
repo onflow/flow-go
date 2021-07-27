@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
@@ -1260,28 +1259,6 @@ func WithStartState(startState flow.StateCommitment) func(*flow.ChunkDataPack) {
 	return func(cdp *flow.ChunkDataPack) {
 		cdp.StartState = startState
 	}
-}
-
-func WithCollectionID(collID flow.Identifier) func(*storagemodel.StoredChunkDataPack) {
-	return func(storedChunkDataPack *storagemodel.StoredChunkDataPack) {
-		storedChunkDataPack.CollectionID = &collID
-	}
-}
-
-func StoredChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*storagemodel.StoredChunkDataPack)) *storagemodel.StoredChunkDataPack {
-	collectionID := IdentifierFixture()
-	cdp := &storagemodel.StoredChunkDataPack{
-		ChunkID:      chunkID,
-		StartState:   StateCommitmentFixture(),
-		Proof:        []byte{'p'},
-		CollectionID: &collectionID,
-	}
-
-	for _, opt := range opts {
-		opt(cdp)
-	}
-
-	return cdp
 }
 
 func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataPack)) *flow.ChunkDataPack {
