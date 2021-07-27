@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
-	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,17 +34,12 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
-		collectionID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
 		ps.On("AtBlockID", blockID).Return(ss)
-		ss.On("Identity", originID).
-			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
-		execState.
-			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&storagemodel.StoredChunkDataPack{ChunkID: chunkID, CollectionID: &collectionID}, nil)
-		execState.
-			On("GetBlockIDByChunkID", chunkID).
-			Return(blockID, nil)
+		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)), nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -71,17 +65,12 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
-		collectionID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
 		ps.On("AtBlockID", blockID).Return(ss)
-		ss.On("Identity", originID).
-			Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
-		execState.
-			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&storagemodel.StoredChunkDataPack{ChunkID: chunkID, CollectionID: &collectionID}, nil)
-		execState.
-			On("GetBlockIDByChunkID", chunkID).
-			Return(blockID, nil)
+		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -107,17 +96,12 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originID := unittest.IdentifierFixture()
 		chunkID := unittest.IdentifierFixture()
 		blockID := unittest.IdentifierFixture()
-		collectionID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 
 		ps.On("AtBlockID", blockID).Return(ss)
-		ss.On("Identity", originID).
-			Return(nil, protocol.IdentityNotFoundError{})
-		execState.
-			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(&storagemodel.StoredChunkDataPack{ChunkID: chunkID, CollectionID: &collectionID}, nil)
-		execState.
-			On("GetBlockIDByChunkID", chunkID).
-			Return(blockID, nil)
+		ss.On("Identity", originID).Return(nil, protocol.IdentityNotFoundError{})
+		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -137,9 +121,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		ss := new(mockprotocol.Snapshot)
 
 		execState := new(state.ExecutionState)
-		execState.
-			On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).
-			Return(nil, errors.New("not found!"))
+		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(nil, errors.New("not found!"))
 
 		e := Engine{state: ps, unit: engine.NewUnit(), execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
 
