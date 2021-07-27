@@ -198,6 +198,21 @@ func (bs *BlockState) HighestSealed() (*messages.BlockProposal, bool) {
 	return bs.highestSealed, true
 }
 
+func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.BlockProposal {
+	timeout := 2 * blockStateTimeout
+	require.Eventually(t,
+		func() bool {
+			if bs.highestSealed != nil {
+				fmt.Println("waiting for sealed", bs.highestSealed.Header.View, view)
+			}
+			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
+		},
+		timeout,
+		100*time.Millisecond,
+		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, timeout))
+	return bs.highestSealed
+}
+
 func (bs *BlockState) FinalizedHeight(currentHeight uint64) (*messages.BlockProposal, bool) {
 	bs.RLock()
 	defer bs.RUnlock()

@@ -2,6 +2,7 @@ package convert
 
 import (
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -11,9 +12,20 @@ import (
 
 // EpochSetupFixture returns an EpochSetup service event as a Cadence event
 // representation and as a protocol model representation.
-func EpochSetupFixture() (flow.Event, *flow.EpochSetup) {
-	event := unittest.EventFixture(flow.EventEpochSetup, 1, 1, unittest.IdentifierFixture(), 2)
+func EpochSetupFixture(chain flow.ChainID) (flow.Event, *flow.EpochSetup) {
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := unittest.EventFixture(events.EpochSetup.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochSetupFixtureJSON)
+
+	// randomSource is [0,0,...,1,2,3,4]
+	randomSource := make([]uint8, flow.EpochSetupRandomSourceLength)
+	for i := 0; i < 4; i++ {
+		randomSource[flow.EpochSetupRandomSourceLength-1-i] = uint8(4 - i)
+	}
 
 	expected := &flow.EpochSetup{
 		Counter:            1,
@@ -22,7 +34,7 @@ func EpochSetupFixture() (flow.Event, *flow.EpochSetup) {
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 160,
 		DKGPhase3FinalView: 170,
-		RandomSource:       []byte{1, 2, 3, 4},
+		RandomSource:       randomSource,
 		Assignments: flow.AssignmentList{
 			{
 				flow.MustHexStringToIdentifier("0000000000000000000000000000000000000000000000000000000000000001"),
@@ -98,8 +110,14 @@ func EpochSetupFixture() (flow.Event, *flow.EpochSetup) {
 
 // EpochCommitFixture returns an EpochCommit service event as a Cadence event
 // representation and as a protocol model representation.
-func EpochCommitFixture() (flow.Event, *flow.EpochCommit) {
-	event := unittest.EventFixture(flow.EventEpochCommit, 1, 1, unittest.IdentifierFixture(), 0)
+func EpochCommitFixture(chain flow.ChainID) (flow.Event, *flow.EpochCommit) {
+
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		panic(err)
+	}
+
+	event := unittest.EventFixture(events.EpochCommit.EventType(), 1, 1, unittest.IdentifierFixture(), 0)
 	event.Payload = []byte(epochCommitFixtureJSON)
 
 	expected := &flow.EpochCommit{
@@ -914,7 +932,7 @@ var epochSetupFixtureJSON = `
             {
               "type": "Struct",
               "value": {
-                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.Cluster",
+                "id": "A.01cf0e2f2f715450.FlowClusterQC.Cluster",
                 "fields": [
                   {
                     "name": "index",
@@ -971,7 +989,7 @@ var epochSetupFixtureJSON = `
             {
               "type": "Struct",
               "value": {
-                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.Cluster",
+                "id": "A.01cf0e2f2f715450.FlowClusterQC.Cluster",
                 "fields": [
                   {
                     "name": "index",
@@ -1082,7 +1100,7 @@ var epochCommitFixtureJSON = `
                         {
                             "type": "Struct",
                             "value": {
-                                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.ClusterQC",
+                                "id": "A.01cf0e2f2f715450.FlowClusterQC.ClusterQC",
                                 "fields": [
                                     {
                                         "name": "index",
@@ -1092,7 +1110,7 @@ var epochCommitFixtureJSON = `
                                         }
                                     },
                                     {
-                                        "name": "votes",
+                                        "name": "voteSignatures",
                                         "value": {
                                             "type": "Array",
                                             "value": [
@@ -1107,6 +1125,13 @@ var epochCommitFixtureJSON = `
                                             ]
                                         }
                                     },
+									{
+										"name": "voteMessage",
+										"value": {
+											"type": "String",
+											"value": "irrelevant_for_these_purposes"
+										}
+									},
 									{
                                         "name": "voterIDs",
                                         "value": {
@@ -1129,7 +1154,7 @@ var epochCommitFixtureJSON = `
                         {
                             "type": "Struct",
                             "value": {
-                                "id": "A.01cf0e2f2f715450.FlowEpochClusterQC.ClusterQC",
+                                "id": "A.01cf0e2f2f715450.FlowClusterQC.ClusterQC",
                                 "fields": [
                                     {
                                         "name": "index",
@@ -1139,7 +1164,7 @@ var epochCommitFixtureJSON = `
                                         }
                                     },
                                     {
-                                        "name": "votes",
+                                        "name": "voteSignatures",
                                         "value": {
                                             "type": "Array",
                                             "value": [
@@ -1154,6 +1179,13 @@ var epochCommitFixtureJSON = `
                                             ]
                                         }
                                     },
+									{
+										"name": "voteMessage",
+										"value": {
+											"type": "String",
+											"value": "irrelevant_for_these_purposes"
+										}
+									},
 									{
                                         "name": "voterIDs",
                                         "value": {

@@ -53,7 +53,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
 	*mocknetwork.Engine, *sync.WaitGroup) {
 
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
+	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
@@ -167,7 +167,7 @@ func SetupMockConsensusNode(t *testing.T,
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
+	conNode := testutil.GenericNodeFromParticipants(t, hub, conIdentity, othersIdentity, chainID)
 	conEngine := new(mocknetwork.Engine)
 
 	// map form verIds --> result approval ID
@@ -590,7 +590,8 @@ func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemo
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch

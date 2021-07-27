@@ -44,7 +44,7 @@ func NewCombinedVerifier(committee hotstuff.Committee, staking module.Aggregatin
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the to-be-signed message
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
 	stakingSig, beaconShare, err := c.merger.Split(sigData)
@@ -94,7 +94,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
 	}
 
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	// TODO: verify if batch verification is faster
 
 	// verify the beacon signature first

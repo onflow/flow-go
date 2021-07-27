@@ -8,19 +8,17 @@ import (
 
 	"github.com/dapperlabs/testingdock"
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/model/flow/filter"
-
+	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go-sdk/templates"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	sdk "github.com/onflow/flow-go-sdk"
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go-sdk/templates"
-
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 // timeout for individual actions
@@ -124,13 +122,17 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
+		// TODO replace these with actual values
+		testnet.WithAdditionalFlag("--access-address=null"),
 	}
 
-	consensusConfigs := append(collectionConfigs,
+	consensusConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-	)
+	}
 
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
@@ -180,8 +182,6 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
 		SetPayer(serviceAddress)
-
-	fmt.Println(">> creating new account...")
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
