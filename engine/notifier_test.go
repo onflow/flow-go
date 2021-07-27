@@ -118,7 +118,6 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 // all workers eventually get a notification.
 func TestNotifier_AllWorkProcessed(t *testing.T) {
 	singleTestRun := func(t *testing.T) {
-		t.Parallel()
 		notifier := NewNotifier()
 
 		totalWork := int32(100)
