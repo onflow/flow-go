@@ -235,6 +235,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Logger()
 
 	if chunkDataPack.Collection != nil {
+		// non-system chunk data packs have non-nil collection
 		lg = lg.With().
 			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
 			Logger()
