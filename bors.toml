@@ -1,0 +1,8 @@
+status = [
+  "golangci",
+  "unit-test",
+  "integration-test",
+]
+
+delete_merged_branches = true
+required_approvals = 2
