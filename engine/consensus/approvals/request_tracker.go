@@ -37,7 +37,7 @@ func NewRequestTrackerItem(blackoutPeriodMin, blackoutPeriodMax int) RequestTrac
 	return item
 }
 
-// Update increments the number of requests and recomputes the NextTimeout.
+// Update creates a _new_ RequestTrackerItem with incremented request number and updated NextTimeout.
 func (i RequestTrackerItem) Update() RequestTrackerItem {
 	i.Requests++
 	i.NextTimeout = randBlackout(i.blackoutPeriodMin, i.blackoutPeriodMax)

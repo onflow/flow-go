@@ -125,7 +125,8 @@ func main() {
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 		}).
-		Module("mutable follower state", func(node *cmd.FlowNodeBuilder) error {
+		Initialize().
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -142,39 +143,39 @@ func main() {
 			)
 			return err
 		}).
-		Module("execution metrics", func(node *cmd.FlowNodeBuilder) error {
+		Module("execution metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("sync core", func(node *cmd.FlowNodeBuilder) error {
+		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
-		Module("execution receipts storage", func(node *cmd.FlowNodeBuilder) error {
+		Module("execution receipts storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
 			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
 			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
 			return nil
 		}).
-		Module("pending block cache", func(node *cmd.FlowNodeBuilder) error {
+		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
-		Module("state deltas mempool", func(node *cmd.FlowNodeBuilder) error {
+		Module("state deltas mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
-		Module("stake checking function", func(node *cmd.FlowNodeBuilder) error {
+		Module("stake checking function", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
 				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 			}
 			return nil
 		}).
-		Component("Write-Ahead Log", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("Write-Ahead Log", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer, collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 			return diskWAL, err
 		}).
-		Component("execution state ledger", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("execution state ledger", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
@@ -188,7 +189,7 @@ func main() {
 			if !bootstrapped {
 				// when bootstrapping, the bootstrap folder must have a checkpoint file
 				// we need to cover this file to the trie folder to restore the trie to restore the execution state.
-				err = copyBootstrapState(node.BaseConfig.BootstrapDir, triedir)
+				err = copyBootstrapState(node.BootstrapDir, triedir)
 				if err != nil {
 					return nil, fmt.Errorf("could not load bootstrap state from checkpoint file: %w", err)
 				}
@@ -212,7 +213,7 @@ func main() {
 			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
-		Component("execution state ledger WAL compactor", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("execution state ledger WAL compactor", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			checkpointer, err := ledgerStorage.Checkpointer()
 			if err != nil {
@@ -222,7 +223,7 @@ func main() {
 
 			return compactor, nil
 		}).
-		Component("provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
 			if err != nil {
@@ -294,7 +295,7 @@ func main() {
 
 			return providerEngine, err
 		}).
-		Component("checker engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("checker engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			checkerEng = checker.New(
 				node.Logger,
 				node.State,
@@ -303,7 +304,7 @@ func main() {
 			)
 			return checkerEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.HasRole(flow.RoleCollection),
@@ -354,7 +355,7 @@ func main() {
 
 			return ingestionEng, err
 		}).
-		Component("follower engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
@@ -414,13 +415,13 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("collection requester engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("collection requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return collectionRequester, nil
 		}).
-		Component("receipt provider engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("receipt provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			retrieve := func(blockID flow.Identifier) (flow.Entity, error) { return myReceipts.MyReceipt(blockID) }
 			eng, err := provider.New(
 				node.Logger,
@@ -434,7 +435,7 @@ func main() {
 			)
 			return eng, err
 		}).
-		Component("synchronization engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("synchronization engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
 				node.Logger,
@@ -454,7 +455,7 @@ func main() {
 
 			return syncEngine, nil
 		}).
-		Component("grpc server", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("grpc server", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
