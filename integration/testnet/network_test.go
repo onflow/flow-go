@@ -10,7 +10,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-var defaultRegistry = "gcr.io/dl-flow"
+// var defaultRegistry = "gcr.io/dl-flow"
+var defaultRegistry = "gcr.io/flow-container-registry"
 
 // data for easy asserting interesting fields
 type nodeInfo struct {
