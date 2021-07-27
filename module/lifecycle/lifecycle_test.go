@@ -111,6 +111,7 @@ func (suite *LifecycleManagerSuite) TestHappyPath() {
 }
 
 func TestLifecycleManager(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(LifecycleManagerSuite))
 }
 
