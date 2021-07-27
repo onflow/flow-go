@@ -659,10 +659,10 @@ func mockVerifierEngine(t *testing.T,
 			require.True(t, ok, "verifier engine received an unknown verifiable chunk data")
 
 			if vc.IsSystemChunk {
-				// system chunk has an empty collection
-				// TODO: nil checkign
+				// system chunk has an nil collection.
 				require.Nil(t, vc.ChunkDataPack.Collection)
 			} else {
+				// non-system chunk has a non-nil collection.
 				require.NotNil(t, vc.ChunkDataPack.Collection)
 				require.Equal(t, expected.ChunkDataPack.Collection.ID(), vc.ChunkDataPack.Collection.ID())
 			}
