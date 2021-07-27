@@ -867,6 +867,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 
 	for _, status := range statuses {
 		if fetcher.IsSystemChunk(status.ChunkIndex, result) {
+			// system-chunk should have a nil collection
 			continue
 		}
 		collMap[status.ID()] = collections[status.ChunkIndex]
