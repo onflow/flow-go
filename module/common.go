@@ -13,6 +13,6 @@ type ReadyDoneAware interface {
 
 	// Done commences shutdown of the module, and returns a done channel that is closed once
 	// shutdown has completed.
-	// This is an idempotent method.
+	// This should be an idempotent method.
 	Done() <-chan struct{}
 }
