@@ -292,6 +292,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 			var collection flow.Collection
 			if i < len(computationResult.StateCommitments)-1 {
+				// non-system chunk
 				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
 				collection = completeCollection.Collection()
@@ -306,7 +307,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 			if i < len(computationResult.StateCommitments)-1 {
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
-				chunkDataPack = execution.GenerateSystemChunkDataPack(chunk.ID(), chunk.StartState, computationResult.Proofs[i])
+				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
 			}
 
 			chunks = append(chunks, chunk)
