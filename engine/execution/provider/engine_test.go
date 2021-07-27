@@ -153,8 +153,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 		chunkID := unittest.IdentifierFixture()
-		collection := unittest.CollectionFixture(1)
-		chunkDataPack := unittest.StoredChunkDataPackFixture(chunkID, unittest.WithCollectionID(collection.ID()))
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 		blockID := unittest.IdentifierFixture()
 
 		ps.On("AtBlockID", blockID).Return(ss)
@@ -169,14 +168,8 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			}).
 			Return(nil)
 
-		execState.
-			On("GetBlockIDByChunkID", chunkID).
-			Return(blockID, nil)
-		execState.
-			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
-			Return(chunkDataPack, nil)
-
-		execState.On("GetCollection", *chunkDataPack.CollectionID).Return(&collection, nil)
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil)
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
@@ -217,14 +210,10 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
 		chunkID := unittest.IdentifierFixture()
-		collection := unittest.CollectionFixture(1)
-		chunkDataPack := unittest.StoredChunkDataPackFixture(chunkID, unittest.WithCollectionID(collection.ID()))
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
 		blockID := unittest.IdentifierFixture()
 
-		execState.
-			On("GetBlockIDByChunkID", chunkID).
-			Return(blockID, nil)
-		//ps.On("Final").Return(ss).Once()
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
 		ps.On("AtBlockID", blockID).Return(ss)
 
 		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
@@ -238,11 +227,7 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 			}).
 			Return(nil).Once()
 
-		execState.
-			On("ChunkDataPackByChunkID", mock.Anything, chunkID).
-			Return(chunkDataPack, nil).Twice()
-
-		execState.On("GetCollection", *chunkDataPack.CollectionID).Return(&collection, nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil).Twice()
 
 		req := &messages.ChunkDataRequest{
 			ChunkID: chunkID,
