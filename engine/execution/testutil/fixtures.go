@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -309,25 +308,68 @@ func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.Acco
 	return accountKey, tx
 }
 
+// CreateAddAnAccountKeyMultipleTimesTransaction generates a tx that adds a key several times to an account.
+// this can be used to exhaust an account's storage.
+func CreateAddAnAccountKeyMultipleTimesTransaction(t *testing.T, accountKey *flow.AccountPrivateKey, counts int) *flow.TransactionBody {
+	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	require.NoError(t, err)
+
+	script := []byte(`
+        transaction(counts: Int, key: [UInt8]) {
+          prepare(signer: AuthAccount) {
+			var i = 0
+			while i < counts {
+				i = i + 1
+				signer.addPublicKey(key)
+			}
+          }
+        }
+   	`)
+
+	arg1, err := jsoncdc.Encode(cadence.NewInt(counts))
+	require.NoError(t, err)
+
+	arg2, err := jsoncdc.Encode(bytesToCadenceArray(keyBytes))
+	require.NoError(t, err)
+
+	addKeysTx := &flow.TransactionBody{
+		Script: []byte(script),
+	}
+	addKeysTx = addKeysTx.AddArgument(arg1).AddArgument(arg2)
+	return addKeysTx
+}
+
 // CreateAddAccountKeyTransaction generates a tx that adds a key to an account.
 func CreateAddAccountKeyTransaction(t *testing.T, accountKey *flow.AccountPrivateKey) *flow.TransactionBody {
 	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
 	require.NoError(t, err)
 
-	// encode the bytes to cadence string
-	encodedKey := languageEncodeBytes(keyBytes)
-
-	script := fmt.Sprintf(`
-        transaction {
+	script := []byte(`
+        transaction(key: [UInt8]) {
           prepare(signer: AuthAccount) {
-            signer.addPublicKey(%s)
+            signer.addPublicKey(key)
           }
         }
-   	`, encodedKey)
+   	`)
 
-	return &flow.TransactionBody{
+	arg, err := jsoncdc.Encode(bytesToCadenceArray(keyBytes))
+	require.NoError(t, err)
+
+	addKeysTx := &flow.TransactionBody{
 		Script: []byte(script),
 	}
+	addKeysTx = addKeysTx.AddArgument(arg)
+
+	return addKeysTx
+}
+
+func bytesToCadenceArray(l []byte) cadence.Array {
+	values := make([]cadence.Value, len(l))
+	for i, b := range l {
+		values[i] = cadence.NewUInt8(b)
+	}
+
+	return cadence.NewArray(values)
 }
 
 // CreateRemoveAccountKeyTransaction generates a tx that removes a key from an account.
@@ -343,11 +385,4 @@ func CreateRemoveAccountKeyTransaction(index int) *flow.TransactionBody {
 	return &flow.TransactionBody{
 		Script: []byte(script),
 	}
-}
-
-func languageEncodeBytes(b []byte) string {
-	if len(b) == 0 {
-		return "[]"
-	}
-	return strings.Join(strings.Fields(fmt.Sprintf("%d", b)), ",")
 }
