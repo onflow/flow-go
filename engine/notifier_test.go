@@ -99,7 +99,7 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 		}()
 	}
 	startingWorkers.Wait()
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
 
 	// send 100 notifications, with small delays
 	for i := 0; i < 100; i++ {
@@ -108,11 +108,9 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 	}
 
 	// require that all workers got a notification
-	require.Eventuallyf(t,
-		func() bool { return pendingWorkers.Load() == 0 },
-		3*time.Second, 100*time.Millisecond,
-		"still awaiting %d workers to get notification", pendingWorkers.Load(),
-	)
+	if !conditionEventuallySatisfied(func() bool { return pendingWorkers.Load() == 0 }, 3*time.Second, 100*time.Millisecond) {
+		require.Fail(t, "timed out", "still awaiting %d workers to get notification", pendingWorkers.Load())
+	}
 }
 
 // TestNotifier_AllWorkProcessed spans many worker routines and
@@ -136,6 +134,7 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			go func() {
 				start.Wait()
 				for scheduledWork.Inc() <= totalWork {
+					time.Sleep(1 * time.Millisecond)
 					pendingWorkQueue <- struct{}{}
 					notifier.Notify()
 				}
@@ -147,30 +146,44 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			go func() {
 				for consumedWork.Load() < totalWork {
 					<-notifier.Channel()
-					for {
-						select {
-						case <-pendingWorkQueue:
-							consumedWork.Inc()
-						default:
-							break
-						}
+					select {
+					case <-pendingWorkQueue:
+						consumedWork.Inc()
+					default:
 					}
 				}
 			}()
 		}
 
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 		start.Done() // start routines to push work
 
 		// require that all work is eventually consumed
-		require.Eventuallyf(t,
-			func() bool { return consumedWork.Load() == totalWork },
-			3*time.Second, 100*time.Millisecond,
-			"only consumed %d units of work but expecting %d", consumedWork.Load(), totalWork,
-		)
+		if !conditionEventuallySatisfied(func() bool { return consumedWork.Load() == totalWork }, 3*time.Second, 100*time.Millisecond) {
+			require.Fail(t, "timed out", "only consumed %d units of work but expecting %d", consumedWork.Load(), totalWork)
+		}
 	}
 
 	for r := 0; r < 100; r++ {
 		t.Run(fmt.Sprintf("run %d", r), singleTestRun)
+	}
+}
+
+func conditionEventuallySatisfied(condition func() bool, waitFor time.Duration, tick time.Duration) bool {
+	done := make(chan struct{})
+
+	go func() {
+		for range time.Tick(tick) {
+			if condition() {
+				close(done)
+			}
+		}
+	}()
+
+	select {
+	case <-time.After(waitFor):
+		return false
+	case <-done:
+		return true
 	}
 }
