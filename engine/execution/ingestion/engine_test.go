@@ -401,7 +401,7 @@ func TestExecuteOneBlock(t *testing.T) {
 		err := ctx.engine.handleBlock(context.Background(), blockB.Block)
 		require.NoError(t, err)
 
-		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		require.False(t, more)
@@ -546,7 +546,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 		err := ctx.engine.handleBlock(context.Background(), blockD.Block)
 		require.NoError(t, err)
 
-		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		require.False(t, more)
@@ -649,7 +649,7 @@ func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
 		require.NoError(t, err)
 		wgPut.Done()
 
-		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		require.False(t, more)
@@ -764,7 +764,7 @@ func TestBlocksArentExecutedMultipleTimes_collectionArrival(t *testing.T) {
 		err = ctx.engine.handleBlock(context.Background(), blockD.Block)
 		require.NoError(t, err)
 
-		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		require.False(t, more)
@@ -852,7 +852,7 @@ func TestExecuteBlockInOrder(t *testing.T) {
 		require.NoError(t, err)
 
 		// wait until all 4 blocks have been executed
-		unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second)
+		unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
 
 		_, more := <-ctx.engine.Done() //wait for all the blocks to be processed
 		assert.False(t, more)
