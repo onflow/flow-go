@@ -100,7 +100,10 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
 
-		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+			true, // no connection gating for the unstaked network
+			true, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
+			msgValidators...)
 
 		upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
 		builder.MustNot(err)

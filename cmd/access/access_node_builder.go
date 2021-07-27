@@ -114,6 +114,8 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	peerUpdateInterval time.Duration,
+	connectionGating bool,
+	managerPeerConnections bool,
 	validators ...network.MessageValidator) *p2p.Middleware {
 	builder.unstakedMiddleware = p2p.NewMiddleware(builder.Logger,
 		factoryFunc,
@@ -122,6 +124,8 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.RootBlock.ID().String(),
 		peerUpdateInterval,
 		p2p.DefaultUnicastTimeout,
+		connectionGating,
+		managerPeerConnections,
 		validators...)
 	return builder.unstakedMiddleware
 }
