@@ -19,6 +19,72 @@ import (
 	"github.com/onflow/flow-go/engine/access/mock"
 )
 
+func TestProxyAccessAPI(t *testing.T) {
+	// create a collection node
+	cn := new(collectionNode)
+	cn.start(t)
+	defer cn.stop(t)
+
+	req := &access.PingRequest{}
+	expected := &access.PingResponse{}
+	cn.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the collection grpc port
+	connectionFactory.CollectionGRPCPort = cn.port
+
+	proxyConnectionFactory := ProxyConnectionFactory{
+		ConnectionFactory: connectionFactory,
+		targetAddress:     cn.listener.Addr().String(),
+	}
+
+	// get a collection API client
+	client, closer, err := proxyConnectionFactory.GetAccessAPIClient("foo")
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	ctx := context.Background()
+	// make the call to the collection node
+	resp, err := client.Ping(ctx, req)
+	assert.NoError(t, err)
+
+	assert.Equal(t, resp, expected)
+}
+
+func TestProxyExecutionAPI(t *testing.T) {
+	// create an execution node
+	en := new(executionNode)
+	en.start(t)
+	defer en.stop(t)
+
+	req := &execution.PingRequest{}
+	expected := &execution.PingResponse{}
+	en.handler.On("Ping", testifymock.Anything, req).Return(expected, nil)
+
+	// create the factory
+	connectionFactory := new(ConnectionFactoryImpl)
+	// set the execution grpc port
+	connectionFactory.ExecutionGRPCPort = en.port
+
+	proxyConnectionFactory := ProxyConnectionFactory{
+		ConnectionFactory: connectionFactory,
+		targetAddress:     en.listener.Addr().String(),
+	}
+
+	// get an execution API client
+	client, closer, err := proxyConnectionFactory.GetExecutionAPIClient("foo")
+	assert.NoError(t, err)
+	defer closer.Close()
+
+	ctx := context.Background()
+	// make the call to the execution node
+	resp, err := client.Ping(ctx, req)
+	assert.NoError(t, err)
+
+	assert.Equal(t, resp, expected)
+}
+
 // TestExecutionNodeClientTimeout tests that the execution API client times out after the timeout duration
 func TestExecutionNodeClientTimeout(t *testing.T) {
 
