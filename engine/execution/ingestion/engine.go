@@ -1101,6 +1101,13 @@ func (e *Engine) saveExecutionResults(
 	if err != nil {
 		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
 	}
+	for _, event := range executionResult.ServiceEvents {
+		e.log.Info().
+			Uint64("block_height", result.ExecutableBlock.Height()).
+			Hex("block_id", logging.Entity(result.ExecutableBlock)).
+			Str("event_type", event.Type).
+			Msg("service event emitted")
+	}
 
 	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
 	if err != nil {
