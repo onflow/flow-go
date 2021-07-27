@@ -172,7 +172,7 @@ func (e *Engine) onChunkDataRequest(
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
-		lg.Warn().Msg("chunk not found")
+		lg.Warn().Msg("chunk data pack not found")
 		return nil
 	}
 
