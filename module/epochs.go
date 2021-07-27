@@ -36,3 +36,10 @@ type QCContractClient interface {
 	// cluster QC aggregator smart contract for the current epoch.
 	Voted(ctx context.Context) (bool, error)
 }
+
+// EpochLookup provides a method to find epochs by view.
+type EpochLookup interface {
+
+	// EpochForView returns the counter of the epoch that the view belongs to.
+	EpochForView(view uint64) (epochCounter uint64, err error)
+}
