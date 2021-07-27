@@ -216,7 +216,9 @@ func (e *Engine) onChunkDataRequest(
 			return
 		}
 
-		if response.ChunkDataPack.Collection != nil { // system chunk has a nil chunk data pack
+		if response.ChunkDataPack.Collection != nil {
+			// logging collection id of non-system chunks.
+			// A system chunk has both the collection and collection id set to nil.
 			lg = lg.With().
 				Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
 				Logger()
