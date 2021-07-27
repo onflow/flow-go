@@ -72,7 +72,7 @@ func NewLifecycleManager() *LifecycleManager {
 // OnStart will commence startup of the LifecycleManager. If OnStop has already been called
 // before the first call to OnStart, startup will not be performed. After the first call,
 // subsequent calls to OnStart do nothing.
-func (lm *LifecycleManager) OnStart(startupFn func()) {
+func (lm *LifecycleManager) OnStart(startupFns ...func()) {
 	lm.stateTransition.Lock()
 	if lm.shutdownCommenced || lm.startupCommenced {
 		lm.stateTransition.Unlock()
@@ -82,7 +82,9 @@ func (lm *LifecycleManager) OnStart(startupFn func()) {
 	lm.stateTransition.Unlock()
 
 	go func() {
-		startupFn()
+		for _, fn := range startupFns {
+			fn()
+		}
 		close(lm.started)
 	}()
 }
@@ -90,7 +92,7 @@ func (lm *LifecycleManager) OnStart(startupFn func()) {
 // OnStop will commence shutdown of the LifecycleManager. If the LifecycleManager is still
 // starting up, we will wait for startup to complete before shutting down. After the first
 // call, subsequent calls to OnStop do nothing.
-func (lm *LifecycleManager) OnStop(shutdownFn func()) {
+func (lm *LifecycleManager) OnStop(shutdownFns ...func()) {
 	lm.stateTransition.Lock()
 	if lm.shutdownCommenced {
 		lm.stateTransition.Unlock()
@@ -102,7 +104,9 @@ func (lm *LifecycleManager) OnStop(shutdownFn func()) {
 	go func() {
 		if lm.startupCommenced {
 			<-lm.started
-			shutdownFn()
+			for _, fn := range shutdownFns {
+				fn()
+			}
 		}
 		close(lm.stopped)
 	}()
