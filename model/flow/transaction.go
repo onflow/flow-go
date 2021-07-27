@@ -330,30 +330,30 @@ func (tb *TransactionBody) PayloadMessage() []byte {
 }
 
 func (tb *TransactionBody) payloadCanonicalForm() interface{} {
-	authorizers := make([][]byte, len(tb.Authorizers))
+	authorizers := make([][AddressLength]byte, len(tb.Authorizers))
 	for i, auth := range tb.Authorizers {
-		authorizers[i] = auth.Bytes()
+		authorizers[i] = auth
 	}
 
 	return struct {
 		Script                    []byte
 		Arguments                 [][]byte
-		ReferenceBlockID          []byte
+		ReferenceBlockID          [32]byte
 		GasLimit                  uint64
-		ProposalKeyAddress        []byte
+		ProposalKeyAddress        [AddressLength]byte
 		ProposalKeyID             uint64
 		ProposalKeySequenceNumber uint64
-		Payer                     []byte
-		Authorizers               [][]byte
+		Payer                     [AddressLength]byte
+		Authorizers               [][AddressLength]byte
 	}{
 		Script:                    tb.Script,
 		Arguments:                 tb.Arguments,
-		ReferenceBlockID:          tb.ReferenceBlockID[:],
+		ReferenceBlockID:          tb.ReferenceBlockID,
 		GasLimit:                  tb.GasLimit,
-		ProposalKeyAddress:        tb.ProposalKey.Address.Bytes(),
+		ProposalKeyAddress:        tb.ProposalKey.Address,
 		ProposalKeyID:             tb.ProposalKey.KeyIndex,
 		ProposalKeySequenceNumber: tb.ProposalKey.SequenceNumber,
-		Payer:                     tb.Payer.Bytes(),
+		Payer:                     tb.Payer,
 		Authorizers:               authorizers,
 	}
 }
