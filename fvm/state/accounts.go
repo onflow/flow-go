@@ -52,7 +52,7 @@ func (a *Accounts) AllocateStorageAddress(address flow.Address) (uint64, error) 
 	if len(indexBytes) == 0 {
 		// if not exist for the first time set it to zero and return
 		index = 0
-	} else if len(indexBytes) != 8 {
+	} else if len(indexBytes) != uint64StorageSize {
 		// this should be fatal
 		return 0, fmt.Errorf("invalid storage index byte size (%d != 8)", len(indexBytes))
 	} else {
@@ -60,7 +60,7 @@ func (a *Accounts) AllocateStorageAddress(address flow.Address) (uint64, error) 
 	}
 
 	index++
-	newIndexBytes := make([]byte, 8)
+	newIndexBytes := make([]byte, uint64StorageSize)
 	binary.BigEndian.PutUint64(newIndexBytes, uint64(index))
 
 	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes)
