@@ -121,7 +121,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 		},
 	)
 
-	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Once()
+	s.state.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Maybe()
 
 	s.state.On("AtHeight", mock.Anything).Return(
 		func(height uint64) realproto.Snapshot {
@@ -726,11 +726,17 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 
 // TestRepopulateAssignmentCollectorTree tests that the
 // collectors tree will contain execution results and assignment collectors will be created.
-// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}] <- E
-//         |     <- F[ER{A}] <- G[ER{B}] <- H
+// P <- A[ER{P}] <- B[ER{A}] <- C[ER{B}] <- D[ER{C}] <- E[ER{D}]
+//         |     <- F[ER{A}] <- G[ER{B}] <- H[ER{G}]
 //      finalized
 // collectors tree has to be repopulated with incorporated results from blocks [A, B, C, D, F, G]
+// E, H shouldn't be considered since
 func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree() {
+	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+	assigner := &module.ChunkAssigner{}
+
+	// setup mocks
 	payloads := &storage.Payloads{}
 	expectedResults := []*flow.IncorporatedResult{s.IncorporatedResult}
 	blockChildren := make([]flow.Identifier, 0)
@@ -750,12 +756,14 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 	s.identitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 
+	assigner.On("Assign", s.IncorporatedResult.Result, mock.Anything).Return(s.ChunksAssignment, nil)
+
 	// two forks
 	for i := 0; i < 2; i++ {
 		fork := unittest.ChainFixtureFrom(i+3, &s.IncorporatedBlock)
 		prevResult := s.IncorporatedResult.Result
 		// create execution results for all blocks except last one, since it won't be valid by definition
-		for _, block := range fork[:len(fork)-1] {
+		for blockIndex, block := range fork {
 			blockID := block.ID()
 
 			// create execution result for previous block in chain
@@ -773,7 +781,16 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 			IR := unittest.IncorporatedResult.Fixture(
 				unittest.IncorporatedResult.WithResult(result),
 				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
-			expectedResults = append(expectedResults, IR)
+
+			// TODO: change this test for phase 3, assigner should expect incorporated block ID, not executed
+			if blockIndex < len(fork)-1 {
+				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
+				assigner.On("Assign", result, blockID).Return(s.ChunksAssignment, nil)
+				expectedResults = append(expectedResults, IR)
+			} else {
+				assigner.On("Assign", result, blockID).Return(nil, fmt.Errorf("no assignment for block without valid child")).Maybe()
+				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
+			}
 
 			payload := unittest.PayloadFixture()
 			payload.Results = append(payload.Results, result)
@@ -788,13 +805,17 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
 	s.state.On("Final").Return(finalSnapShot)
 
-	err := s.core.RepopulateAssignmentCollectorTree(payloads)
+	core, err := NewCore(unittest.Logger(), s.workerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
+		s.headers, s.state, s.sealsDB, assigner, s.sigVerifier, s.sealsPL, s.conduit, s.core.config)
+	require.NoError(s.T(), err)
+
+	err = core.RepopulateAssignmentCollectorTree(payloads)
 	require.NoError(s.T(), err)
 
 	// check collector tree, after repopulating we should have all collectors for execution results that we have
 	// traversed and they have to be processable.
 	for _, incorporatedResult := range expectedResults {
-		collector, err := s.core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
+		collector, err := core.collectorTree.GetOrCreateCollector(incorporatedResult.Result)
 		require.NoError(s.T(), err)
 		require.False(s.T(), collector.Created)
 		require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
