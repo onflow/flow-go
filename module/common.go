@@ -1,6 +1,6 @@
 package module
 
-// ReadyDoneAware provides easy interface to wait for module startup and shutdown.
+// ReadyDoneAware provides an easy interface to wait for module startup and shutdown.
 // Modules that implement this interface only support a single start-stop cycle, and
 // will not restart if Ready() is called again after shutdown has already commenced.
 type ReadyDoneAware interface {
