@@ -115,6 +115,7 @@ func main() {
 		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&anb.staked, "staked", true, "whether this node is a staked access node or not")
 		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", "", "the node ID of the upstream staked access node if this is an unstaked access node")
+		flags.StringVar(&anb.stakedAccessNodeAddress, "staked-access-node-address", "", "the node address of the upstream staked access node if this is an unstaked access node")
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
 	})
 

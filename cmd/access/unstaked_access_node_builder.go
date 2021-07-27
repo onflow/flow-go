@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -101,14 +102,25 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
 
-		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
-		participants := flow.IdentityList{}
-
 		upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
 		builder.MustNot(err)
 
+		nodes, err := builder.State.Sealed().Identities(filter.HasNodeID(upstreamANIdentifier))
+		builder.MustNot(err)
+
+		stakedAN := nodes[0]
+
+		modifiedStakedAN := &flow.Identity{
+			NodeID: stakedAN.NodeID,
+			Address: builder.stakedAccessNodeAddress,
+			Role: stakedAN.Role,
+			NetworkPubKey: stakedAN.NetworkPubKey,
+		}
+
+		participants := flow.IdentityList{modifiedStakedAN}
+
 		// topology only consist of the upsteam staked AN
-		top := topology.NewFixedListTopology(upstreamANIdentifier)
+		top := topology.NewFixedListTopology(participants)
 
 		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
 		builder.MustNot(err)

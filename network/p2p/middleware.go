@@ -10,6 +10,7 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
@@ -74,6 +75,7 @@ type Middleware struct {
 	peerManager           *PeerManager
 	peerUpdateInterval    time.Duration
 	unicastMessageTimeout time.Duration
+	updateAllowList bool
 }
 
 // NewMiddleware creates a new middleware instance with the given config and using the
@@ -85,6 +87,8 @@ func NewMiddleware(log zerolog.Logger,
 	rootBlockID string,
 	peerUpdateInterval time.Duration,
 	unicastMessageTimeout time.Duration,
+	peerManager *PeerManager,
+	updateAllowList bool,
 	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
@@ -111,6 +115,8 @@ func NewMiddleware(log zerolog.Logger,
 		validators:            validators,
 		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
+		updateAllowList: updateAllowList,
+		peerManager: peerManager,
 	}
 }
 
@@ -490,5 +496,20 @@ func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
 		return m.unicastMessageTimeout
 	default:
 		return m.unicastMessageTimeout
+	}
+}
+
+func DefaultPeerManager(host host.Host, logger zerolog.Logger, topology network.Topology, ) (*PeerManager, error) {
+	libp2pConnector, err := newLibp2pConnector(host, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create libp2pConnector: %w", err)
+	}
+
+	m.peerManager = NewPeerManager(logger, topology, libp2pConnector, WithInterval(m.peerUpdateInterval))
+	select {
+	case <-m.peerManager.Ready():
+		m.log.Debug().Msg("peer manager successfully started")
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("could not start peer manager")
 	}
 }

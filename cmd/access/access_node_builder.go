@@ -47,6 +47,7 @@ type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	staked                  bool
 	stakedAccessNodeIDHex   string
+	stakedAccessNodeAddress string
 	unstakedNetworkBindAddr string
 	UnstakedNetwork         p2p.ReadyDoneAwareNetwork
 	unstakedMiddleware      *p2p.Middleware
