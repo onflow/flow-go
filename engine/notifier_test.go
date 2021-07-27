@@ -131,6 +131,7 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 
 		// 10 routines pushing work
 		for i := 0; i < 10; i++ {
+			time.Sleep(100 * time.Microsecond)
 			go func() {
 				start.Wait()
 				for scheduledWork.Inc() <= totalWork {
