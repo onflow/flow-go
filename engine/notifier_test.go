@@ -176,6 +176,7 @@ func conditionEventuallySatisfied(condition func() bool, waitFor time.Duration, 
 		for range time.Tick(tick) {
 			if condition() {
 				close(done)
+				return
 			}
 		}
 	}()
