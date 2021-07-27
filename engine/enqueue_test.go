@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -349,5 +350,18 @@ func TestProcessMessageMultiConcurrent(t *testing.T) {
 			return eng.MessageCount() == count
 		}, 2*time.Second, 10*time.Millisecond, "expect %v messages, but go %v messages",
 			count, eng.MessageCount())
+	})
+}
+
+// TestUnknownMessageType verifies that the message handler returns an
+// IncompatibleInputTypeError when receiving a message of unknown type
+func TestUnknownMessageType(t *testing.T) {
+	WithEngine(t, func(eng *TestEngine) {
+		id := unittest.IdentifierFixture()
+		unknownType := struct{ n int }{n: 10}
+
+		err := eng.Process(id, unknownType)
+		require.Error(t, err)
+		require.True(t, errors.Is(err, engine.IncompatibleInputTypeError))
 	})
 }
