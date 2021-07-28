@@ -693,10 +693,10 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 	t.Parallel()
 
-	b := make([]byte, 100000) // 100k bytes
+	b := make([]byte, 1000000) // 1MB
 	_, err := rand.Read(b)
 	require.NoError(t, err)
-	longString := base64.StdEncoding.EncodeToString(b) // 1.3 times 100k bytes
+	longString := base64.StdEncoding.EncodeToString(b) // 1.3 times 1MB
 
 	script := fmt.Sprintf(`
 			access(all) contract Container {

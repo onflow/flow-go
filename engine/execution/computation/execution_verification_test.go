@@ -172,9 +172,12 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, fvm.DefaultTransactionFees, minimumStorage)
 
-		// ensure only events from the first transaction is emitted
+		// storage limit error
+		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
+		// ensure events from the first transaction is emitted
 		require.Len(t, cr.Events[0], 10)
-		require.Len(t, cr.Events[1], 0)
+		// ensure fee deduction events are emitted even though tx fails
+		require.Len(t, cr.Events[1], 3)
 		// storage limit error
 		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
 	})
@@ -223,11 +226,29 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, txFee, fvm.DefaultMinimumStorageReservation)
 
-		// ensure only events from the first transaction is emitted
-		require.Len(t, cr.Events[0], 10)
-		require.Len(t, cr.Events[1], 0)
-		// tx fee error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1109")
+		// no error
+		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
+
+		// ensure events from the first transaction is emitted. Since transactions are in the same block, get all events from Events[0]
+		transactionEvents := 0
+		for _, event := range cr.Events[0] {
+			if event.TransactionID == cr.TransactionResults[0].TransactionID {
+				transactionEvents += 1
+			}
+		}
+		require.Equal(t, 10, transactionEvents)
+
+		// minimum account balance error as account is put below minimum account balance due to fee deduction
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+
+		// ensure tx fee deduction events are emitted even though tx failed
+		transactionEvents = 0
+		for _, event := range cr.Events[0] {
+			if event.TransactionID == cr.TransactionResults[1].TransactionID {
+				transactionEvents += 1
+			}
+		}
+		require.Equal(t, 3, transactionEvents)
 	})
 
 }

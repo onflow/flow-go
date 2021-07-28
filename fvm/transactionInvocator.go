@@ -152,23 +152,24 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
-	// applying contract changes
-	// this writes back the contract contents to accounts
-	// if any error occurs we fail the tx
-	updatedKeys, err := env.Commit()
-	if err != nil && txError == nil {
-		txError = fmt.Errorf("transaction invocation failed: %w", err)
-	}
-
 	// try to deduct fees even if there is an error.
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {
 		txError = feesError
 	}
 
+	// applying contract changes
+	// this writes back the contract contents to accounts
+	// if any error occurs we fail the tx
+	updatedKeys, err := env.Commit()
+
 	//if there is still no error check if all account storage limits are ok
 	if txError == nil {
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+	}
+
+	if err != nil && txError == nil {
+		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
 	// it there was a transaction error clear changes and try to deduct fees again
@@ -188,6 +189,11 @@ func (i *TransactionInvocator) Process(
 
 		// try to deduct fees again, to get the fe deduction events
 		feesError = i.deductTransactionFees(env, proc)
+
+		updatedKeys, err = env.Commit()
+		if err != nil && feesError == nil {
+			feesError = fmt.Errorf("transaction invocation failed: %w", err)
+		}
 
 		// if fees fail just do clean up and exit
 		if feesError != nil {
