@@ -9,7 +9,7 @@ import (
 	state2 "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
-	
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
