@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -121,8 +122,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 					}
 				}
 				storageUsedChan <- accountPayloadSize{
-					Address:
-					id.Owner,
+					Address:     id.Owner,
 					StorageUsed: uint64(registerSize(id, p.Payload)),
 				}
 			}
@@ -190,7 +190,7 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 
 		if oldUsed > used {
 			storageDecreaseCount += 1
-			change = - int64(oldUsed - used)
+			change = -int64(oldUsed - used)
 		} else if oldUsed == used {
 			storageNoChangeCount += 1
 			change = 0
