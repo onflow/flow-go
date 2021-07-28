@@ -128,23 +128,15 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 		scheduledWork := atomic.NewInt32(0)
 		consumedWork := atomic.NewInt32(0)
 
-		var start sync.WaitGroup
-		start.Add(1)
-
-		// 10 routines pushing work
-		for i := 0; i < 10; i++ {
-			go func() {
-				start.Wait()
-				for scheduledWork.Inc() <= totalWork {
-					pendingWorkQueue <- struct{}{}
-					notifier.Notify()
-				}
-			}()
-		}
-
+		// starts the consuming first, because if we starts the production first instead, then
+		// we might finish pushing all jobs, before any of our consumer has started listening
+		// to the queue.
 		// 5 routines consuming work
+		var consumersAllReady sync.WaitGroup
+		consumersAllReady.Add(5)
 		for i := 0; i < 5; i++ {
 			go func() {
+				consumersAllReady.Done()
 				for consumedWork.Load() < totalWork {
 					<-notifier.Channel()
 					for {
@@ -159,8 +151,25 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			}()
 		}
 
-		time.Sleep(1 * time.Millisecond)
-		start.Done() // start routines to push work
+		// wait long enough for all consumer to be ready for new notification.
+		consumersAllReady.Wait()
+
+		var workersAllReady sync.WaitGroup
+		workersAllReady.Add(10)
+
+		// 10 routines pushing work
+		for i := 0; i < 10; i++ {
+			go func() {
+				workersAllReady.Done()
+				for scheduledWork.Inc() <= totalWork {
+					pendingWorkQueue <- struct{}{}
+					notifier.Notify()
+				}
+			}()
+		}
+
+		// wait long enough for all workers to be started.
+		workersAllReady.Wait()
 
 		// require that all work is eventually consumed
 		require.Eventuallyf(t,
