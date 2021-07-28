@@ -320,6 +320,10 @@ docker-build-bootstrap-transit:
 	    --target production-transit-nocgo  \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
+PHONY: tool-transit
+tool-transit: docker-build-bootstrap-transit
+	docker container create --name transit $(CONTAINER_REGISTRY)/bootstrap-transit:latest;docker container cp transit:/bin/app ./transit;docker container rm transit
+
 .PHONY: docker-build-loader
 docker-build-loader:
 	docker build -f ./integration/loader/Dockerfile  --build-arg TARGET=loader --target production \
