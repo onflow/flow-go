@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
+	"github.com/rs/zerolog"
 
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -28,10 +29,11 @@ type ChunkVerifier struct {
 	vm             VirtualMachine
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
+	logger         zerolog.Logger
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
+func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:    vm,
 		vmCtx: vmCtx,
@@ -41,6 +43,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
+		logger: logger,
 	}
 }
 
@@ -202,6 +205,20 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
 	if chunk.EventCollection != eventsHash {
+
+		for i, event := range events {
+
+			fcv.logger.Debug().Int("list_index", i).
+				Str("event_type", string(event.Type)).
+				Str("event_tx_id", event.TransactionID.String()).
+				Uint32("event_tx_index", event.TransactionIndex).
+				Uint32("event_index", event.EventIndex).
+				Bytes("event_payload", event.Payload).
+				Str("block_id", chunk.BlockID.String()).
+				Str("collection_id", chunkDataPack.CollectionID.String()).
+				Msg("not matching events debug")
+		}
+
 		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
 	}
 
