@@ -215,6 +215,8 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 				Bytes("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
 				Str("collection_id", chunkDataPack.CollectionID.String()).
+				Str("result_id", result.ID().String()).
+				Uint64("chunk_index", chunk.Index).
 				Msg("not matching events debug")
 		}
 
