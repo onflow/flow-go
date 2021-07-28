@@ -107,11 +107,15 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 		time.Sleep(10 * time.Microsecond)
 	}
 
+	nPendingWorkers := pendingWorkers.Load()
 	// require that all workers got a notification
 	require.Eventuallyf(t,
-		func() bool { return pendingWorkers.Load() == 0 },
+		func() bool {
+			nPendingWorkers = pendingWorkers.Load()
+			return nPendingWorkers == 0
+		},
 		3*time.Second, 100*time.Millisecond,
-		"still awaiting %d workers to get notification", pendingWorkers.Load(),
+		"still awaiting %d workers to get notification", nPendingWorkers,
 	)
 }
 
@@ -171,11 +175,15 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 		// wait long enough for all workers to be started.
 		workersAllReady.Wait()
 
+		nConsumedWork := consumedWork.Load()
 		// require that all work is eventually consumed
 		require.Eventuallyf(t,
-			func() bool { return consumedWork.Load() == totalWork },
+			func() bool {
+				nConsumedWork = consumedWork.Load()
+				return nConsumedWork == totalWork
+			},
 			3*time.Second, 100*time.Millisecond,
-			"only consumed %d units of work but expecting %d", consumedWork.Load(), totalWork,
+			"only consumed %d units of work but expecting %d", nConsumedWork, totalWork,
 		)
 	}
 
