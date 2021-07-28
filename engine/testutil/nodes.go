@@ -828,7 +828,7 @@ func VerificationNode(t testing.TB,
 			fvm.WithBlocks(blockFinder),
 		)
 
-		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log.With().Str("component", "chunk_verifier").Logger())
 
 		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
 
