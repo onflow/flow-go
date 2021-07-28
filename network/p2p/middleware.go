@@ -74,7 +74,7 @@ type Middleware struct {
 	peerManager           *PeerManager
 	peerUpdateInterval    time.Duration
 	unicastMessageTimeout time.Duration
-	connectionGating bool
+	connectionGating      bool
 	managePeerConnections bool
 }
 
@@ -122,7 +122,7 @@ func NewMiddleware(log zerolog.Logger,
 		validators:            validators,
 		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
-		connectionGating: connectionGating,
+		connectionGating:      connectionGating,
 		managePeerConnections: managePeerConnections,
 	}
 }
