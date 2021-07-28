@@ -191,18 +191,6 @@ func (m *Middleware) Stop() {
 	m.wg.Wait()
 }
 
-// chooseMode determines the communication mode to use. Currently it only considers the length of the targetIDs.
-func (m *Middleware) chooseMode(_ network.Channel, _ *message.Message, targetIDs ...flow.Identifier) communicationMode {
-	switch len(targetIDs) {
-	case 0:
-		return NoOp
-	case 1:
-		return OneToOne
-	default:
-		return OneToK
-	}
-}
-
 // SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 // direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 // as the router.
