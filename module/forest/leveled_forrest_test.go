@@ -1,6 +1,7 @@
 package forest
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -261,14 +262,19 @@ func TestLevelledForest_GetVertex(t *testing.T) {
 // TestLevelledForest_GetSize tests that GetSize returns valid size when adding and pruning vertices
 func TestLevelledForest_GetSize(t *testing.T) {
 	F := NewLevelledForest(0)
+	numberOfNodes := uint64(10)
+	parentLevel := uint64(0)
+	for i := uint64(1); i <= numberOfNodes; i++ {
+		vertexId := strconv.FormatUint(i, 10)
+		parentId := strconv.FormatUint(parentLevel, 10)
+		F.AddVertex(NewVertexMock(vertexId, i, parentId, parentLevel))
+		parentLevel = i
+	}
+	assert.Equal(t, numberOfNodes, F.GetSize())
+	assert.NoError(t, F.PruneUpToLevel(numberOfNodes/2))
+	assert.Equal(t, numberOfNodes/2+1, F.GetSize())
+	assert.NoError(t, F.PruneUpToLevel(numberOfNodes+1))
 	assert.Equal(t, uint64(0), F.GetSize())
-	F.AddVertex(TestVertices["A"])
-	assert.Equal(t, uint64(1), F.GetSize())
-	F.AddVertex(TestVertices["B"])
-	assert.Equal(t, uint64(2), F.GetSize())
-	err := F.PruneUpToLevel(TestVertices["B"].Level())
-	assert.NoError(t, err)
-	assert.Equal(t, uint64(1), F.GetSize())
 }
 
 // TestLevelledForest_GetVertex tests that Vertex blob is returned properly
