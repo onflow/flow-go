@@ -143,8 +143,8 @@ func buildNetConfig() testnet.NetworkConfig {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, logOnlyFatal),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.AsUnstakedNetworkParticipant()),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.AsUnstaked()),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.AsUnstakedNetworkParticipant(), testnet.WithLogLevel(zerolog.InfoLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.AsUnstaked(), testnet.WithLogLevel(zerolog.InfoLevel)),
 	}
 
 	return testnet.NewNetworkConfig("unstaked_node_test", net)
@@ -165,6 +165,9 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 
 	// Send block proposal fron consensus node to staked AN
 	//suite.conGhost.Send(suite.ctx, engine.PushBlocks, proposal, suite.stakedID)
+
+	// currently the setup doesn't wait for all the nodes to have completely started
+	time.Sleep(10*time.Second)
 
 	stakedANClient, err := client.New(fmt.Sprintf(":%s", suite.net.AccessPorts[testnet.AccessNodeAPIPort]), grpc.WithInsecure())
 	require.NoError(suite.T(), err)
@@ -189,19 +192,21 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	blockFromUnstakedAN, err := unstakedANClient.GetLatestBlock(ctx, true)
 	require.NoError(suite.T(), err)
 
-	require.Equal(suite.T(), blockFromStakedAN, blockFromUnstakedAN)
+	require.InDelta(suite.T(), blockFromStakedAN.Height, blockFromUnstakedAN.Height, 10)
 
-	time.Sleep(30*time.Second)
+	time.Sleep(60*time.Second)
 
 	blockFromStakedAN, err = stakedANClient.GetLatestBlock(ctx, true)
 	require.NoError(suite.T(), err)
-	fmt.Printf(">>>>>>>>>>>>>>>>>>> new height %d\n", blockFromStakedAN.Height)
+	fmt.Printf("new height on staked AN %d\n", blockFromStakedAN.Height)
 
 	blockFromUnstakedAN, err = unstakedANClient.GetLatestBlock(ctx, true)
 	require.NoError(suite.T(), err)
 	fmt.Printf("new height on unstaked AN %d\n", blockFromUnstakedAN.Height)
 
-	//require.Equal(suite.T(), blockFromStakedAN, blockFromUnstakedAN)
+	require.NotZero(suite.T(), blockFromStakedAN.Height)
+	require.NotZero(suite.T(), blockFromUnstakedAN.Height)
+	require.InDelta(suite.T(), blockFromStakedAN.Height, blockFromUnstakedAN.Height, 10)
 
 	// TODO: Since the staked AN follower engine will perform validation on received blocks,
 	// the following check may not work unless we send a "valid" block. In particular we will

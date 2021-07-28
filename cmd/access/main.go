@@ -412,7 +412,12 @@ func main() {
 					return nil, fmt.Errorf("node builder was of unexpected type %T", accessNodeBuilder)
 				}
 
-				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, unstakedNetwork, node.Me)
+				channels := node.SubscriptionManager.Channels()
+				if len(channels) == 0 {
+					return nil, fmt.Errorf("no subscribed channels to relay")
+				}
+
+				relayEngine, err := relay.New(node.Logger, channels, node.Network, unstakedNetwork, node.Me)
 
 				if err != nil {
 					return nil, fmt.Errorf("could not create relay engine: %w", err)

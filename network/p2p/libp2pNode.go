@@ -61,7 +61,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 	}
 
 	return func() (*Node, error) {
-		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, pingInfoProvider, psOptions...)
+		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, false, rootBlockID, pingInfoProvider, psOptions...)
 	}, nil
 }
 
@@ -454,7 +454,9 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 		}
 	}
 
-	n.connGater.update(allowlist)
+	if n.connGater != nil {
+		n.connGater.update(allowlist)
+	}
 	return nil
 }
 

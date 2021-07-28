@@ -65,7 +65,7 @@ type Middleware struct {
 	log                   zerolog.Logger
 	ov                    network.Overlay
 	wg                    *sync.WaitGroup
-	libP2PNode            *Node
+	LibP2PNode            *Node
 	libP2PNodeFactory     LibP2PFactoryFunc
 	me                    flow.Identifier
 	metrics               module.NetworkMetrics
@@ -141,7 +141,7 @@ func (m *Middleware) Me() flow.Identifier {
 
 // GetIPPort returns the ip address and port number associated with the middleware
 func (m *Middleware) GetIPPort() (string, string, error) {
-	return m.libP2PNode.GetIPPort()
+	return m.LibP2PNode.GetIPPort()
 }
 
 // Start will start the middleware.
@@ -152,8 +152,8 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
-	m.libP2PNode = libP2PNode
-	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+	m.LibP2PNode = libP2PNode
+	m.LibP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
 	// get the node identity map from the overlay
 	idsMap, err := m.ov.Identity()
@@ -162,14 +162,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	}
 
 	if m.connectionGating {
-		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
+		err = m.LibP2PNode.UpdateAllowList(identityList(idsMap))
 		if err != nil {
 			return fmt.Errorf("could not update approved peer list: %w", err)
 		}
 	}
 
 	if m.managePeerConnections {
-		libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
+		libp2pConnector, err := newLibp2pConnector(m.LibP2PNode.Host(), m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create libp2pConnector: %w", err)
 		}
@@ -196,7 +196,7 @@ func (m *Middleware) Stop() {
 	}
 
 	// stops libp2p
-	done, err := m.libP2PNode.Stop()
+	done, err := m.LibP2PNode.Stop()
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not stop libp2p node")
 	} else {
@@ -290,7 +290,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
 	// sent out the the receiver
-	stream, err := m.libP2PNode.CreateStream(ctx, targetIdentity)
+	stream, err := m.LibP2PNode.CreateStream(ctx, targetIdentity)
 	if err != nil {
 		return fmt.Errorf("failed to create stream for %s :%w", targetID.String(), err)
 	}
@@ -374,7 +374,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
-	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
+	s, err := m.LibP2PNode.Subscribe(m.ctx, topic)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
@@ -397,7 +397,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 // Unsubscribe unsubscribes the middleware from a channel.
 func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
-	err := m.libP2PNode.UnSubscribe(topic)
+	err := m.LibP2PNode.UnSubscribe(topic)
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
 	}
@@ -449,7 +449,7 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	// publish the bytes on the topic
-	err = m.libP2PNode.Publish(m.ctx, topic, data)
+	err = m.LibP2PNode.Publish(m.ctx, topic, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish the message: %w", err)
 	}
@@ -466,7 +466,7 @@ func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.
 		return message.PingResponse{}, -1, fmt.Errorf("could not find identity for target id: %w", err)
 	}
 
-	return m.libP2PNode.Ping(m.ctx, targetIdentity)
+	return m.LibP2PNode.Ping(m.ctx, targetIdentity)
 }
 
 // UpdateAllowList fetches the most recent identity of the nodes from overlay
@@ -480,7 +480,7 @@ func (m *Middleware) UpdateAllowList() error {
 
 	// update libp2pNode's approve lists is this middleware also does connection gating
 	if m.connectionGating {
-		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
+		err = m.LibP2PNode.UpdateAllowList(identityList(idsMap))
 		if err != nil {
 			return fmt.Errorf("failed to update approved peer list: %w", err)
 		}
@@ -496,7 +496,7 @@ func (m *Middleware) UpdateAllowList() error {
 
 // IsConnected returns true if this node is connected to the node with id nodeID.
 func (m *Middleware) IsConnected(identity flow.Identity) (bool, error) {
-	return m.libP2PNode.IsConnected(identity)
+	return m.LibP2PNode.IsConnected(identity)
 }
 
 // unicastMaxMsgSize returns the max permissible size for a unicast message

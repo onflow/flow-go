@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/validator"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -158,4 +159,10 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	}
 
 	return net, nil
+}
+
+func unstakedNetworkValidators(selfID flow.Identifier) []network.MessageValidator {
+	return []network.MessageValidator{
+		validator.NewSenderValidator(selfID), // validator to filter out messages sent by this node itself
+	}
 }

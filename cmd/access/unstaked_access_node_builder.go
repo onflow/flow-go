@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"strings"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,6 +19,7 @@ import (
 
 type UnstakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
+	upstreamConnector *UpstreamConnector
 }
 
 func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
@@ -29,6 +33,8 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	builder.validateParams()
 
 	builder.enqueueUnstakedNetworkInit()
+
+	builder.enqueueConnectUpstream()
 
 	builder.EnqueueMetricsServerInit()
 
@@ -94,8 +100,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
 		builder.MustNot(err)
 
-		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
+		msgValidators := unstakedNetworkValidators(unstakedNodeID)
 
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
@@ -114,9 +119,9 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		stakedAN := nodes[0]
 
 		modifiedStakedAN := &flow.Identity{
-			NodeID: stakedAN.NodeID,
-			Address: builder.stakedAccessNodeAddress,
-			Role: stakedAN.Role,
+			NodeID:        stakedAN.NodeID,
+			Address:       builder.stakedAccessNodeAddress,
+			Role:          stakedAN.Role,
 			NetworkPubKey: stakedAN.NetworkPubKey,
 		}
 
@@ -137,6 +142,51 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		builder.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
 
+		builder.upstreamConnector = &UpstreamConnector{
+			middleware: middleware,
+			logger:     builder.Logger,
+			stakedAN:   modifiedStakedAN,
+		}
+
 		return builder.UnstakedNetwork, err
 	})
+}
+
+func (builder *UnstakedAccessNodeBuilder) enqueueConnectUpstream() {
+	builder.Component("connect upstream", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return builder.upstreamConnector, nil
+	})
+}
+
+type UpstreamConnector struct {
+	middleware *p2p.Middleware
+	stakedAN   *flow.Identity
+	logger     zerolog.Logger
+}
+
+func (connector *UpstreamConnector) Ready() <-chan struct{} {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		host := connector.middleware.LibP2PNode
+		ctx := context.Background()
+		connector.logger.Info().Str("upstream_an", connector.stakedAN.String()).Msg("connecting to upstream AN")
+		for i := 0; i < 3; i++ {
+			err := host.AddPeer(ctx, *connector.stakedAN)
+			if err == nil {
+				connector.logger.Info().Str("upstream_an", connector.stakedAN.String()).Msg("connected to upstream AN")
+				return
+			}
+			connector.logger.Error().Err(err).Int("attempt", i+1).Msg("failed to connect to upstream access node")
+			time.Sleep(time.Second * 10)
+		}
+		connector.logger.Fatal().Msg("failed to connect to upstream access node")
+	}()
+	return c
+}
+
+func (connector *UpstreamConnector) Done() <-chan struct{} {
+	c := make(chan struct{})
+	close(c)
+	return c
 }

@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -66,8 +65,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
 		builder.MustNot(err)
 
-		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
+		msgValidators := unstakedNetworkValidators(unstakedNodeID)
 
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
