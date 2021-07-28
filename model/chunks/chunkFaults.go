@@ -109,7 +109,7 @@ func (c *CFInvalidEventsCollection) ExecutionResultID() flow.Identifier {
 }
 
 func (c *CFInvalidEventsCollection) String() string {
-	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s, events: %v", c.computed, c.expected,
+	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s, events IDs: %v", c.computed, c.expected,
 		c.chunkIndex, c.resultID, c.eventIDs)
 }
 
