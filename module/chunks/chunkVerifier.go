@@ -209,7 +209,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 
 		for i, event := range events {
 
-			fcv.logger.Debug().Int("list_index", i).
+			fcv.logger.Warn().Int("list_index", i).
 				Str("event_id", event.ID().String()).
 				Hex("event_fingerptint", event.Fingerprint()).
 				Str("event_type", string(event.Type)).
