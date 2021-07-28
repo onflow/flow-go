@@ -7,7 +7,7 @@ on:
       - 'auto-cadence-upgrade/**'
   pull_request:
     branches:
-      - master
+      # - master
       - 'auto-cadence-upgrade/**'
 
 jobs:
