@@ -87,6 +87,9 @@ func decode(env Envelope) (interface{}, error) {
 	case CodeEcho:
 		v = &message.TestMessage{}
 
+	case CodeDKGMessage:
+		v = &messages.DKGMessage{}
+
 	default:
 		return nil, errors.Errorf("invalid message code (%d)", env.Code)
 	}

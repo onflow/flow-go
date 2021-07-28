@@ -8,21 +8,27 @@ import (
 	"github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/signature"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
-// type to a ServiceEvent type for use within protocol software and protocol
+// type to a flow.ServiceEvent type for use within protocol software and protocol
 // state. This acts as the conversion from the Cadence type to the flow-go type.
-func ServiceEvent(event flow.Event) (*flow.ServiceEvent, error) {
+func ServiceEvent(chainID flow.ChainID, event flow.Event) (*flow.ServiceEvent, error) {
 
-	// depending on type of Epoch event construct Go type
+	events, err := systemcontracts.ServiceEventsForChain(chainID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get service event info: %w", err)
+	}
+
+	// depending on type of service event construct Go type
 	switch event.Type {
-	case flow.EventEpochSetup:
+	case events.EpochSetup.EventType():
 		return convertServiceEventEpochSetup(event)
-	case flow.EventEpochCommit:
+	case events.EpochCommit.EventType():
 		return convertServiceEventEpochCommit(event)
 	default:
 		return nil, fmt.Errorf("invalid event type: %s", event.Type)
@@ -72,10 +78,14 @@ func convertServiceEventEpochSetup(event flow.Event) (*flow.ServiceEvent, error)
 	if !ok {
 		return nil, invalidCadenceTypeError("randomSource", cdcEvent.Fields[5], cadence.String(""))
 	}
-	setup.RandomSource, err = hex.DecodeString(string(randomSrcHex))
+	// Cadence's unsafeRandom().toString() produces a string of variable length.
+	// Here we pad it with enough 0s to meet the required length.
+	paddedRandomSrcHex := fmt.Sprintf("%0*s", 2*flow.EpochSetupRandomSourceLength, string(randomSrcHex))
+	setup.RandomSource, err = hex.DecodeString(paddedRandomSrcHex)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode random source hex: %w", err)
+		return nil, fmt.Errorf("could not decode random source hex (%v): %w", paddedRandomSrcHex, err)
 	}
+
 	dkgPhase1FinalView, ok := cdcEvent.Fields[6].(cadence.UInt64)
 	if !ok {
 		return nil, invalidCadenceTypeError("dkgPhase1FinalView", cdcEvent.Fields[6], cadence.UInt64(0))
@@ -322,8 +332,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 
 	// CAUTION: Votes are not validated prior to aggregation. This means a single
 	// invalid vote submission will result in a fully invalid QC for that cluster.
-	// Votes should be validated upon submission by the ClusterQC smart contract.
-	// TODO issue for the above
+	// Votes must be validated by the ClusterQC smart contract.
 	//
 	// NOTE: Aggregation doesn't require a tag or local, but is only accessible
 	// through the broader Provider API, hence the empty arguments.
@@ -336,7 +345,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 		}
 		cdcClusterQCFields := cdcClusterQCStruct.Fields
 
-		expectedFields := 3
+		expectedFields := 4
 		if len(cdcClusterQCFields) < expectedFields {
 			return nil, fmt.Errorf("insufficient fields (%d < %d)", len(cdcClusterQCFields), expectedFields)
 		}
@@ -353,7 +362,7 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 			return nil, fmt.Errorf("duplicate cluster QC index (%d)", index)
 		}
 
-		cdcVoterIDs, ok := cdcClusterQCFields[2].(cadence.Array)
+		cdcVoterIDs, ok := cdcClusterQCFields[3].(cadence.Array)
 		if !ok {
 			return nil, invalidCadenceTypeError("clusterQC.voterIDs", cdcClusterQCFields[2], cadence.Array{})
 		}
