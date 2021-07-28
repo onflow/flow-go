@@ -287,26 +287,27 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 		for i := range computationResult.StateCommitments {
 			endState := computationResult.StateCommitments[i]
-			txNumber := 1 //default for system chunk
-			// account for system chunk being last
 
-			var collection flow.Collection
+			// generates chunk and chunk data pack
+			var chunkDataPack *flow.ChunkDataPack
+			var chunk *flow.Chunk
 			if i < len(computationResult.StateCommitments)-1 {
-				// non-system chunk
+				// generates chunk data pack fixture for non-system chunk
 				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
-				collection = completeCollection.Collection()
-				txNumber = len(completeCollection.Transactions)
-			}
+				collection := completeCollection.Collection()
 
-			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
-			require.NoError(t, err)
-			chunk := execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint16(txNumber))
+				eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+				require.NoError(t, err)
 
-			var chunkDataPack *flow.ChunkDataPack
-			if i < len(computationResult.StateCommitments)-1 {
+				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint16(len(completeCollection.Transactions)))
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
+				// generates chunk data pack fixture for system chunk
+				eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+				require.NoError(t, err)
+
+				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint16(1))
 				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
 			}
 
