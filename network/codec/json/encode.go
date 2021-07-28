@@ -87,6 +87,10 @@ func encode(v interface{}) (*Envelope, error) {
 	case *message.TestMessage:
 		code = CodeEcho
 
+	// dkg
+	case *messages.DKGMessage:
+		code = CodeDKGMessage
+
 	default:
 		return nil, errors.Errorf("invalid encode type (%T)", v)
 	}

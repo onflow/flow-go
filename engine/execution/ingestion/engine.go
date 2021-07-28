@@ -845,8 +845,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
 
-				fmt.Printf("handled collection\n")
-
 				// check if the block becomes executable
 				_ = e.executeBlockIfComplete(executableBlock)
 			}
@@ -1100,6 +1098,13 @@ func (e *Engine) saveExecutionResults(
 	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(previousErID, startState, result)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
+	}
+	for _, event := range executionResult.ServiceEvents {
+		e.log.Info().
+			Uint64("block_height", result.ExecutableBlock.Height()).
+			Hex("block_id", logging.Entity(result.ExecutableBlock)).
+			Str("event_type", event.Type).
+			Msg("service event emitted")
 	}
 
 	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)

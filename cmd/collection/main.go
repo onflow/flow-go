@@ -5,6 +5,10 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+	"google.golang.org/grpc"
+
+	"github.com/onflow/flow-go-sdk/client"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -21,6 +25,7 @@ import (
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -75,6 +80,9 @@ func main() {
 		followerEng       *followereng.Engine
 		colMetrics        module.CollectionMetrics
 		err               error
+
+		// epoch qc contract client
+		accessAddress string
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -126,6 +134,9 @@ func main() {
 				"additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
+
+			// epoch qc contract flags
+			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -353,11 +364,17 @@ func main() {
 				return nil, err
 			}
 
+			createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
+				return metrics.NewHotstuffCollector(chainID)
+			}
+			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
+				staking,
 				node.DB,
 				node.State,
+				createMetrics,
 				consensus.WithBlockRateDelay(blockRateDelay),
 				consensus.WithInitialTimeout(hotstuffTimeout),
 				consensus.WithMinTimeout(hotstuffMinTimeout),
@@ -369,14 +386,20 @@ func main() {
 				return nil, err
 			}
 
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+
+			// construct QC contract client
+			qcContractClient, err := createQCContractClient(node, accessAddress)
+			if err != nil {
+				return nil, fmt.Errorf("could not create qc contract client %w", err)
+			}
+
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
 				node.Me,
 				signer,
 				node.State,
-				nil, // TODO
+				qcContractClient,
 			)
 
 			factory := factories.NewEpochComponentsFactory(
@@ -411,4 +434,48 @@ func main() {
 			return manager, err
 		}).
 		Run()
+}
+
+// TEMPORARY: The functionality to allow starting up a node without a properly configured
+// machine account is very much intended to be temporary.
+// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
+// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
+func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.QCContractClient, error) {
+
+	var qcContractClient module.QCContractClient
+
+	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
+	if err != nil {
+		return nil, err
+	}
+	qcContractAddress := contracts.ClusterQC.Address.Hex()
+
+	// if not valid return a mock qc contract client
+	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
+		return epochs.NewMockQCContractClient(node.Logger), nil
+	}
+
+	// attempt to read NodeMachineAccountInfo
+	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.Me.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
+	}
+
+	// construct signer from private key
+	sk, err := sdkcrypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
+	}
+	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
+
+	// create flow client
+	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
+	}
+
+	// create actual qc contract client, all flags and machine account info file found
+	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), info.Address, info.KeyIndex, qcContractAddress, txSigner)
+
+	return qcContractClient, nil
 }
