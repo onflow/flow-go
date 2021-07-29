@@ -104,7 +104,7 @@ func TestNotifier_ManyConsumers(t *testing.T) {
 		// send 100 notifications, with small delays
 		for i := 0; i < 100; i++ {
 			notifier.Notify()
-			time.Sleep(1 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 
 		// require that all workers got a notification
