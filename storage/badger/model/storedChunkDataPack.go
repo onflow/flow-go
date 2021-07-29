@@ -13,11 +13,3 @@ type StoredChunkDataPack struct {
 	Proof        flow.StorageProof
 	CollectionID *flow.Identifier
 }
-
-func (s StoredChunkDataPack) ID() flow.Identifier {
-	return s.ChunkID
-}
-
-func (s StoredChunkDataPack) Checksum() flow.Identifier {
-	return flow.MakeID(s)
-}
