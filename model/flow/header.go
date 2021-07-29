@@ -8,8 +8,8 @@ import (
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/fingerprint"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/model/fingerprint"
 )
 
 // Header contains all meta-data for a block, as well as a hash representing

@@ -7,10 +7,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
-	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
