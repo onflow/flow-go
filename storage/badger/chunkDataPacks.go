@@ -9,28 +9,28 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	storagemodel "github.com/onflow/flow-go/storage/badger/model"
+	badgermodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type ChunkDataPacks struct {
 	db             *badger.DB
-	collections    *Collections
+	collections    storage.Collections
 	byChunkIDCache *Cache
 }
 
-func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections *Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections storage.Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
-		chdp := val.(*storagemodel.StoredChunkDataPack)
+		chdp := val.(*badgermodel.StoredChunkDataPack)
 		return transaction.WithTx(operation.SkipDuplicates(operation.InsertChunkDataPack(chdp)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		chunkID := key.(flow.Identifier)
 
-		var c storagemodel.StoredChunkDataPack
+		var c badgermodel.StoredChunkDataPack
 		return func(tx *badger.Txn) (interface{}, error) {
 			err := operation.RetrieveChunkDataPack(chunkID, &c)(tx)
 			return &c, err
@@ -106,18 +106,18 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	return chdp, nil
 }
 
-func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*storagemodel.StoredChunkDataPack, error) {
-	return func(tx *badger.Txn) (*storagemodel.StoredChunkDataPack, error) {
+func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
+	return func(tx *badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
 		val, err := ch.byChunkIDCache.Get(chunkID)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return val.(*storagemodel.StoredChunkDataPack), nil
+		return val.(*badgermodel.StoredChunkDataPack), nil
 	}
 }
 
-func toStoredChunkDataPack(c *flow.ChunkDataPack) *storagemodel.StoredChunkDataPack {
-	sc := &storagemodel.StoredChunkDataPack{
+func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPack {
+	sc := &badgermodel.StoredChunkDataPack{
 		ChunkID:    c.ChunkID,
 		StartState: c.StartState,
 		Proof:      c.Proof,
