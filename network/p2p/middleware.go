@@ -74,10 +74,19 @@ type Middleware struct {
 	peerManager           *PeerManager
 	peerUpdateInterval    time.Duration
 	unicastMessageTimeout time.Duration
+	connectionGating      bool
+	managePeerConnections bool
 }
 
-// NewMiddleware creates a new middleware instance with the given config and using the
-// given codec to encode/decode messages to our peers.
+// NewMiddleware creates a new middleware instance
+// libP2PNodeFactory is the factory used to create a LibP2PNode
+// flowID is this node's Flow ID
+// metrics is the interface to report network related metrics
+// peerUpdateInterval is the interval when the PeerManager's peer update runs
+// unicastMessageTimeout is the timeout used for unicast messages
+// connectionGating if set to True, restricts this node to only talk to other nodes which are part of the identity list
+// managePeerConnections if set to True, enables the default PeerManager which continuously updates the node's peer connections
+// validators are the set of the different message validators that each inbound messages is passed through
 func NewMiddleware(log zerolog.Logger,
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
@@ -85,6 +94,8 @@ func NewMiddleware(log zerolog.Logger,
 	rootBlockID string,
 	peerUpdateInterval time.Duration,
 	unicastMessageTimeout time.Duration,
+	connectionGating bool,
+	managePeerConnections bool,
 	validators ...network.MessageValidator) *Middleware {
 
 	if len(validators) == 0 {
@@ -111,6 +122,8 @@ func NewMiddleware(log zerolog.Logger,
 		validators:            validators,
 		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
+		connectionGating:      connectionGating,
+		managePeerConnections: managePeerConnections,
 	}
 }
 
@@ -148,22 +161,26 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
-	if err != nil {
-		return fmt.Errorf("could not update approved peer list: %w", err)
+	if m.connectionGating {
+		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
+		if err != nil {
+			return fmt.Errorf("could not update approved peer list: %w", err)
+		}
 	}
 
-	libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
-	if err != nil {
-		return fmt.Errorf("failed to create libp2pConnector: %w", err)
-	}
+	if m.managePeerConnections {
+		libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
+		if err != nil {
+			return fmt.Errorf("failed to create libp2pConnector: %w", err)
+		}
 
-	m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector, WithInterval(m.peerUpdateInterval))
-	select {
-	case <-m.peerManager.Ready():
-		m.log.Debug().Msg("peer manager successfully started")
-	case <-time.After(30 * time.Second):
-		return fmt.Errorf("could not start peer manager")
+		m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector, WithInterval(m.peerUpdateInterval))
+		select {
+		case <-m.peerManager.Ready():
+			m.log.Debug().Msg("peer manager successfully started")
+		case <-time.After(30 * time.Second):
+			return fmt.Errorf("could not start peer manager")
+		}
 	}
 
 	return nil
@@ -171,9 +188,13 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
-	// stops peer manager
-	<-m.peerManager.Done()
-	m.log.Debug().Msg("peer manager successfully stopped")
+
+	mgr, found := m.peerMgr()
+	if found {
+		// stops peer manager
+		<-mgr.Done()
+		m.log.Debug().Msg("peer manager successfully stopped")
+	}
 
 	// stops libp2p
 	done, err := m.libP2PNode.Stop()
@@ -318,7 +339,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	go rs.receiveLoop(m.wg)
 
 	// update peers to add some nodes interested in the same topic as direct peers
-	m.peerManager.RequestPeerUpdate()
+	m.peerManagerUpdate()
 
 	return nil
 }
@@ -330,8 +351,9 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	if err != nil {
 		return fmt.Errorf("failed to unsubscribe from channel %s: %w", channel, err)
 	}
+
 	// update peers to remove nodes subscribed to channel
-	m.peerManager.RequestPeerUpdate()
+	m.peerManagerUpdate()
 
 	return nil
 }
@@ -404,14 +426,16 @@ func (m *Middleware) UpdateAllowList() error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// update libp2pNode's approve lists
-	err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
-	if err != nil {
-		return fmt.Errorf("failed to update approved peer list: %w", err)
+	// update libp2pNode's approve lists if this middleware also does connection gating
+	if m.connectionGating {
+		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
+		if err != nil {
+			return fmt.Errorf("failed to update approved peer list: %w", err)
+		}
 	}
 
-	// update peer connections
-	m.peerManager.RequestPeerUpdate()
+	// update peer connections if this middleware also does peer management
+	m.peerManagerUpdate()
 
 	return nil
 }
@@ -442,4 +466,20 @@ func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
 	default:
 		return m.unicastMessageTimeout
 	}
+}
+
+// peerManagerUpdate request an update from the peer manager to connect to new peers and disconnect from unwanted peers
+func (m *Middleware) peerManagerUpdate() {
+	mgr, found := m.peerMgr()
+	if found {
+		mgr.RequestPeerUpdate()
+	}
+}
+
+// peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
+func (m *Middleware) peerMgr() (*PeerManager, bool) {
+	if m.managePeerConnections {
+		return m.peerManager, true
+	}
+	return nil, false
 }
