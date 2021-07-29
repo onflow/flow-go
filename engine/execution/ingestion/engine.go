@@ -845,8 +845,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
 
-				fmt.Printf("handled collection\n")
-
 				// check if the block becomes executable
 				_ = e.executeBlockIfComplete(executableBlock)
 			}
