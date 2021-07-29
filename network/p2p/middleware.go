@@ -189,9 +189,10 @@ func (m *Middleware) Start(ov network.Overlay) error {
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
 
-	if m.managePeerConnections {
+	mgr, found := m.peerMgr()
+	if found {
 		// stops peer manager
-		<-m.peerManager.Done()
+		<-mgr.Done()
 		m.log.Debug().Msg("peer manager successfully stopped")
 	}
 
@@ -387,9 +388,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	go rs.receiveLoop(m.wg)
 
 	// update peers to add some nodes interested in the same topic as direct peers
-	if m.managePeerConnections {
-		m.peerManager.RequestPeerUpdate()
-	}
+	m.peerManagerUpdate()
 
 	return nil
 }
@@ -403,9 +402,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	}
 
 	// update peers to remove nodes subscribed to channel
-	if m.managePeerConnections {
-		m.peerManager.RequestPeerUpdate()
-	}
+	m.peerManagerUpdate()
 
 	return nil
 }
@@ -487,9 +484,7 @@ func (m *Middleware) UpdateAllowList() error {
 	}
 
 	// update peer connections if this middleware also does peer management
-	if m.managePeerConnections {
-		m.peerManager.RequestPeerUpdate()
-	}
+	m.peerManagerUpdate()
 
 	return nil
 }
@@ -520,4 +515,20 @@ func (m *Middleware) unicastMaxMsgDuration(msg *message.Message) time.Duration {
 	default:
 		return m.unicastMessageTimeout
 	}
+}
+
+// peerManagerUpdate request an update from the peer manager to connect to new peers and disconnect from unwanted peers
+func (m *Middleware) peerManagerUpdate() {
+	mgr, found := m.peerMgr()
+	if found {
+		mgr.RequestPeerUpdate()
+	}
+}
+
+// peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
+func (m *Middleware) peerMgr() (*PeerManager, bool) {
+	if m.managePeerConnections {
+		return m.peerManager, true
+	}
+	return nil, false
 }
