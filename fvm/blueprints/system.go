@@ -32,7 +32,7 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(systemChunkTransactionTemplate, contracts.Epoch.Address))).
-		AddAuthorizer(chain.ServiceAddress())
+		AddAuthorizer(contracts.Epoch.Address)
 
 	return tx, nil
 }
