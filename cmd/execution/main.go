@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
-	wal "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
@@ -255,7 +255,7 @@ func main() {
 			}
 			computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, chdpCacheSize)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, chdpCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
