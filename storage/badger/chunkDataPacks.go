@@ -97,7 +97,7 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	if schdp.CollectionID != nil {
 		collection, err := ch.collections.ByID(*schdp.CollectionID)
 		if err != nil {
-			return nil, fmt.Errorf("could not retrive collection for stored chunk data pack: %w", err)
+			return nil, fmt.Errorf("could not retrive collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
 		}
 
 		chdp.Collection = collection
