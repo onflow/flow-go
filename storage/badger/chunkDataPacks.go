@@ -16,10 +16,11 @@ import (
 
 type ChunkDataPacks struct {
 	db             *badger.DB
+	collections    *Collections
 	byChunkIDCache *Cache
 }
 
-func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCacheSize uint) *ChunkDataPacks {
+func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections *Collections, byChunkIDCacheSize uint) *ChunkDataPacks {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		chdp := val.(*storagemodel.StoredChunkDataPack)
@@ -45,6 +46,7 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, byChunkIDCa
 	ch := ChunkDataPacks{
 		db:             db,
 		byChunkIDCache: cache,
+		collections:    collections,
 	}
 	return &ch
 }
@@ -77,10 +79,31 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 	return operation.BatchInsertChunkDataPack(sc)(writeBatch)
 }
 
-func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*storagemodel.StoredChunkDataPack, error) {
+func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
 	tx := ch.db.NewTransaction(false)
 	defer tx.Discard()
-	return ch.retrieveCHDP(chunkID)(tx)
+
+	schdp, err := ch.retrieveCHDP(chunkID)(tx)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
+	}
+
+	chdp := &flow.ChunkDataPack{
+		ChunkID:    schdp.ChunkID,
+		StartState: schdp.StartState,
+		Proof:      schdp.Proof,
+	}
+
+	if schdp.CollectionID != nil {
+		collection, err := ch.collections.ByID(*schdp.CollectionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not retrive collection for stored chunk data pack: %w", err)
+		}
+
+		chdp.Collection = collection
+	}
+
+	return chdp, nil
 }
 
 func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*storagemodel.StoredChunkDataPack, error) {

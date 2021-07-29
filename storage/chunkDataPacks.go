@@ -2,7 +2,6 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 )
 
 // ChunkDataPacks represents persistent storage for chunk data packs.
@@ -18,5 +17,5 @@ type ChunkDataPacks interface {
 	Remove(chunkID flow.Identifier) error
 
 	// ByChunkID returns the chunk data for the given a chunk ID.
-	ByChunkID(chunkID flow.Identifier) (*storagemodel.StoredChunkDataPack, error)
+	ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error)
 }
