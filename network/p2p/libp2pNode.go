@@ -18,6 +18,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
@@ -31,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dht"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -71,6 +73,7 @@ type Node struct {
 	connGater            *connGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
+	dht                  *discovery.RoutingDiscovery            // reference to the libp2p DHT component
 	cancel               context.CancelFunc                     // used to cancel context of host
 	logger               zerolog.Logger                         // used to provide logging
 	topics               map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
@@ -116,10 +119,18 @@ func NewLibP2PNode(logger zerolog.Logger,
 	pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
 	pingService := NewPingService(libP2PHost, pingLibP2PProtocolID, pingInfoProvider, logger)
 
+	dht, err := dht.NewDHT(ctx, libP2PHost, make([]peer.AddrInfo, 0))
+
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("could not bootstrap libp2p DHT: %w", err)
+	}
+
 	n := &Node{
 		connGater:            connGater,
 		host:                 libP2PHost,
 		pubSub:               pubSub,
+		dht:                  dht,
 		cancel:               cancel,
 		logger:               logger,
 		topics:               make(map[flownet.Topic]*pubsub.Topic),
