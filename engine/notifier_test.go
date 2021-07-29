@@ -156,12 +156,13 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 				start.Wait()
 				for consumedWork.Load() < totalWork {
 					<-notifier.Channel()
+				L:
 					for {
 						select {
 						case <-pendingWorkQueue:
 							consumedWork.Inc()
 						default:
-							break
+							break L
 						}
 					}
 				}
