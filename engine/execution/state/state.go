@@ -307,25 +307,9 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 }
 
 func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	storedChunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
+	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
-	}
-
-	chunkDataPack := &flow.ChunkDataPack{
-		ChunkID:    storedChunkDataPack.ChunkID,
-		StartState: storedChunkDataPack.StartState,
-		Proof:      storedChunkDataPack.Proof,
-	}
-
-	if storedChunkDataPack.CollectionID != nil {
-		// non-system chunks have a non-nil collection
-		collection, err := s.GetCollection(*storedChunkDataPack.CollectionID)
-		if err != nil {
-			return nil, fmt.Errorf("could not retrieve collection for chunk data pack: %w", err)
-		}
-
-		chunkDataPack.Collection = collection
 	}
 
 	return chunkDataPack, nil
