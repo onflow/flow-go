@@ -797,7 +797,7 @@ func VerificationNode(t testing.TB,
 	if node.Results == nil {
 		results := storage.NewExecutionResults(node.Metrics, node.DB)
 		node.Results = results
-		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results, storage.DefaultCacheSize)
 	}
 
 	if node.ProcessedChunkIndex == nil {
