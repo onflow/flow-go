@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	mock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -31,22 +33,88 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
-		// protocol state has been bootstrapped, now open a protocol state with the database
-		metrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(metrics, db)
-		state, err := bprotocol.OpenState(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses)
+
+		// expect the final view metric to be set to current epoch's final view
+		epoch := rootSnapshot.Epochs().Current()
+		finalView, err := epoch.FinalView()
+		require.NoError(t, err)
+		counter, err := epoch.Counter()
+		require.NoError(t, err)
+		phase, err := rootSnapshot.Phase()
 		require.NoError(t, err)
 
+		complianceMetrics := new(mock.ComplianceMetrics)
+		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+
+		noopMetrics := new(metrics.NoopCollector)
+		all := storagebadger.InitAll(noopMetrics, db)
+		// protocol state has been bootstrapped, now open a protocol state with the database
+		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		require.NoError(t, err)
+
+		complianceMetrics.AssertExpectations(t)
+
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+	})
+}
+
+// TestBootstrapAndOpen_EpochCommitted verifies after bootstrapping with a
+// root snapshot from EpochCommitted phase  we should be able to open it and
+// got the same state.
+func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
+
+	// create a state root and bootstrap the protocol state with it
+	participants := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
+		block.Header.ParentID = unittest.IdentifierFixture()
+	})
+	rootBlock, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
+	// build an epoch on the root state and return a snapshot from the committed phase
+	committedPhaseSnapshot := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+		unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+
+		// find the point where we transition to the epoch committed phase
+		for height := rootBlock.Height + 1; ; height++ {
+			phase, err := state.AtHeight(height).Phase()
+			require.NoError(t, err)
+			if phase == flow.EpochPhaseCommitted {
+				return state.AtHeight(height)
+			}
+		}
+	})
+
+	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+
+		complianceMetrics := new(mock.ComplianceMetrics)
+
+		// expect the final view metric to be set to next epoch's final view
+		finalView, err := committedPhaseSnapshot.Epochs().Next().FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+
+		// expect counter to be set to current epochs counter
+		counter, err := committedPhaseSnapshot.Epochs().Current().Counter()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+
+		// expect epoch phase to be set to current phase
+		phase, err := committedPhaseSnapshot.Phase()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+
+		noopMetrics := new(metrics.NoopCollector)
+		all := storagebadger.InitAll(noopMetrics, db)
+		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		require.NoError(t, err)
+
+		// assert update final view was called
+		complianceMetrics.AssertExpectations(t)
+
+		unittest.AssertSnapshotsEqual(t, committedPhaseSnapshot, state.Final())
 	})
 }
 
@@ -173,63 +241,68 @@ func TestBootstrapNonRoot(t *testing.T) {
 	})
 }
 
-func TestBootstrapDuplicateID(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4}, // dupe
-	}
-	root := unittest.RootSnapshotFixture(participants)
-	bootstrap(t, root, func(state *bprotocol.State, err error) {
-		assert.Error(t, err)
-	})
-}
+func TestBootstrap_InvalidIdentities(t *testing.T) {
+	t.Run("duplicate node ID", func(t *testing.T) {
+		participants := unittest.CompleteIdentitySet()
+		dupeIDIdentity := unittest.IdentityFixture(unittest.WithNodeID(participants[0].NodeID))
+		participants = append(participants, dupeIDIdentity)
 
-func TestBootstrapZeroStake(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 0},
-		{NodeID: flow.Identifier{0x02}, Address: "a2", Role: flow.RoleConsensus, Stake: 2},
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
-	root := unittest.RootSnapshotFixture(participants)
-	bootstrap(t, root, func(state *bprotocol.State, err error) {
-		assert.Error(t, err)
-	})
-}
-
-func TestBootstrapMissingRole(t *testing.T) {
-	requiredRoles := []flow.Role{
-		flow.RoleConsensus,
-		flow.RoleCollection,
-		flow.RoleExecution,
-		flow.RoleVerification,
-	}
-
-	for _, role := range requiredRoles {
-		t.Run(fmt.Sprintf("no %s nodes", role.String()), func(t *testing.T) {
-			participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
-			root := unittest.RootSnapshotFixture(participants)
-			bootstrap(t, root, func(state *bprotocol.State, err error) {
-				assert.Error(t, err)
-			})
+		root := unittest.RootSnapshotFixture(participants)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
 		})
-	}
-}
+	})
 
-func TestBootstrapExistingAddress(t *testing.T) {
-	participants := flow.IdentityList{
-		{NodeID: flow.Identifier{0x01}, Address: "a1", Role: flow.RoleCollection, Stake: 1},
-		{NodeID: flow.Identifier{0x02}, Address: "a1", Role: flow.RoleConsensus, Stake: 2}, // dupe address
-		{NodeID: flow.Identifier{0x03}, Address: "a3", Role: flow.RoleExecution, Stake: 3},
-		{NodeID: flow.Identifier{0x04}, Address: "a4", Role: flow.RoleVerification, Stake: 4},
-	}
+	t.Run("zero stake", func(t *testing.T) {
+		zeroStakeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification), unittest.WithStake(0))
+		participants := unittest.CompleteIdentitySet(zeroStakeIdentity)
+		root := unittest.RootSnapshotFixture(participants)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
 
-	root := unittest.RootSnapshotFixture(participants)
-	bootstrap(t, root, func(state *bprotocol.State, err error) {
-		assert.Error(t, err)
+	t.Run("missing role", func(t *testing.T) {
+		requiredRoles := []flow.Role{
+			flow.RoleConsensus,
+			flow.RoleCollection,
+			flow.RoleExecution,
+			flow.RoleVerification,
+		}
+
+		for _, role := range requiredRoles {
+			t.Run(fmt.Sprintf("no %s nodes", role), func(t *testing.T) {
+				participants := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(role))
+				root := unittest.RootSnapshotFixture(participants)
+				bootstrap(t, root, func(state *bprotocol.State, err error) {
+					assert.Error(t, err)
+				})
+			})
+		}
+	})
+
+	t.Run("duplicate address", func(t *testing.T) {
+		participants := unittest.CompleteIdentitySet()
+		dupeAddressIdentity := unittest.IdentityFixture(unittest.WithAddress(participants[0].Address))
+		participants = append(participants, dupeAddressIdentity)
+
+		root := unittest.RootSnapshotFixture(participants)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
+	})
+
+	t.Run("non-canonical ordering", func(t *testing.T) {
+		participants := unittest.IdentityListFixture(20, unittest.WithAllRoles())
+
+		root := unittest.RootSnapshotFixture(participants)
+		// randomly shuffle the identities so they are not canonically ordered
+		encodable := root.Encodable()
+		encodable.Identities = participants.DeterministicShuffle(time.Now().UnixNano())
+		root = inmem.SnapshotFromEncodable(encodable)
+		bootstrap(t, root, func(state *bprotocol.State, err error) {
+			assert.Error(t, err)
+		})
 	})
 }
 

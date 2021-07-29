@@ -3,12 +3,14 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
@@ -133,6 +135,18 @@ func (iy Identity) MarshalMsgpack() ([]byte, error) {
 	return data, nil
 }
 
+func (iy Identity) EncodeRLP(w io.Writer) error {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	err = rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
+}
+
 func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
 	identity.NodeID = ie.NodeID
 	identity.Address = ie.Address
@@ -176,6 +190,41 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 		return fmt.Errorf("could not convert from encodable msgpack: %w", err)
 	}
 	return nil
+}
+
+func (iy *Identity) EqualTo(other *Identity) bool {
+	if iy.NodeID != other.NodeID {
+		return false
+	}
+	if iy.Address != other.Address {
+		return false
+	}
+	if iy.Role != other.Role {
+		return false
+	}
+	if iy.Stake != other.Stake {
+		return false
+	}
+	if iy.Ejected != other.Ejected {
+		return false
+	}
+	if (iy.StakingPubKey != nil && other.StakingPubKey == nil) ||
+		(iy.StakingPubKey == nil && other.StakingPubKey != nil) {
+		return false
+	}
+	if iy.StakingPubKey != nil && !iy.StakingPubKey.Equals(other.StakingPubKey) {
+		return false
+	}
+
+	if (iy.NetworkPubKey != nil && other.NetworkPubKey == nil) ||
+		(iy.NetworkPubKey == nil && other.NetworkPubKey != nil) {
+		return false
+	}
+	if iy.NetworkPubKey != nil && !iy.NetworkPubKey.Equals(other.NetworkPubKey) {
+		return false
+	}
+
+	return true
 }
 
 // IdentityFilter is a filter on identities.
@@ -243,21 +292,33 @@ func (il IdentityList) Selector() IdentityFilter {
 	}
 }
 
-func (il IdentityList) Lookup() map[Identifier]struct{} {
-	lookup := make(map[Identifier]struct{})
+func (il IdentityList) Lookup() map[Identifier]*Identity {
+	lookup := make(map[Identifier]*Identity, len(il))
 	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
+		lookup[identity.NodeID] = identity
 	}
 	return lookup
 }
 
-// Order will sort the list using the given sort function.
-func (il IdentityList) Order(less IdentityOrder) IdentityList {
+// Sort will sort the list using the given ordering.
+func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
 	})
 	return dup
+}
+
+// Sorted returns whether the list is sorted by the input ordering.
+func (il IdentityList) Sorted(less IdentityOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		a := il[i]
+		b := il[i+1]
+		if !less(a, b) {
+			return false
+		}
+	}
+	return true
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
@@ -377,4 +438,18 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	}
 
 	return union
+}
+
+// EqualTo checks if the other list if the same, that it contains the same elements
+// in the same order
+func (il IdentityList) EqualTo(other IdentityList) bool {
+	if len(il) != len(other) {
+		return false
+	}
+	for i, identity := range il {
+		if !identity.EqualTo(other[i]) {
+			return false
+		}
+	}
+	return true
 }

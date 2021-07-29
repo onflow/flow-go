@@ -53,7 +53,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 
 	fi, err := os.Create(outputFile)
 	if err != nil {
-		return nil, fmt.Errorf("could not create block output file %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("could not create block output file %w", err)
 	}
 	defer fi.Close()
 
@@ -107,11 +107,11 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 
 		jsonData, err := json.Marshal(b)
 		if err != nil {
-			return nil, fmt.Errorf("could not create a json obj for a block: %w", err)
+			return flow.DummyStateCommitment, fmt.Errorf("could not create a json obj for a block: %w", err)
 		}
 		_, err = blockWriter.WriteString(string(jsonData) + "\n")
 		if err != nil {
-			return nil, fmt.Errorf("could not write block json to the file: %w", err)
+			return flow.DummyStateCommitment, fmt.Errorf("could not write block json to the file: %w", err)
 		}
 		blockWriter.Flush()
 
@@ -120,7 +120,7 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 
 	state, err := commits.ByBlockID(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not find state commitment for this block: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("could not find state commitment for this block: %w", err)
 	}
 	return state, nil
 }

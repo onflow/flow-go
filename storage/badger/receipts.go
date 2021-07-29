@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // ExecutionReceipts implements storage for execution receipts.
@@ -23,20 +24,20 @@ type ExecutionReceipts struct {
 // NewExecutionReceipts Creates ExecutionReceipts instance which is a database of receipts which
 // supports storing and indexing receipts by receipt ID and block ID.
 func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results *ExecutionResults, cacheSize uint) *ExecutionReceipts {
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		receipt := val.(*flow.ExecutionReceipt)
 		receiptID := receipt.ID()
 
 		// assemble DB operations to store result (no execution)
 		storeResultOps := results.store(&receipt.ExecutionResult)
-		// assemble DB operations to to index receipt (no execution)
-		storeReceiptOps := operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receiptID, receipt.Meta()))
+		// assemble DB operations to index receipt (no execution)
+		storeReceiptOps := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionReceiptMeta(receiptID, receipt.Meta())))
 		// assemble DB operations to index receipt by the block it computes (no execution)
-		indexReceiptOps := operation.SkipDuplicates(
+		indexReceiptOps := transaction.WithTx(operation.SkipDuplicates(
 			operation.IndexExecutionReceipts(receipt.ExecutionResult.BlockID, receiptID),
-		)
+		))
 
-		return func(tx *badger.Txn) error {
+		return func(tx *transaction.Tx) error {
 			err := storeResultOps(tx) // execute operations to store receipt
 			if err != nil {
 				return fmt.Errorf("could not store result: %w", err)
@@ -80,8 +81,8 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 }
 
 // storeMyReceipt assembles the operations to store an arbitrary receipt.
-func (r *ExecutionReceipts) store(receipt *flow.ExecutionReceipt) func(*badger.Txn) error {
-	return r.cache.Put(receipt.ID(), receipt)
+func (r *ExecutionReceipts) storeTx(receipt *flow.ExecutionReceipt) func(*transaction.Tx) error {
+	return r.cache.PutTx(receipt.ID(), receipt)
 }
 
 func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*flow.ExecutionReceipt, error) {
@@ -95,7 +96,7 @@ func (r *ExecutionReceipts) byID(receiptID flow.Identifier) func(*badger.Txn) (*
 	}
 }
 
-func (r *ExecutionReceipts) byBlockId(blockID flow.Identifier) func(*badger.Txn) ([]*flow.ExecutionReceipt, error) {
+func (r *ExecutionReceipts) byBlockID(blockID flow.Identifier) func(*badger.Txn) ([]*flow.ExecutionReceipt, error) {
 	return func(tx *badger.Txn) ([]*flow.ExecutionReceipt, error) {
 		var receiptIDs []flow.Identifier
 		err := operation.LookupExecutionReceipts(blockID, &receiptIDs)(tx)
@@ -116,7 +117,7 @@ func (r *ExecutionReceipts) byBlockId(blockID flow.Identifier) func(*badger.Txn)
 }
 
 func (r *ExecutionReceipts) Store(receipt *flow.ExecutionReceipt) error {
-	return operation.RetryOnConflict(r.db.Update, r.store(receipt))
+	return operation.RetryOnConflictTx(r.db, transaction.Update, r.storeTx(receipt))
 }
 
 func (r *ExecutionReceipts) BatchStore(receipt *flow.ExecutionReceipt, batch storage.BatchStorage) error {
@@ -149,5 +150,5 @@ func (r *ExecutionReceipts) ByID(receiptID flow.Identifier) (*flow.ExecutionRece
 func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionReceiptList, error) {
 	tx := r.db.NewTransaction(false)
 	defer tx.Discard()
-	return r.byBlockId(blockID)(tx)
+	return r.byBlockID(blockID)(tx)
 }

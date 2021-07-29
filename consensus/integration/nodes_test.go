@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -131,7 +132,11 @@ func createNode(
 	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
+	require.NoError(t, err)
+
+	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer,
+		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -181,11 +186,12 @@ func createNode(
 
 	receipts := consensusMempools.NewExecutionTree()
 
-	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
-	build := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB,
-		guarantees, seals, receipts, tracer)
+	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
+		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
+	require.NoError(t, err)
 
 	signer := &Signer{identity.ID()}
 

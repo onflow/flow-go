@@ -64,8 +64,9 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == nil {
 			return storage.ErrAlreadyExists
 		}
-		if err != badger.ErrKeyNotFound {
-			return fmt.Errorf("could not check key: %w", err)
+
+		if !errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("could not retrieve key: %w", err)
 		}
 
 		// serialize the entity data
@@ -120,7 +121,7 @@ func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
+		if errors.Is(err, badger.ErrKeyNotFound) {
 			return storage.ErrNotFound
 		}
 		if err != nil {

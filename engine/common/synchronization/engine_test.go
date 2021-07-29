@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -93,6 +94,15 @@ func (ss *SyncSuite) SetupTest() {
 			return ss.snapshot
 		},
 	)
+	ss.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) protocolint.Snapshot {
+			if ss.head.ID() == blockID {
+				return ss.snapshot
+			} else {
+				return unittest.StateSnapshotForUnknownBlock()
+			}
+		},
+	).Maybe()
 
 	// set up the snapshot mock
 	ss.snapshot = &protocol.Snapshot{}
@@ -206,8 +216,7 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Height)
-	err := ss.e.onSyncResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
 
@@ -357,8 +366,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	},
 	)
 
-	err := ss.e.onBlockResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
@@ -373,8 +381,7 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
 		},
 	)
-	err := ss.e.pollHeight()
-	ss.Require().Nil(err)
+	ss.e.pollHeight()
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -402,8 +409,8 @@ func (ss *SyncSuite) TestSendRequests() {
 	)
 	ss.core.On("BatchRequested", batches[0])
 
-	err := ss.e.sendRequests(ranges, batches)
-	ss.Assert().Nil(err)
+	// exclude my node ID
+	ss.e.sendRequests(ss.participants[1:], ranges, batches)
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -413,4 +420,53 @@ func (ss *SyncSuite) TestStartStop() {
 		<-ss.e.Ready()
 		<-ss.e.Done()
 	}, time.Second)
+}
+
+// TestProcessingMultipleItems tests that items are processed in async way
+func (ss *SyncSuite) TestProcessingMultipleItems() {
+	<-ss.e.Ready()
+
+	originID := unittest.IdentifierFixture()
+	for i := 0; i < 5; i++ {
+		msg := &messages.SyncResponse{
+			Nonce:  uint64(i),
+			Height: uint64(1000 + i),
+		}
+		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+	}
+
+	finalHeight := ss.head.Height
+	for i := 0; i < 5; i++ {
+		msg := &messages.SyncRequest{
+			Nonce:  uint64(i),
+			Height: finalHeight - 100,
+		}
+
+		originID := unittest.IdentifierFixture()
+		ss.core.On("WithinTolerance", mock.Anything, mock.Anything).Return(false)
+		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
+
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+	}
+
+	// give at least some time to process items
+	time.Sleep(time.Millisecond * 100)
+
+	ss.core.AssertExpectations(ss.T())
+}
+
+// TestOnFinalizedBlock tests that when new finalized block is discovered engine updates cached variables
+// to latest state
+func (ss *SyncSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
+	// change head
+	ss.head = &finalizedBlock
+
+	err := ss.e.onFinalizedBlock()
+	require.NoError(ss.T(), err)
+	actualSnapshot := ss.e.finalSnapshot()
+	require.ElementsMatch(ss.T(), actualSnapshot.participants, ss.participants[1:])
+	require.Equal(ss.T(), actualSnapshot.head, &finalizedBlock)
 }

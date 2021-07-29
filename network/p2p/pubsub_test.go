@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -42,10 +43,13 @@ func (suite *PubSubTestSuite) SetupTest() {
 }
 
 type mockDiscovery struct {
-	peers []peer.AddrInfo
+	peerLock sync.Mutex
+	peers    []peer.AddrInfo
 }
 
 func (s *mockDiscovery) SetPeers(peers []peer.AddrInfo) {
+	s.peerLock.Lock()
+	defer s.peerLock.Unlock()
 	s.peers = peers
 }
 
@@ -54,6 +58,8 @@ func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Op
 }
 
 func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
+	defer s.peerLock.Unlock()
+	s.peerLock.Lock()
 	count := len(s.peers)
 	ch := make(chan peer.AddrInfo, count)
 	for _, reg := range s.peers {
@@ -163,10 +169,11 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 
 		noopMetrics := metrics.NewNoopCollector()
 
+		pingInfoProvider, _, _ := MockPingInfoProvider()
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, psOption)
+		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, pingInfoProvider, psOption)
 		require.NoError(suite.T(), err)
-		n.SetStreamHandler(handlerFunc)
+		n.SetFlowProtocolStreamHandler(handlerFunc)
 
 		require.Eventuallyf(suite.T(), func() bool {
 			ip, p, err := n.GetIPPort()

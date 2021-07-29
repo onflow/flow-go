@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 func withLimit(limit uint) func(*Cache) {
@@ -17,7 +18,7 @@ func withLimit(limit uint) func(*Cache) {
 	}
 }
 
-type storeFunc func(key interface{}, val interface{}) func(*badger.Txn) error
+type storeFunc func(key interface{}, val interface{}) func(*transaction.Tx) error
 
 const DefaultCacheSize = uint(1000)
 
@@ -27,14 +28,14 @@ func withStore(store storeFunc) func(*Cache) {
 	}
 }
 
-func noStore(key interface{}, val interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func noStore(key interface{}, val interface{}) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		return fmt.Errorf("no store function for cache put available")
 	}
 }
 
-func noopStore(key interface{}, val interface{}) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func noopStore(key interface{}, val interface{}) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		return nil
 	}
 }
@@ -124,17 +125,20 @@ func (c *Cache) Insert(key interface{}, resource interface{}) {
 	}
 }
 
-// Put will return Badger tx which adds an resource to the cache with the given ID.
-func (c *Cache) Put(key interface{}, resource interface{}) func(*badger.Txn) error {
+// PutTx will return tx which adds an resource to the cache with the given ID.
+func (c *Cache) PutTx(key interface{}, resource interface{}) func(*transaction.Tx) error {
 	storeOps := c.store(key, resource) // assemble DB operations to store resource (no execution)
 
-	return func(tx *badger.Txn) error {
+	return func(tx *transaction.Tx) error {
 		err := storeOps(tx) // execute operations to store recourse
 		if err != nil {
 			return fmt.Errorf("could not store resource: %w", err)
 		}
 
-		c.Insert(key, resource)
+		tx.OnSucceed(func() {
+			c.Insert(key, resource)
+		})
+
 		return nil
 	}
 }

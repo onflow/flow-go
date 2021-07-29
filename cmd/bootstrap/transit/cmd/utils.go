@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"crypto/md5"
 	"crypto/rand"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/crypto/nacl/box"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/build"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	ioutils "github.com/onflow/flow-go/utils/io"
@@ -73,18 +73,17 @@ func getFilesToUpload(role flow.Role) []string {
 	}
 }
 
-func getFileMD5(file string) (string, error) {
+func getFileSHA256(file string) (string, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	h := md5.New()
+	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return "", err
 	}
-
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 

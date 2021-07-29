@@ -3,7 +3,6 @@
 package crypto
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -48,7 +47,7 @@ var popKMAC = internalBLSKMAC(popTagPrefix)
 func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 	_, ok := sk.(*PrKeyBLSBLS12381)
 	if !ok {
-		return nil, fmt.Errorf("key is not a BLS key")
+		return nil, newInvalidInputsError("key is not a BLS key")
 	}
 	// sign the public key
 	return sk.Sign(sk.PublicKey().Encode(), popKMAC)
@@ -60,7 +59,7 @@ func BLSGeneratePOP(sk PrivateKey) (Signature, error) {
 func BLSVerifyPOP(pk PublicKey, s Signature) (bool, error) {
 	_, ok := pk.(*PubKeyBLSBLS12381)
 	if !ok {
-		return false, fmt.Errorf("key is not a BLS key")
+		return false, newInvalidInputsError("key is not a BLS key")
 	}
 	// verify the signature against the public key
 	return pk.Verify(s, pk.Encode(), popKMAC)
@@ -79,28 +78,35 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 
 	// check for empty list
 	if len(sigs) == 0 {
-		return nil, fmt.Errorf("signature list should not be empty")
+		return nil, newInvalidInputsError("signature list should not be empty")
 	}
 
 	// flatten the shares (required by the C layer)
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	for i, sig := range sigs {
 		if len(sig) != signatureLengthBLSBLS12381 {
-			return nil, fmt.Errorf("signature at index %d is not a valid BLS signature", i)
+			return nil, newInvalidInputsError(
+				"signature at index %d has an invalid length, %d is expected, got %d",
+				i, signatureLengthBLSBLS12381, len(sig))
 		}
 		flatSigs = append(flatSigs, sig...)
 	}
 	aggregatedSig := make([]byte, signatureLengthBLSBLS12381)
 
 	// add the points in the C layer
-	if C.ep_sum_vector_byte(
+	result := C.ep_sum_vector_byte(
 		(*C.uchar)(&aggregatedSig[0]),
 		(*C.uchar)(&flatSigs[0]),
-		(C.int)(len(sigs)),
-	) != valid {
-		return nil, fmt.Errorf("decoding BLS signatures has failed")
+		(C.int)(len(sigs)))
+
+	switch result {
+	case valid:
+		return aggregatedSig, nil
+	case invalid:
+		return nil, newInvalidInputsError("decoding at least one BLS signatures has failed")
+	default:
+		return nil, fmt.Errorf("aggregating signatures failed")
 	}
-	return aggregatedSig, nil
 }
 
 // AggregateBLSPrivateKeys aggregate multiple BLS private keys into one.
@@ -114,25 +120,23 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, fmt.Errorf("keys list should not be empty")
+		return nil, newInvalidInputsError("keys list should not be empty")
 	}
 
 	scalars := make([]scalar, 0, len(keys))
 	for i, sk := range keys {
 		skBls, ok := sk.(*PrKeyBLSBLS12381)
 		if !ok {
-			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
+			return nil, newInvalidInputsError("key at index %d is not a BLS key", i)
 		}
 		scalars = append(scalars, skBls.scalar)
 	}
 
 	var sum scalar
+	C.bn_new_wrapper((*C.bn_st)(&sum))
 	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
 		(C.int)(len(scalars)))
-	return &PrKeyBLSBLS12381{
-		pk:     nil,
-		scalar: sum,
-	}, nil
+	return newPrKeyBLSBLS12381(&sum), nil
 }
 
 // AggregateBLSPublicKeys aggregate multiple BLS public keys into one.
@@ -146,14 +150,14 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 
 	// check for empty list
 	if len(keys) == 0 {
-		return nil, fmt.Errorf("keys list should not be empty")
+		return nil, newInvalidInputsError("keys list should not be empty")
 	}
 
 	points := make([]pointG2, 0, len(keys))
 	for i, pk := range keys {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
 		if !ok {
-			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
+			return nil, newInvalidInputsError("key at index %d is not a BLS key", i)
 		}
 		points = append(points, pkBLS.point)
 	}
@@ -161,16 +165,14 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	var sum pointG2
 	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
 		(C.int)(len(points)))
-	return &PubKeyBLSBLS12381{
-		point: sum,
-	}, nil
+	return newPubKeyBLSBLS12381(&sum), nil
 }
 
 func NeutralBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
 
-	var neutralPk PubKeyBLSBLS12381
+	neutralPk := *newPubKeyBLSBLS12381(nil)
 	// set the point to infinity
 	C.ep2_set_infty((*C.ep2_st)(&neutralPk.point))
 	return &neutralPk
@@ -190,14 +192,14 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 
 	aggPKBLS, ok := aggKey.(*PubKeyBLSBLS12381)
 	if !ok {
-		return nil, fmt.Errorf("aggregated Key is not a BLS key")
+		return nil, newInvalidInputsError("aggregated Key is not a BLS key")
 	}
 
 	pointsToSubtract := make([]pointG2, 0, len(keysToRemove))
 	for i, pk := range keysToRemove {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
 		if !ok {
-			return nil, fmt.Errorf("key at index %d is not a BLS key", i)
+			return nil, newInvalidInputsError("key at index %d is not a BLS key", i)
 		}
 		pointsToSubtract = append(pointsToSubtract, pkBLS.point)
 	}
@@ -211,9 +213,7 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 	C.ep2_subtract_vector((*C.ep2_st)(&resultKey), (*C.ep2_st)(&aggPKBLS.point),
 		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
-	return &PubKeyBLSBLS12381{
-		point: resultKey,
-	}, nil
+	return newPubKeyBLSBLS12381(&resultKey), nil
 }
 
 // VerifyBLSSignatureOneMessage is a multi-signature verification that verifies a
@@ -235,11 +235,13 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 	message []byte, kmac hash.Hasher) (bool, error) {
 	// check the public key list is non empty
 	if len(pks) == 0 {
-		return false, fmt.Errorf("key list is empty")
+		return false, newInvalidInputsError("key list is empty")
 	}
 	aggPk, err := AggregateBLSPublicKeys(pks)
 	if err != nil {
-		return false, fmt.Errorf("aggregating public keys for verification failed: %w", err)
+		return false, newInvalidInputsError(
+			"aggregating public keys for verification failed: %s",
+			err)
 	}
 	return aggPk.Verify(s, message, kmac)
 }
@@ -269,22 +271,27 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 	}
 	// check the list lengths
 	if len(pks) == 0 {
-		return false, fmt.Errorf("key list is empty")
+		return false, newInvalidInputsError("key list is empty")
 	}
 	if len(pks) != len(messages) || len(kmac) != len(messages) {
-		return false, fmt.Errorf("input lists must be equal, messages are %d, keys are %d, hashers are %d",
-			len(messages), len(pks), len(kmac))
+		return false, newInvalidInputsError(
+			"input lists must be equal, messages are %d, keys are %d, hashers are %d",
+			len(messages),
+			len(pks),
+			len(kmac))
 	}
 
 	// compute the hashes
 	hashes := make([][]byte, 0, len(messages))
 	for i, k := range kmac {
 		if k == nil {
-			return false, fmt.Errorf("hasher at index %d is nil", i)
+			return false, newInvalidInputsError("hasher at index %d is nil", i)
 		}
 		if k.Size() < minHashSizeBLSBLS12381 {
-			return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
-				minHashSizeBLSBLS12381, k.Size())
+			return false, newInvalidInputsError(
+				"Hasher with at least %d output byte size is required, current size is %d",
+				minHashSizeBLSBLS12381,
+				k.Size())
 		}
 		hashes = append(hashes, k.ComputeHash(messages[i]))
 	}
@@ -307,14 +314,17 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
 		if !ok {
-			return false, fmt.Errorf("public key at index %d is not BLS key, it is a %s key",
-				i, pk.Algorithm())
+			return false, newInvalidInputsError(
+				"public key at index %d is not BLS key, it is a %s key",
+				i,
+				pk.Algorithm())
 		}
 
 		mapPerHash[string(hashes[i])] = append(mapPerHash[string(hashes[i])], pkBLS.point)
 		mapPerPk[pkBLS.point] = append(mapPerPk[pkBLS.point], hashes[i])
 	}
 
+	var verif (C.int)
 	//compare the 2 maps for the shortest length
 	if len(mapPerHash) < len(mapPerPk) {
 		// aggregate keys per distinct hashes
@@ -329,7 +339,7 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			pkPerHash = append(pkPerHash, uint32(len(pksVal)))
 			allPks = append(allPks, pksVal...)
 		}
-		verif := C.bls_verifyPerDistinctMessage(
+		verif = C.bls_verifyPerDistinctMessage(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerHash)),
 			(*C.uchar)(&flatDistinctHashes[0]),
@@ -337,7 +347,6 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			(*C.uint32_t)(&pkPerHash[0]),
 			(*C.ep2_st)(&allPks[0]),
 		)
-		return (verif == valid), nil
 
 	} else {
 		// aggregate hashes per distinct key
@@ -355,14 +364,22 @@ func VerifyBLSSignatureManyMessages(pks []PublicKey, s Signature,
 			}
 		}
 
-		verif := C.bls_verifyPerDistinctKey(
+		verif = C.bls_verifyPerDistinctKey(
 			(*C.uchar)(&s[0]),
 			(C.int)(len(mapPerPk)),
 			(*C.ep2_st)(&distinctPks[0]),
 			(*C.uint32_t)(&hashPerPk[0]),
 			(*C.uchar)(&flatHashes[0]),
 			(*C.uint32_t)(&lenHashes[0]))
-		return (verif == valid), nil
+	}
+
+	switch verif {
+	case invalid:
+		return false, nil
+	case valid:
+		return true, nil
+	default:
+		return false, fmt.Errorf("signature verification failed")
 	}
 }
 
@@ -387,30 +404,34 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 
 	// empty list check
 	if len(pks) == 0 {
-		return []bool{}, fmt.Errorf("key list should not be empty")
+		return []bool{}, newInvalidInputsError("key list should not be empty")
 	}
 
 	if len(pks) != len(sigs) {
-		return []bool{}, fmt.Errorf("keys length %d and signatures length %d are mismatching",
-			len(pks), len(sigs))
+		return []bool{}, newInvalidInputsError(
+			"keys length %d and signatures length %d are mismatching",
+			len(pks),
+			len(sigs))
 	}
 
 	verifBool := make([]bool, len(sigs))
 	// hasher check
 	if kmac == nil {
-		return verifBool, errors.New("VerifyBytes requires a Hasher")
+		return verifBool, newInvalidInputsError("verification requires a Hasher")
 	}
 
 	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return verifBool, fmt.Errorf("hasher with at least %d output byte size is required, current size is %d",
-			opSwUInputLenBLSBLS12381, kmac.Size())
+		return verifBool, newInvalidInputsError(
+			"hasher with at least %d output byte size is required, current size is %d",
+			opSwUInputLenBLSBLS12381,
+			kmac.Size())
 	}
 
 	pkPoints := make([]pointG2, 0, len(pks))
 	for i, pk := range pks {
 		pkBLS, ok := pk.(*PubKeyBLSBLS12381)
 		if !ok {
-			return verifBool, fmt.Errorf("key at index %d is not a BLS key", i)
+			return verifBool, newInvalidInputsError("key at index %d is not a BLS key", i)
 		}
 		pkPoints = append(pkPoints, pkBLS.point)
 	}
@@ -444,6 +465,9 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	)
 
 	for i, v := range verifInt {
+		if (C.int)(v) != valid && (C.int)(v) != invalid {
+			return verifBool, fmt.Errorf("batch verification failed")
+		}
 		verifBool[i] = ((C.int)(v) == valid)
 	}
 

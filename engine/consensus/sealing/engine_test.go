@@ -1,21 +1,23 @@
+// (c) 2021 Dapper Labs - ALL RIGHTS RESERVED
+
 package sealing
 
 import (
-	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
+	mockconsensus "github.com/onflow/flow-go/engine/consensus/mock"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/utils/fifoqueue"
+	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
+	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -24,141 +26,128 @@ func TestSealingEngineContext(t *testing.T) {
 }
 
 type SealingEngineSuite struct {
-	unittest.BaseChainSuite
-	// misc SERVICE COMPONENTS which are injected into Sealing Core
-	requester         *mockmodule.Requester
-	receiptValidator  *mockmodule.ReceiptValidator
-	approvalValidator *mockmodule.ApprovalValidator
+	suite.Suite
+
+	core    *mockconsensus.SealingCore
+	state   *mockprotocol.State
+	index   *mockstorage.Index
+	results *mockstorage.ExecutionResults
 
 	// Sealing Engine
 	engine *Engine
 }
 
-func (ms *SealingEngineSuite) SetupTest() {
-	// ~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP SUITE ~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-	ms.SetupChain()
-
-	log := zerolog.New(os.Stderr)
+func (s *SealingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
-	tracer := trace.NewNoopTracer()
+	me := &mockmodule.Local{}
+	s.core = &mockconsensus.SealingCore{}
+	s.state = &mockprotocol.State{}
+	s.index = &mockstorage.Index{}
+	s.results = &mockstorage.ExecutionResults{}
 
-	// ~~~~~~~~~~~~~~~~~~~~~~~ SETUP MATCHING ENGINE ~~~~~~~~~~~~~~~~~~~~~~~ //
-	ms.requester = new(mockmodule.Requester)
-	ms.receiptValidator = &mockmodule.ReceiptValidator{}
-	ms.approvalValidator = &mockmodule.ApprovalValidator{}
+	rootHeader, err := unittest.RootSnapshotFixture(unittest.IdentityListFixture(5)).Head()
+	require.NoError(s.T(), err)
 
-	approvalsProvider := make(chan *Event)
-	approvalResponseProvider := make(chan *Event)
-	receiptsProvider := make(chan *Event)
-
-	ms.engine = &Engine{
-		log:  log,
-		unit: engine.NewUnit(),
-		core: &Core{
-			tracer:                               tracer,
-			log:                                  log,
-			coreMetrics:                          metrics,
-			mempool:                              metrics,
-			metrics:                              metrics,
-			state:                                ms.State,
-			receiptRequester:                     ms.requester,
-			receiptsDB:                           ms.ReceiptsDB,
-			headersDB:                            ms.HeadersDB,
-			indexDB:                              ms.IndexDB,
-			incorporatedResults:                  ms.ResultsPL,
-			receipts:                             ms.ReceiptsPL,
-			approvals:                            ms.ApprovalsPL,
-			seals:                                ms.SealsPL,
-			pendingReceipts:                      stdmap.NewPendingReceipts(100),
-			sealingThreshold:                     10,
-			maxResultsToRequest:                  200,
-			assigner:                             ms.Assigner,
-			receiptValidator:                     ms.receiptValidator,
-			approvalValidator:                    ms.approvalValidator,
-			requestTracker:                       NewRequestTracker(1, 3),
-			approvalRequestsThreshold:            10,
-			requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
-			emergencySealingActive:               false,
-		},
-		approvalSink:                         approvalsProvider,
-		requestedApprovalSink:                approvalResponseProvider,
-		receiptSink:                          receiptsProvider,
-		pendingEventSink:                     make(chan *Event),
-		engineMetrics:                        metrics,
-		cacheMetrics:                         metrics,
-		requiredApprovalsForSealConstruction: RequiredApprovalsForSealConstructionTestingValue,
+	s.engine = &Engine{
+		log:           unittest.Logger(),
+		unit:          engine.NewUnit(),
+		core:          s.core,
+		me:            me,
+		engineMetrics: metrics,
+		cacheMetrics:  metrics,
+		rootHeader:    rootHeader,
+		index:         s.index,
+		results:       s.results,
+		state:         s.state,
 	}
 
-	ms.engine.pendingReceipts, _ = fifoqueue.NewFifoQueue()
-	ms.engine.pendingApprovals, _ = fifoqueue.NewFifoQueue()
-	ms.engine.pendingRequestedApprovals, _ = fifoqueue.NewFifoQueue()
+	// setup inbound queues for trusted inputs and message handler for untrusted inputs
+	err = s.engine.setupTrustedInboundQueues()
+	require.NoError(s.T(), err)
+	err = s.engine.setupMessageHandler(RequiredApprovalsForSealConstructionTestingValue)
+	require.NoError(s.T(), err)
 
-	<-ms.engine.Ready()
+	<-s.engine.Ready()
 }
 
-// TestProcessValidReceipt tests if valid receipt gets recorded into mempool when send through `Engine`.
+// TestOnFinalizedBlock tests if finalized block gets processed when send through `Engine`.
 // Tests the whole processing pipeline.
-func (ms *SealingEngineSuite) TestProcessValidReceipt() {
-	originID := ms.ExeID
-	receipt := unittest.ExecutionReceiptFixture(
-		unittest.WithExecutorID(originID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
-	)
+func (s *SealingEngineSuite) TestOnFinalizedBlock() {
 
-	ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
-	// we expect that receipt is persisted in storage
-	ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
-	// we expect that receipt is added to mempool
-	ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
-	// setup the results mempool to check if we attempted to add the incorporated result
-	ms.ResultsPL.
-		On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
-		Return(true, nil).Once()
+	finalizedBlock := unittest.BlockHeaderFixture()
+	finalizedBlockID := finalizedBlock.ID()
 
-	err := ms.engine.Process(originID, receipt)
-	ms.Require().NoError(err, "should add receipt and result to mempool if valid")
+	s.state.On("Final").Return(unittest.StateSnapshotForKnownBlock(&finalizedBlock, nil))
+	s.core.On("ProcessFinalizedBlock", finalizedBlockID).Return(nil).Once()
+	s.engine.OnFinalizedBlock(finalizedBlockID)
 
-	// sealing engine has at least 100ms ticks for processing events
+	// matching engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
 
-	ms.receiptValidator.AssertExpectations(ms.T())
-	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.ResultsPL.AssertExpectations(ms.T())
+	s.core.AssertExpectations(s.T())
+}
+
+// TestOnBlockIncorporated tests if incorporated block gets processed when send through `Engine`.
+// Tests the whole processing pipeline.
+func (s *SealingEngineSuite) TestOnBlockIncorporated() {
+	parentBlock := unittest.BlockHeaderFixture()
+	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	incorporatedBlockID := incorporatedBlock.ID()
+	// setup payload fixture
+	payload := unittest.PayloadFixture(unittest.WithAllTheFixins)
+	index := &flow.Index{}
+
+	for _, result := range payload.Results {
+		index.ResultIDs = append(index.ReceiptIDs, result.ID())
+		s.results.On("ByID", result.ID()).Return(result, nil).Once()
+
+		IR := flow.NewIncorporatedResult(result.BlockID, result)
+		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
+	}
+	s.index.On("ByBlockID", parentBlock.ID()).Return(index, nil)
+
+	// setup headers storage
+	headers := &mockstorage.Headers{}
+	headers.On("ByBlockID", incorporatedBlockID).Return(&incorporatedBlock, nil).Once()
+	s.engine.headers = headers
+
+	s.engine.OnBlockIncorporated(incorporatedBlockID)
+
+	// matching engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	s.core.AssertExpectations(s.T())
 }
 
 // TestMultipleProcessingItems tests that the engine queues multiple receipts and approvals
 // and eventually feeds them into sealing.Core for processing
-func (ms *SealingEngineSuite) TestMultipleProcessingItems() {
-	originID := ms.ExeID
+func (s *SealingEngineSuite) TestMultipleProcessingItems() {
+	originID := unittest.IdentifierFixture()
+	block := unittest.BlockFixture()
 
 	receipts := make([]*flow.ExecutionReceipt, 20)
 	for i := range receipts {
 		receipt := unittest.ExecutionReceiptFixture(
 			unittest.WithExecutorID(originID),
-			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&ms.UnfinalizedBlock))),
+			unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(&block))),
 		)
-		ms.receiptValidator.On("Validate", receipt).Return(nil).Once()
-		// we expect that receipt is persisted in storage
-		ms.ReceiptsDB.On("Store", receipt).Return(nil).Once()
-		// we expect that receipt is added to mempool
-		ms.ReceiptsPL.On("AddReceipt", receipt, ms.UnfinalizedBlock.Header).Return(true, nil).Once()
-		// setup the results mempool to check if we attempted to add the incorporated result
-		ms.ResultsPL.
-			On("Add", incorporatedResult(receipt.ExecutionResult.BlockID, &receipt.ExecutionResult)).
-			Return(true, nil).Once()
 		receipts[i] = receipt
 	}
 
 	numApprovalsPerReceipt := 1
 	approvals := make([]*flow.ResultApproval, 0, len(receipts)*numApprovalsPerReceipt)
-	approverID := ms.VerID
+	responseApprovals := make([]*messages.ApprovalResponse, 0)
+	approverID := unittest.IdentifierFixture()
 	for _, receipt := range receipts {
 		for j := 0; j < numApprovalsPerReceipt; j++ {
 			approval := unittest.ResultApprovalFixture(unittest.WithExecutionResultID(receipt.ID()),
 				unittest.WithApproverID(approverID))
-			ms.approvalValidator.On("Validate", approval).Return(nil).Once()
+			responseApproval := &messages.ApprovalResponse{
+				Approval: *approval,
+			}
+			responseApprovals = append(responseApprovals, responseApproval)
 			approvals = append(approvals, approval)
-			ms.ApprovalsPL.On("Add", approval).Return(true, nil).Once()
+			s.core.On("ProcessApproval", approval).Return(nil).Twice()
 		}
 	}
 
@@ -166,17 +155,17 @@ func (ms *SealingEngineSuite) TestMultipleProcessingItems() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for _, receipt := range receipts {
-			err := ms.engine.Process(originID, receipt)
-			ms.Require().NoError(err, "should add receipt and result to mempool if valid")
+		for _, approval := range approvals {
+			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			s.Require().NoError(err, "should process approval")
 		}
 	}()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for _, approval := range approvals {
-			err := ms.engine.Process(approverID, approval)
-			ms.Require().NoError(err, "should process approval")
+		for _, approval := range responseApprovals {
+			err := s.engine.Process(engine.ReceiveApprovals, approverID, approval)
+			s.Require().NoError(err, "should process approval")
 		}
 	}()
 
@@ -185,8 +174,21 @@ func (ms *SealingEngineSuite) TestMultipleProcessingItems() {
 	// sealing engine has at least 100ms ticks for processing events
 	time.Sleep(1 * time.Second)
 
-	ms.receiptValidator.AssertExpectations(ms.T())
-	ms.ReceiptsPL.AssertExpectations(ms.T())
-	ms.ResultsPL.AssertExpectations(ms.T())
-	ms.ApprovalsPL.AssertExpectations(ms.T())
+	s.core.AssertExpectations(s.T())
+}
+
+// try to submit an approval where the message origin is inconsistent with the message creator
+func (s *SealingEngineSuite) TestApprovalInvalidOrigin() {
+	// approval from valid origin (i.e. a verification node) but with random ApproverID
+	originID := unittest.IdentifierFixture()
+	approval := unittest.ResultApprovalFixture() // with random ApproverID
+
+	err := s.engine.Process(engine.ReceiveApprovals, originID, approval)
+	s.Require().NoError(err, "approval from unknown verifier should be dropped but not error")
+
+	// sealing engine has at least 100ms ticks for processing events
+	time.Sleep(1 * time.Second)
+
+	// In both cases, we expect the approval to be rejected without hitting the mempools
+	s.core.AssertNumberOfCalls(s.T(), "ProcessApproval", 0)
 }

@@ -131,7 +131,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
-			errors.New("two timeouts should be set before ending dkg")
+			fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
 	}
 	s.running = false
 	// check if a complaint has remained without an answer
@@ -155,19 +155,14 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	}
 
 	// private key of the current node
-	x := &PrKeyBLSBLS12381{
-		scalar: s.x, // the private share
-	}
+	x := newPrKeyBLSBLS12381(&s.x)
+
 	// Group public key
-	Y := &PubKeyBLSBLS12381{
-		point: s.vA[0],
-	}
+	Y := newPubKeyBLSBLS12381(&s.vA[0])
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
-		y[i] = &PubKeyBLSBLS12381{
-			point: p,
-		}
+		y[i] = newPubKeyBLSBLS12381(&p)
 	}
 	return x, Y, y, nil
 }
@@ -185,8 +180,10 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	}
 
 	if orig >= s.Size() || orig < 0 {
-		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), orig)
+		return newInvalidInputsError(
+			"wrong origin input, should be less than %d, got %d",
+			s.Size(),
+			orig)
 	}
 
 	// In case a message is received by the origin node,
@@ -227,7 +224,10 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return errors.New("wrong input")
+		return newInvalidInputsError(
+			"invalid origin, should be positive less than %d, got %d",
+			s.Size(),
+			orig)
 	}
 
 	// In case a private message is received by the origin node,
@@ -265,7 +265,8 @@ func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
+		return newInvalidInputsError(
+			"invalid origin input, should be less than %d, got %d",
 			s.Size(), node)
 	}
 	if index(node) == s.leaderIndex {
@@ -556,6 +557,7 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 		}
 
 		// read the complainer private share
+		C.bn_new_wrapper((*C.bn_st)(&s.complaints[complainer].answer))
 		if C.bn_read_Zr_bin((*C.bn_st)(&s.complaints[complainer].answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,
@@ -576,9 +578,10 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 	}
 	c.answerReceived = true
 
-	// first flag check is a sanity check
+	// flag check is a sanity check
 	if c.received {
 		// read the complainer private share
+		C.bn_new_wrapper((*C.bn_st)(&c.answer))
 		if C.bn_read_Zr_bin((*C.bn_st)(&c.answer),
 			(*C.uchar)(&data[1]),
 			PrKeyLenBLSBLS12381,

@@ -10,9 +10,11 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -104,7 +106,7 @@ func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, erro
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := publicKey(identity.NetworkPubKey)
+	lkey, err := PublicKey(identity.NetworkPubKey)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
@@ -159,8 +161,12 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolIDPrefix + rootBlockID)
+func generateFlowProtocolID(rootBlockID string) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID)
+}
+
+func generatePingProtcolID(rootBlockID string) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID)
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
@@ -203,4 +209,25 @@ func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 		validIDs = append(validIDs, peerInfo)
 	}
 	return validIDs, invalidIDs
+}
+
+// streamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
+func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
+	logger := log.With().
+		Str("protocol", string(stream.Protocol())).
+		Str("remote_peer", stream.Conn().RemotePeer().String()).
+		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
+		Str("local_peer", stream.Conn().LocalPeer().String()).
+		Str("local_address", stream.Conn().LocalMultiaddr().String()).Logger()
+	return logger
+}
+
+// flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
+func flowStream(conn network.Conn) network.Stream {
+	for _, s := range conn.GetStreams() {
+		if isFlowProtocolStream(s) {
+			return s
+		}
+	}
+	return nil
 }

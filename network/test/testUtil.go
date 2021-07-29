@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
@@ -79,7 +80,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			id.NodeID,
 			metrics,
-			rootBlockID)
+			rootBlockID,
+			p2p.DefaultPeerUpdateInterval,
+			p2p.DefaultUnicastTimeout)
 	}
 	return mws
 }
@@ -190,6 +193,10 @@ func generateLibP2PNode(t *testing.T,
 		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
 	}
 
+	pingInfoProvider := new(mocknetwork.PingInfoProvider)
+	pingInfoProvider.On("SoftwareVersion").Return("test")
+	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
+
 	libP2PNode, err := p2p.NewLibP2PNode(logger,
 		id.NodeID,
 		"0.0.0.0:0",
@@ -197,6 +204,7 @@ func generateLibP2PNode(t *testing.T,
 		key,
 		true,
 		rootBlockID,
+		pingInfoProvider,
 		psOptions...)
 
 	require.NoError(t, err)

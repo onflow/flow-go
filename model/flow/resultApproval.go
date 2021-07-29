@@ -24,6 +24,19 @@ type ResultApprovalBody struct {
 	Spock                crypto.Signature // proof of re-computation, one per each chunk
 }
 
+// PartialID generates a unique identifier using Attestation + ApproverID
+func (rab ResultApprovalBody) PartialID() Identifier {
+	data := struct {
+		Attestation Attestation
+		ApproverID  Identifier
+	}{
+		Attestation: rab.Attestation,
+		ApproverID:  rab.ApproverID,
+	}
+
+	return MakeID(data)
+}
+
 // ID generates a unique identifier using ResultApprovalBody
 func (rab ResultApprovalBody) ID() Identifier {
 	return MakeID(rab)

@@ -10,7 +10,8 @@ import (
 )
 
 type PingCollector struct {
-	reachable *prometheus.GaugeVec
+	reachable    *prometheus.GaugeVec
+	sealedHeight *prometheus.GaugeVec
 }
 
 func NewPingCollector() *PingCollector {
@@ -21,7 +22,14 @@ func NewPingCollector() *PingCollector {
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
+		sealedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "sealed_height",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Help:      "the last sealed height of a node",
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo, LabelNodeVersion}),
 	}
+
 	return pc
 }
 
@@ -39,4 +47,14 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt
 		LabelNodeRole:    node.Role.String(),
 		LabelNodeInfo:    nodeInfo}).
 		Set(rttValue)
+}
+
+func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64) {
+	pc.sealedHeight.With(prometheus.Labels{
+		LabelNodeID:      node.NodeID.String(),
+		LabelNodeAddress: node.Address,
+		LabelNodeRole:    node.Role.String(),
+		LabelNodeInfo:    nodeInfo,
+		LabelNodeVersion: version}).
+		Set(float64(sealedHeight))
 }

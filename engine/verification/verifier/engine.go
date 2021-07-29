@@ -10,13 +10,13 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/verification"
 	"github.com/onflow/flow-go/engine/verification/utils"
 	chmodels "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
@@ -95,15 +95,20 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.ProcessLocal(event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -112,12 +117,14 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -198,19 +205,24 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	if chFault != nil {
 		switch chFault.(type) {
 		case *chmodels.CFMissingRegisterTouch:
-			e.log.Error().Msg(chFault.String())
+			e.log.Warn().Msg(chFault.String())
+			// still create approvals for this case
 		case *chmodels.CFNonMatchingFinalState:
 			// TODO raise challenge
 			e.log.Warn().Msg(chFault.String())
+			return nil
 		case *chmodels.CFInvalidVerifiableChunk:
 			// TODO raise challenge
 			e.log.Error().Msg(chFault.String())
+			return nil
+		case *chmodels.CFInvalidEventsCollection:
+			// TODO raise challenge
+			e.log.Error().Msg(chFault.String())
+			return nil
 		default:
 			return engine.NewInvalidInputErrorf("unknown type of chunk fault is received (type: %T) : %v",
 				chFault, chFault.String())
 		}
-		// don't do anything else, but skip generating result approvals
-		return nil
 	}
 
 	// Generate result approval
@@ -248,7 +260,7 @@ func (e *Engine) verify(ctx context.Context, originID flow.Identifier,
 	}
 	log.Info().Msg("result approval submitted")
 	// increases number of sent result approvals for sake of metrics
-	e.metrics.OnResultApproval()
+	e.metrics.OnResultApprovalDispatchedInNetworkByVerifier()
 
 	return nil
 }
@@ -313,7 +325,7 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 
 	// increments number of received verifiable chunks
 	// for sake of metrics
-	e.metrics.OnVerifiableChunkReceived()
+	e.metrics.OnVerifiableChunkReceivedAtVerifierEngine()
 
 	log := e.log.With().
 		Hex("result_id", logging.ID(ch.Result.ID())).

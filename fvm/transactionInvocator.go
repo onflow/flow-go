@@ -23,6 +23,11 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+const (
+	flowServiceAccountContract = "FlowServiceAccount"
+	deductFeesContractFunction = "deductTransactionFee"
+)
+
 type TransactionInvocator struct {
 	logger zerolog.Logger
 }
@@ -55,15 +60,15 @@ func (i *TransactionInvocator) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *hostEnv
+	var env *TransactionEnv
 	var txError error
 	retry := false
 	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = newEnvironment(*ctx, vm, sth, programs)
-	predeclaredValues := i.valueDeclarations(ctx, env)
+	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
 		// an extra check for state holder health, this should never happen
@@ -113,11 +118,8 @@ func (i *TransactionInvocator) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = newEnvironment(*ctx, vm, sth, programs)
+			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 		}
-
-		env.setTransaction(proc.Transaction, proc.TxIndex)
-		env.setTraceSpan(span)
 
 		location := common.TransactionLocation(proc.ID[:])
 
@@ -158,10 +160,16 @@ func (i *TransactionInvocator) Process(
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
-	// check the storage limits
-	if ctx.LimitAccountStorage && txError == nil {
-		txError = NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
+	if txError == nil {
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 	}
+
+	if txError == nil {
+		txError = i.deductTransactionFees(env, proc)
+	}
+
+	proc.Logs = append(proc.Logs, env.Logs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	if txError != nil {
 		// drop delta
@@ -181,10 +189,8 @@ func (i *TransactionInvocator) Process(
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
-	proc.Events = append(proc.Events, env.getEvents()...)
-	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
-	proc.Logs = append(proc.Logs, env.getLogs()...)
-	proc.GasUsed = proc.GasUsed + env.GetComputationUsed()
+	proc.Events = append(proc.Events, env.Events()...)
+	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
 	i.logger.Info().
 		Str("txHash", proc.ID.String()).
@@ -196,7 +202,40 @@ func (i *TransactionInvocator) Process(
 	return nil
 }
 
-func (i *TransactionInvocator) valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
+func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
+	if !env.ctx.TransactionFeesEnabled {
+		return nil
+	}
+
+	invocator := NewTransactionContractFunctionInvocator(
+		common.AddressLocation{
+			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
+			Name:    flowServiceAccountContract,
+		},
+		deductFeesContractFunction,
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
+		},
+		[]sema.Type{
+			sema.AuthAccountType,
+		},
+		env.ctx.Logger,
+	)
+	_, err := invocator.Invoke(env, proc.TraceSpan)
+
+	if err != nil {
+		// TODO: Fee value is currently a constant. this should be changed when it is not
+		fees, ok := DefaultTransactionFees.ToGoValue().(uint64)
+		if !ok {
+			err = fmt.Errorf("could not get transaction fees during formatting of TransactionFeeDeductionFailedError: %w", err)
+		}
+
+		return errors.NewTransactionFeeDeductionFailedError(proc.Transaction.Payer, fees, err)
+	}
+	return nil
+}
+
+func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {

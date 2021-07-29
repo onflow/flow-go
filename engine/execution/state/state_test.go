@@ -36,12 +36,12 @@ func prepareTest(f func(t *testing.T, es state.ExecutionState, l *ledger.Ledger)
 			headers := mocks.NewMockHeaders(ctrl)
 			collections := mocks.NewMockCollections(ctrl)
 			events := mocks.NewMockEvents(ctrl)
-			serviceEvents := mocks.NewMockEvents(ctrl)
+			serviceEvents := mocks.NewMockServiceEvents(ctrl)
 			txResults := mocks.NewMockTransactionResults(ctrl)
 
 			stateCommitment := ls.InitialState()
 
-			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(stateCommitment, nil)
+			stateCommitments.EXPECT().ByBlockID(gomock.Any()).Return(flow.StateCommitment(stateCommitment), nil)
 
 			chunkDataPacks := new(storage.ChunkDataPacks)
 

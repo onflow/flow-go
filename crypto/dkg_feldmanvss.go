@@ -73,6 +73,7 @@ func (s *feldmanVSSstate) init() {
 	s.y = nil
 	s.xReceived = false
 	s.vAReceived = false
+	C.bn_new_wrapper((*C.bn_st)(&s.x))
 }
 
 // Start starts running the protocol in the current node
@@ -107,21 +108,15 @@ func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		return nil, nil, nil, errors.New("keys are not correct")
 	}
 	// private key of the current node
-	x := &PrKeyBLSBLS12381{
-		scalar: s.x, // the private share
-	}
+	x := newPrKeyBLSBLS12381(&s.x)
 
 	// Group public key
-	Y := &PubKeyBLSBLS12381{
-		point: s.vA[0],
-	}
+	Y := newPubKeyBLSBLS12381(&s.vA[0])
 
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
-		y[i] = &PubKeyBLSBLS12381{
-			point: p,
-		}
+		y[i] = newPubKeyBLSBLS12381(&p)
 	}
 	return x, Y, y, nil
 }
@@ -141,8 +136,10 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), orig)
+		return newInvalidInputsError(
+			"wrong origin input, should be less than %d, got %d",
+			s.Size(),
+			orig)
 	}
 
 	if len(msg) == 0 {
@@ -175,7 +172,10 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return errors.New("wrong input")
+		return newInvalidInputsError(
+			"wrong origin, should be positive less than %d, got %d",
+			s.Size(),
+			orig)
 	}
 
 	if len(msg) == 0 {
@@ -209,8 +209,10 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return fmt.Errorf("wrong origin input, should be less than %d, got %d",
-			s.Size(), node)
+		return newInvalidInputsError(
+			"wrong origin input, should be less than %d, got %d",
+			s.Size(),
+			node)
 	}
 	if index(node) == s.leaderIndex {
 		s.validKey = false
@@ -222,8 +224,12 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
+		if IsInvalidInputsError(err) {
+			return newInvalidInputsError("generating shares failed: %s", err)
+		}
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
+
 	// Generate a polyomial P in Zr[X] of degree t
 	s.a = make([]scalar, s.threshold+1)
 	s.vA = make([]pointG2, s.threshold+1)
@@ -231,6 +237,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	randZrStar(&s.a[0]) // non zero a[0]
 	genScalarMultG2(&s.vA[0], &s.a[0])
 	for i := 1; i < s.threshold+1; i++ {
+		C.bn_new_wrapper((*C.bn_st)(&s.a[i]))
 		randZr(&s.a[i])
 		genScalarMultG2(&s.vA[i], &s.a[i])
 	}
@@ -360,13 +367,16 @@ func writeVerifVector(dest []byte, A []pointG2) {
 // readVerifVector imports A vector from an array of bytes,
 // assuming the slice length matches the vector length
 func readVerifVector(A []pointG2, src []byte) error {
-	if C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
+	switch C.ep2_vector_read_bin((*C.ep2_st)(&A[0]),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(A)),
-	) != valid {
-		return errors.New("the verifcation vector does not serialize points correctly")
+		(C.int)(len(A))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("the verifcation vector does not serialize G2 points")
+	default:
+		return errors.New("reading the verifcation vector failed")
 	}
-	return nil
 }
 
 func (s *feldmanVSSstate) verifyShare() bool {

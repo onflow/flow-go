@@ -21,16 +21,8 @@ func NewDelta() Delta {
 }
 
 func toString(owner, controller, key string) string {
-	register := toRegisterID(owner, controller, key)
+	register := flow.NewRegisterID(owner, controller, key)
 	return register.String()
-}
-
-func toRegisterID(owner, controller, key string) flow.RegisterID {
-	return flow.RegisterID{
-		Owner:      owner,
-		Controller: controller,
-		Key:        key,
-	}
 }
 
 // Get reads a register value from this delta.
@@ -46,7 +38,7 @@ func (d Delta) Get(owner, controller, key string) (flow.RegisterValue, bool) {
 func (d Delta) Set(owner, controller, key string, value flow.RegisterValue) {
 	k := toString(owner, controller, key)
 	d.Data[k] = flow.RegisterEntry{
-		Key:   toRegisterID(owner, controller, key),
+		Key:   flow.NewRegisterID(owner, controller, key),
 		Value: value,
 	}
 }
@@ -97,7 +89,7 @@ func (d Delta) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func (d Delta) UnmarshalJSON(data []byte) error {
+func (d *Delta) UnmarshalJSON(data []byte) error {
 
 	var m flow.RegisterEntries
 

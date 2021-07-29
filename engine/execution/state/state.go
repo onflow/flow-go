@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -63,7 +64,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
 
 const (
@@ -134,7 +135,7 @@ func NewExecutionState(
 }
 
 func makeSingleValueQuery(commitment flow.StateCommitment, owner, controller, key string) (*ledger.Query, error) {
-	return ledger.NewQuery(commitment,
+	return ledger.NewQuery(ledger.State(commitment),
 		[]ledger.Key{
 			RegisterIDToKey(flow.NewRegisterID(owner, controller, key)),
 		})
@@ -147,7 +148,7 @@ func makeQuery(commitment flow.StateCommitment, ids []flow.RegisterID) (*ledger.
 		keys[i] = RegisterIDToKey(id)
 	}
 
-	return ledger.NewQuery(commitment, keys)
+	return ledger.NewQuery(ledger.State(commitment), keys)
 }
 
 func RegisterIDSToKeys(ids []flow.RegisterID) []ledger.Key {
@@ -216,21 +217,21 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 	ids, values := ruh.RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
-		baseState,
+		ledger.State(baseState),
 		RegisterIDSToKeys(ids),
 		RegisterValuesToValues(values),
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
 	commit, err := ldg.Set(update)
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, err
 	}
 
-	return commit, nil
+	return flow.StateCommitment(commit), nil
 }
 
 //func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
@@ -292,6 +293,7 @@ func (s *state) GetProof(
 		return nil, fmt.Errorf("cannot create ledger query: %w", err)
 	}
 
+	// Get proofs in an arbitrary order, not correlated to the register ID order in the query.
 	proof, err := s.ls.Prove(query)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get proof: %w", err)
@@ -318,7 +320,10 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.Event, serviceEvents []flow.Event, results []flow.TransactionResult) error {
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error {
+
+	spew.Config.DisableMethods = true
+	spew.Config.DisablePointerMethods = true
 
 	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
 	defer span.Finish()
@@ -354,11 +359,14 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	sp.Finish()
 
 	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
+
 	err = s.events.BatchStore(blockID, events, batch)
+
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
-	err = s.serviceEvents.BatchStore(blockID, events, batch)
+
+	err = s.serviceEvents.BatchStore(blockID, serviceEvents, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
@@ -466,7 +474,7 @@ func (s *state) RetrieveStateDelta(ctx context.Context, blockID flow.Identifier)
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
 			Block:               block,
-			StartState:          startStateCommitment,
+			StartState:          &startStateCommitment,
 			CompleteCollections: completeCollections,
 		},
 		StateInteractions:  stateInteractions,

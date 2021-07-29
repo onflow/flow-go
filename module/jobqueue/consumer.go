@@ -23,13 +23,13 @@ type Consumer struct {
 
 	// Storage
 	jobs     module.Jobs              // storage to read jobs from
-	progress storage.ConsumerProgress // storing the last processed job, so that we can resume after restarting
+	progress storage.ConsumerProgress // to resume from first unprocessed job after restarting
 
 	// dependency
-	worker Worker // defines how jobs will be processed
+	worker Worker // to process job and notify consumer when finish processing a job
 
 	// Config
-	maxProcessing int64 // max number of jobs to be processed concurrently
+	maxProcessing uint64 // max number of jobs to be processed concurrently
 
 	// State Variables
 	running bool // a signal to control whether to start processing more jobs. Useful for waiting
@@ -49,10 +49,10 @@ func NewConsumer(
 	jobs module.Jobs,
 	progress storage.ConsumerProgress,
 	worker Worker,
-	maxProcessing int64,
+	maxProcessing uint64,
 ) *Consumer {
 	return &Consumer{
-		log: log.With().Str("module", "jobqueue").Logger(),
+		log: log.With().Str("sub_module", "job_queue").Logger(),
 
 		// store dependency
 		jobs:     jobs,
@@ -128,9 +128,14 @@ func (c *Consumer) Stop() {
 	c.log.Info().Msg("consumer stopped")
 }
 
+// Size returns number of in-memory jobs that consumer is processing.
+func (c *Consumer) Size() uint {
+	return uint(len(c.processings))
+}
+
 // NotifyJobIsDone let the consumer know a job has been finished, so that consumer will take
-// the next job from the job queue if there are workers available
-func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
+// the next job from the job queue if there are workers available. It returns the last processed job index.
+func (c *Consumer) NotifyJobIsDone(jobID module.JobID) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.log.Debug().Str("job_id", string(jobID)).Msg("finishing job")
@@ -138,6 +143,8 @@ func (c *Consumer) NotifyJobIsDone(jobID module.JobID) {
 	if c.doneJob(jobID) {
 		c.checkProcessable()
 	}
+
+	return c.processedIndex
 }
 
 // Check allows the job publisher to notify the consumer that a new job has been added, so that
@@ -219,6 +226,17 @@ func (c *Consumer) run() (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("could not set processed index %v, %w", processedTo, err)
 	}
+
+	for index := c.processedIndex + 1; index <= processedTo; index++ {
+		jobStatus, ok := c.processings[index]
+		if !ok {
+			continue
+		}
+
+		delete(c.processings, index)
+		delete(c.processingsIndex, jobStatus.jobID)
+	}
+
 	c.processedIndex = processedTo
 
 	return int64(len(processables)), nil
@@ -248,12 +266,13 @@ func (c *Consumer) processableJobs() ([]*jobAtIndex, uint64, error) {
 // processableJobs check the worker's capacity and if sufficient, read
 // jobs from the storage, return the processable jobs, and the processed
 // index
-func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing int64, processedIndex uint64) ([]*jobAtIndex, uint64, error) {
+func processableJobs(jobs module.Jobs, processings map[uint64]*jobStatus, maxProcessing uint64, processedIndex uint64) ([]*jobAtIndex, uint64,
+	error) {
 	processables := make([]*jobAtIndex, 0)
 
 	// count how many jobs are still processing,
 	// in order to decide whether to process a new job
-	processing := int64(0)
+	processing := uint64(0)
 
 	// if still have processing capacity, find the next processable job
 	for i := processedIndex + 1; processing < maxProcessing; i++ {

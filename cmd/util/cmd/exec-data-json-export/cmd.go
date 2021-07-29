@@ -78,7 +78,7 @@ func run(*cobra.Command, []string) {
 	log.Info().Msg("start exporting ledger")
 	// if state commitment not provided do the fall back to the one connected to the block
 	if len(flagStateCommitment) == 0 {
-		flagStateCommitment = hex.EncodeToString(fallbackState)
+		flagStateCommitment = hex.EncodeToString(fallbackState[:])
 		log.Info().Msg("no state commitment is provided, falling back to the one attached to the block")
 	}
 

@@ -124,11 +124,13 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 			wg.Done()
 		}
 	}).Return(nil)
-	pm := NewPeerManager(suite.log, idProvider, connector)
-	PeerUpdateInterval = 5 * time.Millisecond
+
+	peerUpdateInterval := 5 * time.Millisecond
+	pm := NewPeerManager(suite.log, idProvider, connector, WithInterval(peerUpdateInterval))
+
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
-	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*PeerUpdateInterval,
+	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 2*peerUpdateInterval,
 		"UpdatePeers is not running on UpdateIntervals")
 }
 
@@ -140,7 +142,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	}
 
 	// chooses peer interval rate deliberately long to capture on demand peer update
-	PeerUpdateInterval = time.Hour
+	peerUpdateInterval := time.Hour
 
 	// creates mock connector
 	wg := &sync.WaitGroup{} // keeps track of number of calls on `ConnectPeers`
@@ -160,7 +162,7 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 		}
 	}).Return(nil)
 
-	pm := NewPeerManager(suite.log, idProvider, connector)
+	pm := NewPeerManager(suite.log, idProvider, connector, WithInterval(peerUpdateInterval))
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
 
 	unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second,
@@ -187,12 +189,12 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	connectPeerGate := make(chan time.Time)
 	defer close(connectPeerGate)
 
+	// choose the periodic interval as a high value so that periodic runs don't interfere with this test
+	peerUpdateInterval := time.Hour
+
 	connector.On("UpdatePeers", mock.Anything, mock.Anything).Return(nil).
 		WaitUntil(connectPeerGate) // blocks call for connectPeerGate channel
-	pm := NewPeerManager(suite.log, idProvider, connector)
-
-	// set the periodic interval to a high value so that periodic runs don't interfere with this test
-	PeerUpdateInterval = time.Hour
+	pm := NewPeerManager(suite.log, idProvider, connector, WithInterval(peerUpdateInterval))
 
 	// start the peer manager
 	// this should trigger the first update and which will block on the ConnectPeers to return
@@ -218,7 +220,7 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 // assertListsEqual asserts that two identity list are equal ignoring the order
 func assertListsEqual(t *testing.T, list1, list2 flow.IdentityList) {
-	list1 = list1.Order(order.ByNodeIDAsc)
-	list2 = list2.Order(order.ByNodeIDAsc)
+	list1 = list1.Sort(order.ByNodeIDAsc)
+	list2 = list2.Sort(order.ByNodeIDAsc)
 	assert.Equal(t, list1, list2)
 }

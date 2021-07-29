@@ -48,14 +48,18 @@ const (
 	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
 
 	// Matching
-	CONMatchCheckSealing                        SpanName = "con.sealing.checkSealing"
-	CONMatchCheckSealingSealableResults         SpanName = "con.sealing.checkSealing.sealableResults"
-	CONMatchCheckSealingClearPools              SpanName = "con.sealing.checkSealing.clearPools"
-	CONMatchCheckSealingRequestPendingReceipts  SpanName = "con.sealing.checkSealing.requestPendingReceipts"
-	CONMatchCheckSealingRequestPendingApprovals SpanName = "con.sealing.checkSealing.requestPendingApprovals"
-	CONMatchOnReceipt                           SpanName = "con.sealing.onReceipt"
-	CONMatchOnReceiptVal                        SpanName = "con.sealing.onReceipt.validation"
-	CONMatchOnApproval                          SpanName = "con.sealing.onApproval"
+	CONMatchRequestPendingReceipts SpanName = "con.matching.requestPendingReceipts"
+	CONMatchProcessReceiptVal      SpanName = "con.matching.processReceipt.validation"
+	CONMatchProcessReceipt         SpanName = "con.matching.processReceipt"
+
+	// Sealing
+	CONSealingProcessFinalizedBlock           SpanName = "con.sealing.processFinalizedBlock"
+	CONSealingCheckForEmergencySealableBlocks SpanName = "con.sealing.processFinalizedBlock.checkEmergencySealing"
+	CONSealingPruning                         SpanName = "con.sealing.processFinalizedBlock.pruning"
+	CONSealingRequestingPendingApproval       SpanName = "con.sealing.processFinalizedBlock.requestPendingApprovals"
+
+	CONSealingProcessIncorporatedResult SpanName = "con.sealing.processIncorporatedResult"
+	CONSealingProcessApproval           SpanName = "con.sealing.processApproval"
 
 	// Builder
 	CONBuildOn                        SpanName = "con.builder"
@@ -113,6 +117,7 @@ const (
 	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
 	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
+	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
 	//
@@ -123,6 +128,21 @@ const (
 	VERAssignerHandleExecutionReceipt SpanName = "ver.assigner.handleExecutionReceipt"
 	VERAssignerChunkAssignment        SpanName = "ver.assigner.chunkAssignment"
 	VERAssignerProcessChunk           SpanName = "ver.assigner.processChunk"
+
+	// fetcher engine
+	VERProcessAssignedChunk SpanName = "ver.processAssignedChunk"
+	// children of VERProcessAssignedChunk
+	VERFetcherHandleAssignedChunk   SpanName = "ver.fetcher.handleAssignedChunk"
+	VERFetcherHandleChunkDataPack   SpanName = "ver.fetcher.handleChunkDataPack"
+	VERFetcherValidateChunkDataPack SpanName = "ver.fetcher.validateChunkDataPack"
+	VERFetcherPushToVerifier        SpanName = "ver.fetcher.pushToVerifier"
+
+	// requester engine
+	VERProcessChunkDataPackRequest SpanName = "ver.processChunkDataPackRequest"
+	// children of VERProcessChunkDataPackRequest
+	VERRequesterHandleChunkDataRequest   SpanName = "ver.requester.handleChunkDataRequest"
+	VERRequesterHandleChunkDataResponse  SpanName = "ver.requester.handleChunkDataResponse"
+	VERRequesterDispatchChunkDataRequest SpanName = "ver.requester.dispatchChunkDataRequest"
 
 	VERProcessExecutionReceipt SpanName = "ver.processExecutionReceipt"
 	// children of VERProcessExecutionReceipt
@@ -148,6 +168,7 @@ const (
 	FVMSeqNumCheckTransaction        SpanName = "fvm.seqNumCheckTransaction"
 	FVMExecuteTransaction            SpanName = "fvm.executeTransaction"
 	FVMDeductTransactionFees         SpanName = "fvm.deductTransactionFees"
+	FVMInvokeContractFunction        SpanName = "fvm.invokeContractFunction"
 	FVMFrozenAccountCheckTransaction SpanName = "fvm.frozenAccountCheckTransaction"
 
 	FVMEnvHash                      SpanName = "fvm.env.Hash"

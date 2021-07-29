@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // FollowerState implements a lighter version of a mutable protocol state.
@@ -31,11 +32,13 @@ import (
 // the non-consensus nodes have to perform.
 type FollowerState struct {
 	*State
-	index    storage.Index
-	payloads storage.Payloads
-	tracer   module.Tracer
-	consumer protocol.Consumer
-	cfg      Config
+
+	index      storage.Index
+	payloads   storage.Payloads
+	tracer     module.Tracer
+	consumer   protocol.Consumer
+	blockTimer protocol.BlockTimer
+	cfg        Config
 }
 
 // MutableState implements a mutable protocol state. When extending the
@@ -54,14 +57,16 @@ func NewFollowerState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:    state,
-		index:    index,
-		payloads: payloads,
-		tracer:   tracer,
-		consumer: consumer,
-		cfg:      DefaultConfig(),
+		State:      state,
+		index:      index,
+		payloads:   payloads,
+		tracer:     tracer,
+		consumer:   consumer,
+		blockTimer: blockTimer,
+		cfg:        DefaultConfig(),
 	}
 	return followerState, nil
 }
@@ -76,10 +81,11 @@ func NewFullConsensusState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer)
+	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
@@ -192,6 +198,15 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	if header.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
 			header.Height, parent.Height)
+	}
+
+	// check validity of block timestamp using parent's timestamp
+	err = m.blockTimer.Validate(parent.Timestamp, candidate.Header.Timestamp)
+	if err != nil {
+		if protocol.IsInvalidBlockTimestampError(err) {
+			return state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
+		}
+		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
 	// THIRD: Once we have established the block is valid within itself, and the
@@ -418,7 +433,7 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 	// protocol state. We can now store the candidate block, as well as adding
 	// its final seal to the seal index and initializing its children index.
 
-	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
+	err = operation.RetryOnConflictTx(m.db, transaction.Update, func(tx *transaction.Tx) error {
 		// insert the block into the database AND cache
 		err := m.blocks.StoreTx(candidate)(tx)
 		if err != nil {
@@ -426,13 +441,13 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 		}
 
 		// index the latest sealed block in this fork
-		err = operation.IndexBlockSeal(blockID, last.ID())(tx)
+		err = transaction.WithTx(operation.IndexBlockSeal(blockID, last.ID()))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index candidate seal: %w", err)
 		}
 
 		// index the child block for recovery
-		err = procedure.IndexNewBlock(blockID, candidate.Header.ParentID)(tx)
+		err = transaction.WithTx(procedure.IndexNewBlock(blockID, candidate.Header.ParentID))(tx)
 		if err != nil {
 			return fmt.Errorf("could not index new block: %w", err)
 		}
@@ -476,7 +491,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	}
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve pending block: %w", err)
+		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
 	}
 	header := block.Header
 	if header.ParentID != finalID {
@@ -501,13 +516,22 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve epoch state: %w", err)
 	}
-	setup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
+	currentEpochSetup, err := m.epoch.setups.ByID(epochStatus.CurrentEpoch.SetupID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
 
-	payload := block.Payload
-	// track protocol events that should be emitted
+	// We will process service events from blocks which are sealed by this
+	// block's PARENT. The events are emitted when we finalize the first child
+	// of the block containing the seal for the result containing the
+	// corresponding service event.
+	parent, err := m.blocks.ByID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not get parent (id=%x): %w", header.ParentID, err)
+	}
+
+	payload := parent.Payload
+	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {
 		result, err := m.results.ByID(seal.ResultID)
@@ -517,9 +541,21 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				// update current epoch phase
+				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
+				// track epoch phase transition (staking->setup)
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
+				// update current epoch phase
+				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
+				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
+				// track final view of committed epoch
+				nextEpochSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+				if err != nil {
+					return fmt.Errorf("could not retrieve setup event for next epoch: %w", err)
+				}
+				events = append(events, func() { m.metrics.CommittedEpochFinalView(nextEpochSetup.FinalView) })
 			default:
 				return fmt.Errorf("invalid service event type in payload (%T)", event)
 			}
@@ -535,7 +571,10 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// if this block's view exceeds the final view of its parent's current epoch,
 	// this block begins the next epoch
 	if header.View > finalView {
-		events = append(events, func() { m.consumer.EpochTransition(setup.Counter, header) })
+		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+
+		// set current epoch counter
+		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
@@ -669,7 +708,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // includes an operation to index the epoch status for every block, and
 // operations to insert service events for blocks that include them.
 //
-func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.Txn) error, error) {
+func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
 
 	// Determine epoch status for block's CURRENT epoch.
 	//
@@ -688,7 +727,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*badger.T
 	counter := activeSetup.Counter
 
 	// keep track of DB operations to apply when inserting this block
-	var ops []func(*badger.Txn) error
+	var ops []func(*transaction.Tx) error
 
 	// we will apply service events from blocks which are sealed by this block's PARENT
 	parent, err := m.blocks.ByID(block.Header.ParentID)

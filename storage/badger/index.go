@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Index implements a simple read-only payload storage around a badger DB.
@@ -20,10 +21,10 @@ type Index struct {
 
 func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		blockID := key.(flow.Identifier)
 		index := val.(*flow.Index)
-		return procedure.InsertIndex(blockID, index)
+		return transaction.WithTx(procedure.InsertIndex(blockID, index))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
@@ -46,8 +47,8 @@ func NewIndex(collector module.CacheMetrics, db *badger.DB) *Index {
 	return p
 }
 
-func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(*badger.Txn) error {
-	return i.cache.Put(blockID, index)
+func (i *Index) storeTx(blockID flow.Identifier, index *flow.Index) func(*transaction.Tx) error {
+	return i.cache.PutTx(blockID, index)
 }
 
 func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Index, error) {
@@ -61,7 +62,7 @@ func (i *Index) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Ind
 }
 
 func (i *Index) Store(blockID flow.Identifier, index *flow.Index) error {
-	return operation.RetryOnConflict(i.db.Update, i.storeTx(blockID, index))
+	return operation.RetryOnConflictTx(i.db, transaction.Update, i.storeTx(blockID, index))
 }
 
 func (i *Index) ByBlockID(blockID flow.Identifier) (*flow.Index, error) {

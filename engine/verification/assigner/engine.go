@@ -83,7 +83,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 		Hex("executed_block_id", logging.ID(result.BlockID)).
 		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
 		Logger()
-	e.metrics.OnExecutionReceiptReceived()
+	e.metrics.OnExecutionResultReceivedAtAssignerEngine()
 
 	// verification node should be staked at the reference block id.
 	ok, err := stakedAsVerification(e.state, result.BlockID, e.me.NodeID())
@@ -100,7 +100,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("could not determine chunk assignment: %w", err)
 	}
-	e.metrics.OnChunksAssigned(len(chunkList))
+	e.metrics.OnChunksAssignmentDoneAtAssigner(len(chunkList))
 
 	// TODO: de-escalate to debug level on stable version.
 	log.Info().
@@ -117,11 +117,13 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 // (through the chunk assigner), and belong to the execution result.
 //
 // Deduplication of chunk locators is delegated to the chunks queue.
-func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
-	log := e.log.With().
+func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
+	lg := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("chunk_id", logging.ID(chunk.ID())).
-		Uint64("chunk_index", chunk.Index).Logger()
+		Uint64("chunk_index", chunk.Index).
+		Uint64("block_height", blockHeight).
+		Logger()
 
 	locator := &chunks.Locator{
 		ResultID: resultID,
@@ -134,15 +136,15 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)
 	}
 	if !ok {
-		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
+		lg.Debug().Msg("could not push duplicate chunk locator to chunks queue")
 		return false, nil
 	}
 
-	e.metrics.OnChunkProcessed()
+	e.metrics.OnAssignedChunkProcessedAtAssigner()
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Info().Msg("chunk locator successfully pushed to chunks queue")
+	lg.Info().Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }
@@ -204,7 +206,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 		assignedChunksCount += uint64(len(chunkList))
 		for _, chunk := range chunkList {
-			processed, err := e.processChunkWithTracing(ctx, chunk, resultID)
+			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
 			if err != nil {
 				resultLog.Fatal().
 					Err(err).
@@ -219,7 +221,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 		}
 	}
 
-	e.metrics.OnAssignerProcessFinalizedBlock(block.Header.Height)
+	e.metrics.OnFinalizedBlockArrivedAtAssigner(block.Header.Height)
 	lg.Info().
 		Uint64("total_assigned_chunks", assignedChunksCount).
 		Uint64("total_processed_chunks", processedChunksCount).
@@ -301,11 +303,11 @@ func (e *Engine) resultChunkAssignmentWithTracing(
 //
 // Note that the chunk in the input should be legitimately assigned to this verification node
 // (through the chunk assigner), and belong to the same execution result.
-func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
+func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
 	var err error
 	var processed bool
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessChunk, func() {
-		processed, err = e.processChunk(chunk, resultID)
+		processed, err = e.processChunk(chunk, resultID, blockHeight)
 	})
 	return processed, err
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/verification/assigner"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/jobqueue"
@@ -13,12 +14,17 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// DefaultBlockWorkers is the number of blocks processed in parallel.
+const DefaultBlockWorkers = uint64(2)
+
 // BlockConsumer listens to the OnFinalizedBlock event
 // and notifies the consumer to check in the job queue
 // (i.e., its block reader) for new block jobs.
 type BlockConsumer struct {
 	consumer     module.JobConsumer
 	defaultIndex uint64
+	unit         *engine.Unit
+	metrics      module.VerificationMetrics
 }
 
 // defaultProcessedIndex returns the last sealed block height from the protocol state.
@@ -36,11 +42,14 @@ func defaultProcessedIndex(state protocol.State) (uint64, error) {
 // NewBlockConsumer creates a new consumer and returns the default processed
 // index for initializing the processed index in storage.
 func NewBlockConsumer(log zerolog.Logger,
+	metrics module.VerificationMetrics,
 	processedHeight storage.ConsumerProgress,
 	blocks storage.Blocks,
 	state protocol.State,
 	blockProcessor assigner.FinalizedBlockProcessor,
-	maxProcessing int64) (*BlockConsumer, uint64, error) {
+	maxProcessing uint64) (*BlockConsumer, uint64, error) {
+
+	lg := log.With().Str("module", "block_consumer").Logger()
 
 	// wires blockProcessor as the worker. The block consumer will
 	// invoke instances of worker concurrently to process block jobs.
@@ -48,9 +57,9 @@ func NewBlockConsumer(log zerolog.Logger,
 	blockProcessor.WithBlockConsumerNotifier(worker)
 
 	// the block reader is where the consumer reads new finalized blocks from (i.e., jobs).
-	jobs := newFinalizedBlockReader(state, blocks)
+	jobs := NewFinalizedBlockReader(state, blocks)
 
-	consumer := jobqueue.NewConsumer(log, jobs, processedHeight, worker, maxProcessing)
+	consumer := jobqueue.NewConsumer(lg, jobs, processedHeight, worker, maxProcessing)
 	defaultIndex, err := defaultProcessedIndex(state)
 	if err != nil {
 		return nil, 0, fmt.Errorf("could not read default processed index: %w", err)
@@ -59,6 +68,8 @@ func NewBlockConsumer(log zerolog.Logger,
 	blockConsumer := &BlockConsumer{
 		consumer:     consumer,
 		defaultIndex: defaultIndex,
+		unit:         engine.NewUnit(),
+		metrics:      metrics,
 	}
 	worker.withBlockConsumer(blockConsumer)
 
@@ -68,7 +79,13 @@ func NewBlockConsumer(log zerolog.Logger,
 // NotifyJobIsDone is invoked by the worker to let the consumer know that it is done
 // processing a (block) job.
 func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
-	c.consumer.NotifyJobIsDone(jobID)
+	processedIndex := c.consumer.NotifyJobIsDone(jobID)
+	c.metrics.OnBlockConsumerJobDone(processedIndex)
+}
+
+// Size returns number of in-memory block jobs that block consumer is processing.
+func (c *BlockConsumer) Size() uint {
+	return c.consumer.Size()
 }
 
 // OnFinalizedBlock implements FinalizationConsumer, and is invoked by the follower engine whenever
@@ -78,13 +95,13 @@ func (c *BlockConsumer) NotifyJobIsDone(jobID module.JobID) {
 // The consumer retrieves the new blocks from its block reader module, hence it does not need to use the parameter
 // of OnFinalizedBlock here.
 func (c *BlockConsumer) OnFinalizedBlock(*model.Block) {
-	c.consumer.Check()
+	c.unit.Launch(c.consumer.Check)
 }
 
-// To implement FinalizationConsumer
+// OnBlockIncorporated is to implement FinalizationConsumer
 func (c *BlockConsumer) OnBlockIncorporated(*model.Block) {}
 
-// To implement FinalizationConsumer
+// OnDoubleProposeDetected is to implement FinalizationConsumer
 func (c *BlockConsumer) OnDoubleProposeDetected(*model.Block, *model.Block) {}
 
 func (c *BlockConsumer) Ready() <-chan struct{} {
@@ -99,9 +116,12 @@ func (c *BlockConsumer) Ready() <-chan struct{} {
 }
 
 func (c *BlockConsumer) Done() <-chan struct{} {
-	c.consumer.Stop()
-
 	ready := make(chan struct{})
-	close(ready)
+	go func() {
+		completeChan := c.unit.Done()
+		c.consumer.Stop()
+		<-completeChan
+		close(ready)
+	}()
 	return ready
 }

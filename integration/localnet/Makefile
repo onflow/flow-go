@@ -3,23 +3,37 @@ CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
 ACCESS = 1
+UNSTAKED_ACCESS = 0
 NCLUSTERS=1
+EPOCHLEN=0   # 0 means use default
+STAKINGLEN=0 # 0 means use default
+DKGLEN=0     # 0 means use default
 PROFILER=false
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
+# The Git commit hash
+COMMIT=$(shell git rev-parse HEAD)
+VERSION=localnetbuild
 
 .PHONY: init
 init:
-	go run -tags relic bootstrap.go \
+	go run -tags relic \
+		-ldflags="-X 'github.com/onflow/flow-go/cmd/build.commit=${COMMIT}' \
+		-X  'github.com/onflow/flow-go/cmd/build.semver=${VERSION}'" \
+		bootstrap.go \
 		-collection=$(COLLECTION) \
 		-consensus=$(CONSENSUS) \
 		-execution=$(EXECUTION) \
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
+		-unstaked-access=$(UNSTAKED_ACCESS) \
 		-nclusters=$(NCLUSTERS) \
+		-epoch-length=$(EPOCHLEN) \
+		-epoch-staking-phase-length=$(STAKINGLEN) \
+		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
-		-collection-delay=$(COLLECTION_DELAY) \
+		-collection-delay=$(COLLECTION_DELAY)
 
 # Creates a light version of the localnet with just 1 instance for each node type
 .PHONY: init-light
@@ -42,3 +56,4 @@ stop:
 .PHONY: load
 load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+
