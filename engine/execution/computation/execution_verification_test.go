@@ -266,19 +266,8 @@ func TestTransactionFeeDeduction(t *testing.T) {
 	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
 	fundingAmount := uint64(1_0000_0000)
 	transferAmount := uint64(123_456)
-	//minimumStorageReservation := fvm.DefaultMinimumStorageReservation.ToGoValue().(uint64)
 
 	testCases := []testCase{
-		{
-			name:          "Transaction fees are deducted",
-			fundWith:      fundingAmount,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
-			},
-		},
 		{
 			name:          "Transaction fee deduction emits events",
 			fundWith:      fundingAmount,
@@ -305,13 +294,28 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			},
 		},
 		{
-			name:          "If just enough balance, fees are deducted",
+			name:          "If just enough balance, fees are still deducted",
 			fundWith:      txFees + transferAmount,
 			tryToTransfer: transferAmount,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
 			},
 		},
 		{
@@ -324,6 +328,21 @@ func TestTransactionFeeDeduction(t *testing.T) {
 				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
 				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
 			},
 		},
 		{
@@ -355,16 +374,6 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 	testCasesWithStorageEnabled := []testCase{
 		{
-			name:          "Transaction fees are deducted",
-			fundWith:      fundingAmount,
-			tryToTransfer: 0,
-			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
-				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
-				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
-			},
-		},
-		{
 			name:          "Transaction fee deduction emits events",
 			fundWith:      fundingAmount,
 			tryToTransfer: 0,
@@ -415,7 +424,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			},
 		},
 		{
-			name:          "If tx fails, fees are deducted",
+			name:          "If tx fails, fees are still deducted and fee deduction events are emitted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
 			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
