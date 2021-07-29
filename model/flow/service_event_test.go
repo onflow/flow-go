@@ -11,23 +11,10 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/crypto"
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-// "For best performance, reuse EncMode and DecMode after creating them." [1]
-// [1] https://github.com/fxamacker/cbor
-var cborEncMode = func() cbor.EncMode {
-	options := cbor.CoreDetEncOptions() // CBOR deterministic options
-	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
-	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
-	options.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-	encMode, err := options.EncMode()
-	if err != nil {
-		panic(err)
-	}
-	return encMode
-}()
 
 func TestEncodeDecode(t *testing.T) {
 
@@ -142,7 +129,7 @@ func TestEncodeDecode(t *testing.T) {
 
 	t.Run("cbor", func(t *testing.T) {
 		t.Run("specific event types", func(t *testing.T) {
-			b, err := cborEncMode.Marshal(setup)
+			b, err := cborcodec.EncMode.Marshal(setup)
 			require.NoError(t, err)
 
 			gotSetup := new(flow.EpochSetup)
@@ -150,7 +137,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			assert.DeepEqual(t, setup, gotSetup)
 
-			b, err = cborEncMode.Marshal(commit)
+			b, err = cborcodec.EncMode.Marshal(commit)
 			require.NoError(t, err)
 
 			gotCommit := new(flow.EpochCommit)
@@ -165,7 +152,7 @@ func TestEncodeDecode(t *testing.T) {
 
 		t.Run("generic type", func(t *testing.T) {
 			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
-			b, err := cborEncMode.Marshal(setup.ServiceEvent())
+			b, err := cborcodec.EncMode.Marshal(setup.ServiceEvent())
 			require.NoError(t, err)
 
 			outer := new(flow.ServiceEvent)
@@ -177,7 +164,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.True(t, ok)
 			assert.DeepEqual(t, setup, gotSetup)
 
-			b, err = cborEncMode.Marshal(commit.ServiceEvent())
+			b, err = cborcodec.EncMode.Marshal(commit.ServiceEvent())
 			require.NoError(t, err)
 
 			outer = new(flow.ServiceEvent)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/fingerprint"
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
 // Header contains all meta-data for a block, as well as a hash representing
@@ -105,20 +106,6 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	return err
 }
 
-// "For best performance, reuse EncMode and DecMode after creating them." [1]
-// [1] https://github.com/fxamacker/cbor
-var cborEncMode = func() cbor.EncMode {
-	options := cbor.CoreDetEncOptions() // CBOR deterministic options
-	// default: "2021-07-06 21:20:00 +0000 UTC" <- unwanted
-	// option : "2021-07-06 21:20:00.820603 +0000 UTC" <- wanted
-	options.Time = cbor.TimeRFC3339Nano // option needed for wanted time format
-	encMode, err := options.EncMode()
-	if err != nil {
-		panic(err)
-	}
-	return encMode
-}()
-
 // MarshalCBOR makes sure the timestamp is encoded in UTC.
 func (h Header) MarshalCBOR() ([]byte, error) {
 
@@ -131,7 +118,7 @@ func (h Header) MarshalCBOR() ([]byte, error) {
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
 	type Encodable Header
-	return cborEncMode.Marshal(Encodable(h))
+	return cborcodec.EncMode.Marshal(Encodable(h))
 }
 
 // UnmarshalCBOR makes sure the timestamp is decoded in UTC.

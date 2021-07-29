@@ -6,6 +6,8 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
+
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 )
 
 const (
@@ -163,7 +165,7 @@ func (se *ServiceEvent) UnmarshalCBOR(b []byte) error {
 		return fmt.Errorf("missing event key")
 	}
 
-	evb, err := cborEncMode.Marshal(ev)
+	evb, err := cborcodec.EncMode.Marshal(ev)
 	if err != nil {
 		return err
 	}
