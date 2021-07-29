@@ -239,9 +239,10 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		lg = lg.With().
 			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
 			Logger()
+		lg.Info().Msg("chunk data pack arrived")
+	} else {
+		lg.Info().Msg("system chunk data pack arrived")
 	}
-
-	lg.Info().Msg("chunk data pack arrived")
 
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
