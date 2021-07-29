@@ -156,7 +156,9 @@ func (suite *Suite) TestHandleProposal() {
 	// we don't have any cached children
 	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
 
-	err := suite.eng.Process(originID, proposal)
+	chainID, err := suite.cluster.params.ChainID()
+	suite.Assert().Nil(err)
+	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
 	suite.Assert().Nil(err)
 
 	// assert that the proposal was submitted to consensus algo
@@ -184,7 +186,9 @@ func (suite *Suite) TestHandlePendingProposal() {
 	// should add the proposal to pending buffer
 	suite.pending.On("Add", originID, proposal).Return(true).Once()
 
-	err := suite.eng.Process(originID, proposal)
+	chainID, err := suite.cluster.params.ChainID()
+	suite.Assert().Nil(err)
+	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
 	suite.Assert().Nil(err)
 
 	// proposal should not have been submitted to consensus algo
@@ -226,7 +230,9 @@ func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
 	// should send a request for the grandparent
 	suite.sync.On("RequestBlock", grandparent.ID())
 
-	err := suite.eng.Process(originID, proposal)
+	chainID, err := suite.cluster.params.ChainID()
+	suite.Assert().Nil(err)
+	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
 	suite.Assert().Nil(err)
 
 	// proposal should not have been submitted to consensus algo
@@ -286,7 +292,9 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	suite.pending.On("DropForParent", block.ID()).Once()
 	suite.pending.On("ByParentID", child.ID()).Return(nil, false)
 
-	err := suite.eng.Process(originID, proposal)
+	chainID, err := suite.cluster.params.ChainID()
+	suite.Assert().Nil(err)
+	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
 	suite.Assert().Nil(err)
 
 	// assert that the proposal was submitted to consensus algo
@@ -304,7 +312,9 @@ func (suite *Suite) TestReceiveVote() {
 
 	suite.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Once()
 
-	err := suite.eng.Process(originID, vote)
+	chainID, err := suite.cluster.params.ChainID()
+	suite.Assert().Nil(err)
+	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, vote)
 	suite.Assert().Nil(err)
 
 	suite.hotstuff.AssertExpectations(suite.T())

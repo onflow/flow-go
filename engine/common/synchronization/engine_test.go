@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -215,8 +216,7 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Height)
-	err := ss.e.onSyncResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
 
@@ -366,8 +366,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	},
 	)
 
-	err := ss.e.onBlockResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
@@ -382,8 +381,7 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
 		},
 	)
-	err := ss.e.pollHeight()
-	ss.Require().Nil(err)
+	ss.e.pollHeight()
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -412,8 +410,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("BatchRequested", batches[0])
 
 	// exclude my node ID
-	err := ss.e.sendRequests(ss.participants[1:], ranges, batches)
-	ss.Assert().Nil(err)
+	ss.e.sendRequests(ss.participants[1:], ranges, batches)
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -436,7 +433,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 			Height: uint64(1000 + i),
 		}
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
-		require.NoError(ss.T(), ss.e.Process(originID, msg))
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
 	}
 
 	finalHeight := ss.head.Height
@@ -451,7 +448,7 @@ func (ss *SyncSuite) TestProcessingMultipleItems() {
 		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
 		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
-		require.NoError(ss.T(), ss.e.Process(originID, msg))
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
 	}
 
 	// give at least some time to process items

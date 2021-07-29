@@ -155,13 +155,18 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -175,7 +180,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 	return fmt.Errorf("ingestion error does not process local events")
 }
 
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -840,8 +845,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
 
-				fmt.Printf("handled collection\n")
-
 				// check if the block becomes executable
 				_ = e.executeBlockIfComplete(executableBlock)
 			}
@@ -1095,6 +1098,13 @@ func (e *Engine) saveExecutionResults(
 	endState, chdps, executionResult, err := execution.GenerateExecutionResultAndChunkDataPacks(previousErID, startState, result)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build chunk data pack: %w", err)
+	}
+	for _, event := range executionResult.ServiceEvents {
+		e.log.Info().
+			Uint64("block_height", result.ExecutableBlock.Height()).
+			Hex("block_id", logging.Entity(result.ExecutableBlock)).
+			Str("event_type", event.Type).
+			Msg("service event emitted")
 	}
 
 	executionReceipt, err := e.generateExecutionReceipt(ctx, executionResult, result.StateSnapshots)
