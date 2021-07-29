@@ -1,4 +1,4 @@
-package storagemodel
+package badgermodel
 
 import (
 	"github.com/onflow/flow-go/model/flow"
