@@ -44,7 +44,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context, logger zerolog.Logge
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
-		logger: logger,
+		logger: logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
 
