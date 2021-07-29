@@ -475,7 +475,7 @@ func (m *Middleware) UpdateAllowList() error {
 		return fmt.Errorf("could not get identities: %w", err)
 	}
 
-	// update libp2pNode's approve lists is this middleware also does connection gating
+	// update libp2pNode's approve lists if this middleware also does connection gating
 	if m.connectionGating {
 		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 		if err != nil {
