@@ -210,7 +210,7 @@ func (i *TransactionInvocator) Process(
 			return feesError
 		}
 	} else {
-		// transaction is ok, log as successfull
+		// transaction is ok, log as successful
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
