@@ -82,9 +82,11 @@ func IsServerAuthError(err error) bool {
 // The TLSConfig verifies that the server certifcate is valid and has the correct signature
 func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 
+	// #nosec G402
 	config := &tls.Config{
-		MinVersion:         tls.VersionTLS13,
-		InsecureSkipVerify: true, // This is not insecure here. We will verify the cert chain ourselves.
+		MinVersion: tls.VersionTLS13,
+		// This is not insecure here. We will verify the cert chain ourselves.
+		InsecureSkipVerify: true,
 		ClientAuth:         tls.RequireAnyClientCert,
 	}
 

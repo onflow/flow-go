@@ -94,11 +94,11 @@ func TestExecutionFlow(t *testing.T) {
 
 	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
+	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
-	verificationNode := testutil.GenericNode(t, hub, verID, identities, chainID)
+	verificationNode := testutil.GenericNodeFromParticipants(t, hub, verID, identities, chainID)
 	defer verificationNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
+	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
 	// create collection node that can respond collections to execution node
@@ -284,7 +284,7 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Emulator
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -293,9 +293,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID)
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
+	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
+	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27, chainID)
 	exe1Node.Ready()
@@ -383,7 +383,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, scExe1Block1, scExe1Block2)
+	// TODO this is no longer valid because the system chunk can change the state
+	//assert.Equal(t, scExe1Block1, scExe1Block2)
+	_ = scExe1Block2
 
 	collectionEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
@@ -420,7 +422,7 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Emulator
 
 	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
@@ -434,9 +436,9 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	exeNode.Ready()
 	defer exeNode.Done()
 
-	verification1Node := testutil.GenericNode(t, hub, ver1ID, identities, chainID)
+	verification1Node := testutil.GenericNodeFromParticipants(t, hub, ver1ID, identities, chainID)
 	defer verification1Node.Done()
-	verification2Node := testutil.GenericNode(t, hub, ver2ID, identities, chainID)
+	verification2Node := testutil.GenericNodeFromParticipants(t, hub, ver2ID, identities, chainID)
 	defer verification2Node.Done()
 
 	genesis, err := exeNode.State.AtHeight(0).Head()
