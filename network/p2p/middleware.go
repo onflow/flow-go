@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 type communicationMode int
@@ -382,7 +383,9 @@ func (m *Middleware) processMessage(msg *message.Message) {
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 
 	// convert the message to bytes to be put on the wire.
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
 	data, err := msg.Marshal()
+	//binstat.LeaveVal(bs, int64(len(data)))
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}

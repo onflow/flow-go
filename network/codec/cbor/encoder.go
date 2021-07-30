@@ -1,17 +1,18 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package json
+package cbor
 
 import (
-	"encoding/json"
 	"fmt"
+
+	"github.com/fxamacker/cbor/v2"
 
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Encoder is an encoder to write serialized JSON to a writer.
 type Encoder struct {
-	enc *json.Encoder
+	enc *cbor.Encoder
 }
 
 // Encode will convert the given message into binary JSON and write it to the
@@ -19,14 +20,20 @@ type Encoder struct {
 func (e *Encoder) Encode(v interface{}) error {
 
 	// encode the value
-	env, err := v2envEncode(v, ":strm<1(json)")
+	data, code, err := v2envEncode(v, ":strm<1(cbor)")
 	if err != nil {
 		return fmt.Errorf("could not encode value: %w", err)
 	}
 
+	if (code <= CodeMin) || (code >= CodeMax) {
+		return fmt.Errorf("invalid message envelope code: %d", code)
+	}
+
+	data = append(data, code)
+
 	// write the envelope to network
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":strm<2(json)", int64(len(env.Data)))
-	err = e.enc.Encode(env)
+	//bs := binstat.EnterTimeVal(binstat.BinNet+":strm<2(cbor)", int64(len(data)))
+	err = e.enc.Encode(data)
 	//binstat.Leave(bs)
 	if err != nil {
 		return fmt.Errorf("could not encode envelope: %w", err)
