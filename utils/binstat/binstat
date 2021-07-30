@@ -1,0 +1,83 @@
+#!/usr/bin/perl
+use strict;
+
+# todo: consider rewriting this tool as a Golang compiler plug-in
+
+my $argv = join(' ', @ARGV);
+my ($bin_regex) = $argv =~ m~regex=([^\s]*)~;
+    $bin_regex  = '.*' if(not defined $bin_regex);
+#printf qq[- argv = >%s<\n], $argv;
+#printf qq[- bin_regex = >%s<\n], $bin_regex;
+
+if   ($argv =~ m~\b(unhide)-instrumentation\b~) { scan($1); }
+elsif($argv =~   m~\b(hide)-instrumentation\b~) { scan($1); }
+elsif($argv =~   m~\b(list)-instrumentation\b~) { scan($1); }
+else { printf qq[$0: Please specifiy a command line option: (list|hide|unhide)-instrumentation [regex='binstat\.Bin(Net|MakeID)']\n]; }
+
+sub scan {
+	my ($what) = @_; # e.g. unhide, hide, or list
+	# search for all files (excluding utils/binstat/) containing 'binstat.Bin'
+	my $files_written = 0;
+	my @files_with_binstat = `find . -type f | egrep "\.go\$" | egrep -v 'utils/binstat/' | xargs egrep --files-with-matches 'binstat\.Bin'`;
+	printf qq[- %s instrumentation found %d files to examine\n], $what, scalar @files_with_binstat;
+	foreach my $file_with_binstat (@files_with_binstat) { # e.g. ./module/mempool/stdmap/backend.go
+		chomp $file_with_binstat;
+		my ($go_file) = $file_with_binstat =~ m~^(.*?\.go)~;
+		my $go_file_body = `cat $go_file`;
+		my $regex = q[\t([^\t][^\n]+binstat\.Enter[^\n]+)(.*?)\t+([^\n]*binstat\.Leave[^\n]+)];
+		my @pos;
+		my @len;
+		my @new;
+		my $i = 0;
+		# find all pairs of lines with binstat.Enter / binstat.Leave
+		while($go_file_body =~ m~$regex~gs) {
+			my ($binstat_enter, $lines_inbetween, $binstat_leave) = ($1, $2, $3);
+			my ($p1a, $p1b, $p2a, $p2b) = ($-[1], $+[1], $-[3], $+[3]);
+			($pos[$i+0], $len[$i+0], $pos[$i+1], $len[$i+1]) = ($-[1], $+[1] - $-[1], $-[3], $+[3] - $-[3]);
+			next if(($what ne 'hide') && (not $binstat_enter =~ m~$bin_regex~)); # skip if list or unhide and binstat.Enter line does not match given regex
+			die sprintf qq[ERROR: unexpectedly found binstat. inbetween binstat.Enter and binstat.Leave in go file: %s\n], $go_file if($lines_inbetween =~ m~\bbinstat\.~s);
+			my $binstat_enter_is_comment = 1 if($binstat_enter =~ m~^//~);
+			my $binstat_leave_is_comment = 1 if($binstat_leave =~ m~^//~);
+			my $binstat_xxxxx_is_comment = $binstat_enter_is_comment + $binstat_leave_is_comment;
+			die sprintf qq[ERROR: unexpectedly found binstat.Enter and binstat.Leave with mismatched comments in go file: %s\nbinstat.Enter: %s\nbinstat.Leave: %s\n], $go_file, $binstat_enter, $binstat_leave if(1 == $binstat_xxxxx_is_comment);
+			if ($what eq 'hide') {
+				next if (2 == $binstat_xxxxx_is_comment); # next if pair is already commented
+				$binstat_enter =~ s~^(.*)$~//$1~;
+				$binstat_leave =~ s~^(.*)$~//$1~;
+			}
+			elsif ($what eq 'unhide') {
+				next if (0 == $binstat_xxxxx_is_comment); # next if pair is already uncommented
+				$binstat_enter =~ s~^//~~;
+				$binstat_leave =~ s~^//~~;
+			}
+			my $binstat_enter_pretty = $binstat_enter; $binstat_enter_pretty =~ s~^(.*binstat.*)\s*//.*$~$1~;
+			my $binstat_leave_pretty = $binstat_leave; $binstat_leave_pretty =~ s~^(.*binstat.*)\s*//.*$~$1~;
+			printf qq[- %s instrumentation in %5u byte go file: %-45s %s ... %s\n], $what, length($go_file_body), $go_file, $binstat_enter_pretty, $binstat_leave_pretty;
+			next if ($what eq 'list');
+			# come here if un(hide) to queue changes to apply below
+			$new[$i+0] = $binstat_enter;
+			$new[$i+1] = $binstat_leave;
+			$i += 2;
+		}
+		next if ($what eq 'list');
+		# come here to decide if more work todo
+		my $enter_leave_pairs_found = $i / 2;
+		next if(0 == $enter_leave_pairs_found);
+		# come here if (un)hide to substitute all the binstat enter / leave pairs found above (important: in reverse order!)
+		for($i --; $i >= 0; $i --) {
+			substr($go_file_body, $pos[$i], $len[$i]) = $new[$i];
+		}
+		# if necessary (un)hide Golang import of binstat
+		if    ($what eq   'hide') { $go_file_body =~   s~("github.com/onflow/flow-go/utils/binstat")~_ $1~; }
+		elsif ($what eq 'unhide') { $go_file_body =~ s~_ ("github.com/onflow/flow-go/utils/binstat")~$1~; }
+		# write out updated source file
+		if (1) {
+			open(my $fd, '>', $file_with_binstat) || die sprintf qq[ERROR: cannot open file %s for writing: %s\n], $file_with_binstat, $!;
+			my $bytes_written = syswrite($fd, $go_file_body);
+			die sprintf qq[ERROR: syswrite() wrote %d bytes but needed to write %d bytes to file %s\n], $bytes_written, length($go_file_body), $file_with_binstat if($bytes_written != length($go_file_body));
+			close($fd);
+			$files_written ++;
+		}
+	} # foreach my $file_with_binstat
+	printf qq[- %s instrumentation wrote %d files\n], $what, $files_written;
+} # sub scan
