@@ -169,6 +169,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.RootBlock.ID().String(),
 			fnb.BaseConfig.peerUpdateInterval,
 			fnb.BaseConfig.unicastMessageTimeout,
+			true,
+			true,
 			fnb.MsgValidators...)
 
 		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
