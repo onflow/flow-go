@@ -1,11 +1,12 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package json
+package cbor
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/fxamacker/cbor/v2"
 
 	"github.com/onflow/flow-go/network"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -23,13 +24,13 @@ func NewCodec() *Codec {
 
 // NewEncoder creates a new JSON encoder with the given underlying writer.
 func (c *Codec) NewEncoder(w io.Writer) network.Encoder {
-	enc := json.NewEncoder(w)
+	enc := cbor.NewEncoder(w)
 	return &Encoder{enc: enc}
 }
 
 // NewDecoder creates a new JSON decoder with the given underlying reader.
 func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
-	dec := json.NewDecoder(r)
+	dec := cbor.NewDecoder(r)
 	return &Decoder{dec: dec}
 }
 
@@ -37,20 +38,15 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
-	env, err := v2envEncode(v, ":wire<1(json)")
+	data, code, err := v2envEncode(v, ":wire<1(cbor)")
 	if err != nil {
 		return nil, fmt.Errorf("could not encode envelope: %w", err)
 	}
 
-	// TODO: consider eliminating envelope / double .Marshal as implemented in sibling codec CBOR using append()?
-
 	// encode the envelope
-	//bs := binstat.EnterTime(binstat.BinNet + ":wire<2(json)envelope2payload")
-	data, err := json.Marshal(env)
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire<2(cbor)envelope2payload")
+	data = append(data, code)
 	//binstat.LeaveVal(bs, int64(len(data)))
-	if err != nil {
-		return nil, fmt.Errorf("could not encode value: %w", err)
-	}
 
 	return data, nil
 }
@@ -59,16 +55,12 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
-	var env Envelope
-	//bs := binstat.EnterTime(binstat.BinNet + ":wire>3(json)payload2envelope")
-	err := json.Unmarshal(data, &env)
-	//binstat.LeaveVal(bs, int64(len(env.Data)))
-	if err != nil {
-		return nil, fmt.Errorf("could not decode envelope: %w", err)
-	}
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire>3(cbor)payload2envelope")
+	code := data[len(data)-1] // only last byte
+	//binstat.LeaveVal(bs, int64(len(data)))
 
 	// decode the value
-	v, err := env2vDecode(env, ":wire>4(json)")
+	v, err := env2vDecode(data[:len(data)-1], code, ":wire>4(cbor)") // all but last byte
 	if err != nil {
 		return nil, fmt.Errorf("could not decode value: %w", err)
 	}

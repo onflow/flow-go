@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 const DefaultCacheSize = 10e6
@@ -290,6 +291,9 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
+
+	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
+	//defer binstat.Leave(bs)
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()

@@ -69,7 +69,7 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 			return nil
 		}
 
-		added = ir.Backdata.Add(seal)
+		added = ir.Backdata.Add(sealID, seal)
 		if !added {
 			return nil
 		}
