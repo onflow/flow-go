@@ -37,9 +37,8 @@ func (suite *LifecycleManagerSuite) TestConcurrentStart() {
 	}
 
 	unittest.RequireCloseBefore(suite.T(), suite.lm.Started(), time.Second, "timed out waiting for startup")
-	time.Sleep(100 * time.Millisecond) // wait for potential race conditions to occur
-
 	suite.Assert().EqualValues(1, numStarts)
+	suite.Assert().Neverf(func() bool { return numStarts != 1 }, 100*time.Millisecond, 10*time.Millisecond, "lifecycle manager started more than once")
 }
 
 // TestConcurrentStop tests that calling OnStop multiple times concurrently only
@@ -59,9 +58,8 @@ func (suite *LifecycleManagerSuite) TestConcurrentStop() {
 	}
 
 	unittest.RequireCloseBefore(suite.T(), suite.lm.Stopped(), time.Second, "timed out waiting for shutdown")
-	time.Sleep(100 * time.Millisecond) // wait for potential race conditions to occur
-
-	suite.Assert().EqualValues(numStops, 1)
+	suite.Assert().EqualValues(1, numStops)
+	suite.Assert().Neverf(func() bool { return numStops != 1 }, 100*time.Millisecond, 10*time.Millisecond, "lifecycle manager stopped more than once")
 }
 
 // TestStopBeforeStart tests that calling OnStop before OnStart results in startup never
@@ -86,7 +84,7 @@ func (suite *LifecycleManagerSuite) TestStopAfterStart() {
 
 	suite.lm.OnStart(func() {
 		// simulate startup processing
-		time.Sleep(3 * time.Second)
+		time.Sleep(100 * time.Millisecond)
 		atomic.StoreUint32(&started, 1)
 	})
 
@@ -94,7 +92,7 @@ func (suite *LifecycleManagerSuite) TestStopAfterStart() {
 		suite.Assert().EqualValues(atomic.LoadUint32(&started), 1)
 	})
 
-	unittest.RequireCloseBefore(suite.T(), suite.lm.Stopped(), 5*time.Second, "timed out waiting for shutdown")
+	unittest.RequireCloseBefore(suite.T(), suite.lm.Stopped(), time.Second, "timed out waiting for shutdown")
 	unittest.RequireClosed(suite.T(), suite.lm.Started(), "Started channel should be closed")
 }
 
