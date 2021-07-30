@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack"
 
 	"github.com/onflow/flow-go/crypto"
@@ -25,7 +26,7 @@ func toHex(bs []byte) string {
 func fromJSONHex(b []byte) ([]byte, error) {
 	var x string
 	if err := json.Unmarshal(b, &x); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -33,7 +34,15 @@ func fromJSONHex(b []byte) ([]byte, error) {
 func fromMsgPackHex(b []byte) ([]byte, error) {
 	var x string
 	if err := msgpack.Unmarshal(b, &x); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
+	}
+	return hex.DecodeString(x)
+}
+
+func fromCBORPackHex(b []byte) ([]byte, error) {
+	var x string
+	if err := cbor.Unmarshal(b, &x); err != nil {
+		return nil, fmt.Errorf("could not unmarshal the key: %w", err)
 	}
 	return hex.DecodeString(x)
 }
@@ -162,6 +171,26 @@ func (pub RandomBeaconPubKey) MarshalJSON() ([]byte, error) {
 
 func (pub *RandomBeaconPubKey) UnmarshalJSON(b []byte) error {
 	bz, err := fromJSONHex(b)
+	if err != nil {
+		return err
+	}
+
+	if len(bz) == 0 {
+		return nil
+	}
+	pub.PublicKey, err = crypto.DecodePublicKey(crypto.BLSBLS12381, bz)
+	return err
+}
+
+func (pub RandomBeaconPubKey) MarshalCBOR() ([]byte, error) {
+	if pub.PublicKey == nil {
+		return cbor.Marshal(nil)
+	}
+	return cbor.Marshal(toHex(pub.Encode()))
+}
+
+func (pub *RandomBeaconPubKey) UnmarshalCBOR(b []byte) error {
+	bz, err := fromCBORPackHex(b)
 	if err != nil {
 		return err
 	}

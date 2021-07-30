@@ -444,6 +444,12 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 
 // UpdateAllowList allows the peer allow list to be updated.
 func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
+	// if the node was so far not under allowList
+	if n.connGater == nil {
+		return fmt.Errorf("Could not add an allow list, this node was started without allow listing")
+
+	}
+
 	// generates peer address information for all identities
 	allowlist := make([]peer.AddrInfo, len(identities))
 	var err error
