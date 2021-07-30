@@ -1,7 +1,9 @@
 package assigner_test
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
@@ -168,7 +170,7 @@ func newBlockHappyPath(t *testing.T) {
 	// invoked for it.
 	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
 	// it is done with processing this chunk.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Once()
@@ -178,10 +180,11 @@ func newBlockHappyPath(t *testing.T) {
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
+	unittest.RequireReturnsBefore(t, chunksQueueWG.Wait, 10*time.Millisecond, "could not receive chunk locators")
+
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.chunksQueue,
 		s.newChunkListener,
 		s.notifier)
 }
@@ -226,6 +229,35 @@ func newBlockUnstaked(t *testing.T) {
 		s.metrics,
 		s.assigner,
 		s.notifier)
+}
+
+func mockChunksQueueForAssignment(t *testing.T,
+	verId flow.Identifier,
+	chunksQueue *storage.ChunksQueue,
+	resultID flow.Identifier,
+	assignment *chunks.Assignment) *sync.WaitGroup {
+
+	// map of received locators
+	// receivedIndices := make(map[uint64]struct{})
+
+	expectedIndices := make([]uint64, 0)
+	for _, chunkIndex := range assignment.ByNodeID(verId) {
+		expectedIndices = append(expectedIndices, chunkIndex)
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(expectedIndices))
+	chunksQueue.On("StoreChunkLocator", mock.Anything).Run(func(args mock.Arguments) {
+		locator, ok := args[0].(*chunks.Locator)
+		require.True(t, ok)
+
+		require.Equal(t, resultID, locator.ResultID)
+		require.Contains(t, expectedIndices, locator.Index)
+
+		wg.Done()
+	}).Return(true, nil)
+
+	return wg
 }
 
 // newBlockNoChunk evaluates passing a new finalized block to assigner engine that contains
