@@ -231,35 +231,6 @@ func newBlockUnstaked(t *testing.T) {
 		s.notifier)
 }
 
-func mockChunksQueueForAssignment(t *testing.T,
-	verId flow.Identifier,
-	chunksQueue *storage.ChunksQueue,
-	resultID flow.Identifier,
-	assignment *chunks.Assignment) *sync.WaitGroup {
-
-	// map of received locators
-	// receivedIndices := make(map[uint64]struct{})
-
-	expectedIndices := make([]uint64, 0)
-	for _, chunkIndex := range assignment.ByNodeID(verId) {
-		expectedIndices = append(expectedIndices, chunkIndex)
-	}
-
-	wg := &sync.WaitGroup{}
-	wg.Add(len(expectedIndices))
-	chunksQueue.On("StoreChunkLocator", mock.Anything).Run(func(args mock.Arguments) {
-		locator, ok := args[0].(*chunks.Locator)
-		require.True(t, ok)
-
-		require.Equal(t, resultID, locator.ResultID)
-		require.Contains(t, expectedIndices, locator.Index)
-
-		wg.Done()
-	}).Return(true, nil)
-
-	return wg
-}
-
 // newBlockNoChunk evaluates passing a new finalized block to assigner engine that contains
 // a receipt with no chunk in its result. Assigner engine should
 // not pass any chunk to the chunks queue, and should never notify the job listener.
@@ -414,4 +385,33 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 
 	// job listener should not be notified as no new chunk is added.
 	s.newChunkListener.AssertNotCalled(t, "Check")
+}
+
+func mockChunksQueueForAssignment(t *testing.T,
+	verId flow.Identifier,
+	chunksQueue *storage.ChunksQueue,
+	resultID flow.Identifier,
+	assignment *chunks.Assignment) *sync.WaitGroup {
+
+	// map of received locators
+	// receivedIndices := make(map[uint64]struct{})
+
+	expectedIndices := make([]uint64, 0)
+	for _, chunkIndex := range assignment.ByNodeID(verId) {
+		expectedIndices = append(expectedIndices, chunkIndex)
+	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(len(expectedIndices))
+	chunksQueue.On("StoreChunkLocator", mock.Anything).Run(func(args mock.Arguments) {
+		locator, ok := args[0].(*chunks.Locator)
+		require.True(t, ok)
+
+		require.Equal(t, resultID, locator.ResultID)
+		require.Contains(t, expectedIndices, locator.Index)
+
+		wg.Done()
+	}).Return(true, nil)
+
+	return wg
 }
