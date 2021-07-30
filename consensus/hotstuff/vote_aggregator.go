@@ -4,12 +4,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// createVote holds the data for signing a block. The constructor of this function should have the block
+// CreateVote holds the data for signing a block. The constructor of this function should have the block
 // info already, taking block again as argument is to ensure it's called with the same block.
-// For consensus cluster, the createVote function will create a disposable stateful signer object
+// For consensus cluster, the CreateVote function will create a disposable stateful signer object
 // for producing the signature for a vote. After the the signature has been produced, the signer object will
 // be discarded.
-type createVote func(*model.Block) (*model.Vote, error)
+type CreateVote func(*model.Block) (*model.Vote, error)
 
 // VoteAggregator verifies, aggregates votes, as well as votes for blocks.
 // When enough votes have been collected, it builds a QC and send it to the EventLoop
@@ -28,9 +28,9 @@ type VoteAggregator interface {
 	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
 	AddBlock(block *model.Block) (bool, error)
 
-	// GetVoteCreator returns a createVote function for a given block
+	// GetVoteCreator returns a CreateVote function for a given block
 	// The caller must ensure the block is a known block by calling AddBlock before.
-	GetVoteCreator(block *model.Block) (createVote, error)
+	GetVoteCreator(block *model.Block) (CreateVote, error)
 
 	// InvalidBlock notifies the VoteAggregator about an invalid block, so that it can process votes for the invalid
 	// block and slash the voters.
