@@ -328,7 +328,7 @@ func newBlockMultipleAssignment(t *testing.T) {
 	// mocks processing assigned chunks
 	// each assigned chunk should be stored in the chunks queue and new chunk listener should be
 	// invoked for it.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).Return(true, nil).Times(chunksNum)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, true, nil)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Times(chunksNum)
 
@@ -340,10 +340,11 @@ func newBlockMultipleAssignment(t *testing.T) {
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
+	unittest.RequireReturnsBefore(t, chunksQueueWG.Wait, 10*time.Millisecond, "could not receive chunk locators")
+
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.chunksQueue,
 		s.notifier,
 		s.newChunkListener)
 }
@@ -365,7 +366,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
-	mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, false, nil)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, false, nil)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
@@ -375,10 +376,11 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s.metrics.On("OnExecutionResultReceivedAtAssignerEngine").Return().Once()
 	e.ProcessFinalizedBlock(containerBlock)
 
+	unittest.RequireReturnsBefore(t, chunksQueueWG.Wait, 10*time.Millisecond, "could not receive chunk locators")
+
 	mock.AssertExpectationsForObjects(t,
 		s.metrics,
 		s.assigner,
-		s.chunksQueue,
 		s.notifier)
 
 	// job listener should not be notified as no new chunk is added.
