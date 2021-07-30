@@ -170,7 +170,7 @@ func newBlockHappyPath(t *testing.T) {
 	// invoked for it.
 	// Also, once all receipts of the block processed, engine should notify the block consumer once, that
 	// it is done with processing this chunk.
-	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment)
+	chunksQueueWG := mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, true, nil)
 	s.newChunkListener.On("Check").Return().Times(chunksNum)
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
 	s.metrics.On("OnAssignedChunkProcessedAtAssigner").Return().Once()
@@ -391,11 +391,12 @@ func mockChunksQueueForAssignment(t *testing.T,
 	verId flow.Identifier,
 	chunksQueue *storage.ChunksQueue,
 	resultID flow.Identifier,
-	assignment *chunks.Assignment) *sync.WaitGroup {
+	assignment *chunks.Assignment,
+	returnBool bool,
+	returnError error) *sync.WaitGroup {
 
 	// map of received locators
 	// receivedIndices := make(map[uint64]struct{})
-
 	expectedIndices := make([]uint64, 0)
 	for _, chunkIndex := range assignment.ByNodeID(verId) {
 		expectedIndices = append(expectedIndices, chunkIndex)
@@ -411,7 +412,13 @@ func mockChunksQueueForAssignment(t *testing.T,
 		require.Contains(t, expectedIndices, locator.Index)
 
 		wg.Done()
-	}).Return(true, nil)
+	}).Return(
+		func(locator *chunks.Locator) bool {
+			return returnBool
+		},
+		func(locator *chunks.Locator) error {
+			return returnError
+		})
 
 	return wg
 }
