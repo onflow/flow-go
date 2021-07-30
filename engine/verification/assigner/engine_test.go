@@ -400,12 +400,8 @@ func mockChunksQueueForAssignment(t *testing.T,
 	returnBool bool,
 	returnError error) *sync.WaitGroup {
 
-	// extracts chunk indices assigned to this verification node
-	expectedIndices := make([]uint64, 0)
-	expectedIndices = append(expectedIndices, assignment.ByNodeID(verId)...)
-
 	wg := &sync.WaitGroup{}
-	wg.Add(len(expectedIndices))
+	wg.Add(len(assignment.ByNodeID(verId)))
 	chunksQueue.On("StoreChunkLocator", mock.Anything).Run(func(args mock.Arguments) {
 		// should be a chunk locator
 		locator, ok := args[0].(*chunks.Locator)
@@ -413,7 +409,7 @@ func mockChunksQueueForAssignment(t *testing.T,
 
 		// should belong to the expected execution result and assigned chunk
 		require.Equal(t, resultID, locator.ResultID)
-		require.Contains(t, expectedIndices, locator.Index)
+		require.Contains(t, assignment.ByNodeID(verId), locator.Index)
 
 		wg.Done()
 	}).Return(
