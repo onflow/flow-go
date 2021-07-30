@@ -5,6 +5,7 @@
 /cmd/verification/verification
 /cmd/testclient/testclient
 /cmd/util/util
+/cmd/bootstrap/bootstrap
 
 # Test binary, build with `go test -c`
 *.test
@@ -14,6 +15,12 @@
 
 # Output from logging to debug
 *.log
+
+# Output from binstat
+*.binstat.txt*
+
+# Output from pprof
+*.pprof.txt
 
 # Coverage artifacts
 coverage.zip
@@ -48,4 +55,3 @@ language/tools/vscode-extension/out/*
 read-badger
 read-protocol-state
 remove-execution-fork
-bootstrap

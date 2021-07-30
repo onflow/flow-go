@@ -26,10 +26,11 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -91,7 +92,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(zerolog.Nop())
+		execCtx := fvm.NewContext(
+			zerolog.Nop(),
+		)
 
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
@@ -131,12 +134,17 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		contextOptions := []fvm.Option{
 			fvm.WithTransactionFeesEnabled(true),
 			fvm.WithAccountStorageLimit(true),
+			fvm.WithBlocks(&fvm.NoopBlockFinder{}),
 		}
+		// set 0 clusters to pass n_collectors >= n_clusters check
+		epochConfig := epochs.DefaultEpochConfig()
+		epochConfig.NumCollectorClusters = 0
 		bootstrapOptions := []fvm.BootstrapProcedureOption{
 			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
 			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
 			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			fvm.WithEpochConfig(epochConfig),
 		}
 
 		rt := fvm.NewInterpreterRuntime()
@@ -286,21 +294,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := handler.GetServiceEventWhitelist()
+		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+		require.NoError(t, err)
+
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochSetup.Address.Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
 		}
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochCommit.Address.Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
 		}
 
@@ -340,7 +350,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// all events should have been collected
 		require.Len(t, result.ServiceEvents, 2)
 
-		//events are ordered
+		// events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
 
@@ -603,7 +613,10 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 func Test_ExecutingSystemCollection(t *testing.T) {
 
-	execCtx := fvm.NewContext(zerolog.Nop())
+	execCtx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+	)
 
 	runtime := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(runtime)
@@ -662,7 +675,9 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 
 	block := flow.Block{
 		Header: &flow.Header{
-			View: 42,
+			Timestamp: flow.GenesisTime,
+			Height:    42,
+			View:      42,
 		},
 		Payload: &flow.Payload{
 			Guarantees: guarantees,

@@ -821,6 +821,16 @@ func NodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo 
 	return nodeInfos
 }
 
+func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.NodeInfo {
+	il := IdentityListFixture(n, opts...)
+	nodeInfos := make([]bootstrap.NodeInfo, 0, n)
+	for _, identity := range il {
+		nodeInfo := bootstrap.PrivateNodeInfoFromIdentity(identity, KeyFixture(crypto.ECDSAP256), KeyFixture(crypto.BLSBLS12381))
+		nodeInfos = append(nodeInfos, nodeInfo)
+	}
+	return nodeInfos
+}
+
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
@@ -853,6 +863,13 @@ func WithKeys(identity *flow.Identity) {
 func WithNodeID(id flow.Identifier) func(*flow.Identity) {
 	return func(identity *flow.Identity) {
 		identity.NodeID = id
+	}
+}
+
+// WithStakingPubKey adds a staking public key to the identity
+func WithStakingPubKey(pubKey crypto.PublicKey) func(*flow.Identity) {
+	return func(identity *flow.Identity) {
+		identity.StakingPubKey = pubKey
 	}
 }
 
@@ -1409,6 +1426,12 @@ func QCWithBlockID(blockID flow.Identifier) func(*flow.QuorumCertificate) {
 	}
 }
 
+func QCWithSignerIDs(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) {
+	return func(qc *flow.QuorumCertificate) {
+		qc.SignerIDs = signerIDs
+	}
+}
+
 func VoteFixture() *hotstuff.Vote {
 	return &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
@@ -1443,18 +1466,27 @@ func WithFirstView(view uint64) func(*flow.EpochSetup) {
 	}
 }
 
+// EpochSetupFixture creates a valid EpochSetup with default properties for
+// testing. The default properties can be overwritten with optional parameter
+// functions.
 func EpochSetupFixture(opts ...func(setup *flow.EpochSetup)) *flow.EpochSetup {
 	participants := IdentityListFixture(5, WithAllRoles())
 	setup := &flow.EpochSetup{
-		Counter:      uint64(rand.Uint32()),
-		FinalView:    uint64(rand.Uint32() + 1000),
-		Participants: participants.Sort(order.Canonical),
-		RandomSource: SeedFixture(flow.EpochSetupRandomSourceLength),
+		Counter:            uint64(rand.Uint32()),
+		FirstView:          uint64(0),
+		FinalView:          uint64(rand.Uint32() + 1000),
+		Participants:       participants.Sort(order.Canonical),
+		RandomSource:       SeedFixture(flow.EpochSetupRandomSourceLength),
+		DKGPhase1FinalView: 100,
+		DKGPhase2FinalView: 200,
+		DKGPhase3FinalView: 300,
 	}
 	for _, apply := range opts {
 		apply(setup)
 	}
-	setup.Assignments = ClusterAssignment(1, setup.Participants)
+	if setup.Assignments == nil {
+		setup.Assignments = ClusterAssignment(1, setup.Participants)
+	}
 	return setup
 }
 
@@ -1487,6 +1519,16 @@ func WithDKGFromParticipants(participants flow.IdentityList) func(*flow.EpochCom
 	count := len(participants.Filter(filter.IsValidDKGParticipant))
 	return func(commit *flow.EpochCommit) {
 		commit.DKGParticipantKeys = PublicKeysFixture(count, crypto.BLSBLS12381)
+	}
+}
+
+func WithClusterQCsFromAssignments(assignments flow.AssignmentList) func(*flow.EpochCommit) {
+	qcs := make([]*flow.QuorumCertificate, 0, len(assignments))
+	for _, cluster := range assignments {
+		qcs = append(qcs, QuorumCertificateFixture(QCWithSignerIDs(cluster)))
+	}
+	return func(commit *flow.EpochCommit) {
+		commit.ClusterQCs = flow.ClusterQCVoteDatasFromQCs(qcs)
 	}
 }
 
@@ -1536,7 +1578,11 @@ func BootstrapFixture(participants flow.IdentityList, opts ...func(*flow.Block))
 		WithFirstView(root.Header.View),
 		WithFinalView(root.Header.View+1000),
 	)
-	commit := EpochCommitFixture(WithDKGFromParticipants(participants), CommitWithCounter(counter))
+	commit := EpochCommitFixture(
+		CommitWithCounter(counter),
+		WithClusterQCsFromAssignments(setup.Assignments),
+		WithDKGFromParticipants(participants),
+	)
 
 	result := BootstrapExecutionResultFixture(root, GenesisStateCommitment)
 	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
@@ -1631,5 +1677,22 @@ func ReconnectBlocksAndReceipts(blocks []*flow.Block, receipts []*flow.Execution
 				block.Payload.Receipts[i].ResultID = block.Payload.Results[i].ID()
 			}
 		}
+	}
+}
+
+// DKGMessageFixture creates a single DKG message with random fields
+func DKGMessageFixture() *messages.DKGMessage {
+	return &messages.DKGMessage{
+		Orig:          uint64(rand.Int()),
+		Data:          RandomBytes(10),
+		DKGInstanceID: fmt.Sprintf("test-dkg-instance-%d", uint64(rand.Int())),
+	}
+}
+
+// DKGBroadcastMessageFixture creates a single DKG broadcast message with random fields
+func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
+	return &messages.BroadcastDKGMessage{
+		DKGMessage: *DKGMessageFixture(),
+		Signature:  SignatureFixture(),
 	}
 }
