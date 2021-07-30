@@ -387,6 +387,11 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 	s.newChunkListener.AssertNotCalled(t, "Check")
 }
 
+// mockChunksQueueForAssignment mocks chunks queue against invoking its store functionality for the
+// input assignment.
+// The mocked version of chunks queue evaluates that whatever chunk locator is tried to be stored belongs to the
+// assigned list of chunks for specified execution result (i.e., a valid input).
+// It also mocks the chunks queue to return the specified boolean and error values upon trying to store a valid input.
 func mockChunksQueueForAssignment(t *testing.T,
 	verId flow.Identifier,
 	chunksQueue *storage.ChunksQueue,
@@ -395,8 +400,6 @@ func mockChunksQueueForAssignment(t *testing.T,
 	returnBool bool,
 	returnError error) *sync.WaitGroup {
 
-	// map of received locators
-	// receivedIndices := make(map[uint64]struct{})
 	expectedIndices := make([]uint64, 0)
 	for _, chunkIndex := range assignment.ByNodeID(verId) {
 		expectedIndices = append(expectedIndices, chunkIndex)
@@ -405,9 +408,11 @@ func mockChunksQueueForAssignment(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(len(expectedIndices))
 	chunksQueue.On("StoreChunkLocator", mock.Anything).Run(func(args mock.Arguments) {
+		// should be a chunk locator
 		locator, ok := args[0].(*chunks.Locator)
 		require.True(t, ok)
 
+		// should belong to the expected execution result and assigned chunk
 		require.Equal(t, resultID, locator.ResultID)
 		require.Contains(t, expectedIndices, locator.Index)
 
