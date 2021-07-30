@@ -1,6 +1,7 @@
 package sealing
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/gammazero/workerpool"
@@ -368,9 +369,10 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
+	err := e.messageHandler.Process(e.me.NodeID(), event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		// receiving an input of incompatible type from a trusted internal component is fatal
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -378,9 +380,18 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
+	err := e.messageHandler.Process(e.me.NodeID(), event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		lg := e.log.With().
+			Err(err).
+			Str("channel", channel.String()).
+			Str("origin", originID.String()).
+			Logger()
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			lg.Error().Msg("received message with incompatible type")
+			return
+		}
+		lg.Fatal().Msg("internal error processing message")
 	}
 }
 

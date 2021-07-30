@@ -178,8 +178,11 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 
 	// creates and tracks 100 items
 	size := 100
+	var bkend Backend
+
 	items := make([]flow.Identifier, size)
 	entities := make(map[flow.Identifier]flow.Entity)
+
 	for i := 0; i < size; i++ {
 		var id flow.Identifier
 		_, _ = crand.Read(id[:])
@@ -192,8 +195,10 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 	// untracks the oldest item
 	ejector.Untrack(items[0])
 
+	bkend.entities = entities
+
 	// next ejectable item should be the second oldest item
-	id, _ := ejector.Eject(entities)
+	id, _, _ := ejector.Eject(&bkend)
 	assert.Equal(t, id, items[1])
 }
 
@@ -204,6 +209,8 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 
 	// creates and tracks 100 items
 	size := 100
+	var bkend Backend
+
 	items := make([]flow.Identifier, size)
 	entities := make(map[flow.Identifier]flow.Entity)
 	for i := 0; i < size; i++ {
@@ -215,9 +222,11 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 		items[i] = id
 	}
 
+	bkend.entities = entities
+
 	// ejects one by one
 	for i := 0; i < size; i++ {
-		id, _ := ejector.Eject(entities)
+		id, _, _ := ejector.Eject(&bkend)
 		require.Equal(t, id, items[i])
 	}
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 const DefaultCacheSize = 10e6
@@ -43,6 +44,14 @@ type Network struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 	subMngr network.SubscriptionManager // used to keep track of subscribed channels
+
+	// fields for managing the network's start-stop lifecycle
+	stateTransition   sync.Mutex    // lock for preventing concurrent state transitions
+	ready             chan struct{} // used to signal that startup has completed
+	done              chan struct{} // used to signal that shutdown has completed
+	startupCommenced  bool          // indicates whether Ready() has been invoked
+	shutdownCommenced bool          // indicates whether Done() has been invoked
+
 	ReadyDoneAwareNetwork
 }
 
@@ -68,14 +77,19 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:  log,
-		codec:   codec,
-		me:      me,
-		mw:      mw,
-		rcache:  rcache,
-		top:     top,
-		metrics: metrics,
-		subMngr: sm,
+		logger:            log,
+		codec:             codec,
+		me:                me,
+		mw:                mw,
+		rcache:            rcache,
+		top:               top,
+		metrics:           metrics,
+		subMngr:           sm,
+		ready:             make(chan struct{}),
+		done:              make(chan struct{}),
+		stateTransition:   sync.Mutex{},
+		startupCommenced:  false,
+		shutdownCommenced: false,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
@@ -92,26 +106,45 @@ func NewNetwork(
 
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
-	ready := make(chan struct{})
+	n.stateTransition.Lock()
+	if n.shutdownCommenced || n.startupCommenced {
+		n.stateTransition.Unlock()
+		return n.ready
+	}
+	n.startupCommenced = true
+	n.stateTransition.Unlock()
+
 	go func() {
 		err := n.mw.Start(n)
 		if err != nil {
 			n.logger.Fatal().Err(err).Msg("failed to start middleware")
 		}
-		close(ready)
+		close(n.ready)
 	}()
-	return ready
+
+	return n.ready
 }
 
 // Done returns a channel that will close when shutdown is complete.
 func (n *Network) Done() <-chan struct{} {
-	done := make(chan struct{})
+	n.stateTransition.Lock()
+	if n.shutdownCommenced {
+		n.stateTransition.Unlock()
+		return n.done
+	}
+	n.shutdownCommenced = true
+	n.stateTransition.Unlock()
+
 	go func() {
 		n.cancel()
-		n.mw.Stop()
-		close(done)
+		if n.startupCommenced {
+			<-n.ready
+			n.mw.Stop()
+		}
+		close(n.done)
 	}()
-	return done
+
+	return n.done
 }
 
 // Register will register the given engine with the given unique engine engineID,
@@ -258,6 +291,9 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
+
+	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
+	//defer binstat.Leave(bs)
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
