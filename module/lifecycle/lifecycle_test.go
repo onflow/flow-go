@@ -23,9 +23,9 @@ func (suite *LifecycleManagerSuite) SetupTest() {
 	suite.lm = lifecycle.NewLifecycleManager()
 }
 
-// TestConsecutiveStart tests that calling OnStart multiple times concurrently only
+// TestConcurrentStart tests that calling OnStart multiple times concurrently only
 // results in startup being performed once
-func (suite *LifecycleManagerSuite) TestConsecutiveStart() {
+func (suite *LifecycleManagerSuite) TestConcurrentStart() {
 	var numStarts uint32
 
 	for i := 0; i < 10; i++ {
@@ -42,9 +42,9 @@ func (suite *LifecycleManagerSuite) TestConsecutiveStart() {
 	suite.Assert().EqualValues(1, numStarts)
 }
 
-// TestConsecutiveStop tests that calling OnStop multiple times concurrently only
+// TestConcurrentStop tests that calling OnStop multiple times concurrently only
 // results in shutdown being performed once
-func (suite *LifecycleManagerSuite) TestConsecutiveStop() {
+func (suite *LifecycleManagerSuite) TestConcurrentStop() {
 	suite.lm.OnStart()
 	unittest.RequireCloseBefore(suite.T(), suite.lm.Started(), time.Second, "timed out waiting for startup")
 
