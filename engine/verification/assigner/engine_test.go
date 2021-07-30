@@ -400,6 +400,7 @@ func mockChunksQueueForAssignment(t *testing.T,
 	returnBool bool,
 	returnError error) *sync.WaitGroup {
 
+	// extracts chunk indices assigned to this verification node
 	expectedIndices := make([]uint64, 0)
 	for _, chunkIndex := range assignment.ByNodeID(verId) {
 		expectedIndices = append(expectedIndices, chunkIndex)
