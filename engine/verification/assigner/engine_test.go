@@ -365,9 +365,7 @@ func chunkQueueUnhappyPathDuplicate(t *testing.T) {
 
 	// mocks processing assigned chunks
 	// adding new chunks to queue returns false, which means a duplicate chunk.
-	s.chunksQueue.On("StoreChunkLocator", mock.Anything).
-		Return(false, nil).
-		Times(chunksNum)
+	mockChunksQueueForAssignment(t, s.verIdentity.NodeID, s.chunksQueue, result.ID(), assignment, false, nil)
 
 	// once assigner engine is done processing the block, it should notify the processing notifier.
 	s.notifier.On("Notify", containerBlock.ID()).Return().Once()
