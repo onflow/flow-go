@@ -1,7 +1,7 @@
 status = [
-  "golangci",
-  "unit-test",
-  "integration-test",
+  "Lint",
+  "Unit Tests",
+  "Integration Tests",
 ]
 
 delete_merged_branches = true
