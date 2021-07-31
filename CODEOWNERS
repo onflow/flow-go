@@ -36,6 +36,3 @@
 
 # Bootstrap and transit scripts
 /cmd/bootstrap/** @vishalchangrani @ljk662
-
-# Bors test 
-/engine/access/relay/engine_test.go @uhznms
