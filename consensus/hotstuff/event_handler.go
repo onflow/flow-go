@@ -10,8 +10,8 @@ import (
 // EventHandler runs a state machine to process proposals, QC and local timeouts.
 type EventHandler interface {
 
-	// OnReceiveQC processes a valid qc received from internal vote aggregator.
-	OnReceiveQC(qc *flow.QuorumCertificate) error
+	// OnQCConstructed processes a valid qc constructed by internal vote aggregator.
+	OnQCConstructed(qc *flow.QuorumCertificate) error
 
 	// OnReceiveProposal processes a block proposal received fro another HotStuff
 	// consensus participant.
