@@ -5,14 +5,12 @@ on:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
-      - main
       - staging
       - trying
   pull_request:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
-      - main
 
 jobs:
   golangci:
