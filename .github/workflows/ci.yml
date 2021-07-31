@@ -3,14 +3,14 @@ name: CI
 on:
   push:
     branches:
-      - master
+      # - master
       - 'auto-cadence-upgrade/**'
       - main
       - staging
       - trying
   pull_request:
     branches:
-      - master
+      # - master
       - 'auto-cadence-upgrade/**'
       - main
 
