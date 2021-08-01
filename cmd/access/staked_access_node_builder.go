@@ -76,7 +76,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		peerUpdateInterval := time.Hour
 
 		middleware := builder.initMiddleware(unstakedNodeID,
-			unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+			unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, builder.UnicastMessageTimeout,
 			false, // no connection gating for the unstaked network
 			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 			msgValidators...)

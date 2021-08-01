@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -69,6 +70,7 @@ type consensusFollowerImpl struct {
 	dataDir               string          // directory to store the protocol state
 	bootstrapDir          string
 	networkConnectTimeout time.Duration // how long to try connecting to the network
+	unicastTimeout        time.Duration // how long a unicast transmission can take to complete
 }
 
 type ConsensusFollowerOption func(*consensusFollowerImpl)
@@ -95,6 +97,7 @@ func NewConsensusFollower(log zerolog.Logger, nodeID flow.Identifier, upstreamAc
 	const (
 		defaultBootstrapDir          = "bootstrap"
 		defaultNetworkConnectTimeout = time.Minute
+		defaultUnicastTimeout        = p2p.DefaultUnicastTimeout
 	)
 
 	homedir, _ := os.UserHomeDir() // TODO: handle error here
@@ -110,6 +113,7 @@ func NewConsensusFollower(log zerolog.Logger, nodeID flow.Identifier, upstreamAc
 		dataDir:               defaultDataDir,
 		bootstrapDir:          defaultBootstrapDir,
 		networkConnectTimeout: defaultNetworkConnectTimeout,
+		unicastTimeout:        defaultUnicastTimeout,
 	}
 
 	for _, opt := range opts {
@@ -149,11 +153,11 @@ func NewConsensusFollower(log zerolog.Logger, nodeID flow.Identifier, upstreamAc
 	// timeout               time.Duration // component startup / shutdown timeout
 	// datadir               string // "directory to store the protocol state"
 	// BootstrapDir          string
+	// unicastMessageTimeout time.Duration p2p.DefaultUnicastTimeout // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
 	//
 	// metricsPort           uint // port for metrics server. Can we disable this?
-	//
 	// level                 string // use "info" // pass in logger using PreInit.
-	// unicastMessageTimeout time.Duration p2p.DefaultUnicastTimeout // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
+
 	// profilerEnabled       bool // Set this to false
 	// tracerEnabled         bool // set False
 	// _____(not needed) bindAddr              string

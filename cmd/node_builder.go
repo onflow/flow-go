@@ -111,7 +111,7 @@ type BaseConfig struct {
 	metricsPort           uint
 	BootstrapDir          string
 	peerUpdateInterval    time.Duration
-	unicastMessageTimeout time.Duration
+	UnicastMessageTimeout time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
