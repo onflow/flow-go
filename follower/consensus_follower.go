@@ -31,6 +31,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/rs/zerolog"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
@@ -90,7 +91,7 @@ func WithNetworkConnectTimeout(timeout time.Duration) ConsensusFollowerOption {
 	}
 }
 
-func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Identifier, bindAddr string, opts ...ConsensusFollowerOption) ConsensusFollower {
+func NewConsensusFollower(log zerolog.Logger, nodeID flow.Identifier, upstreamAccessNodeID flow.Identifier, bindAddr string, opts ...ConsensusFollowerOption) ConsensusFollower {
 	const (
 		defaultBootstrapDir          = "bootstrap"
 		defaultNetworkConnectTimeout = time.Minute
@@ -147,9 +148,9 @@ func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Iden
 	// datadir               string // "directory to store the protocol state"
 	// BootstrapDir          string
 	//
-	// level                 string // log level. Can we use a child logger instead? // pass in logger using PreInit.
 	// metricsPort           uint // port for metrics server. Can we disable this?
 	//
+	// level                 string // use "info" // pass in logger using PreInit.
 	// unicastMessageTimeout time.Duration p2p.DefaultUnicastTimeout // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
 	// profilerEnabled       bool // Set this to false
 	// tracerEnabled         bool // set False
@@ -162,6 +163,9 @@ func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Iden
 
 	nodeBuilder.
 		Initialize().
+		PreInit(func(builder cmd.NodeBuilder, node *cmd.NodeConfig) {
+			node.Logger = log
+		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
