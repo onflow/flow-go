@@ -10,9 +10,9 @@ type UnstakedAccessNode struct {
 }
 
 func (unstakedAN *UnstakedAccessNode) Ready() <-chan struct{} {
-
+	return make(chan struct{}, 1)
 }
 
 func (unstakedAN *UnstakedAccessNode) Done() <-chan struct{} {
-
+	return make(chan struct{}, 1)
 }

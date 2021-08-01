@@ -22,6 +22,8 @@ import (
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
 
+	module.ReadyDoneAware
+
 	// BaseFlags reads the command line arguments common to all nodes
 	BaseFlags()
 
