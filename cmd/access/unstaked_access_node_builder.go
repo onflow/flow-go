@@ -17,7 +17,7 @@ type UnstakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
+func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 	return &UnstakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -127,4 +127,12 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		return builder.UnstakedNetwork, err
 	})
+}
+
+func (builder *UnstakedAccessNodeBuilder) Build() {
+	builder.Initialize()
+	builder.
+		mutableFollowerStateModule().
+		followerEnginerDepsModule()
+		//transactionTimingMempoolsModule()
 }
