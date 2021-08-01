@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -99,6 +100,7 @@ type FlowNodeBuilder struct {
 	components  []namedComponentFunc
 	doneObject  []namedDoneObject
 	sig         chan os.Signal
+	unit        *engine.Unit
 	preInitFns  []func(NodeBuilder, *NodeConfig)
 	postInitFns []func(NodeBuilder, *NodeConfig)
 }
@@ -574,7 +576,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 		log.Fatal().Msg("component startup timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component startup aborted")
-		os.Exit(1)
+		return
 	}
 
 	fnb.doneObject = append(fnb.doneObject, namedDoneObject{
@@ -593,7 +595,7 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 		log.Fatal().Msg("component shutdown timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component shutdown aborted")
-		os.Exit(1)
+		return
 	}
 }
 
@@ -659,6 +661,7 @@ func FlowNode(role string) *FlowNodeBuilder {
 			Logger: zerolog.New(os.Stderr),
 		},
 		flags: pflag.CommandLine,
+		unit:  engine.NewUnit(),
 	}
 	return builder
 }
@@ -691,60 +694,89 @@ func (fnb *FlowNodeBuilder) Run() {
 	fnb.sig = make(chan os.Signal, 1)
 	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
 
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
-	fnb.initNodeInfo()
-
-	fnb.initLogger()
-
-	fnb.initProfiler()
-
-	fnb.initDB()
-
-	fnb.initMetrics()
-
-	fnb.initStorage()
-
-	for _, f := range fnb.preInitFns {
-		fnb.handlePreInit(f)
+	select {
+	case <-fnb.Ready():
+		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
+	case <-time.After(fnb.BaseConfig.timeout):
+		fnb.Logger.Fatal().Msg("node startup timed out")
+	case <-fnb.sig:
+		fnb.Logger.Warn().Msg("node startup aborted")
+		os.Exit(1)
 	}
 
-	fnb.initState()
-
-	fnb.initFvmOptions()
-
-	for _, f := range fnb.postInitFns {
-		fnb.handlePostInit(f)
-	}
-
-	// set up all modules
-	for _, f := range fnb.modules {
-		fnb.handleModule(f)
-	}
-
-	// initialize all components
-	for _, f := range fnb.components {
-		fnb.handleComponent(f)
-	}
-
-	fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
-
+	// block till a SIGINT is received
 	<-fnb.sig
 
 	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.NodeRole)
 
-	for i := len(fnb.doneObject) - 1; i >= 0; i-- {
-		doneObject := fnb.doneObject[i]
-
-		fnb.handleDoneObject(doneObject)
+	select {
+	case <-fnb.Done():
+		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
+	case <-time.After(fnb.BaseConfig.timeout):
+		fnb.Logger.Fatal().Msg("node shutdown timed out")
+	case <-fnb.sig:
+		fnb.Logger.Warn().Msg("node shutdown aborted")
+		os.Exit(1)
 	}
 
-	fnb.closeDatabase()
-
-	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
-
 	os.Exit(0)
+}
+
+func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
+
+	return fnb.unit.Ready(func() {
+
+		// seed random generator
+		rand.Seed(time.Now().UnixNano())
+
+		fnb.initNodeInfo()
+
+		fnb.initLogger()
+
+		fnb.initProfiler()
+
+		fnb.initDB()
+
+		fnb.initMetrics()
+
+		fnb.initStorage()
+
+		for _, f := range fnb.preInitFns {
+			fnb.handlePreInit(f)
+		}
+
+		fnb.initState()
+
+		fnb.initFvmOptions()
+
+		for _, f := range fnb.postInitFns {
+			fnb.handlePostInit(f)
+		}
+
+		// set up all modules
+		for _, f := range fnb.modules {
+			fnb.handleModule(f)
+		}
+
+		// initialize all components
+		for _, f := range fnb.components {
+			fnb.handleComponent(f)
+		}
+	})
+}
+
+func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
+
+	return fnb.unit.Ready(func() {
+		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
+			doneObject := fnb.doneObject[i]
+
+			fnb.handleDoneObject(doneObject)
+		}
+
+		fnb.closeDatabase()
+	})
+
 }
 
 func (fnb *FlowNodeBuilder) handlePreInit(f func(builder NodeBuilder, node *NodeConfig)) {
