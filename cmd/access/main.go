@@ -35,81 +35,44 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/state/protocol"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 func main() {
 
-	var (
-		blockLimit                   uint
-		collectionLimit              uint
-		receiptLimit                 uint
-		collectionGRPCPort           uint
-		executionGRPCPort            uint
-		pingEnabled                  bool
-		nodeInfoFile                 string
-		apiRatelimits                map[string]int
-		apiBurstlimits               map[string]int
-		followerState                protocol.MutableState
-		ingestEng                    *ingestion.Engine
-		requestEng                   *requester.Engine
-		followerEng                  *followereng.Engine
-		syncCore                     *synchronization.Core
-		rpcConf                      rpc.Config
-		rpcEng                       *rpc.Engine
-		finalizationDistributor      *pubsub.FinalizationDistributor
-		collectionRPC                access.AccessAPIClient
-		executionNodeAddress         string // deprecated
-		historicalAccessRPCs         []access.AccessAPIClient
-		err                          error
-		conCache                     *buffer.PendingBlocks // pending block cache for follower
-		transactionTimings           *stdmap.TransactionTimings
-		collectionsToMarkFinalized   *stdmap.Times
-		collectionsToMarkExecuted    *stdmap.Times
-		blocksToMarkExecuted         *stdmap.Times
-		transactionMetrics           module.TransactionMetrics
-		pingMetrics                  module.PingMetrics
-		logTxTimeToFinalized         bool
-		logTxTimeToExecuted          bool
-		logTxTimeToFinalizedExecuted bool
-		retryEnabled                 bool
-		rpcMetricsEnabled            bool
-	)
+	var ()
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
 
 	anb.PrintBuildVersionDetails()
 
 	anb.ExtraFlags(func(flags *pflag.FlagSet) {
-		flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
-		flags.UintVar(&collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
-		flags.UintVar(&blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
-		flags.UintVar(&collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
-		flags.UintVar(&executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
-		flags.StringVarP(&rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the unsecured gRPC server listens on")
-		flags.StringVar(&rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "localhost:9001", "the address the secure gRPC server listens on")
-		flags.StringVarP(&rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
-		flags.StringVarP(&rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
-		flags.StringVarP(&executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
-		flags.StringVarP(&rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
-		flags.DurationVar(&rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
-		flags.UintVar(&rpcConf.MaxHeightRange, "rpc-max-height-range", backend.DefaultMaxHeightRange, "maximum size for height range requests")
-		flags.StringSliceVar(&rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringSliceVar(&rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.BoolVar(&logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
-		flags.BoolVar(&logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
-		flags.BoolVar(&logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
-		flags.BoolVar(&pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
-		flags.BoolVar(&retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
-		flags.BoolVar(&rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-		flags.StringVarP(&nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
-		flags.StringToIntVar(&apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
-		flags.StringToIntVar(&apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
+		flags.UintVar(&anb.receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+		flags.UintVar(&anb.collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
+		flags.UintVar(&anb.blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
+		flags.UintVar(&anb.collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
+		flags.UintVar(&anb.executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
+		flags.StringVarP(&anb.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the unsecured gRPC server listens on")
+		flags.StringVar(&anb.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "localhost:9001", "the address the secure gRPC server listens on")
+		flags.StringVarP(&anb.rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
+		flags.StringVarP(&anb.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
+		flags.StringVarP(&anb.executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
+		flags.StringVarP(&anb.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
+		flags.DurationVar(&anb.rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
+		flags.DurationVar(&anb.rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
+		flags.UintVar(&anb.rpcConf.MaxHeightRange, "rpc-max-height-range", backend.DefaultMaxHeightRange, "maximum size for height range requests")
+		flags.StringSliceVar(&anb.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&anb.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.BoolVar(&anb.logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
+		flags.BoolVar(&anb.logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
+		flags.BoolVar(&anb.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
+		flags.BoolVar(&anb.pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
+		flags.BoolVar(&anb.retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
+		flags.BoolVar(&anb.rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
+		flags.StringVarP(&anb.nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		flags.StringToIntVar(&anb.apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+		flags.StringToIntVar(&anb.apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&anb.staked, "staked", true, "whether this node is a staked access node or not")
 		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", "", "the node ID of the upstream staked access node if this is an unstaked access node")
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
@@ -121,59 +84,42 @@ func main() {
 	// choose a staked or an unstaked node builder based on anb.staked
 	var nodeBuilder AccessNodeBuilder
 	if anb.staked {
-		nodeBuilder = StakedAccessNode(anb)
+		nodeBuilder = NewStakedAccessNodeBuilder(anb)
 	} else {
-		nodeBuilder = UnstakedAccessNode(anb)
+		nodeBuilder = NewUnstakedAccessNodeBuilder(anb)
 	}
 
 	nodeBuilder.
 		Initialize().
-		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// For now, we only support state implementations from package badger.
-			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
-			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
-			}
-			followerState, err = badgerState.NewFollowerState(
-				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
-				blocktimer.DefaultBlockTimer,
-			)
-			return err
-		}).
 		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
-			if strings.TrimSpace(rpcConf.CollectionAddr) == "" {
+			if strings.TrimSpace(anb.rpcConf.CollectionAddr) == "" {
 				node.Logger.Info().Msg("using a dynamic collection node address")
 				return nil
 			}
 
 			node.Logger.Info().
-				Str("collection_node", rpcConf.CollectionAddr).
+				Str("collection_node", anb.rpcConf.CollectionAddr).
 				Msg("using the static collection node address")
 
 			collectionRPCConn, err := grpc.Dial(
-				rpcConf.CollectionAddr,
+				anb.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
 				grpc.WithInsecure(),
-				backend.WithClientUnaryInterceptor(rpcConf.CollectionClientTimeout))
+				backend.WithClientUnaryInterceptor(anb.rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
 			}
-			collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
+			anb.collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
 		Module("historical access node clients", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			addrs := strings.Split(rpcConf.HistoricalAccessAddrs, ",")
+			addrs := strings.Split(anb.rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
 					continue
 				}
-				node.Logger.Err(err).Msgf("Historical access node Addr: %s", addr)
+				node.Logger.Info().Str("access_nodes", addr).Msg("historical access node addresses")
 
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
@@ -182,44 +128,46 @@ func main() {
 				if err != nil {
 					return err
 				}
-				historicalAccessRPCs = append(historicalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+				anb.historicalAccessRPCs = append(anb.historicalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
 			}
 			return nil
 		}).
 		Module("block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			conCache = buffer.NewPendingBlocks()
+			anb.conCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			var err error
+			anb.syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
 		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			var err error
+			anb.transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
 				return err
 			}
 
-			collectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			anb.collectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
 			if err != nil {
 				return err
 			}
 
-			collectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			anb.collectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
 			if err != nil {
 				return err
 			}
 
-			blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			anb.blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 			return err
 		}).
 		Module("transaction metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			transactionMetrics = metrics.NewTransactionCollector(transactionTimings, node.Logger, logTxTimeToFinalized,
-				logTxTimeToExecuted, logTxTimeToFinalizedExecuted)
+			anb.transactionMetrics = metrics.NewTransactionCollector(anb.transactionTimings, node.Logger, anb.logTxTimeToFinalized,
+				anb.logTxTimeToExecuted, anb.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
 		Module("ping metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			pingMetrics = metrics.NewPingCollector()
+			anb.pingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
 		Module("server certificate", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -229,34 +177,35 @@ func main() {
 				return err
 			}
 			tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
-			rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+			anb.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
 		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng = rpc.New(
+			anb.rpcEng = rpc.New(
 				node.Logger,
 				node.State,
-				rpcConf,
-				collectionRPC,
-				historicalAccessRPCs,
+				anb.rpcConf,
+				anb.collectionRPC,
+				anb.historicalAccessRPCs,
 				node.Storage.Blocks,
 				node.Storage.Headers,
 				node.Storage.Collections,
 				node.Storage.Transactions,
 				node.Storage.Receipts,
 				node.RootChainID,
-				transactionMetrics,
-				collectionGRPCPort,
-				executionGRPCPort,
-				retryEnabled,
-				rpcMetricsEnabled,
-				apiRatelimits,
-				apiBurstlimits,
+				anb.transactionMetrics,
+				anb.collectionGRPCPort,
+				anb.executionGRPCPort,
+				anb.retryEnabled,
+				anb.rpcMetricsEnabled,
+				anb.apiRatelimits,
+				anb.apiBurstlimits,
 			)
-			return rpcEng, nil
+			return anb.rpcEng, nil
 		}).
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			requestEng, err = requester.New(
+			var err error
+			anb.requestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -269,16 +218,16 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, transactionMetrics,
-				collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
-			requestEng.WithHandle(ingestEng.OnCollection)
-			return ingestEng, err
+			anb.ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.transactionMetrics,
+				anb.collectionsToMarkFinalized, anb.collectionsToMarkExecuted, anb.blocksToMarkExecuted, anb.rpcEng)
+			anb.requestEng.WithHandle(anb.ingestEng.OnCollection)
+			return anb.ingestEng, err
 		}).
 		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
-			return requestEng, nil
+			return anb.requestEng, nil
 		}).
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -287,7 +236,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, anb.followerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -310,18 +259,18 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			finalizationDistributor = pubsub.NewFinalizationDistributor()
-			finalizationDistributor.AddConsumer(ingestEng)
+			anb.finalizationDistributor = pubsub.NewFinalizationDistributor()
+			anb.finalizationDistributor.AddConsumer(anb.ingestEng)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
 			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier,
-				finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
+				anb.finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
 
-			followerEng, err = followereng.New(
+			anb.followerEng, err = followereng.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -330,16 +279,16 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				followerState,
-				conCache,
+				anb.followerState,
+				anb.conCache,
 				followerCore,
-				syncCore,
+				anb.syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			return followerEng, nil
+			return anb.followerEng, nil
 		}).
 		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
@@ -349,14 +298,14 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				followerEng,
-				syncCore,
+				anb.followerEng,
+				anb.syncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 
-			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+			anb.finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		})
@@ -368,10 +317,10 @@ func main() {
 				node.Logger,
 				node.State,
 				node.Me,
-				pingMetrics,
-				pingEnabled,
+				anb.pingMetrics,
+				anb.pingEnabled,
 				node.Middleware,
-				nodeInfoFile,
+				anb.nodeInfoFile,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create ping engine: %w", err)

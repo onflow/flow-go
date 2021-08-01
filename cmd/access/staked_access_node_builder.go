@@ -17,7 +17,7 @@ type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
+func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	return &StakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -94,4 +94,16 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		node.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
 		return builder.UnstakedNetwork, err
 	})
+}
+
+func (builder *StakedAccessNodeBuilder) Build() {
+	builder.Initialize()
+	builder.
+		mutableFollowerStateModule().
+		collectionNodeClientModule().
+		historialAccessNodeClientModule().
+		followerEnginerDepsModule().
+		transactionTimingMempoolsModule().
+		pingMetricsModule().
+		grpcCertificateModule()
 }
