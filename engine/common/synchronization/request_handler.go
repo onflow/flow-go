@@ -15,16 +15,17 @@ import (
 )
 
 type RequestHandler struct {
-	blocks         storage.Blocks // TODO: function to get blocks?
-	getFinalHeader func() *flow.Header
-	updateHeight   func(final *flow.Header, height uint64)
-	con            network.Conduit // Do we need this? or directly return result to caller?
-	// If anything, we should probably pass in the entire network instance, so that
-	// the handler can subscribe to messages at the same time
+	blocks storage.Blocks // TODO: pass a function to get blocks?
+	core   module.SyncCore
 
-	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
-	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
-	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
+	getFinalHeader func() *flow.Header
+
+	con network.Conduit // used for sending responses to requesters
+
+	pendingSyncRequests  engine.MessageStore // message store for *message.SyncRequest
+	pendingBatchRequests engine.MessageStore // message store for *message.BatchRequest
+	pendingRangeRequests engine.MessageStore // message store for *message.RangeRequest
+
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
 
 	log     zerolog.Logger       // TODO: when this engine runs on unstaked network, we should use separate
@@ -34,7 +35,7 @@ type RequestHandler struct {
 	module.Engine
 }
 
-func NewRequestHandler(getFinalHeader func() *flow.Header) *RequestHandler {
+func NewRequestHandler(con network.Conduit, getFinalHeader func() *flow.Header) *RequestHandler {
 	return &RequestHandler{}
 }
 
