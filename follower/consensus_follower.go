@@ -1,9 +1,9 @@
 package consensus_follower
 
 import (
-	"crypto"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access" // TODO: fix this
@@ -59,27 +59,20 @@ type consensusFollowerImpl struct {
 	subscribersMu sync.RWMutex
 	subscribers   map[Subscriber]struct{}
 
-	options ConsensusFollowerOptions
+	options ConsensusFollowerOptions // TODO: remove this
 }
 
+// TODO: define this as functional options
 type ConsensusFollowerOptions struct {
-	upstreamAccessNodeID string            // node ID of the upstream access node
-	bindAddr             string            // network address to bind on
-	networkKey           crypto.PrivateKey // network private key
-	datadir              string            // directory to store the protocol state
+	nodeID                flow.Identifier
+	upstreamAccessNodeID  flow.Identifier // node ID of the upstream access node
+	bindAddr              string          // network address to bind on
+	datadir               string          // directory to store the protocol state
+	unicastMessageTimeout time.Duration   // how long a unicast transmission can take to complete
+	networkConnectTimeout time.Duration   // how long to try connecting to the network
+	bootstrapDir          string
 }
-
-// node.State
-// node.Storage
-// node.Tracer
-// node.ProtocolEvents
-// node.Logger
-// node.Me
-// node.RootBlock
-// node.RootQC
-// node.DB
-// node.Network
-// node.Metrics
+type ConsensusFollowerOption func(*consensusFollowerImpl)
 
 func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 	var (
@@ -98,31 +91,43 @@ func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 
 	nodeBuilder := access.UnstakedAccessNode(access.FlowAccessNode())
 
+	// node.State
+	// node.Storage
+	// node.Tracer
+	// node.ProtocolEvents
+	// node.Logger
+	// node.Me
+	// node.RootBlock
+	// node.RootQC
+	// node.DB
+	// node.Network
+	// node.Metrics
+
 	// nodeBuilder.FlowAccessNodeBuilder
 	//
 	// staked                  bool
 	// stakedAccessNodeIDHex   string
 	// unstakedNetworkBindAddr string
-	// UnstakedNetwork         *p2p.Network
-	// unstakedMiddleware      *p2p.Middleware
+	// _____ UnstakedNetwork         *p2p.Network
+	// _____ unstakedMiddleware      *p2p.Middleware
 
 	// nodeBuilder.BaseConfig
 	//
-	// nodeIDHex             string
-	// bindAddr              string
-	// NodeRole              string
-	// timeout               time.Duration
-	// datadir               string
-	// level                 string
-	// metricsPort           uint
+	// nodeIDHex             string // pass flow.Identifier instead
+	// timeout               time.Duration // component startup / shutdown timeout
+	// datadir               string // "directory to store the protocol state"
 	// BootstrapDir          string
-	// peerUpdateInterval    time.Duration
-	// unicastMessageTimeout time.Duration
-	// profilerEnabled       bool
-	// profilerDir           string
-	// profilerInterval      time.Duration
-	// profilerDuration      time.Duration
-	// tracerEnabled         bool
+	// unicastMessageTimeout time.Duration // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
+	// level                 string // log level. Can we use a child logger instead?
+	// metricsPort           uint // port for metrics server. Can we disable this?
+	// profilerEnabled       bool // Set this to false
+	// tracerEnabled         bool // set False
+	// _____(not needed) bindAddr              string
+	// _____(already given) NodeRole              string
+	// _____(overridden) peerUpdateInterval    time.Duration
+	// _____(not needed since we set profilerEnabled false) profilerDir           string
+	// _____(not needed) profilerInterval      time.Duration
+	// _____(not needed) profilerDuration      time.Duration
 
 	nodeBuilder.
 		Initialize().
@@ -242,7 +247,7 @@ func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 }
 
 // TODO: need to add ctx so we can cancel things
-
+// TODO: find a way to catch log.Fatal or panic and return error from Run()?
 func (cf *consensusFollowerImpl) Run() {
 	cf.nodeBuilder.Run()
 }
