@@ -2,6 +2,8 @@ package consensus_follower
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -59,26 +61,63 @@ type consensusFollowerImpl struct {
 	subscribersMu sync.RWMutex
 	subscribers   map[Subscriber]struct{}
 
-	options ConsensusFollowerOptions // TODO: remove this
-}
-
-// TODO: define this as functional options
-type ConsensusFollowerOptions struct {
+	// options
 	nodeID                flow.Identifier
 	upstreamAccessNodeID  flow.Identifier // node ID of the upstream access node
 	bindAddr              string          // network address to bind on
-	datadir               string          // directory to store the protocol state
-	unicastMessageTimeout time.Duration   // how long a unicast transmission can take to complete
-	networkConnectTimeout time.Duration   // how long to try connecting to the network
+	dataDir               string          // directory to store the protocol state
 	bootstrapDir          string
+	networkConnectTimeout time.Duration // how long to try connecting to the network
 }
+
 type ConsensusFollowerOption func(*consensusFollowerImpl)
 
-func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
+func WithDataDir(dataDir string) ConsensusFollowerOption {
+	return func(cf *consensusFollowerImpl) {
+		cf.dataDir = dataDir
+	}
+}
+
+func WithBootstrapDir(bootstrapDir string) ConsensusFollowerOption {
+	return func(cf *consensusFollowerImpl) {
+		cf.bootstrapDir = bootstrapDir
+	}
+}
+
+func WithNetworkConnectTimeout(timeout time.Duration) ConsensusFollowerOption {
+	return func(cf *consensusFollowerImpl) {
+		cf.networkConnectTimeout = timeout
+	}
+}
+
+func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Identifier, bindAddr string, opts ...ConsensusFollowerOption) ConsensusFollower {
+	const (
+		defaultBootstrapDir          = "bootstrap"
+		defaultNetworkConnectTimeout = time.Minute
+	)
+
+	homedir, _ := os.UserHomeDir() // TODO: handle error here
+	defaultDataDir := filepath.Join(homedir, ".flow", "database")
+
+	nodeBuilder := access.UnstakedAccessNode(access.FlowAccessNode())
+	consensusFollower := &consensusFollowerImpl{
+		nodeBuilder:           nodeBuilder,
+		subscribers:           make(map[Subscriber]struct{}),
+		nodeID:                nodeID,
+		upstreamAccessNodeID:  upstreamAccessNodeID,
+		bindAddr:              bindAddr,
+		dataDir:               defaultDataDir,
+		bootstrapDir:          defaultBootstrapDir,
+		networkConnectTimeout: defaultNetworkConnectTimeout,
+	}
+
+	for _, opt := range opts {
+		opt(consensusFollower)
+	}
+
 	var (
 		followerState           protocol.MutableState
 		followerCore            module.HotStuffFollower
-		consensusFollower       *consensusFollowerImpl
 		relayer                 *eventRelayer
 		finalized               *flow.Header
 		pending                 []*flow.Header
@@ -88,8 +127,6 @@ func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 		finalizationDistributor *pubsub.FinalizationDistributor
 		err                     error
 	)
-
-	nodeBuilder := access.UnstakedAccessNode(access.FlowAccessNode())
 
 	// node.State
 	// node.Storage
@@ -117,9 +154,11 @@ func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 	// timeout               time.Duration // component startup / shutdown timeout
 	// datadir               string // "directory to store the protocol state"
 	// BootstrapDir          string
-	// unicastMessageTimeout time.Duration // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
+	//
 	// level                 string // log level. Can we use a child logger instead?
 	// metricsPort           uint // port for metrics server. Can we disable this?
+	//
+	// unicastMessageTimeout time.Duration p2p.DefaultUnicastTimeout // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
 	// profilerEnabled       bool // Set this to false
 	// tracerEnabled         bool // set False
 	// _____(not needed) bindAddr              string
@@ -235,11 +274,6 @@ func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 			return sync, nil
 		})
 
-	consensusFollower = &consensusFollowerImpl{
-		options:     opts,
-		nodeBuilder: nodeBuilder,
-		subscribers: make(map[Subscriber]struct{}),
-	}
 	finalizationDistributor = pubsub.NewFinalizationDistributor()
 	finalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
