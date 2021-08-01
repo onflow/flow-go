@@ -133,6 +133,7 @@ func (builder *UnstakedAccessNodeBuilder) Build() {
 	builder.Initialize()
 	builder.
 		mutableFollowerStateModule().
-		followerEnginerDepsModule()
-		//transactionTimingMempoolsModule()
+		followerEnginerDepsModule().
+		followerEngineComponent().
+		syncEngineComponent()
 }

@@ -105,5 +105,11 @@ func (builder *StakedAccessNodeBuilder) Build() {
 		followerEnginerDepsModule().
 		transactionTimingMempoolsModule().
 		pingMetricsModule().
-		grpcCertificateModule()
+		grpcCertificateModule().
+		rpcEngineComponent().
+		ingestionComponent().
+		requesterEngineComponent().
+		followerEngineComponent().
+		syncEngineComponent().
+		pingEngineComponent()
 }
