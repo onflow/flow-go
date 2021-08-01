@@ -115,30 +115,22 @@ func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Iden
 		opt(consensusFollower)
 	}
 
+	finalizationDistributor := pubsub.NewFinalizationDistributor()
+	finalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
+
 	var (
-		followerState           protocol.MutableState
-		followerCore            module.HotStuffFollower
-		relayer                 *eventRelayer
-		finalized               *flow.Header
-		pending                 []*flow.Header
-		syncCore                *synchronization.Core
-		followerEng             *follower.Engine
-		committee               hotstuff.Committee
-		finalizationDistributor *pubsub.FinalizationDistributor
-		err                     error
+		followerState protocol.MutableState
+		followerCore  module.HotStuffFollower
+		relayer       *eventRelayer
+		finalized     *flow.Header
+		pending       []*flow.Header
+		syncCore      *synchronization.Core
+		followerEng   *follower.Engine
+		committee     hotstuff.Committee
+		err           error
 	)
 
-	// node.State
-	// node.Storage
-	// node.Tracer
-	// node.ProtocolEvents
-	// node.Logger
-	// node.Me
-	// node.RootBlock
-	// node.RootQC
-	// node.DB
-	// node.Network
-	// node.Metrics
+	// TODO: need some way to override  baseconfig AND stakeAccessNodIDHex
 
 	// nodeBuilder.FlowAccessNodeBuilder
 	//
@@ -155,7 +147,7 @@ func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Iden
 	// datadir               string // "directory to store the protocol state"
 	// BootstrapDir          string
 	//
-	// level                 string // log level. Can we use a child logger instead?
+	// level                 string // log level. Can we use a child logger instead? // pass in logger using PreInit.
 	// metricsPort           uint // port for metrics server. Can we disable this?
 	//
 	// unicastMessageTimeout time.Duration p2p.DefaultUnicastTimeout // TODO: need to update FlowAccessNodeBuilder.initMiddleware to actually use this
@@ -273,9 +265,6 @@ func NewConsensusFollower(nodeID flow.Identifier, upstreamAccessNodeID flow.Iden
 
 			return sync, nil
 		})
-
-	finalizationDistributor = pubsub.NewFinalizationDistributor()
-	finalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
 	return consensusFollower
 }
