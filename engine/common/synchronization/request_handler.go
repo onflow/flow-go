@@ -8,38 +8,113 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
 	"github.com/rs/zerolog"
 )
 
+// defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
+const defaultSyncRequestQueueCapacity = 500
+
+// defaultSyncRequestQueueCapacity maximum capacity of range requests queue
+const defaultRangeRequestQueueCapacity = 500
+
+// defaultSyncRequestQueueCapacity maximum capacity of batch requests queue
+const defaultBatchRequestQueueCapacity = 500
+
+// defaultEngineRequestsWorkers number of workers to dispatch events for requests
+const defaultEngineRequestsWorkers = 8
+
 type RequestHandler struct {
-	blocks storage.Blocks // TODO: pass a function to get blocks?
-	core   module.SyncCore
+	unit *engine.Unit
+	lm   *lifecycle.LifecycleManager
 
-	getFinalHeader func() *flow.Header
+	me      module.Local
+	log     zerolog.Logger
+	metrics module.EngineMetrics
 
-	con network.Conduit // used for sending responses to requesters
+	blocks            storage.Blocks
+	core              module.SyncCore
+	finalizedSnapshot *finalizedSnapshotCache
+	con               network.Conduit // used for sending responses to requesters
 
-	pendingSyncRequests  engine.MessageStore // message store for *message.SyncRequest
-	pendingBatchRequests engine.MessageStore // message store for *message.BatchRequest
-	pendingRangeRequests engine.MessageStore // message store for *message.RangeRequest
-
+	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
+	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
+	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
-
-	log     zerolog.Logger       // TODO: when this engine runs on unstaked network, we should use separate
-	metrics module.EngineMetrics // TODO: values for these vs the one from staked network?
-	// or maybe metrics.EngineSynchronization is what needs to change.
-
-	module.Engine
 }
 
-func NewRequestHandler(con network.Conduit, getFinalHeader func() *flow.Header) *RequestHandler {
-	return &RequestHandler{}
+func NewRequestHandler(
+	log zerolog.Logger,
+	metrics module.EngineMetrics,
+	con network.Conduit,
+	me module.Local,
+	blocks storage.Blocks,
+	core module.SyncCore,
+	finalizedSnapshot *finalizedSnapshotCache,
+) *RequestHandler {
+	r := &RequestHandler{
+		unit:              engine.NewUnit(),
+		lm:                lifecycle.NewLifecycleManager(),
+		me:                me,
+		log:               log.With().Str("engine", "synchronization").Logger(),
+		metrics:           metrics,
+		blocks:            blocks,
+		core:              core,
+		finalizedSnapshot: finalizedSnapshot,
+		con:               con,
+	}
+
+	r.setupRequestMessageHandler()
+
+	return r
 }
 
-// TODO: note that on the staked network this only receives local submissions from sync engine
+// SubmitLocal submits an event originating on the local node.
+func (r *RequestHandler) SubmitLocal(event interface{}) {
+	err := r.process(r.me.NodeID(), event)
+	if err != nil {
+		// receiving an input of incompatible type from a trusted internal component is fatal
+		r.log.Fatal().Err(err).Msg("internal error processing event")
+	}
+}
+
+// Submit submits the given event from the node with the given origin ID
+// for processing in a non-blocking manner. It returns instantly and logs
+// a potential processing error internally when done.
+func (r *RequestHandler) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+	err := r.process(originID, event)
+	if err != nil {
+		lg := r.log.With().
+			Err(err).
+			Str("channel", channel.String()).
+			Str("origin", originID.String()).
+			Logger()
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			lg.Error().Msg("received message with incompatible type")
+			return
+		}
+		lg.Fatal().Msg("internal error processing message")
+	}
+}
+
+// ProcessLocal processes an event originating on the local node.
+func (r *RequestHandler) ProcessLocal(event interface{}) error {
+	return r.process(r.me.NodeID(), event)
+}
+
+// Process processes the given event from the node with the given origin ID in
+// a blocking manner. It returns the potential processing error when done.
+func (r *RequestHandler) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	return r.process(originID, event)
+}
+
+// process processes events for the synchronization request handler engine.
+// Error returns:
+//  * IncompatibleInputTypeError if input has unexpected type
+//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
 func (r *RequestHandler) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
@@ -97,7 +172,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	final := r.getFinalHeader()
+	final := r.finalizedSnapshot.get().head
 
 	// queue any missing heights as needed
 	r.core.HandleHeight(final, req.Height)
@@ -126,7 +201,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
 	// get the latest final state to know if we can fulfill the request
-	head := r.getFinalHeader()
+	head := r.finalizedSnapshot.get().head
 
 	// if we don't have anything to send, we can bail right away
 	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
@@ -214,4 +289,81 @@ func (r *RequestHandler) onBatchRequest(originID flow.Identifier, req *messages.
 	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
 	return nil
+}
+
+// processAvailableRequests is processor of pending events which drives events from networking layer to business logic.
+func (r *RequestHandler) processAvailableRequests() error {
+	for {
+		select {
+		case <-r.unit.Quit():
+			return nil
+		default:
+		}
+
+		msg, ok := r.pendingSyncRequests.Get()
+		if ok {
+			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
+			if err != nil {
+				return fmt.Errorf("processing sync request failed: %w", err)
+			}
+			continue
+		}
+
+		msg, ok = r.pendingRangeRequests.Get()
+		if ok {
+			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
+			if err != nil {
+				return fmt.Errorf("processing range request failed: %w", err)
+			}
+			continue
+		}
+
+		msg, ok = r.pendingBatchRequests.Get()
+		if ok {
+			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
+			if err != nil {
+				return fmt.Errorf("processing batch request failed: %w", err)
+			}
+			continue
+		}
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
+	}
+}
+
+// requestProcessingLoop is a separate goroutine that performs processing of queued requests
+func (r *RequestHandler) requestProcessingLoop() {
+	notifier := r.requestMessageHandler.GetNotifier()
+	for {
+		select {
+		case <-r.unit.Quit():
+			return
+		case <-notifier:
+			err := r.processAvailableRequests()
+			if err != nil {
+				r.log.Fatal().Err(err).Msg("internal error processing queued requests")
+			}
+		}
+	}
+}
+
+// Ready returns a ready channel that is closed once the engine has fully started.
+func (r *RequestHandler) Ready() <-chan struct{} {
+	r.lm.OnStart(func() {
+		for i := 0; i < defaultEngineRequestsWorkers; i++ {
+			r.unit.Launch(r.requestProcessingLoop)
+		}
+	})
+	return r.lm.Started()
+}
+
+// Done returns a done channel that is closed once the engine has fully stopped.
+func (r *RequestHandler) Done() <-chan struct{} {
+	r.lm.OnStop(func() {
+		// wait for all request processing workers to exit
+		<-r.unit.Done()
+	})
+	return r.lm.Stopped()
 }
