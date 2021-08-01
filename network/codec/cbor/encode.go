@@ -1,13 +1,13 @@
 // (c) 2019 Dapper Labs - ALL RIGHTS RESERVED
 
-package json
+package cbor
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/pkg/errors"
 
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
@@ -182,31 +182,26 @@ func switchv2what(v interface{}) (string, error) {
 	return what, nil
 }
 
-func v2envEncode(v interface{}, via string) (*Envelope, error) {
+func v2envEncode(v interface{}, via string) ([]byte, uint8, error) {
 
 	// determine the message type
 	code, err := switchv2code(v)
 	if nil != err {
-		return nil, err
+		return nil, 0, err
 	}
 
 	what, err := switchv2what(v)
 	if nil != err {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// encode the payload
-	//bs := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, code)) // e.g. ~3net::wire<1(json)CodeEntityRequest:23
-	data, err := json.Marshal(v)
+	//bs := binstat.EnterTime(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, code)) // e.g. ~3net::wire<1(cbor)CodeEntityRequest:23
+	data, err := cborcodec.EncMode.Marshal(v)
 	//binstat.LeaveVal(bs, int64(len(data)))
 	if err != nil {
-		return nil, fmt.Errorf("could not encode json payload of type %s: %w", what, err)
+		return nil, 0, fmt.Errorf("could not encode cbor payload of type %s: %w", what, err)
 	}
 
-	env := Envelope{
-		Code: code,
-		Data: data,
-	}
-
-	return &env, nil
+	return data, code, nil
 }
