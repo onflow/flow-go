@@ -63,11 +63,23 @@ type consensusFollowerImpl struct {
 }
 
 type ConsensusFollowerOptions struct {
-	upstreamNodeID string            // node ID of the upstream access node
-	bindAddr       string            // network address to bind on
-	networkKey     crypto.PrivateKey // network private key
-	datadir        string            // directory to store the protocol state
+	upstreamAccessNodeID string            // node ID of the upstream access node
+	bindAddr             string            // network address to bind on
+	networkKey           crypto.PrivateKey // network private key
+	datadir              string            // directory to store the protocol state
 }
+
+// node.State
+// node.Storage
+// node.Tracer
+// node.ProtocolEvents
+// node.Logger
+// node.Me
+// node.RootBlock
+// node.RootQC
+// node.DB
+// node.Network
+// node.Metrics
 
 func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 	var (
@@ -84,7 +96,35 @@ func NewConsensusFollower(opts ConsensusFollowerOptions) ConsensusFollower {
 		err                     error
 	)
 
-	nodeBuilder := access.UnstakedAccessNode(access.FlowAccessNode()).
+	nodeBuilder := access.UnstakedAccessNode(access.FlowAccessNode())
+
+	// nodeBuilder.FlowAccessNodeBuilder
+	//
+	// staked                  bool
+	// stakedAccessNodeIDHex   string
+	// unstakedNetworkBindAddr string
+	// UnstakedNetwork         *p2p.Network
+	// unstakedMiddleware      *p2p.Middleware
+
+	// nodeBuilder.BaseConfig
+	//
+	// nodeIDHex             string
+	// bindAddr              string
+	// NodeRole              string
+	// timeout               time.Duration
+	// datadir               string
+	// level                 string
+	// metricsPort           uint
+	// BootstrapDir          string
+	// peerUpdateInterval    time.Duration
+	// unicastMessageTimeout time.Duration
+	// profilerEnabled       bool
+	// profilerDir           string
+	// profilerInterval      time.Duration
+	// profilerDuration      time.Duration
+	// tracerEnabled         bool
+
+	nodeBuilder.
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
