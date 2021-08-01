@@ -23,7 +23,10 @@ func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 	}
 }
 
-func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *UnstakedAccessNodeBuilder) Initialize(opts ...cmd.NodeBuilderOption) cmd.NodeBuilder {
+	for _, opt := range opts {
+		opt(&builder.BaseConfig)
+	}
 
 	builder.validateParams()
 

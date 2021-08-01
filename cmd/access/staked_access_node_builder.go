@@ -23,7 +23,10 @@ func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	}
 }
 
-func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *StakedAccessNodeBuilder) Initialize(opts ...cmd.NodeBuilderOption) cmd.NodeBuilder {
+	for _, opt := range opts {
+		opt(&builder.BaseConfig)
+	}
 
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node

@@ -663,13 +663,17 @@ func FlowNode(role string) *FlowNodeBuilder {
 	return builder
 }
 
-func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
+func (fnb *FlowNodeBuilder) Initialize(opts ...NodeBuilderOption) NodeBuilder {
 
 	fnb.PrintBuildVersionDetails()
 
 	fnb.BaseFlags()
 
 	fnb.ParseAndPrintFlags()
+
+	for _, opt := range opts {
+		opt(&fnb.BaseConfig)
+	}
 
 	fnb.EnqueueNetworkInit()
 

@@ -32,7 +32,7 @@ type NodeBuilder interface {
 	ParseAndPrintFlags()
 
 	// Initialize performs all the initialization needed at the very start of a node
-	Initialize() NodeBuilder
+	Initialize(opts ...NodeBuilderOption) NodeBuilder
 
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
@@ -78,6 +78,26 @@ type NodeBuilder interface {
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics()
+}
+
+type NodeBuilderOption func(*BaseConfig)
+
+func WithNodeID(nodeID flow.Identifier) NodeBuilderOption {
+	return func(config *BaseConfig) {
+		config.nodeIDHex = nodeID.String()
+	}
+}
+
+func WithTimeout(timeout time.Duration) NodeBuilderOption {
+	return func(config *BaseConfig) {
+		config.timeout = timeout
+	}
+}
+
+func WithDataDir(dataDir string) NodeBuilderOption {
+	return func(config *BaseConfig) {
+		config.datadir = dataDir
+	}
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params

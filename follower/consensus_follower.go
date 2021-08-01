@@ -116,6 +116,8 @@ func NewConsensusFollower(log zerolog.Logger, nodeID flow.Identifier, upstreamAc
 		opt(consensusFollower)
 	}
 
+	nodeBuilder.BaseConfig.BootstrapDir = consensusFollower.bootstrapDir
+
 	finalizationDistributor := pubsub.NewFinalizationDistributor()
 	finalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
@@ -162,7 +164,7 @@ func NewConsensusFollower(log zerolog.Logger, nodeID flow.Identifier, upstreamAc
 	// _____(not needed) profilerDuration      time.Duration
 
 	nodeBuilder.
-		Initialize().
+		Initialize(cmd.WithNodeID(nodeID), cmd.WithDataDir(consensusFollower.dataDir), cmd.WithTimeout(consensusFollower.networkConnectTimeout)).
 		PreInit(func(builder cmd.NodeBuilder, node *cmd.NodeConfig) {
 			node.Logger = log
 		}).
