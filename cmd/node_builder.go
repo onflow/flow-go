@@ -25,6 +25,7 @@ const NotSet = "not set"
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
+	module.ReadyDoneAware
 
 	module.ReadyDoneAware
 

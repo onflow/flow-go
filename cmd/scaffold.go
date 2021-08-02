@@ -98,7 +98,7 @@ type FlowNodeBuilder struct {
 	components  []namedComponentFunc
 	doneObject  []namedDoneObject
 	sig         chan os.Signal
-	unit         *engine.Unit
+	unit        *engine.Unit
 	preInitFns  []func(NodeBuilder, *NodeConfig)
 	postInitFns []func(NodeBuilder, *NodeConfig)
 }
@@ -658,7 +658,7 @@ func FlowNode(role string) *FlowNodeBuilder {
 			Logger: zerolog.New(os.Stderr),
 		},
 		flags: pflag.CommandLine,
-		unit: engine.NewUnit(),
+		unit:  engine.NewUnit(),
 	}
 	return builder
 }
@@ -682,9 +682,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 	return fnb
 }
 
-// Run initiates all common components (logger, database, protocol state etc.)
-// then starts each component. It also sets up a channel to gracefully shut
-// down each component if a SIGINT is received.
+// Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
+// down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
+// Since, Run is a blocking call it should only be used when running a node as it's own independent process.
 func (fnb *FlowNodeBuilder) Run() {
 
 	// initialize signal catcher
@@ -719,6 +719,8 @@ func (fnb *FlowNodeBuilder) Run() {
 	os.Exit(0)
 }
 
+// Ready returns a channel that closes after initiating all common components (logger, database, protocol state etc.)
+// and then starting all modules and components.
 func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 	return fnb.unit.Ready(func() {
@@ -762,6 +764,7 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 	})
 }
 
+// Done returns a channel that closes after all registered components are stopped
 func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
 
 	return fnb.unit.Ready(func() {

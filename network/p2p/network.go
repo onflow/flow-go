@@ -13,6 +13,7 @@ import (
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
@@ -32,26 +33,19 @@ type ReadyDoneAwareNetwork interface {
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	logger  zerolog.Logger
-	codec   network.Codec
-	ids     flow.IdentityList
-	me      module.Local
-	mw      network.Middleware
-	top     network.Topology // used to determine fanout connections
-	metrics module.NetworkMetrics
-	rcache  *RcvCache // used to deduplicate incoming messages
-	queue   network.MessageQueue
-	ctx     context.Context
-	cancel  context.CancelFunc
-	subMngr network.SubscriptionManager // used to keep track of subscribed channels
-
-	// fields for managing the network's start-stop lifecycle
-	stateTransition   sync.Mutex    // lock for preventing concurrent state transitions
-	ready             chan struct{} // used to signal that startup has completed
-	done              chan struct{} // used to signal that shutdown has completed
-	startupCommenced  bool          // indicates whether Ready() has been invoked
-	shutdownCommenced bool          // indicates whether Done() has been invoked
-
+	logger           zerolog.Logger
+	codec            network.Codec
+	ids              flow.IdentityList
+	me               module.Local
+	mw               network.Middleware
+	top              network.Topology // used to determine fanout connections
+	metrics          module.NetworkMetrics
+	rcache           *RcvCache // used to deduplicate incoming messages
+	queue            network.MessageQueue
+	ctx              context.Context
+	cancel           context.CancelFunc
+	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
+	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
 	ReadyDoneAwareNetwork
 }
 
@@ -77,19 +71,15 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:            log,
-		codec:             codec,
-		me:                me,
-		mw:                mw,
-		rcache:            rcache,
-		top:               top,
-		metrics:           metrics,
-		subMngr:           sm,
-		ready:             make(chan struct{}),
-		done:              make(chan struct{}),
-		stateTransition:   sync.Mutex{},
-		startupCommenced:  false,
-		shutdownCommenced: false,
+		logger:           log,
+		codec:            codec,
+		me:               me,
+		mw:               mw,
+		rcache:           rcache,
+		top:              top,
+		metrics:          metrics,
+		subMngr:          sm,
+		lifecycleManager: lifecycle.NewLifecycleManager(),
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 	o.ids = ids
@@ -106,45 +96,20 @@ func NewNetwork(
 
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
-	n.stateTransition.Lock()
-	if n.shutdownCommenced || n.startupCommenced {
-		n.stateTransition.Unlock()
-		return n.ready
-	}
-	n.startupCommenced = true
-	n.stateTransition.Unlock()
-
-	go func() {
+	n.lifecycleManager.OnStart(func() {
 		err := n.mw.Start(n)
 		if err != nil {
 			n.logger.Fatal().Err(err).Msg("failed to start middleware")
 		}
-		close(n.ready)
-	}()
-
-	return n.ready
+	})
+	return n.lifecycleManager.Started()
 }
 
 // Done returns a channel that will close when shutdown is complete.
 func (n *Network) Done() <-chan struct{} {
-	n.stateTransition.Lock()
-	if n.shutdownCommenced {
-		n.stateTransition.Unlock()
-		return n.done
-	}
-	n.shutdownCommenced = true
-	n.stateTransition.Unlock()
-
-	go func() {
-		n.cancel()
-		if n.startupCommenced {
-			<-n.ready
-			n.mw.Stop()
-		}
-		close(n.done)
-	}()
-
-	return n.done
+	n.cancel()
+	n.lifecycleManager.OnStop(n.mw.Stop)
+	return n.lifecycleManager.Stopped()
 }
 
 // Register will register the given engine with the given unique engine engineID,
