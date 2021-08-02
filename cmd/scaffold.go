@@ -17,11 +17,11 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
@@ -100,9 +100,9 @@ type FlowNodeBuilder struct {
 	components  []namedComponentFunc
 	doneObject  []namedDoneObject
 	sig         chan os.Signal
-	unit        *engine.Unit
 	preInitFns  []func(NodeBuilder, *NodeConfig)
 	postInitFns []func(NodeBuilder, *NodeConfig)
+	lm          *lifecycle.LifecycleManager
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -112,7 +112,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", NotSet, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", NotSet, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "node startup / shutdown timeout")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
 	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", p2p.DefaultPeerUpdateInterval, "how often to refresh the peer connections for the node")
@@ -572,8 +572,6 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 	select {
 	case <-readyAware.Ready():
 		log.Info().Msg("component startup complete")
-	case <-time.After(fnb.BaseConfig.timeout):
-		log.Fatal().Msg("component startup timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component startup aborted")
 		return
@@ -591,8 +589,6 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 	select {
 	case <-v.ob.Done():
 		log.Info().Msg("component shutdown complete")
-	case <-time.After(fnb.BaseConfig.timeout):
-		log.Fatal().Msg("component shutdown timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component shutdown aborted")
 		return
@@ -661,7 +657,7 @@ func FlowNode(role string) *FlowNodeBuilder {
 			Logger: zerolog.New(os.Stderr),
 		},
 		flags: pflag.CommandLine,
-		unit:  engine.NewUnit(),
+		lm:    lifecycle.NewLifecycleManager(),
 	}
 	return builder
 }
@@ -725,9 +721,7 @@ func (fnb *FlowNodeBuilder) Run() {
 // Ready returns a channel that closes after initiating all common components (logger, database, protocol state etc.)
 // and then starting all modules and components.
 func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
-
-	return fnb.unit.Ready(func() {
-
+	fnb.lm.OnStart(func() {
 		// seed random generator
 		rand.Seed(time.Now().UnixNano())
 
@@ -765,11 +759,21 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 			fnb.handleComponent(f)
 		}
 	})
+	return fnb.lm.Started()
 }
 
 // Done returns a channel that closes after all registered components are stopped
 func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
+	fnb.lm.OnStop(func() {
+		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
+			doneObject := fnb.doneObject[i]
 
+			fnb.handleDoneObject(doneObject)
+		}
+
+		fnb.closeDatabase()
+	})
+	return fnb.lm.Stopped()
 	return fnb.unit.Ready(func() {
 		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
 			doneObject := fnb.doneObject[i]
