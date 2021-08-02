@@ -53,6 +53,7 @@ type AccessNodeBuilder interface {
 	ParticipatesInUnstakedNetwork() bool
 }
 
+// AccessNodeConfig defines all the user defined parameters expected to bootstrap an access node
 type AccessNodeConfig struct {
 	staked                       bool
 	stakedAccessNodeIDHex        string
@@ -66,24 +67,9 @@ type AccessNodeConfig struct {
 	nodeInfoFile                 string
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
-	FollowerState                protocol.MutableState
-	IngestEng                    *ingestion.Engine
-	RequestEng                   *requester.Engine
-	FollowerEng                  *followereng.Engine
-	SyncCore                     *synchronization.Core
 	rpcConf                      rpc.Config
-	RpcEng                       *rpc.Engine
-	FinalizationDistributor      *pubsub.FinalizationDistributor
-	CollectionRPC                access.AccessAPIClient
 	ExecutionNodeAddress         string // deprecated
 	HistoricalAccessRPCs         []access.AccessAPIClient
-	ConCache                     *buffer.PendingBlocks // pending block cache for follower
-	TransactionTimings           *stdmap.TransactionTimings
-	CollectionsToMarkFinalized   *stdmap.Times
-	CollectionsToMarkExecuted    *stdmap.Times
-	BlocksToMarkExecuted         *stdmap.Times
-	TransactionMetrics           module.TransactionMetrics
-	PingMetrics                  module.PingMetrics
 	logTxTimeToFinalized         bool
 	logTxTimeToExecuted          bool
 	logTxTimeToFinalizedExecuted bool
@@ -91,6 +77,7 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled            bool
 }
 
+// DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
 func DefaultAccessNodeConfig() *AccessNodeConfig {
 	return &AccessNodeConfig{
 		receiptLimit:       1000,
@@ -127,12 +114,32 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 }
 
 // FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
-// It is composed of the FlowNodeBuilder
+// It is composed of the FlowNodeBuilder, the AccessNodeConfig and contains all the components and modules needed for the
+// staked and unstaked access nodes
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
-	UnstakedNetwork    *p2p.Network
-	unstakedMiddleware *p2p.Middleware
+
+	// components
+	UnstakedNetwork            *p2p.Network
+	unstakedMiddleware         *p2p.Middleware
+	FollowerState              protocol.MutableState
+	SyncCore                   *synchronization.Core
+	RpcEng                     *rpc.Engine
+	FinalizationDistributor    *pubsub.FinalizationDistributor
+	CollectionRPC              access.AccessAPIClient
+	ConCache                   *buffer.PendingBlocks // pending block cache for follower
+	TransactionTimings         *stdmap.TransactionTimings
+	CollectionsToMarkFinalized *stdmap.Times
+	CollectionsToMarkExecuted  *stdmap.Times
+	BlocksToMarkExecuted       *stdmap.Times
+	TransactionMetrics         module.TransactionMetrics
+	PingMetrics                module.PingMetrics
+
+	// engines
+	IngestEng   *ingestion.Engine
+	RequestEng  *requester.Engine
+	FollowerEng *followereng.Engine
 }
 
 func FlowAccessNode() *FlowAccessNodeBuilder {
