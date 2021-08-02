@@ -53,7 +53,9 @@ type AccessNodeBuilder interface {
 	ParticipatesInUnstakedNetwork() bool
 }
 
-// AccessNodeConfig defines all the user defined parameters expected to bootstrap an access node
+// AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
+// For a node running as a standalone process, the config fields will be populated from the command line params,
+// while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
 	staked                       bool
 	stakedAccessNodeIDHex        string

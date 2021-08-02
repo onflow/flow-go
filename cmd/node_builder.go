@@ -85,6 +85,8 @@ type NodeBuilder interface {
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params
+// For a node running as a standalone process, the config fields will be populated from the command line params,
+// while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
 	bindAddr              string
