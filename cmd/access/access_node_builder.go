@@ -66,25 +66,24 @@ type AccessNodeConfig struct {
 	nodeInfoFile                 string
 	apiRatelimits                map[string]int
 	apiBurstlimits               map[string]int
-	followerState                protocol.MutableState
-	ingestEng                    *ingestion.Engine
-	requestEng                   *requester.Engine
-	followerEng                  *followereng.Engine
-	syncCore                     *synchronization.Core
+	FollowerState                protocol.MutableState
+	IngestEng                    *ingestion.Engine
+	RequestEng                   *requester.Engine
+	FollowerEng                  *followereng.Engine
+	SyncCore                     *synchronization.Core
 	rpcConf                      rpc.Config
-	rpcEng                       *rpc.Engine
-	finalizationDistributor      *pubsub.FinalizationDistributor
-	collectionRPC                access.AccessAPIClient
-	executionNodeAddress         string // deprecated
-	historicalAccessRPCs         []access.AccessAPIClient
-	err                          error
-	conCache                     *buffer.PendingBlocks // pending block cache for follower
-	transactionTimings           *stdmap.TransactionTimings
-	collectionsToMarkFinalized   *stdmap.Times
-	collectionsToMarkExecuted    *stdmap.Times
-	blocksToMarkExecuted         *stdmap.Times
-	transactionMetrics           module.TransactionMetrics
-	pingMetrics                  module.PingMetrics
+	RpcEng                       *rpc.Engine
+	FinalizationDistributor      *pubsub.FinalizationDistributor
+	CollectionRPC                access.AccessAPIClient
+	ExecutionNodeAddress         string // deprecated
+	HistoricalAccessRPCs         []access.AccessAPIClient
+	ConCache                     *buffer.PendingBlocks // pending block cache for follower
+	TransactionTimings           *stdmap.TransactionTimings
+	CollectionsToMarkFinalized   *stdmap.Times
+	CollectionsToMarkExecuted    *stdmap.Times
+	BlocksToMarkExecuted         *stdmap.Times
+	TransactionMetrics           module.TransactionMetrics
+	PingMetrics                  module.PingMetrics
 	logTxTimeToFinalized         bool
 	logTxTimeToExecuted          bool
 	logTxTimeToFinalizedExecuted bool
@@ -111,7 +110,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 		},
-		executionNodeAddress:         "localhost:9000",
+		ExecutionNodeAddress:         "localhost:9000",
 		logTxTimeToFinalized:         false,
 		logTxTimeToExecuted:          false,
 		logTxTimeToFinalizedExecuted: false,
@@ -134,7 +133,6 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 	UnstakedNetwork    *p2p.Network
 	unstakedMiddleware *p2p.Middleware
-	followerState      protocol.MutableState
 }
 
 func FlowAccessNode() *FlowAccessNodeBuilder {

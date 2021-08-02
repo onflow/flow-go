@@ -58,7 +58,7 @@ func main() {
 		flags.StringVar(&anb.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
 		flags.StringVarP(&anb.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
 		flags.StringVarP(&anb.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
-		flags.StringVarP(&anb.executionNodeAddress, "script-addr", "s", defaultConfig.executionNodeAddress, "the address (of the execution node) forward the script to")
+		flags.StringVarP(&anb.ExecutionNodeAddress, "script-addr", "s", defaultConfig.ExecutionNodeAddress, "the address (of the execution node) forward the script to")
 		flags.StringVarP(&anb.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
 		flags.DurationVar(&anb.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
 		flags.DurationVar(&anb.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
@@ -100,7 +100,7 @@ func main() {
 				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
 			}
 			var err error
-			anb.followerState, err = badgerState.NewFollowerState(
+			anb.FollowerState, err = badgerState.NewFollowerState(
 				state,
 				node.Storage.Index,
 				node.Storage.Payloads,
@@ -129,7 +129,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			anb.collectionRPC = access.NewAccessAPIClient(collectionRPCConn)
+			anb.CollectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
 		Module("historical access node clients", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -147,46 +147,46 @@ func main() {
 				if err != nil {
 					return err
 				}
-				anb.historicalAccessRPCs = append(anb.historicalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+				anb.HistoricalAccessRPCs = append(anb.HistoricalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
 			}
 			return nil
 		}).
 		Module("block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			anb.conCache = buffer.NewPendingBlocks()
+			anb.ConCache = buffer.NewPendingBlocks()
 			return nil
 		}).
 		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			var err error
-			anb.syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
+			anb.SyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
 		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			var err error
-			anb.transactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			anb.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
 				return err
 			}
 
-			anb.collectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			anb.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
 			if err != nil {
 				return err
 			}
 
-			anb.collectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			anb.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
 			if err != nil {
 				return err
 			}
 
-			anb.blocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			anb.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 			return err
 		}).
 		Module("transaction metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			anb.transactionMetrics = metrics.NewTransactionCollector(anb.transactionTimings, node.Logger, anb.logTxTimeToFinalized,
+			anb.TransactionMetrics = metrics.NewTransactionCollector(anb.TransactionTimings, node.Logger, anb.logTxTimeToFinalized,
 				anb.logTxTimeToExecuted, anb.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
 		Module("ping metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			anb.pingMetrics = metrics.NewPingCollector()
+			anb.PingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
 		Module("server certificate", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -200,19 +200,19 @@ func main() {
 			return nil
 		}).
 		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			anb.rpcEng = rpc.New(
+			anb.RpcEng = rpc.New(
 				node.Logger,
 				node.State,
 				anb.rpcConf,
-				anb.collectionRPC,
-				anb.historicalAccessRPCs,
+				anb.CollectionRPC,
+				anb.HistoricalAccessRPCs,
 				node.Storage.Blocks,
 				node.Storage.Headers,
 				node.Storage.Collections,
 				node.Storage.Transactions,
 				node.Storage.Receipts,
 				node.RootChainID,
-				anb.transactionMetrics,
+				anb.TransactionMetrics,
 				anb.collectionGRPCPort,
 				anb.executionGRPCPort,
 				anb.retryEnabled,
@@ -220,11 +220,11 @@ func main() {
 				anb.apiRatelimits,
 				anb.apiBurstlimits,
 			)
-			return anb.rpcEng, nil
+			return anb.RpcEng, nil
 		}).
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
-			anb.requestEng, err = requester.New(
+			anb.RequestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
@@ -237,16 +237,16 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
-			anb.ingestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.requestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.transactionMetrics,
-				anb.collectionsToMarkFinalized, anb.collectionsToMarkExecuted, anb.blocksToMarkExecuted, anb.rpcEng)
-			anb.requestEng.WithHandle(anb.ingestEng.OnCollection)
-			return anb.ingestEng, err
+			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.TransactionMetrics,
+				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
+			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
+			return anb.IngestEng, err
 		}).
 		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
-			return anb.requestEng, nil
+			return anb.RequestEng, nil
 		}).
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -255,7 +255,7 @@ func main() {
 
 			// create a finalizer that will handle updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, anb.followerState)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, anb.FollowerState)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -278,18 +278,18 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
 			}
 
-			anb.finalizationDistributor = pubsub.NewFinalizationDistributor()
-			anb.finalizationDistributor.AddConsumer(anb.ingestEng)
+			anb.FinalizationDistributor = pubsub.NewFinalizationDistributor()
+			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
 
 			// creates a consensus follower with ingestEngine as the notifier
 			// so that it gets notified upon each new finalized block
 			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier,
-				anb.finalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
+				anb.FinalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize follower core: %w", err)
 			}
 
-			anb.followerEng, err = followereng.New(
+			anb.FollowerEng, err = followereng.New(
 				node.Logger,
 				node.Network,
 				node.Me,
@@ -298,16 +298,16 @@ func main() {
 				cleaner,
 				node.Storage.Headers,
 				node.Storage.Payloads,
-				anb.followerState,
-				anb.conCache,
+				anb.FollowerState,
+				anb.ConCache,
 				followerCore,
-				anb.syncCore,
+				anb.SyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
 			}
 
-			return anb.followerEng, nil
+			return anb.FollowerEng, nil
 		}).
 		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
@@ -317,14 +317,14 @@ func main() {
 				node.Me,
 				node.State,
 				node.Storage.Blocks,
-				anb.followerEng,
-				anb.syncCore,
+				anb.FollowerEng,
+				anb.SyncCore,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 
-			anb.finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+			anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		})
@@ -336,7 +336,7 @@ func main() {
 				node.Logger,
 				node.State,
 				node.Me,
-				anb.pingMetrics,
+				anb.PingMetrics,
 				anb.pingEnabled,
 				node.Middleware,
 				anb.nodeInfoFile,
