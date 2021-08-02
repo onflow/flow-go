@@ -156,7 +156,14 @@ func (ss *SyncSuite) SetupTest() {
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core)
+
+	finalizedSnapshot, err := NewFinalizedSnapshotCache(log, ss.state, filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(ss.me.NodeID())),
+	))
+	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
+
+	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedSnapshot)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -174,7 +181,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	// regardless of request height, if within tolerance, we should not respond
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(true)
-	err := ss.e.onSyncRequest(originID, req)
+	err := ss.e.requestHandler.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
@@ -182,7 +189,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	req.Height = ss.head.Height + 1
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-	err = ss.e.onSyncRequest(originID, req)
+	err = ss.e.requestHandler.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
@@ -199,7 +206,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
 	)
-	err = ss.e.onSyncRequest(originID, req)
+	err = ss.e.requestHandler.onSyncRequest(originID, req)
 	require.NoError(ss.T(), err, "smaller height sync request should pass")
 
 	ss.core.AssertExpectations(ss.T())
@@ -241,14 +248,14 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	// empty range should be a no-op
 	req.FromHeight = ref
 	req.ToHeight = ref - 1
-	err := ss.e.onRangeRequest(originID, req)
+	err := ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "empty range request should pass")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// range with only unknown block should be a no-op
 	req.FromHeight = ref + 1
 	req.ToHeight = ref + 3
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "unknown range request should pass")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
@@ -265,7 +272,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 		},
 	)
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "range request with higher to height should pass")
 
 	// a request for a range that we partially have should send partial response
@@ -281,7 +288,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 		},
 	)
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range with missing blocks should fail")
 
 	// a request for a range we entirely have should send all blocks
@@ -297,7 +304,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 		},
 	)
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range request should pass")
 }
 
@@ -312,13 +319,13 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 
 	// an empty request should not lead to response
 	req.BlockIDs = []flow.Identifier{}
-	err := ss.e.onBatchRequest(originID, req)
+	err := ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass empty request")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// a non-empty request for missing block ID should be a no-op
 	req.BlockIDs = unittest.IdentifierListFixture(1)
-	err = ss.e.onBatchRequest(originID, req)
+	err = ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request for missing block")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
@@ -336,7 +343,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
 		},
 	)
-	err = ss.e.onBatchRequest(originID, req)
+	err = ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request with valid block")
 }
 
@@ -464,9 +471,9 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	// change head
 	ss.head = &finalizedBlock
 
-	err := ss.e.onFinalizedBlock()
+	err := ss.e.finalizedSnapshot.updateSnapshot()
 	require.NoError(ss.T(), err)
-	actualSnapshot := ss.e.finalSnapshot()
+	actualSnapshot := ss.e.finalizedSnapshot.get()
 	require.ElementsMatch(ss.T(), actualSnapshot.participants, ss.participants[1:])
 	require.Equal(ss.T(), actualSnapshot.head, &finalizedBlock)
 }
