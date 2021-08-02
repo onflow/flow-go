@@ -65,8 +65,6 @@ import (
 type AccessNodeBuilder interface {
 	cmd.NodeBuilder
 
-	Build()
-
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
 

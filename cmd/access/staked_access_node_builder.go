@@ -95,15 +95,3 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		return builder.UnstakedNetwork, err
 	})
 }
-
-func (builder *StakedAccessNodeBuilder) Build() {
-	builder.Initialize()
-	builder.
-		mutableFollowerStateModule().
-		collectionNodeClientModule().
-		historialAccessNodeClientModule().
-		followerEnginerDepsModule().
-		transactionTimingMempoolsModule().
-		pingMetricsModule().
-		grpcCertificateModule()
-}

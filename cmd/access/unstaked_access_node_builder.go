@@ -128,11 +128,3 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		return builder.UnstakedNetwork, err
 	})
 }
-
-func (builder *UnstakedAccessNodeBuilder) Build() {
-	builder.Initialize()
-	builder.
-		mutableFollowerStateModule().
-		followerEnginerDepsModule()
-		//transactionTimingMempoolsModule()
-}
