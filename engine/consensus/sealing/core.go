@@ -170,7 +170,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
-				return fmt.Errorf("could not process incorporated result for block %s: %w", blockID, err)
+				return fmt.Errorf("could not process incorporated result from block %s: %w", blockID, err)
 			}
 		}
 

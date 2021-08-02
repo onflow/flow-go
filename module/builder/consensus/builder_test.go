@@ -92,6 +92,9 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	bs.blocks[block.ID()] = block
 	bs.index[block.ID()] = block.Payload.Index()
 	bs.blockChildren[block.Header.ParentID] = append(bs.blockChildren[block.Header.ParentID], block.ID())
+	for _, result := range block.Payload.Results {
+		bs.resultByID[result.ID()] = result
+	}
 }
 
 // createAndRecordBlock creates a new block chained to the previous block (if it

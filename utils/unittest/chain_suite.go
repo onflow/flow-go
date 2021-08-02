@@ -531,10 +531,6 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 
 	for _, result := range block.Payload.Results {
 		// Exec Receipt for block with valid subgraph
-		// ATTENTION:
-		// Here, IncorporatedBlockID (the first argument) should be set
-		// to ancestorID, because that is the block that contains the
-		// ExecutionResult.
 		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(result),
 			IncorporatedResult.WithIncorporatedBlockID(blockID))
 

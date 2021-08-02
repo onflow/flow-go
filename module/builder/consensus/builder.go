@@ -384,19 +384,21 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
 		blockID := header.ID()
-		block, err := b.blocks.ByID(blockID)
+		index, err := b.index.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve block %x: %w", blockID, err)
+			return fmt.Errorf("could not retrieve index for block %x: %w", blockID, err)
 		}
 
 		// enforce condition (1): only consider seals for results that are incorporated in the fork
-		for _, result := range block.Payload.Results {
+		for _, resultID := range index.ResultIDs {
+
+			result, err := b.resultsDB.ByID(resultID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve execution result %x: %w", resultID, err)
+			}
+
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			// ATTENTION:
-			// Here, IncorporatedBlockID (the first argument) should be set to
-			// ancestorID, because that is the block that contains the
-			// ExecutionResult.
 			incorporatedResult := flow.NewIncorporatedResult(
 				blockID,
 				result,
