@@ -140,7 +140,7 @@ func TestPendingReceipts(t *testing.T) {
 				total++
 			}
 		}
-		require.Equal(t, 60, total)
+		require.Equal(t, 100, total)
 
 		// since there are 60 left, should remove 60 in total
 		total = 0
@@ -150,7 +150,7 @@ func TestPendingReceipts(t *testing.T) {
 				total++
 			}
 		}
-		require.Equal(t, 60, total)
+		require.Equal(t, 100, total)
 	})
 
 	t.Run("concurrent adding and removing", func(t *testing.T) {

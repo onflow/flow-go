@@ -216,8 +216,7 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Height)
-	err := ss.e.onSyncResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
 
@@ -367,8 +366,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	},
 	)
 
-	err := ss.e.onBlockResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
@@ -383,8 +381,7 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
 		},
 	)
-	err := ss.e.pollHeight()
-	ss.Require().Nil(err)
+	ss.e.pollHeight()
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -413,8 +410,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("BatchRequested", batches[0])
 
 	// exclude my node ID
-	err := ss.e.sendRequests(ss.participants[1:], ranges, batches)
-	ss.Assert().Nil(err)
+	ss.e.sendRequests(ss.participants[1:], ranges, batches)
 	ss.con.AssertExpectations(ss.T())
 }
 

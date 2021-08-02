@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -100,10 +101,12 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		}
 
 		// create signer
-		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
-		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconSigner, merger, participant.NodeID)
+		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
+		beaconVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
+		beaconStore := signature.NewSingleSignerStore(beaconSigner)
+		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconVerifier, merger, beaconStore, participant.NodeID)
 		signers[i] = signer
 
 		// create validator
@@ -118,7 +121,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 // random beacon and staking signatures on the QC.
 //
 // allNodes must be in the same order that was used when running the DKG.
-func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) (*ParticipantData, error) {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {
