@@ -76,7 +76,7 @@ func GenerateExecutionResultForBlock(
 	// convert Cadence service event representation to flow-go representation
 	convertedServiceEvents := make([]flow.ServiceEvent, 0, len(serviceEvents))
 	for _, event := range serviceEvents {
-		converted, err := convert.ServiceEvent(event)
+		converted, err := convert.ServiceEvent(block.Header.ChainID, event)
 		if err != nil {
 			return nil, fmt.Errorf("could not convert service event: %w", err)
 		}
