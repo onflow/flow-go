@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/model/flow"
@@ -53,6 +54,7 @@ type AccessNodeBuilder interface {
 }
 
 type AccessNodeConfig struct {
+	staked                       bool
 	stakedAccessNodeIDHex        string
 	unstakedNetworkBindAddr      string
 	blockLimit                   uint
@@ -90,12 +92,46 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled            bool
 }
 
+func DefaultAccessNodeConfig() *AccessNodeConfig {
+	return &AccessNodeConfig{
+		receiptLimit:       1000,
+		collectionLimit:    1000,
+		blockLimit:         1000,
+		collectionGRPCPort: 9000,
+		executionGRPCPort:  9000,
+		rpcConf: rpc.Config{
+			UnsecureGRPCListenAddr:    "localhost:9000",
+			SecureGRPCListenAddr:      "localhost:9001",
+			HTTPListenAddr:            "localhost:8000",
+			CollectionAddr:            "",
+			HistoricalAccessAddrs:     "",
+			CollectionClientTimeout:   3 * time.Second,
+			ExecutionClientTimeout:    3 * time.Second,
+			MaxHeightRange:            backend.DefaultMaxHeightRange,
+			PreferredExecutionNodeIDs: nil,
+			FixedExecutionNodeIDs:     nil,
+		},
+		executionNodeAddress:         "localhost:9000",
+		logTxTimeToFinalized:         false,
+		logTxTimeToExecuted:          false,
+		logTxTimeToFinalizedExecuted: false,
+		pingEnabled:                  false,
+		retryEnabled:                 false,
+		rpcMetricsEnabled:            false,
+		nodeInfoFile:                 "",
+		apiRatelimits:                nil,
+		apiBurstlimits:               nil,
+		staked:                       true,
+		stakedAccessNodeIDHex:        "",
+		unstakedNetworkBindAddr:      cmd.NotSet,
+	}
+}
+
 // FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
 // It is composed of the FlowNodeBuilder
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
-	staked             bool
 	UnstakedNetwork    *p2p.Network
 	unstakedMiddleware *p2p.Middleware
 	followerState      protocol.MutableState
