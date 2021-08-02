@@ -44,7 +44,7 @@ type Engine struct {
 	pollInterval      time.Duration
 	scanInterval      time.Duration
 	core              module.SyncCore
-	finalizedSnapshot *finalizedSnapshotCache
+	finalizedSnapshot *FinalizedSnapshotCache
 
 	requestHandler *RequestHandler // component responsible for handling requests
 
@@ -62,7 +62,7 @@ func New(
 	blocks storage.Blocks,
 	comp network.Engine,
 	core module.SyncCore,
-	finalizedSnapshot *finalizedSnapshotCache,
+	finalizedSnapshot *FinalizedSnapshotCache,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 

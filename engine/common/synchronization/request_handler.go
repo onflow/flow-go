@@ -37,7 +37,7 @@ type RequestHandler struct {
 
 	blocks            storage.Blocks
 	core              module.SyncCore
-	finalizedSnapshot *finalizedSnapshotCache
+	finalizedSnapshot *FinalizedSnapshotCache
 	con               network.Conduit // used for sending responses to requesters
 
 	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
@@ -53,7 +53,7 @@ func NewRequestHandler(
 	me module.Local,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedSnapshot *finalizedSnapshotCache,
+	finalizedSnapshot *FinalizedSnapshotCache,
 ) *RequestHandler {
 	r := &RequestHandler{
 		unit:              engine.NewUnit(),

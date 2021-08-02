@@ -59,6 +59,7 @@ func main() {
 		requestEng                   *requester.Engine
 		followerEng                  *followereng.Engine
 		syncCore                     *synchronization.Core
+		finalizedSnapshot            *synceng.FinalizedSnapshotCache
 		rpcConf                      rpc.Config
 		rpcEng                       *rpc.Engine
 		finalizationDistributor      *pubsub.FinalizationDistributor
@@ -341,22 +342,34 @@ func main() {
 
 			return followerEng, nil
 		}).
+		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedSnapshot, err = synceng.NewFinalizedSnapshotCache(node.Logger, node.State, filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.NodeID)),
+			))
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(finalizedSnapshot.OnFinalizedBlock)
+
+			return finalizedSnapshot, nil
+		}).
 		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
+				finalizedSnapshot,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-
-			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		})
