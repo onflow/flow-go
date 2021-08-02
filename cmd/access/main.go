@@ -35,6 +35,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
@@ -89,6 +91,23 @@ func main() {
 
 	nodeBuilder.
 		Initialize().
+		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			// For now, we only support state implementations from package badger.
+			// If we ever support different implementations, the following can be replaced by a type-aware factory
+			state, ok := node.State.(*badgerState.State)
+			if !ok {
+				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			}
+			anb.followerState, err = badgerState.NewFollowerState(
+				state,
+				node.Storage.Index,
+				node.Storage.Payloads,
+				node.Tracer,
+				node.ProtocolEvents,
+				blocktimer.DefaultBlockTimer,
+			)
+			return err
+		}).
 		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(anb.rpcConf.CollectionAddr) == "" {
