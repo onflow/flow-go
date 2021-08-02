@@ -131,17 +131,6 @@ func ReadShortData(input []byte) (data []byte, rest []byte, err error) {
 	return
 }
 
-// ReadLongData read data shorter than 32MB and return the rest of bytes
-func ReadLongData(input []byte) (data []byte, rest []byte, err error) {
-	var size uint32
-	size, rest, err = ReadUint32(input)
-	if err != nil {
-		return nil, rest, err
-	}
-	data = rest[:size]
-	return
-}
-
 // ReadShortDataFromReader reads data shorter than 16kB from reader
 func ReadShortDataFromReader(reader io.Reader) ([]byte, error) {
 	buf, err := ReadFromBuffer(reader, 2)
@@ -406,14 +395,4 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 		}
 	}
 	return keys
-}
-
-// RandomUniqueKeysRandomN generate n (0<n<maxN) random keys (each m random key part),
-func RandomUniqueKeysRandomN(maxN, m, minByteSize, maxByteSize int) []l.Key {
-	numberOfKeys := rand.Intn(maxN) + 1
-	// at least return 1 keys
-	if numberOfKeys == 0 {
-		numberOfKeys = 1
-	}
-	return RandomUniqueKeys(numberOfKeys, m, minByteSize, maxByteSize)
 }
