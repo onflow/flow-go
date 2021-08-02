@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -400,18 +399,7 @@ func main() {
 		if nodeBuilder.ParticipatesInUnstakedNetwork() {
 			// create relay engine
 			nodeBuilder.Component("relay engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				var unstakedNetwork p2p.ReadyDoneAwareNetwork
-
-				switch accessNodeBuilder := nodeBuilder.(type) {
-				case *StakedAccessNodeBuilder:
-					unstakedNetwork = accessNodeBuilder.UnstakedNetwork
-				case *UnstakedAccessNodeBuilder:
-					unstakedNetwork = accessNodeBuilder.UnstakedNetwork
-				default:
-					return nil, fmt.Errorf("node builder was of unexpected type %T", accessNodeBuilder)
-				}
-
-				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, unstakedNetwork, node.Me)
+				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, anb.UnstakedNetwork, node.Me)
 
 				if err != nil {
 					return nil, fmt.Errorf("could not create relay engine: %w", err)
