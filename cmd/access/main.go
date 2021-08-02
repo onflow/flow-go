@@ -399,7 +399,12 @@ func main() {
 		if nodeBuilder.ParticipatesInUnstakedNetwork() {
 			// create relay engine
 			nodeBuilder.Component("relay engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				relayEngine, err := relay.New(node.Logger, node.SubscriptionManager.Channels(), node.Network, anb.UnstakedNetwork, node.Me)
+				channels := node.SubscriptionManager.Channels()
+				if len(channels) == 0 {
+					return nil, fmt.Errorf("no subscribed channels to relay")
+				}
+
+				relayEngine, err := relay.New(node.Logger, channels, node.Network, anb.UnstakedNetwork, node.Me)
 
 				if err != nil {
 					return nil, fmt.Errorf("could not create relay engine: %w", err)
