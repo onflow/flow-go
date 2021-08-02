@@ -48,11 +48,15 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Checkout repo
       uses: actions/checkout@v2
+    - name: Print env vars
+      run: |
+        echo "ACTOR: ${GITHUB_ACTOR}"
+        echo "actor: ${github.actor}"
     - name: Run tests
-      if: ${{ github.actor != 'bors' }}
+      if: github.actor != 'bors'
       run: make ci
     - name: Run tests (Bors)
-      if: ${{ github.actor == 'bors' }}
+      if: github.actor == 'bors'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
@@ -86,10 +90,10 @@ jobs:
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests
-      if: ${{ github.actor != 'bors' }}
+      if: github.actor != 'bors'
       run: make ci-integration
     - name: Run tests (Bors)
-      if: ${{ github.actor == 'bors' }}
+      if: github.actor == 'bors'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 15
