@@ -774,16 +774,6 @@ func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
 		fnb.closeDatabase()
 	})
 	return fnb.lm.Stopped()
-	return fnb.unit.Ready(func() {
-		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
-			doneObject := fnb.doneObject[i]
-
-			fnb.handleDoneObject(doneObject)
-		}
-
-		fnb.closeDatabase()
-	})
-
 }
 
 func (fnb *FlowNodeBuilder) handlePreInit(f func(builder NodeBuilder, node *NodeConfig)) {
