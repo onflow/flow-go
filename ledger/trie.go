@@ -46,14 +46,6 @@ func init() {
 	}
 }
 
-// GetDefaultHashes returns the default hashes of the SMT.
-//
-// For each tree level N, there is a default hash equal to the chained
-// hashing of the default value N times.
-func GetDefaultHashes() [defaultHashesNum]hash.Hash {
-	return defaultHashes
-}
-
 // GetDefaultHashForHeight returns the default hashes of the SMT at a specified height.
 //
 // For each tree level N, there is a default hash equal to the chained
