@@ -22,7 +22,7 @@ type finalizedSnapshot struct {
 // FinalizedSnapshotCache represents a cached snapshot of the latest finalized header and participants list.
 // It is used in Engine to access latest valid data.
 type FinalizedSnapshotCache struct {
-	mu sync.Mutex
+	mu sync.RWMutex
 
 	log                       zerolog.Logger
 	state                     protocol.State
@@ -62,8 +62,8 @@ func NewFinalizedSnapshotCache(log zerolog.Logger, state protocol.State, partici
 // get returns last locally stored snapshot which contains final header
 // and list of filtered identities
 func (f *FinalizedSnapshotCache) get() *finalizedSnapshot {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	return f.lastFinalizedSnapshot
 }
 
