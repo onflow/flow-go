@@ -272,7 +272,7 @@ func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 }
 
 func decodeValue(inp []byte) (ledger.Value, error) {
-	return ledger.Value(inp), nil
+	return inp, nil
 }
 
 // EncodePath encodes a path into a byte slice

@@ -36,7 +36,7 @@ func Uint64ToBinary(integer uint64) []byte {
 
 // AppendUint8 appends the value byte to the input slice
 func AppendUint8(input []byte, value uint8) []byte {
-	return append(input, byte(value))
+	return append(input, value)
 }
 
 // AppendUint16 appends the value bytes to the input slice (big endian)
@@ -93,7 +93,7 @@ func ReadUint8(input []byte) (value uint8, rest []byte, err error) {
 	if len(input) < 1 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint8", len(input))
 	}
-	return uint8(input[0]), input[1:], nil
+	return input[0], input[1:], nil
 }
 
 // ReadUint16 reads a uint16 from the input and returns the rest
@@ -247,7 +247,7 @@ func PathByUint16LeftPadded(inp uint16) l.Path {
 
 // KeyPartFixture returns a key part fixture
 func KeyPartFixture(typ uint16, val string) l.KeyPart {
-	kp1t := uint16(typ)
+	kp1t := typ
 	kp1v := []byte(val)
 	return l.NewKeyPart(kp1t, kp1v)
 }
@@ -307,7 +307,7 @@ func TrieBatchProofFixture() (*l.TrieBatchProof, l.State) {
 	bp := l.NewTrieBatchProof()
 	bp.Proofs = append(bp.Proofs, p)
 	bp.Proofs = append(bp.Proofs, p)
-	return bp, l.State(s)
+	return bp, s
 }
 
 // RandomPathsRandLen generate m random paths.
