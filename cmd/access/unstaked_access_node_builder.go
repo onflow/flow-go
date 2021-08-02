@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/proxy"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -116,11 +117,13 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
 		builder.MustNot(err)
 
-		builder.UnstakedNetwork = network
+		unstakedNetwork := proxy.NewProxyNetwork(network, upstreamANIdentifier)
+
+		builder.UnstakedNetwork = unstakedNetwork
 		builder.unstakedMiddleware = middleware
 
 		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
-		builder.Network = network
+		builder.Network = unstakedNetwork
 		builder.Middleware = middleware
 
 		builder.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)

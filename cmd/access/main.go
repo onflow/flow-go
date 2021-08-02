@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	"github.com/onflow/flow-go/engine/common/splitter"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
@@ -35,6 +36,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -79,6 +81,8 @@ func main() {
 		logTxTimeToFinalizedExecuted bool
 		retryEnabled                 bool
 		rpcMetricsEnabled            bool
+		unstakedNetworkConduit       network.Conduit
+		proxyEngine                  *splitter.Engine
 	)
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
@@ -391,6 +395,37 @@ func main() {
 			}
 			return ping, nil
 		})
+
+		if nodeBuilder.ParticipatesInUnstakedNetwork() {
+			nodeBuilder.
+				Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+					proxyEngine := splitter.New(node.Logger, engine.SyncCommittee)
+
+					// register the proxy engine with the unstaked network
+					unstakedNetworkConduit, err = anb.UnstakedNetwork.Register(engine.SyncCommittee, proxyEngine)
+					if err != nil {
+						return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
+					}
+
+					return proxyEngine, nil
+				}).
+				Component("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+					syncRequestHandler := synceng.NewRequestHandler(
+						node.Logger,         // TODO: use different logger for unstaked network?
+						node.Metrics.Engine, // TODO: use different metrics for unstaked network?
+						unstakedNetworkConduit,
+						node.Me, // TODO: does staked node use same Node ID on unstaked network?
+						node.Storage.Blocks,
+						syncCore,
+						finalizedSnapshot,
+					)
+
+					// register the sync request handler with the proxy engine
+					proxyEngine.RegisterEngine(syncRequestHandler)
+
+					return syncRequestHandler, nil
+				})
+		}
 	}
 
 	nodeBuilder.Run()
