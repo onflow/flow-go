@@ -574,6 +574,21 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 	})
 }
 
+func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
+	// Create a Node with AllowList = false
+	node, identity := suite.NodesFixture(1, nil, false)
+	node1 := node[0]
+	node1Id := identity[0]
+	defer StopNode(suite.T(), node1)
+
+	suite.Run("updating allowlist of node w/o ConnGater does not crash", func() {
+
+		// node1 allowlists node1
+		err := node1.UpdateAllowList(flow.IdentityList{node1Id})
+		require.Error(suite.T(), err)
+	})
+}
+
 // NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
 func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
