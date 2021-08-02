@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -18,6 +20,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
+
+const NotSet = "not set"
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
@@ -127,4 +131,25 @@ type NodeConfig struct {
 	RootResult  *flow.ExecutionResult
 	RootSeal    *flow.Seal
 	RootChainID flow.ChainID
+}
+
+func DefaultBaseConfig() *BaseConfig {
+	homedir, _ := os.UserHomeDir()
+	datadir := filepath.Join(homedir, ".flow", "database")
+	return &BaseConfig{
+		nodeIDHex:             NotSet,
+		bindAddr:              NotSet,
+		BootstrapDir:          "bootstrap",
+		timeout:               1 * time.Minute,
+		datadir:               datadir,
+		level:                 "info",
+		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
+		unicastMessageTimeout: p2p.DefaultUnicastTimeout,
+		metricsPort:           8080,
+		profilerEnabled:       false,
+		profilerDir:           "profiler",
+		profilerInterval:      15 * time.Minute,
+		profilerDuration:      10 * time.Second,
+		tracerEnabled:         false,
+	}
 }
