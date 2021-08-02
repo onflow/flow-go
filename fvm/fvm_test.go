@@ -382,6 +382,71 @@ func TestBlockContext_DeployContract(t *testing.T) {
 		assert.NoError(t, tx.Err)
 	})
 
+	t.Run("account with deployed contract has `contracts.names` filled", func(t *testing.T) {
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		txBody := testutil.DeployCounterContractTransaction(accounts[0], chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+
+		// transaction will panic if `contracts.names` is incorrect
+		txBody = flow.NewTransactionBody().
+			SetScript([]byte(`
+				transaction {
+					prepare(signer: AuthAccount) {
+						var s : String = ""
+						var i : Int = 0
+						while i < signer.contracts.names.length {
+							s = s.concat(signer.contracts.names[i]).concat(",")
+							i = i + 1
+						}
+						if s != "Container," {
+							panic(s)
+						}
+					}
+				}
+			`)).
+			AddAuthorizer(accounts[0])
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx = fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+	})
+
 	t.Run("account update with checker heavy contract", func(t *testing.T) {
 		ledger := testutil.RootBootstrappedLedger(vm, ctx)
 
