@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
@@ -22,8 +23,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
-	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/encodable"
@@ -32,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -76,6 +76,7 @@ type AccessNodeBuilder interface {
 }
 
 type AccessNodeConfig struct {
+	staked                       bool
 	stakedAccessNodeIDHex        string
 	unstakedNetworkBindAddr      string
 	blockLimit                   uint
@@ -113,12 +114,46 @@ type AccessNodeConfig struct {
 	rpcMetricsEnabled            bool
 }
 
+func DefaultAccessNodeConfig() *AccessNodeConfig {
+	return &AccessNodeConfig{
+		receiptLimit:       1000,
+		collectionLimit:    1000,
+		blockLimit:         1000,
+		collectionGRPCPort: 9000,
+		executionGRPCPort:  9000,
+		rpcConf: rpc.Config{
+			UnsecureGRPCListenAddr:    "localhost:9000",
+			SecureGRPCListenAddr:      "localhost:9001",
+			HTTPListenAddr:            "localhost:8000",
+			CollectionAddr:            "",
+			HistoricalAccessAddrs:     "",
+			CollectionClientTimeout:   3 * time.Second,
+			ExecutionClientTimeout:    3 * time.Second,
+			MaxHeightRange:            backend.DefaultMaxHeightRange,
+			PreferredExecutionNodeIDs: nil,
+			FixedExecutionNodeIDs:     nil,
+		},
+		executionNodeAddress:         "localhost:9000",
+		logTxTimeToFinalized:         false,
+		logTxTimeToExecuted:          false,
+		logTxTimeToFinalizedExecuted: false,
+		pingEnabled:                  false,
+		retryEnabled:                 false,
+		rpcMetricsEnabled:            false,
+		nodeInfoFile:                 "",
+		apiRatelimits:                nil,
+		apiBurstlimits:               nil,
+		staked:                       true,
+		stakedAccessNodeIDHex:        "",
+		unstakedNetworkBindAddr:      cmd.NotSet,
+	}
+}
+
 // FlowAccessNodeBuilder provides the common functionality needed to bootstrap a Flow staked and unstaked access node
 // It is composed of the FlowNodeBuilder
 type FlowAccessNodeBuilder struct {
 	*cmd.FlowNodeBuilder
 	*AccessNodeConfig
-	staked             bool
 	UnstakedNetwork    *p2p.Network
 	unstakedMiddleware *p2p.Middleware
 	followerState      protocol.MutableState
@@ -497,25 +532,25 @@ func (builder *FlowAccessNodeBuilder) followerEngineComponent() *FlowAccessNodeB
 }
 
 func (builder *FlowAccessNodeBuilder) syncEngineComponent() *FlowAccessNodeBuilder {
-builder.Component("sync engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-	sync, err := synceng.New(
-		node.Logger,
-		node.Metrics.Engine,
-		node.Network,
-		node.Me,
-		node.State,
-		node.Storage.Blocks,
-		builder.followerEng,
-		builder.syncCore,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not create synchronization engine: %w", err)
-	}
+	builder.Component("sync engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		sync, err := synceng.New(
+			node.Logger,
+			node.Metrics.Engine,
+			node.Network,
+			node.Me,
+			node.State,
+			node.Storage.Blocks,
+			builder.followerEng,
+			builder.syncCore,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
+		}
 
-	builder.finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+		builder.finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
-	return sync, nil
-})
+		return sync, nil
+	})
 	return builder
 }
 

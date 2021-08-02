@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/spf13/pflag"
@@ -41,41 +40,41 @@ import (
 
 func main() {
 
-	var ()
+	defaultConfig := DefaultAccessNodeConfig()
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
 
 	anb.PrintBuildVersionDetails()
 
 	anb.ExtraFlags(func(flags *pflag.FlagSet) {
-		flags.UintVar(&anb.receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
-		flags.UintVar(&anb.collectionLimit, "collection-limit", 1000, "maximum number of collections in the memory pool")
-		flags.UintVar(&anb.blockLimit, "block-limit", 1000, "maximum number of result blocks in the memory pool")
-		flags.UintVar(&anb.collectionGRPCPort, "collection-ingress-port", 9000, "the grpc ingress port for all collection nodes")
-		flags.UintVar(&anb.executionGRPCPort, "execution-ingress-port", 9000, "the grpc ingress port for all execution nodes")
-		flags.StringVarP(&anb.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", "localhost:9000", "the address the unsecured gRPC server listens on")
-		flags.StringVar(&anb.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", "localhost:9001", "the address the secure gRPC server listens on")
-		flags.StringVarP(&anb.rpcConf.HTTPListenAddr, "http-addr", "h", "localhost:8000", "the address the http proxy server listens on")
-		flags.StringVarP(&anb.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", "", "the address (of the collection node) to send transactions to")
-		flags.StringVarP(&anb.executionNodeAddress, "script-addr", "s", "localhost:9000", "the address (of the execution node) forward the script to")
-		flags.StringVarP(&anb.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", "", "comma separated rpc addresses for historical access nodes")
-		flags.DurationVar(&anb.rpcConf.CollectionClientTimeout, "collection-client-timeout", 3*time.Second, "grpc client timeout for a collection node")
-		flags.DurationVar(&anb.rpcConf.ExecutionClientTimeout, "execution-client-timeout", 3*time.Second, "grpc client timeout for an execution node")
-		flags.UintVar(&anb.rpcConf.MaxHeightRange, "rpc-max-height-range", backend.DefaultMaxHeightRange, "maximum size for height range requests")
-		flags.StringSliceVar(&anb.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.StringSliceVar(&anb.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", nil, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
-		flags.BoolVar(&anb.logTxTimeToFinalized, "log-tx-time-to-finalized", false, "log transaction time to finalized")
-		flags.BoolVar(&anb.logTxTimeToExecuted, "log-tx-time-to-executed", false, "log transaction time to executed")
-		flags.BoolVar(&anb.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", false, "log transaction time to finalized and executed")
-		flags.BoolVar(&anb.pingEnabled, "ping-enabled", false, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
-		flags.BoolVar(&anb.retryEnabled, "retry-enabled", false, "whether to enable the retry mechanism at the access node level")
-		flags.BoolVar(&anb.rpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
-		flags.StringVarP(&anb.nodeInfoFile, "node-info-file", "", "", "full path to a json file which provides more details about nodes when reporting its reachability metrics")
-		flags.StringToIntVar(&anb.apiRatelimits, "api-rate-limits", nil, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
-		flags.StringToIntVar(&anb.apiBurstlimits, "api-burst-limits", nil, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
-		flags.BoolVar(&anb.staked, "staked", true, "whether this node is a staked access node or not")
-		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", "", "the node ID of the upstream staked access node if this is an unstaked access node")
-		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", cmd.NotSet, "address to bind on for the unstaked network")
+		flags.UintVar(&anb.receiptLimit, "receipt-limit", defaultConfig.receiptLimit, "maximum number of execution receipts in the memory pool")
+		flags.UintVar(&anb.collectionLimit, "collection-limit", defaultConfig.collectionLimit, "maximum number of collections in the memory pool")
+		flags.UintVar(&anb.blockLimit, "block-limit", defaultConfig.blockLimit, "maximum number of result blocks in the memory pool")
+		flags.UintVar(&anb.collectionGRPCPort, "collection-ingress-port", defaultConfig.collectionGRPCPort, "the grpc ingress port for all collection nodes")
+		flags.UintVar(&anb.executionGRPCPort, "execution-ingress-port", defaultConfig.executionGRPCPort, "the grpc ingress port for all execution nodes")
+		flags.StringVarP(&anb.rpcConf.UnsecureGRPCListenAddr, "rpc-addr", "r", defaultConfig.rpcConf.UnsecureGRPCListenAddr, "the address the unsecured gRPC server listens on")
+		flags.StringVar(&anb.rpcConf.SecureGRPCListenAddr, "secure-rpc-addr", defaultConfig.rpcConf.SecureGRPCListenAddr, "the address the secure gRPC server listens on")
+		flags.StringVarP(&anb.rpcConf.HTTPListenAddr, "http-addr", "h", defaultConfig.rpcConf.HTTPListenAddr, "the address the http proxy server listens on")
+		flags.StringVarP(&anb.rpcConf.CollectionAddr, "static-collection-ingress-addr", "", defaultConfig.rpcConf.CollectionAddr, "the address (of the collection node) to send transactions to")
+		flags.StringVarP(&anb.executionNodeAddress, "script-addr", "s", defaultConfig.executionNodeAddress, "the address (of the execution node) forward the script to")
+		flags.StringVarP(&anb.rpcConf.HistoricalAccessAddrs, "historical-access-addr", "", defaultConfig.rpcConf.HistoricalAccessAddrs, "comma separated rpc addresses for historical access nodes")
+		flags.DurationVar(&anb.rpcConf.CollectionClientTimeout, "collection-client-timeout", defaultConfig.rpcConf.CollectionClientTimeout, "grpc client timeout for a collection node")
+		flags.DurationVar(&anb.rpcConf.ExecutionClientTimeout, "execution-client-timeout", defaultConfig.rpcConf.ExecutionClientTimeout, "grpc client timeout for an execution node")
+		flags.UintVar(&anb.rpcConf.MaxHeightRange, "rpc-max-height-range", defaultConfig.rpcConf.MaxHeightRange, "maximum size for height range requests")
+		flags.StringSliceVar(&anb.rpcConf.PreferredExecutionNodeIDs, "preferred-execution-node-ids", defaultConfig.rpcConf.PreferredExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.StringSliceVar(&anb.rpcConf.FixedExecutionNodeIDs, "fixed-execution-node-ids", defaultConfig.rpcConf.FixedExecutionNodeIDs, "comma separated list of execution nodes ids to choose from when making an upstream call if no matching preferred execution id is found e.g. b4a4dbdcd443d...,fb386a6a... etc.")
+		flags.BoolVar(&anb.logTxTimeToFinalized, "log-tx-time-to-finalized", defaultConfig.logTxTimeToFinalized, "log transaction time to finalized")
+		flags.BoolVar(&anb.logTxTimeToExecuted, "log-tx-time-to-executed", defaultConfig.logTxTimeToExecuted, "log transaction time to executed")
+		flags.BoolVar(&anb.logTxTimeToFinalizedExecuted, "log-tx-time-to-finalized-executed", defaultConfig.logTxTimeToFinalizedExecuted, "log transaction time to finalized and executed")
+		flags.BoolVar(&anb.pingEnabled, "ping-enabled", defaultConfig.pingEnabled, "whether to enable the ping process that pings all other peers and report the connectivity to metrics")
+		flags.BoolVar(&anb.retryEnabled, "retry-enabled", defaultConfig.retryEnabled, "whether to enable the retry mechanism at the access node level")
+		flags.BoolVar(&anb.rpcMetricsEnabled, "rpc-metrics-enabled", defaultConfig.rpcMetricsEnabled, "whether to enable the rpc metrics")
+		flags.StringVarP(&anb.nodeInfoFile, "node-info-file", "", defaultConfig.nodeInfoFile, "full path to a json file which provides more details about nodes when reporting its reachability metrics")
+		flags.StringToIntVar(&anb.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
+		flags.StringToIntVar(&anb.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
+		flags.BoolVar(&anb.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
+		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", defaultConfig.stakedAccessNodeIDHex, "the node ID of the upstream staked access node if this is an unstaked access node")
+		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", defaultConfig.unstakedNetworkBindAddr, "address to bind on for the unstaked network")
 	})
 
 	// parse all the command line args
