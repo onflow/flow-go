@@ -97,16 +97,7 @@ func (f *finalizedSnapshotCache) updateSnapshot() error {
 
 func (f *finalizedSnapshotCache) Ready() <-chan struct{} {
 	f.lm.OnStart(func() {
-		started := make(chan struct{})
-
-		go func() {
-			defer close(f.shutdownCompleted)
-			close(started)
-			f.finalizationProcessingLoop(f.ctx)
-		}()
-
-		// wait for goroutine to start
-		<-started
+		go f.finalizationProcessingLoop(f.ctx)
 	})
 	return f.lm.Started()
 }
@@ -131,6 +122,7 @@ func (f *finalizedSnapshotCache) OnFinalizedBlock(flow.Identifier) {
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (f *finalizedSnapshotCache) finalizationProcessingLoop(ctx context.Context) {
+	defer close(f.shutdownCompleted)
 	notifier := f.finalizationEventNotifier.Channel()
 	for {
 		select {
