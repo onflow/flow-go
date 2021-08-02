@@ -170,13 +170,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 			if err != nil {
 				return fmt.Errorf("internal error fetching result %v incorporated in stored block %v: %w", resultID, blockID, err)
 			}
-			// ATTENTION:
-			// Here, IncorporatedBlockID (the first argument) should be set
-			// to ancestorID, because that is the block that contains the
-			// ExecutionResult. However, in phase 2 of the sealing roadmap,
-			// we are still using a temporary sealing logic where the
-			// IncorporatedBlockID is expected to be the result's block ID.
-			incorporatedResults[resultID] = flow.NewIncorporatedResult(result.BlockID, result)
+			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
 		}
 		return nil
 	}

@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
@@ -158,7 +158,6 @@ func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
 func (m *MiddlewareTestSuite) MultiPing(count int) {
 	wg := sync.WaitGroup{}
 	// extracts sender id based on the mock option
-	var err error
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
 	firstNode := 0
 	lastNode := m.size - 1
@@ -171,7 +170,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			})
 		go func() {
 			// sends a direct message from first node to the last node
-			err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
+			err := m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -208,7 +207,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[last].SendDirect(replyMsg, firstNode)
+			err := m.mws[last].SendDirect(replyMsg, firstNode)
 			assert.NoError(m.T(), err)
 
 		})
@@ -251,7 +250,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		Text: string(payload),
 	}
 
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -281,7 +280,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	// set the message type to a known large message type
 	msg.Type = "messages.ChunkDataResponse"
 
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -301,7 +300,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	require.NoError(m.Suite.T(), err)
 
 	// check message reception on target
-	unittest.RequireCloseBefore(m.T(), ch, 3*time.Second, "source node failed to send large message to target")
+	unittest.RequireCloseBefore(m.T(), ch, 15*time.Second, "source node failed to send large message to target")
 
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
@@ -328,7 +327,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 		Text: string(payload),
 	}
 
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
