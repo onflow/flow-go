@@ -5,13 +5,14 @@ import (
 	"io"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/module/lifecycle"
 )
 
 type Compactor struct {
 	checkpointer *Checkpointer
-	done         chan struct{}
 	stopc        chan struct{}
-	wg           sync.WaitGroup
+	lm           *lifecycle.LifecycleManager
 	sync.Mutex
 	interval           time.Duration
 	checkpointDistance uint
@@ -24,8 +25,8 @@ func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpoint
 	}
 	return &Compactor{
 		checkpointer:       checkpointer,
-		done:               make(chan struct{}),
 		stopc:              make(chan struct{}),
+		lm:                 lifecycle.NewLifecycleManager(),
 		interval:           interval,
 		checkpointDistance: checkpointDistance,
 		checkpointsToKeep:  checkpointsToKeep,
@@ -33,39 +34,27 @@ func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpoint
 }
 
 // Ready periodically fires Run function, every `interval`
-// If called more then once, behaviour is undefined.
 func (c *Compactor) Ready() <-chan struct{} {
-	ch := make(chan struct{})
-
-	c.wg.Add(1)
-	go c.start()
-
-	defer close(ch)
-	return ch
+	c.lm.OnStart(func() {
+		go c.start()
+	})
+	return c.lm.Started()
 }
 
 func (c *Compactor) Done() <-chan struct{} {
-	c.stopc <- struct{}{}
-
-	ch := make(chan struct{})
-
-	go func() {
-		c.wg.Wait()
-		close(ch)
-	}()
-
-	return ch
+	c.lm.OnStop(func() {
+		c.stopc <- struct{}{}
+	})
+	return c.lm.Stopped()
 }
 
 func (c *Compactor) start() {
-
 	for {
 		//TODO Log error
 		_ = c.Run()
 
 		select {
 		case <-c.stopc:
-			c.wg.Done()
 			return
 		case <-time.After(c.interval):
 		}
