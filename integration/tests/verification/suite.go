@@ -55,13 +55,13 @@ func (s *Suite) MetricsPort() string {
 	return s.net.AccessPorts[testnet.ExeNodeMetricsPort]
 }
 
-// SetupTest runs a bare minimum Flow network to function correctly with the following roles:
+// SetupSuite runs a bare minimum Flow network to function correctly with the following roles:
 // - Two collector nodes
 // - Four consensus nodes
 // - One execution node
 // - One verification node
-// - One ghost node (as another verification node)
-func (s *Suite) SetupTest() {
+// - One ghost node (as an execution node)
+func (s *Suite) SetupSuite() {
 	blockRateFlag := "--block-rate-delay=1ms"
 
 	// generates one access node
@@ -115,20 +115,27 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
 	// Ghost Node
-	// adds one access node as ghost node
 	// the ghost node's objective is to observe the messages exchanged on the
 	// system and decide to terminate the test.
 	// By definition, ghost node is subscribed to all channels.
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleAccess,
+	ghostConfig := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.FatalLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generates, initializes, and starts the Flow network
-	netConfig := testnet.NewNetworkConfig("verification_tests", s.nodeConfigs)
+	netConfig := testnet.NewNetworkConfig(
+		"verification_tests",
+		s.nodeConfigs,
+		// set long staking phase to avoid QC/DKG transactions during test run
+		testnet.WithViewsInStakingAuction(10_000),
+		testnet.WithViewsInEpoch(100_000),
+	)
+
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
 	s.net.Start(ctx)
@@ -137,8 +144,8 @@ func (s *Suite) SetupTest() {
 	s.Track(s.T(), ctx, s.Ghost())
 }
 
-// TearDownTest tears down the test network of Flow
-func (s *Suite) TearDownTest() {
+// TearDownSuite tears down the test network of Flow
+func (s *Suite) TearDownSuite() {
 	s.net.Remove()
 	if s.cancel != nil {
 		s.cancel()

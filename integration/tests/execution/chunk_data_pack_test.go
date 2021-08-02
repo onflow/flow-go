@@ -49,7 +49,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), gs.BlockState, &gs.ReceiptState)
+	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), gs.BlockState, gs.ReceiptState)
 	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1
