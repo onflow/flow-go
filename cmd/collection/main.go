@@ -73,6 +73,7 @@ func main() {
 		pools                   *epochpool.TransactionPools // epoch-scoped transaction pools
 		followerBuffer          *buffer.PendingBlocks       // pending block cache for follower
 		finalizationDistributor *pubsub.FinalizationDistributor
+		finalizedSnapshot       *consync.FinalizedSnapshotCache
 
 		push              *pusher.Engine
 		ing               *ingest.Engine
@@ -243,6 +244,19 @@ func main() {
 
 			return followerEng, nil
 		}).
+		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedSnapshot, err = consync.NewFinalizedSnapshotCache(node.Logger, node.State, filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.NodeID)),
+			))
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+
+			finalizationDistributor.AddOnBlockFinalizedConsumer(finalizedSnapshot.OnFinalizedBlock)
+
+			return finalizedSnapshot, nil
+		}).
 		Component("main chain sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// create a block synchronization engine to handle follower getting out of sync
@@ -251,16 +265,16 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				mainChainSyncCore,
+				finalizedSnapshot,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
 
-			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
+			finalizationDistributor.AddOnBlockFinalizedConsumer(finalizedSnapshot.OnFinalizedBlock)
 
 			return sync, nil
 		}).
