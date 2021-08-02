@@ -3,16 +3,14 @@ name: CI
 on:
   push:
     branches:
-      # - master
+      - master
       - 'auto-cadence-upgrade/**'
-      - main
       - staging
       - trying
   pull_request:
     branches:
-      # - master
+      - master
       - 'auto-cadence-upgrade/**'
-      - main
 
 jobs:
   golangci:
@@ -51,7 +49,15 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
+      if: ${{ env.GITHUB_ACTOR != 'bors' }}
       run: make ci
+    - name: Run tests (Bors)
+      if: ${{ env.GITHUB_ACTOR == 'bors' }}
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 25
+        max_attempts: 2
+        command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1
       if: ${{ matrix.go-version == '1.15' }}
@@ -80,4 +86,12 @@ jobs:
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests
+      if: ${{ env.GITHUB_ACTOR != 'bors' }}
       run: make ci-integration
+    - name: Run tests (Bors)
+      if: ${{ env.GITHUB_ACTOR == 'bors' }}
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: make ci-integration
