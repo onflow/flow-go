@@ -167,12 +167,10 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		}
 
 		for _, result := range payload.Results {
-			// TODO: change this when migrating to sealing & verification phase 3.
-			// Incorporated result is created this way only for phase 2.
-			incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
-				return fmt.Errorf("could not process incorporated result for block %s: %w", blockID, err)
+				return fmt.Errorf("could not process incorporated result from block %s: %w", blockID, err)
 			}
 		}
 
@@ -245,7 +243,6 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 	if err != nil {
 		return fmt.Errorf("won't process outdated or unverifiable execution incRes %s: %w", incRes.Result.BlockID, err)
 	}
-
 	incorporatedBlock, err := c.headers.ByBlockID(incRes.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get block height for incorporated block %s: %w",
@@ -253,7 +250,8 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 	}
 	incorporatedAtHeight := incorporatedBlock.Height
 
-	// check if we are dealing with finalized block or an orphan
+	// For incorporating blocks at heights that are already finalized, we check that the incorporating block
+	// is on the finalized fork. Otherwise, the incorporating block is orphaned, and we can drop the result.
 	if incorporatedAtHeight <= c.counterLastFinalizedHeight.Value() {
 		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
 		if err != nil {
@@ -266,14 +264,14 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 		}
 	}
 
-	// in case block is not finalized, we will create collector and start processing approvals
-	// no checks for orphans can be made at this point
-	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
+	// Get (or create) assignment collector for the respective result (atomic operation) and
+	// add the assignment for the incorporated result to it. (No-op if assignment already known).
+	// Here, we just add assignment collectors to the tree. Cleanup of orphaned and sealed assignments
+	// IRs whenever new finalized block is processed
 	lazyCollector, err := c.collectorTree.GetOrCreateCollector(incRes.Result)
 	if err != nil {
 		return fmt.Errorf("cannot create collector: %w", err)
 	}
-
 	err = lazyCollector.Collector.ProcessIncorporatedResult(incRes)
 	if err != nil {
 		return fmt.Errorf("could not process incorporated incRes: %w", err)
