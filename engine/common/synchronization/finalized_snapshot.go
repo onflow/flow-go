@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/state/protocol"
-	"github.com/rs/zerolog"
 )
 
 // finalizedSnapshot is a helper structure which contains latest finalized header and participants list
