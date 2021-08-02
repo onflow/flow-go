@@ -49,10 +49,10 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
-      if: ${{ env.GITHUB_ACTOR != 'bors' }}
+      if: github.actor != 'bors[bot]'
       run: make ci
     - name: Run tests (Bors)
-      if: ${{ env.GITHUB_ACTOR == 'bors' }}
+      if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
@@ -86,10 +86,10 @@ jobs:
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests
-      if: ${{ env.GITHUB_ACTOR != 'bors' }}
+      if: github.actor != 'bors[bot]'
       run: make ci-integration
     - name: Run tests (Bors)
-      if: ${{ env.GITHUB_ACTOR == 'bors' }}
+      if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 15
