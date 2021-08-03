@@ -1,7 +1,6 @@
 package synchronization
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -30,25 +29,17 @@ type FinalizedSnapshotCache struct {
 	lastFinalizedSnapshot     *finalizedSnapshot
 	finalizationEventNotifier engine.Notifier // notifier for finalization events
 
-	lm                *lifecycle.LifecycleManager
-	shutdownCompleted chan struct{} // used to signal that shutdown of finalization processing loop was completed
-
-	ctx    context.Context
-	cancel context.CancelFunc
+	lm *lifecycle.LifecycleManager
 }
 
 // NewFinalizedSnapshotCache creates a new finalized snapshot cache.
 func NewFinalizedSnapshotCache(log zerolog.Logger, state protocol.State, participantsFilter flow.IdentityFilter) (*FinalizedSnapshotCache, error) {
-	ctx, cancel := context.WithCancel(context.Background())
 
 	cache := &FinalizedSnapshotCache{
-		state:             state,
-		identityFilter:    participantsFilter,
-		lm:                lifecycle.NewLifecycleManager(),
-		ctx:               ctx,
-		cancel:            cancel,
-		shutdownCompleted: make(chan struct{}),
-		log:               log.With().Str("component", "finalized_snapshot_cache").Logger(),
+		state:          state,
+		identityFilter: participantsFilter,
+		lm:             lifecycle.NewLifecycleManager(),
+		log:            log.With().Str("component", "finalized_snapshot_cache").Logger(),
 	}
 
 	err := cache.updateSnapshot()
@@ -98,17 +89,13 @@ func (f *FinalizedSnapshotCache) updateSnapshot() error {
 
 func (f *FinalizedSnapshotCache) Ready() <-chan struct{} {
 	f.lm.OnStart(func() {
-		go f.finalizationProcessingLoop(f.ctx)
+		go f.finalizationProcessingLoop()
 	})
 	return f.lm.Started()
 }
 
 func (f *FinalizedSnapshotCache) Done() <-chan struct{} {
-	f.cancel()
-	f.lm.OnStop(func() {
-		// wait for finalization processing loop to shutdown
-		<-f.shutdownCompleted
-	})
+	f.lm.OnStop()
 	return f.lm.Stopped()
 }
 
@@ -122,12 +109,11 @@ func (f *FinalizedSnapshotCache) OnFinalizedBlock(flow.Identifier) {
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (f *FinalizedSnapshotCache) finalizationProcessingLoop(ctx context.Context) {
-	defer close(f.shutdownCompleted)
+func (f *FinalizedSnapshotCache) finalizationProcessingLoop() {
 	notifier := f.finalizationEventNotifier.Channel()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-f.lm.ShutdownSignal():
 			return
 		case <-notifier:
 			err := f.updateSnapshot()
