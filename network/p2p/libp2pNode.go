@@ -512,8 +512,6 @@ func WithDefaultLibP2PHost(
 			return fmt.Errorf("could not generate libp2p key: %w", err)
 		}
 
-		var connGater *connGater
-
 		ip, port, err := net.SplitHostPort(address)
 		if err != nil {
 			return fmt.Errorf("could not split node address %s:%w", address, err)
@@ -539,18 +537,24 @@ func WithDefaultLibP2PHost(
 		options := []config.Option{
 			libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 			libp2p.Identity(libp2pKey),          // pass in the networking key
-			libp2p.ConnectionManager(conMgr),    // set the connection manager
 			transport,                           // set the protocol
 			libp2p.Ping(true),                   // enable ping
+		}
+
+		if conMgr != nil {
+			options = append(options, libp2p.ConnectionManager(conMgr)) // set the connection manager
+			node.connMgr = conMgr
 		}
 
 		// if allowlisting is enabled, create a connection gator with allowListAddrs
 		if allowList {
 			// create a connection gater
-			connGater = newConnGater(node.logger)
+			connGater := newConnGater(node.logger)
 
 			// provide the connection gater as an option to libp2p
 			options = append(options, libp2p.ConnectionGater(connGater))
+
+			node.connGater = connGater
 		}
 
 		// create the libp2p host
@@ -560,7 +564,6 @@ func WithDefaultLibP2PHost(
 		}
 
 		node.host = libP2PHost
-		node.connGater = connGater
 
 		return nil
 	}
