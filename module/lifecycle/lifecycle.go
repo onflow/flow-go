@@ -57,7 +57,6 @@ type LifecycleManager struct {
 	stopped           chan struct{} // used to signal that shutdown has completed
 	startupCommenced  bool          // indicates whether OnStart() has been invoked
 	shutdownCommenced bool          // indicates whether OnStop() has been invoked
-	startupSignal     chan struct{} // used to signal that startup has commenced
 	shutdownSignal    chan struct{} // used to signal that shutdown has commenced
 }
 
@@ -68,7 +67,6 @@ func NewLifecycleManager() *LifecycleManager {
 		started:           make(chan struct{}),
 		shutdownCommenced: false,
 		stopped:           make(chan struct{}),
-		startupSignal:     make(chan struct{}),
 		shutdownSignal:    make(chan struct{}),
 	}
 }
@@ -86,7 +84,6 @@ func (lm *LifecycleManager) OnStart(startupFns ...func()) {
 	lm.stateTransition.Unlock()
 
 	go func() {
-		close(lm.startupSignal)
 		for _, fn := range startupFns {
 			fn()
 		}
@@ -106,8 +103,8 @@ func (lm *LifecycleManager) OnStop(shutdownFns ...func()) {
 	lm.shutdownCommenced = true
 	lm.stateTransition.Unlock()
 
+	close(lm.shutdownSignal)
 	go func() {
-		close(lm.shutdownSignal)
 		if lm.startupCommenced {
 			<-lm.started
 			for _, fn := range shutdownFns {
@@ -116,11 +113,6 @@ func (lm *LifecycleManager) OnStop(shutdownFns ...func()) {
 		}
 		close(lm.stopped)
 	}()
-}
-
-// ShutdownSignal returns a channel that is closed when startup has commenced.
-func (lm *LifecycleManager) StartupSignal() <-chan struct{} {
-	return lm.startupSignal
 }
 
 // ShutdownSignal returns a channel that is closed when shutdown has commenced.
