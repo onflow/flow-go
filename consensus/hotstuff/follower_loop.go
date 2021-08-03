@@ -6,8 +6,8 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/runner"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -17,7 +17,7 @@ type FollowerLoop struct {
 	followerLogic FollowerLogic
 	proposals     chan *model.Proposal
 
-	runner runner.SingleRunner // lock for preventing concurrent state transitions
+	lm *lifecycle.LifecycleManager // lock for preventing concurrent state transitions
 }
 
 // NewFollowerLoop creates an instance of EventLoop
@@ -26,7 +26,7 @@ func NewFollowerLoop(log zerolog.Logger, followerLogic FollowerLogic) (*Follower
 		log:           log,
 		followerLogic: followerLogic,
 		proposals:     make(chan *model.Proposal),
-		runner:        runner.NewSingleRunner(),
+		lm:            lifecycle.NewLifecycleManager(),
 	}, nil
 }
 
@@ -53,7 +53,7 @@ func (fl *FollowerLoop) SubmitProposal(proposalHeader *flow.Header, parentView u
 //   * known critical error: some prerequisites of the HotStuff follower have been broken
 //   * unknown critical error: bug-related
 func (fl *FollowerLoop) loop() {
-	shutdownSignal := fl.runner.ShutdownSignal()
+	shutdownSignal := fl.lm.ShutdownSignal()
 	for {
 		select { // to ensure we are not skipping over a termination signal
 		case <-shutdownSignal:
@@ -82,10 +82,21 @@ func (fl *FollowerLoop) loop() {
 // Method call will starts the FollowerLoop's internal processing loop.
 // Multiple calls are handled gracefully and the follower will only start once.
 func (fl *FollowerLoop) Ready() <-chan struct{} {
-	return fl.runner.Start(fl.loop)
+	fl.lm.OnStart(func() {
+		go func() {
+			fl.loop()
+			// there are two cases f() would exit:
+			// (a) f exited on its own without Done() being called (this is generally an internal error)
+			// (b) f exited as a reaction to Done() being called
+			// In either case, we want to abort and stop the lifecycle manager
+			fl.lm.OnStop()
+		}()
+	})
+	return fl.lm.Started()
 }
 
 // Done implements interface module.ReadyDoneAware
 func (fl *FollowerLoop) Done() <-chan struct{} {
-	return fl.runner.Abort()
+	fl.lm.OnStop()
+	return fl.lm.Stopped()
 }
