@@ -119,6 +119,8 @@ bors merge
 If the PR passes CI, it will automatically be pushed to the `master` branch. If it fails, bors will comment
 on the PR so you can fix it.
 
+See the [documentation](https://bors.tech/documentation/) for a more comprehensive list of bors commands.
+
 ## Style Guide
 
 The following is a brief summary of the coding style used in Flow. 
