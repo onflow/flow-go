@@ -199,16 +199,13 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	libP2PNode, err := p2p.NewLibP2PNode(logger,
-		id.NodeID,
-		"0.0.0.0:0",
-		p2p.NewConnManager(logger, noopMetrics),
-		key,
-		true,
-		rootBlockID,
-		pingInfoProvider,
-		psOptions...)
+	options := []p2p.NodeOption{
+		p2p.WithDefaultLibP2PHost("0.0.0.0:0", p2p.NewConnManager(logger, noopMetrics), key, true),
+		p2p.WithDefaultPubSub(psOptions...),
+		p2p.WithDefaultPingService(rootBlockID, pingInfoProvider),
+	}
 
+	libP2PNode, err := p2p.NewLibP2PNode(id.NodeID, rootBlockID, logger, options...)
 	require.NoError(t, err)
 
 	return libP2PNode

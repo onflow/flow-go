@@ -633,14 +633,14 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
 	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(log,
-		identity.NodeID,
-		identity.Address,
-		NewConnManager(log, noopMetrics),
-		key,
-		allowList,
-		rootID,
-		pingInfoProvider)
+
+	options := []NodeOption{
+		WithDefaultLibP2PHost(address, NewConnManager(log, noopMetrics), key, allowList),
+		WithDefaultPubSub(),
+		WithDefaultPingService(rootBlockID, pingInfoProvider),
+	}
+
+	n, err := NewLibP2PNode(identity.NodeID, rootID, log, options...)
 	require.NoError(t, err)
 	n.SetFlowProtocolStreamHandler(handlerFunc)
 
