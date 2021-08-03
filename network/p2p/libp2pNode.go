@@ -507,38 +507,9 @@ func WithDefaultLibP2PHost(
 
 	return func(node *Node) error {
 
-		libp2pKey, err := PrivKey(key)
+		options, err := DefaultLibP2POptions(address, key, true)
 		if err != nil {
-			return fmt.Errorf("could not generate libp2p key: %w", err)
-		}
-
-		ip, port, err := net.SplitHostPort(address)
-		if err != nil {
-			return fmt.Errorf("could not split node address %s:%w", address, err)
-		}
-
-		sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiAddressStr(ip, port))
-		if err != nil {
-			return fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
-		}
-
-		// create a transport which disables port reuse and web socket.
-		// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
-		// While this sounds great, it intermittently causes a 'broken pipe' error
-		// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
-		// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-		transport := libp2p.Transport(func(u *tptu.Upgrader) *tcp.TcpTransport {
-			tpt := tcp.NewTCPTransport(u)
-			tpt.DisableReuseport = true
-			return tpt
-		})
-
-		// gather all the options for the libp2p node
-		options := []config.Option{
-			libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
-			libp2p.Identity(libp2pKey),          // pass in the networking key
-			transport,                           // set the protocol
-			libp2p.Ping(true),                   // enable ping
+			return err
 		}
 
 		if conMgr != nil {
@@ -567,6 +538,46 @@ func WithDefaultLibP2PHost(
 
 		return nil
 	}
+}
+
+// DefaultLibP2POptions returns the standard LibP2P host options that are used for the Flow Libp2p network
+func DefaultLibP2POptions(address string, key fcrypto.PrivateKey, pingEnabled bool) ([]config.Option, error) {
+
+	libp2pKey, err := PrivKey(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
+	}
+
+	ip, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("could not split node address %s:%w", address, err)
+	}
+
+	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiAddressStr(ip, port))
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
+	}
+
+	// create a transport which disables port reuse and web socket.
+	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
+	// While this sounds great, it intermittently causes a 'broken pipe' error
+	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
+	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
+	transport := libp2p.Transport(func(u *tptu.Upgrader) *tcp.TcpTransport {
+		tpt := tcp.NewTCPTransport(u)
+		tpt.DisableReuseport = true
+		return tpt
+	})
+
+	// gather all the options for the libp2p node
+	options := []config.Option{
+		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
+		libp2p.Identity(libp2pKey),          // pass in the networking key
+		transport,                           // set the protocol
+		libp2p.Ping(pingEnabled),            // enable ping
+	}
+
+	return options, nil
 }
 
 // WithDefaultPubSub returns a NodeOption that initializes a GossipSub object for the node libp2p host with the given
