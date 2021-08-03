@@ -31,7 +31,7 @@ func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 	// ejecting a seal from mempool means that we have reached our limit and something is very bad, meaning that sealing
 	// is not actually happening.
 	// By setting high limit ~12 hours we ensure that we have some safety window for sealing to recover and make progress
-	ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
+	ejector := func(b *Backend) (flow.Identifier, flow.Entity, bool) {
 		log.Fatalf("incorporated result seals reached max capacity %d", limit)
 		panic("incorporated result seals reached max capacity")
 	}

@@ -101,18 +101,21 @@ func (b *Backdata) Hash() flow.Identifier {
 type Backend struct {
 	sync.RWMutex
 	Backdata
-	limit             uint
-	eject             EjectFunc
-	ejectionCallbacks []mempool.OnEjection
+	guaranteedCapacity uint
+	batchEject         BatchEjectFunc
+	eject              EjectFunc
+	ejectionCallbacks  []mempool.OnEjection
 }
 
 // NewBackend creates a new memory pool backend.
+// This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
 	b := Backend{
-		Backdata:          NewBackdata(),
-		limit:             uint(math.MaxUint32),
-		eject:             EjectTrueRandom,
-		ejectionCallbacks: nil,
+		Backdata:           NewBackdata(),
+		guaranteedCapacity: uint(math.MaxUint32),
+		batchEject:         EjectTrueRandomFast,
+		eject:              nil,
+		ejectionCallbacks:  nil,
 	}
 	for _, option := range options {
 		option(&b)
@@ -220,7 +223,7 @@ func (b *Backend) Size() uint {
 
 // Limit returns the maximum number of items allowed in the backend.
 func (b *Backend) Limit() uint {
-	return b.limit
+	return b.guaranteedCapacity
 }
 
 // All returns all entities from the pool.
@@ -279,23 +282,16 @@ func (b *Backend) reduce() {
 	//defer binstat.Leave(bs)
 
 	// we keep reducing the cache size until we are at limit again
-	for len(b.entities) > int(b.limit) {
-
+	// this was a loop, but the loop is now in EjectTrueRandomFast()
+	// the ejections are batched, so this call to eject() may not actually
+	// do anything until the batch threshold is reached (currently 128)
+	if len(b.entities) > int(b.guaranteedCapacity) {
 		// get the key from the eject function
-		key, _ := b.eject(b.entities)
-
-		// if the key is not actually part of the map, use stupid fallback eject
-		entity, ok := b.entities[key]
-		if !ok {
-			key, _ = EjectFakeRandom(b.entities)
-		}
-
-		// remove the key
-		delete(b.entities, key)
-
-		// notify callback
-		for _, callback := range b.ejectionCallbacks {
-			callback(entity)
+		// we don't do anything if there is an error
+		if b.batchEject != nil {
+			_ = b.batchEject(b)
+		} else {
+			_, _, _ = b.eject(b)
 		}
 	}
 }
