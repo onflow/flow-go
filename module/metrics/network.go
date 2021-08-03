@@ -24,6 +24,7 @@ type NetworkCollector struct {
 	inboundProcessTime       *prometheus.CounterVec
 	outboundConnectionCount  prometheus.Gauge
 	inboundConnectionCount   prometheus.Gauge
+	dnsLookupDuration        prometheus.Histogram
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -52,6 +53,14 @@ func NewNetworkCollector() *NetworkCollector {
 			Name:      "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
 		}, []string{LabelChannel, LabelMessage}),
+
+		dnsLookupDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_lookup_duration_ms",
+			Buckets:   []float64{1, 10, 100, 500, 1000, 2000, 50_000, 100_000},
+			Help:      "the time spent on resolving a dns lookup (including cache hits)",
+		}),
 
 		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
