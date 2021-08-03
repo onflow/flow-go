@@ -16,16 +16,28 @@ import (
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID        ChainID    // ChainID is a chain-specific value to prevent replay attacks.
-	ParentID       Identifier // ParentID is the ID of this block's parent.
-	Height         uint64
-	PayloadHash    Identifier       // PayloadHash is a hash of the payload of this block.
-	Timestamp      time.Time        // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
-	View           uint64           // View is the view number at which this block was proposed.
-	ParentVoterIDs []Identifier     // list of voters who signed the parent block
-	ParentVoterSig crypto.Signature // aggregated signature over the parent block
-	ProposerID     Identifier       // proposer identifier for the block
-	ProposerSig    crypto.Signature // signature of the proposer over the new block
+	ChainID ChainID // ChainID is a chain-specific value to prevent replay attacks.
+
+	ParentID Identifier // ParentID is the ID of this block's parent.
+
+	Height uint64 // Height is the height of the parent + 1
+
+	PayloadHash Identifier // PayloadHash is a hash of the payload of this block.
+
+	Timestamp time.Time // Timestamp is the time at which this block was proposed.
+	// The proposer can choose any time, so this should not be trusted as accurate.
+
+	View uint64 // View is the view number at which this block was proposed.
+
+	ParentVoterIDs []Identifier // List of voters who signed the parent block. Used as QC.SignerIDs
+	// aggregated signature over the parent block.
+
+	ParentVoterSig []byte // Used as QC.SigData. Not a crypto.Signature since it could be a serialization of multi sigs
+
+	ProposerID Identifier // proposer identifier for the block
+
+	ProposerSig []byte // signature of the proposer over the new block.
+	// Not a crypto.Signature, since it could be a serialization of multi sigs
 }
 
 // Body returns the immutable part of the block header.
