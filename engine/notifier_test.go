@@ -83,41 +83,43 @@ func TestNotifier_ManyNotifications(t *testing.T) {
 // sends just as many notifications with small delays. We require that
 // all workers eventually get a notification.
 func TestNotifier_ManyConsumers(t *testing.T) {
-	t.Parallel()
-	notifier := NewNotifier()
-	c := notifier.Channel()
+	singleTestRun := func(t *testing.T) {
+		t.Parallel()
+		notifier := NewNotifier()
+		c := notifier.Channel()
 
-	// spawn 100 worker routines to each wait for a notification
-	var startingWorkers sync.WaitGroup
-	pendingWorkers := atomic.NewInt32(100)
-	for i := 0; i < 100; i++ {
-		startingWorkers.Add(1)
-		go func() {
-			startingWorkers.Done()
-			<-c
-			pendingWorkers.Dec()
-		}()
+		// spawn 100 worker routines to each wait for a notification
+		var startingWorkers sync.WaitGroup
+		pendingWorkers := atomic.NewInt32(100)
+		for i := 0; i < 100; i++ {
+			startingWorkers.Add(1)
+			go func() {
+				startingWorkers.Done()
+				<-c
+				pendingWorkers.Dec()
+			}()
+		}
+		startingWorkers.Wait()
+
+		// send 100 notifications, with small delays
+		for i := 0; i < 100; i++ {
+			notifier.Notify()
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		// require that all workers got a notification
+		if !conditionEventuallySatisfied(func() bool { return pendingWorkers.Load() == 0 }, 3*time.Second, 100*time.Millisecond) {
+			require.Fail(t, "timed out", "still awaiting %d workers to get notification", pendingWorkers.Load())
+		}
 	}
-	startingWorkers.Wait()
-	time.Sleep(1 * time.Millisecond)
 
-	// send 100 notifications, with small delays
-	for i := 0; i < 100; i++ {
-		notifier.Notify()
-		time.Sleep(10 * time.Microsecond)
+	for r := 0; r < 100; r++ {
+		t.Run(fmt.Sprintf("run %d", r), singleTestRun)
 	}
-
-	// require that all workers got a notification
-	require.Eventuallyf(t,
-		func() bool { return pendingWorkers.Load() == 0 },
-		3*time.Second, 100*time.Millisecond,
-		"still awaiting %d workers to get notification", pendingWorkers.Load(),
-	)
 }
 
-// TestNotifier_AllWorkProcessed spans many worker routines and
-// sends just as many notifications with small delays. We require that
-// all workers eventually get a notification.
+// TestNotifier_AllWorkProcessed spans many routines pushing work and fewer
+// routines consuming work. We require that all worker is eventually processed.
 func TestNotifier_AllWorkProcessed(t *testing.T) {
 	singleTestRun := func(t *testing.T) {
 		t.Parallel()
@@ -128,13 +130,41 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 		scheduledWork := atomic.NewInt32(0)
 		consumedWork := atomic.NewInt32(0)
 
-		var start sync.WaitGroup
-		start.Add(1)
+		// starts the consuming first, because if we starts the production first instead, then
+		// we might finish pushing all jobs, before any of our consumer has started listening
+		// to the queue.
+		var consumersAllReady sync.WaitGroup
+		consumersAllReady.Add(5)
+
+		// 5 routines consuming work
+		for i := 0; i < 5; i++ {
+			go func() {
+				consumersAllReady.Done()
+				for consumedWork.Load() < totalWork {
+					<-notifier.Channel()
+				L:
+					for {
+						select {
+						case <-pendingWorkQueue:
+							consumedWork.Inc()
+						default:
+							break L
+						}
+					}
+				}
+			}()
+		}
+
+		// wait long enough for all consumer to be ready for new notification.
+		consumersAllReady.Wait()
+
+		var workersAllReady sync.WaitGroup
+		workersAllReady.Add(10)
 
 		// 10 routines pushing work
 		for i := 0; i < 10; i++ {
 			go func() {
-				start.Wait()
+				workersAllReady.Done()
 				for scheduledWork.Inc() <= totalWork {
 					pendingWorkQueue <- struct{}{}
 					notifier.Notify()
@@ -142,35 +172,36 @@ func TestNotifier_AllWorkProcessed(t *testing.T) {
 			}()
 		}
 
-		// 5 routines consuming work
-		for i := 0; i < 5; i++ {
-			go func() {
-				for consumedWork.Load() < totalWork {
-					<-notifier.Channel()
-					for {
-						select {
-						case <-pendingWorkQueue:
-							consumedWork.Inc()
-						default:
-							break
-						}
-					}
-				}
-			}()
-		}
-
-		time.Sleep(1 * time.Millisecond)
-		start.Done() // start routines to push work
+		// wait long enough for all workers to be started.
+		workersAllReady.Wait()
 
 		// require that all work is eventually consumed
-		require.Eventuallyf(t,
-			func() bool { return consumedWork.Load() == totalWork },
-			3*time.Second, 100*time.Millisecond,
-			"only consumed %d units of work but expecting %d", consumedWork.Load(), totalWork,
-		)
+		if !conditionEventuallySatisfied(func() bool { return consumedWork.Load() == totalWork }, 3*time.Second, 100*time.Millisecond) {
+			require.Fail(t, "timed out", "only consumed %d units of work but expecting %d", consumedWork.Load(), totalWork)
+		}
 	}
 
 	for r := 0; r < 100; r++ {
 		t.Run(fmt.Sprintf("run %d", r), singleTestRun)
+	}
+}
+
+func conditionEventuallySatisfied(condition func() bool, waitFor time.Duration, tick time.Duration) bool {
+	done := make(chan struct{})
+
+	go func() {
+		for range time.Tick(tick) {
+			if condition() {
+				close(done)
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-time.After(waitFor):
+		return false
+	case <-done:
+		return true
 	}
 }
