@@ -7,27 +7,34 @@ const (
 
 // NewSHA3_256 returns a new instance of SHA3-256 hasher.
 func NewSHA3_256() Hasher {
-	return &sha3State{
+	return &Sha3State{
 		rate:      rateSha3_256,
 		outputLen: HashLenSha3_256,
 	}
 }
 
+// Initialize a data structure
+func InitSHA3_256(sha *Sha3State) {
+	sha.rate = rateSha3_256
+	sha.outputLen = HashLenSha3_256
+}
+
+
 // NewSHA3_384 returns a new instance of SHA3-384 hasher.
 func NewSHA3_384() Hasher {
-	return &sha3State{
+	return &Sha3State{
 		rate:      rateSha3_384,
 		outputLen: HashLenSha3_384,
 	}
 }
 
 // Size returns the output size of the hash function in bytes.
-func (d *sha3State) Size() int {
+func (d *Sha3State) Size() int {
 	return d.outputLen
 }
 
 // Algorithm returns the hashing algorithm of the instance.
-func (s *sha3State) Algorithm() HashingAlgorithm {
+func (s *Sha3State) Algorithm() HashingAlgorithm {
 	switch s.outputLen {
 	case HashLenSha3_256:
 		return SHA3_256
@@ -41,7 +48,7 @@ func (s *sha3State) Algorithm() HashingAlgorithm {
 // ComputeHash calculates and returns the SHA3 digest of the input.
 // It updates the state (and therefore not thread-safe) and doesn't allow
 // further writing without calling Reset().
-func (s *sha3State) ComputeHash(data []byte) Hash {
+func (s *Sha3State) ComputeHash(data []byte) Hash {
 	s.Reset()
 	s.write(data)
 	return s.sum()
@@ -50,13 +57,13 @@ func (s *sha3State) ComputeHash(data []byte) Hash {
 // SumHash returns the SHA3-256 digest of the data written to the state.
 // It updates the state and doesn't allow further writing without
 // calling Reset().
-func (s *sha3State) SumHash() Hash {
+func (s *Sha3State) SumHash() Hash {
 	return s.sum()
 }
 
 // Write absorbs more data into the hash's state.
 // It returns the number of bytes written and never errors.
-func (d *sha3State) Write(p []byte) (int, error) {
+func (d *Sha3State) Write(p []byte) (int, error) {
 	d.write(p)
 	return len(p), nil
 }
@@ -109,7 +116,7 @@ const (
 	dsbyte = byte(0x6)
 )
 
-type sha3State struct {
+type Sha3State struct {
 	a         [25]uint64 // main state of the hash
 	buf       []byte     // points into storage
 	storage   storageBuf
@@ -118,7 +125,7 @@ type sha3State struct {
 }
 
 // Reset clears the internal state.
-func (d *sha3State) Reset() {
+func (d *Sha3State) Reset() {
 	// Zero the permutation's state.
 	for i := range d.a {
 		d.a[i] = 0
@@ -127,14 +134,14 @@ func (d *sha3State) Reset() {
 }
 
 // permute applies the KeccakF-1600 permutation.
-func (d *sha3State) permute() {
+func (d *Sha3State) permute() {
 	// xor the input into the state before applying the permutation.
 	xorIn(d, d.buf)
 	d.buf = d.storage.asBytes()[:0]
 	keccakF1600(&d.a)
 }
 
-func (d *sha3State) write(p []byte) {
+func (d *Sha3State) write(p []byte) {
 	if d.buf == nil {
 		d.buf = d.storage.asBytes()[:0]
 	}
@@ -165,7 +172,7 @@ func (d *sha3State) write(p []byte) {
 
 // pads appends the domain separation bits in dsbyte, applies
 // the multi-bitrate 10..1 padding rule, and permutes the state.
-func (d *sha3State) padAndPermute() {
+func (d *Sha3State) padAndPermute() {
 	if d.buf == nil {
 		d.buf = d.storage.asBytes()[:0]
 	}
@@ -190,7 +197,7 @@ func (d *sha3State) padAndPermute() {
 
 // Sum applies padding to the hash state and then squeezes out the desired
 // number of output bytes.
-func (d *sha3State) sum() []byte {
+func (d *Sha3State) sum() []byte {
 	hash := make([]byte, d.outputLen)
 	d.padAndPermute()
 	copyOut(hash, d)

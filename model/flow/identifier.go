@@ -93,7 +93,11 @@ func MakeID(entity interface{}) Identifier {
 	data := fingerprint.Fingerprint(entity)
 	//binstat.LeaveVal(bs1, int64(len(data)))
 	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
-	hasher := hash.NewSHA3_256()
+
+	var state hash.Sha3State
+	hash.InitSHA3_256(&state)
+
+	var hasher hash.Hasher = &state
 	hash := hasher.ComputeHash(data)
 	id := HashToID(hash)
 	//binstat.Leave(bs2)
