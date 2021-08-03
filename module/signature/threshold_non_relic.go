@@ -8,9 +8,9 @@ import (
 )
 
 func NewThresholdProvider(_ string, _ encodable.RandomBeaconPrivKey) module.ThresholdSigner {
-	panic("")
+	panic("NewThresholdProvider not supported with non-relic build")
 }
 
-func EnoughThresholdShares(size int, shares int) (bool, error) {
-	panic("")
+func EnoughThresholdShares(_ int, _ int) (bool, error) {
+	panic("EnoughThresholdShares not supported with non-relic build\"")
 }
