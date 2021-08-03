@@ -12,5 +12,5 @@ func NewThresholdProvider(_ string, _ encodable.RandomBeaconPrivKey) module.Thre
 }
 
 func EnoughThresholdShares(_ int, _ int) (bool, error) {
-	panic("EnoughThresholdShares not supported with non-relic build\"")
+	panic("EnoughThresholdShares not supported with non-relic build")
 }
