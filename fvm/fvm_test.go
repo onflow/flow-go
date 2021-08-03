@@ -417,10 +417,8 @@ func TestBlockContext_DeployContract(t *testing.T) {
 				transaction {
 					prepare(signer: AuthAccount) {
 						var s : String = ""
-						var i : Int = 0
-						while i < signer.contracts.names.length {
-							s = s.concat(signer.contracts.names[i]).concat(",")
-							i = i + 1
+						for name in signer.contracts.names {
+							s = s.concat(name).concat(",")
 						}
 						if s != "Container," {
 							panic(s)
