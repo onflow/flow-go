@@ -24,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -31,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -60,8 +62,13 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
 	}
 
+	resolver, err := dns.NewResolver(metrics)
+	if err != nil {
+		return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	}
+
 	return func() (*Node, error) {
-		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, pingInfoProvider, psOptions...)
+		return NewLibP2PNode(log, me, address, NewConnManager(log, metrics), flowKey, true, rootBlockID, pingInfoProvider, resolver, psOptions...)
 	}, nil
 }
 
@@ -89,6 +96,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 	allowList bool,
 	rootBlockID string,
 	pingInfoProvider PingInfoProvider,
+	resolver *madns.Resolver,
 	psOption ...pubsub.Option) (*Node, error) {
 
 	libp2pKey, err := PrivKey(key)
@@ -105,6 +113,7 @@ func NewLibP2PNode(logger zerolog.Logger,
 		address,
 		conMgr,
 		libp2pKey,
+		resolver,
 		allowList,
 		psOption...)
 
@@ -499,6 +508,7 @@ func bootstrapLibP2PHost(ctx context.Context,
 	address string,
 	conMgr *ConnManager,
 	key crypto.PrivKey,
+	resolver *madns.Resolver,
 	allowList bool,
 	psOption ...pubsub.Option) (host.Host, *connGater, *pubsub.PubSub, error) {
 
@@ -530,8 +540,9 @@ func bootstrapLibP2PHost(ctx context.Context,
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 		libp2p.Identity(key),                // pass in the networking key
 		libp2p.ConnectionManager(conMgr),    // set the connection manager
-		transport,                           // set the protocol
-		libp2p.Ping(true),                   // enable ping
+		libp2p.MultiaddrResolver(resolver),
+		transport,         // set the protocol
+		libp2p.Ping(true), // enable ping
 	}
 
 	// if allowlisting is enabled, create a connection gator with allowListAddrs
