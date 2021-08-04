@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
@@ -157,13 +158,10 @@ func (ss *SyncSuite) SetupTest() {
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	finalizedSnapshot, err := NewFinalizedSnapshotCache(log, ss.state, filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(ss.me.NodeID())),
-	))
+	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
 	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
 
-	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedSnapshot)
+	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader, ss.state)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -471,9 +469,9 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	// change head
 	ss.head = &finalizedBlock
 
-	err := ss.e.finalizedSnapshot.updateSnapshot()
+	err := ss.e.finalizedHeader.updateHeader()
 	require.NoError(ss.T(), err)
-	actualSnapshot := ss.e.finalizedSnapshot.get()
-	require.ElementsMatch(ss.T(), actualSnapshot.participants, ss.participants[1:])
-	require.Equal(ss.T(), actualSnapshot.head, &finalizedBlock)
+	actualHeader := ss.e.finalizedHeader.Get()
+	require.ElementsMatch(ss.T(), ss.e.getParticipants(actualHeader.Height), ss.participants[1:])
+	require.Equal(ss.T(), actualHeader, &finalizedBlock)
 }

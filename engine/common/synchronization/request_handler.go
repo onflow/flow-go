@@ -36,10 +36,10 @@ type RequestHandler struct {
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 
-	blocks            storage.Blocks
-	core              module.SyncCore
-	finalizedSnapshot *FinalizedSnapshotCache
-	con               network.Conduit // used for sending responses to requesters
+	blocks          storage.Blocks
+	core            module.SyncCore
+	finalizedHeader *FinalizedHeaderCache
+	con             network.Conduit // used for sending responses to requesters
 
 	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
@@ -54,18 +54,18 @@ func NewRequestHandler(
 	me module.Local,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedSnapshot *FinalizedSnapshotCache,
+	finalizedHeader *FinalizedHeaderCache,
 ) *RequestHandler {
 	r := &RequestHandler{
-		unit:              engine.NewUnit(),
-		lm:                lifecycle.NewLifecycleManager(),
-		me:                me,
-		log:               log.With().Str("engine", "synchronization").Logger(),
-		metrics:           metrics,
-		blocks:            blocks,
-		core:              core,
-		finalizedSnapshot: finalizedSnapshot,
-		con:               con,
+		unit:            engine.NewUnit(),
+		lm:              lifecycle.NewLifecycleManager(),
+		me:              me,
+		log:             log.With().Str("engine", "synchronization").Logger(),
+		metrics:         metrics,
+		blocks:          blocks,
+		core:            core,
+		finalizedHeader: finalizedHeader,
+		con:             con,
 	}
 
 	r.setupRequestMessageHandler()
@@ -173,7 +173,7 @@ func (r *RequestHandler) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	final := r.finalizedSnapshot.get().head
+	final := r.finalizedHeader.Get()
 
 	// queue any missing heights as needed
 	r.core.HandleHeight(final, req.Height)
@@ -202,7 +202,7 @@ func (r *RequestHandler) onSyncRequest(originID flow.Identifier, req *messages.S
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandler) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
 	// get the latest final state to know if we can fulfill the request
-	head := r.finalizedSnapshot.get().head
+	head := r.finalizedHeader.Get()
 
 	// if we don't have anything to send, we can bail right away
 	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {

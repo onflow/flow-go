@@ -622,10 +622,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore)
 	require.NoError(t, err)
 
-	finalizedSnapshot, err := synchronization.NewFinalizedSnapshotCache(node.Log, node.State, filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(node.Me.NodeID())),
-	))
+	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
 	syncEngine, err := synchronization.New(
@@ -636,12 +633,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Blocks,
 		followerEng,
 		syncCore,
-		finalizedSnapshot,
+		finalizedHeader,
+		node.State,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
-
-	finalizationDistributor.AddOnBlockFinalizedConsumer(finalizedSnapshot.OnFinalizedBlock)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,

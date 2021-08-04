@@ -6,82 +6,66 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// finalizedSnapshot is a helper structure which contains latest finalized header and participants list
-type finalizedSnapshot struct {
-	head         *flow.Header
-	participants flow.IdentityList
-}
-
-// FinalizedSnapshotCache represents a cached snapshot of the latest finalized header and participants list.
+// FinalizedHeaderCache represents the cached value of the latest finalized header.
 // It is used in Engine to access latest valid data.
-type FinalizedSnapshotCache struct {
+type FinalizedHeaderCache struct {
 	mu sync.RWMutex
 
 	log                       zerolog.Logger
 	state                     protocol.State
-	identityFilter            flow.IdentityFilter
-	lastFinalizedSnapshot     *finalizedSnapshot
+	lastFinalizedHeader       *flow.Header
 	finalizationEventNotifier engine.Notifier // notifier for finalization events
 
 	lm *lifecycle.LifecycleManager
 }
 
-// NewFinalizedSnapshotCache creates a new finalized snapshot cache.
-func NewFinalizedSnapshotCache(log zerolog.Logger, state protocol.State, participantsFilter flow.IdentityFilter) (*FinalizedSnapshotCache, error) {
-
-	cache := &FinalizedSnapshotCache{
-		state:          state,
-		identityFilter: participantsFilter,
-		lm:             lifecycle.NewLifecycleManager(),
-		log:            log.With().Str("component", "finalized_snapshot_cache").Logger(),
+// NewFinalizedHeaderCache creates a new finalized header cache.
+func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
+	cache := &FinalizedHeaderCache{
+		state: state,
+		lm:    lifecycle.NewLifecycleManager(),
+		log:   log.With().Str("component", "finalized_snapshot_cache").Logger(),
 	}
 
-	snapshot, err := cache.getSnapshot()
+	snapshot, err := cache.getHeader()
 	if err != nil {
 		return nil, fmt.Errorf("could not apply last finalized state")
 	}
 
-	cache.lastFinalizedSnapshot = snapshot
+	cache.lastFinalizedHeader = snapshot
+
+	finalizationDistributor.AddOnBlockFinalizedConsumer(cache.onFinalizedBlock)
 
 	return cache, nil
 }
 
-// get returns last locally stored snapshot which contains final header
-// and list of filtered identities
-func (f *FinalizedSnapshotCache) get() *finalizedSnapshot {
+// Get returns the last locally cached finalized header.
+func (f *FinalizedHeaderCache) Get() *flow.Header {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	return f.lastFinalizedSnapshot
+	return f.lastFinalizedHeader
 }
 
-func (f *FinalizedSnapshotCache) getSnapshot() (*finalizedSnapshot, error) {
+func (f *FinalizedHeaderCache) getHeader() (*flow.Header, error) {
 	finalSnapshot := f.state.Final()
 	head, err := finalSnapshot.Head()
 	if err != nil {
 		return nil, fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
-	// get all participant nodes from the state
-	participants, err := finalSnapshot.Identities(f.identityFilter)
-	if err != nil {
-		return nil, fmt.Errorf("could not get consensus participants at latest finalized block: %w", err)
-	}
-
-	return &finalizedSnapshot{
-		head:         head,
-		participants: participants,
-	}, nil
+	return head, nil
 }
 
-// updateSnapshot updates latest locally cached finalized snapshot
-func (f *FinalizedSnapshotCache) updateSnapshot() error {
-	snapshot, err := f.getSnapshot()
+// updateHeader updates latest locally cached finalized header.
+func (f *FinalizedHeaderCache) updateHeader() error {
+	head, err := f.getHeader()
 	if err != nil {
 		return err
 	}
@@ -89,43 +73,43 @@ func (f *FinalizedSnapshotCache) updateSnapshot() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if f.lastFinalizedSnapshot.head.Height < snapshot.head.Height {
-		f.lastFinalizedSnapshot = snapshot
+	if f.lastFinalizedHeader.Height < head.Height {
+		f.lastFinalizedHeader = head
 	}
 
 	return nil
 }
 
-func (f *FinalizedSnapshotCache) Ready() <-chan struct{} {
+func (f *FinalizedHeaderCache) Ready() <-chan struct{} {
 	f.lm.OnStart(func() {
 		go f.finalizationProcessingLoop()
 	})
 	return f.lm.Started()
 }
 
-func (f *FinalizedSnapshotCache) Done() <-chan struct{} {
+func (f *FinalizedHeaderCache) Done() <-chan struct{} {
 	f.lm.OnStop()
 	return f.lm.Stopped()
 }
 
-// OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
+// onFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
 //  (1) Updates local state of last finalized snapshot.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (f *FinalizedSnapshotCache) OnFinalizedBlock(flow.Identifier) {
+func (f *FinalizedHeaderCache) onFinalizedBlock(flow.Identifier) {
 	// notify that there is new finalized block
 	f.finalizationEventNotifier.Notify()
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
-func (f *FinalizedSnapshotCache) finalizationProcessingLoop() {
+func (f *FinalizedHeaderCache) finalizationProcessingLoop() {
 	notifier := f.finalizationEventNotifier.Channel()
 	for {
 		select {
 		case <-f.lm.ShutdownSignal():
 			return
 		case <-notifier:
-			err := f.updateSnapshot()
+			err := f.updateHeader()
 			if err != nil {
 				f.log.Fatal().Err(err).Msg("could not process latest finalized block")
 			}

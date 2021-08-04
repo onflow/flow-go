@@ -72,7 +72,7 @@ func main() {
 		chunkConsumer           *chunkconsumer.ChunkConsumer
 		blockConsumer           *blockconsumer.BlockConsumer
 		finalizationDistributor *pubsub.FinalizationDistributor
-		finalizedSnapshot       *synceng.FinalizedSnapshotCache
+		finalizedHeader         *synceng.FinalizedHeaderCache
 
 		followerEng *followereng.Engine        // the follower engine
 		collector   module.VerificationMetrics // used to collect metrics of all engines
@@ -336,17 +336,12 @@ func main() {
 			return followerEng, nil
 		}).
 		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedSnapshot, err = synceng.NewFinalizedSnapshotCache(node.Logger, node.State, filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(node.NodeID)),
-			))
+			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
 			}
 
-			finalizationDistributor.AddOnBlockFinalizedConsumer(finalizedSnapshot.OnFinalizedBlock)
-
-			return finalizedSnapshot, nil
+			return finalizedHeader, nil
 		}).
 		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
@@ -357,7 +352,8 @@ func main() {
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
-				finalizedSnapshot,
+				finalizedHeader,
+				node.State
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

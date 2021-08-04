@@ -15,12 +15,14 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -41,10 +43,11 @@ type Engine struct {
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
-	pollInterval      time.Duration
-	scanInterval      time.Duration
-	core              module.SyncCore
-	finalizedSnapshot *FinalizedSnapshotCache
+	pollInterval    time.Duration
+	scanInterval    time.Duration
+	core            module.SyncCore
+	state           protocol.State
+	finalizedHeader *FinalizedHeaderCache
 
 	requestHandler *RequestHandler // component responsible for handling requests
 
@@ -62,7 +65,8 @@ func New(
 	blocks storage.Blocks,
 	comp network.Engine,
 	core module.SyncCore,
-	finalizedSnapshot *FinalizedSnapshotCache,
+	finalizedHeader *FinalizedHeaderCache,
+	state protocol.State,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -77,17 +81,17 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:              engine.NewUnit(),
-		lm:                lifecycle.NewLifecycleManager(),
-		log:               log.With().Str("engine", "synchronization").Logger(),
-		metrics:           metrics,
-		me:                me,
-		blocks:            blocks,
-		comp:              comp,
-		core:              core,
-		pollInterval:      opt.pollInterval,
-		scanInterval:      opt.scanInterval,
-		finalizedSnapshot: finalizedSnapshot,
+		unit:            engine.NewUnit(),
+		lm:              lifecycle.NewLifecycleManager(),
+		log:             log.With().Str("engine", "synchronization").Logger(),
+		metrics:         metrics,
+		me:              me,
+		blocks:          blocks,
+		comp:            comp,
+		core:            core,
+		pollInterval:    opt.pollInterval,
+		scanInterval:    opt.scanInterval,
+		finalizedHeader: finalizedHeader,
 	}
 
 	err := e.setupResponseMessageHandler()
@@ -102,7 +106,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandler(log, metrics, con, me, blocks, core, finalizedSnapshot)
+	e.requestHandler = NewRequestHandler(log, metrics, con, me, blocks, core, finalizedHeader)
 
 	return e, nil
 }
@@ -280,7 +284,7 @@ func (e *Engine) processAvailableResponses() {
 
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
-	final := e.finalizedSnapshot.get().head
+	final := e.finalizedHeader.Get()
 	e.core.HandleHeight(final, res.Height)
 }
 
@@ -324,9 +328,10 @@ CheckLoop:
 		case <-pollChan:
 			e.pollHeight()
 		case <-scan.C:
-			snapshot := e.finalizedSnapshot.get()
-			ranges, batches := e.core.ScanPending(snapshot.head)
-			e.sendRequests(snapshot.participants, ranges, batches)
+			head := e.finalizedHeader.Get()
+			participants := e.getParticipants(head.Height)
+			ranges, batches := e.core.ScanPending(head)
+			e.sendRequests(participants, ranges, batches)
 		}
 	}
 
@@ -334,16 +339,30 @@ CheckLoop:
 	scan.Stop()
 }
 
+// getParticipants gets all of the consensus nodes from the state at the given block height.
+func (e *Engine) getParticipants(height uint64) flow.IdentityList {
+	participants, err := e.state.AtHeight(height).Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(e.me.NodeID())),
+	))
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("could not get consensus participants at block height %d", height)
+	}
+
+	return participants
+}
+
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
-	snapshot := e.finalizedSnapshot.get()
+	head := e.finalizedHeader.Get()
+	participants := e.getParticipants(head.Height)
 
 	// send the request for synchronization
 	req := &messages.SyncRequest{
 		Nonce:  rand.Uint64(),
-		Height: snapshot.head.Height,
+		Height: head.Height,
 	}
-	err := e.con.Multicast(req, synccore.DefaultPollNodes, snapshot.participants.NodeIDs()...)
+	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants.NodeIDs()...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
