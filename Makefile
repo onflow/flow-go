@@ -29,30 +29,21 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
-# relic versions in script and submodule
-export LOCAL_VERSION := $(shell git submodule status | egrep '\s[0-9a-f]' | cut -c 2-9)
-export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{8}"' ./crypto/build_dependency.sh| cut -c 16-23)
-
-.PHONY: crypto/relic
-crypto/relic:
-	rm -rf crypto/relic
-	git submodule update --init --recursive
-
 .PHONY: crypto/relic/build
-crypto/relic/build: crypto/relic
-	./crypto/relic_build.sh
+crypto/relic/build:
+	cd ./crypto &&	go generate
+
+# relic versions in script and submodule
+export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
+export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{40}"' ./crypto/build_dependency.sh | cut -c 16-55)
 
 .PHONY: crypto/relic/check
 crypto/relic/check:
 ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
-	@echo "Relic submodule version matches script, good!"
+	@echo "local relic version matches the version required by the crypto package"
 else
-	$(error Mismatch between relic submodule commit and the version in ./crypto/build_dependency.sh)
+	$(error local relic version doesn't match the version required by the crypto package)
 endif
-
-
-crypto/relic/update:
-	git submodule update --recursive
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -147,7 +138,7 @@ generate-mocks:
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
-tidy: crypto/relic/check
+tidy:
 	go mod tidy
 	cd integration; go mod tidy
 	cd crypto; go mod tidy
