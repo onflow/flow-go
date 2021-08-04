@@ -135,8 +135,8 @@ func NewCore(
 // 2) traverse forward all unfinalized(pending) blocks starting from last finalized block.
 // For each block that is being traversed we will collect execution results and process them using sealing.Core.
 func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) error {
-	finalizedSnapshot := c.state.Final()
-	finalized, err := finalizedSnapshot.Head()
+	finalizedHeader := c.state.Final()
+	finalized, err := finalizedHeader.Head()
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized block: %w", err)
 	}
@@ -193,7 +193,7 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	// at this point we have processed all results in range (lastSealedBlock, lastFinalizedBlock].
 	// Now, we add all known results for any valid block that descends from the latest finalized block:
-	validPending, err := finalizedSnapshot.ValidDescendants()
+	validPending, err := finalizedHeader.ValidDescendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}

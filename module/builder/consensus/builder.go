@@ -153,8 +153,8 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 // 2) traverse forward all unfinalized(pending) blocks starting from last finalized block.
 // For each block that is being traversed we will collect execution results and add them to execution tree.
 func (b *Builder) repopulateExecutionTree() error {
-	finalizedSnapshot := b.state.Final()
-	finalized, err := finalizedSnapshot.Head()
+	finalizedHeader := b.state.Final()
+	finalized, err := finalizedHeader.Head()
 	if err != nil {
 		return fmt.Errorf("could not retrieve finalized block: %w", err)
 	}
@@ -218,7 +218,7 @@ func (b *Builder) repopulateExecutionTree() error {
 
 	// At this point execution tree is filled with all results for blocks (lastSealedBlock, lastFinalizedBlock].
 	// Now, we add all known receipts for any valid block that descends from the latest finalized block:
-	validPending, err := finalizedSnapshot.ValidDescendants()
+	validPending, err := finalizedHeader.ValidDescendants()
 	if err != nil {
 		return fmt.Errorf("could not retrieve valid pending blocks from finalized snapshot: %w", err)
 	}
