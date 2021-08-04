@@ -74,7 +74,7 @@ unittest:
 test: generate-mocks unittest
 
 .PHONY: integration-test
-integration-test: docker-build-flow 
+integration-test: docker-build-flow
 	$(MAKE) -C integration integration-test
 
 .PHONY: benchmark
