@@ -69,7 +69,7 @@ func (f *FinalizedSnapshotCache) updateSnapshot() error {
 	// get all participant nodes from the state
 	participants, err := finalSnapshot.Identities(f.identityFilter)
 	if err != nil {
-		return fmt.Errorf("could get consensus participants at latest finalized block: %w", err)
+		return fmt.Errorf("could not get consensus participants at latest finalized block: %w", err)
 	}
 
 	f.mu.Lock()
