@@ -39,8 +39,14 @@ func Example() {
 	// register engines on the splitter network
 	fooChannel := network.Channel("foo-channel")
 	barChannel := network.Channel("bar-channel")
-	splitterNet.Register(fooChannel, fooEngine)
-	splitterNet.Register(barChannel, barEngine)
+	_, err := splitterNet.Register(fooChannel, fooEngine)
+	if err != nil {
+		fmt.Println(err)
+	}
+	_, err = splitterNet.Register(barChannel, barEngine)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// create another network that messages will be relayed to
 	relayNet := unittest.NewNetwork().OnPublish(func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
@@ -50,11 +56,20 @@ func Example() {
 
 	// create relay engine
 	channels := network.ChannelList{fooChannel, barChannel}
-	relay.New(logger, channels, splitterNet, relayNet)
+	_, err = relay.New(logger, channels, splitterNet, relayNet)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// send messages to network
-	net.Send(fooChannel, id, "foo")
-	net.Send(barChannel, id, "bar")
+	err = net.Send(fooChannel, id, "foo")
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = net.Send(barChannel, id, "bar")
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// Unordered output:
 	// Message published to relay network: channel=foo-channel, event=foo, targetIDs=[0000000000000000000000000000000000000000000000000000000000000000]

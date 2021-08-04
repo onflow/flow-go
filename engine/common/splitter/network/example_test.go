@@ -38,12 +38,24 @@ func Example() {
 
 	// register engines with splitter network
 	channel := network.Channel("foo-channel")
-	splitterNet.Register(channel, engine1)
-	splitterNet.Register(channel, engine2)
-	splitterNet.Register(channel, engine3)
+	_, err := splitterNet.Register(channel, engine1)
+	if err != nil {
+		fmt.Println(err)
+	}
+	_, err = splitterNet.Register(channel, engine2)
+	if err != nil {
+		fmt.Println(err)
+	}
+	_, err = splitterNet.Register(channel, engine3)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// send message to network
-	net.Send(channel, id, "foo")
+	err = net.Send(channel, id, "foo")
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	// Unordered output:
 	// Engine 1 received message: channel=foo-channel, originID=0194fdc2fa2ffcc041d3ff12045b73c86e4ff95ff662a5eee82abdf44a2d0b75, event=foo
