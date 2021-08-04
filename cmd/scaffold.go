@@ -104,24 +104,23 @@ type FlowNodeBuilder struct {
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
-	defaultBaseConfig := DefaultBaseConfig()
 	// bind configuration parameters
-	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultBaseConfig.nodeIDHex, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultBaseConfig.bindAddr, "address to bind on")
-	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultBaseConfig.BootstrapDir, "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultBaseConfig.timeout, "node startup / shutdown timeout")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultBaseConfig.datadir, "directory to store the protocol state")
-	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultBaseConfig.level, "level for logging output")
-	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultBaseConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
-	fnb.flags.DurationVar(&fnb.BaseConfig.unicastMessageTimeout, "unicast-timeout", defaultBaseConfig.unicastMessageTimeout, "how long a unicast transmission can take to complete")
-	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultBaseConfig.metricsPort, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultBaseConfig.profilerEnabled, "whether to enable the auto-profiler")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultBaseConfig.profilerDir, "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultBaseConfig.profilerInterval,
+	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", fnb.BaseConfig.nodeIDHex, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", fnb.BaseConfig.bindAddr, "address to bind on")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", fnb.BaseConfig.BootstrapDir, "path to the bootstrap directory")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", fnb.BaseConfig.timeout, "node startup / shutdown timeout")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", fnb.BaseConfig.datadir, "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", fnb.BaseConfig.level, "level for logging output")
+	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", fnb.BaseConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
+	fnb.flags.DurationVar(&fnb.BaseConfig.unicastMessageTimeout, "unicast-timeout", fnb.BaseConfig.unicastMessageTimeout, "how long a unicast transmission can take to complete")
+	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", fnb.BaseConfig.metricsPort, "port for /metrics endpoint")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", fnb.BaseConfig.profilerEnabled, "whether to enable the auto-profiler")
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", fnb.BaseConfig.profilerDir, "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", fnb.BaseConfig.profilerInterval,
 		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultBaseConfig.profilerDuration,
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", fnb.BaseConfig.profilerDuration,
 		"the duration to run the auto-profile for")
-	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultBaseConfig.tracerEnabled,
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", fnb.BaseConfig.tracerEnabled,
 		"whether to enable tracer")
 }
 
@@ -643,15 +642,38 @@ func (fnb *FlowNodeBuilder) PostInit(f func(builder NodeBuilder, node *NodeConfi
 	return fnb
 }
 
+type Option func(*BaseConfig)
+
+func WithBootstrapDir(bootstrapDir string) Option {
+	return func(config *BaseConfig) {
+		config.BootstrapDir = bootstrapDir
+	}
+}
+
+func WithNodeID(nodeID flow.Identifier) Option {
+	return func(config *BaseConfig) {
+		config.nodeIDHex = nodeID.String()
+	}
+}
+
+func WithDataDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		config.datadir = dataDir
+	}
+}
+
 // FlowNode creates a new Flow node builder with the given name.
-func FlowNode(role string) *FlowNodeBuilder {
+func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
+	config := DefaultBaseConfig()
+	config.NodeRole = role
+	for _, opt := range opts {
+		opt(config)
+	}
 
 	builder := &FlowNodeBuilder{
 		NodeConfig: &NodeConfig{
-			BaseConfig: BaseConfig{
-				NodeRole: role,
-			},
-			Logger: zerolog.New(os.Stderr),
+			BaseConfig: *config,
+			Logger:     zerolog.New(os.Stderr),
 		},
 		flags: pflag.CommandLine,
 		lm:    lifecycle.NewLifecycleManager(),

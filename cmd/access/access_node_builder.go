@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
@@ -77,6 +78,7 @@ type AccessNodeConfig struct {
 	logTxTimeToFinalizedExecuted bool
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
+	baseOptions                  []cmd.Option
 }
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
@@ -129,6 +131,7 @@ type FlowAccessNodeBuilder struct {
 	SyncCore                   *synchronization.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *pubsub.FinalizationDistributor
+	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
 	ConCache                   *buffer.PendingBlocks // pending block cache for follower
 	TransactionTimings         *stdmap.TransactionTimings
@@ -144,10 +147,35 @@ type FlowAccessNodeBuilder struct {
 	FollowerEng *followereng.Engine
 }
 
-func FlowAccessNode() *FlowAccessNodeBuilder {
+type Option func(*AccessNodeConfig)
+
+func WithUpstreamAccessNodeID(upstreamAccessNodeID flow.Identifier) Option {
+	return func(config *AccessNodeConfig) {
+		config.stakedAccessNodeIDHex = upstreamAccessNodeID.String()
+	}
+}
+
+func WithUnstakedNetworkBindAddr(bindAddr string) Option {
+	return func(config *AccessNodeConfig) {
+		config.unstakedNetworkBindAddr = bindAddr
+	}
+}
+
+func WithBaseOptions(baseOptions []cmd.Option) Option {
+	return func(config *AccessNodeConfig) {
+		config.baseOptions = baseOptions
+	}
+}
+
+func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
+	config := DefaultAccessNodeConfig()
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig: &AccessNodeConfig{},
-		FlowNodeBuilder:  cmd.FlowNode(flow.RoleAccess.String()),
+		AccessNodeConfig: config,
+		FlowNodeBuilder:  cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
 	}
 }
 func (builder *FlowAccessNodeBuilder) IsStaked() bool {
