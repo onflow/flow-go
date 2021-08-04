@@ -65,7 +65,7 @@ func (t *AssignmentCollectorTree) GetSize() uint64 {
 }
 
 // GetCollector returns assignment collector for the given result.
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollectorState {
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollector {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
@@ -225,7 +225,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []Ass
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
-	Collector AssignmentCollectorState
+	Collector AssignmentCollector
 	Created   bool // whether collector was created or retrieved from cache
 }
 
@@ -268,7 +268,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
 	}
 	t.forest.AddVertex(vertex)
-	t.size += 1
+	t.size += 1 // TODO: caution this is imprecise. If we have already concurrenlty pruned
 
 	// An assignment collector is processable if and only if:
 	// either (i) the parent result is the latest sealed result (seal is finalized)
