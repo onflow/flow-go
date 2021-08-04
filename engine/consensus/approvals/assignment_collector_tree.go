@@ -251,7 +251,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 
 	// Initial check showed that there was no collector. However, it's possible that after the
 	// initial check but before acquiring the lock to add the newly-created collector, another
-	// goroutine already added the needed collector. Hence check again after acquiring the lock:
+	// goroutine already added the needed collector. Hence, check again after acquiring the lock:
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	v, found := t.forest.GetVertex(resultID)
@@ -294,7 +294,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 
 // pruneUpToHeight prunes all assignment collectors for results with height up to but
 // NOT INCLUDING `limit`. Noop, if limit is lower than the previous value (caution:
-// this is different than the levelled forest's convention).
+// this is different from the levelled forest's convention).
 // This function is NOT concurrency safe.
 func (t *AssignmentCollectorTree) pruneUpToHeight(limit uint64) error {
 	if t.forest.LowestLevel >= limit {
