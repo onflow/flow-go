@@ -277,19 +277,19 @@ func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (
 	)
 }
 
-// retry makes maxRetry attempts to executed function f, with retryMilliseconds
-// between each attempt. It returns an error if all attemps failed.
+// retry makes maxRetry attempts to executed function f. After the nth attempt,
+// we wait retryMilliseconds*2^n ms before retrying. Returns an error after
+// maxRetry unsuccessful attempts.
 func (b *Broker) retry(f func() error, maxRetry int, retryMilliseconds int) bool {
-	success := false
 	for attempt := 1; attempt <= maxRetry; attempt++ {
 		err := f()
 		if err != nil {
 			b.log.Warn().Err(err).Msgf("attempt %d/%d failed", attempt, maxRetry)
-			time.Sleep(RETRY_MILLISECONDS * time.Millisecond)
+			wait := time.Duration(retryMilliseconds<<(attempt-1)) * time.Millisecond
+			time.Sleep(wait)
 			continue
 		}
-		success = true
-		break
+		return true
 	}
-	return success
+	return false
 }
