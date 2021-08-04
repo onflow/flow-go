@@ -412,13 +412,7 @@ func mockChunksQueueForAssignment(t *testing.T,
 		require.Contains(t, assignment.ByNodeID(verId), locator.Index)
 
 		wg.Done()
-	}).Return(
-		func(locator *chunks.Locator) bool {
-			return returnBool
-		},
-		func(locator *chunks.Locator) error {
-			return returnError
-		})
+	}).Return(returnBool, returnError)
 
 	return wg
 }
