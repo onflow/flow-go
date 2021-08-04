@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -199,6 +200,9 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
+	resolver, err := dns.NewResolver(noopMetrics)
+	require.NoError(t, err)
+
 	libP2PNode, err := p2p.NewLibP2PNode(logger,
 		id.NodeID,
 		"0.0.0.0:0",
@@ -207,6 +211,7 @@ func generateLibP2PNode(t *testing.T,
 		true,
 		rootBlockID,
 		pingInfoProvider,
+		resolver,
 		psOptions...)
 
 	require.NoError(t, err)

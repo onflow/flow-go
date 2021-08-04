@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -171,7 +172,21 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, pingInfoProvider, psOption)
+
+		resolver, err := dns.NewResolver(metrics.NewNoopCollector())
+		require.NoError(suite.T(), err)
+
+		n, err := NewLibP2PNode(logger,
+			flow.Identifier{},
+			"0.0.0.0:0",
+			NewConnManager(logger, noopMetrics),
+			key,
+			false,
+			rootBlockID,
+			pingInfoProvider,
+			resolver,
+			psOption)
+
 		require.NoError(suite.T(), err)
 		n.SetFlowProtocolStreamHandler(handlerFunc)
 

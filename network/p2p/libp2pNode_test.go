@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -632,6 +633,9 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
+	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
+	require.NoError(t, err)
+
 	noopMetrics := metrics.NewNoopCollector()
 	n, err := NewLibP2PNode(log,
 		identity.NodeID,
@@ -640,7 +644,8 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		key,
 		allowList,
 		rootID,
-		pingInfoProvider)
+		pingInfoProvider,
+		resolver)
 	require.NoError(t, err)
 	n.SetFlowProtocolStreamHandler(handlerFunc)
 
