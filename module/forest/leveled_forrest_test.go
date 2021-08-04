@@ -291,10 +291,11 @@ func TestLevelledForest_GetSize_PruningTwice(t *testing.T) {
 		parentLevel = i
 	}
 	assert.NoError(t, F.PruneUpToLevel(numberOfNodes/2))
+	size := F.GetSize()
+	
 	assert.NoError(t, F.PruneUpToLevel(numberOfNodes/2))
-	// pruning removes element till some level but not including, that's why if we prune
-	// to numberOfNodes/2 then we actually expect elements with level >= numberOfNodes/2
-	assert.Equal(t, numberOfNodes/2+1, F.GetSize())
+	// pruning again with the same level should not change size
+	assert.Equal(t, size, F.GetSize())
 }
 
 // TestLevelledForest_GetSize_DuplicatedNodes tests that GetSize returns valid size when adding duplicated nodes
