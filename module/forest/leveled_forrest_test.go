@@ -292,7 +292,7 @@ func TestLevelledForest_GetSize_PruningTwice(t *testing.T) {
 	}
 	assert.NoError(t, F.PruneUpToLevel(numberOfNodes/2))
 	size := F.GetSize()
-	
+
 	assert.NoError(t, F.PruneUpToLevel(numberOfNodes/2))
 	// pruning again with the same level should not change size
 	assert.Equal(t, size, F.GetSize())
@@ -301,15 +301,14 @@ func TestLevelledForest_GetSize_PruningTwice(t *testing.T) {
 // TestLevelledForest_GetSize_DuplicatedNodes tests that GetSize returns valid size when adding duplicated nodes
 func TestLevelledForest_GetSize_DuplicatedNodes(t *testing.T) {
 	F := NewLevelledForest(0)
-	numberOfNodes := uint64(10)
-	parentLevel := uint64(0)
-	vertexId := strconv.FormatUint(1, 10)
-	parentId := strconv.FormatUint(parentLevel, 10)
-	for i := uint64(1); i <= numberOfNodes; i++ {
-		// add 10 nodes at same level
-		F.AddVertex(NewVertexMock(vertexId, i, parentId, parentLevel))
+	for _, vertex := range TestVertices {
+		F.AddVertex(vertex)
 	}
-	assert.Equal(t, uint64(1), F.GetSize())
+	size := F.GetSize()
+	for _, vertex := range TestVertices {
+		F.AddVertex(vertex)
+	}
+	assert.Equal(t, size, F.GetSize())
 }
 
 // TestLevelledForest_GetVertex tests that Vertex blob is returned properly
