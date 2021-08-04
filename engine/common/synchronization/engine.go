@@ -92,6 +92,7 @@ func New(
 		pollInterval:    opt.pollInterval,
 		scanInterval:    opt.scanInterval,
 		finalizedHeader: finalizedHeader,
+		state:           state,
 	}
 
 	err := e.setupResponseMessageHandler()
