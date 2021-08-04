@@ -68,7 +68,7 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		for l, vertices := range f.verticesAtLevel {
 			if l < level {
 				for _, v := range vertices {
-					if !v.isEmptyContainer() {
+					if !f.isEmptyContainer(v) {
 						elementsPruned++
 					}
 					delete(f.vertices, v.id)
@@ -80,7 +80,7 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		for l := f.LowestLevel; l < level; l++ {
 			verticesAtLevel := f.verticesAtLevel[l]
 			for _, v := range verticesAtLevel { // nil map behaves like empty map when iterating over it
-				if !v.isEmptyContainer() {
+				if !f.isEmptyContainer(v) {
 					elementsPruned++
 				}
 				delete(f.vertices, v.id)
@@ -115,7 +115,7 @@ func (f *LevelledForest) GetVertex(id flow.Identifier) (Vertex, bool) {
 	return container.vertex, true
 }
 
-// GetSize returns the total number of vertices above the pruned lowest level. 
+// GetSize returns the total number of vertices above the pruned lowest level.
 // Note this call is not concurrent-safe, caller is responsible to ensure concurrency safety.
 func (f *LevelledForest) GetSize() uint64 {
 	return f.size
