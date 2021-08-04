@@ -59,6 +59,7 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 func (t *AssignmentCollectorTree) GetSize() uint64 {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
+	//locking is still needed, since forest.GetSize is not concurrent safe.
 	return t.forest.GetSize()
 }
 
