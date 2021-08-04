@@ -16,16 +16,16 @@ const defaultVoteAggregatorWorkers = 8
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregator struct {
-	unit                 *engine.Unit
-	log                  zerolog.Logger
-	notifier             hotstuff.Consumer
-	committee            hotstuff.Committee
-	voteValidator        hotstuff.Validator
-	signer               hotstuff.SignerVerifier
-	highestPrunedView    counters.StrictMonotonousCounter
-	collectors           VoteCollectors
-	pendingVotesNotifier engine.Notifier
-	pendingVotes         *fifoqueue.FifoQueue // keeps track of votes whose blocks can not be found
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	notifier            hotstuff.Consumer
+	committee           hotstuff.Committee
+	voteValidator       hotstuff.Validator
+	signer              hotstuff.SignerVerifier
+	highestPrunedView   counters.StrictMonotonousCounter
+	collectors          VoteCollectors
+	queuedVotesNotifier engine.Notifier
+	queuedVotes         *fifoqueue.FifoQueue // keeps track of votes whose blocks can not be found
 }
 
 // New creates an instance of vote aggregator
@@ -57,7 +57,7 @@ func (va *VoteAggregator) Done() <-chan struct{} {
 }
 
 func (va *VoteAggregator) pendingVotesProcessingLoop() {
-	notifier := va.pendingVotesNotifier.Channel()
+	notifier := va.queuedVotesNotifier.Channel()
 	for {
 		select {
 		case <-va.unit.Quit():
@@ -79,11 +79,11 @@ func (va *VoteAggregator) processPendingVoteEvents() error {
 		default:
 		}
 
-		msg, ok := va.pendingVotes.Pop()
+		msg, ok := va.queuedVotes.Pop()
 		if ok {
 			err := va.processPendingVote(msg.(*model.Vote))
 			if err != nil {
-				return fmt.Errorf("could not process incorporated block: %w", err)
+				return fmt.Errorf("could not process pending vote: %w", err)
 			}
 			continue
 		}
@@ -100,7 +100,7 @@ func (va *VoteAggregator) processPendingVote(vote *model.Vote) error {
 		return fmt.Errorf("could not lazy init collector for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
 	}
-	err = lazyInitCollector.Collector.AddVote(vote)
+	err = lazyInitCollector.AddVote(vote)
 	if err != nil {
 		return fmt.Errorf("could not process vote for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
@@ -117,8 +117,8 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) error {
 
 	// It's ok to silently drop votes in case our processing pipeline is full.
 	// It means that we are probably catching up.
-	if ok := va.pendingVotes.Push(vote); ok {
-		va.pendingVotesNotifier.Notify()
+	if ok := va.queuedVotes.Push(vote); ok {
+		va.queuedVotesNotifier.Notify()
 	}
 
 	return nil
