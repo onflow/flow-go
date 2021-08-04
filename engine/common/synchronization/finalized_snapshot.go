@@ -42,10 +42,12 @@ func NewFinalizedSnapshotCache(log zerolog.Logger, state protocol.State, partici
 		log:            log.With().Str("component", "finalized_snapshot_cache").Logger(),
 	}
 
-	err := cache.updateSnapshot()
+	snapshot, err := cache.getSnapshot()
 	if err != nil {
 		return nil, fmt.Errorf("could not apply last finalized state")
 	}
+
+	cache.lastFinalizedSnapshot = snapshot
 
 	return cache, nil
 }
@@ -58,30 +60,37 @@ func (f *FinalizedSnapshotCache) get() *finalizedSnapshot {
 	return f.lastFinalizedSnapshot
 }
 
-// updateSnapshot updates latest locally cached finalized snapshot
-func (f *FinalizedSnapshotCache) updateSnapshot() error {
+func (f *FinalizedSnapshotCache) getSnapshot() (*finalizedSnapshot, error) {
 	finalSnapshot := f.state.Final()
 	head, err := finalSnapshot.Head()
 	if err != nil {
-		return fmt.Errorf("could not get last finalized header: %w", err)
+		return nil, fmt.Errorf("could not get last finalized header: %w", err)
 	}
 
 	// get all participant nodes from the state
 	participants, err := finalSnapshot.Identities(f.identityFilter)
 	if err != nil {
-		return fmt.Errorf("could not get consensus participants at latest finalized block: %w", err)
+		return nil, fmt.Errorf("could not get consensus participants at latest finalized block: %w", err)
+	}
+
+	return &finalizedSnapshot{
+		head:         head,
+		participants: participants,
+	}, nil
+}
+
+// updateSnapshot updates latest locally cached finalized snapshot
+func (f *FinalizedSnapshotCache) updateSnapshot() error {
+	snapshot, err := f.getSnapshot()
+	if err != nil {
+		return err
 	}
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	if f.lastFinalizedSnapshot != nil && f.lastFinalizedSnapshot.head.Height >= head.Height {
-		return nil
-	}
-
-	f.lastFinalizedSnapshot = &finalizedSnapshot{
-		head:         head,
-		participants: participants,
+	if f.lastFinalizedSnapshot.head.Height < snapshot.head.Height {
+		f.lastFinalizedSnapshot = snapshot
 	}
 
 	return nil
