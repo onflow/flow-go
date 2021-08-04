@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p-core/discovery"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -21,7 +21,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -42,47 +41,26 @@ func (suite *PubSubTestSuite) SetupTest() {
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
-type mockDiscovery struct {
-	peerLock sync.Mutex
-	peers    []peer.AddrInfo
-}
-
-func (s *mockDiscovery) SetPeers(peers []peer.AddrInfo) {
-	s.peerLock.Lock()
-	defer s.peerLock.Unlock()
-	s.peers = peers
-}
-
-func (s *mockDiscovery) Advertise(_ context.Context, _ string, _ ...discovery.Option) (time.Duration, error) {
-	return time.Second, nil
-}
-
-func (s *mockDiscovery) FindPeers(_ context.Context, _ string, _ ...discovery.Option) (<-chan peer.AddrInfo, error) {
-	defer s.peerLock.Unlock()
-	s.peerLock.Lock()
-	count := len(s.peers)
-	ch := make(chan peer.AddrInfo, count)
-	for _, reg := range s.peers {
-		ch <- reg
-	}
-	close(ch)
-	return ch, nil
-}
-
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message
 func (suite *PubSubTestSuite) TestPubSub() {
 	defer suite.cancel()
-	topic := flownet.Topic("testtopic/" + unittest.IdentifierFixture().String())
+	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 4
-	golog.SetAllLoggers(golog.LevelError)
+	golog.SetAllLoggers(golog.LevelDebug)
 
 	// Step 1: Creates nodes
-	d := &mockDiscovery{}
+	dhtServerNodes := suite.CreateNodes(1, true)
+	require.Len(suite.T(), dhtServerNodes, 1)
+	dhtServerNode := dhtServerNodes[0]
+	dhtClientNodes := suite.CreateNodes(count-1, false)
 
-	nodes := suite.CreateNodes(count, d)
+	nodes := append(dhtServerNodes, dhtClientNodes...)
+
 	defer suite.StopNodes(nodes)
 
-	// Step 2: Subscribe to a Flow topic
+
+
+	// Step 2: Subscribe to the test topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan flow.Identifier, count)
@@ -91,15 +69,15 @@ func (suite *PubSubTestSuite) TestPubSub() {
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(suite.ctx)
-			require.NoError(suite.Suite.T(), err)
-			require.NotNil(suite.Suite.T(), msg)
-			assert.Equal(suite.Suite.T(), []byte("hello"), msg.Data)
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), msg)
+			assert.Equal(suite.T(), []byte("hello"), msg.Data)
 			ch <- m
 		}
 
 		// Subscribes to the test topic
 		s, err := n.Subscribe(suite.ctx, topic)
-		require.NoError(suite.Suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		// kick off the reader
 		go subReader(s)
@@ -107,20 +85,26 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	}
 
 	// Step 3: Now setup discovery to allow nodes to find each other
-	var pInfos []peer.AddrInfo
-	for _, n := range nodes {
-		id := n.host.ID()
-		addrs := n.host.Addrs()
-		pInfos = append(pInfos, peer.AddrInfo{ID: id, Addrs: addrs})
+	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
+	for _, clientNode := range dhtClientNodes {
+		err := clientNode.host.Connect(suite.ctx, dhtServerAddr)
+		require.NoError(suite.T(), err)
 	}
-	// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
-	d.SetPeers(pInfos)
+	//// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
+	//d.SetPeers(pInfos)
 
 	// let the nodes discover each other
-	time.Sleep(2 * time.Second)
+	time.Sleep(40 * time.Second)
+
+	fmt.Println(dhtClientNodes[0].host.Network().Connectedness(dhtServerNode.host.ID()))
+	fmt.Println(dhtClientNodes[1].host.Network().Connectedness(dhtServerNode.host.ID()))
+	fmt.Println(dhtClientNodes[2].host.Network().Connectedness(dhtServerNode.host.ID()))
+	fmt.Println(dhtClientNodes[0].host.Network().Connectedness(dhtClientNodes[1].host.ID()))
+	fmt.Println(dhtClientNodes[1].host.Network().Connectedness(dhtClientNodes[2].host.ID()))
+	fmt.Println(dhtClientNodes[2].host.Network().Connectedness(dhtClientNodes[0].host.ID()))
 
 	// Step 4: publish a message to the topic
-	require.NoError(suite.Suite.T(), nodes[0].Publish(suite.ctx, topic, []byte("hello")))
+	require.NoError(suite.T(), dhtServerNode.Publish(suite.ctx, topic, []byte("hello")))
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
@@ -131,26 +115,26 @@ func (suite *PubSubTestSuite) TestPubSub() {
 			recv[res] = true
 		case <-time.After(3 * time.Second):
 			var missing flow.IdentifierList
-			for _, n := range nodes {
+			for _, n := range dhtClientNodes {
 				if _, found := recv[n.id]; !found {
 					missing = append(missing, n.id)
 				}
 			}
-			assert.Fail(suite.Suite.T(), " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
+			assert.Fail(suite.T(), " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
 			break
 		}
 	}
 
 	// Step 6: unsubscribes all nodes from the topic
 	for _, n := range nodes {
-		assert.NoError(suite.Suite.T(), n.UnSubscribe(topic))
+		assert.NoError(suite.T(), n.UnSubscribe(topic))
 	}
 }
 
 // CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*Node) {
+func (suite *PubSubTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node) {
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -167,13 +151,27 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 	for i := 1; i <= count; i++ {
 		_, key := generateNetworkingAndLibP2PKeys(suite.T())
 
-		noopMetrics := metrics.NewNoopCollector()
+		libP2PHostOptions, err := DefaultLibP2POptions("0.0.0.0:0", key, false)
+		require.NoError(suite.T(), err)
+
+		libP2PHost, err := libp2p.New(suite.ctx, libP2PHostOptions...)
+		require.NoError(suite.T(), err)
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
-		psOption := pubsub.WithDiscovery(d)
+
+		var dhtDiscovery *discovery.RoutingDiscovery
+		if dhtServer {
+			dhtDiscovery, err = NewDHTServer(suite.ctx, libP2PHost)
+			require.NoError(suite.T(), err)
+		} else {
+			dhtDiscovery, err = NewDHTClient(suite.ctx, libP2PHost)
+			require.NoError(suite.T(), err)
+		}
+
+		psOption := pubsub.WithDiscovery(dhtDiscovery)
 
 		options := []NodeOption{
-			WithDefaultLibP2PHost("0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false),
+			WithLibP2PHost(libP2PHost),
 			WithDefaultPubSub(psOption),
 			WithDefaultPingService(rootBlockID, pingInfoProvider),
 		}
@@ -195,7 +193,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 func (suite *PubSubTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()
-		assert.NoError(suite.Suite.T(), err)
+		assert.NoError(suite.T(), err)
 		<-done
 	}
 }
