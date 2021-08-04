@@ -101,9 +101,9 @@ func (lm *LifecycleManager) OnStop(shutdownFns ...func()) {
 		return
 	}
 	lm.shutdownCommenced = true
-	close(lm.shutdownSignal)
 	lm.stateTransition.Unlock()
 
+	close(lm.shutdownSignal)
 	go func() {
 		if lm.startupCommenced {
 			<-lm.started
@@ -115,6 +115,7 @@ func (lm *LifecycleManager) OnStop(shutdownFns ...func()) {
 	}()
 }
 
+// ShutdownSignal returns a channel that is closed when shutdown has commenced.
 func (lm *LifecycleManager) ShutdownSignal() <-chan struct{} {
 	return lm.shutdownSignal
 }
