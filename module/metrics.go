@@ -38,6 +38,9 @@ type NetworkMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+
+	// DNSLookupDuration tracks the time spent to resolve a DNS address.
+	DNSLookupDuration(duration time.Duration)
 }
 
 type EngineMetrics interface {
