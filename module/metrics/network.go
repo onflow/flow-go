@@ -136,10 +136,17 @@ func (nc *NetworkCollector) InboundProcessDuration(topic string, duration time.D
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
 }
 
+// OutboundConnections updates the metric tracking the number of outbound connections of this node
 func (nc *NetworkCollector) OutboundConnections(connectionCount uint) {
 	nc.outboundConnectionCount.Set(float64(connectionCount))
 }
 
+// InboundConnections updates the metric tracking the number of inbound connections of this node
 func (nc *NetworkCollector) InboundConnections(connectionCount uint) {
 	nc.inboundConnectionCount.Set(float64(connectionCount))
+}
+
+// DNSLookupDuration tracks the time spent to resolve a DNS address.
+func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
+	nc.dnsLookupDuration.Observe(float64(duration.Milliseconds()))
 }
