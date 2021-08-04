@@ -58,7 +58,7 @@ func NewNetworkCollector() *NetworkCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "dns_lookup_duration_ms",
-			Buckets:   []float64{1, 10, 100, 500, 1000, 2000, 50_000, 100_000},
+			Buckets:   []float64{1, 10, 100, 500, 1000, 2000},
 			Help:      "the time spent on resolving a dns lookup (including cache hits)",
 		}),
 
