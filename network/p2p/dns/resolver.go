@@ -6,22 +6,20 @@ import (
 	"time"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
-	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module"
 )
 
 type Resolver struct {
 	res       madns.BasicResolver
-	collector metrics.NetworkCollector
-	logger    zerolog.Logger
+	collector module.NetworkMetrics
 }
 
-func NewResolver(res madns.BasicResolver, collector metrics.NetworkCollector) *Resolver {
-	return &Resolver{
-		res:       res,
+func NewResolver(collector module.NetworkMetrics) (*madns.Resolver, error) {
+	return madns.NewResolver(madns.WithDefaultResolver(&Resolver{
+		res:       madns.DefaultResolver,
 		collector: collector,
-	}
+	}))
 }
 
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
