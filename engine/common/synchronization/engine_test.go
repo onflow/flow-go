@@ -472,6 +472,6 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	err := ss.e.finalizedHeader.updateHeader()
 	require.NoError(ss.T(), err)
 	actualHeader := ss.e.finalizedHeader.Get()
-	require.ElementsMatch(ss.T(), ss.e.getParticipants(actualHeader.Height), ss.participants[1:])
+	require.ElementsMatch(ss.T(), ss.e.getParticipants(actualHeader.ID()), ss.participants[1:])
 	require.Equal(ss.T(), actualHeader, &finalizedBlock)
 }

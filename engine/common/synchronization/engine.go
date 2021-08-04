@@ -329,7 +329,7 @@ CheckLoop:
 			e.pollHeight()
 		case <-scan.C:
 			head := e.finalizedHeader.Get()
-			participants := e.getParticipants(head.Height)
+			participants := e.getParticipants(head.ID())
 			ranges, batches := e.core.ScanPending(head)
 			e.sendRequests(participants, ranges, batches)
 		}
@@ -339,14 +339,14 @@ CheckLoop:
 	scan.Stop()
 }
 
-// getParticipants gets all of the consensus nodes from the state at the given block height.
-func (e *Engine) getParticipants(height uint64) flow.IdentityList {
-	participants, err := e.state.AtHeight(height).Identities(filter.And(
+// getParticipants gets all of the consensus nodes from the state at the given block ID.
+func (e *Engine) getParticipants(blockID flow.Identifier) flow.IdentityList {
+	participants, err := e.state.AtBlockID(blockID).Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not get consensus participants at block height %d", height)
+		e.log.Fatal().Err(err).Msgf("could not get consensus participants at block ID %v", blockID)
 	}
 
 	return participants
@@ -355,7 +355,7 @@ func (e *Engine) getParticipants(height uint64) flow.IdentityList {
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
 	head := e.finalizedHeader.Get()
-	participants := e.getParticipants(head.Height)
+	participants := e.getParticipants(head.ID())
 
 	// send the request for synchronization
 	req := &messages.SyncRequest{
