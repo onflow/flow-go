@@ -8,10 +8,10 @@ RELIC_DIR="${PKG_DIR}/${RELIC_DIR_NAME}"
 
 # grant permissions if not existant
 if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
-   sudo chmod -R 755 ${PKG_DIR}
+   sudo chmod -R 755 "${PKG_DIR}"
 fi
 
-rm -rf ${RELIC_DIR}
+rm -rf "${RELIC_DIR}"
 
 # relic version or tag
 relic_version="9206ae50b667de160fcc385ba3dc2c920143ab0a"
@@ -22,7 +22,7 @@ relic_version="9206ae50b667de160fcc385ba3dc2c920143ab0a"
 # clone all the history if the version is only defined by a commit hash.
 git -c http.sslVerify=true clone --branch main --single-branch https://github.com/relic-toolkit/relic.git ${RELIC_DIR_NAME} || { echo "git clone failed"; exit 1; }
 
-if [ -d ${RELIC_DIR} ]
+if [ -d "${RELIC_DIR}" ]
 then
    (
       cd ${RELIC_DIR_NAME} || { echo "cd relic failed"; exit 1; }
