@@ -29,14 +29,12 @@ func New(
 	log zerolog.Logger,
 	channel network.Channel,
 ) *Engine {
-	e := &Engine{
+	return &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "splitter").Logger(),
 		engines: make(map[module.Engine]struct{}),
 		channel: channel,
 	}
-
-	return e
 }
 
 // RegisterEngine registers a new engine with the splitter. Events
