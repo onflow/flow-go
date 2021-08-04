@@ -1,8 +1,10 @@
 package sealing
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -32,6 +34,10 @@ const defaultApprovalResponseQueueCapacity = 10000
 // defaultSealingEngineWorkers number of workers to dispatch events for sealing core
 const defaultSealingEngineWorkers = 8
 
+// defaultAssignmentCollectorsWorkerPoolCapacity is the default number of workers that is available for worker pool which is used
+// by assignment collector state machine to do transitions
+const defaultAssignmentCollectorsWorkerPoolCapacity = 4
+
 // defaultIncorporatedBlockQueueCapacity maximum capacity of block incorporated events queue
 const defaultIncorporatedBlockQueueCapacity = 1000
 
@@ -45,6 +51,7 @@ type (
 // them to `Core`. Engine runs 2 separate gorourtines that perform pre-processing and consuming messages by Core.
 type Engine struct {
 	unit                       *engine.Unit
+	workerPool                 *workerpool.WorkerPool
 	core                       consensus.SealingCore
 	log                        zerolog.Logger
 	me                         module.Local
@@ -93,6 +100,7 @@ func NewEngine(log zerolog.Logger,
 	unit := engine.NewUnit()
 	e := &Engine{
 		unit:          unit,
+		workerPool:    workerpool.New(defaultAssignmentCollectorsWorkerPoolCapacity),
 		log:           log.With().Str("engine", "sealing.Engine").Logger(),
 		me:            me,
 		state:         state,
@@ -126,7 +134,7 @@ func NewEngine(log zerolog.Logger,
 		return nil, fmt.Errorf("could not register for requesting approvals: %w", err)
 	}
 
-	core, err := NewCore(log, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
+	core, err := NewCore(log, e.workerPool, tracer, conMetrics, sealingTracker, unit, headers, state, sealsDB, assigner, verifier, sealsMempool, approvalConduit, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to init sealing engine: %w", err)
 	}
@@ -254,7 +262,7 @@ func (e *Engine) processAvailableMessages() error {
 
 		event, ok := e.pendingIncorporatedResults.Pop()
 		if ok {
-			err := e.processIncorporatedResult(event.(*flow.ExecutionResult))
+			err := e.processIncorporatedResult(event.(*flow.IncorporatedResult))
 			if err != nil {
 				return fmt.Errorf("could not process incorporated result: %w", err)
 			}
@@ -336,10 +344,7 @@ func (e *Engine) loop() {
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
 // to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
 // This will be changed in phase 3.
-func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
-	// TODO: change this when migrating to sealing & verification phase 3.
-	// Incorporated result is created this way only for phase 2.
-	incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+func (e *Engine) processIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	return err
@@ -361,9 +366,10 @@ func (e *Engine) onApproval(originID flow.Identifier, approval *flow.ResultAppro
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	err := e.ProcessLocal(event)
+	err := e.messageHandler.Process(e.me.NodeID(), event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		// receiving an input of incompatible type from a trusted internal component is fatal
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -371,9 +377,18 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.Process(channel, originID, event)
+	err := e.messageHandler.Process(e.me.NodeID(), event)
 	if err != nil {
-		engine.LogError(e.log, err)
+		lg := e.log.With().
+			Err(err).
+			Str("channel", channel.String()).
+			Str("origin", originID.String()).
+			Logger()
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			lg.Error().Msg("received message with incompatible type")
+			return
+		}
+		lg.Fatal().Msg("internal error processing message")
 	}
 }
 
@@ -396,7 +411,9 @@ func (e *Engine) Ready() <-chan struct{} {
 }
 
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		e.workerPool.StopWait()
+	})
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
@@ -447,7 +464,9 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", incorporatedBlock.ParentID, err)
 		}
-		added := e.pendingIncorporatedResults.Push(result)
+
+		incorporatedResult := flow.NewIncorporatedResult(incorporatedBlock.ParentID, result)
+		added := e.pendingIncorporatedResults.Push(incorporatedResult)
 		if !added {
 			// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the
 			// queue capacity is depleted. However, we cannot dropped the incorporated result, because there
