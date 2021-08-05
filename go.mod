@@ -38,7 +38,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.18.1-0.20210728003008-99c00af2812e
+	github.com/onflow/cadence v0.18.1-0.20210729032048-d0f3783eccd9
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
