@@ -13,7 +13,7 @@ import (
 
 type Resolver struct {
 	sync.RWMutex
-	ttl       time.Duration
+	ttl       time.Duration // time-to-live for cache entry
 	res       madns.BasicResolver
 	collector module.NetworkMetrics
 	ipCache   map[string]*ipCacheEntry
@@ -30,7 +30,21 @@ type txtCacheEntry struct {
 	timestamp time.Time
 }
 
-func NewResolver(collector module.NetworkMetrics) (*madns.Resolver, error) {
+type optFunc func(resolver *Resolver)
+
+func WithBasicResolver(resolver madns.BasicResolver) func(resolver *Resolver) {
+	return func(resolver *Resolver) {
+		resolver.res = resolver
+	}
+}
+
+func WithTTL(ttl time.Duration) func(resolver *Resolver) {
+	return func(resolver *Resolver) {
+		resolver.ttl = ttl
+	}
+}
+
+func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
 	return madns.NewResolver(madns.WithDefaultResolver(&Resolver{
 		res:       madns.DefaultResolver,
 		collector: collector,
