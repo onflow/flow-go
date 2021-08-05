@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+const defaultTimeToLive = 5 * time.Minute
+
 type Resolver struct {
 	sync.RWMutex
 	ttl       time.Duration // time-to-live for cache entry
@@ -45,10 +47,17 @@ func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 }
 
 func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
-	return madns.NewResolver(madns.WithDefaultResolver(&Resolver{
+	resolver := &Resolver{
 		res:       madns.DefaultResolver,
+		ttl:       defaultTimeToLive,
 		collector: collector,
-	}))
+	}
+
+	for _, opt := range opts {
+		opt(resolver)
+	}
+
+	return madns.NewResolver(madns.WithDefaultResolver(resolver))
 }
 
 // LookupIPAddr implements BasicResolver interface for libp2p.
