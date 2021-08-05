@@ -144,7 +144,7 @@ func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
 
 	blsPass := err == nil
 	blstPass := res != nil
-	require.Equal(t, blsPass, blstPass, "deserialization of privkey %x differs, internal finds validity %v, blst finds validity %v", skBytes, blsPass, blstPass)
+	require.Equal(t, blsPass, blstPass, "deserialization of the private key %x differs", skBytes)
 
 	if blstPass && blsPass {
 		skBLSOutBytes := skBLS.Encode()
@@ -173,7 +173,7 @@ func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
 
 	blsPass := err == nil
 	blstPass := res != nil && pkValidBLST
-	require.Equal(t, blsPass, blstPass, "deserialization of pubkey %x differs, internal finds validity %v, blst finds validity %v", pkBytes, blsPass, blstPass)
+	require.Equal(t, blsPass, blstPass, "deserialization of pubkey %x differs", pkBytes)
 
 	if blsPass && blstPass {
 		pkBLSOutBytes := pkBLS.Encode()
@@ -210,7 +210,7 @@ func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
 	blsPass := sigValidBLS
 	blstPass := res != nil && sigValidBLST
 
-	require.Equal(t, blsPass, blstPass, "deserialization of signature %x differs, internal finds validity %v, blst finds validity %v", sigBytes, blsPass, blstPass)
+	require.Equal(t, blsPass, blstPass, "deserialization of signature %x differs", sigBytes)
 
 	if blsPass && blstPass {
 		sigBLSOutBytes := make([]byte, signatureLengthBLSBLS12381)
@@ -235,7 +235,7 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 
 	blsPass := err == nil
 	blstPass := res != nil
-	require.Equal(t, blsPass, blstPass, "deserialization of privkey %x differs, internal finds validity %v, blst finds validity %v", skBytes, blsPass, blstPass)
+	require.Equal(t, blsPass, blstPass, "deserialization of the private key %x differs", skBytes)
 
 	if blsPass && blstPass {
 		var sigBLST blst.P1Affine
