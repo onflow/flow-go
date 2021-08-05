@@ -6,15 +6,22 @@ package flow
 type QuorumCertificate struct {
 	View    uint64
 	BlockID Identifier
-	// For consensus cluster, the signerIDs includes both threshold sig signers and staking sig signers.
-	// In order to distinguish them, the SigData has to be deseralized and a bit vector, namely the
-	// SigType field, can be used to distinguish whether each signer signed threshold sig or staking sig.
+
+	// SignerIDs holds the IDs of HotStuff participants that voted for the block.
+	// Note that for the main consensus committee, members can provide a staking or a threshold signature
+	// to indicate their HotStuff vote. In addition to contributing to consensus progress, committee members
+	// contribute to running the Random Beacon if they express their vote through a threshold signature.
+	// In order to distinguish the signature types, the SigData has to be deserialized. Specifically,
+	// the field `SigData.SigType` (bit vector) indicates for each signer which sig type they provided.
 	// For collection cluster, the SignerIDs includes all the staking sig signers.
 	SignerIDs []Identifier
+
 	// For consensus cluster, the SigData is a serialization of the following fields
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.
 	// - AggregatedStakingSig crypto.Signature,
 	// - AggregatedRandomBeaconSig crypto.Signature
 	// - RandomBeacon crypto.Signature
+	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
+	// from all signers.
 	SigData []byte
 }

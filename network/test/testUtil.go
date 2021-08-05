@@ -22,7 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
@@ -82,7 +82,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			metrics,
 			rootBlockID,
 			p2p.DefaultPeerUpdateInterval,
-			p2p.DefaultUnicastTimeout)
+			p2p.DefaultUnicastTimeout,
+			true,
+			true)
 	}
 	return mws
 }
@@ -124,7 +126,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := p2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
+		net, err := p2p.NewNetwork(log, cbor.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -279,7 +281,7 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	}
 
 	// encodes the message
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	empty, err := codec.Encode(emptyEvent)
 	require.NoError(t, err)
 

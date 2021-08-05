@@ -15,7 +15,7 @@ type BlockSigner interface {
 	CreateVote(*model.Block) (*model.Vote, error)
 }
 
-// VoteAggregator verifies, aggregates votes, as well as votes for blocks.
+// VoteAggregator verifies and aggregates votes to build QC.
 // When enough votes have been collected, it builds a QC and send it to the EventLoop
 // VoteAggregator also detects protocol violation, including invalid votes, double voting etc, and
 // notifies a HotStuff consumer for slashing.
