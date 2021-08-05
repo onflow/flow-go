@@ -41,25 +41,53 @@ func NewResolver(collector module.NetworkMetrics) (*madns.Resolver, error) {
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	started := time.Now()
 
+	addr, err := r.lookupIPAddr(ctx, domain)
+
+	r.collector.DNSLookupDuration(time.Since(started))
+	return addr, err
+}
+
+func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	if addr, ok := r.resolveIPCache(domain); ok {
 		// resolving address from cache
 		return addr, nil
 	}
 
+	// resolves domain through underlying resolver
 	addr, err := r.res.LookupIPAddr(ctx, domain)
-	r.updateIPCache(domain, addr) // updates address in the cache
+	if err != nil {
+		return nil, err
+	}
 
-	r.collector.DNSLookupDuration(time.Since(started))
-	return addr, err
+	r.updateIPCache(domain, addr) // updates cache
+
+	return addr, nil
 }
 
 // LookupTXT implements BasicResolver interface for libp2p.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
 	started := time.Now()
 
-	addr, err := r.res.LookupTXT(ctx, txt)
+	addr, err := r.lookupTXT(ctx, txt)
 
 	r.collector.DNSLookupDuration(time.Since(started))
+	return addr, err
+}
+
+func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
+	if addr, ok := r.resolveTXTCache(txt); ok {
+		// resolving address from cache
+		return addr, nil
+	}
+
+	// resolves dtxt through underlying resolver
+	addr, err := r.res.LookupTXT(ctx, txt)
+	if err != nil {
+		return nil, err
+	}
+
+	r.updateTXTCache(txt, addr) // updates cache
+
 	return addr, err
 }
 
