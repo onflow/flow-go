@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// VoteCollectors is an interface which allows VoteAggregator to interact with collectors structured by
+// voteCollectors is an interface which allows VoteAggregator to interact with collectors structured by
 // view and blockID.
 // Implementations of this interface are responsible for state transitions of `VoteCollector`s and pruning of
 // stale and outdated collectors by view.
