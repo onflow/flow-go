@@ -25,19 +25,17 @@ type Header struct {
 	PayloadHash Identifier // PayloadHash is a hash of the payload of this block.
 
 	Timestamp time.Time // Timestamp is the time at which this block was proposed.
-	// The proposer can choose any time, so this should not be trusted as accurate.
 
-	View uint64 // View is the view number at which this block was proposed.
+	View uint64 // View number at which this block was proposed.
 
 	ParentVoterIDs []Identifier // List of voters who signed the parent block. Used as QC.SignerIDs
-	// aggregated signature over the parent block.
 
-	ParentVoterSig []byte // Used as QC.SigData. Not a crypto.Signature since it could be a serialization of multi sigs
+	ParentVoterSig []byte // Used as QC.SigData. Might be a serialization of multiple signatures and therefore not a crypto.Signature.
 
 	ProposerID Identifier // proposer identifier for the block
 
 	ProposerSig []byte // signature of the proposer over the new block.
-	// Not a crypto.Signature, since it could be a serialization of multi sigs
+	// Might be a serialization of multiple signatures and therefore not a crypto.Signature.
 }
 
 // Body returns the immutable part of the block header.
