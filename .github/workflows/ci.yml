@@ -65,6 +65,7 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
+    
   integration-test:
     name: Integration Tests
     strategy:
