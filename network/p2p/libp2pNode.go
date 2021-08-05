@@ -47,10 +47,12 @@ type LibP2PFactoryFunc func() (*Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
+func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
 	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
+
+	connGater := NewConnGater(log)
 
 	// create PubSub options for libp2p to use
 	psOptions := []pubsub.Option{
@@ -63,25 +65,33 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 		// no discovery
 	}
 
-	options := []NodeOption{
-		WithDefaultLibP2PHost(address, connManager, flowKey, true),
-		WithDefaultPubSub(psOptions...),
-		WithDefaultPingService(rootBlockID, pingInfoProvider),
-	}
-
 	return func() (*Node, error) {
-		return NewLibP2PNode(me, rootBlockID, log, options...)
+		libp2pHost, err := LibP2PHost(ctx, address, flowKey,
+			WithLibP2PConnectionManager(connManager),
+			WithLibP2PConnectionGator(connGater),
+			WithLibP2PPingEnabled())
+		if err != nil {
+			return nil, err
+		}
+
+		libp2pPubSub, err := DefaultPubSub(ctx, libp2pHost, psOptions...)
+		if err != nil {
+			return nil, err
+		}
+
+		return NewLibP2PNode(me, rootBlockID, log, libp2pHost, libp2pPubSub,
+			WithConnectionGator(connGater),
+			WithConnectionManager(connManager),
+			WithPingService(rootBlockID, pingInfoProvider))
 	}, nil
 }
 
 // Node is a wrapper around LibP2P host.
 type Node struct {
 	sync.Mutex
-	connGater            *connGater     // used to provide white listing
-	host                 host.Host      // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub               *pubsub.PubSub // reference to the libp2p PubSub component
-	ctx                  context.Context
-	cancel               context.CancelFunc                     // used to cancel context of host
+	connGater            *connGater                             // used to provide white listing
+	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
 	logger               zerolog.Logger                         // used to provide logging
 	topics               map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
@@ -93,36 +103,45 @@ type Node struct {
 
 type NodeOption func(node *Node) error
 
-func WithLibP2PHost(host host.Host) NodeOption {
+// WithConnectionManager returns a NodeOption that sets the connection gater for the node
+func WithConnectionGator(gater *connGater) NodeOption {
 	return func(node *Node) error {
-		node.host = host
+		node.connGater = gater
 		return nil
 	}
 }
 
-func WithConnectionManager(conMgr *ConnManager) NodeOption {
+// WithConnectionManager returns a NodeOption that sets the connection manager for the node
+func WithConnectionManager(connMgr *ConnManager) NodeOption {
 	return func(node *Node) error {
-		node.connMgr = conMgr
+		node.connMgr = connMgr
 		return nil
 	}
 }
 
-func WithPubSub(pubsub *pubsub.PubSub) NodeOption {
+// WithPingService returns a NodeOption that initializes the PingService object for the node
+func WithPingService(rootBlockID string, pingInfoProvider PingInfoProvider) NodeOption {
 	return func(node *Node) error {
-		node.pubSub = pubsub
+		pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
+		pingService := NewPingService(node.host, pingLibP2PProtocolID, pingInfoProvider, node.logger)
+		node.pingService = pingService
 		return nil
 	}
 }
 
-func NewLibP2PNode(id flow.Identifier, rootBlockID string, logger zerolog.Logger, options ...NodeOption) (*Node, error) {
-
-	ctx, cancel := context.WithCancel(context.Background())
+// NewLibP2PNode creates a NewLibP2PNode using the given libp2p host and pubsub instances
+func NewLibP2PNode(id flow.Identifier,
+	rootBlockID string,
+	logger zerolog.Logger,
+	libp2pHost host.Host,
+	libp2pPubSub *pubsub.PubSub,
+	options ...NodeOption) (*Node, error) {
 
 	node := &Node{
 		id:                   id,
 		flowLibP2PProtocolID: generateFlowProtocolID(rootBlockID),
-		ctx:                  ctx,
-		cancel:               cancel,
+		host:                 libp2pHost,
+		pubSub:               libp2pPubSub,
 		logger:               logger,
 		topics:               make(map[flownet.Topic]*pubsub.Topic),
 		subs:                 make(map[flownet.Topic]*pubsub.Subscription),
@@ -131,7 +150,6 @@ func NewLibP2PNode(id flow.Identifier, rootBlockID string, logger zerolog.Logger
 	for _, opt := range options {
 		err := opt(node)
 		if err != nil {
-			cancel()
 			return nil, err
 		}
 	}
@@ -179,7 +197,6 @@ func (n *Node) Stop() (chan struct{}, error) {
 			Err(err).Msg("closing peer store")
 		result = multierror.Append(result, err)
 	}
-	n.cancel()
 
 	if result != nil {
 		close(done)
@@ -496,52 +513,46 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 	return isConnected, nil
 }
 
-// WithDefaultLibP2PHost returns a NodeOption that instantiates a libp2p host with the default values for the libp2p
-// transport, ping etc.
-// If 'allowList' is true, a connection gater is also added to the host
-func WithDefaultLibP2PHost(
-	address string,
-	conMgr *ConnManager,
-	key fcrypto.PrivateKey,
-	allowList bool) NodeOption {
+// LibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and customized
+// with the options
+func LibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
 
-	return func(node *Node) error {
-
-		options, err := DefaultLibP2POptions(address, key, true)
-		if err != nil {
-			return err
-		}
-
-		if conMgr != nil {
-			options = append(options, libp2p.ConnectionManager(conMgr)) // set the connection manager
-			node.connMgr = conMgr
-		}
-
-		// if allowlisting is enabled, create a connection gator with allowListAddrs
-		if allowList {
-			// create a connection gater
-			connGater := newConnGater(node.logger)
-
-			// provide the connection gater as an option to libp2p
-			options = append(options, libp2p.ConnectionGater(connGater))
-
-			node.connGater = connGater
-		}
-
-		// create the libp2p host
-		libP2PHost, err := libp2p.New(node.ctx, options...)
-		if err != nil {
-			return fmt.Errorf("could not create libp2p host: %w", err)
-		}
-
-		node.host = libP2PHost
-
-		return nil
+	defaultOptions, err := DefaultLibP2POptions(address, key)
+	if err != nil {
+		return nil, err
 	}
+
+	allOptions := append(defaultOptions, options...)
+
+	// create the libp2p host
+	libP2PHost, err := libp2p.New(ctx, allOptions...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p host: %w", err)
+	}
+
+	return libP2PHost, nil
+
 }
 
-// DefaultLibP2POptions returns the standard LibP2P host options that are used for the Flow Libp2p network
-func DefaultLibP2POptions(address string, key fcrypto.PrivateKey, pingEnabled bool) ([]config.Option, error) {
+func WithLibP2PPingEnabled() config.Option {
+	return libp2p.Ping(true)
+}
+
+func WithLibP2PPingDisabled() config.Option {
+	return libp2p.Ping(true)
+}
+
+func WithLibP2PConnectionManager(connMgr *ConnManager) config.Option {
+	return libp2p.ConnectionManager(connMgr)
+}
+
+func WithLibP2PConnectionGator(connGater *connGater) config.Option {
+	return libp2p.ConnectionGater(connGater)
+}
+
+// DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
+// appended with the extra options
+func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
 	libp2pKey, err := PrivKey(key)
 	if err != nil {
@@ -574,33 +585,17 @@ func DefaultLibP2POptions(address string, key fcrypto.PrivateKey, pingEnabled bo
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 		libp2p.Identity(libp2pKey),          // pass in the networking key
 		transport,                           // set the protocol
-		libp2p.Ping(pingEnabled),            // enable ping
 	}
 
 	return options, nil
 }
 
-// WithDefaultPubSub returns a NodeOption that initializes a GossipSub object for the node libp2p host with the given
-// options
-func WithDefaultPubSub(psOption ...pubsub.Option) NodeOption {
-	return func(node *Node) error {
-
-		// Creating a new PubSub instance of the type GossipSub with psOption
-		pubSub, err := pubsub.NewGossipSub(node.ctx, node.host, psOption...)
-		if err != nil {
-			return fmt.Errorf("could not create libp2p pubsub: %w", err)
-		}
-		node.pubSub = pubSub
-		return nil
+// DefaultPubSub returns initializes and returns a GossipSub object for the given libp2p host and options
+func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Option) (*pubsub.PubSub, error) {
+	// Creating a new PubSub instance of the type GossipSub with psOption
+	pubSub, err := pubsub.NewGossipSub(ctx, host, psOption...)
+	if err != nil {
+		return nil, fmt.Errorf("could not create libp2p gossipsub: %w", err)
 	}
-}
-
-// WithDefaultPingService returns a NodeOption that initializes the PingService object for the node
-func WithDefaultPingService(rootBlockID string, pingInfoProvider PingInfoProvider) NodeOption {
-	return func(node *Node) error {
-		pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
-		pingService := NewPingService(node.host, pingLibP2PProtocolID, pingInfoProvider, node.logger)
-		node.pingService = pingService
-		return nil
-	}
+	return pubSub, nil
 }

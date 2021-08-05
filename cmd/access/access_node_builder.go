@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -193,7 +194,8 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
 		},
 	}
 
-	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(builder.Logger,
+	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(context.Background(),
+		builder.Logger,
 		nodeID,
 		builder.unstakedNetworkBindAddr,
 		networkKey,

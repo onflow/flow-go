@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -149,7 +150,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			},
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(context.Background(),
+			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
