@@ -73,6 +73,7 @@ func main() {
 		collectionRequester         *requester.Engine
 		ingestionEng                *ingestion.Engine
 		finalizationDistributor     *pubsub.FinalizationDistributor
+		finalizedHeader             *synchronization.FinalizedHeaderCache
 		rpcConf                     rpc.Config
 		err                         error
 		executionState              state.ExecutionState
@@ -435,6 +436,14 @@ func main() {
 			)
 			return eng, err
 		}).
+		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedHeader, err = synchronization.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+
+			return finalizedHeader, nil
+		}).
 		Component("synchronization engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
@@ -442,16 +451,15 @@ func main() {
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.State,
 				node.Storage.Blocks,
 				followerEng,
 				syncCore,
+				finalizedHeader,
+				node.State,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-
-			finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 			return syncEngine, nil
 		}).
