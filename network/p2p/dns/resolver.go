@@ -40,10 +40,15 @@ func NewResolver(collector module.NetworkMetrics) (*madns.Resolver, error) {
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	started := time.Now()
 
+	if addr, ok := r.resolveIPCache(domain); ok {
+		// resolving address from cache
+		return addr, nil
+	}
+
 	addr, err := r.res.LookupIPAddr(ctx, domain)
+	r.updateIPCache(domain, addr) // updates address in the cache
 
 	r.collector.DNSLookupDuration(time.Since(started))
-
 	return addr, err
 }
 
@@ -53,7 +58,6 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 	addr, err := r.res.LookupTXT(ctx, txt)
 
 	r.collector.DNSLookupDuration(time.Since(started))
-
 	return addr, err
 }
 
