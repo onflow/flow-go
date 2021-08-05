@@ -16,7 +16,7 @@ type VoteCollectors interface {
 	GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, error)
 	// PruneByView prunes already stored collectors by view.
 	PruneByView(view uint64) error
-	// ProcessBlock processes already validated block.
+	// ProcessBlock performs validation of block signature and processes block with respected collector.
 	// Calling this function will mark conflicting collectors as stale and change state of valid collectors
 	ProcessBlock(block *model.Block) error
 }

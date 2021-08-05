@@ -46,7 +46,7 @@ func New(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuf
 func (va *VoteAggregator) Ready() <-chan struct{} {
 	// launch as many workers as we need
 	for i := 0; i < defaultVoteAggregatorWorkers; i++ {
-		va.unit.Launch(va.pendingVotesProcessingLoop)
+		va.unit.Launch(va.queuedVotesProcessingLoop)
 	}
 
 	return va.unit.Ready()
@@ -56,14 +56,14 @@ func (va *VoteAggregator) Done() <-chan struct{} {
 	return va.unit.Done()
 }
 
-func (va *VoteAggregator) pendingVotesProcessingLoop() {
+func (va *VoteAggregator) queuedVotesProcessingLoop() {
 	notifier := va.queuedVotesNotifier.Channel()
 	for {
 		select {
 		case <-va.unit.Quit():
 			return
 		case <-notifier:
-			err := va.processPendingVoteEvents()
+			err := va.processQueuedVoteEvents()
 			if err != nil {
 				va.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
 			}
@@ -71,7 +71,7 @@ func (va *VoteAggregator) pendingVotesProcessingLoop() {
 	}
 }
 
-func (va *VoteAggregator) processPendingVoteEvents() error {
+func (va *VoteAggregator) processQueuedVoteEvents() error {
 	for {
 		select {
 		case <-va.unit.Quit():
@@ -81,7 +81,7 @@ func (va *VoteAggregator) processPendingVoteEvents() error {
 
 		msg, ok := va.queuedVotes.Pop()
 		if ok {
-			err := va.processPendingVote(msg.(*model.Vote))
+			err := va.processQueuedVote(msg.(*model.Vote))
 			if err != nil {
 				return fmt.Errorf("could not process pending vote: %w", err)
 			}
@@ -130,14 +130,10 @@ func (va *VoteAggregator) AddBlock(block *model.Block) error {
 		return nil
 	}
 
-	// TODO: check block signature
-
 	err := va.collectors.ProcessBlock(block)
 	if err != nil {
 		return fmt.Errorf("could not process block %v: %w", block.BlockID, err)
 	}
-
-	// after this call, collector might change state
 
 	return nil
 }
