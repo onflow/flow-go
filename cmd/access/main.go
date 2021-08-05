@@ -41,7 +41,6 @@ import (
 )
 
 func main() {
-
 	defaultConfig := DefaultAccessNodeConfig()
 
 	anb := FlowAccessNode() // use the generic Access Node builder till it is determined if this is a staked AN or an unstaked AN
@@ -97,7 +96,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			var err error
 			anb.FollowerState, err = badgerState.NewFollowerState(
@@ -309,22 +308,31 @@ func main() {
 
 			return anb.FollowerEng, nil
 		}).
+		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, anb.FinalizationDistributor)
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+			anb.FinalizedHeader = finalizedHeader
+
+			return anb.FinalizedHeader, nil
+		}).
 		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.State,
 				node.Storage.Blocks,
 				anb.FollowerEng,
 				anb.SyncCore,
+				anb.FinalizedHeader,
+				node.State,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
 			}
-
-			anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		})
