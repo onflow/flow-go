@@ -17,7 +17,7 @@ type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
+func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	return &StakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
