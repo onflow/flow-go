@@ -49,7 +49,7 @@ type Engine struct {
 	state           protocol.State
 	finalizedHeader *FinalizedHeaderCache
 
-	requestHandler *RequestHandler // component responsible for handling requests
+	requestHandler *RequestHandlerEngine // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -107,7 +107,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandler(log, metrics, con, me, blocks, core, finalizedHeader)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader)
 
 	return e, nil
 }
@@ -166,6 +166,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 // Ready returns a ready channel that is closed once the engine has fully started.
 func (e *Engine) Ready() <-chan struct{} {
 	e.lm.OnStart(func() {
+		<-e.finalizedHeader.Ready()
 		e.unit.Launch(e.checkLoop)
 		e.unit.Launch(e.responseProcessingLoop)
 		// wait for request handler to startup
@@ -183,6 +184,7 @@ func (e *Engine) Done() <-chan struct{} {
 		<-e.unit.Done()
 		// wait for request handler shutdown to complete
 		<-requestHandlerDone
+		<-e.finalizedHeader.Done()
 	})
 	return e.lm.Stopped()
 }
