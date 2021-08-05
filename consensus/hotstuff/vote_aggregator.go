@@ -4,14 +4,19 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// BlockSigner provides the privileged ability to sign a block, i.e. create a consensus vote for the block.
-// ToDo: move the following documentation to the implementation
-// The VoteAggregator implements both the VoteAggregator interface and the BlockSigner interface.
+// BlockSigner abstracts the implementation of how a signature of a block or a voteis produced
+// and stored in a stateful crypto object for aggregation.
+// The VoteAggregator implements both the VoteAggregator interface and the BlockSigner interface so that
+// The EventHandler could use the VoteAggregator interface to send Block, and Voter/BlockProducer can use
+// the BlockSigner interface to create vote.
 // When `CreateVote` is called, it internally creates stateful VoteCollector object, which also has the ability
-// to generate the vote signature. Thereafter, the VoteCollector object can be discarded.
+// to verify the block and generate the vote signature.
+// The created vote collector will be added to the vote collectors map. These
+// implementation details are abstracted to Voter/BlockProducer.
 type BlockSigner interface {
 	// CreateVote returns a vote for the given block.
-	// ToDo: document sentinel errors expected during normal operation
+	// return (vote, nil) if vote is created
+	// return (nil , module.InvalidBlockError) if the block is invalid.
 	CreateVote(*model.Block) (*model.Vote, error)
 }
 
@@ -20,7 +25,6 @@ type BlockSigner interface {
 // VoteAggregator also detects protocol violation, including invalid votes, double voting etc, and
 // notifies a HotStuff consumer for slashing.
 type VoteAggregator interface {
-
 	// AddVote verifies and aggregates a vote.
 	// The voting block could either be known or unknown.
 	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.
