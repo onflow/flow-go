@@ -49,7 +49,7 @@ type Engine struct {
 	state           protocol.State
 	finalizedHeader *FinalizedHeaderCache
 
-	requestHandler *RequestHandler // component responsible for handling requests
+	requestHandler *RequestHandlerEngine // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
@@ -107,7 +107,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandler(log, metrics, con, me, blocks, core, finalizedHeader)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader)
 
 	return e, nil
 }
