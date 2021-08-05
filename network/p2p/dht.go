@@ -20,9 +20,12 @@ func newDHT(ctx context.Context, host host.Host, serverMode bool) (*discovery.Ro
 
 	// If we have no bootstrapPeers, we're the server
 	if serverMode {
-		// DHT defaults to ModeAuto which will automatically switch the DHT between Server and Client modes based on whether the node appears to be publicly reachable (e.g. not behind a NAT and with a public IP address).
-		// This default tends to make test setups fail (since the test nodes are normally not reachable by the public network), but is useful for improving the stability and performance of live public networks.
-		// While we could force all nodes to be DHT Servers, a bunch of nodes otherwise not reachable by most of the network => network partition
+		// DHT defaults to ModeAuto which will automatically switch the DHT between Server and Client modes based on
+		// whether the node appears to be publicly reachable (e.g. not behind a NAT and with a public IP address).
+		// This default tends to make test setups fail (since the test nodes are normally not reachable by the public
+		// network), but is useful for improving the stability and performance of live public networks.
+		// While we could force all nodes to be DHT Servers, a bunch of nodes otherwise not reachable by most of the
+		// network => network partition
 		defaultOptions = append(defaultOptions, dht.Mode(dht.ModeServer))
 	}
 
@@ -72,7 +75,7 @@ func defaultDHTOptions() []dht.Option {
 		dht.RoutingTableRefreshPeriod(routingTableRefresh),        // this is 100 seconds
 		dht.RoutingTableRefreshQueryTimeout(peerDiscoveryTimeout), // this is 2 seconds
 
-		// public capabilities we don't need
+		// public capabilities we don't need - disabling these capabilities does not allow peer discovery
 		//dht.DisableProviders(),
 		//dht.DisableValues(),
 	}
