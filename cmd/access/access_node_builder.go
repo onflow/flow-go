@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
@@ -129,6 +130,7 @@ type FlowAccessNodeBuilder struct {
 	SyncCore                   *synchronization.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *pubsub.FinalizationDistributor
+	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
 	ConCache                   *buffer.PendingBlocks // pending block cache for follower
 	TransactionTimings         *stdmap.TransactionTimings
