@@ -31,14 +31,15 @@ func main() {
 	loadTypeFlag := flag.String("load-type", "token-transfer", "type of loads (\"token-transfer\", \"add-keys\", \"computation-heavy\", \"event-heavy\", \"ledger-heavy\")")
 	tpsFlag := flag.String("tps", "1", "transactions per second (TPS) to send, accepts a comma separated list of values if used in conjunction with `tps-durations`")
 	tpsDurationsFlag := flag.String("tps-durations", "0", "duration that each load test will run, accepts a comma separted list that will be applied to multiple values of the `tps` flag (defaults to infinite if not provided, meaning only the first tps case will be tested; additional values will be ignored)")
-	chainIDStr := flag.String("chain", string(flowsdk.Testnet), "chain ID")
-	chainID := flowsdk.ChainID([]byte(*chainIDStr))
+	chainIDStr := flag.String("chain", string(flowsdk.Emulator), "chain ID")
 	access := flag.String("access", "localhost:3569", "access node address")
 	serviceAccountPrivateKeyHex := flag.String("servPrivHex", unittest.ServiceAccountPrivateKeyHex, "service account private key hex")
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
 	flag.Parse()
+
+	chainID := flowsdk.ChainID([]byte(*chainIDStr))
 
 	// parse log level and apply to logger
 	log := zerolog.New(os.Stderr).With().Timestamp().Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr})
