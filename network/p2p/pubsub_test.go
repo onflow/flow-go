@@ -41,26 +41,48 @@ func (suite *PubSubTestSuite) SetupTest() {
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
-// TestPubSub checks if nodes can subscribe to a topic and send and receive a message
-func (suite *PubSubTestSuite) TestPubSub() {
+// TestPubSub checks if nodes can subscribe to a topic and send and receive a message on that topic. The DHT discovery
+// mechanism is used for nodes to find each other.
+func (suite *PubSubTestSuite) TestPubSubWithDHTDiscovery() {
 	defer suite.cancel()
 	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
-	count := 4
-	golog.SetAllLoggers(golog.LevelDebug)
+	count := 5
+	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	// Step 1: Creates nodes
+	// Nodes will be connected in a hub and spoke configuration where one node will act as the DHT server,
+	// while the other nodes will act as the client.
+	// The hub-spoke configuration should eventually converge to a fully connected graph as all nodes discover
+	// each other via the central node.
+	// We have less than 6 nodes in play, hence the full mesh. LibP2P would limit max connections to 12 if there were
+	// more nodes.
+	//
+	//  Initial configuration  =>  Final/expected configuration
+	//   N2      N3                     N2-----N3
+	//      \  /                        | \   / |
+	//       N1             =>          |   N1  |
+	//     /   \                        | /   \ |
+	//   N4     N5                      N4-----N5
+
+	// create one node running the DHT Server (mimicking the staked AN)
 	dhtServerNodes := suite.CreateNodes(1, true)
 	require.Len(suite.T(), dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
+
+	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
 	dhtClientNodes := suite.CreateNodes(count-1, false)
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
-
 	defer suite.StopNodes(nodes)
 
+	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
+	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
+	for _, clientNode := range dhtClientNodes {
+		err := clientNode.host.Connect(suite.ctx, dhtServerAddr)
+		require.NoError(suite.T(), err)
+	}
 
-
-	// Step 2: Subscribe to the test topic
+	// Step 3: Subscribe to the test topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
 	ch := make(chan flow.Identifier, count)
@@ -84,24 +106,18 @@ func (suite *PubSubTestSuite) TestPubSub() {
 
 	}
 
-	// Step 3: Now setup discovery to allow nodes to find each other
-	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
-	for _, clientNode := range dhtClientNodes {
-		err := clientNode.host.Connect(suite.ctx, dhtServerAddr)
-		require.NoError(suite.T(), err)
+	fullyConnectedGraph := func() bool {
+		for i := 0; i < len(nodes); i++ {
+			for j := i + 1; j < len(nodes); j++ {
+				if nodes[i].host.Network().Connectedness(nodes[j].host.ID()) == network.NotConnected {
+					return false
+				}
+			}
+		}
+		return true
 	}
-	//// set the common discovery object shared by all nodes with the list of all peer.AddrInfos
-	//d.SetPeers(pInfos)
-
-	// let the nodes discover each other
-	time.Sleep(40 * time.Second)
-
-	fmt.Println(dhtClientNodes[0].host.Network().Connectedness(dhtServerNode.host.ID()))
-	fmt.Println(dhtClientNodes[1].host.Network().Connectedness(dhtServerNode.host.ID()))
-	fmt.Println(dhtClientNodes[2].host.Network().Connectedness(dhtServerNode.host.ID()))
-	fmt.Println(dhtClientNodes[0].host.Network().Connectedness(dhtClientNodes[1].host.ID()))
-	fmt.Println(dhtClientNodes[1].host.Network().Connectedness(dhtClientNodes[2].host.ID()))
-	fmt.Println(dhtClientNodes[2].host.Network().Connectedness(dhtClientNodes[0].host.ID()))
+	// assert that the graph is fully connected
+	require.Eventually(suite.T(), fullyConnectedGraph, time.Second*5, tickForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
 	require.NoError(suite.T(), dhtServerNode.Publish(suite.ctx, topic, []byte("hello")))
@@ -131,10 +147,10 @@ func (suite *PubSubTestSuite) TestPubSub() {
 	}
 }
 
-// CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
-// it also asserts the correctness of nodes creations
-// a single error in creating one node terminates the entire test
+// CreateNode creates the given number of libp2pnodes
+// if dhtServer is true, the DHTServer is used as for Discovery else DHTClient
 func (suite *PubSubTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node) {
+
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
