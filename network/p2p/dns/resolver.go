@@ -3,6 +3,7 @@ package dns
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
@@ -11,8 +12,22 @@ import (
 )
 
 type Resolver struct {
+	sync.RWMutex
+	ttl       time.Duration
 	res       madns.BasicResolver
 	collector module.NetworkMetrics
+	ipCache   map[string]ipCacheEntry
+	txtCache  map[string]txtCacheEntry
+}
+
+type ipCacheEntry struct {
+	addresses []net.IPAddr
+	timestamp time.Time
+}
+
+type txtCacheEntry struct {
+	addresses []net.IPAddr
+	timestamp time.Time
 }
 
 func NewResolver(collector module.NetworkMetrics) (*madns.Resolver, error) {
@@ -40,4 +55,24 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 	r.collector.DNSLookupDuration(time.Since(started))
 
 	return addr, err
+}
+
+// resolveIPCache resolves the domain through the cache if it is available.
+func (r *Resolver) resolveIPCache(domain string) ([]net.IPAddr, bool) {
+	r.Lock()
+	defer r.Unlock()
+
+	entry, ok := r.ipCache[domain]
+
+	if !ok {
+		return nil, false
+	}
+
+	if time.Now().After(entry.timestamp.Add(r.ttl)) {
+		// invalidates cache entry
+		delete(r.ipCache, domain)
+		return nil, false
+	}
+
+	return entry.addresses, true
 }
