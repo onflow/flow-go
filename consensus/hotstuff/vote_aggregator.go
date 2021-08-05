@@ -36,7 +36,7 @@ type VoteAggregator interface {
 
 	// InvalidBlock notifies the VoteAggregator about an invalid block, so that it can process votes for the invalid
 	// block and slash the voters.
-	InvalidBlock(block *model.Block)
+	InvalidBlock(block *model.Proposal) error
 
 	// PruneByView will remove any data held for the provided view.
 	PruneByView(view uint64)
