@@ -100,6 +100,7 @@ void     ep2_sum_vector(ep2_t, ep2_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len);
 
+int check_membership_G1(const ep_t p);
 int simple_subgroup_check_G1(const ep_t);
 int simple_subgroup_check_G2(const ep2_t);
 void ep_rand_G1(ep_t);
@@ -109,7 +110,6 @@ int bowe_subgroup_check_G1(const ep_t);
 #endif
 int subgroup_check_G1_test(int, int);
 int subgroup_check_G1_bench();
-int check_membership_G1(const ep_t p);
 
 
 // Debugging related functions
