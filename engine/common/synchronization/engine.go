@@ -166,6 +166,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 // Ready returns a ready channel that is closed once the engine has fully started.
 func (e *Engine) Ready() <-chan struct{} {
 	e.lm.OnStart(func() {
+		<-e.finalizedHeader.Ready()
 		e.unit.Launch(e.checkLoop)
 		e.unit.Launch(e.responseProcessingLoop)
 		// wait for request handler to startup
@@ -183,6 +184,7 @@ func (e *Engine) Done() <-chan struct{} {
 		<-e.unit.Done()
 		// wait for request handler shutdown to complete
 		<-requestHandlerDone
+		<-e.finalizedHeader.Done()
 	})
 	return e.lm.Stopped()
 }

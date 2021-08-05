@@ -353,6 +353,7 @@ func (r *RequestHandlerEngine) requestProcessingLoop() {
 // Ready returns a ready channel that is closed once the engine has fully started.
 func (r *RequestHandlerEngine) Ready() <-chan struct{} {
 	r.lm.OnStart(func() {
+		<-r.finalizedHeader.Ready()
 		for i := 0; i < defaultEngineRequestsWorkers; i++ {
 			r.unit.Launch(r.requestProcessingLoop)
 		}
@@ -365,6 +366,7 @@ func (r *RequestHandlerEngine) Done() <-chan struct{} {
 	r.lm.OnStop(func() {
 		// wait for all request processing workers to exit
 		<-r.unit.Done()
+		<-r.finalizedHeader.Done()
 	})
 	return r.lm.Stopped()
 }
