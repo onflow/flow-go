@@ -17,7 +17,7 @@ type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
+func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	return &StakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -72,7 +72,11 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
 
-		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+		middleware := builder.initMiddleware(unstakedNodeID,
+			unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+			false, // no connection gating for the unstaked network
+			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
+			msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		// TODO: this list should be the unstaked addresses of all the staked AN that participate in the unstaked network
