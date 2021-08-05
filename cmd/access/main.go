@@ -10,33 +10,17 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/consensus"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
-	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/buffer"
-	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/module/synchronization"
-	badgerState "github.com/onflow/flow-go/state/protocol/badger"
-	"github.com/onflow/flow-go/state/protocol/blocktimer"
-	storage "github.com/onflow/flow-go/storage/badger"
 	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
@@ -89,24 +73,6 @@ func main() {
 
 	nodeBuilder.
 		Initialize().
-		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// For now, we only support state implementations from package badger.
-			// If we ever support different implementations, the following can be replaced by a type-aware factory
-			state, ok := node.State.(*badgerState.State)
-			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
-			}
-			var err error
-			anb.FollowerState, err = badgerState.NewFollowerState(
-				state,
-				node.Storage.Index,
-				node.Storage.Payloads,
-				node.Tracer,
-				node.ProtocolEvents,
-				blocktimer.DefaultBlockTimer,
-			)
-			return err
-		}).
 		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(anb.rpcConf.CollectionAddr) == "" {
@@ -147,15 +113,6 @@ func main() {
 				anb.HistoricalAccessRPCs = append(anb.HistoricalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
 			}
 			return nil
-		}).
-		Module("block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			anb.ConCache = buffer.NewPendingBlocks()
-			return nil
-		}).
-		Module("sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			var err error
-			anb.SyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
-			return err
 		}).
 		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			var err error
@@ -219,7 +176,7 @@ func main() {
 			)
 			return anb.RpcEng, nil
 		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 			anb.RequestEng, err = requester.New(
 				node.Logger,
@@ -234,106 +191,20 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
+
+			return anb.RequestEng, nil
+		}).
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
 			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.TransactionMetrics,
 				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
 			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
-			return anb.IngestEng, err
-		}).
-		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
-			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
-			// be handled by the scaffold.
-			return anb.RequestEng, nil
-		}).
-		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
-
-			// create a finalizer that will handle updating the protocol
-			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, anb.FollowerState)
-
-			// initialize the staking & beacon verifiers, signature joiner
-			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
-			beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
-			// initialize consensus committee's membership state
-			// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
-			// Note: node.Me.NodeID() is not part of the consensus committee
-			committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-
-			// initialize the verifier for the protocol consensus
-			verifier := verification.NewCombinedVerifier(committee, staking, beacon, merger)
-
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
-			if err != nil {
-				return nil, fmt.Errorf("could not find latest finalized block and pending blocks to recover consensus follower: %w", err)
-			}
-
-			anb.FinalizationDistributor = pubsub.NewFinalizationDistributor()
 			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
 
-			// creates a consensus follower with ingestEngine as the notifier
-			// so that it gets notified upon each new finalized block
-			followerCore, err := consensus.NewFollower(node.Logger, committee, node.Storage.Headers, final, verifier,
-				anb.FinalizationDistributor, node.RootBlock.Header, node.RootQC, finalized, pending)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize follower core: %w", err)
-			}
-
-			anb.FollowerEng, err = followereng.New(
-				node.Logger,
-				node.Network,
-				node.Me,
-				node.Metrics.Engine,
-				node.Metrics.Mempool,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				anb.FollowerState,
-				anb.ConCache,
-				followerCore,
-				anb.SyncCore,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create follower engine: %w", err)
-			}
-
-			return anb.FollowerEng, nil
-		}).
-		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, anb.FinalizationDistributor)
-			if err != nil {
-				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
-			}
-			anb.FinalizedHeader = finalizedHeader
-
-			return anb.FinalizedHeader, nil
-		}).
-		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			sync, err := synceng.New(
-				node.Logger,
-				node.Metrics.Engine,
-				node.Network,
-				node.Me,
-				node.Storage.Blocks,
-				anb.FollowerEng,
-				anb.SyncCore,
-				anb.FinalizedHeader,
-				node.State,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
-			}
-
-			return sync, nil
+			return anb.IngestEng, err
 		})
+
+	anb.BuildConsensusFollower()
 
 	// the ping engine is only needed for the staked access node
 	if nodeBuilder.IsStaked() {

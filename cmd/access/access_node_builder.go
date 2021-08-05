@@ -8,23 +8,37 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/common/follower"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
+	badgerState "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
+	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -133,18 +147,193 @@ type FlowAccessNodeBuilder struct {
 	FinalizationDistributor    *pubsub.FinalizationDistributor
 	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
-	ConCache                   *buffer.PendingBlocks // pending block cache for follower
 	TransactionTimings         *stdmap.TransactionTimings
 	CollectionsToMarkFinalized *stdmap.Times
 	CollectionsToMarkExecuted  *stdmap.Times
 	BlocksToMarkExecuted       *stdmap.Times
 	TransactionMetrics         module.TransactionMetrics
 	PingMetrics                module.PingMetrics
+	Committee                  hotstuff.Committee
+	Finalized                  *flow.Header
+	Pending                    []*flow.Header
+	FollowerCore               module.HotStuffFollower
 
 	// engines
 	IngestEng   *ingestion.Engine
 	RequestEng  *requester.Engine
 	FollowerEng *followereng.Engine
+	SyncEng     *synceng.Engine
+}
+
+func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
+	builder.Module("mutable follower state", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		// For now, we only support state implementations from package badger.
+		// If we ever support different implementations, the following can be replaced by a type-aware factory
+		state, ok := node.State.(*badgerState.State)
+		if !ok {
+			return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+		}
+
+		followerState, err := badgerState.NewFollowerState(
+			state,
+			node.Storage.Index,
+			node.Storage.Payloads,
+			node.Tracer,
+			node.ProtocolEvents,
+			blocktimer.DefaultBlockTimer,
+		)
+		builder.FollowerState = followerState
+
+		return err
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
+	builder.Module("sync core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		syncCore, err := synchronization.New(node.Logger, synchronization.DefaultConfig())
+		builder.SyncCore = syncCore
+
+		return err
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
+	builder.Module("committee", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		// initialize consensus committee's membership state
+		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
+		// Note: node.Me.NodeID() is not part of the consensus committee
+		committee, err := committees.NewConsensusCommittee(node.State, node.Me.NodeID())
+		builder.Committee = committee
+
+		return err
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder {
+	builder.Module("latest header", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+		builder.Finalized, builder.Pending = finalized, pending
+
+		return err
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder {
+	builder.Component("follower core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// create a finalizer that will handle updating the protocol
+		// state when the follower detects newly finalized blocks
+		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState)
+
+		// initialize the staking & beacon verifiers, signature joiner
+		staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
+		beacon := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+		merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
+
+		// initialize the verifier for the protocol consensus
+		verifier := verification.NewCombinedVerifier(builder.Committee, staking, beacon, merger)
+
+		followerCore, err := consensus.NewFollower(node.Logger, builder.Committee, node.Storage.Headers, final, verifier,
+			builder.FinalizationDistributor, node.RootBlock.Header, node.RootQC, builder.Finalized, builder.Pending)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize follower core: %w", err)
+		}
+		builder.FollowerCore = followerCore
+
+		return builder.FollowerCore, nil
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
+	builder.Component("follower engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		// initialize cleaner for DB
+		cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+		conCache := buffer.NewPendingBlocks()
+
+		followerEng, err := follower.New(
+			node.Logger,
+			node.Network,
+			node.Me,
+			node.Metrics.Engine,
+			node.Metrics.Mempool,
+			cleaner,
+			node.Storage.Headers,
+			node.Storage.Payloads,
+			builder.FollowerState,
+			conCache,
+			builder.FollowerCore,
+			builder.SyncCore,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create follower engine: %w", err)
+		}
+		builder.FollowerEng = followerEng
+
+		return builder.FollowerEng, nil
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
+	builder.Component("finalized snapshot", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
+		if err != nil {
+			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+		}
+		builder.FinalizedHeader = finalizedHeader
+
+		return builder.FinalizedHeader, nil
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
+	builder.Component("sync engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		sync, err := synceng.New(
+			node.Logger,
+			node.Metrics.Engine,
+			node.Network,
+			node.Me,
+			node.Storage.Blocks,
+			builder.FollowerEng,
+			builder.SyncCore,
+			builder.FinalizedHeader,
+			node.State,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
+		}
+		builder.SyncEng = sync
+
+		return builder.SyncEng, nil
+	})
+
+	return builder
+}
+
+func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder {
+	builder.
+		buildFollowerState().
+		buildSyncCore().
+		buildCommittee().
+		buildLatestHeader().
+		buildFollowerCore().
+		buildFollowerEngine().
+		buildFinalizedHeader().
+		buildSyncEngine()
+
+	return builder
 }
 
 type Option func(*AccessNodeConfig)
@@ -174,8 +363,9 @@ func FlowAccessNode(opts ...Option) *FlowAccessNodeBuilder {
 	}
 
 	return &FlowAccessNodeBuilder{
-		AccessNodeConfig: config,
-		FlowNodeBuilder:  cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		AccessNodeConfig:        config,
+		FlowNodeBuilder:         cmd.FlowNode(flow.RoleAccess.String(), config.baseOptions...),
+		FinalizationDistributor: pubsub.NewFinalizationDistributor(),
 	}
 }
 func (builder *FlowAccessNodeBuilder) IsStaked() bool {

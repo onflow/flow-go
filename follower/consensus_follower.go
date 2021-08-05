@@ -41,7 +41,7 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 	anb := access.FlowAccessNode(accessNodeOptions...)
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
-	// TODO
+	nodeBuilder.BuildConsensusFollower()
 
 	return nodeBuilder
 }
