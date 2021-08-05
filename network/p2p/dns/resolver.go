@@ -16,8 +16,8 @@ type Resolver struct {
 	ttl       time.Duration
 	res       madns.BasicResolver
 	collector module.NetworkMetrics
-	ipCache   map[string]ipCacheEntry
-	txtCache  map[string]txtCacheEntry
+	ipCache   map[string]*ipCacheEntry
+	txtCache  map[string]*txtCacheEntry
 }
 
 type ipCacheEntry struct {
@@ -95,4 +95,15 @@ func (r *Resolver) resolveTXTCache(txt string) ([]string, bool) {
 	}
 
 	return entry.addresses, true
+}
+
+// updateIPCache updates the cache entry for the domain.
+func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.ipCache[domain] = &ipCacheEntry{
+		addresses: addr,
+		timestamp: time.Now(),
+	}
 }
