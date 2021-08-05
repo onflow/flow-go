@@ -37,6 +37,7 @@ func NewResolver(collector module.NetworkMetrics) (*madns.Resolver, error) {
 	}))
 }
 
+// LookupIPAddr implements BasicResolver interface for libp2p.
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	started := time.Now()
 
@@ -52,6 +53,7 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	return addr, err
 }
 
+// LookupTXT implements BasicResolver interface for libp2p.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
 	started := time.Now()
 
