@@ -107,3 +107,14 @@ func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
 		timestamp: time.Now(),
 	}
 }
+
+// updateTXTCache updates the cache entry for the txt.
+func (r *Resolver) updateTXTCache(txt string, addr []string) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.txtCache[txt] = &txtCacheEntry{
+		addresses: addr,
+		timestamp: time.Now(),
+	}
+}
