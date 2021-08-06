@@ -75,7 +75,8 @@ func main() {
 		flags.StringToIntVar(&anb.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&anb.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
 		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", defaultConfig.stakedAccessNodeIDHex, "the node ID of the upstream staked access node if this is an unstaked access node")
-		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-id", defaultConfig.stakedAccessNodeIDHex, "the network address of the upstream staked access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653")
+		flags.StringVar(&anb.stakedAccessNodeIDHex, "staked-access-node-address", defaultConfig.stakedAccessNodeIDHex, "the network address of the upstream staked access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653")
+		flags.StringVar(&anb.stakedAccessNodeNetworkingPublicKey, "staked-access-node-public-key", defaultConfig.stakedAccessNodeNetworkingPublicKey, "the networking public key of the upstream staked access node if this is an unstaked access node")
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", defaultConfig.unstakedNetworkBindAddr, "address to bind on for the unstaked network")
 	})
 
