@@ -212,7 +212,7 @@ func generateLibP2PNode(t *testing.T,
 	libp2pPubSub, err := p2p.DefaultPubSub(ctx, libp2pHost, psOptions...)
 	require.NoError(t, err)
 
-	libP2PNode, err := p2p.NewLibP2PNode(id.NodeID, rootBlockID, logger,libp2pHost, libp2pPubSub,
+	libP2PNode, err := p2p.NewLibP2PNode(id.NodeID, rootBlockID, logger, libp2pHost, libp2pPubSub,
 		p2p.WithConnectionGator(connGater),
 		p2p.WithConnectionManager(connManager),
 		p2p.WithPingService(rootBlockID, pingInfoProvider))

@@ -182,7 +182,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		libp2pPubSub, err := DefaultPubSub(ctx, libp2pHost, psOption)
 		require.NoError(suite.T(), err)
 
-		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger,libp2pHost, libp2pPubSub,
+		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger, libp2pHost, libp2pPubSub,
 			WithConnectionManager(connManager),
 			WithPingService(rootBlockID, pingInfoProvider))
 		require.NoError(suite.T(), err)
