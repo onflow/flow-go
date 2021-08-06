@@ -86,7 +86,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 	}, nil
 }
 
-// Node is a wrapper around LibP2P host.
+// Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
 	connGater            *connGater                             // used to provide white listing
