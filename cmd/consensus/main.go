@@ -109,6 +109,7 @@ func main() {
 		finalizationDistributor *pubsub.FinalizationDistributor
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
+		finalizedHeader         *synceng.FinalizedHeaderCache
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -598,22 +599,29 @@ func main() {
 			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
+		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
+			if err != nil {
+				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
+			}
+
+			return finalizedHeader, nil
+		}).
 		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
 				node.Network,
 				node.Me,
-				node.State,
 				node.Storage.Blocks,
 				comp,
 				syncCore,
+				finalizedHeader,
+				node.State,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
 			}
-
-			finalizationDistributor.AddOnBlockFinalizedConsumer(sync.OnFinalizedBlock)
 
 			return sync, nil
 		}).

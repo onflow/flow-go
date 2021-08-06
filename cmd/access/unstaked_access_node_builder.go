@@ -17,7 +17,7 @@ type UnstakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
+func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 	return &UnstakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}

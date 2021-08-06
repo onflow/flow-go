@@ -15,10 +15,8 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use: "epoch-recovery",
-	Short: "If the epoch setup phase fails (either the DKG, QC voting, or smart contract bug)," +
-		"manual intervention is needed to transition to the next epoch. This tool encapsulates the commands" +
-		"needed for such intervention.",
+	Use:   "epochs",
+	Short: "This tool encapsulates all commands required to interact with Epochs, from recovery to deployment.",
 }
 
 var RootCmd = rootCmd
@@ -31,6 +29,8 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&flagBootDir, "boot-dir", "b", "", "path to the directory containing the bootstrap files")
+
 	cobra.OnInitialize(initConfig)
 	log = zerolog.New(zerolog.NewConsoleWriter())
 }
