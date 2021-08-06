@@ -200,7 +200,7 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	resolver, err := dns.NewResolver(noopMetrics)
+	resolver, err := dns.NewCachedResolver(noopMetrics)
 	require.NoError(t, err)
 
 	libP2PNode, err := p2p.NewLibP2PNode(logger,

@@ -46,7 +46,7 @@ func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 	}
 }
 
-func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
+func NewCachedResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
 	resolver := &Resolver{
 		res:       madns.DefaultResolver,
 		ttl:       defaultTimeToLive,
