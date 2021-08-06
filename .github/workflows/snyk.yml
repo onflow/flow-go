@@ -27,7 +27,7 @@ jobs:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           # command: monitor
-          args: --all-projects --severity-threshold=high --sarif-file-output=snyk.sarif # https://support.snyk.io/hc/en-us/articles/360003812578-CLI-reference
+          args: --all-projects --severity-threshold=critical --sarif-file-output=snyk.sarif # https://support.snyk.io/hc/en-us/articles/360003812578-CLI-reference
       
       - name: Upload result to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v1
