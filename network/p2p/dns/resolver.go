@@ -74,10 +74,12 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	if addr, ok := r.resolveIPCache(domain); ok {
 		// resolving address from cache
+		r.collector.DNSCacheResolution()
 		return addr, nil
 	}
 
 	// resolves domain through underlying resolver
+	r.collector.DNSLookupResolution()
 	addr, err := r.res.LookupIPAddr(ctx, domain)
 	if err != nil {
 		return nil, err
@@ -101,10 +103,12 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
 	if addr, ok := r.resolveTXTCache(txt); ok {
 		// resolving address from cache
+		r.collector.DNSCacheResolution()
 		return addr, nil
 	}
 
-	// resolves dtxt through underlying resolver
+	// resolves txt through underlying resolver
+	r.collector.DNSLookupResolution()
 	addr, err := r.res.LookupTXT(ctx, txt)
 	if err != nil {
 		return nil, err
