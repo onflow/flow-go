@@ -80,16 +80,16 @@ void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
     // hash to G1
     map_to_G1(h, data, len);
     // s = h^sk
-	ep_mult(h, h, sk);  
-    ep_write_bin_compact(s, h, SIGNATURE_LEN);
+    bls_sign_ep(s, sk, h);
     ep_free(h);
 }
 
-// For testing only, computes a BLS signature from a point representing the embedding of a message
-void bls_sign_nomap(byte* s, const bn_t sk, const ep_t pt) {
+// Computes a BLS signature from a G1 point 
+void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
     ep_t p;
     ep_new(p);
-    ep_mult(p, pt, sk);
+    // s = h^sk
+    ep_mult(p, h, sk);
     ep_write_bin_compact(s, p, SIGNATURE_LEN);
     ep_free(p);
 }
