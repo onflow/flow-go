@@ -2,6 +2,7 @@ package sigvalidator
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -15,4 +16,12 @@ import (
 type CombinedSigValidator struct {
 	identity2SignerIndex map[flow.Identifier]int  // lookup signer index by identity
 	sigVerifier          hotstuff.ThresholdSigner // verifies the signature, but has no concept of vote
+}
+
+func (v *CombinedSigValidator) ValidateVote(vote *model.Vote) error {
+	panic("TO IMPLEMENT")
+}
+
+func (v *CombinedSigValidator) ValidateBlock(block *model.Proposal) error {
+	panic("TO IMPLEMENT")
 }

@@ -37,3 +37,21 @@ type StakingSigAggregator interface {
 	// if called concurrently, only one threshold will be running the aggregation.
 	Aggregate() ([]byte, error)
 }
+
+type Packer interface {
+	Combine(
+		stakingSigners []flow.Identifier,
+		thresholdSigners []flow.Identifier,
+		aggregatedStakingSig crypto.Signature,
+		aggregatedThresholdSig crypto.Signature,
+		reconstructedThresholdSig crypto.Signature,
+	) ([]flow.Identifier, []byte, error)
+
+	Split(signerIDs []flow.Identifier, sigData []byte) (
+		[]flow.Identifier, // staking signers
+		[]flow.Identifier, // threshold signers
+		crypto.Signature, // aggregated staking sig
+		crypto.Signature, // aggregated threshold sig
+		crypto.Siganture, // reconstructed threshold sig
+		error)
+}
