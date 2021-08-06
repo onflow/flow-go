@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"time"
@@ -42,8 +43,8 @@ type NodeBuilder interface {
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
 
-	// EnqueueNetworkInit enqueues the default network component
-	EnqueueNetworkInit()
+	// EnqueueNetworkInit enqueues the default network component with the given context
+	EnqueueNetworkInit(ctx context.Context)
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()
@@ -110,6 +111,7 @@ type BaseConfig struct {
 // structs such as DB, Network etc. The NodeConfig is composed of the BaseConfig and is updated in the
 // NodeBuilder functions as a node is bootstrapped.
 type NodeConfig struct {
+	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
 	Logger            zerolog.Logger
 	NodeID            flow.Identifier

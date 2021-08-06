@@ -47,9 +47,6 @@ func TestEncodableNetworkPubKey(t *testing.T) {
 	enc, err := json.Marshal(key)
 	require.NoError(t, err)
 	require.NotEmpty(t, enc)
-	fmt.Printf("\n%v\n", string(enc))
-	fmt.Printf("\n%v\n", enc)
-
 
 	var dec NetworkPubKey
 	err = json.Unmarshal(enc, &dec)

@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -19,7 +18,6 @@ type Suite struct {
 	suite.Suite
 
 	engine   *Engine
-	me       module.Local
 	channels network.ChannelList
 	conduits map[network.Channel]*mocknetwork.Conduit
 }
@@ -30,7 +28,6 @@ func (suite *Suite) SetupTest() {
 	}
 	net := new(mockmodule.Network)
 	unstakedNet := new(mockmodule.Network)
-	suite.me = new(mockmodule.Local)
 	suite.conduits = make(map[network.Channel]*mocknetwork.Conduit)
 
 	for _, channel := range suite.channels {
@@ -45,7 +42,6 @@ func (suite *Suite) SetupTest() {
 		suite.channels,
 		net,
 		unstakedNet,
-		suite.me,
 	)
 	suite.Require().Nil(err)
 

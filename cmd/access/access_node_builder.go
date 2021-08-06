@@ -183,11 +183,12 @@ func (builder *FlowAccessNodeBuilder) parseFlags() {
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
+	nodeID flow.Identifier,
+	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
 	return func() (*p2p.Node, error) {
-		ctx := context.Background()
-		host, err := p2p.LibP2PHost(ctx, builder.unstakedNetworkBindAddr, networkKey, p2p.WithLibP2PPingDisabled())
+		host, err := p2p.LibP2PHost(ctx, builder.unstakedNetworkBindAddr, networkKey, p2p.WithLibP2PPing(false))
 		if err != nil {
 			return nil, err
 		}
@@ -217,7 +218,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, 
 			return nil, err
 		}
 		return builder.UnstakedLibP2PNode, nil
-	}
+	}, nil
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
