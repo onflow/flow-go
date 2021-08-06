@@ -1,7 +1,8 @@
 package signature
 
 import (
-	"github.com/onflow/flow-go/model/encodable"
+	"errors"
+
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
@@ -37,17 +38,17 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 	if ok {
 		return signer, nil
 	}
+
 	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	if err != nil {
+	if errors.Is(err, storage.ErrNotFound) {
+		signer = NewInvalidThresholdProvider(encoding.RandomBeaconTag)
+	} else if err != nil {
 		return nil, err
-	}
-	if privDKGData == nil {
-		signer = NewThresholdProvider(encoding.RandomBeaconTag, encodable.RandomBeaconPrivKey{})
 	} else {
 		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
 	}
-
 	s.signers[epoch] = signer
+
 	return signer, nil
 }
 
