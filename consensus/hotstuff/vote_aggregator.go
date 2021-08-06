@@ -18,6 +18,10 @@ type BlockSigner interface {
 	// return (vote, nil) if vote is created
 	// return (nil , module.InvalidBlockError) if the block is invalid.
 	CreateVote(*model.Block) (*model.Vote, error)
+
+	// CreateProposal returns a proposal for the given block.
+	// return (proposal, nil) if vote is created
+	CreateProposal(*model.Block) (*model.Proposal, error)
 }
 
 // VoteAggregator verifies and aggregates votes to build QC.

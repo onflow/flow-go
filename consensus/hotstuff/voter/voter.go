@@ -10,7 +10,7 @@ import (
 
 // Voter produces votes for the given block
 type Voter struct {
-	createVote    createVote // create vote
+	signer        hotstuff.BlockSigner // to create vote
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
 	committee     hotstuff.Committee // only produce votes when we are valid committee members
@@ -19,7 +19,7 @@ type Voter struct {
 
 // New creates a new Voter instance
 func New(
-	createVote createVote,
+	signer hotstuff.BlockSigner,
 	forks hotstuff.ForksReader,
 	persist hotstuff.Persister,
 	committee hotstuff.Committee,
@@ -27,7 +27,7 @@ func New(
 ) *Voter {
 
 	return &Voter{
-		createVote:    createVote,
+		signer:        signer,
 		forks:         forks,
 		persist:       persist,
 		committee:     committee,
@@ -67,7 +67,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 		return nil, fmt.Errorf("could not get self identity: %w", err)
 	}
 
-	vote, err := v.createVote(block)
+	vote, err := v.signer.CreateVote(block)
 	if err != nil {
 		return nil, fmt.Errorf("could not vote for block: %w", err)
 	}

@@ -11,7 +11,7 @@ import (
 
 // BlockProducer is responsible for producing new block proposals
 type BlockProducer struct {
-	signer    hotstuff.Signer
+	signer    hotstuff.BlockSigner
 	committee hotstuff.Committee
 	builder   module.Builder
 }

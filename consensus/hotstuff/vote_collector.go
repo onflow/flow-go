@@ -23,6 +23,27 @@ const (
 	VoteCollectorStatusInvalid
 )
 
+// VoteCollectors holds a map from block ID to vote collector state machine.
+// It manages the concurrent access to the map.
+type VoteCollectors interface {
+	// Get finds a vote collector state machine by the block ID.
+	// It returns the vote collector state machine and true if found,
+	// It returns nil and false if not found
+	GetOrCreate(blockID flow.Identifier) (VoteCollectorStateMachine, bool)
+
+	// ProcessBlock triggers the state transition of the vote colletor state machine from
+	// caching status to verifying status.
+	ProcessBlock(block model.Proposal) error
+
+	// Prune the vote collectors whose view is below the given view
+	PruneByView(view uint64) error
+}
+
+// VoteCollectorStateMachine is the state machine for transitioning different status of the vote collector
+type VoteCollectorStateMachine interface {
+	VoteCollector() VoteCollector
+}
+
 // VoteCollector collects votes for the same block, produces QC when enough votes are collected
 // VoteCollector takes a callback function to report the event that a QC has been produced.
 type VoteCollector interface {
@@ -42,11 +63,12 @@ type VoteCollector interface {
 	Status() VoteCollectorStatus
 }
 
-// VerifyingVoteCollector must implement the same interface as BlockSigner, such that when eventhandler
-// asks voter to vote for the block, the voter will ask VoteAggregator(via BlockSigner interface)
+// VerifyingVoteCollector is a VoteCollector and also implement the same interface as BlockSigner, so that
+// when the voter ask VoteAggregator(via BlockSigner interface)
 // to sign the block, and VoteAggregator will read the VerifyingVoteCollector from the vote collectors
 // map and produce the vote.
 // Note CachingVoteCollector can't create vote, only VerifyingVoteCollector can
 type VerifyingVoteCollector interface {
+	VoteCollector
 	BlockSigner
 }
