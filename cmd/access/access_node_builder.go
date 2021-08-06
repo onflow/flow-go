@@ -6,11 +6,10 @@ import (
 	"time"
 
 	discovery "github.com/libp2p/go-libp2p-discovery"
-	"github.com/onflow/flow/protobuf/go/flow/access"
 	libp2ppubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/access/ingestion"
@@ -27,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -63,6 +63,7 @@ type AccessNodeBuilder interface {
 type AccessNodeConfig struct {
 	staked                       bool
 	stakedAccessNodeIDHex        string
+	stakedAccessNodeAddress string
 	unstakedNetworkBindAddr      string
 	blockLimit                   uint
 	collectionLimit              uint
@@ -216,19 +217,16 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, 
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
-	peerUpdateInterval time.Duration,
-	connectionGating bool,
-	managerPeerConnections bool,
 	validators ...network.MessageValidator) *p2p.Middleware {
 	builder.unstakedMiddleware = p2p.NewMiddleware(builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
 		builder.RootBlock.ID().String(),
-		peerUpdateInterval,
+		time.Hour, // TODO: this is pretty meaningless since there is no peermaanger in play.
 		p2p.DefaultUnicastTimeout,
-		connectionGating,
-		managerPeerConnections,
+		false,  // no connection gating for the unstaked network
+		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 		validators...)
 	return builder.unstakedMiddleware
 }
@@ -261,4 +259,11 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	}
 
 	return net, nil
+}
+
+func unstakedNetworkMsgValidators(selfID flow.Identifier) []network.MessageValidator {
+	return []network.MessageValidator{
+		// filter out messages sent by this node itself
+		validator.NewSenderValidator(selfID),
+	}
 }

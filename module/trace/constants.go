@@ -180,6 +180,7 @@ const (
 	FVMEnvGetAccountBalance         SpanName = "fvm.env.getAccountBalance"
 	FVMEnvResolveLocation           SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                   SpanName = "fvm.env.getCode"
+	FVMEnvGetAccountContractNames   SpanName = "fvm.env.getAccountContractNames"
 	FVMEnvGetProgram                SpanName = "fvm.env.getCachedProgram"
 	FVMEnvSetProgram                SpanName = "fvm.env.cacheProgram"
 	FVMEnvProgramLog                SpanName = "fvm.env.programLog"

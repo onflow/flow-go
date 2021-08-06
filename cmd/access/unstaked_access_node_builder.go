@@ -2,14 +2,12 @@ package main
 
 import (
 	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -90,15 +88,9 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		libP2PFactory := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkKey)
 
-		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
+		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
 
-		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
-		peerUpdateInterval := time.Hour
-
-		middleware := builder.initMiddl eware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
-			false, // no connection gating for the unstaked network
-			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory,
 			msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront

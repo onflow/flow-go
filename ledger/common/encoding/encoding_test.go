@@ -26,7 +26,7 @@ func Test_KeyPartEncodingDecoding(t *testing.T) {
 	require.Error(t, err)
 
 	// test wrong version decoding
-	encoded[0] = byte(uint8(1))
+	encoded[0] = uint8(1)
 	_, err = encoding.DecodeKeyPart(encoded)
 	require.Error(t, err)
 }
@@ -96,12 +96,12 @@ func Test_TrieUpdateEncodingDecoding(t *testing.T) {
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1 part 1"))
 	kp2 := ledger.NewKeyPart(uint16(22), []byte("key 1 part 2"))
 	k1 := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
-	pl1 := ledger.NewPayload(k1, ledger.Value([]byte{'A'}))
+	pl1 := ledger.NewPayload(k1, []byte{'A'})
 
 	p2 := utils.PathByUint16(2)
 	kp3 := ledger.NewKeyPart(uint16(1), []byte("key2 part 1"))
 	k2 := ledger.NewKey([]ledger.KeyPart{kp3})
-	pl2 := ledger.NewPayload(k2, ledger.Value([]byte{'B'}))
+	pl2 := ledger.NewPayload(k2, []byte{'B'})
 
 	tu := &ledger.TrieUpdate{
 		RootHash: utils.RootHashFixture(),
