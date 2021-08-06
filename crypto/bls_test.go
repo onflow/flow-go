@@ -118,13 +118,16 @@ func validPrivateKeyBytesBLST(t *rapid.T) []byte {
 
 func validPrivateKeyBytesBLS(t *rapid.T) []byte {
 	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
-	sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
+	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
+	if err != nil {
+		assert.FailNow(t, "failed key generation")
+	}
 	return sk.Encode()
 }
 
 func validPublicKeyBytesBLST(t *rapid.T) []byte {
 	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
-	blstS := blst.KeyGen(ikm[:])
+	blstS := blst.KeyGen(ikm)
 	blstG2 := new(blst.P2Affine).From(blstS)
 	return blstG2.Compress()
 }
