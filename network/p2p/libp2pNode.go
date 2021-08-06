@@ -129,7 +129,7 @@ func WithPingService(rootBlockID string, pingInfoProvider PingInfoProvider) Node
 	}
 }
 
-// NewLibP2PNode creates a NewLibP2PNode using the given libp2p host and pubsub instances
+// NewLibP2PNode creates a LibP2PNode using the given libp2p host and pubsub instance.
 func NewLibP2PNode(id flow.Identifier,
 	rootBlockID string,
 	logger zerolog.Logger,
@@ -513,8 +513,8 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 	return isConnected, nil
 }
 
-// LibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and customized
-// with the options
+// LibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
+// customized with options
 func LibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
 
 	defaultOptions, err := DefaultLibP2POptions(address, key)
@@ -551,7 +551,6 @@ func WithLibP2PConnectionGator(connGater *connGater) config.Option {
 }
 
 // DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
-// appended with the extra options
 func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
 	libp2pKey, err := PrivKey(key)
