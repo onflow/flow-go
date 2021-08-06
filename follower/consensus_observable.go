@@ -5,7 +5,6 @@ import (
 
 	"github.com/reactivex/rxgo/v2"
 
-	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
@@ -16,11 +15,16 @@ func finalizedBlockProducer(anb *access.UnstakedAccessNodeBuilder) rxgo.Producer
 		anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(onBlockFinalizedConsumer(next))
 
 		select {
-		case <-anb.Ready():
-			// log: component startup complete
 		case <-ctx.Done():
-			// log: component startup aborted
 			return
+		default:
+		}
+
+		select {
+		case <-anb.Ready():
+			// log: startup complete
+		case <-ctx.Done():
+			// log: startup aborted
 		}
 
 		<-ctx.Done()
@@ -35,38 +39,6 @@ func onBlockFinalizedConsumer(next chan<- rxgo.Item) pubsub.OnBlockFinalizedCons
 	return func(finalizedBlockID flow.Identifier) {
 		next <- rxgo.Of(finalizedBlockID)
 	}
-}
-
-func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNodeBuilder {
-	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
-
-	nodeBuilder.Initialize()
-	nodeBuilder.BuildConsensusFollower()
-
-	return nodeBuilder
-}
-
-type Option func(c *Config)
-
-func getAccessNodeOptions(config *Config) []access.Option {
-	return []access.Option{
-		access.WithUpstreamAccessNodeID(config.upstreamAccessNodeID),
-		access.WithUnstakedNetworkBindAddr(config.bindAddr),
-		access.WithBaseOptions(getBaseOptions(config)),
-	}
-}
-
-func getBaseOptions(config *Config) []cmd.Option {
-	options := []cmd.Option{cmd.WithNodeID(config.nodeID)}
-	if config.bootstrapDir != "" {
-		options = append(options, cmd.WithBootstrapDir(config.bootstrapDir))
-	}
-	if config.dataDir != "" {
-		options = append(options, cmd.WithDataDir(config.dataDir))
-	}
-
-	return options
 }
 
 func GetFinalizedBlockProducer(
@@ -98,12 +70,4 @@ func CreateFinalizedBlockObservable(
 	opts ...Option,
 ) rxgo.Observable {
 	return rxgo.Create([]rxgo.Producer{GetFinalizedBlockProducer(nodeID, upstreamAccessNodeID, bindAddr, opts...)})
-}
-
-type Config struct {
-	nodeID               flow.Identifier // the node ID of this node
-	upstreamAccessNodeID flow.Identifier // the node ID of the upstream access node
-	bindAddr             string          // address to bind on
-	dataDir              string          // directory to store the protocol state
-	bootstrapDir         string          // path to the bootstrap directory
 }
