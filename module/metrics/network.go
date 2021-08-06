@@ -26,6 +26,7 @@ type NetworkCollector struct {
 	inboundConnectionCount   prometheus.Gauge
 	dnsLookupDuration        prometheus.Histogram
 	dnsLookupCount           prometheus.Counter
+	dnsCacheHitCount         prometheus.Counter
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -68,6 +69,13 @@ func NewNetworkCollector() *NetworkCollector {
 			Subsystem: subsystemGossip,
 			Name:      "dns_lookup_total",
 			Help:      "the number of dns lookups made through network",
+		}),
+
+		dnsCacheHitCount: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_cache_hit_total",
+			Help:      "the number of dns cache hits",
 		}),
 
 		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
@@ -167,5 +175,5 @@ func (nc *NetworkCollector) DNSLookupResolution() {
 // DNSCacheResolution tracks the total number of time dns requests resolved through the cache without
 // looking up the network.
 func (nc *NetworkCollector) DNSCacheResolution() {
-
+	nc.dnsCacheHitCount.Inc()
 }
