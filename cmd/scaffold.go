@@ -41,8 +41,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const NotSet = "not set"
-
 type Metrics struct {
 	Network    module.NetworkMetrics
 	Engine     module.EngineMetrics
@@ -106,25 +104,24 @@ type FlowNodeBuilder struct {
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
-	homedir, _ := os.UserHomeDir()
-	datadir := filepath.Join(homedir, ".flow", "database")
+	defaultBaseConfig := DefaultBaseConfig()
 	// bind configuration parameters
-	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", NotSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", NotSet, "address to bind on")
-	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "node startup / shutdown timeout")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
-	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
-	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", p2p.DefaultPeerUpdateInterval, "how often to refresh the peer connections for the node")
-	fnb.flags.DurationVar(&fnb.BaseConfig.unicastMessageTimeout, "unicast-timeout", p2p.DefaultUnicastTimeout, "how long a unicast transmission can take to complete")
-	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute,
+	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultBaseConfig.nodeIDHex, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultBaseConfig.bindAddr, "address to bind on")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultBaseConfig.BootstrapDir, "path to the bootstrap directory")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultBaseConfig.timeout, "node startup / shutdown timeout")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultBaseConfig.datadir, "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultBaseConfig.level, "level for logging output")
+	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultBaseConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
+	fnb.flags.DurationVar(&fnb.BaseConfig.unicastMessageTimeout, "unicast-timeout", defaultBaseConfig.unicastMessageTimeout, "how long a unicast transmission can take to complete")
+	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultBaseConfig.metricsPort, "port for /metrics endpoint")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultBaseConfig.profilerEnabled, "whether to enable the auto-profiler")
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultBaseConfig.profilerDir, "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultBaseConfig.profilerInterval,
 		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second,
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultBaseConfig.profilerDuration,
 		"the duration to run the auto-profile for")
-	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultBaseConfig.tracerEnabled,
 		"whether to enable tracer")
 
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")

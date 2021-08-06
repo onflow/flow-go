@@ -227,8 +227,11 @@ func createNode(
 	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
 	require.NoError(t, err)
 
+	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
+	require.NoError(t, err)
+
 	// initialize the synchronization engine
-	sync, err := synceng.New(log, metrics, net, me, state, blocksDB, comp, syncCore)
+	sync, err := synceng.New(log, metrics, net, me, blocksDB, comp, syncCore, finalizedHeader, state)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}
