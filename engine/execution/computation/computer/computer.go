@@ -239,11 +239,19 @@ func (e *blockComputer) executeSystemCollection(
 		return txIndex, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
-	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
+	err, txerr := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
 	if err != nil {
 		return txIndex, err
+	} else if txerr != nil {
+		e.log.Err(txerr).
+			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
+			Str("system_chunk_error", "true").
+			Msgf("error executing system chunk transaction")
+
+		return txIndex, err
 	}
+
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
 	return txIndex, err
@@ -279,7 +287,7 @@ func (e *blockComputer) executeCollection(
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res)
+		err, _ := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -306,7 +314,7 @@ func (e *blockComputer) executeTransaction(
 	collectionIndex int,
 	txIndex uint32,
 	res *execution.ComputationResult,
-) error {
+) (error, txerror error) {
 
 	startedAt := time.Now()
 	var txSpan opentracing.Span
@@ -336,7 +344,7 @@ func (e *blockComputer) executeTransaction(
 
 	err := e.vm.Run(ctx, tx, txView, programs)
 	if err != nil {
-		return fmt.Errorf("failed to execute transaction: %w", err)
+		return fmt.Errorf("failed to execute transaction: %w", err), tx.Err
 	}
 
 	txResult := flow.TransactionResult{
@@ -364,7 +372,7 @@ func (e *blockComputer) executeTransaction(
 	// of failed transaction invocation
 	err = collectionView.MergeView(txView)
 	if err != nil {
-		return fmt.Errorf("merging tx view to collection view failed: %w", err)
+		return fmt.Errorf("merging tx view to collection view failed: %w", err), tx.Err
 	}
 
 	res.AddEvents(collectionIndex, tx.Events)
@@ -379,7 +387,7 @@ func (e *blockComputer) executeTransaction(
 		Msg("transaction executed")
 
 	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
-	return nil
+	return nil, tx.Err
 }
 
 type blockCommitter struct {
