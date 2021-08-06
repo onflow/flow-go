@@ -650,10 +650,10 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		nodeOptions = append(nodeOptions, WithConnectionGator(connGater))
 	}
 
-	libp2pHost, err := LibP2PHost(context.Background(), address, key, libp2pOptions...)
+	ctx := context.Background()
+	libp2pHost, err := LibP2PHost(ctx, address, key, libp2pOptions...)
 	require.NoError(t, err)
 
-	ctx := context.Background()
 	libp2pPubSub, err := DefaultPubSub(ctx, libp2pHost)
 	require.NoError(t, err)
 

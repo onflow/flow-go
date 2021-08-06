@@ -69,7 +69,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 		libp2pHost, err := LibP2PHost(ctx, address, flowKey,
 			WithLibP2PConnectionManager(connManager),
 			WithLibP2PConnectionGator(connGater),
-			WithLibP2PPingEnabled())
+			WithLibP2PPing(true))
 		if err != nil {
 			return nil, err
 		}
@@ -103,7 +103,7 @@ type Node struct {
 
 type NodeOption func(node *Node) error
 
-// WithConnectionManager returns a NodeOption that sets the connection gater for the node
+// WithConnectionGator returns a NodeOption that sets the connection gater for the node
 func WithConnectionGator(gater *connGater) NodeOption {
 	return func(node *Node) error {
 		node.connGater = gater
@@ -129,7 +129,11 @@ func WithPingService(rootBlockID string, pingInfoProvider PingInfoProvider) Node
 	}
 }
 
-// NewLibP2PNode creates a LibP2PNode using the given libp2p host and pubsub instance.
+// NewLibP2PNode creates a LibP2PNode using the given id, root block ID, libp2p host and pubsub instance.
+// The node can be additionally customized with the following NodeOptions:
+// WithConnectionGator adds connection gating ability to the node
+// WithConnectionManager adds a connection manager to receive callbacks on connection creation an destruction
+// WithPingService adds a PingService to respond to a Flow Ping.
 func NewLibP2PNode(id flow.Identifier,
 	rootBlockID string,
 	logger zerolog.Logger,
@@ -534,12 +538,8 @@ func LibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, opt
 
 }
 
-func WithLibP2PPingEnabled() config.Option {
-	return libp2p.Ping(true)
-}
-
-func WithLibP2PPingDisabled() config.Option {
-	return libp2p.Ping(true)
+func WithLibP2PPing(enable bool) config.Option {
+	return libp2p.Ping(enable)
 }
 
 func WithLibP2PConnectionManager(connMgr *ConnManager) config.Option {
