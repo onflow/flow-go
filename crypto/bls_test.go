@@ -135,37 +135,6 @@ func validSignature(t *rapid.T) []byte {
 	return signature
 }
 
-// validPrivateKeyBytesBLST generates bytes of a valid BLST private key
-func validPrivateKeyBytesBLST(t *rapid.T) []byte {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
-	ikm := randomSlice.Draw(t, "ikm").([]byte)
-	return blst.KeyGen(ikm).Serialize()
-}
-
-func testKeyGenDecodePrivateCrossBLST(t *rapid.T) {
-	skBytes := rapid.Custom(validPrivateKeyBytesBLST).Example().([]byte)
-	_, err := DecodePrivateKey(BLSBLS12381, skBytes)
-	require.NoError(t, err)
-}
-
-func testGenKeyDeserializeScalarCrossBLST(t *rapid.T) {
-	skBytes := rapid.Custom(validPrivateKeyBytes).Example().([]byte)
-	var skBLST blst.Scalar
-	res := skBLST.Deserialize(skBytes)
-
-// validSignature generates bytes of a valid signature
-// NOTE: this generates a signature according to our own map-to-curve, beware if using in verification
-func validSignatureBytesBLS(t *rapid.T) []byte {
-	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
-	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
-	require.NoError(t, err)
-	hasher := NewBLSKMAC("random_tag")
-	message := rapid.SliceOfN(rapid.Byte(), 1, 1000).Draw(t, "msg").([]byte)
-	signature, err := sk.Sign(message, hasher)
-	require.NoError(t, err)
-	return signature
-}
-
 // testEncodeDecodePrivateKeyCrossBLST tests encoding and decoding of private keys are consistent with BLST.
 // This test assumes private key serialization is identical to the one in BLST.
 func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
@@ -283,20 +252,11 @@ func testSignWithRelicMapCrossBLST(t *rapid.T) {
 	assert.Equal(t, sigBytesBLST, sigBytesBLS)
 }
 
-func TestCrossEncodeDecodeScalar(t *testing.T) {
-	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
-}
-
-func TestCrossEncodeDecodePubKey(t *testing.T) {
-	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
-}
-
-func TestCrossEncodeDecodeSignature(t *testing.T) {
-	rapid.Check(t, testBLSEncodeDecodeSignatureCrossBLST)
-}
-
-func TestCrossSign(t *testing.T) {
-	rapid.Check(t, testBLSWithRelicSignCrossBLST)
+func TestBLSCrossBLST(t *testing.T) {
+	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
+	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
+	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
+	rapid.Check(t, testSignWithRelicMapCrossBLST)
 }
 
 // TestBLSEquals tests equal for BLS keys
