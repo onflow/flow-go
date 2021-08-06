@@ -101,31 +101,28 @@ type Node struct {
 	connMgr              *ConnManager
 }
 
-type NodeOption func(node *Node) error
+type NodeOption func(node *Node)
 
 // WithConnectionGator returns a NodeOption that sets the connection gater for the node
 func WithConnectionGator(gater *connGater) NodeOption {
-	return func(node *Node) error {
+	return func(node *Node) {
 		node.connGater = gater
-		return nil
 	}
 }
 
 // WithConnectionManager returns a NodeOption that sets the connection manager for the node
 func WithConnectionManager(connMgr *ConnManager) NodeOption {
-	return func(node *Node) error {
+	return func(node *Node) {
 		node.connMgr = connMgr
-		return nil
 	}
 }
 
 // WithPingService returns a NodeOption that initializes the PingService object for the node
 func WithPingService(rootBlockID string, pingInfoProvider PingInfoProvider) NodeOption {
-	return func(node *Node) error {
+	return func(node *Node) {
 		pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
 		pingService := NewPingService(node.host, pingLibP2PProtocolID, pingInfoProvider, node.logger)
 		node.pingService = pingService
-		return nil
 	}
 }
 
