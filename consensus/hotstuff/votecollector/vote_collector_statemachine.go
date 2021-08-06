@@ -51,15 +51,28 @@ func NewVoteCollectorStateMachine(base BaseVoteCollector) *VoteCollectorStateMac
 	return sm
 }
 
+// CreateVote implements BlockSigner interface, if underlying collector implements BlockSigner interface then we will
+// delegate function call, otherwise we will return an error indicating wrong collector state.
+// ATTENTION: this might be changed if CreateVote and state transitions will be called in parallel
+// something like compare-and-repeat might need to be implemented.
+func (csm *VoteCollectorStateMachine) CreateVote(block *model.Block) (*model.Vote, error) {
+	collector := csm.atomicLoadCollector()
+	blockSigner, ok := collector.(hotstuff.BlockSigner)
+	if ok {
+		return blockSigner.CreateVote(block)
+	}
+	return nil, ErrDifferentCollectorState
+}
+
 func (csm *VoteCollectorStateMachine) AddVote(vote *model.Vote) error {
 	for {
 		collector := csm.atomicLoadCollector()
-		currentState := collector.ProcessingStatus()
+		currentState := collector.Status()
 		err := collector.AddVote(vote)
 		if err != nil {
 			return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
 		}
-		if currentState != csm.ProcessingStatus() {
+		if currentState != csm.Status() {
 			continue
 		}
 
@@ -67,21 +80,17 @@ func (csm *VoteCollectorStateMachine) AddVote(vote *model.Vote) error {
 	}
 }
 
-func (csm *VoteCollectorStateMachine) VoteCreator() hotstuff.CreateVote {
-	panic("not implemented")
+func (csm *VoteCollectorStateMachine) Status() hotstuff.VoteCollectorStatus {
+	return csm.atomicLoadCollector().Status()
 }
 
-func (csm *VoteCollectorStateMachine) ProcessingStatus() hotstuff.ProcessingStatus {
-	return csm.atomicLoadCollector().ProcessingStatus()
-}
-
-func (csm *VoteCollectorStateMachine) ChangeProcessingStatus(expectedCurrentStatus, newStatus hotstuff.ProcessingStatus) error {
+func (csm *VoteCollectorStateMachine) ChangeProcessingStatus(expectedCurrentStatus, newStatus hotstuff.VoteCollectorStatus) error {
 	// don't transition between same states
 	if expectedCurrentStatus == newStatus {
 		return nil
 	}
 
-	if (expectedCurrentStatus == hotstuff.CachingVotes) && (newStatus == hotstuff.VerifyingVotes) {
+	if (expectedCurrentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
 		cachingCollector, err := csm.caching2Verifying()
 		if err != nil {
 			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), err)
@@ -109,7 +118,7 @@ func (csm *VoteCollectorStateMachine) caching2Verifying() (*CachingVoteCollector
 	clr := csm.atomicLoadCollector()
 	cachingCollector, ok := clr.(*CachingVoteCollector)
 	if !ok {
-		return nil, fmt.Errorf("collector's current state is %s: %w", clr.ProcessingStatus().String(), ErrDifferentCollectorState)
+		return nil, fmt.Errorf("collector's current state is %s: %w", clr.Status().String(), ErrDifferentCollectorState)
 	}
 
 	verifyingCollector, err := csm.createVerifyingCollector(csm.BaseVoteCollector)

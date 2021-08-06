@@ -26,8 +26,9 @@ func NewVerifyingVoteCollector(base BaseVoteCollector) *ConsensusClusterVoteColl
 	}
 }
 
-func (c *ConsensusClusterVoteCollector) VoteCreator() hotstuff.CreateVote {
-	panic("not implemented")
+// CreateVote implements BlockSigner interface for creating votes from block proposals
+func (c *ConsensusClusterVoteCollector) CreateVote(block *model.Block) (*model.Vote, error) {
+	panic("implement me")
 }
 
 func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
@@ -114,6 +115,6 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 	panic("not implemented")
 }
 
-func (c *ConsensusClusterVoteCollector) ProcessingStatus() hotstuff.ProcessingStatus {
-	return hotstuff.VerifyingVotes
+func (c *ConsensusClusterVoteCollector) Status() hotstuff.VoteCollectorStatus {
+	return hotstuff.VoteCollectorStatusVerifying
 }

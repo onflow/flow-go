@@ -5,47 +5,53 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type ProcessingStatus int
+// OnQCCreated is a callback which will be used by VoteCollector to submit a QC when it's able to create it
+type OnQCCreated func(*flow.QuorumCertificate)
+
+// VoteCollectorStatus indicates the VoteCollector's status
+// It has three different status.
+type VoteCollectorStatus int
 
 const (
-	CachingVotes ProcessingStatus = iota
-	VerifyingVotes
-	Invalid
+	// VoteCollectorStatusCaching is for the status when the block has not been received.
+	// The vote collector in this status will cache all the votes without verifying them
+	VoteCollectorStatusCaching = iota
+
+	// VoteCollectorStatusVerifying is for the status when the block has been received,
+	// and is able to process all votes for it.
+	VoteCollectorStatusVerifying
+
+	// VoteCollectorStatusInvalid is for the status when the block has been verified and
+	// is invalid. All votes to this block will be collected to slash the voter.
+	VoteCollectorStatusInvalid
 )
 
-func (ps ProcessingStatus) String() string {
-	names := [...]string{"CachingVotes", "VerifyingVotes", "Invalid"}
-	if ps < CachingVotes || ps > Invalid {
+func (ps VoteCollectorStatus) String() string {
+	names := [...]string{"VoteCollectorStatusCaching",
+		"VoteCollectorStatusVerifying",
+		"VoteCollectorStatusInvalid"}
+	if ps < VoteCollectorStatusCaching || ps > VoteCollectorStatusInvalid {
 		return "UNKNOWN"
 	}
 	return names[ps]
 }
 
-// OnQCCreated is callback which should be called by VoteCollector whenever
-// it produces a QC.
-type OnQCCreated func(*flow.QuorumCertificate)
-
 // VoteCollectorState collects votes for the same block, produces QC when enough votes are collected
+// VoteCollectorState takes a callback function to report the event that a QC has been produced.
 type VoteCollectorState interface {
 	// AddVote adds a vote to the collector
-	// if vote collector was able to create a QC, it will be returned together will bool value indicating success
 	// return error if the signature is invalid
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
 	// passed to EventLoop through a callback.
+	// ToDo: document sentinel errors expected during normal operation
 	AddVote(vote *model.Vote) error
 
-	// VoteCreator returns a function that is able to create a vote for a given block
-	// The returned CreateVote function holds a stateful crypto signer object that is able to
-	// verify and store a signature share from other nodes, as well as produce a signature for
-	// our own vote. It is used by Voter to create our own vote.
-	VoteCreator() CreateVote
-
-	// BlockID returns the block ID that the collector is collecting votes for.
+	// BlockID returns the block ID that this instance is collecting votes for.
 	// This method is useful when adding the newly created vote collector to vote collectors map.
 	BlockID() flow.Identifier
 
-	// ProcessingStatus returns the VoteCollector's  ProcessingStatus
-	ProcessingStatus() ProcessingStatus
+	// Status returns the status of the vote collector
+	Status() VoteCollectorStatus
 }
 
 type VoteCollector interface {
@@ -62,5 +68,5 @@ type VoteCollector interface {
 	// * ErrDifferentCollectorState if the VoteCollector's state is different than expectedCurrentStatus
 	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
 	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-	ChangeProcessingStatus(expectedValue, newValue ProcessingStatus) error
+	ChangeProcessingStatus(expectedValue, newValue VoteCollectorStatus) error
 }
