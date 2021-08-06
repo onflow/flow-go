@@ -28,6 +28,8 @@ func (nc *NoopCollector) MessageHandled(engine string, message string)          
 func (nc *NoopCollector) OutboundConnections(_ uint)                                             {}
 func (nc *NoopCollector) InboundConnections(_ uint)                                              {}
 func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)                               {}
+func (nc *NoopCollector) DNSLookupResolution()                                                   {}
+func (nc *NoopCollector) DNSCacheResolution()                                                    {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                                          {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                                         {}

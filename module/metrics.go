@@ -9,8 +9,22 @@ import (
 
 type EntriesFunc func() uint
 
-// Network Metrics
+// ResolverMetrics encapsulates the metrics collectors for dns resolver module
+type ResolverMetrics interface {
+	// DNSLookupDuration tracks the time spent to resolve a DNS address.
+	DNSLookupDuration(duration time.Duration)
+
+	// DNSLookupResolution tracks the total number of time dns requests resolved through looking up the network.
+	DNSLookupResolution()
+
+	// DNSCacheResolution tracks the total number of time dns requests resolved through the cache without
+	// looking up the network.
+	DNSCacheResolution()
+}
+
 type NetworkMetrics interface {
+	ResolverMetrics
+
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
@@ -38,9 +52,6 @@ type NetworkMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
-
-	// DNSLookupDuration tracks the time spent to resolve a DNS address.
-	DNSLookupDuration(duration time.Duration)
 }
 
 type EngineMetrics interface {

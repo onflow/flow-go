@@ -150,3 +150,14 @@ func (nc *NetworkCollector) InboundConnections(connectionCount uint) {
 func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
 	nc.dnsLookupDuration.Observe(float64(duration.Milliseconds()))
 }
+
+// DNSLookupResolution tracks the total number of time dns requests resolved through looking up the network.
+func (nc *NetworkCollector) DNSLookupResolution() {
+
+}
+
+// DNSCacheResolution tracks the total number of time dns requests resolved through the cache without
+// looking up the network.
+func (nc *NetworkCollector) DNSCacheResolution() {
+
+}
