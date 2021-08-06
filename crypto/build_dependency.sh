@@ -14,7 +14,7 @@ fi
 rm -rf "${RELIC_DIR}"
 
 # relic version or tag
-relic_version="9206ae50b667de160fcc385ba3dc2c920143ab0a"
+relic_version="3dd26f5ae28234e02fa4da375422ba954b7b1e53"
 
 # clone a specific version of Relic without history if it's tagged.
 # git -c http.sslVerify=true clone --branch $(relic_version) --single-branch --depth 1 https://github.com/relic-toolkit/relic.git ${RELIC_DIR_NAME} || { echo "git clone failed"; exit 1; }
