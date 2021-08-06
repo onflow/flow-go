@@ -34,10 +34,11 @@ type Controller struct {
 	broker module.DKGBroker
 
 	// Channels used internally to trigger state transitions
-	h1Ch       chan struct{}
-	h2Ch       chan struct{}
-	endCh      chan struct{}
-	shutdownCh chan struct{}
+	h0Ch       chan struct{} // Init -> Phase1
+	h1Ch       chan struct{} // Phase1 -> Phase2
+	h2Ch       chan struct{} // Phase2 -> Phase3
+	endCh      chan struct{} // Phase3 -> End
+	shutdownCh chan struct{} // * -> Shutdown
 
 	// private fields that hold the DKG artifacts when the protocol runs to
 	// completion
@@ -68,6 +69,7 @@ func NewController(
 		dkg:        dkg,
 		seed:       seed,
 		broker:     broker,
+		h0Ch:       make(chan struct{}),
 		h1Ch:       make(chan struct{}),
 		h2Ch:       make(chan struct{}),
 		endCh:      make(chan struct{}),
@@ -259,6 +261,7 @@ func (c *Controller) start() error {
 
 	c.log.Debug().Msg("DKG engine started")
 	c.SetState(Phase1)
+	close(c.h0Ch)
 	return nil
 }
 
@@ -277,6 +280,11 @@ func (c *Controller) phase1() error {
 			return nil
 		}
 	}
+}
+
+// Started returns a channel which is closed when the DKG has successfully started.
+func (c *Controller) Started() <-chan struct{} {
+	return c.h0Ch
 }
 
 func (c *Controller) phase2() error {
