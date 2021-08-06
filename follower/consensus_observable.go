@@ -13,25 +13,7 @@ import (
 func finalizedBlockProducer(anb *access.UnstakedAccessNodeBuilder) rxgo.Producer {
 	return func(ctx context.Context, next chan<- rxgo.Item) {
 		anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(onBlockFinalizedConsumer(next))
-
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		select {
-		case <-anb.Ready():
-			// log: startup complete
-		case <-ctx.Done():
-			// log: startup aborted
-		}
-
-		<-ctx.Done()
-
-		// log: shutting down
-
-		<-anb.Done()
+		runAccessNode(ctx, anb)
 	}
 }
 

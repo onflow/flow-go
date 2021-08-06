@@ -125,6 +125,10 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 
 // Run starts the consensus follower.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
+	runAccessNode(ctx, cf.nodeBuilder)
+}
+
+func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
 	select {
 	case <-ctx.Done():
 		return
@@ -132,14 +136,14 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 	}
 
 	select {
-	case <-cf.nodeBuilder.Ready():
-		cf.nodeBuilder.Logger.Info().Msg("Access node startup complete")
+	case <-anb.Ready():
+		anb.Logger.Info().Msg("Access node startup complete")
 	case <-ctx.Done():
-		cf.nodeBuilder.Logger.Info().Msg("Access node startup aborted")
+		anb.Logger.Info().Msg("Access node startup aborted")
 	}
 
 	<-ctx.Done()
-	cf.nodeBuilder.Logger.Info().Msg("Access node shutting down")
-	<-cf.nodeBuilder.Done()
-	cf.nodeBuilder.Logger.Info().Msg("Access node shutdown complete")
+	anb.Logger.Info().Msg("Access node shutting down")
+	<-anb.Done()
+	anb.Logger.Info().Msg("Access node shutdown complete")
 }
