@@ -28,4 +28,4 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.18.0-patch.5
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.18.0-patch.6
