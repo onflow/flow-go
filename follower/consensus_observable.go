@@ -23,6 +23,7 @@ func onBlockFinalizedConsumer(next chan<- rxgo.Item) pubsub.OnBlockFinalizedCons
 	}
 }
 
+// GetFinalizedBlockProducer returns a `rxgo.Producer` for block finalization events.
 func GetFinalizedBlockProducer(
 	nodeID flow.Identifier,
 	upstreamAccessNodeID flow.Identifier,
@@ -45,6 +46,8 @@ func GetFinalizedBlockProducer(
 	return finalizedBlockProducer(anb)
 }
 
+// CreateFinalizedBlockObservable returns a `rxgo.Observable` representing a stream of block
+// finalization events.
 func CreateFinalizedBlockObservable(
 	nodeID flow.Identifier,
 	upstreamAccessNodeID flow.Identifier,

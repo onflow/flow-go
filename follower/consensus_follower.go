@@ -20,6 +20,7 @@ type ConsensusFollower interface {
 	AddOnBlockFinalizedConsumer(pubsub.OnBlockFinalizedConsumer)
 }
 
+// Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
 	nodeID               flow.Identifier // the node ID of this node
 	upstreamAccessNodeID flow.Identifier // the node ID of the upstream access node
