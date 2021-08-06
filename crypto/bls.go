@@ -428,7 +428,7 @@ func (sk *PrKeyBLSBLS12381) signWithRelicMapTest(data []byte) Signature {
 	blsInstance.reInit()
 
 	s := make([]byte, SignatureLenBLSBLS12381)
-	C.bls_sign_nomap((*C.uchar)(&s[0]),
+	C.bls_sign_ep((*C.uchar)(&s[0]),
 		(*C.bn_st)(&sk.scalar),
 		(*C.ep_st)(&point))
 	return s
