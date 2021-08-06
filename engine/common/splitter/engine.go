@@ -93,6 +93,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
+		if channel != e.channel {
+			e.log.Fatal().Err(fmt.Errorf("received event on unknown channel")).Str("channel", channel.String())
+		}
+
 		e.enginesMu.RLock()
 		defer e.enginesMu.RUnlock()
 		for eng := range e.engines {

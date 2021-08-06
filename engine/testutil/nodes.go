@@ -485,7 +485,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
 	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, 100)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, collectionsStorage, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
@@ -622,20 +622,22 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore)
 	require.NoError(t, err)
 
+	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
+	require.NoError(t, err)
+
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
 		node.Net,
 		node.Me,
-		node.State,
 		node.Blocks,
 		followerEng,
 		syncCore,
+		finalizedHeader,
+		node.State,
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
-
-	finalizationDistributor.AddOnBlockFinalizedConsumer(syncEngine.OnFinalizedBlock)
 
 	return testmock.ExecutionNode{
 		GenericNode:         node,

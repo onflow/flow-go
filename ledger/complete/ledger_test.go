@@ -357,9 +357,9 @@ func TestLedgerFunctionality(t *testing.T) {
 				for s := range histStorage {
 					value := histStorage[s]
 					var state ledger.State
-					copy(state[:], []byte(s[:stateComSize]))
+					copy(state[:], s[:stateComSize])
 					enk := []byte(s[stateComSize:])
-					key, err := encoding.DecodeKey([]byte(enk))
+					key, err := encoding.DecodeKey(enk)
 					assert.NoError(t, err)
 					query, err := ledger.NewQuery(state, []ledger.Key{*key})
 					assert.NoError(t, err)
