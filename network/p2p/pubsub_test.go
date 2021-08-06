@@ -173,7 +173,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 		psOption := pubsub.WithDiscovery(d)
 
-		resolver, err := dns.NewCachedResolver(metrics.NewNoopCollector())
+		resolver, err := dns.NewResolver(metrics.NewNoopCollector())
 		require.NoError(suite.T(), err)
 
 		n, err := NewLibP2PNode(logger,

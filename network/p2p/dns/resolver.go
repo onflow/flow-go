@@ -13,6 +13,7 @@ import (
 
 const defaultTimeToLive = 5 * time.Minute
 
+// Resolver is a cache-based dns resolver for libp2p.
 type Resolver struct {
 	sync.RWMutex
 	ttl       time.Duration // time-to-live for cache entry
@@ -46,7 +47,7 @@ func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 	}
 }
 
-func NewCachedResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
+func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
 	resolver := &Resolver{
 		res:       madns.DefaultResolver,
 		ttl:       defaultTimeToLive,

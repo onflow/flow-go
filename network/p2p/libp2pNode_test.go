@@ -633,7 +633,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
-	resolver, err := dns.NewCachedResolver(metrics.NewNoopCollector())
+	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
 	require.NoError(t, err)
 
 	noopMetrics := metrics.NewNoopCollector()

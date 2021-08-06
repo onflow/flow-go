@@ -62,7 +62,7 @@ func DefaultLibP2PNodeFactory(log zerolog.Logger, me flow.Identifier, address st
 		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
 	}
 
-	resolver, err := dns.NewCachedResolver(metrics)
+	resolver, err := dns.NewResolver(metrics)
 	if err != nil {
 		return nil, fmt.Errorf("could not create dns resolver: %w", err)
 	}
