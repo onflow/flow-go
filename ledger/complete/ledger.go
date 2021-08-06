@@ -211,7 +211,7 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
 	}
 
-	return ledger.Proof(proofToGo), err
+	return proofToGo, err
 }
 
 // MemSize return the amount of memory used by ledger
