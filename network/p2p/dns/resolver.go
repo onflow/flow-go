@@ -35,9 +35,9 @@ type txtCacheEntry struct {
 
 type optFunc func(resolver *Resolver)
 
-func WithBasicResolver(resolver madns.BasicResolver) func(resolver *Resolver) {
+func WithBasicResolver(basic madns.BasicResolver) func(resolver *Resolver) {
 	return func(resolver *Resolver) {
-		resolver.res = resolver
+		resolver.res = basic
 	}
 }
 
