@@ -149,10 +149,7 @@ func NewLibP2PNode(id flow.Identifier,
 	}
 
 	for _, opt := range options {
-		err := opt(node)
-		if err != nil {
-			return nil, err
-		}
+		opt(node)
 	}
 
 	ip, port, err := node.GetIPPort()
