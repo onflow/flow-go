@@ -637,7 +637,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	connManager := NewConnManager(log, noopMetrics)
 
 	libp2pOptions := []config.Option{
-		WithLibP2PPingEnabled(),
+		WithLibP2PPing(true),
 		WithLibP2PConnectionManager(connManager),
 	}
 	nodeOptions := []NodeOption{
