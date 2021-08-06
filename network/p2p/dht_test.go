@@ -109,6 +109,7 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 
 	}
 
+	// fullyConnectedGraph checks that each node is directly connected to all the other nodes
 	fullyConnectedGraph := func() bool {
 		for i := 0; i < len(nodes); i++ {
 			for j := i + 1; j < len(nodes); j++ {
@@ -192,7 +193,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 		libp2pPubSub, err := DefaultPubSub(suite.ctx, libP2PHost, psOption)
 		require.NoError(suite.T(), err)
 
-		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger,libP2PHost, libp2pPubSub,
+		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger, libP2PHost, libp2pPubSub,
 			WithConnectionManager(connManager),
 			WithPingService(rootBlockID, pingInfoProvider))
 		require.NoError(suite.T(), err)

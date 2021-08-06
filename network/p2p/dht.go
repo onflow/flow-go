@@ -9,7 +9,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
 
-const routingTableRefresh  = time.Second // * 100
+const routingTableRefresh = time.Second // * 100
 const peerDiscoveryTimeout = time.Second * 2
 const FlowRendezVousStr string = "flow"
 
@@ -53,7 +53,7 @@ func newDHT(ctx context.Context, host host.Host, serverMode bool) (*discovery.Ro
 	//wg.Wait()
 
 	var routingDiscovery = discovery.NewRoutingDiscovery(kdht)
-//	discovery.Advertise(ctx, routingDiscovery, FlowRendezVousStr)
+	//	discovery.Advertise(ctx, routingDiscovery, FlowRendezVousStr)
 
 	return routingDiscovery, nil
 }

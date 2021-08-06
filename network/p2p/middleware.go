@@ -156,7 +156,6 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
-
 	if m.connectionGating {
 
 		// get the node identity map from the overlay

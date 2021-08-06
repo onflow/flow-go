@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/encodable"
@@ -150,25 +148,14 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 	})
 }
 
-// enqueueConnectWithStakedAN connects the libp2p host of the unstaked AN with the staked AN.
+// enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the unstaked
+// AN with the staked AN.
 // Currently, there is an issue with LibP2P stopping advertisements of subscribed topics if no peers are connected
 // (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an unstaked AN could end up not being
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	const maxAttempts = 3
-	log := builder.Logger.With().Str("staked_an", builder.stakedANIdentity.String()).Logger()
-	for i := 1; i <= maxAttempts; i++ {
-		err := builder.UnstakedLibP2PNode.AddPeer(context.Background(), *builder.stakedANIdentity)
-		if err != nil {
-			log.Trace().Msg("connected to upstream access node")
-			return
-		}
-		log.Error().Int("attempt", i).Int("max_attempts", maxAttempts).Msg("failed to connected to the staked access node")
-		time.Sleep(time.Second)
-	}
-	// log fatal as there is no point continuing further if the unstaked AN cannot connect to the staked AN
-	log.Fatal().Msg("failed to connected to the staked access node, " +
-		"please ensure the node ID, network address and public key of the staked access node are correct " +
-		"and that the staked access node is running.")
+	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return newUpstreamConnector(builder.stakedANIdentity, builder.UnstakedLibP2PNode, builder.Logger), nil
+	})
 }
