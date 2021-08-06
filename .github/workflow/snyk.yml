@@ -16,7 +16,7 @@ jobs:
       - self-hosted
       - Linux
       - X64
-      - sre
+      - security
     continue-on-error: true # set to true if you want this job to continue to the next stage even on failure
     steps:
       - uses: actions/checkout@master
