@@ -89,7 +89,6 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
 func TestBLSEncodeDecode(t *testing.T) {
-
 	// generic tests
 	testEncodeDecode(t, BLSBLS12381)
 
@@ -106,37 +105,64 @@ func TestBLSEncodeDecode(t *testing.T) {
 	require.Error(t, err, "the key decoding should fail - key value is identity")
 	assert.IsType(t, expectedError, err)
 }
+/////////////////////////////////////////
+//             Rapid tests             //
+/////////////////////////////////////////
 
-func genScalarBLST(t *rapid.T) []byte {
+// Helpers for relic to mix in "known good" bytes from one of the two libraries: BLS (local) or BLST (the comparison)
+func validPrivateKeyBytesBLST(t *rapid.T) []byte {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
 	ikm := randomSlice.Draw(t, "ikm").([]byte)
 	return blst.KeyGen(ikm).Serialize()
 }
 
-func testKeyGenDecodePrivateCrossBLST(t *rapid.T) {
-	skBytes := rapid.Custom(genScalarBLST).Example().([]byte)
-	_, err := DecodePrivateKey(BLSBLS12381, skBytes)
-	require.NoError(t, err)
-}
-
-func genScalarBLS(t *rapid.T) []byte {
+func validPrivateKeyBytesBLS(t *rapid.T) []byte {
 	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
 	sk, _ := GeneratePrivateKey(BLSBLS12381, seed)
 	return sk.Encode()
 }
 
-func testGenKeyDeserializeScalarCrossBLST(t *rapid.T) {
-	skBytes := rapid.Custom(genScalarBLS).Example().([]byte)
-	var skBLST blst.Scalar
-	res := skBLST.Deserialize(skBytes)
-
-	assert.True(t, res != nil)
+func validPublicKeyBytesBLST(t *rapid.T) []byte {
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
+	blstS := blst.KeyGen(ikm[:])
+	blstG2 := new(blst.P2Affine).From(blstS)
+	return blstG2.Compress()
 }
 
+// validPublicKeyBytesBLS generates bytes of a valid public key
+func validPublicKeyBytesBLS(t *rapid.T) []byte {
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
+	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
+	require.NoError(t, err)
+	return sk.PublicKey().Encode()
+}
+
+func validSignatureBytesBLST(t *rapid.T) []byte {
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
+	blstS := blst.KeyGen(ikm[:])
+	blstG1 := new(blst.P1Affine).From(blstS)
+	return blstG1.Compress()
+}
+
+// validSignature generates bytes of a valid signature
+// NOTE: this generates a signature according to our own map-to-curve, beware if using in verification
+func validSignatureBytesBLS(t *rapid.T) []byte {
+	seed := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "seed").([]byte)
+	sk, err := GeneratePrivateKey(BLSBLS12381, seed)
+	require.NoError(t, err)
+	hasher := NewBLSKMAC("random_tag")
+	message := rapid.SliceOfN(rapid.Byte(), 1, 1000).Draw(t, "msg").([]byte)
+	signature, err := sk.Sign(message, hasher)
+	require.NoError(t, err)
+	return signature
+}
+
+// This ensures keys produced by either deserialize on the other end, and re-serialize to the same bytes
 func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381)
-	validSlice := rapid.Custom(genScalarBLS)
-	var skBytes []byte = rapid.OneOf(randomSlice, validSlice).Example().([]byte)
+	validSliceBLS := rapid.Custom(validPrivateKeyBytesBLS)
+	validSliceBLST := rapid.Custom(validPrivateKeyBytesBLST)
+	var skBytes []byte = rapid.OneOf(randomSlice, validSliceBLS, validSliceBLST).Example().([]byte)
 	skBLS, err := DecodePrivateKey(BLSBLS12381, skBytes)
 
 	var skBLST blst.Scalar
@@ -153,18 +179,12 @@ func testBLSEncodeDecodeScalarCrossBLST(t *rapid.T) {
 	}
 }
 
-func validPointG2BLST(t *rapid.T) []byte {
-	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
-	blstS := blst.KeyGen(ikm[:])
-	blstG2 := new(blst.P2Affine).From(blstS)
-	return blstG2.Compress()
-}
-
 func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
-	validSliceBLST := rapid.Custom(validPointG2BLST)
+	validSliceBLS := rapid.Custom(validPublicKeyBytesBLS)
+	validSliceBLST := rapid.Custom(validPublicKeyBytesBLST)
 
-	var pkBytes []byte = rapid.OneOf(randomSlice, validSliceBLST).Example().([]byte)
+	var pkBytes []byte = rapid.OneOf(randomSlice, validSliceBLS, validSliceBLST).Example().([]byte)
 	pkBLS, err := DecodePublicKey(BLSBLS12381, pkBytes)
 
 	var pkBLST blst.P2Affine
@@ -183,17 +203,12 @@ func testBLSEncodeDecodePubKeyCrossBLST(t *rapid.T) {
 	}
 }
 
-func validSigG1BLST(t *rapid.T) []byte {
-	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
-	blstS := blst.KeyGen(ikm[:])
-	blstG1 := new(blst.P1Affine).From(blstS)
-	return blstG1.Compress()
-}
-
-func testBLSEncodeDecodeSigCrossBLST(t *rapid.T) {
+func testBLSEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381)
-	validSigG1 := rapid.Custom(validSigG1BLST)
-	var sigBytes []byte = rapid.OneOf(randomSlice, validSigG1).Example().([]byte)
+	validSigG1BLST := rapid.Custom(validSignatureBytesBLST)
+	validSigG1BLS := rapid.Custom(validSignatureBytesBLST)
+
+	var sigBytes []byte = rapid.OneOf(randomSlice, validSigG1BLS, validSigG1BLST).Example().([]byte)
 	// here we test readPointG1 rather than the simple Signature type alias
 	var sigBLSPt pointG1
 	err := readPointG1(&sigBLSPt, sigBytes)
@@ -227,7 +242,7 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 	blsCipher := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
 	var msgBytes []byte = rapid.SliceOfN(rapid.Byte(), 1, 1000).Example().([]byte)
 
-	var skBytes []byte = rapid.Custom(genScalarBLS).Example().([]byte)
+	var skBytes []byte = rapid.Custom(validPrivateKeyBytesBLS).Example().([]byte)
 	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
 
 	var skBLST blst.Scalar
@@ -235,9 +250,8 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 
 	blsPass := err == nil
 	blstPass := res != nil
-	require.Equal(t, blsPass, blstPass, "deserialization of the private key %x differs", skBytes)
+	require.True(t, blsPass && blstPass, "deserialization of the private key %x differs", skBytes)
 
-	if blsPass && blstPass {
 		var sigBLST blst.P1Affine
 		sigBLST.Sign(&skBLST, msgBytes, blsCipher)
 		sigBytesBLST := sigBLST.Compress()
@@ -249,16 +263,12 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 		sigBytesBLS := sig.Bytes()
 		assert.Equal(t, sigBytesBLST, sigBytesBLS)
 
-	}
-
 }
 
 func TestBLSCrossBLST(t *testing.T) {
-	rapid.Check(t, testKeyGenDecodePrivateCrossBLST)
-	rapid.Check(t, testGenKeyDeserializeScalarCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
 	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
-	rapid.Check(t, testBLSEncodeDecodeSigCrossBLST)
+	rapid.Check(t, testBLSEncodeDecodeSignatureCrossBLST)
 	rapid.Check(t, testBLSWithRelicSignCrossBLST)
 }
 
