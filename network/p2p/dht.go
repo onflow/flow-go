@@ -40,7 +40,6 @@ func newDHT(ctx context.Context, host host.Host, serverMode bool) (*discovery.Ro
 
 	//var wg sync.WaitGroup
 	//for _, peerInfo := range bootstrapPeers {
-	//
 	//	wg.Add(1)
 	//	go func(pInfo peer.AddrInfo) {
 	//		defer wg.Done()

@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -199,13 +200,22 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	options := []p2p.NodeOption{
-		p2p.WithDefaultLibP2PHost("0.0.0.0:0", p2p.NewConnManager(logger, noopMetrics), key, true),
-		p2p.WithDefaultPubSub(psOptions...),
-		p2p.WithDefaultPingService(rootBlockID, pingInfoProvider),
-	}
+	ctx := context.Background()
+	connGater := p2p.NewConnGater(logger)
+	connManager := p2p.NewConnManager(logger, noopMetrics)
 
-	libP2PNode, err := p2p.NewLibP2PNode(id.NodeID, rootBlockID, logger, options...)
+	libp2pHost, err := p2p.LibP2PHost(context.Background(), "0.0.0.0:0", key,
+		p2p.WithLibP2PConnectionGator(connGater),
+		p2p.WithLibP2PConnectionManager(connManager))
+	require.NoError(t, err)
+
+	libp2pPubSub, err := p2p.DefaultPubSub(ctx, libp2pHost, psOptions...)
+	require.NoError(t, err)
+
+	libP2PNode, err := p2p.NewLibP2PNode(id.NodeID, rootBlockID, logger,libp2pHost, libp2pPubSub,
+		p2p.WithConnectionGator(connGater),
+		p2p.WithConnectionManager(connManager),
+		p2p.WithPingService(rootBlockID, pingInfoProvider))
 	require.NoError(t, err)
 
 	return libP2PNode

@@ -21,7 +21,7 @@ type connGater struct {
 	log             zerolog.Logger
 }
 
-func newConnGater(log zerolog.Logger) *connGater {
+func NewConnGater(log zerolog.Logger) *connGater {
 	cg := &connGater{
 		log: log,
 	}

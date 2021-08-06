@@ -17,7 +17,7 @@ type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
+func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	return &StakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -61,10 +61,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// TODO: define new network metrics for the unstaked network
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
-		// network metrics
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
-		builder.MustNot(err)
+		libP2PFactory := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkKey)
 
 		// use the default validators for the staked access node unstaked networks
 		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)

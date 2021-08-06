@@ -9,7 +9,6 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	discovery "github.com/libp2p/go-libp2p-discovery"
@@ -21,29 +20,30 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type PubSubTestSuite struct {
+type DHTTestSuite struct {
 	suite.Suite
 	ctx    context.Context
 	cancel context.CancelFunc // used to cancel the context
 }
 
-// TestLibP2PNodesTestSuite runs all the test methods in this test suit
-func TestPubSubTestSuite(t *testing.T) {
-	suite.Run(t, new(PubSubTestSuite))
+// TestDHTTestSuite test the libp2p pubsub with DHT for discovery
+func TestDHTTestSuite(t *testing.T) {
+	suite.Run(t, new(DHTTestSuite))
 }
 
 // SetupTests initiates the test setups prior to each test
-func (suite *PubSubTestSuite) SetupTest() {
+func (suite *DHTTestSuite) SetupTest() {
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message on that topic. The DHT discovery
 // mechanism is used for nodes to find each other.
-func (suite *PubSubTestSuite) TestPubSubWithDHTDiscovery() {
+func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 	defer suite.cancel()
 	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
@@ -76,6 +76,9 @@ func (suite *PubSubTestSuite) TestPubSubWithDHTDiscovery() {
 	defer suite.StopNodes(nodes)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
+	// This has to be done before subscribing to any topic, otherwise the node gives on advertising
+	// its topics of interest and becomes undiscoverable by other nodes
+	// (see: https://github.com/libp2p/go-libp2p-pubsub/issues/442)
 	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
 	for _, clientNode := range dhtClientNodes {
 		err := clientNode.host.Connect(suite.ctx, dhtServerAddr)
@@ -149,7 +152,7 @@ func (suite *PubSubTestSuite) TestPubSubWithDHTDiscovery() {
 
 // CreateNode creates the given number of libp2pnodes
 // if dhtServer is true, the DHTServer is used as for Discovery else DHTClient
-func (suite *PubSubTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node) {
+func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node) {
 
 	// keeps track of errors on creating a node
 	var err error
@@ -166,14 +169,14 @@ func (suite *PubSubTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*N
 	// creating nodes
 	for i := 1; i <= count; i++ {
 		_, key := generateNetworkingAndLibP2PKeys(suite.T())
-
-		libP2PHostOptions, err := DefaultLibP2POptions("0.0.0.0:0", key, false)
-		require.NoError(suite.T(), err)
-
-		libP2PHost, err := libp2p.New(suite.ctx, libP2PHostOptions...)
-		require.NoError(suite.T(), err)
+		noopMetrics := metrics.NewNoopCollector()
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
+
+		connManager := NewConnManager(logger, noopMetrics)
+		libP2PHost, err := LibP2PHost(context.Background(), "0.0.0.0:0", key,
+			WithLibP2PConnectionManager(connManager))
+		require.NoError(suite.T(), err)
 
 		var dhtDiscovery *discovery.RoutingDiscovery
 		if dhtServer {
@@ -186,14 +189,14 @@ func (suite *PubSubTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*N
 
 		psOption := pubsub.WithDiscovery(dhtDiscovery)
 
-		options := []NodeOption{
-			WithLibP2PHost(libP2PHost),
-			WithDefaultPubSub(psOption),
-			WithDefaultPingService(rootBlockID, pingInfoProvider),
-		}
-
-		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger, options...)
+		libp2pPubSub, err := DefaultPubSub(suite.ctx, libP2PHost, psOption)
 		require.NoError(suite.T(), err)
+
+		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger,libP2PHost, libp2pPubSub,
+			WithConnectionManager(connManager),
+			WithPingService(rootBlockID, pingInfoProvider))
+		require.NoError(suite.T(), err)
+
 		n.SetFlowProtocolStreamHandler(handlerFunc)
 
 		require.Eventuallyf(suite.T(), func() bool {
@@ -206,7 +209,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*N
 }
 
 // StopNodes stop all nodes in the input slice
-func (suite *PubSubTestSuite) StopNodes(nodes []*Node) {
+func (suite *DHTTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()
 		assert.NoError(suite.T(), err)

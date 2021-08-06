@@ -17,7 +17,7 @@ type UnstakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
+func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 	return &UnstakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -88,10 +88,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
-		// network metrics
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
-		builder.MustNot(err)
+		libP2PFactory := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkKey)
 
 		// use the default validators for the staked access node unstaked networks
 		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
@@ -99,7 +96,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
 		peerUpdateInterval := time.Hour
 
-		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+		middleware := builder.initMiddl eware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
 			false, // no connection gating for the unstaked network
 			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 			msgValidators...)
