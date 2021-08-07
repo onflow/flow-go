@@ -32,9 +32,9 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.validateParams()
 
-	builder.enqueueUnstakedNetworkInit(ctx)
-
 	builder.deriveStakedANIdentity()
+
+	builder.enqueueUnstakedNetworkInit(ctx)
 
 	builder.enqueueConnectWithStakedAN()
 

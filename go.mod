@@ -24,16 +24,14 @@ require (
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-log v1.0.5
-	github.com/ipfs/go-todocounter v0.0.2 // indirect
 	github.com/jrick/bitset v1.0.0
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-addr-util v0.1.0
 	github.com/libp2p/go-libp2p v0.14.4
 	github.com/libp2p/go-libp2p-core v0.8.6
 	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-kad-dht v0.13.0 // indirect
+	github.com/libp2p/go-libp2p-kad-dht v0.13.0
 	github.com/libp2p/go-libp2p-pubsub v0.4.1
-	github.com/libp2p/go-libp2p-routing v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-swarm v0.5.3
 	github.com/libp2p/go-libp2p-tls v0.1.3
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.6

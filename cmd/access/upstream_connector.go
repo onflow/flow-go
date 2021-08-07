@@ -36,7 +36,7 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 		log := connector.logger.With().Str("staked_an", connector.stakedANIdentity.String()).Logger()
 		for i := 1; i <= maxAttempts; i++ {
 			err := connector.unstakedNode.AddPeer(ctx, *connector.stakedANIdentity)
-			if err != nil {
+			if err == nil {
 				log.Info().Msg("connected to upstream access node")
 				return
 			}
