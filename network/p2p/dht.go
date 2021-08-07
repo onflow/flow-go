@@ -13,12 +13,11 @@ const routingTableRefresh = time.Second // * 100
 const peerDiscoveryTimeout = time.Second * 2
 const FlowRendezVousStr string = "flow"
 
-// THis produces a new IPFS DHT
+// This produces a new IPFS DHT
 // on the name, see https://github.com/libp2p/go-libp2p-kad-dht/issues/337
 func newDHT(ctx context.Context, host host.Host, serverMode bool) (*discovery.RoutingDiscovery, error) {
 	defaultOptions := defaultDHTOptions()
 
-	// If we have no bootstrapPeers, we're the server
 	if serverMode {
 		// DHT defaults to ModeAuto which will automatically switch the DHT between Server and Client modes based on
 		// whether the node appears to be publicly reachable (e.g. not behind a NAT and with a public IP address).
@@ -38,30 +37,16 @@ func newDHT(ctx context.Context, host host.Host, serverMode bool) (*discovery.Ro
 		return nil, err
 	}
 
-	//var wg sync.WaitGroup
-	//for _, peerInfo := range bootstrapPeers {
-	//	wg.Add(1)
-	//	go func(pInfo peer.AddrInfo) {
-	//		defer wg.Done()
-	//		if err := host.Connect(ctx, pInfo); err != nil {
-	//			log.Printf("Error while connecting to node %q: %-v", pInfo, err)
-	//		} else {
-	//			log.Printf("Connection established with bootstrap node: %q", pInfo)
-	//		}
-	//	}(peerInfo)
-	//}
-	//wg.Wait()
-
-	var routingDiscovery = discovery.NewRoutingDiscovery(kdht)
-	//	discovery.Advertise(ctx, routingDiscovery, FlowRendezVousStr)
-
+	routingDiscovery := discovery.NewRoutingDiscovery(kdht)
 	return routingDiscovery, nil
 }
 
+// NewDHTServer starts the DHT in server mode
 func NewDHTServer(ctx context.Context, host host.Host) (*discovery.RoutingDiscovery, error) {
 	return newDHT(ctx, host, true)
 }
 
+// NewDHTClient starts the DHT in client mode
 func NewDHTClient(ctx context.Context, host host.Host) (*discovery.RoutingDiscovery, error) {
 	return newDHT(ctx, host, false)
 }
@@ -74,7 +59,8 @@ func defaultDHTOptions() []dht.Option {
 		dht.RoutingTableRefreshPeriod(routingTableRefresh),        // this is 100 seconds
 		dht.RoutingTableRefreshQueryTimeout(peerDiscoveryTimeout), // this is 2 seconds
 
-		// public capabilities we don't need - disabling these capabilities does not allow peer discovery
+		// public capabilities we don't need - disabling these capabilities does not allow peer discovery leading
+		// to the node being only connected to server and no other node
 		//dht.DisableProviders(),
 		//dht.DisableValues(),
 	}
