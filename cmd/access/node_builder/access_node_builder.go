@@ -446,8 +446,9 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 			)
 			return anb.RpcEng, nil
 		}).
-		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
+
 			anb.RequestEng, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -462,16 +463,18 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			return anb.RequestEng, nil
-		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			var err error
 			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.TransactionMetrics,
 				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
 			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
 			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
 
 			return anb.IngestEng, err
+		}).
+		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return anb.RequestEng, nil
 		})
 
 	return anb
