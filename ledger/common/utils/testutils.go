@@ -36,7 +36,7 @@ func Uint64ToBinary(integer uint64) []byte {
 
 // AppendUint8 appends the value byte to the input slice
 func AppendUint8(input []byte, value uint8) []byte {
-	return append(input, byte(value))
+	return append(input, value)
 }
 
 // AppendUint16 appends the value bytes to the input slice (big endian)
@@ -93,7 +93,7 @@ func ReadUint8(input []byte) (value uint8, rest []byte, err error) {
 	if len(input) < 1 {
 		return 0, input, fmt.Errorf("input size (%d) is too small to read a uint8", len(input))
 	}
-	return uint8(input[0]), input[1:], nil
+	return input[0], input[1:], nil
 }
 
 // ReadUint16 reads a uint16 from the input and returns the rest
@@ -124,17 +124,6 @@ func ReadUint64(input []byte) (value uint64, rest []byte, err error) {
 func ReadShortData(input []byte) (data []byte, rest []byte, err error) {
 	var size uint16
 	size, rest, err = ReadUint16(input)
-	if err != nil {
-		return nil, rest, err
-	}
-	data = rest[:size]
-	return
-}
-
-// ReadLongData read data shorter than 32MB and return the rest of bytes
-func ReadLongData(input []byte) (data []byte, rest []byte, err error) {
-	var size uint32
-	size, rest, err = ReadUint32(input)
 	if err != nil {
 		return nil, rest, err
 	}
@@ -247,7 +236,7 @@ func PathByUint16LeftPadded(inp uint16) l.Path {
 
 // KeyPartFixture returns a key part fixture
 func KeyPartFixture(typ uint16, val string) l.KeyPart {
-	kp1t := uint16(typ)
+	kp1t := typ
 	kp1v := []byte(val)
 	return l.NewKeyPart(kp1t, kp1v)
 }
@@ -307,7 +296,7 @@ func TrieBatchProofFixture() (*l.TrieBatchProof, l.State) {
 	bp := l.NewTrieBatchProof()
 	bp.Proofs = append(bp.Proofs, p)
 	bp.Proofs = append(bp.Proofs, p)
-	return bp, l.State(s)
+	return bp, s
 }
 
 // RandomPathsRandLen generate m random paths.
@@ -406,14 +395,4 @@ func RandomUniqueKeys(n, m, minByteSize, maxByteSize int) []l.Key {
 		}
 	}
 	return keys
-}
-
-// RandomUniqueKeysRandomN generate n (0<n<maxN) random keys (each m random key part),
-func RandomUniqueKeysRandomN(maxN, m, minByteSize, maxByteSize int) []l.Key {
-	numberOfKeys := rand.Intn(maxN) + 1
-	// at least return 1 keys
-	if numberOfKeys == 0 {
-		numberOfKeys = 1
-	}
-	return RandomUniqueKeys(numberOfKeys, m, minByteSize, maxByteSize)
 }
