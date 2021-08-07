@@ -193,7 +193,11 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			return nil, err
 		}
 
+		// the disovery object used to discover other peers
 		var discovery *discovery.RoutingDiscovery
+
+		// the staked AN acts as the DHT server, while the unstaked AN act as DHT clients,
+		// eventually though all unstaked nodes should be able to discover each other and form the libp2p mesh
 		if builder.IsStaked() {
 			discovery, err = p2p.NewDHTServer(ctx, host)
 			if err != nil {
@@ -206,6 +210,8 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			}
 		}
 
+		// unlike the staked network where currently all the node addresses are known upfront, for the unstaked network
+		// the nodes need to discover each other.
 		psOption := libp2ppubsub.WithDiscovery(discovery)
 
 		pubsub, err := p2p.DefaultPubSub(ctx, host, psOption)
