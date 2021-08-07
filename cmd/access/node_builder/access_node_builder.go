@@ -70,8 +70,8 @@ type AccessNodeBuilder interface {
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
 
-	// ParticipatesInUnstakedNetwork returns True if this is a staked Access node which also participates
-	// in the unstaked network acting as an upstream for other unstaked access nodes, False otherwise.
+	// ParticipatesInUnstakedNetwork returns True if this an Access Node which participates in the unstaked network,
+	// False otherwise
 	ParticipatesInUnstakedNetwork() bool
 
 	// Build defines all of the Access node's components and modules.
@@ -143,8 +143,8 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	UnstakedNetwork            *p2p.Network
-	unstakedMiddleware         *p2p.Middleware
+	UnstakedNetwork            p2p.ReadyDoneAwareNetwork
+	unstakedMiddleware         network.Middleware
 	FollowerState              protocol.MutableState
 	SyncCore                   *synchronization.Core
 	RpcEng                     *rpc.Engine
@@ -517,12 +517,6 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 }
 
 func (builder *FlowAccessNodeBuilder) ParticipatesInUnstakedNetwork() bool {
-	// unstaked access nodes can't be upstream of other unstaked access nodes for now
-	if !builder.IsStaked() {
-		return false
-	}
-	// if an unstaked network bind address is provided, then this staked access node will act as the upstream for
-	// unstaked access nodes
 	return builder.unstakedNetworkBindAddr != cmd.NotSet
 }
 
@@ -611,7 +605,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,
 	managerPeerConnections bool,
-	validators ...network.MessageValidator) *p2p.Middleware {
+	validators ...network.MessageValidator) network.Middleware {
 	builder.unstakedMiddleware = p2p.NewMiddleware(builder.Logger,
 		factoryFunc,
 		nodeID,
@@ -630,7 +624,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 // updated by calling network.SetIDs.
 func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
-	middleware *p2p.Middleware,
+	middleware network.Middleware,
 	participants flow.IdentityList,
 	topology network.Topology) (*p2p.Network, error) {
 
