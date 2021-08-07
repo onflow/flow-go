@@ -9,6 +9,7 @@ import (
 
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 )
@@ -25,21 +26,21 @@ type Network struct {
 	log       zerolog.Logger
 	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
 	conduits  map[network.Channel]network.Conduit        // stores conduits for all registered channels
+	lm        *lifecycle.LifecycleManager
 }
 
 // NewNetwork returns a new splitter network.
 func NewNetwork(
 	net p2p.ReadyDoneAwareNetwork,
 	log zerolog.Logger,
-) (*Network, error) {
-	e := &Network{
+) *Network {
+	return &Network{
 		ReadyDoneAwareNetwork: net,
 		splitters:             make(map[network.Channel]*splitterEngine.Engine),
 		conduits:              make(map[network.Channel]network.Conduit),
 		log:                   log,
+		lm:                    lifecycle.NewLifecycleManager(),
 	}
-
-	return e, nil
 }
 
 // Register will subscribe the given engine with the spitter on the given channel, and all registered
@@ -107,21 +108,17 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 // started. For the splitter network, this is true once the wrapped network
 // has started.
 func (n *Network) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
+	n.lm.OnStart(func() {
 		<-n.ReadyDoneAwareNetwork.Ready()
-		close(ready)
-	}()
-	return ready
+	})
+	return n.lm.Started()
 }
 
 // Done returns a done channel that is closed once the network has fully stopped.
 // For the splitter network, this is true once the wrapped network has stopped.
 func (n *Network) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
+	n.lm.OnStop(func() {
 		<-n.ReadyDoneAwareNetwork.Done()
-		close(done)
-	}()
-	return done
+	})
+	return n.lm.Stopped()
 }
