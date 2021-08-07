@@ -116,14 +116,14 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		// Networking key
 		unstakedNetworkKey := node.NetworkKey
 
-		// Network Metrics
-		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
-		unstakedNetworkMetrics := metrics.NewNoopCollector()
-
 		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
 		builder.MustNot(err)
 
 		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
+
+		// Network Metrics
+		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
+		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory,
 			msgValidators...)
