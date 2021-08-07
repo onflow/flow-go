@@ -32,25 +32,24 @@ func GenerateExecutionResultAndChunkDataPacks(
 		// TODO: deltas should be applied to a particular state
 
 		endState = result.StateCommitments[i]
-		var collectionID flow.Identifier
-
-		txNumber := 1 //default for system chunk
-
+		var chunk *flow.Chunk
 		// account for system chunk being last
 		if i < len(result.StateCommitments)-1 {
+			// non-system chunks
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
-			collectionID = completeCollection.Collection().ID()
-			txNumber = len(completeCollection.Transactions)
+			collection := completeCollection.Collection()
+			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint16(len(completeCollection.Transactions)))
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
 		} else {
-			collectionID = flow.ZeroID
+			// system chunk
+			// note that system chunk does not have a collection.
+			// also, number of transactions is one for system chunk.
+			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], 1)
+			// system chunk has a nil collection.
+			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, nil, result.Proofs[i])
 		}
 
-		eventsHash := result.EventsHashes[i]
-		chunk := GenerateChunk(i, startState, endState, collectionID, blockID, eventsHash, uint16(txNumber))
-
-		// chunkDataPack
-		chdps[i] = GenerateChunkDataPack(chunk, collectionID, result.Proofs[i])
 		// TODO use view.SpockSecret() as an input to spock generator
 		chunks[i] = chunk
 		startState = endState
@@ -96,7 +95,7 @@ func GenerateExecutionResultForBlock(
 // GenerateChunk creates a chunk from the provided computation data.
 func GenerateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	colID, blockID, eventsCollection flow.Identifier, txNumber uint16) *flow.Chunk {
+	blockID, eventsCollection flow.Identifier, txNumber uint16) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),
@@ -112,16 +111,16 @@ func GenerateChunk(colIndex int,
 	}
 }
 
-// generateChunkDataPack creates a chunk data pack
 func GenerateChunkDataPack(
-	chunk *flow.Chunk,
-	collectionID flow.Identifier,
+	chunkID flow.Identifier,
+	startState flow.StateCommitment,
+	collection *flow.Collection,
 	proof flow.StorageProof,
 ) *flow.ChunkDataPack {
 	return &flow.ChunkDataPack{
-		ChunkID:      chunk.ID(),
-		StartState:   chunk.StartState,
-		Proof:        proof,
-		CollectionID: collectionID,
+		ChunkID:    chunkID,
+		StartState: startState,
+		Proof:      proof,
+		Collection: collection,
 	}
 }
