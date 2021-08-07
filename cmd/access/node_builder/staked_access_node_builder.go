@@ -1,9 +1,11 @@
-package main
+package node_builder
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/onflow/flow-go/cmd"
+	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -43,6 +45,27 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	return builder
 }
 
+func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
+	anb.FlowAccessNodeBuilder.
+		Build().
+		Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ping, err := pingeng.New(
+				node.Logger,
+				node.State,
+				node.Me,
+				anb.PingMetrics,
+				anb.pingEnabled,
+				node.Middleware,
+				anb.nodeInfoFile,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ping engine: %w", err)
+			}
+			return ping, nil
+		})
+	return anb
+}
+
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
@@ -74,6 +97,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		middleware := builder.initMiddleware(unstakedNodeID,
 			unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+			builder.UnicastMessageTimeout,
 			false, // no connection gating for the unstaked network
 			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 			msgValidators...)

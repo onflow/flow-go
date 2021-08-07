@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/cmd"
-	access "github.com/onflow/flow-go/cmd/access"
+	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -52,7 +52,10 @@ func getAccessNodeOptions(config *Config) []access.Option {
 }
 
 func getBaseOptions(config *Config) []cmd.Option {
-	options := []cmd.Option{cmd.WithNodeID(config.nodeID)}
+	options := []cmd.Option{
+		cmd.WithNodeID(config.nodeID),
+		cmd.WithMetricsEnabled(false),
+	}
 	if config.bootstrapDir != "" {
 		options = append(options, cmd.WithBootstrapDir(config.bootstrapDir))
 	}
