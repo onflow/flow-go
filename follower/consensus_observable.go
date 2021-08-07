@@ -5,7 +5,7 @@ import (
 
 	"github.com/reactivex/rxgo/v2"
 
-	access "github.com/onflow/flow-go/cmd/access"
+	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/model/flow"
 )
