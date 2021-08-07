@@ -6,6 +6,8 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/relay"
+	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -79,6 +81,10 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 }
 
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
+	anb.Component("splitter network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		node.Network = splitternetwork.NewNetwork(node.Network, node.Logger)
+		return node.Network, nil
+	})
 	anb.FlowAccessNodeBuilder.
 		Build().
 		Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -96,6 +102,23 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 			}
 			return ping, nil
 		})
+	if anb.ParticipatesInUnstakedNetwork() {
+		// create relay engine
+		anb.Component("relay engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			channels := node.SubscriptionManager.Channels()
+			if len(channels) == 0 {
+				return nil, fmt.Errorf("no subscribed channels to relay")
+			}
+
+			relayEngine, err := relay.New(node.Logger, channels, node.Network, anb.UnstakedNetwork)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not create relay engine: %w", err)
+			}
+
+			return relayEngine, nil
+		})
+	}
 	return anb
 }
 
