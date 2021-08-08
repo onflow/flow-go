@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"bufio"
@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -91,7 +92,7 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 		ip, port, _, err := networkingInfo(*tc.identity)
 		require.NoError(suite.T(), err)
 
-		actualAddress := MultiAddressStr(ip, port)
+		actualAddress := p2p.MultiAddressStr(ip, port)
 		assert.Equal(suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
@@ -119,12 +120,12 @@ func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
-		info, err := PeerAddressInfo(*identity)
+		info, err := p2p.PeerAddressInfo(*identity)
 		require.NoError(suite.T(), err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
-			rinfo, err := PeerAddressInfo(*identity)
+			rinfo, err := p2p.PeerAddressInfo(*identity)
 			require.NoError(suite.T(), err)
 			assert.True(suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
 		}
@@ -190,7 +191,7 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, identity := range identities[1:] {
 		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, *identity))
-		pInfo, err := PeerAddressInfo(*identity)
+		pInfo, err := p2p.PeerAddressInfo(*identity)
 		assert.NoError(suite.T(), err)
 		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
@@ -209,7 +210,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	flowProtocolID := generateFlowProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+	require.Equal(suite.T(), 0, p2p.CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
@@ -219,7 +220,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(suite.T(), i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i+1, p2p.CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 		// assert that the same connection is reused
 		require.Len(suite.T(), nodes[0].host.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -237,7 +238,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(suite.T(), i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(suite.T(), i, p2p.CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 	}
 }
 
@@ -324,7 +325,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	}()
 
 	// setup the context to expire after the default timeout
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), p2p.DefaultUnicastTimeout)
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
@@ -334,7 +335,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 		func() {
 			_, err = nodes[0].CreateStream(ctx, silentNodeId)
 		},
-		DefaultUnicastTimeout+grace)
+		p2p.DefaultUnicastTimeout+grace)
 	assert.Error(suite.T(), err)
 }
 
@@ -507,7 +508,7 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 	testPing(suite.T(), node2, node1Id, expectedVersion, expectedHeight)
 }
 
-func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64) {
+func testPing(t *testing.T, source *p2p.Node, target flow.Identity, expectedVersion string, expectedHeight uint64) {
 	pctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	resp, rtt, err := source.Ping(pctx, target)
@@ -591,10 +592,10 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
 
 // NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
+func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*p2p.Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
-	var nodes []*Node
+	var nodes []*p2p.Node
 
 	defer func() {
 		if err != nil && nodes != nil {
@@ -617,7 +618,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testin
 
 // NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID string, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
+func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID string, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*p2p.Node, flow.Identity) {
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
@@ -633,16 +634,16 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := NewConnManager(log, noopMetrics)
+	connManager := p2p.NewConnManager(log, noopMetrics)
 
-	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
+	builder := p2p.NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
 		SetRootBlockID(rootBlockID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetLogger(log)
 
 	if allowList {
-		connGater := NewConnGater(log)
+		connGater := p2p.NewConnGater(log)
 		builder.SetConnectionGater(connGater)
 	}
 
@@ -675,13 +676,13 @@ func MockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64) {
 }
 
 // StopNodes stop all nodes in the input slice
-func StopNodes(t *testing.T, nodes []*Node) {
+func StopNodes(t *testing.T, nodes []*p2p.Node) {
 	for _, n := range nodes {
 		StopNode(t, n)
 	}
 }
 
-func StopNode(t *testing.T, node *Node) {
+func StopNode(t *testing.T, node *p2p.Node) {
 	done, err := node.Stop()
 	assert.NoError(t, err)
 	<-done
@@ -702,7 +703,7 @@ func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.Priv
 	key := generateNetworkingKey(t)
 
 	// translates flow key into libp2p key
-	libP2Pkey, err := PrivKey(key)
+	libP2Pkey, err := p2p.PrivKey(key)
 	require.NoError(t, err)
 
 	return libP2Pkey, key
@@ -724,7 +725,7 @@ func silentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
 
 	go acceptAndHang(t, lst)
 
-	ip, port, err := IPPortFromMultiAddress(addrs...)
+	ip, port, err := p2p.IPPortFromMultiAddress(addrs...)
 	require.NoError(t, err)
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(ip+":"+port))

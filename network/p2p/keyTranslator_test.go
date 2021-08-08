@@ -1,4 +1,4 @@
-package p2p
+package p2p_test
 
 import (
 	"crypto/rand"
@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 // KeyTranslatorTestSuite tests key conversion from Flow keys to LibP2P keys
@@ -45,7 +46,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// convert it to a LibP2P private key
-			lpk, err := PrivKey(fpk)
+			lpk, err := p2p.PrivKey(fpk)
 			require.NoError(k.T(), err)
 
 			// get the raw bytes of both the keys
@@ -91,7 +92,7 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			fpublic := fpk.PublicKey()
 
 			// convert the Flow public key to a Libp2p public key
-			lpublic, err := PublicKey(fpublic)
+			lpublic, err := p2p.PublicKey(fpublic)
 			require.NoError(k.T(), err)
 
 			// compare raw bytes of the public keys
@@ -123,7 +124,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	fpublic := fpk.PublicKey()
 
 	// convert it to the Libp2p Public key
-	lconverted, err := PublicKey(fpublic)
+	lconverted, err := p2p.PublicKey(fpublic)
 	require.NoError(k.T(), err)
 
 	// check that the LibP2P Id generation is deterministic
