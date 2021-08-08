@@ -1,4 +1,4 @@
-package p2p_test
+package p2p
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -171,7 +170,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	testOneToKMessagingFails(ctx, suite.T(), node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *p2p.Node, targetId flow.Identity) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, targetId flow.Identity) {
 	// create stream from node 1 to node 2
 	s, err := sourceNode.CreateStream(context.Background(), targetId)
 	// assert that stream creation succeeded
@@ -179,7 +178,7 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *p2p.Node, targetId 
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *p2p.Node, targetId flow.Identity) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, targetId flow.Identity) {
 	// create stream from source node to destination address
 	_, err := sourceNode.CreateStream(context.Background(), targetId)
 	// assert that stream creation failed
@@ -190,7 +189,7 @@ func testOneToOneMessagingFails(t *testing.T, sourceNode *p2p.Node, targetId flo
 
 func testOneToKMessagingSucceeds(ctx context.Context,
 	t *testing.T,
-	sourceNode *p2p.Node,
+	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
 	topic network.Topic) {
 
@@ -211,7 +210,7 @@ func testOneToKMessagingSucceeds(ctx context.Context,
 
 func testOneToKMessagingFails(ctx context.Context,
 	t *testing.T,
-	sourceNode *p2p.Node,
+	sourceNode *Node,
 	dstnSub *pubsub.Subscription,
 	topic network.Topic) {
 

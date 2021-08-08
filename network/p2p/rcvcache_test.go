@@ -1,4 +1,4 @@
-package p2p_test
+package p2p
 
 import (
 	"fmt"
@@ -10,12 +10,11 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 type RcvCacheTestSuite struct {
 	suite.Suite
-	c    *p2p.RcvCache
+	c    *RcvCache
 	size int
 }
 

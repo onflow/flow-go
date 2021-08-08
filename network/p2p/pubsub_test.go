@@ -1,4 +1,4 @@
-package p2p_test
+package p2p
 
 import (
 	"context"
@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -151,7 +150,7 @@ func (suite *PubSubTestSuite) TestPubSub() {
 // CreateNode creates a number of libp2pnodes equal to the count with the given callback function for stream handling
 // it also asserts the correctness of nodes creations
 // a single error in creating one node terminates the entire test
-func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*p2p.Node) {
+func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []*Node) {
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -174,9 +173,9 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		psOption := pubsub.WithDiscovery(d)
 
 		ctx := context.Background()
-		connManager := p2p.NewConnManager(logger, noopMetrics)
+		connManager := NewConnManager(logger, noopMetrics)
 
-		n, err := p2p.NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
+		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
 			SetRootBlockID(rootBlockID).
 			SetConnectionManager(connManager).
 			SetPubsubOptions(psOption).
@@ -197,7 +196,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 }
 
 // StopNodes stop all nodes in the input slice
-func (suite *PubSubTestSuite) StopNodes(nodes []*p2p.Node) {
+func (suite *PubSubTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()
 		assert.NoError(suite.Suite.T(), err)

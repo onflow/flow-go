@@ -1,4 +1,4 @@
-package p2p_test
+package p2p
 
 import (
 	"fmt"
@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -48,7 +47,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 
 	log := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := p2p.NewConnManager(log, noopMetrics)
+	connManager := NewConnManager(log, noopMetrics)
 
 	testCases := [][]fun{
 		// single stream created on a connection
@@ -64,7 +63,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 	}
 }
 
-func testSequence(t *testing.T, sequence []fun, connMgr *p2p.ConnManager) {
+func testSequence(t *testing.T, sequence []fun, connMgr *ConnManager) {
 	pID := generatePeerInfo(t)
 	for _, s := range sequence {
 		switch s.funName {
@@ -81,7 +80,7 @@ func testSequence(t *testing.T, sequence []fun, connMgr *p2p.ConnManager) {
 func generatePeerInfo(t *testing.T) peer.ID {
 	key := generateNetworkingKey(t)
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
-	pInfo, err := p2p.PeerAddressInfo(*identity)
+	pInfo, err := PeerAddressInfo(*identity)
 	require.NoError(t, err)
 	return pInfo.ID
 }
