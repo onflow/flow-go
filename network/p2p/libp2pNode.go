@@ -80,7 +80,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 type LibP2PNodeBuilder interface {
 	SetRootBlockID(string) LibP2PNodeBuilder
 	SetConnectionManager(*ConnManager) LibP2PNodeBuilder
-	SetConnectionGater(*connGater) LibP2PNodeBuilder
+	SetConnectionGater(*ConnGater) LibP2PNodeBuilder
 	SetPubsubOptions(...pubsub.Option) LibP2PNodeBuilder
 	SetPingInfoProvider(PingInfoProvider) LibP2PNodeBuilder
 	SetLogger(zerolog.Logger) LibP2PNodeBuilder
@@ -90,7 +90,7 @@ type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
 	rootBlockID      string
 	logger           zerolog.Logger
-	connGater        *connGater
+	connGater        *ConnGater
 	connMngr         *ConnManager
 	pingInfoProvider PingInfoProvider
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
@@ -120,7 +120,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr *ConnMana
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *connGater) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater) LibP2PNodeBuilder {
 	builder.connGater = connGater
 	return builder
 }
@@ -211,7 +211,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	connGater            *connGater                             // used to provide white listing
+	connGater            *ConnGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
 	logger               zerolog.Logger                         // used to provide logging
