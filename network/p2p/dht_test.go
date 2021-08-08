@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -41,10 +40,13 @@ func (suite *DHTTestSuite) SetupTest() {
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 }
 
+func (suite *DHTTestSuite) TearDownTest() {
+	suite.cancel()
+}
+
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message on that topic. The DHT discovery
 // mechanism is used for nodes to find each other.
 func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
-	defer suite.cancel()
 	topic := flownet.Topic("/flow/" + unittest.IdentifierFixture().String())
 	count := 5
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
@@ -76,7 +78,7 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 	defer suite.StopNodes(nodes)
 
 	// Step 2: Connect all nodes running a DHT client to the node running the DHT server
-	// This has to be done before subscribing to any topic, otherwise the node gives on advertising
+	// This has to be done before subscribing to any topic, otherwise the node gives up on advertising
 	// its topics of interest and becomes undiscoverable by other nodes
 	// (see: https://github.com/libp2p/go-libp2p-pubsub/issues/442)
 	dhtServerAddr := peer.AddrInfo{ID: dhtServerNode.host.ID(), Addrs: dhtServerNode.host.Addrs()}
@@ -135,7 +137,7 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 			recv[res] = true
 		case <-time.After(3 * time.Second):
 			var missing flow.IdentifierList
-			for _, n := range dhtClientNodes {
+			for _, n := range nodes {
 				if _, found := recv[n.id]; !found {
 					missing = append(missing, n.id)
 				}
@@ -169,14 +171,13 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 
 	// creating nodes
 	for i := 1; i <= count; i++ {
-		_, key := generateNetworkingAndLibP2PKeys(suite.T())
+		key := generateNetworkingKey(suite.T())
 		noopMetrics := metrics.NewNoopCollector()
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 
 		connManager := NewConnManager(logger, noopMetrics)
-		libP2PHost, err := LibP2PHost(context.Background(), "0.0.0.0:0", key,
-			WithLibP2PConnectionManager(connManager))
+		libP2PHost, err := LibP2PHost(suite.ctx, "0.0.0.0:0", key, WithLibP2PConnectionManager(connManager))
 		require.NoError(suite.T(), err)
 
 		var dhtDiscovery *discovery.RoutingDiscovery
@@ -200,10 +201,6 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 
 		n.SetFlowProtocolStreamHandler(handlerFunc)
 
-		require.Eventuallyf(suite.T(), func() bool {
-			ip, p, err := n.GetIPPort()
-			return err == nil && ip != "" && p != ""
-		}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %d", i))
 		nodes = append(nodes, n)
 	}
 	return nodes
