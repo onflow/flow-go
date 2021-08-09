@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"fmt"
 	"math/rand"
 	"net"
 	"testing"
@@ -16,7 +17,27 @@ func TestResolver(t *testing.T) {
 	_, err := NewResolver(metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
-	basicResolver.On("LookupIPAddr", "example1.com").Return([]net.IPAddr{})
+}
+
+type ipLookupTestCase struct {
+	domain string
+	result []net.IPAddr
+}
+
+func mockBasicResolverForDomains(resolver *Resolver, testCases []*ipLookupTestCase) {
+
+}
+
+func ipLookupFixture(count int) []*ipLookupTestCase {
+	tt := make([]*ipLookupTestCase, count)
+	for i := 0; i < count; i++ {
+		tt = append(tt, &ipLookupTestCase{
+			domain: fmt.Sprintf("example%d.com", i),
+			result: netIPAddrFixture(),
+		})
+	}
+
+	return tt
 }
 
 func netIPAddrFixture() []net.IPAddr {
