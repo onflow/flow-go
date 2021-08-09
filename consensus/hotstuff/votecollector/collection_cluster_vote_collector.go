@@ -8,24 +8,27 @@ import (
 )
 
 type CollectionClusterVoteCollector struct {
-	BaseVoteCollector
+	CollectionBase
 
 	onQCCreated hotstuff.OnQCCreated
 	done        atomic.Bool
+}
+
+// CreateVote implements BlockSigner interface for creating votes from block proposals
+func (c *CollectionClusterVoteCollector) CreateVote(block *model.Block) (*model.Vote, error) {
+	panic("implement me")
 }
 
 func (c *CollectionClusterVoteCollector) AddVote(vote *model.Vote) error {
 	panic("implement me")
 }
 
-func (c *CollectionClusterVoteCollector) ProcessingStatus() hotstuff.ProcessingStatus {
-	return hotstuff.VerifyingVotes
+func (c *CollectionClusterVoteCollector) Status() hotstuff.VoteCollectorStatus {
+	return hotstuff.VoteCollectorStatusVerifying
 }
 
-func (c *CollectionClusterVoteCollector) ChangeProcessingStatus(expectedValue, newValue hotstuff.ProcessingStatus) error {
-	panic("implement me")
-}
-
-func (c *CollectionClusterVoteCollector) VoteCreator() hotstuff.CreateVote {
-	panic("not implemented")
+func NewCollectionClusterVoteCollector(base CollectionBase) *CollectionClusterVoteCollector {
+	return &CollectionClusterVoteCollector{
+		CollectionBase: base,
+	}
 }

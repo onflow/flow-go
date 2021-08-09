@@ -8,14 +8,14 @@ import (
 )
 
 type CachingVoteCollector struct {
-	BaseVoteCollector
+	CollectionBase
 	pendingVotes *PendingVotes
 }
 
-func NewCachingVoteCollector(base BaseVoteCollector) *CachingVoteCollector {
+func NewCachingVoteCollector(base CollectionBase) *CachingVoteCollector {
 	return &CachingVoteCollector{
-		BaseVoteCollector: base,
-		pendingVotes:      NewPendingVotes(),
+		CollectionBase: base,
+		pendingVotes:   NewPendingVotes(),
 	}
 }
 
@@ -30,12 +30,8 @@ func (c *CachingVoteCollector) AddVote(vote *model.Vote) error {
 	return nil
 }
 
-func (c *CachingVoteCollector) VoteCreator() hotstuff.CreateVote {
-	panic("not implemented")
-}
-
-func (c *CachingVoteCollector) ProcessingStatus() hotstuff.ProcessingStatus {
-	return hotstuff.CachingVotes
+func (c *CachingVoteCollector) Status() hotstuff.VoteCollectorStatus {
+	return hotstuff.VoteCollectorStatusCaching
 }
 
 func (c *CachingVoteCollector) GetVotes() []*model.Vote {

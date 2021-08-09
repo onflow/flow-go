@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
 	"github.com/onflow/flow-go/crypto"
+	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -14,21 +16,26 @@ import (
 // the combined payload of the entire block. It is what consensus nodes agree
 // on after validating the contents against the payload hash.
 type Header struct {
-	ChainID        ChainID    // ChainID is a chain-specific value to prevent replay attacks.
-	ParentID       Identifier // ParentID is the ID of this block's parent.
-	Height         uint64
-	PayloadHash    Identifier   // PayloadHash is a hash of the payload of this block.
-	Timestamp      time.Time    // Timestamp is the time at which this block was proposed. The proposing node can choose any time, so this should not be trusted as accurate.
-	View           uint64       // View is the view number at which this block was proposed.
-	ParentVoterIDs []Identifier // list of voters who signed the parent block. This is used as QC.SignerIDs
-	// aggregated signature over the parent block. This is used as QC.SigData
-	// The reason its type is not crypto.Signature is that
-	// the signature could be a serialization of multi sigs
-	ParentVoterSig []byte
-	ProposerID     Identifier // proposer identifier for the block
-	// signature of the proposer over the new block. The reason its type is not crypto.Signature is that
-	// the signature could be a serialization of multi sigs
-	ProposerSig []byte
+	ChainID ChainID // ChainID is a chain-specific value to prevent replay attacks.
+
+	ParentID Identifier // ParentID is the ID of this block's parent.
+
+	Height uint64 // Height is the height of the parent + 1
+
+	PayloadHash Identifier // PayloadHash is a hash of the payload of this block.
+
+	Timestamp time.Time // Timestamp is the time at which this block was proposed.
+
+	View uint64 // View number at which this block was proposed.
+
+	ParentVoterIDs []Identifier // List of voters who signed the parent block. Used as QC.SignerIDs
+
+	ParentVoterSig []byte // Used as QC.SigData. Might be a serialization of multiple signatures and therefore not a crypto.Signature.
+
+	ProposerID Identifier // proposer identifier for the block
+
+	ProposerSig []byte // signature of the proposer over the new block.
+	// Might be a serialization of multiple signatures and therefore not a crypto.Signature.
 }
 
 // Body returns the immutable part of the block header.
@@ -100,6 +107,43 @@ func (h *Header) UnmarshalJSON(data []byte) error {
 	err := json.Unmarshal(data, Decodable(h))
 
 	// NOTE: the timezone check is not required for JSON, as it already encodes
+	// timezones, but it doesn't hurt to add it in case someone messes with the
+	// raw encoded format
+	if h.Timestamp.Location() != time.UTC {
+		h.Timestamp = h.Timestamp.UTC()
+	}
+
+	return err
+}
+
+// MarshalCBOR makes sure the timestamp is encoded in UTC.
+func (h Header) MarshalCBOR() ([]byte, error) {
+
+	// NOTE: this is just a sanity check to make sure that we don't get
+	// different encodings if someone forgets to use UTC timestamps
+	if h.Timestamp.Location() != time.UTC {
+		h.Timestamp = h.Timestamp.UTC()
+	}
+
+	// we use an alias to avoid endless recursion; the alias will not have the
+	// marshal function and encode like a raw header
+	type Encodable Header
+	return cborcodec.EncMode.Marshal(Encodable(h))
+}
+
+// UnmarshalCBOR makes sure the timestamp is decoded in UTC.
+func (h *Header) UnmarshalCBOR(data []byte) error {
+
+	// we use an alias to avoid endless recursion; the alias will not have the
+	// unmarshal function and decode like a raw header
+	// NOTE: for some reason, the pointer alias works for JSON to not recurse,
+	// but msgpack will still recurse; we have to do an extra struct copy here
+	type Decodable Header
+	decodable := Decodable(*h)
+	err := cbor.Unmarshal(data, &decodable)
+	*h = Header(decodable)
+
+	// NOTE: the timezone check is not required for CBOR, as it already encodes
 	// timezones, but it doesn't hurt to add it in case someone messes with the
 	// raw encoded format
 	if h.Timestamp.Location() != time.UTC {

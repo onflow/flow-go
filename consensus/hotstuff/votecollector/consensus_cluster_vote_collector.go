@@ -11,7 +11,7 @@ import (
 )
 
 type ConsensusClusterVoteCollector struct {
-	BaseVoteCollector
+	CollectionBase
 
 	dkg           hotstuff.DKG
 	aggregator    CombinedAggregator
@@ -20,14 +20,15 @@ type ConsensusClusterVoteCollector struct {
 	done          atomic.Bool
 }
 
-func NewVerifyingVoteCollector(base BaseVoteCollector) *ConsensusClusterVoteCollector {
+func NewConsensusClusterVoteCollector(base CollectionBase) *ConsensusClusterVoteCollector {
 	return &ConsensusClusterVoteCollector{
-		BaseVoteCollector: base,
+		CollectionBase: base,
 	}
 }
 
-func (c *ConsensusClusterVoteCollector) VoteCreator() hotstuff.CreateVote {
-	panic("not implemented")
+// CreateVote implements BlockSigner interface for creating votes from block proposals
+func (c *ConsensusClusterVoteCollector) CreateVote(block *model.Block) (*model.Vote, error) {
+	panic("implement me")
 }
 
 func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
@@ -65,13 +66,8 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		}
 	}
 
-	// we haven't collected sufficient weight, we have nothing to do further
-	if !c.aggregator.HasSufficientWeight() {
-		return nil
-	}
-
-	// we haven't collected sufficient shares, we have nothing to do further
-	if !c.reconstructor.HasSufficientShares() {
+	// we haven't collected sufficient weight or shares, we have nothing to do further
+	if !c.aggregator.HasSufficientWeight() || !c.reconstructor.HasSufficientShares() {
 		return nil
 	}
 
@@ -114,6 +110,6 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 	panic("not implemented")
 }
 
-func (c *ConsensusClusterVoteCollector) ProcessingStatus() hotstuff.ProcessingStatus {
-	return hotstuff.VerifyingVotes
+func (c *ConsensusClusterVoteCollector) Status() hotstuff.VoteCollectorStatus {
+	return hotstuff.VoteCollectorStatusVerifying
 }

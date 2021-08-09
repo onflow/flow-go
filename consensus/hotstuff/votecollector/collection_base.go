@@ -5,18 +5,18 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type BaseVoteCollector struct {
+type CollectionBase struct {
 	workerPool *workerpool.WorkerPool
 
 	blockID flow.Identifier
 }
 
-func NewBaseVoteCollector(blockID flow.Identifier) BaseVoteCollector {
-	return BaseVoteCollector{
+func NewCollectionBase(blockID flow.Identifier) CollectionBase {
+	return CollectionBase{
 		blockID: blockID,
 	}
 }
 
-func (c *BaseVoteCollector) BlockID() flow.Identifier {
+func (c *CollectionBase) BlockID() flow.Identifier {
 	return c.blockID
 }
