@@ -10,6 +10,6 @@ import (
 
 // TestVerifyingVoteCollector_ProcessingStatus tests that processing status is expected
 func TestVerifyingVoteCollector_ProcessingStatus(t *testing.T) {
-	collector := NewConsensusClusterVoteCollector(BaseVoteCollector{})
+	collector := NewConsensusClusterVoteCollector(CollectionBase{})
 	require.Equal(t, hotstuff.VoteCollectorStatusVerifying, collector.Status())
 }

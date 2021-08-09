@@ -8,7 +8,7 @@ import (
 )
 
 type CollectionClusterVoteCollector struct {
-	BaseVoteCollector
+	CollectionBase
 
 	onQCCreated hotstuff.OnQCCreated
 	done        atomic.Bool
@@ -27,8 +27,8 @@ func (c *CollectionClusterVoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
-func NewCollectionClusterVoteCollector(base BaseVoteCollector) *CollectionClusterVoteCollector {
+func NewCollectionClusterVoteCollector(base CollectionBase) *CollectionClusterVoteCollector {
 	return &CollectionClusterVoteCollector{
-		BaseVoteCollector: base,
+		CollectionBase: base,
 	}
 }

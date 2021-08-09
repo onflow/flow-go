@@ -16,14 +16,14 @@ func TestCachingVoteCollector_AddVote(t *testing.T) {
 	t.Parallel()
 	blockID := unittest.IdentifierFixture()
 	t.Run("add-invalid-vote", func(t *testing.T) {
-		collector := NewCachingVoteCollector(NewBaseVoteCollector(blockID))
+		collector := NewCachingVoteCollector(NewCollectionBase(blockID))
 		vote := unittest.VoteFixture()
 		err := collector.AddVote(vote)
 		require.Error(t, err)
 		require.Empty(t, collector.GetVotes())
 	})
 	t.Run("add-valid-vote", func(t *testing.T) {
-		collector := NewCachingVoteCollector(NewBaseVoteCollector(blockID))
+		collector := NewCachingVoteCollector(NewCollectionBase(blockID))
 		vote := unittest.VoteFixture()
 		vote.BlockID = blockID
 		err := collector.AddVote(vote)
@@ -31,7 +31,7 @@ func TestCachingVoteCollector_AddVote(t *testing.T) {
 		require.Equal(t, []*model.Vote{vote}, collector.GetVotes())
 	})
 	t.Run("add-duplicated-vote", func(t *testing.T) {
-		collector := NewCachingVoteCollector(NewBaseVoteCollector(blockID))
+		collector := NewCachingVoteCollector(NewCollectionBase(blockID))
 		vote := unittest.VoteFixture()
 		vote.BlockID = blockID
 		err := collector.AddVote(vote)
@@ -46,7 +46,7 @@ func TestCachingVoteCollector_AddVote(t *testing.T) {
 // TestCachingVoteCollector_ProcessingStatus tests that processing status is expected
 func TestCachingVoteCollector_ProcessingStatus(t *testing.T) {
 	t.Parallel()
-	collector := NewCachingVoteCollector(NewBaseVoteCollector(unittest.IdentifierFixture()))
+	collector := NewCachingVoteCollector(NewCollectionBase(unittest.IdentifierFixture()))
 	require.Equal(t, hotstuff.CachingVotes, collector.ProcessingStatus())
 }
 
@@ -54,7 +54,7 @@ func TestCachingVoteCollector_ProcessingStatus(t *testing.T) {
 func TestCachingVoteCollector_BlockID(t *testing.T) {
 	t.Parallel()
 	blockID := unittest.IdentifierFixture()
-	collector := NewCachingVoteCollector(NewBaseVoteCollector(blockID))
+	collector := NewCachingVoteCollector(NewCollectionBase(blockID))
 	require.Equal(t, blockID, collector.BlockID())
 }
 
@@ -62,7 +62,7 @@ func TestCachingVoteCollector_BlockID(t *testing.T) {
 func TestCachingVoteCollector_GetVotes(t *testing.T) {
 	t.Parallel()
 	blockID := unittest.IdentifierFixture()
-	collector := NewCachingVoteCollector(NewBaseVoteCollector(blockID))
+	collector := NewCachingVoteCollector(NewCollectionBase(blockID))
 	expectedVotes := make([]*model.Vote, 5)
 	for i := range expectedVotes {
 		vote := unittest.VoteFixture()

@@ -11,7 +11,7 @@ import (
 )
 
 type ConsensusClusterVoteCollector struct {
-	BaseVoteCollector
+	CollectionBase
 
 	dkg           hotstuff.DKG
 	aggregator    CombinedAggregator
@@ -20,9 +20,9 @@ type ConsensusClusterVoteCollector struct {
 	done          atomic.Bool
 }
 
-func NewConsensusClusterVoteCollector(base BaseVoteCollector) *ConsensusClusterVoteCollector {
+func NewConsensusClusterVoteCollector(base CollectionBase) *ConsensusClusterVoteCollector {
 	return &ConsensusClusterVoteCollector{
-		BaseVoteCollector: base,
+		CollectionBase: base,
 	}
 }
 

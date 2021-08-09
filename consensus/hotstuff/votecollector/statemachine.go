@@ -17,11 +17,11 @@ var (
 )
 
 // NewVerifyingCollectorFactoryMethod is a factory method to generate a hotstuff.VoteCollectorState
-type NewVerifyingCollectorFactoryMethod = func(base BaseVoteCollector) (hotstuff.VoteCollectorState, error)
+type NewVerifyingCollectorFactoryMethod = func(base CollectionBase) (hotstuff.VoteCollectorState, error)
 
 // StateMachine implements a state machine for transition between different states of vote collector
 type StateMachine struct {
-	BaseVoteCollector
+	CollectionBase
 
 	sync.Mutex
 	collector                atomic.Value
@@ -39,9 +39,9 @@ type atomicValueWrapper struct {
 	collector hotstuff.VoteCollectorState
 }
 
-func NewStateMachine(base BaseVoteCollector) *StateMachine {
+func NewStateMachine(base CollectionBase) *StateMachine {
 	sm := &StateMachine{
-		BaseVoteCollector: base,
+		CollectionBase: base,
 	}
 
 	// by default start with caching collector
@@ -124,7 +124,7 @@ func (csm *StateMachine) caching2Verifying() (*CachingVoteCollector, error) {
 		return nil, fmt.Errorf("collector's current state is %s: %w", clr.Status().String(), ErrDifferentCollectorState)
 	}
 
-	verifyingCollector, err := csm.createVerifyingCollector(csm.BaseVoteCollector)
+	verifyingCollector, err := csm.createVerifyingCollector(csm.CollectionBase)
 	if err != nil {
 		return nil, fmt.Errorf("could not create verifying vote collector")
 	}

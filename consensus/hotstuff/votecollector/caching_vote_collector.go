@@ -8,14 +8,14 @@ import (
 )
 
 type CachingVoteCollector struct {
-	BaseVoteCollector
+	CollectionBase
 	pendingVotes *PendingVotes
 }
 
-func NewCachingVoteCollector(base BaseVoteCollector) *CachingVoteCollector {
+func NewCachingVoteCollector(base CollectionBase) *CachingVoteCollector {
 	return &CachingVoteCollector{
-		BaseVoteCollector: base,
-		pendingVotes:      NewPendingVotes(),
+		CollectionBase: base,
+		pendingVotes:   NewPendingVotes(),
 	}
 }
 
