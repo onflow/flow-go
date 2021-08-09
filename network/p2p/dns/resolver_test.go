@@ -1,4 +1,4 @@
-package dns
+package dns_test
 
 import (
 	"fmt"
@@ -10,11 +10,12 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/dns"
 )
 
 func TestResolver(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	_, err := NewResolver(metrics.NewNoopCollector(), WithBasicResolver(&basicResolver))
+	_, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
 }
@@ -41,25 +42,54 @@ func mockBasicResolverForDomains(resolver *mocknetwork.BasicResolver, ipLookupTe
 }
 
 func ipLookupFixture(count int) []*ipLookupTestCase {
-	tt := make([]*ipLookupTestCase, count)
+	tt := make([]*ipLookupTestCase, 0, count)
 	for i := 0; i < count; i++ {
 		tt = append(tt, &ipLookupTestCase{
 			domain: fmt.Sprintf("example%d.com", i),
-			result: netIPAddrFixture(),
+			result: []net.IPAddr{ // resolves each domain to 4 addresses.
+				netIPAddrFixture(),
+				netIPAddrFixture(),
+				netIPAddrFixture(),
+				netIPAddrFixture(),
+			},
 		})
 	}
 
 	return tt
 }
 
-func netIPAddrFixture() []net.IPAddr {
+func txtLookupFixture(count int) []*txtLookupTestCase {
+	tt := make([]*txtLookupTestCase, 0, count)
+
+	for i := 0; i < count; i++ {
+		tt = append(tt, &txtLookupTestCase{
+			domain: fmt.Sprintf("_dnsaddr.example%d.com", i),
+			result: []string{ // resolves each domain to 4 addresses.
+				txtIPFixture(),
+				txtIPFixture(),
+				txtIPFixture(),
+				txtIPFixture(),
+			},
+		})
+	}
+
+	return tt
+}
+
+func netIPAddrFixture() net.IPAddr {
 	token := make([]byte, 4)
 	rand.Read(token)
 
 	ip := net.IPAddr{
 		IP:   net.IPv4(token[0], token[1], token[2], token[3]),
-		Zone: "flow",
+		Zone: "flow0",
 	}
 
-	return []net.IPAddr{ip}
+	return ip
+}
+
+func txtIPFixture() string {
+	token := make([]byte, 4)
+	rand.Read(token)
+	return "dnsaddr=" + net.IPv4(token[0], token[1], token[2], token[3]).String()
 }
