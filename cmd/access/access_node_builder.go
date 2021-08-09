@@ -31,18 +31,19 @@ import (
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
 // These functions are shared by staked and unstaked access node builders.
 // The Staked network allows the staked nodes to communicate among themselves, while the unstaked network allows the
-// unstaked nodes and a staked Access node to communicate.
+// unstaked nodes and the staked Access nodes to communicate.
 //
 //                                 unstaked network                           staked network
 //  +------------------------+
 //  | Unstaked Access Node 1 |<--------------------------|
 //  +------------------------+                           v
-//  +------------------------+                         +--------------------+                 +------------------------+
-//  | Unstaked Access Node 2 |<----------------------->| Staked Access Node |<--------------->| All other staked Nodes |
-//  +------------------------+                         +--------------------+                 +------------------------+
-//  +------------------------+                           ^
-//  | Unstaked Access Node 3 |<--------------------------|
-//  +------------------------+
+//  +------------------------+                         +----------------------+
+//  | Unstaked Access Node 2 |<----------------------->| Staked Access Node 1 |<--------------------------v
+//  +------------------------+                         +----------------------+               +------------------------+
+//                                                                                            | All other staked Nodes |
+//  +------------------------+                         +----------------------+               +------------------------+
+//  | Unstaked Access Node 3 |<----------------------->| Staked Access Node 2 |<---------------------------^
+//  +------------------------+                         +----------------------+
 
 type AccessNodeBuilder interface {
 	cmd.NodeBuilder
