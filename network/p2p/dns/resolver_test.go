@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
@@ -17,18 +18,22 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestResolver(t *testing.T) {
+func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
-	txtTestCases := txtLookupFixture(10)
-	ipTestCase := ipLookupFixture(10)
+	size := 10 // we have 10 txt and 10 ip lookup test cases
+	txtTestCases := txtLookupFixture(size)
+	ipTestCase := ipLookupFixture(size)
 	wg := &sync.WaitGroup{}
-	wg.Add(20) // 10 ip + 10 txt
+	wg.Add(2 * size) // 10 ip + 10 txt
+	mockBasicResolverForDomains(&basicResolver, ipTestCase, txtTestCases)
 
 	ctx := context.Background()
-	for i := 0; i < 10; i++ {
+	// each test case is repeated 5 times, since resolver has been mocked only once per test case
+	// it ensures that the rest 4 calls are made through the cache and not the resolver.
+	for i := 0; i < 5*size; i++ {
 		go func(tc *txtLookupTestCase) {
 			addrs, err := resolver.LookupTXT(ctx, tc.domain)
 			require.NoError(t, err)
@@ -36,19 +41,21 @@ func TestResolver(t *testing.T) {
 			require.ElementsMatch(t, addrs, tc.result)
 
 			wg.Done()
-		}(txtTestCases[i])
+		}(txtTestCases[i%size])
 
 		go func(tc *ipLookupTestCase) {
-			addrs, err := resolver.LookupTXT(ctx, tc.domain)
+			addrs, err := resolver.LookupIPAddr(ctx, tc.domain)
 			require.NoError(t, err)
 
 			require.ElementsMatch(t, addrs, tc.result)
 
 			wg.Done()
-		}(ipTestCase[i])
+		}(ipTestCase[i%size])
 	}
 
-	unittest.RequireReturnsBefore(t, wg.Done, 1*time.Second, "could not resolve all addresses")
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
+
+	basicResolver.AssertExpectations(t) // asserts that basic resolver is invoked exactly once per domain
 }
 
 type ipLookupTestCase struct {
@@ -64,11 +71,11 @@ type txtLookupTestCase struct {
 // mockBasicResolverForDomains mocks the resolver for the ip and txt lookup test cases.
 func mockBasicResolverForDomains(resolver *mocknetwork.BasicResolver, ipLookupTestCases []*ipLookupTestCase, txtLookupTestCases []*txtLookupTestCase) {
 	for _, tc := range ipLookupTestCases {
-		resolver.On("LookupIPAddr", tc.domain).Return(tc.result, nil).Once()
+		resolver.On("LookupIPAddr", mock.Anything, tc.domain).Return(tc.result, nil).Once()
 	}
 
 	for _, tc := range txtLookupTestCases {
-		resolver.On("LookupTXT", tc.domain).Return(tc.result, nil).Once()
+		resolver.On("LookupTXT", mock.Anything, tc.domain).Return(tc.result, nil).Once()
 	}
 }
 
