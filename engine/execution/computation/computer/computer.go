@@ -239,15 +239,16 @@ func (e *blockComputer) executeSystemCollection(
 		return txIndex, fmt.Errorf("could not get system chunk transaction: %w", err)
 	}
 
-	err, txerr := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
+	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
+
 	if err != nil {
 		return txIndex, err
-	} else if txerr != nil {
+	} else if res.TransactionResults[txIndex].ErrorMessage != ""{
 		// This log is used as the data source for an alert on grafana.
 		// The system_chunk_error field must not be changed without adding the corresponding
 		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
-		e.log.Err(txerr).
+		e.log.Err(fmt.Errorf(res.TransactionResults[txIndex].ErrorMessage)).
 			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
 			Str("system_chunk_error", "true").
 			Str("critical_error", "true").
@@ -291,7 +292,7 @@ func (e *blockComputer) executeCollection(
 
 	txCtx := fvm.NewContextFromParent(blockCtx, fvm.WithMetricsReporter(e.metrics), fvm.WithTracer(e.tracer))
 	for _, txBody := range collection.Transactions {
-		err, _ := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res)
+		err := e.executeTransaction(txBody, colSpan, collectionView, programs, txCtx, collectionIndex, txIndex, res)
 		txIndex++
 		if err != nil {
 			return txIndex, err
@@ -318,7 +319,7 @@ func (e *blockComputer) executeTransaction(
 	collectionIndex int,
 	txIndex uint32,
 	res *execution.ComputationResult,
-) (executionErr, txErr error) {
+) error {
 	startedAt := time.Now()
 	var txSpan opentracing.Span
 	var traceID string
@@ -347,7 +348,7 @@ func (e *blockComputer) executeTransaction(
 
 	err := e.vm.Run(ctx, tx, txView, programs)
 	if err != nil {
-		return fmt.Errorf("failed to execute transaction: %w", err), tx.Err
+		return fmt.Errorf("failed to execute transaction: %w", err)
 	}
 
 	txResult := flow.TransactionResult{
@@ -375,7 +376,7 @@ func (e *blockComputer) executeTransaction(
 	// of failed transaction invocation
 	err = collectionView.MergeView(txView)
 	if err != nil {
-		return fmt.Errorf("merging tx view to collection view failed: %w", err), tx.Err
+		return fmt.Errorf("merging tx view to collection view failed: %w", err)
 	}
 
 	res.AddEvents(collectionIndex, tx.Events)
@@ -390,7 +391,7 @@ func (e *blockComputer) executeTransaction(
 		Msg("transaction executed")
 
 	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
-	return nil, tx.Err
+	return nil
 }
 
 type blockCommitter struct {
