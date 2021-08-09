@@ -77,13 +77,13 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 	}, nil
 }
 
-type LibP2PNodeBuilder interface {
-	SetRootBlockID(string) LibP2PNodeBuilder
-	SetConnectionManager(*ConnManager) LibP2PNodeBuilder
-	SetConnectionGater(*ConnGater) LibP2PNodeBuilder
-	SetPubsubOptions(...pubsub.Option) LibP2PNodeBuilder
-	SetPingInfoProvider(PingInfoProvider) LibP2PNodeBuilder
-	SetLogger(zerolog.Logger) LibP2PNodeBuilder
+type NodeBuilder interface {
+	SetRootBlockID(string) NodeBuilder
+	SetConnectionManager(*ConnManager) NodeBuilder
+	SetConnectionGater(*ConnGater) NodeBuilder
+	SetPubsubOptions(...pubsub.Option) NodeBuilder
+	SetPingInfoProvider(PingInfoProvider) NodeBuilder
+	SetLogger(zerolog.Logger) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 type DefaultLibP2PNodeBuilder struct {
@@ -98,7 +98,7 @@ type DefaultLibP2PNodeBuilder struct {
 	pubSubOpts       []pubsub.Option
 }
 
-func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) LibP2PNodeBuilder {
+func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
 	return &DefaultLibP2PNodeBuilder{
 		id: id,
 		pubSubMaker: func(ctx context.Context, h host.Host, opts ...pubsub.Option) (*pubsub.PubSub, error) {
@@ -110,32 +110,32 @@ func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcr
 	}
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
 	builder.rootBlockID = rootBlockId
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr *ConnManager) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr *ConnManager) NodeBuilder {
 	builder.connMngr = connMngr
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater) NodeBuilder {
 	builder.connGater = connGater
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...pubsub.Option) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...pubsub.Option) NodeBuilder {
 	builder.pubSubOpts = opts
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetPingInfoProvider(pingInfoProvider PingInfoProvider) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetPingInfoProvider(pingInfoProvider PingInfoProvider) NodeBuilder {
 	builder.pingInfoProvider = pingInfoProvider
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) LibP2PNodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBuilder {
 	builder.logger = logger
 	return builder
 }
