@@ -86,6 +86,7 @@ type NodeBuilder interface {
 	SetLogger(zerolog.Logger) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
+
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
 	rootBlockID      string
