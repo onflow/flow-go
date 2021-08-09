@@ -10,12 +10,12 @@ import (
 	splitterNetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/utils/unittest"
+	testnet "github.com/onflow/flow-go/utils/unittest/network"
 )
 
 func Example() {
 	// create a mock network
-	net := unittest.NewNetwork()
+	net := testnet.NewNetwork()
 
 	// create splitter network
 	logger := zerolog.Nop()
@@ -27,14 +27,14 @@ func Example() {
 	rand.Read(id[:])
 
 	// create engines
-	engineProcessFunc := func(engineName string) unittest.EngineProcessFunc {
+	engineProcessFunc := func(engineName string) testnet.EngineProcessFunc {
 		return func(channel network.Channel, originID flow.Identifier, event interface{}) error {
 			fmt.Printf("Engine %v received message: channel=%v, originID=%v, event=%v\n", engineName, channel, originID, event)
 			return nil
 		}
 	}
-	fooEngine := unittest.NewEngine().OnProcess(engineProcessFunc("Foo"))
-	barEngine := unittest.NewEngine().OnProcess(engineProcessFunc("Bar"))
+	fooEngine := testnet.NewEngine().OnProcess(engineProcessFunc("Foo"))
+	barEngine := testnet.NewEngine().OnProcess(engineProcessFunc("Bar"))
 
 	// register engines on the splitter network
 	fooChannel := network.Channel("foo-channel")
@@ -49,7 +49,7 @@ func Example() {
 	}
 
 	// create another network that messages will be relayed to
-	relayNet := unittest.NewNetwork().OnPublish(func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
+	relayNet := testnet.NewNetwork().OnPublish(func(channel network.Channel, event interface{}, targetIDs ...flow.Identifier) error {
 		fmt.Printf("Message published to relay network: channel=%v, event=%v, targetIDs=%v\n", channel, event, targetIDs)
 		return nil
 	})
