@@ -18,6 +18,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestResolver_HappyPath evaluates the happy path behavior of dns resolver against concurrent invocations. Each unique domain
+// invocation should go through the underlying basic resolver only once, and the result should get cached for subsequent invocations.
+// the test evaluates the correctness of invocations as well as resolution through cache on repetition.
 func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
