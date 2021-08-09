@@ -34,12 +34,13 @@ type storageFormatV5MigrationResult struct {
 }
 
 type StorageFormatV5Migration struct {
-	Log           zerolog.Logger
-	OutputDir     string
-	accounts      *state.Accounts
-	programs      *programs.Programs
-	brokenTypeIDs map[common.TypeID]brokenTypeCause
-	reportFile    *os.File
+	Log             zerolog.Logger
+	OutputDir       string
+	accounts        *state.Accounts
+	programs        *programs.Programs
+	brokenTypeIDs   map[common.TypeID]brokenTypeCause
+	reportFile      *os.File
+	brokenContracts map[common.Address]map[string]bool
 }
 
 type brokenTypeCause int
@@ -78,8 +79,9 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.Log.Info().Msg("Loaded account contracts")
 
 	m.programs = programs.NewEmptyPrograms()
-	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
 
+	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
+	m.brokenContracts = make(map[common.Address]map[string]bool, 0)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
@@ -108,7 +110,12 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 		}
 	}
 
-	return migratedPayloads, nil
+	cleanedPayloads, err := m.cleanupBrokenContracts(migratedPayloads)
+	if err != nil {
+		return nil, fmt.Errorf("failed to migrate storage: %w", err)
+	}
+
+	return cleanedPayloads, nil
 }
 
 func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
@@ -175,6 +182,171 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	}
 	return decMode
 }()
+
+// Clean-up the payloads by removing broken contracts. This method:
+//   - Removes the contracts code,
+//   - Remove the contract name from account.
+//
+func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payload) ([]ledger.Payload, error) {
+	cleanedPayloads := make([]ledger.Payload, 0, len(payloads))
+
+	addToCleanedPayloads := func(payload ledger.Payload) {
+		cleanedPayloads = append(cleanedPayloads, payload)
+	}
+
+	removedNames := make(map[common.AddressLocation]bool, 0)
+	removedContracts := make(map[common.AddressLocation]bool, 0)
+
+	removeBrokenContracts := func(payload ledger.Payload) {
+		keyParts := payload.Key.KeyParts
+
+		rawOwner := keyParts[0].Value
+		rawController := keyParts[1].Value
+		rawKey := keyParts[2].Value
+
+		// If the payload is a cadence value, then do not further process.
+		if !state.IsFVMStateKey(
+			string(rawOwner),
+			string(rawController),
+			string(rawKey),
+		) {
+			addToCleanedPayloads(payload)
+			return
+		}
+
+		address := common.BytesToAddress(rawOwner)
+
+		// Remove the contract name from the account
+		if string(rawKey) == state.KeyContractNames {
+
+			encContractNames := payload.Value
+			if len(encContractNames) == 0 {
+				addToCleanedPayloads(payload)
+				return
+			}
+
+			// Decode contract names
+			contractNames := make([]string, 0)
+			reader := bytes.NewReader(encContractNames)
+			cborDecoder := cbor.NewDecoder(reader)
+			err := cborDecoder.Decode(&contractNames)
+			if err != nil {
+				panic(err)
+			}
+
+			brokenContracts := m.brokenContracts[address]
+
+			// Remove broken contracts
+			updatedContractNames := make([]string, 0)
+			for _, contractName := range contractNames {
+				if !brokenContracts[contractName] {
+					updatedContractNames = append(updatedContractNames, contractName)
+					continue
+				}
+
+				m.Log.Warn().Msgf(
+					"REMOVED contract name '%s' from account: %s",
+					contractName,
+					address,
+				)
+
+				// Keep track of the removed names, so that it can be validated later.
+				removedContracts[common.AddressLocation{
+					Address: address,
+					Name:    contractName,
+				}] = true
+			}
+
+			// Encode the updated names back
+
+			buf := &bytes.Buffer{}
+			cborEncoder := cbor.NewEncoder(buf)
+			err = cborEncoder.Encode(updatedContractNames)
+			if err != nil {
+				panic(err)
+			}
+
+			updatedNames := ledger.Payload{
+				Key:   payload.Key,
+				Value: buf.Bytes(),
+			}
+
+			addToCleanedPayloads(updatedNames)
+			return
+		}
+
+		// Remove the contract code
+		if bytes.HasPrefix(rawKey, []byte(state.KeyCode)) {
+			prefix := fmt.Sprintf("%s.", state.KeyCode)
+			contractName := strings.TrimPrefix(string(rawKey), prefix)
+
+			brokenContracts := m.brokenContracts[address]
+			if !brokenContracts[contractName] {
+				addToCleanedPayloads(payload)
+				return
+			}
+
+			m.Log.Warn().Msgf("DELETED broken contract '%s' in account %s",
+				contractName,
+				address,
+			)
+			m.reportFile.WriteString(
+				fmt.Sprintf("DELETED broken contract '%s' in account %s",
+					contractName,
+					address,
+				),
+			)
+
+			removedNames[common.AddressLocation{
+				Address: address,
+				Name:    contractName,
+			}] = true
+		}
+	}
+
+	for _, payload := range payloads {
+		removeBrokenContracts(payload)
+	}
+
+	// Do a sanity check.
+	// Check whether all the broken contract codes and their names are removed from accounts.
+	for address, contracts := range m.brokenContracts {
+		for contractName, _ := range contracts {
+			contractLoc := common.AddressLocation{
+				Address: address,
+				Name:    contractName,
+			}
+
+			if _, ok := removedContracts[contractLoc]; ok {
+				delete(removedContracts, contractLoc)
+			} else {
+				return nil, fmt.Errorf("contract code '%s' is not removed from account %s",
+					contractName,
+					address,
+				)
+			}
+
+			if _, ok := removedNames[contractLoc]; ok {
+				delete(removedContracts, contractLoc)
+			} else {
+				return nil, fmt.Errorf("contract name '%s' is not removed from account %s",
+					contractName,
+					address,
+				)
+			}
+		}
+	}
+
+	if len(removedContracts) != 0 {
+		return nil, fmt.Errorf("additional contract codes are removed")
+	}
+
+	if len(removedNames) != 0 {
+		return nil, fmt.Errorf("additional contract names are removed")
+	}
+
+	return cleanedPayloads, nil
+}
 
 func (m StorageFormatV5Migration) reencodePayload(
 	payload ledger.Payload,
@@ -1257,6 +1429,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 		value.Type = interpreter.VariableSizedStaticType{
 			Type: elementType,
 		}
+
 	} else {
 
 		switch arrayType := t.(type) {
@@ -1416,6 +1589,11 @@ func (m StorageFormatV5Migration) loadProgram(
 		},
 	)
 	if err != nil {
+		if m.brokenContracts[addressLocation.Address] == nil {
+			m.brokenContracts[addressLocation.Address] = make(map[string]bool)
+		}
+		m.brokenContracts[addressLocation.Address][addressLocation.Name] = true
+
 		return nil, err
 	}
 
