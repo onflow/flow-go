@@ -167,7 +167,7 @@ func main() {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
 				node.Logger,
