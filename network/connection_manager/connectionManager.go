@@ -18,6 +18,13 @@ type ConnectionManager struct {
 	connmgr.NullConnMgr // a null conn mgr provided by libp2p to allow implementing only the functions needed
 }
 
+func NewConnectionManager() *ConnectionManager {
+	return &ConnectionManager{
+		observers: make(map[network.Observer]struct{}),
+		NullConnMgr: connmgr.NullConnMgr{},
+	}
+}
+
 func (c *ConnectionManager) Listen(n libp2pnet.Network, multiaddr multiaddr.Multiaddr) {
 	c.notifyObservers(func(observer network.Observer) {
 		observer.Listen(n, multiaddr)
