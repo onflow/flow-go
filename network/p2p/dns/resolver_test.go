@@ -1,23 +1,54 @@
 package dns_test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"net"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestResolver(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	_, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
+	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
+	txtTestCases := txtLookupFixture(10)
+	ipTestCase := ipLookupFixture(10)
+	wg := &sync.WaitGroup{}
+	wg.Add(20) // 10 ip + 10 txt
+
+	ctx := context.Background()
+	for i := 0; i < 10; i++ {
+		go func(tc *txtLookupTestCase) {
+			addrs, err := resolver.LookupTXT(ctx, tc.domain)
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, addrs, tc.result)
+
+			wg.Done()
+		}(txtTestCases[i])
+
+		go func(tc *ipLookupTestCase) {
+			addrs, err := resolver.LookupTXT(ctx, tc.domain)
+			require.NoError(t, err)
+
+			require.ElementsMatch(t, addrs, tc.result)
+
+			wg.Done()
+		}(ipTestCase[i])
+	}
+
+	unittest.RequireReturnsBefore(t, wg.Done, 1*time.Second, "could not resolve all addresses")
 }
 
 type ipLookupTestCase struct {
