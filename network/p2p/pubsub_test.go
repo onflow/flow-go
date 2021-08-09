@@ -171,8 +171,19 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 		psOption := pubsub.WithDiscovery(d)
-		n, err := NewLibP2PNode(logger, flow.Identifier{}, "0.0.0.0:0", NewConnManager(logger, noopMetrics), key, false, rootBlockID, pingInfoProvider, psOption)
+
+		ctx := context.Background()
+		connManager := NewConnManager(logger, noopMetrics)
+
+		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
+			SetRootBlockID(rootBlockID).
+			SetConnectionManager(connManager).
+			SetPubsubOptions(psOption).
+			SetPingInfoProvider(pingInfoProvider).
+			SetLogger(logger).
+			Build(ctx)
 		require.NoError(suite.T(), err)
+
 		n.SetFlowProtocolStreamHandler(handlerFunc)
 
 		require.Eventuallyf(suite.T(), func() bool {

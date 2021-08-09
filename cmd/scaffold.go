@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -125,7 +126,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"whether to enable tracer")
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
 		codec := jsoncodec.NewCodec()
@@ -149,7 +150,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			},
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
+			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
@@ -661,13 +663,16 @@ func FlowNode(role string) *FlowNodeBuilder {
 
 func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	fnb.Cancel = cancel
+
 	fnb.PrintBuildVersionDetails()
 
 	fnb.BaseFlags()
 
 	fnb.ParseAndPrintFlags()
 
-	fnb.EnqueueNetworkInit()
+	fnb.EnqueueNetworkInit(ctx)
 
 	fnb.EnqueueMetricsServerInit()
 
@@ -770,6 +775,10 @@ func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
 
 		fnb.closeDatabase()
 	})
+	// cancel the context used by the networking layer
+	if fnb.Cancel != nil {
+		fnb.Cancel()
+	}
 	return fnb.lm.Stopped()
 }
 
