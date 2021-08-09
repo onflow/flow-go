@@ -48,10 +48,12 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 }
 
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	anb.Component("splitter network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		node.Network = splitternetwork.NewNetwork(node.Network, node.Logger)
-		return node.Network, nil
-	})
+	if anb.ParticipatesInUnstakedNetwork() {
+		anb.Component("splitter network", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			node.Network = splitternetwork.NewNetwork(node.Network, node.Logger)
+			return node.Network, nil
+		})
+	}
 	anb.FlowAccessNodeBuilder.
 		Build().
 		Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
