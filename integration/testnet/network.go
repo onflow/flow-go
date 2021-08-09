@@ -135,9 +135,6 @@ func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
 	fmt.Println(">>>> starting network: ", net.config.Name)
 	net.suite.Start(ctx)
-	for _, cf := range net.ConsensusFollowers {
-		go cf.Run(ctx)
-	}
 }
 
 // Remove stops the network, removes all the containers and cleans up all resources.
@@ -448,17 +445,18 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:            t,
-		cli:          dockerClient,
-		config:       networkConf,
-		suite:        suite,
-		network:      network,
-		Containers:   make(map[string]*Container, nNodes),
-		AccessPorts:  make(map[string]string),
-		root:         root,
-		seal:         seal,
-		result:       result,
-		bootstrapDir: bootstrapDir,
+		t:                  t,
+		cli:                dockerClient,
+		config:             networkConf,
+		suite:              suite,
+		network:            network,
+		Containers:         make(map[string]*Container, nNodes),
+		ConsensusFollowers: make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:        make(map[string]string),
+		root:               root,
+		seal:               seal,
+		result:             result,
+		bootstrapDir:       bootstrapDir,
 	}
 
 	// add each node to the network
@@ -469,18 +467,15 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
-		err = flowNetwork.AddConsensusFollower(t, bootstrapDir, followerConf)
-		require.NoError(t, err)
+		flowNetwork.AddConsensusFollower(t, bootstrapDir, followerConf)
 	}
 
 	return flowNetwork
 }
 
-func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, followerConf ConsensusFollowerConfig) error {
+func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, followerConf ConsensusFollowerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
-	if err != nil {
-		return fmt.Errorf("could not get tmp dir: %w", err)
-	}
+	require.NoError(t, err)
 
 	// create a directory for the follower database
 	dataDir := filepath.Join(tmpdir, DefaultFlowDBDir)
@@ -498,7 +493,7 @@ func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, 
 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
-	bindAddr := fmt.Sprintf("0.0.0.0:%d", bindPort)
+	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
 	opts := []consensus_follower.Option{
 		consensus_follower.WithDataDir(dataDir),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
@@ -721,6 +716,37 @@ func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 	require.NoError(net.t, err)
 }
 
+func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {
+	var nodeInfos []bootstrap.NodeInfo
+
+	// get networking keys for all followers
+	networkKeys, err := unittest.NetworkingKeys(len(confs))
+	if err != nil {
+		return nil, err
+	}
+
+	// get staking keys for all followers
+	stakingKeys, err := unittest.StakingKeys(len(confs))
+	if err != nil {
+		return nil, err
+	}
+
+	for i, conf := range confs {
+		info := bootstrap.NewPrivateNodeInfo(
+			conf.nodeID,
+			flow.RoleAccess, // use Access role
+			"",              // no address
+			0,               // no stake
+			networkKeys[i],
+			stakingKeys[i],
+		)
+
+		nodeInfos = append(nodeInfos, info)
+	}
+
+	return nodeInfos, nil
+}
+
 func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
 	chainID := flow.Localnet
 	chain := chainID.Chain()
@@ -746,9 +772,14 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	stakedConfs := filterContainerConfigs(allConfs, func(config ContainerConfig) bool {
 		return !config.Unstaked
 	})
-	fmt.Println(len(stakedConfs))
-	fmt.Println(len(allConfs))
+
+	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
+	}
+
 	allNodeInfos := toNodeInfos(allConfs)
+	allNodeInfos = append(allNodeInfos, followerInfos...)
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
 	// IMPORTANT: these nodes infos must include exactly the identity table

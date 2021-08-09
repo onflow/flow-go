@@ -91,14 +91,13 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	// consensus follower
 	suite.unstakedID = unittest.IdentifierFixture()
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.ConsensusFollowerConfig{
-			nodeID:         suite.unstakedID,
-			upstreamNodeID: suite.stakedID,
-		},
+		testnet.NewConsensusFollowerConfig(suite.unstakedID, suite.stakedID),
 	}
 
 	conf := testnet.NewNetworkConfig("unstaked_node_test", nodeConfigs, followerConfigs)
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+
+	suite.follower = suite.net.ConsensusFollowerByID(suite.unstakedID)
 
 	// start the network
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
@@ -106,6 +105,6 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 }
 
 func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
-	suite.follower = suite.net.ConsensusFollowerByID(suite.unstakedID)
-	// TODO
+	go suite.follower.Run(suite.ctx)
+	// TODO: to be implemented later
 }
