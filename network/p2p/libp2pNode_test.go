@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
-	"github.com/libp2p/go-libp2p/config"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
@@ -636,28 +635,19 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(log, noopMetrics)
 
-	libp2pOptions := []config.Option{
-		WithLibP2PPing(true),
-		WithLibP2PConnectionManager(connManager),
-	}
-	nodeOptions := []NodeOption{
-		WithConnectionManager(connManager),
-		WithPingService(rootBlockID, pingInfoProvider),
-	}
+	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
+		SetRootBlockID(rootBlockID).
+		SetConnectionManager(connManager).
+		SetPingInfoProvider(pingInfoProvider).
+		SetLogger(log)
+
 	if allowList {
 		connGater := NewConnGater(log)
-		libp2pOptions = append(libp2pOptions, WithLibP2PConnectionGator(connGater))
-		nodeOptions = append(nodeOptions, WithConnectionGator(connGater))
+		builder.SetConnectionGater(connGater)
 	}
 
 	ctx := context.Background()
-	libp2pHost, err := LibP2PHost(ctx, address, key, libp2pOptions...)
-	require.NoError(t, err)
-
-	libp2pPubSub, err := DefaultPubSub(ctx, libp2pHost)
-	require.NoError(t, err)
-
-	n, err := NewLibP2PNode(identity.NodeID, rootID, log, libp2pHost, libp2pPubSub, nodeOptions...)
+	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 
 	n.SetFlowProtocolStreamHandler(handlerFunc)

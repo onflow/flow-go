@@ -36,7 +36,7 @@ import (
 const (
 
 	// Maximum time to wait for a ping reply from a remote node
-	PingTimeoutSecs = time.Second * 4
+	PingTimeout = time.Second * 4
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
@@ -66,30 +66,153 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 	}
 
 	return func() (*Node, error) {
-		libp2pHost, err := LibP2PHost(ctx, address, flowKey,
-			WithLibP2PConnectionManager(connManager),
-			WithLibP2PConnectionGator(connGater),
-			WithLibP2PPing(true))
-		if err != nil {
-			return nil, err
-		}
-
-		libp2pPubSub, err := DefaultPubSub(ctx, libp2pHost, psOptions...)
-		if err != nil {
-			return nil, err
-		}
-
-		return NewLibP2PNode(me, rootBlockID, log, libp2pHost, libp2pPubSub,
-			WithConnectionGator(connGater),
-			WithConnectionManager(connManager),
-			WithPingService(rootBlockID, pingInfoProvider))
+		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
+			SetRootBlockID(rootBlockID).
+			SetConnectionGater(connGater).
+			SetConnectionManager(connManager).
+			SetPubsubOptions(psOptions...).
+			SetPingInfoProvider(pingInfoProvider).
+			SetLogger(log).
+			Build(ctx)
 	}, nil
+}
+
+type NodeBuilder interface {
+	SetRootBlockID(string) NodeBuilder
+	SetConnectionManager(*ConnManager) NodeBuilder
+	SetConnectionGater(*ConnGater) NodeBuilder
+	SetPubsubOptions(...pubsub.Option) NodeBuilder
+	SetPingInfoProvider(PingInfoProvider) NodeBuilder
+	SetLogger(zerolog.Logger) NodeBuilder
+	Build(context.Context) (*Node, error)
+}
+
+type DefaultLibP2PNodeBuilder struct {
+	id               flow.Identifier
+	rootBlockID      string
+	logger           zerolog.Logger
+	connGater        *ConnGater
+	connMngr         *ConnManager
+	pingInfoProvider PingInfoProvider
+	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
+	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
+	pubSubOpts       []pubsub.Option
+}
+
+func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
+	return &DefaultLibP2PNodeBuilder{
+		id: id,
+		pubSubMaker: func(ctx context.Context, h host.Host, opts ...pubsub.Option) (*pubsub.PubSub, error) {
+			return DefaultPubSub(ctx, h, opts...)
+		},
+		hostMaker: func(ctx context.Context, opts ...config.Option) (host.Host, error) {
+			return DefaultLibP2PHost(ctx, address, flowKey, opts...)
+		},
+	}
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
+	builder.rootBlockID = rootBlockId
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr *ConnManager) NodeBuilder {
+	builder.connMngr = connMngr
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater) NodeBuilder {
+	builder.connGater = connGater
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...pubsub.Option) NodeBuilder {
+	builder.pubSubOpts = opts
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetPingInfoProvider(pingInfoProvider PingInfoProvider) NodeBuilder {
+	builder.pingInfoProvider = pingInfoProvider
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBuilder {
+	builder.logger = logger
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
+	node := &Node{
+		id:     builder.id,
+		topics: make(map[flownet.Topic]*pubsub.Topic),
+		subs:   make(map[flownet.Topic]*pubsub.Subscription),
+		logger: builder.logger,
+	}
+
+	if builder.hostMaker == nil {
+		return nil, errors.New("unable to create libp2p host: factory function not provided")
+	}
+
+	if builder.pubSubMaker == nil {
+		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
+	}
+
+	if builder.rootBlockID == "" {
+		return nil, errors.New("root block ID must be provided")
+	}
+	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+
+	var opts []config.Option
+
+	if builder.connGater != nil {
+		opts = append(opts, libp2p.ConnectionGater(builder.connGater))
+		node.connGater = builder.connGater
+	}
+
+	if builder.connMngr != nil {
+		opts = append(opts, libp2p.ConnectionManager(builder.connMngr))
+		node.connMgr = builder.connMngr
+	}
+
+	if builder.pingInfoProvider != nil {
+		opts = append(opts, libp2p.Ping(true))
+	}
+
+	libp2pHost, err := builder.hostMaker(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	node.host = libp2pHost
+
+	if builder.pingInfoProvider != nil {
+		pingLibP2PProtocolID := generatePingProtcolID(builder.rootBlockID)
+		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
+		node.pingService = pingService
+	}
+
+	ps, err := builder.pubSubMaker(ctx, libp2pHost, builder.pubSubOpts...)
+	if err != nil {
+		return nil, err
+	}
+	node.pubSub = ps
+
+	ip, port, err := node.GetIPPort()
+	if err != nil {
+		return nil, fmt.Errorf("failed to find IP and port on which the node was started: %w", err)
+	}
+
+	node.logger.Debug().
+		Hex("node_id", logging.ID(node.id)).
+		Str("address", fmt.Sprintf("%s:%s", ip, port)).
+		Msg("libp2p node started successfully")
+
+	return node, nil
 }
 
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	connGater            *connGater                             // used to provide white listing
+	connGater            *ConnGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
 	logger               zerolog.Logger                         // used to provide logging
@@ -99,70 +222,6 @@ type Node struct {
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	pingService          *PingService
 	connMgr              *ConnManager
-}
-
-type NodeOption func(node *Node)
-
-// WithConnectionGator returns a NodeOption that sets the connection gater for the node
-func WithConnectionGator(gater *connGater) NodeOption {
-	return func(node *Node) {
-		node.connGater = gater
-	}
-}
-
-// WithConnectionManager returns a NodeOption that sets the connection manager for the node
-func WithConnectionManager(connMgr *ConnManager) NodeOption {
-	return func(node *Node) {
-		node.connMgr = connMgr
-	}
-}
-
-// WithPingService returns a NodeOption that initializes the PingService object for the node
-func WithPingService(rootBlockID string, pingInfoProvider PingInfoProvider) NodeOption {
-	return func(node *Node) {
-		pingLibP2PProtocolID := generatePingProtcolID(rootBlockID)
-		pingService := NewPingService(node.host, pingLibP2PProtocolID, pingInfoProvider, node.logger)
-		node.pingService = pingService
-	}
-}
-
-// NewLibP2PNode creates a LibP2PNode using the given id, root block ID, libp2p host and pubsub instance.
-// The node can be additionally customized with the following NodeOptions:
-// WithConnectionGator adds connection gating ability to the node
-// WithConnectionManager adds a connection manager to receive callbacks on connection creation an destruction
-// WithPingService adds a PingService to respond to a Flow Ping.
-func NewLibP2PNode(id flow.Identifier,
-	rootBlockID string,
-	logger zerolog.Logger,
-	libp2pHost host.Host,
-	libp2pPubSub *pubsub.PubSub,
-	options ...NodeOption) (*Node, error) {
-
-	node := &Node{
-		id:                   id,
-		flowLibP2PProtocolID: generateFlowProtocolID(rootBlockID),
-		host:                 libp2pHost,
-		pubSub:               libp2pPubSub,
-		logger:               logger,
-		topics:               make(map[flownet.Topic]*pubsub.Topic),
-		subs:                 make(map[flownet.Topic]*pubsub.Subscription),
-	}
-
-	for _, opt := range options {
-		opt(node)
-	}
-
-	ip, port, err := node.GetIPPort()
-	if err != nil {
-		return nil, fmt.Errorf("failed to find IP and port on which the node was started: %w", err)
-	}
-
-	logger.Debug().
-		Hex("node_id", logging.ID(id)).
-		Str("address", fmt.Sprintf("%s:%s", ip, port)).
-		Msg("libp2p node started successfully")
-
-	return node, nil
 }
 
 // Stop stops the libp2p node.
@@ -467,7 +526,7 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	// if the node was so far not under allowList
 	if n.connGater == nil {
-		return fmt.Errorf("Could not add an allow list, this node was started without allow listing")
+		return fmt.Errorf("could not add an allow list, this node was started without allow listing")
 
 	}
 
@@ -511,10 +570,9 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 	return isConnected, nil
 }
 
-// LibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
+// DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func LibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
-
+func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
 	defaultOptions, err := DefaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
@@ -529,19 +587,6 @@ func LibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, opt
 	}
 
 	return libP2PHost, nil
-
-}
-
-func WithLibP2PPing(enable bool) config.Option {
-	return libp2p.Ping(enable)
-}
-
-func WithLibP2PConnectionManager(connMgr *ConnManager) config.Option {
-	return libp2p.ConnectionManager(connMgr)
-}
-
-func WithLibP2PConnectionGator(connGater *connGater) config.Option {
-	return libp2p.ConnectionGater(connGater)
 }
 
 // DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
