@@ -20,7 +20,7 @@ type ConsensusClusterVoteCollector struct {
 	done          atomic.Bool
 }
 
-func NewVerifyingVoteCollector(base BaseVoteCollector) *ConsensusClusterVoteCollector {
+func NewConsensusClusterVoteCollector(base BaseVoteCollector) *ConsensusClusterVoteCollector {
 	return &ConsensusClusterVoteCollector{
 		BaseVoteCollector: base,
 	}
@@ -66,13 +66,8 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		}
 	}
 
-	// we haven't collected sufficient weight, we have nothing to do further
-	if !c.aggregator.HasSufficientWeight() {
-		return nil
-	}
-
-	// we haven't collected sufficient shares, we have nothing to do further
-	if !c.reconstructor.HasSufficientShares() {
+	// we haven't collected sufficient weight or shares, we have nothing to do further
+	if !c.aggregator.HasSufficientWeight() || !c.reconstructor.HasSufficientShares() {
 		return nil
 	}
 

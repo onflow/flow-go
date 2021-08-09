@@ -23,6 +23,8 @@ func (c *combinedAggregator) Verify(signerID flow.Identifier, sig crypto.Signatu
 }
 
 // TrustedAdd adds a verified signature, and returns whether if has collected enough signature shares
+// TrustedAdd adds signature without verification, caller of this function must ensure signature validity using
+// Verify method from safe interface.
 func (c *combinedAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (bool, error) {
 	panic("to be implemented")
 }

@@ -26,3 +26,9 @@ func (c *CollectionClusterVoteCollector) AddVote(vote *model.Vote) error {
 func (c *CollectionClusterVoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
+
+func NewCollectionClusterVoteCollector(base BaseVoteCollector) *CollectionClusterVoteCollector {
+	return &CollectionClusterVoteCollector{
+		BaseVoteCollector: base,
+	}
+}

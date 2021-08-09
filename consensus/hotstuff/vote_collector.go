@@ -26,14 +26,15 @@ const (
 	VoteCollectorStatusInvalid
 )
 
+var collectorStatusNames = [...]string{"VoteCollectorStatusCaching",
+	"VoteCollectorStatusVerifying",
+	"VoteCollectorStatusInvalid"}
+
 func (ps VoteCollectorStatus) String() string {
-	names := [...]string{"VoteCollectorStatusCaching",
-		"VoteCollectorStatusVerifying",
-		"VoteCollectorStatusInvalid"}
-	if ps < VoteCollectorStatusCaching || ps > VoteCollectorStatusInvalid {
+	if ps < 0 || int(ps) > len(collectorStatusNames) {
 		return "UNKNOWN"
 	}
-	return names[ps]
+	return collectorStatusNames[ps]
 }
 
 // VoteCollectorState collects votes for the same block, produces QC when enough votes are collected

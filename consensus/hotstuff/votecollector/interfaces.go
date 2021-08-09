@@ -24,6 +24,9 @@ type CombinedAggregator interface {
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, SigType, error)
 
 	// TrustedAdd adds a verified signature, and returns whether if has collected enough signature shares
+	// TrustedAdd doesn't perform and checks for signature validity. Intended usage of TrustedAdd is after calling
+	// Verify to ensure that signature is valid.
+	// To add signature with verification use VerifyAndAdd.
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (bool, error)
 
 	// VerifyAndAdd verifies the signature, if the signature is valid, then it will be added
@@ -68,6 +71,8 @@ type RandomBeaconReconstructor interface {
 }
 
 // QCBuilder is responsible for creating votes, proposals and QC's for a given block.
+// This interface should be used by consensus or collection vote collector to produce QC when signature
+// aggregation has been completed.
 type QCBuilder interface {
 	// CreateQC creates a QC for the given block.
 	CreateQC(stakingSig, thresholdSig flow.AggregatedSignature, beaconSig crypto.Signature) (*flow.QuorumCertificate, error)
