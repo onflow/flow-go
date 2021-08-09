@@ -24,8 +24,20 @@ type ipLookupTestCase struct {
 	result []net.IPAddr
 }
 
-func mockBasicResolverForDomains(resolver *Resolver, testCases []*ipLookupTestCase) {
+type txtLookupTestCase struct {
+	domain string
+	result []string
+}
 
+// mockBasicResolverForDomains mocks the resolver for the ip and txt lookup test cases.
+func mockBasicResolverForDomains(resolver *mocknetwork.BasicResolver, ipLookupTestCases []*ipLookupTestCase, txtLookupTestCases []*txtLookupTestCase) {
+	for _, tc := range ipLookupTestCases {
+		resolver.On("LookupIPAddr", tc.domain).Return(tc.result, nil).Once()
+	}
+
+	for _, tc := range txtLookupTestCases {
+		resolver.On("LookupTXT", tc.domain).Return(tc.result, nil).Once()
+	}
 }
 
 func ipLookupFixture(count int) []*ipLookupTestCase {
