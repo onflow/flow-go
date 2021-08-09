@@ -14,16 +14,23 @@ type ConnectionMetrics struct {
 	metrics module.NetworkMetrics // metrics to report connection statistics
 }
 
+func NewConnectionMetrics(metrics module.NetworkMetrics) *ConnectionMetrics {
+	return &ConnectionMetrics{
+		NoopNotifiee: libp2pnet.GlobalNoopNotifiee,
+		metrics:      metrics,
+	}
+}
+
 // called by libp2p when a connection opened
-func (c *ConnectionMetrics) Connected(n libp2pnet.Network, _ libp2pnet.Conn) {
-	c.updateConnectionMetric(n)
+func (cm *ConnectionMetrics) Connected(n libp2pnet.Network, _ libp2pnet.Conn) {
+	cm.updateConnectionMetric(n)
 }
 
 // called by libp2p when a connection closed
-func (c *ConnectionMetrics) Disconnected(n libp2pnet.Network, _ libp2pnet.Conn) {
-	c.updateConnectionMetric(n)
+func (cm *ConnectionMetrics) Disconnected(n libp2pnet.Network, _ libp2pnet.Conn) {
+	cm.updateConnectionMetric(n)
 }
-func (c *ConnectionMetrics) updateConnectionMetric(n libp2pnet.Network) {
+func (cm *ConnectionMetrics) updateConnectionMetric(n libp2pnet.Network) {
 	var inbound uint = 0
 	var outbound uint = 0
 	for _, conn := range n.Conns() {
@@ -34,6 +41,6 @@ func (c *ConnectionMetrics) updateConnectionMetric(n libp2pnet.Network) {
 			outbound++
 		}
 	}
-	c.metrics.InboundConnections(inbound)
-	c.metrics.OutboundConnections(outbound)
+	cm.metrics.InboundConnections(inbound)
+	cm.metrics.OutboundConnections(outbound)
 }
