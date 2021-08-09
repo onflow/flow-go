@@ -13,9 +13,8 @@ import (
 
 // Relay engine relays all the messages that are received to the given network for the corresponding channel
 type Engine struct {
-	unit     *engine.Unit   // used to manage concurrency & shutdown
-	log      zerolog.Logger // used to log relevant actions with context
-	me       module.Local
+	unit     *engine.Unit                        // used to manage concurrency & shutdown
+	log      zerolog.Logger                      // used to log relevant actions with context
 	conduits map[network.Channel]network.Conduit // conduits for unstaked network
 }
 
@@ -24,12 +23,10 @@ func New(
 	channels network.ChannelList,
 	net module.Network,
 	unstakedNet module.Network,
-	me module.Local,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:     engine.NewUnit(),
 		log:      log.With().Str("engine", "relay").Logger(),
-		me:       me,
 		conduits: make(map[network.Channel]network.Conduit),
 	}
 
