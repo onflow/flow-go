@@ -5,7 +5,6 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
@@ -45,8 +44,7 @@ func (suite *Suite) SetupTest() {
 		suite.engines[channel] = engine
 	}).Return(suite.con, nil)
 
-	splitterNet, err := splitternetwork.NewNetwork(net, zerolog.Logger{})
-	require.NoError(suite.T(), err)
+	splitterNet := splitternetwork.NewNetwork(net, zerolog.Logger{})
 
 	suite.net = splitterNet
 }
