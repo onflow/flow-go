@@ -52,6 +52,8 @@ func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resol
 		res:       madns.DefaultResolver,
 		ttl:       defaultTimeToLive,
 		collector: collector,
+		ipCache:   make(map[string]*ipCacheEntry),
+		txtCache:  make(map[string]*txtCacheEntry),
 	}
 
 	for _, opt := range opts {
