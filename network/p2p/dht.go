@@ -2,16 +2,11 @@ package p2p
 
 import (
 	"context"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 )
-
-const routingTableRefresh = time.Second // * 100
-const peerDiscoveryTimeout = time.Second * 2
-const FlowRendezVousStr string = "flow"
 
 // This produces a new IPFS DHT
 // on the name, see https://github.com/libp2p/go-libp2p-kad-dht/issues/337
