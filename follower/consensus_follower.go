@@ -1,4 +1,4 @@
-package consensus_follower
+package follower
 
 import (
 	"context"
