@@ -95,12 +95,12 @@ func (va *VoteAggregator) processQueuedVoteEvents() error {
 }
 
 func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
-	lazyInitCollector, err := va.collectors.GetOrCreateCollector(vote.View, vote.BlockID)
+	collector, err := va.collectors.GetOrCreateCollector(vote.View, vote.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not lazy init collector for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
 	}
-	err = lazyInitCollector.AddVote(vote)
+	err = collector.AddVote(vote)
 	if err != nil {
 		return fmt.Errorf("could not process vote for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
@@ -138,16 +138,12 @@ func (va *VoteAggregator) AddBlock(block *model.Block) error {
 	return nil
 }
 
-func (va *VoteAggregator) GetVoteCreator(block *model.Block) (hotstuff.CreateVote, error) {
-	panic("implement me")
-}
-
 func (va *VoteAggregator) InvalidBlock(block *model.Block) {
 	panic("implement me")
 }
 
-// PruneByView will delete all votes equal or below to the given view, as well as related indexes.
-func (va *VoteAggregator) PruneByView(view uint64) {
+// PruneUpToView will delete all votes equal or below to the given view, as well as related indexes.
+func (va *VoteAggregator) PruneUpToView(view uint64) {
 	// if someone else has updated view in parallel don't bother doing extra work for cleaning, whoever
 	// is able to advance counter will perform the cleanup
 	if va.highestPrunedView.Set(view) {

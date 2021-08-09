@@ -42,6 +42,6 @@ type VoteAggregator interface {
 	// block and slash the voters.
 	InvalidBlock(block *model.Proposal) error
 
-	// PruneByView will remove any data held for the provided view.
-	PruneByView(view uint64)
+	// PruneUpToView will remove any data held for the provided view.
+	PruneUpToView(view uint64)
 }
