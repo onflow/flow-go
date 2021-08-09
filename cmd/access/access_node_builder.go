@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	discovery "github.com/libp2p/go-libp2p-discovery"
-	libp2ppubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/cmd"
@@ -188,41 +186,18 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
 	return func() (*p2p.Node, error) {
-		host, err := p2p.LibP2PHost(ctx, builder.unstakedNetworkBindAddr, networkKey, p2p.WithLibP2PPing(false))
+		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.unstakedNetworkBindAddr, networkKey).
+			SetRootBlockID(builder.RootBlock.ID().String()).
+			// unlike the staked network where currently all the node addresses are known upfront,
+			// for the unstaked network the nodes need to discover each other using DHT Discovery.
+			// The staked nodes act as the DHT servers
+			SetPubsubOptions(p2p.WithDHTDiscovery(p2p.AsServer(builder.IsStaked()))).
+			SetLogger(builder.Logger).
+			Build(ctx)
 		if err != nil {
 			return nil, err
 		}
-
-		// the disovery object used to discover other peers
-		var discovery *discovery.RoutingDiscovery
-
-		// the staked AN acts as the DHT server, while the unstaked AN act as DHT clients,
-		// eventually though all unstaked nodes should be able to discover each other and form the libp2p mesh
-		if builder.IsStaked() {
-			discovery, err = p2p.NewDHTServer(ctx, host)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			discovery, err = p2p.NewDHTClient(ctx, host)
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		// unlike the staked network where currently all the node addresses are known upfront, for the unstaked network
-		// the nodes need to discover each other.
-		psOption := libp2ppubsub.WithDiscovery(discovery)
-
-		pubsub, err := p2p.DefaultPubSub(ctx, host, psOption)
-		if err != nil {
-			return nil, err
-		}
-
-		builder.UnstakedLibP2PNode, err = p2p.NewLibP2PNode(nodeID, builder.RootBlock.ID().String(), builder.Logger, host, pubsub)
-		if err != nil {
-			return nil, err
-		}
+		builder.UnstakedLibP2PNode = libp2pNode
 		return builder.UnstakedLibP2PNode, nil
 	}, nil
 }

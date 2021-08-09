@@ -10,7 +10,6 @@ import (
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -177,26 +176,14 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 
 		connManager := NewConnManager(logger, noopMetrics)
-		libP2PHost, err := LibP2PHost(suite.ctx, "0.0.0.0:0", key, WithLibP2PConnectionManager(connManager))
-		require.NoError(suite.T(), err)
 
-		var dhtDiscovery *discovery.RoutingDiscovery
-		if dhtServer {
-			dhtDiscovery, err = NewDHTServer(suite.ctx, libP2PHost)
-			require.NoError(suite.T(), err)
-		} else {
-			dhtDiscovery, err = NewDHTClient(suite.ctx, libP2PHost)
-			require.NoError(suite.T(), err)
-		}
-
-		psOption := pubsub.WithDiscovery(dhtDiscovery)
-
-		libp2pPubSub, err := DefaultPubSub(suite.ctx, libP2PHost, psOption)
-		require.NoError(suite.T(), err)
-
-		n, err := NewLibP2PNode(flow.Identifier{}, rootBlockID, logger, libP2PHost, libp2pPubSub,
-			WithConnectionManager(connManager),
-			WithPingService(rootBlockID, pingInfoProvider))
+		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
+			SetRootBlockID(rootBlockID).
+			SetConnectionManager(connManager).
+			SetPubsubOptions(WithDHTDiscovery(AsServer(dhtServer))).
+			SetPingInfoProvider(pingInfoProvider).
+			SetLogger(logger).
+			Build(suite.ctx)
 		require.NoError(suite.T(), err)
 
 		n.SetFlowProtocolStreamHandler(handlerFunc)

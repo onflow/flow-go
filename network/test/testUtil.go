@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -186,16 +185,6 @@ func generateLibP2PNode(t *testing.T,
 
 	noopMetrics := metrics.NewNoopCollector()
 
-	// create PubSub options for libp2p to use
-	psOptions := []pubsub.Option{
-		// skip message signing
-		pubsub.WithMessageSigning(false),
-		// skip message signature
-		pubsub.WithStrictSignatureVerification(false),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
-	}
-
 	pingInfoProvider := new(mocknetwork.PingInfoProvider)
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
@@ -208,7 +197,7 @@ func generateLibP2PNode(t *testing.T,
 		SetRootBlockID(rootBlockID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
-		SetPubsubOptions(psOptions...).
+		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
 		SetPingInfoProvider(pingInfoProvider).
 		SetLogger(logger).
 		Build(ctx)
