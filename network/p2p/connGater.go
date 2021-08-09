@@ -11,25 +11,25 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var _ connmgr.ConnectionGater = (*connGater)(nil)
+var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 
-// connGater is the implementation of the libp2p connmgr.ConnectionGater interface
+// ConnGater is the implementation of the libp2p connmgr.ConnectionGater interface
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
-type connGater struct {
+type ConnGater struct {
 	sync.RWMutex
 	peerIDAllowlist map[peer.ID]struct{} // the in-memory map of approved peer IDs
 	log             zerolog.Logger
 }
 
-func NewConnGater(log zerolog.Logger) *connGater {
-	cg := &connGater{
+func NewConnGater(log zerolog.Logger) *ConnGater {
+	cg := &ConnGater{
 		log: log,
 	}
 	return cg
 }
 
 // update updates the peer ID map
-func (c *connGater) update(peerInfos []peer.AddrInfo) {
+func (c *ConnGater) update(peerInfos []peer.AddrInfo) {
 
 	// create a new peer.ID map
 	peerIDs := make(map[peer.ID]struct{}, len(peerInfos))
@@ -48,23 +48,23 @@ func (c *connGater) update(peerInfos []peer.AddrInfo) {
 }
 
 // InterceptPeerDial - a callback which allows or disallows outbound connection
-func (c *connGater) InterceptPeerDial(p peer.ID) bool {
+func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
 	return c.validPeerID(p)
 }
 
 // InterceptAddrDial is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
-func (c *connGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
+func (c *ConnGater) InterceptAddrDial(_ peer.ID, ma multiaddr.Multiaddr) bool {
 	return true
 }
 
 // InterceptAccept is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
-func (c *connGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
+func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 	return true
 }
 
 // InterceptSecured - a callback executed after the libp2p security handshake. It tests whether to accept or reject
 // an inbound connection based on its peer id.
-func (c *connGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
+func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
 	case network.DirInbound:
 		allowed := c.validPeerID(p)
@@ -84,11 +84,11 @@ func (c *connGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 }
 
 // Decision to continue or drop the connection should have been made before this call
-func (c *connGater) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
+func (c *ConnGater) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
 	return true, 0
 }
 
-func (c *connGater) validPeerID(p peer.ID) bool {
+func (c *ConnGater) validPeerID(p peer.ID) bool {
 	c.RLock()
 	defer c.RUnlock()
 	_, ok := c.peerIDAllowlist[p]
