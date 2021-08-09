@@ -23,11 +23,6 @@
 // Signature and public key membership check
 #define MEMBERSHIP_CHECK 1
 
-// algorithm choice for the hashing to G1 
-#define HASHCHECK 1
-#define OPSWU 2
-#define hashToPoint OPSWU
-
 
 // bls core (functions in bls_core.c)
 int      get_signature_len();
@@ -35,6 +30,7 @@ int      get_pk_len();
 int      get_sk_len();  
 
 void     bls_sign(byte*, const bn_t, const byte*, const int);
+void     bls_sign_ep(byte*, const bn_t, const ep_t pt);
 int      bls_verify(const ep2_t, const byte*, const byte*, const int);
 int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const uint32_t*,
                          const uint32_t*, const ep2_st*);

@@ -76,6 +76,47 @@ func BenchmarkScalarMult(b *testing.B) {
 	})
 }
 
+// Sanity-check of the map-to-G1 from Relic w.r.t the IRTF draft hash-to-curve
+//
+// TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
+// ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
+func TestMapToG1Relic(t *testing.T) {
+
+	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
+	dst := []byte("QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_")
+
+	msgs := [][]byte{
+		[]byte("abc"),
+		[]byte("abcdef0123456789"),
+		[]byte("q128_qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"),
+		[]byte("a512_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"),
+	}
+
+	expectedPointBytes := []string{
+		"03567bc5ef9c690c2ab2ecdf6a96ef1c139cc0b2f284dca0a9a7943388a49a3aee664ba5379a7655d3c68900be2f6903",
+		"11e0b079dea29a68f0383ee94fed1b940995272407e3bb916bbf268c263ddd57a6a27200a784cbc248e84f357ce82d98",
+		"15f68eaa693b95ccb85215dc65fa81038d69629f70aeee0d0f677cf22285e7bf58d7cb86eefe8f2e9bc3f8cb84fac488",
+		"082aabae8b7dedb0e78aeb619ad3bfd9277a2f77ba7fad20ef6aabdc6c31d19ba5a6d12283553294c1825c4b3ca2dcfe"}
+
+	for i, msg := range msgs {
+		var point pointG1
+		mapToG1RelicTest(&point, msg, dst)
+
+		// This performs a compact serialization, see https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-pairing-friendly-curves-09#appendix-C
+		pointBytes := make([]byte, signatureLengthBLSBLS12381)
+		writePointG1(pointBytes, &point)
+
+		expectedPoint, err := hex.DecodeString(expectedPointBytes[i])
+		require.NoError(t, err)
+
+		// skip comparing the first 3 bits that depend on the serialization scheme
+		pointBytes[0] = (expectedPoint[0] & 0xE0) | (pointBytes[0] & 0x1F)
+
+		// we compare only past the first byte (see comment above)
+		assert.Equal(t, expectedPoint, pointBytes, "Relic's map to G1 should match the IRTF draft test vector")
+	}
+}
+
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {
 	blsInstance.reInit()
