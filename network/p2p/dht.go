@@ -56,9 +56,6 @@ func defaultDHTOptions() []dht.Option {
 
 		dht.ProtocolPrefix(FlowLibP2PProtocolCommonPrefix),
 
-		dht.RoutingTableRefreshPeriod(routingTableRefresh),        // this is 100 seconds
-		dht.RoutingTableRefreshQueryTimeout(peerDiscoveryTimeout), // this is 2 seconds
-
 		// public capabilities we don't need - disabling these capabilities does not allow peer discovery leading
 		// to the node being only connected to server and no other node
 		//dht.DisableProviders(),
