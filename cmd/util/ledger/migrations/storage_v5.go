@@ -290,12 +290,7 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 				contractName,
 				address,
 			)
-			m.reportFile.WriteString(
-				fmt.Sprintf("DELETED broken contract '%s' in account %s",
-					contractName,
-					address,
-				),
-			)
+			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 
 			removedNames[common.AddressLocation{
 				Address: address,
@@ -327,7 +322,7 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 			}
 
 			if _, ok := removedNames[contractLoc]; ok {
-				delete(removedContracts, contractLoc)
+				delete(removedNames, contractLoc)
 			} else {
 				return nil, fmt.Errorf("contract name '%s' is not removed from account %s",
 					contractName,
@@ -338,11 +333,27 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 	}
 
 	if len(removedContracts) != 0 {
-		return nil, fmt.Errorf("additional contract codes are removed")
+		return nil, fmt.Errorf("additional contract names are removed: [%s]",
+			func() string {
+				contracts := make([]string, 0)
+				for contract := range removedContracts {
+					contracts = append(contracts, contract.String())
+				}
+				return strings.Join(contracts, ", ")
+			}(),
+		)
 	}
 
 	if len(removedNames) != 0 {
-		return nil, fmt.Errorf("additional contract names are removed")
+		return nil, fmt.Errorf("additional contract names are removed: [%s]",
+			func() string {
+				names := make([]string, 0)
+				for name := range removedNames {
+					names = append(names, name.String())
+				}
+				return strings.Join(names, ", ")
+			}(),
+		)
 	}
 
 	return cleanedPayloads, nil
@@ -587,6 +598,15 @@ func (m StorageFormatV5Migration) reencodeValue(
 		},
 	)
 	if err != nil {
+		// If there are empty containers without type info (e.g: at root level)
+		// Then drop such values and continue.
+		if _, ok := err.(*EmptyContainerTypeInferringError); ok {
+			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", key, owner)
+			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", owner, key))
+
+			return nil, false, nil
+		}
+
 		return nil, false, err
 	}
 
@@ -1412,7 +1432,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 
 	if t == nil {
 		if value.Count() == 0 {
-			return fmt.Errorf("cannot infer static type for empty array value")
+			return &EmptyContainerTypeInferringError{}
 		}
 
 		var elementType interpreter.StaticType
@@ -1478,7 +1498,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 		// NOTE: use entries.Len() instead of Count, because Count() > 0 && entries.Len() == 0 means
 		// the dictionary has deferred (separately stored) values, and we cannot get the types of those values
 		if entries.Len() == 0 {
-			return fmt.Errorf("cannot infer static type for empty dictionary value: %s", value.String())
+			return &EmptyContainerTypeInferringError{}
 		} else {
 
 			var keyType interpreter.StaticType
@@ -1829,4 +1849,13 @@ func (m migrationRuntimeInterface) ImplementationDebugLog(_ string) error {
 
 func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
 	panic("unexpected ValidatePublicKey call")
+}
+
+// Errors
+
+type EmptyContainerTypeInferringError struct {
+}
+
+func (e EmptyContainerTypeInferringError) Error() string {
+	return fmt.Sprint("cannot infer static type from empty container value")
 }
