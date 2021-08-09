@@ -244,9 +244,13 @@ func (e *blockComputer) executeSystemCollection(
 	if err != nil {
 		return txIndex, err
 	} else if txerr != nil {
+		// This log is used as the data source for an alert on grafana.
+		// The system_chunk_error field must not be changed without adding the corresponding
+		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
 		e.log.Err(txerr).
 			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
 			Str("system_chunk_error", "true").
+			Str("critical_error", "true").
 			Msgf("error executing system chunk transaction")
 
 		return txIndex, err
@@ -314,8 +318,7 @@ func (e *blockComputer) executeTransaction(
 	collectionIndex int,
 	txIndex uint32,
 	res *execution.ComputationResult,
-) (error, txerror error) {
-
+) (executionErr, txErr error) {
 	startedAt := time.Now()
 	var txSpan opentracing.Span
 	var traceID string
