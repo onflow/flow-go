@@ -7,7 +7,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/flow-go/crypto"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -50,7 +49,7 @@ func (h Header) Body() interface{} {
 		Timestamp      uint64
 		View           uint64
 		ParentVoterIDs []Identifier
-		ParentVoterSig crypto.Signature
+		ParentVoterSig []byte
 		ProposerID     Identifier
 	}{
 		ChainID:        h.ChainID,
