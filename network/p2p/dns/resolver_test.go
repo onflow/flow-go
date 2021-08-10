@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -31,33 +32,12 @@ func TestResolver_HappyPath(t *testing.T) {
 	txtTestCases := txtLookupFixture(size)
 	ipTestCases := ipLookupFixture(size)
 
+	// going through the cache, each domain should only being resolved once over the underlying resolver.
 	wg := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, true, 1)
 
-	ctx := context.Background()
 	// each test case is repeated 5 times, since resolver has been mocked only once per test case
 	// it ensures that the rest 4 calls are made through the cache and not the resolver.
-	for i := 0; i < times; i++ {
-		for _, txttc := range txtTestCases {
-			go func(tc *txtLookupTestCase) {
-				addrs, err := resolver.LookupTXT(ctx, tc.domain)
-				require.NoError(t, err)
-
-				require.ElementsMatch(t, addrs, tc.result)
-
-			}(txttc)
-		}
-
-		for _, iptc := range ipTestCases {
-			go func(tc *ipLookupTestCase) {
-				addrs, err := resolver.LookupIPAddr(ctx, tc.domain)
-				require.NoError(t, err)
-
-				require.ElementsMatch(t, addrs, tc.result)
-
-				wg.Done()
-			}(iptc)
-		}
-	}
+	queryResolver(t, times, resolver, txtTestCases, ipTestCases)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
 }
@@ -74,12 +54,12 @@ func TestResolver_HappyPath(t *testing.T) {
 //	require.NoError(t, err)
 //
 //	size := 10        // we have 10 txt and 10 ip lookup test cases
-//	times := 5 * size // each domain is queried for resolution 10 times
+//	times := 5  // each domain is queried for resolution 10 times
 //	txtTestCases := txtLookupFixture(size)
 //	ipTestCase := ipLookupFixture(size)
 //	wg := &sync.WaitGroup{}
-//	wg.Add(times) // 10 ip + 10 txt
-//	mockBasicResolverForDomains(&basicResolver, ipTestCase, txtTestCases, 2)
+//	wg.Add(times)
+//	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, true, 2)
 //
 //	ctx := context.Background()
 //	// each test case is repeated 5 times, since resolver has been mocked only once per test case
@@ -182,6 +162,31 @@ type ipLookupTestCase struct {
 type txtLookupTestCase struct {
 	domain string
 	result []string
+}
+
+func queryResolver(t *testing.T, times int, resolver *madns.Resolver, txtTestCases map[string]*txtLookupTestCase,
+	ipTestCases map[string]*ipLookupTestCase) {
+	ctx := context.Background()
+	for i := 0; i < times; i++ {
+		for _, txttc := range txtTestCases {
+			go func(tc *txtLookupTestCase) {
+				addrs, err := resolver.LookupTXT(ctx, tc.domain)
+				require.NoError(t, err)
+
+				require.ElementsMatch(t, addrs, tc.result)
+
+			}(txttc)
+		}
+
+		for _, iptc := range ipTestCases {
+			go func(tc *ipLookupTestCase) {
+				addrs, err := resolver.LookupIPAddr(ctx, tc.domain)
+				require.NoError(t, err)
+
+				require.ElementsMatch(t, addrs, tc.result)
+			}(iptc)
+		}
+	}
 }
 
 // mockBasicResolverForDomains mocks the resolver for the ip and txt lookup test cases.
