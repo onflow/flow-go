@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
@@ -199,16 +200,18 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	libP2PNode, err := p2p.NewLibP2PNode(logger,
-		id.NodeID,
-		"0.0.0.0:0",
-		p2p.NewConnManager(logger, noopMetrics),
-		key,
-		true,
-		rootBlockID,
-		pingInfoProvider,
-		psOptions...)
+	ctx := context.Background()
+	connGater := p2p.NewConnGater(logger)
+	connManager := p2p.NewConnManager(logger, noopMetrics)
 
+	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
+		SetRootBlockID(rootBlockID).
+		SetConnectionGater(connGater).
+		SetConnectionManager(connManager).
+		SetPubsubOptions(psOptions...).
+		SetPingInfoProvider(pingInfoProvider).
+		SetLogger(logger).
+		Build(ctx)
 	require.NoError(t, err)
 
 	return libP2PNode
