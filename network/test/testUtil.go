@@ -71,6 +71,16 @@ func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
 	}
 }
 
+func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
+	cwcm.obsLock.RLock()
+	defer cwcm.obsLock.RUnlock()
+	res := cwcm.ConnManager.Unprotect(id, tag)
+	for obs := range cwcm.observers {
+		go obs.OnNext(PeerTag{peer: id, tag: tag})
+	}
+	return res
+}
+
 func NewTagWatchingConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *TagWatchingConnManager {
 	cm := p2p.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
