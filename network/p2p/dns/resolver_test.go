@@ -27,7 +27,7 @@ func TestResolver_HappyPath(t *testing.T) {
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
-	size := 2  // we have 10 txt and 10 ip lookup test cases
+	size := 10 // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
 	txtTestCases := txtLookupFixture(size)
 	ipTestCases := ipLookupFixture(size)
@@ -42,75 +42,34 @@ func TestResolver_HappyPath(t *testing.T) {
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
 }
 
-//// TestResolver_HappyPath evaluates the happy path behavior of dns resolver against concurrent invocations. Each unique domain
-//// invocation should go through the underlying basic resolver only once, and the result should get cached for subsequent invocations.
-//// the test evaluates the correctness of invocations as well as resolution through cache on repetition.
-//func TestResolver_CacheExpiry(t *testing.T) {
-//	basicResolver := mocknetwork.BasicResolver{}
-//	resolver, err := dns.NewResolver(
-//		metrics.NewNoopCollector(),
-//		dns.WithBasicResolver(&basicResolver),
-//		dns.WithTTL(2*time.Second))
-//	require.NoError(t, err)
-//
-//	size := 10        // we have 10 txt and 10 ip lookup test cases
-//	times := 5  // each domain is queried for resolution 10 times
-//	txtTestCases := txtLookupFixture(size)
-//	ipTestCase := ipLookupFixture(size)
-//	wg := &sync.WaitGroup{}
-//	wg.Add(times)
-//	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, true, 2)
-//
-//	ctx := context.Background()
-//	// each test case is repeated 5 times, since resolver has been mocked only once per test case
-//	// it ensures that the rest 4 calls are made through the cache and not the resolver.
-//	for i := 0; i < times; i++ {
-//		go func(tc *txtLookupTestCase) {
-//			addrs, err := resolver.LookupTXT(ctx, tc.domain)
-//			require.NoError(t, err)
-//
-//			require.ElementsMatch(t, addrs, tc.result)
-//
-//			wg.Done()
-//		}(txtTestCases[i%size])
-//
-//		go func(tc *ipLookupTestCase) {
-//			addrs, err := resolver.LookupIPAddr(ctx, tc.domain)
-//			require.NoError(t, err)
-//
-//			require.ElementsMatch(t, addrs, tc.result)
-//
-//			wg.Done()
-//		}(ipTestCase[i%size])
-//	}
-//	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
-//
-//	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
-//	wg.Add(2 * times)           // 10 ip + 10 txt
-//
-//	for i := 0; i < times; i++ {
-//		go func(tc *txtLookupTestCase) {
-//			addrs, err := resolver.LookupTXT(ctx, tc.domain)
-//			require.NoError(t, err)
-//
-//			require.ElementsMatch(t, addrs, tc.result)
-//
-//			wg.Done()
-//		}(txtTestCases[i%size])
-//
-//		go func(tc *ipLookupTestCase) {
-//			addrs, err := resolver.LookupIPAddr(ctx, tc.domain)
-//			require.NoError(t, err)
-//
-//			require.ElementsMatch(t, addrs, tc.result)
-//
-//			wg.Done()
-//		}(ipTestCase[i%size])
-//	}
-//	unittest.RequireReturnsBefore(t, wg.Wait, 1000*time.Second, "could not resolve all addresses")
-//
-//	basicResolver.AssertExpectations(t) // asserts that basic resolver is invoked exactly once per domain
-//}
+// TestResolver_HappyPath evaluates the happy path behavior of dns resolver against concurrent invocations. Each unique domain
+// invocation should go through the underlying basic resolver only once, and the result should get cached for subsequent invocations.
+// the test evaluates the correctness of invocations as well as resolution through cache on repetition.
+func TestResolver_CacheExpiry(t *testing.T) {
+	basicResolver := mocknetwork.BasicResolver{}
+	resolver, err := dns.NewResolver(
+		metrics.NewNoopCollector(),
+		dns.WithBasicResolver(&basicResolver),
+		dns.WithTTL(2*time.Second)) // cache timeout set to 2 seconds for this test
+
+	require.NoError(t, err)
+
+	size := 10 // we have 10 txt and 10 ip lookup test cases
+	times := 5 // each domain is queried for resolution 10 times
+	txtTestCases := txtLookupFixture(size)
+	ipTestCase := ipLookupFixture(size)
+	wg := &sync.WaitGroup{}
+	wg.Add(times)
+	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, true, 2)
+
+	queryResolver(t, times, resolver, txtTestCases, ipTestCase)
+
+	time.Sleep(5 * time.Second) // waits enough for cache to get invalidated
+
+	queryResolver(t, times, resolver, txtTestCases, ipTestCase)
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
+}
+
 //
 //// TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
 //func TestResolver_Error(t *testing.T) {
