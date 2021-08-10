@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"time"
 
 	"github.com/onflow/flow-go/cmd"
@@ -25,13 +26,16 @@ func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBui
 
 func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	builder.Cancel = cancel
+
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
-	builder.EnqueueNetworkInit()
+	builder.EnqueueNetworkInit(ctx)
 
 	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
 	if builder.ParticipatesInUnstakedNetwork() {
-		builder.enqueueUnstakedNetworkInit()
+		builder.enqueueUnstakedNetworkInit(ctx)
 	}
 
 	builder.EnqueueMetricsServerInit()
@@ -44,7 +48,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
-func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -61,9 +65,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// TODO: define new network metrics for the unstaked network
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
-		// network metrics
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
+		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
 		builder.MustNot(err)
 
 		// use the default validators for the staked access node unstaked networks
