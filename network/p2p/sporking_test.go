@@ -33,7 +33,7 @@ type SporkingTestSuite struct {
 }
 
 func TestSporkingTestSuite(t *testing.T) {
-	golog.SetAllLoggers(golog.LevelDebug)
+	golog.SetAllLoggers(golog.LevelError)
 	suite.Run(t, new(SporkingTestSuite))
 }
 

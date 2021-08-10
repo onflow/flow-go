@@ -15,14 +15,20 @@ type SenderValidator struct {
 	sender []byte
 }
 
-// NewSenderValidator creates and returns a new SenderValidator for the given sender ID
-func NewSenderValidator(sender flow.Identifier) *SenderValidator {
+// ValidateSender creates and returns a new SenderValidator for the given sender ID
+func ValidateSender(sender flow.Identifier) network.MessageValidator {
 	sv := &SenderValidator{}
 	sv.sender = sender[:]
 	return sv
 }
 
-// Validate returns true if the message origin id is different from the sender ID.
+// Validate returns true if the message origin id is the same as the sender ID.
 func (sv *SenderValidator) Validate(msg message.Message) bool {
-	return !bytes.Equal(sv.sender, msg.OriginID)
+	return bytes.Equal(sv.sender, msg.OriginID)
+}
+
+// ValidateNotSender creates and returns a validator which validates that the message origin id is different from
+// sender id
+func ValidateNotSender(sender flow.Identifier) network.MessageValidator {
+	return NewNotValidator(ValidateSender(sender))
 }
