@@ -60,28 +60,27 @@ type AccessNodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
-	staked                              bool
-	stakedAccessNodeIDHex               string
-	stakedAccessNodeAddress             string
-	stakedAccessNodeNetworkingPublicKey string
-	unstakedNetworkBindAddr             string
-	blockLimit                          uint
-	collectionLimit                     uint
-	receiptLimit                        uint
-	collectionGRPCPort                  uint
-	executionGRPCPort                   uint
-	pingEnabled                         bool
-	nodeInfoFile                        string
-	apiRatelimits                       map[string]int
-	apiBurstlimits                      map[string]int
-	rpcConf                             rpc.Config
-	ExecutionNodeAddress                string // deprecated
-	HistoricalAccessRPCs                []access.AccessAPIClient
-	logTxTimeToFinalized                bool
-	logTxTimeToExecuted                 bool
-	logTxTimeToFinalizedExecuted        bool
-	retryEnabled                        bool
-	rpcMetricsEnabled                   bool
+	staked                       bool
+	bootstrapNodeAddresses       []string
+	bootstrapNodePublicKeys      []string
+	unstakedNetworkBindAddr      string
+	blockLimit                   uint
+	collectionLimit              uint
+	receiptLimit                 uint
+	collectionGRPCPort           uint
+	executionGRPCPort            uint
+	pingEnabled                  bool
+	nodeInfoFile                 string
+	apiRatelimits                map[string]int
+	apiBurstlimits               map[string]int
+	rpcConf                      rpc.Config
+	ExecutionNodeAddress         string // deprecated
+	HistoricalAccessRPCs         []access.AccessAPIClient
+	logTxTimeToFinalized         bool
+	logTxTimeToExecuted          bool
+	logTxTimeToFinalizedExecuted bool
+	retryEnabled                 bool
+	rpcMetricsEnabled            bool
 }
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig
@@ -104,21 +103,20 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			PreferredExecutionNodeIDs: nil,
 			FixedExecutionNodeIDs:     nil,
 		},
-		ExecutionNodeAddress:                "localhost:9000",
-		logTxTimeToFinalized:                false,
-		logTxTimeToExecuted:                 false,
-		logTxTimeToFinalizedExecuted:        false,
-		pingEnabled:                         false,
-		retryEnabled:                        false,
-		rpcMetricsEnabled:                   false,
-		nodeInfoFile:                        "",
-		apiRatelimits:                       nil,
-		apiBurstlimits:                      nil,
-		staked:                              true,
-		stakedAccessNodeIDHex:               "",
-		stakedAccessNodeAddress:             cmd.NotSet,
-		stakedAccessNodeNetworkingPublicKey: cmd.NotSet,
-		unstakedNetworkBindAddr:             cmd.NotSet,
+		ExecutionNodeAddress:         "localhost:9000",
+		logTxTimeToFinalized:         false,
+		logTxTimeToExecuted:          false,
+		logTxTimeToFinalizedExecuted: false,
+		pingEnabled:                  false,
+		retryEnabled:                 false,
+		rpcMetricsEnabled:            false,
+		nodeInfoFile:                 "",
+		apiRatelimits:                nil,
+		apiBurstlimits:               nil,
+		staked:                       true,
+		bootstrapNodeAddresses:       []string{},
+		bootstrapNodePublicKeys:      []string{},
+		unstakedNetworkBindAddr:      cmd.NotSet,
 	}
 }
 

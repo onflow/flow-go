@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/encodable"
@@ -11,11 +10,10 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/topology"
 )
 
 type UnstakedAccessNodeBuilder struct {
-	stakedANIdentity *flow.Identity // the identity of the upstream Staked AN to which this unstaked node connects to
+	bootstrapIdentites flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	*FlowAccessNodeBuilder
 }
 
@@ -32,7 +30,7 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.validateParams()
 
-	builder.deriveStakedANIdentity()
+	builder.deriveBootstrapPeerIdentities()
 
 	builder.enqueueUnstakedNetworkInit(ctx)
 
@@ -51,37 +49,37 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 func (builder *UnstakedAccessNodeBuilder) validateParams() {
 
-	// for an unstaked access node, the staked access node ID must be provided
-	if strings.TrimSpace(builder.stakedAccessNodeIDHex) == "" {
-		builder.Logger.Fatal().Msg("staked access node ID not specified")
-	}
-
-	// and also the unstaked bind address
+	// for an unstaked access node, the unstaked network bind address must be provided
 	if builder.unstakedNetworkBindAddr == cmd.NotSet {
 		builder.Logger.Fatal().Msg("unstaked bind address not set")
 	}
+
+	if len(builder.bootstrapNodePublicKeys) != len(builder.bootstrapNodeAddresses) {
+		builder.Logger.Fatal().Msg("number of networking public keys and staked access node addresses should match")
+	}
 }
 
-// deriveStakedANIdentity derives the Flow Identity of the upstream Staked AN from the parameters. This is the identity
-// of the staked AN that the unstaked AN uses to talk to it and is completely different from the identity of the staked
-// AN that is included in the identity table on chain.
-func (builder *UnstakedAccessNodeBuilder) deriveStakedANIdentity() {
+// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstreap peers from the parameters.
+// These are the identity of the staked and unstaked AN also acting as the DHT bootstrap server
+func (builder *UnstakedAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 
-	// Flow Identifier of the staked AN
-	upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
-	builder.MustNot(err)
+	builder.bootstrapIdentites = make([]*flow.Identity, len(builder.bootstrapNodeAddresses))
+	for i, address := range builder.bootstrapNodeAddresses {
+		key := builder.bootstrapNodePublicKeys[i]
 
-	// networking public key
-	var networkKey encodable.NetworkPubKey
-	err = json.Unmarshal([]byte(builder.stakedAccessNodeNetworkingPublicKey), &networkKey)
-	builder.MustNot(err)
+		// networking public key
+		var networkKey encodable.NetworkPubKey
+		err := json.Unmarshal([]byte(key), &networkKey)
+		builder.MustNot(err)
 
-	// create the identity of the staked AN
-	builder.stakedANIdentity = &flow.Identity{
-		NodeID:        upstreamANIdentifier,
-		Address:       builder.stakedAccessNodeAddress,
-		Role:          flow.RoleAccess, // the upstream node has to be an access node
-		NetworkPubKey: networkKey,
+		// create the identity of the peer by setting only the relevant fields
+		id := &flow.Identity{
+			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
+			Address:       address,
+			Role:          flow.RoleAccess, // the upstream node has to be an access node
+			NetworkPubKey: networkKey,
+		}
+		builder.bootstrapIdentites[i] = id
 	}
 }
 
@@ -131,13 +129,8 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		participants := flow.IdentityList{}
 
-		upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
-		builder.MustNot(err)
-
-		// topology only consist of the upsteam staked AN
-		top := topology.NewFixedListTopology(upstreamANIdentifier)
-
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
+		// topology is nil since its automatically managed by libp2p
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, nil)
 		builder.MustNot(err)
 
 		builder.UnstakedNetwork = network
@@ -161,6 +154,6 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN(ctx context.Context) {
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return newUpstreamConnector(ctx, builder.stakedANIdentity, builder.UnstakedLibP2PNode, builder.Logger), nil
+		return newUpstreamConnector(ctx, builder.bootstrapIdentites, builder.UnstakedLibP2PNode, builder.Logger), nil
 	})
 }
