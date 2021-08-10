@@ -25,7 +25,7 @@ transaction(name: String,
 
     let currentBlock = getCurrentBlock()
 
-	let code = %s
+	let code: [UInt8] = %s
 
     // The smart contract computes the final view of the epoch like currentBlock.view+numViewsInEpoch. 
     // Since the Epoch contract is deployed after the spork while the network is running, 
