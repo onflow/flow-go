@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-// DefaultEmergencySealingThreshold is the default number of blocks which indicates that ER should be sealed using emergency
+// DefaultEmergencySealingThreshold is the default number of Blocks which indicates that ER should be sealed using emergency
 // sealing.
 const DefaultEmergencySealingThreshold = 400
 
@@ -40,7 +40,7 @@ type VerifyingAssignmentCollector struct {
 }
 
 // NewVerifyingAssignmentCollector instantiates a new VerifyingAssignmentCollector.
-// All errors are unexpected and potential symptoms of internal bugs or state corruption (fatal).
+// All errors are unexpected and potential symptoms of internal bugs or State corruption (fatal).
 func NewVerifyingAssignmentCollector(collectorBase AssignmentCollectorBase) (*VerifyingAssignmentCollector, error) {
 	// pre-select all authorized verifiers at the block that is being sealed
 	authorizedApprovers, err := authorizedVerifiersAtBlock(collectorBase.state, collectorBase.BlockID())
@@ -66,11 +66,11 @@ func (ac *VerifyingAssignmentCollector) collectorByBlockID(incorporatedBlockID f
 
 // emergencySealable determines whether an incorporated Result qualifies for "emergency sealing".
 // ATTENTION: this is a temporary solution, which is NOT BFT compatible. When the approval process
-// hangs far enough behind finalization (measured in finalized but unsealed blocks), emergency
+// hangs far enough behind finalization (measured in finalized but unsealed Blocks), emergency
 // sealing kicks in. This will be removed when implementation of Sealing & Verification is finished.
 func (ac *VerifyingAssignmentCollector) emergencySealable(collector *ApprovalCollector, finalizedBlockHeight uint64) bool {
 	// Criterion for emergency sealing:
-	// there must be at least DefaultEmergencySealingThreshold number of blocks between
+	// there must be at least DefaultEmergencySealingThreshold number of Blocks between
 	// the block that _incorporates_ result and the latest finalized block
 	return collector.IncorporatedBlock().Height+DefaultEmergencySealingThreshold <= finalizedBlockHeight
 }
@@ -101,7 +101,7 @@ func (ac *VerifyingAssignmentCollector) ProcessingStatus() ProcessingStatus {
 // Method is idempotent.
 // Error Returns:
 //  * no errors expected during normal operation;
-//    errors might be symptoms of bugs or internal state corruption (fatal)
+//    errors might be symptoms of bugs or internal State corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	// check that result is the one that this VerifyingAssignmentCollector manages
 	if irID := incorporatedResult.Result.ID(); irID != ac.ResultID() {
@@ -260,7 +260,7 @@ func (ac *VerifyingAssignmentCollector) validateApproval(approval *flow.ResultAp
 // Error Returns:
 //  * nil in case of success (outdated approvals might be silently discarded)
 //  * engine.InvalidInputError if the result approval is invalid
-//  * any other errors might be symptoms of bugs or internal state corruption (fatal)
+//  * any other errors might be symptoms of bugs or internal State corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
 	// we have this approval cached already, no need to process it again
 	// here we need to use PartialID to have a hash over Attestation + ApproverID

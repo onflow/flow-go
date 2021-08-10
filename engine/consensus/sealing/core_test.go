@@ -784,12 +784,10 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 
 			// TODO: change this test for phase 3, assigner should expect incorporated block ID, not executed
 			if blockIndex < len(fork)-1 {
-				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
 				assigner.On("Assign", result, blockID).Return(s.ChunksAssignment, nil)
 				expectedResults = append(expectedResults, IR)
 			} else {
-				assigner.On("Assign", result, blockID).Return(nil, fmt.Errorf("no assignment for block without valid child")).Maybe()
-				assigner.On("Assign", result, result.BlockID).Return(s.ChunksAssignment, nil)
+				assigner.On("Assign", result, blockID).Return(nil, fmt.Errorf("no assignment for block without valid child"))
 			}
 
 			payload := unittest.PayloadFixture()
@@ -819,84 +817,5 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 		require.NoError(s.T(), err)
 		require.False(s.T(), collector.Created)
 		require.Equal(s.T(), approvals.VerifyingApprovals, collector.Collector.ProcessingStatus())
-	}
-}
-
-// TestProcessFinalizedBlock_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
-// after parent block gets sealed. More specifically this case:
-// P <- A <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
-//        <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
-//               |
-//           finalized
-// Initially P was executed,  B is finalized and incorporates ER for A, C incorporates ER for B, D was forked from
-// A but wasn't finalized, E incorporates ER for D.
-// Let's take a case where we have collectors for ER incorporated in blocks B, C, D, E. Since we don't
-// have a collector for A, {B, C, D, E} are not processable. Test that when A becomes sealed {B, C, D} become processable
-// but E is unprocessable since D wasn't part of finalized fork.
-// TODO: move this test to assignment_collector_tree_test when implemented an interface for assignment collectors.
-func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_ProcessableAfterSealedParent() {
-	s.identitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
-	// two forks
-	forks := make([][]*flow.Block, 2)
-	results := make([][]*flow.IncorporatedResult, 2)
-	for i := 0; i < len(forks); i++ {
-		fork := unittest.ChainFixtureFrom(3, &s.IncorporatedBlock)
-		forks[i] = fork
-		prevResult := s.IncorporatedResult.Result
-		// create execution results for all blocks except last one, since it won't be valid by definition
-		for _, block := range fork {
-			blockID := block.ID()
-
-			// create execution result for previous block in chain
-			// this result will be incorporated in current block.
-			result := unittest.ExecutionResultFixture(
-				unittest.WithPreviousResult(*prevResult),
-			)
-			result.BlockID = block.Header.ParentID
-
-			// update caches
-			s.blocks[blockID] = block.Header
-			s.identitiesCache[blockID] = s.AuthorizedVerifiers
-
-			IR := unittest.IncorporatedResult.Fixture(
-				unittest.IncorporatedResult.WithResult(result),
-				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
-
-			results[i] = append(results[i], IR)
-
-			err := s.core.ProcessIncorporatedResult(IR)
-			require.NoError(s.T(), err)
-
-			collector := s.core.collectorTree.GetCollector(IR.Result.ID())
-			require.Equal(s.T(), approvals.CachingApprovals, collector.ProcessingStatus())
-
-			prevResult = result
-		}
-	}
-
-	finalized := forks[0][0].Header
-
-	// A becomes sealed
-	s.sealsDB.On("ByBlockID", finalized.ID()).Return(
-		unittest.Seal.Fixture(
-			unittest.Seal.WithBlock(&s.Block)), nil)
-
-	s.markFinalized(&s.IncorporatedBlock)
-	s.markFinalized(finalized)
-
-	// B becomes finalized
-	err := s.core.ProcessFinalizedBlock(finalized.ID())
-	require.NoError(s.T(), err)
-
-	// at this point collectors for forks[0] should be processable and for forks[1] not
-	for forkIndex := range forks {
-		for _, result := range results[forkIndex][1:] {
-			collector := s.core.collectorTree.GetCollector(result.Result.ID())
-			if forkIndex == 0 {
-				require.Equal(s.T(), approvals.VerifyingApprovals, collector.ProcessingStatus())
-			} else {
-				require.Equal(s.T(), approvals.Orphaned, collector.ProcessingStatus())
-			}
-		}
 	}
 }
