@@ -774,3 +774,9 @@ int subgroup_check_G1_bench() {
     #endif
     return res;
 }
+
+// this is a testing function.
+// it wraps a call to a Relic macro since cgo can't call macros.
+void xmd_sha256(uint8_t *hash, int len_hash, uint8_t *msg, int len_msg, uint8_t *dst, int len_dst){
+    md_xmd_sh256(hash, len_hash, msg, len_msg, dst, len_dst);
+}

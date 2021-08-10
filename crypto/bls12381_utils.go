@@ -186,21 +186,16 @@ func readPointG1(a *pointG1, src []byte) error {
 }
 
 // This is only a TEST function.
-// It wraps calls to the relic hash-to-G1 map since cgo can't be used
+// It wraps calls to subgroup checks since cgo can't be used
 // in go test files.
 //
-// This map uses, by default, XMD:SH256 for hash-to-field, and can be
-// configured to use several XMD:(SHA|BS) variants, see:
-// https://github.com/relic-toolkit/relic/blob/43f2cd4695ff29a35dfab5bbf368439d4ff20d14/include/relic_md.h
-//
-// TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
-// ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
-func mapToG1RelicTest(dest *pointG1, msg, dst []byte) {
-	C.ep_map_dst((*C.ep_st)(dest), (*C.uchar)(&msg[0]), (C.int)(len(msg)), (*C.uchar)(&dst[0]), (C.int)(len(dst)))
+// This wraps a subgroup check in G1
+func checkInG1Test(pt *pointG1) bool {
+	return C.check_membership_G1((*C.ep_st)(pt)) == valid
 }
 
 // This is only a TEST function.
-// It wraps calls to subgroup check tests since cgo can't be used
+// It wraps calls to subgroup checks since cgo can't be used
 // in go test files.
 // if inG1 is true, the function tests the membership of a point in G1,
 // otherwise, a point in E1\G1 membership is tested.

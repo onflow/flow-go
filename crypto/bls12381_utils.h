@@ -74,6 +74,9 @@ typedef struct prec_ {
     bn_st p_1div2;
 } prec_st;
 
+// BLS based SPoCK
+int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
+
 // Utility functions
 int      get_valid();
 int      get_invalid();
@@ -115,6 +118,8 @@ int bowe_subgroup_check_G1(const ep_t);
 int subgroup_check_G1_test(int, int);
 int subgroup_check_G1_bench();
 
+// utility testing function
+void xmd_sha256(uint8_t *, int, uint8_t *, int, uint8_t *, int);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
@@ -122,8 +127,5 @@ void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);
 void     ep2_print_(char*, ep2_st*);
-
-// BLS based SPoCK
-int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 
 #endif

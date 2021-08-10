@@ -160,14 +160,15 @@ func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 	}
 }
 
-// testSignWithRelicMapCrossBLST tests signing a hashed G1 point is consistent with BLST.
+// testSignHashCrossBLST tests signing a hashed message is consistent with BLST.
 //
-// The tests assumes the used hash-to-field and map-to-curve are identical in the 2 signatures. This is done
-// by using the relic hash-to-curve, which is tested to be identical to the one used in BLST (TestMapToG1Relic).
-// The test only checks the consistency of the remaining steps of the signature (scalar multiplication)
-// between Flow and BLST.
+// The tests assumes the used hash-to-field and map-to-curve are identical in the 2 signatures:
+// - hash-to-field : use XMD_SHA256 in both signatures
+// - map to curve : Flow and BLST use an optimized SWU consistent with the test vector in
+// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
+//
 // The test also assumes Flow signature serialization is identical to the one in BLST.
-func testSignWithRelicMapCrossBLST(t *rapid.T) {
+func testSignHashCrossBLST(t *rapid.T) {
 	// generate two private keys from the same seed
 	skBytes := rapid.Custom(validPrivateKeyBytesFlow).Example().([]byte)
 
@@ -187,7 +188,7 @@ func testSignWithRelicMapCrossBLST(t *rapid.T) {
 
 	skFlowBLS, ok := skFlow.(*PrKeyBLSBLS12381)
 	require.True(t, ok, "incoherent key type assertion")
-	sigFlow := skFlowBLS.signWithRelicMapTest(message)
+	sigFlow := skFlowBLS.signWithXMDSHA256(message)
 	sigBytesFlow := sigFlow.Bytes()
 
 	// check both signatures are equal
@@ -198,5 +199,5 @@ func TestFlowCrossBLST(t *testing.T) {
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
 	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
-	rapid.Check(t, testSignWithRelicMapCrossBLST)
+	rapid.Check(t, testSignHashCrossBLST)
 }

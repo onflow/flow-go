@@ -4,7 +4,7 @@ package crypto
 
 import (
 	"crypto/rand"
-	"encoding/hex"
+	//"encoding/hex"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,7 +80,7 @@ func BenchmarkScalarMult(b *testing.B) {
 //
 // TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
 // ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
-func TestMapToG1Relic(t *testing.T) {
+/*func TestMapToG1Relic(t *testing.T) {
 
 	// test vectors from https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-11#appendix-J.9.1
 	dst := []byte("QUUX-V01-CS02-with-BLS12381G1_XMD:SHA-256_SSWU_RO_")
@@ -102,7 +102,7 @@ func TestMapToG1Relic(t *testing.T) {
 		var point pointG1
 		mapToG1RelicTest(&point, msg, dst)
 
-		// This performs a compact serialization, see https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-pairing-friendly-curves-09#appendix-C
+		// This performs a compact serialization
 		pointBytes := make([]byte, signatureLengthBLSBLS12381)
 		writePointG1(pointBytes, &point)
 
@@ -115,7 +115,7 @@ func TestMapToG1Relic(t *testing.T) {
 		// we compare only past the first byte (see comment above)
 		assert.Equal(t, expectedPoint, pointBytes, "Relic's map to G1 should match the IRTF draft test vector")
 	}
-}
+}*/
 
 // Hashing to G1 bench
 func BenchmarkHashToG1(b *testing.B) {

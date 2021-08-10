@@ -34,7 +34,6 @@ int      get_pk_len();
 int      get_sk_len();  
 
 void     bls_sign(byte*, const bn_t, const byte*, const int);
-void     bls_sign_ep(byte*, const bn_t, const ep_t pt);
 int      bls_verify(const ep2_t, const byte*, const byte*, const int);
 int      bls_verifyPerDistinctMessage(const byte*, const int, const byte*, const uint32_t*,
                          const uint32_t*, const ep2_st*);
@@ -50,5 +49,5 @@ int      check_membership_G2(const ep2_t);
 
 // hash to curve functions (functions in bls12381_hashtocurve.c)
 void     map_to_G1(ep_t, const byte*, const int);
-//void     opswu_test(uint8_t *, const uint8_t *, int);
+
 #endif
