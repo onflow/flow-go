@@ -47,7 +47,4 @@ int      check_membership_Zr(const bn_t);
 int      check_membership_G1(const ep_t p);
 int      check_membership_G2(const ep2_t);
 
-// hash to curve functions (functions in bls12381_hashtocurve.c)
-void     map_to_G1(ep_t, const byte*, const int);
-
 #endif

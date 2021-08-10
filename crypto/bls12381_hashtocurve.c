@@ -400,6 +400,3 @@ void map_to_G1(ep_t h, const byte* data, const int len) {
     ep_map_from_field(h, data, len);
     #endif
 }
-
-
-

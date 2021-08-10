@@ -77,6 +77,9 @@ typedef struct prec_ {
 // BLS based SPoCK
 int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 
+// hash to curve functions (functions in bls12381_hashtocurve.c)
+void     map_to_G1(ep_t, const byte*, const int);
+
 // Utility functions
 int      get_valid();
 int      get_invalid();

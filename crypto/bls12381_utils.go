@@ -217,3 +217,24 @@ func checkInG1Test(pt *pointG1) bool {
 func benchG1Test() {
 	_ = C.subgroup_check_G1_bench()
 }
+
+// This is only a TEST function.
+// It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.
+// The function uses xmd with SHA256 in the hash-to-field.
+func hashToG1Bytes(data, dst []byte) []byte {
+	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	// XMD using SHA256
+	C.xmd_sha256((*C.uchar)(&hash[0]),
+		(C.int)(opSwUInputLenBLSBLS12381),
+		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
+
+	// map the hash to G1
+	var point pointG1
+	C.map_to_G1((*C.ep_st)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
+
+	// serialize the point
+	pointBytes := make([]byte, signatureLengthBLSBLS12381)
+	writePointG1(pointBytes, &point)
+	return pointBytes
+}
