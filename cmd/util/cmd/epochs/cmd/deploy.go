@@ -108,6 +108,9 @@ func deployRun(cmd *cobra.Command, args []string) {
 	// write the transaction text to a file
 	tx := getDeployEpochTransactionText(snapshot)
 	err = io.WriteFile(deployTxFileName, tx)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not write transaction file")
+	}
 }
 
 // getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch_relative` transaction from the root
