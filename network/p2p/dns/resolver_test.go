@@ -186,36 +186,85 @@ type txtLookupTestCase struct {
 }
 
 // mockBasicResolverForDomains mocks the resolver for the ip and txt lookup test cases.
-func mockBasicResolverForDomains(resolver *mocknetwork.BasicResolver,
-	ipLookupTestCases []*ipLookupTestCase,
-	txtLookupTestCases []*txtLookupTestCase,
-	times int) {
+func mockBasicResolverForDomains(t *testing.T,
+	resolver *mocknetwork.BasicResolver,
+	ipLookupTestCases map[string]*ipLookupTestCase,
+	txtLookupTestCases map[string]*txtLookupTestCase,
+	happyPath bool,
+	times int) *sync.WaitGroup {
 
-	for _, tc := range ipLookupTestCases {
-		resolver.On("LookupIPAddr", mock.Anything, tc.domain).Return(tc.result, nil).Times(times)
-	}
+	// keeping track of number of times each domain is requested.
+	ipRequested := make(map[string]int)
+	txtRequested := make(map[string]int)
 
-	for _, tc := range txtLookupTestCases {
-		resolver.On("LookupTXT", mock.Anything, tc.domain).Return(tc.result, nil).Run(func(args mock.Arguments) {
-		}).Times(times)
-	}
-}
+	wg := &sync.WaitGroup{}
+	wg.Add(times * (len(txtLookupTestCases) + len(ipLookupTestCases))) // each test case requested `times` times!
 
-// mockBasicResolverForDomains mocks the resolver returning error for the ip and txt lookup test cases.
-func mockBasicResolverForDomainsWithError(resolver *mocknetwork.BasicResolver,
-	ipLookupTestCases []*ipLookupTestCase,
-	txtLookupTestCases []*txtLookupTestCase,
-	times int) {
+	resolver.On("LookupIPAddr", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		// method should be called on expected parameters
+		_, ok := args[0].(*context.Context)
+		require.True(t, ok)
 
-	for _, tc := range ipLookupTestCases {
-		resolver.On("LookupIPAddr", mock.Anything, tc.domain).
-			Return(nil, fmt.Errorf("error"))
-	}
+		domain, ok := args[1].(string)
+		require.True(t, ok)
 
-	for _, tc := range txtLookupTestCases {
-		resolver.On("LookupTXT", mock.Anything, tc.domain).
-			Return(nil, fmt.Errorf("error"))
-	}
+		// requested domain should be expected.
+		// number of requests should not exceed the `times`.
+		count, ok := ipRequested[domain]
+		require.True(t, ok)
+		require.Less(t, count, times)
+
+		count++
+		ipRequested[domain] = count
+
+		wg.Done()
+
+	}).Return(
+		func(ctx context.Context, domain string) []net.IPAddr {
+			if !happyPath {
+				return nil
+			}
+			return ipLookupTestCases[domain].result
+		},
+		func(ctx context.Context, domain string) error {
+			if !happyPath {
+				return fmt.Errorf("error")
+			}
+			return nil
+		})
+
+	resolver.On("LookupTXT", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		// method should be called on expected parameters
+		_, ok := args[0].(*context.Context)
+		require.True(t, ok)
+
+		domain, ok := args[1].(string)
+		require.True(t, ok)
+
+		// requested domain should be expected.
+		// number of requests should not exceed the `times`.
+		count, ok := txtRequested[domain]
+		require.True(t, ok)
+		require.Less(t, count, times)
+
+		count++
+		txtRequested[domain] = count
+
+		wg.Done()
+
+	}).Return(
+		func(ctx context.Context, domain string) []string {
+			if !happyPath {
+				return nil
+			}
+			return txtLookupTestCases[domain].result
+		},
+		func(ctx context.Context, domain string) error {
+			if !happyPath {
+				return fmt.Errorf("error")
+			}
+			return nil
+		})
 }
 
 func ipLookupFixture(count int) map[string]*ipLookupTestCase {
