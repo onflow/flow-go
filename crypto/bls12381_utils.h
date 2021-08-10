@@ -45,14 +45,17 @@ typedef uint8_t byte;
 
 
 // constants used in the optimized SWU hash to curve
-#define ELLP_Nx_LEN 12
-#define ELLP_Dx_LEN 10
-#define ELLP_Ny_LEN 16
-#define ELLP_Dy_LEN 15
+#if (hashToPoint == OPSWU)
+    #define ELLP_Nx_LEN 12
+    #define ELLP_Dx_LEN 10
+    #define ELLP_Ny_LEN 16
+    #define ELLP_Dy_LEN 15
+#endif
 
 
 // Structure of precomputed data
 typedef struct prec_ {
+    #if (hashToPoint == OPSWU)
     bn_st p_3div4;
     fp_st fp_p_1div2; 
     // coefficients of E1(Fp)
@@ -63,6 +66,7 @@ typedef struct prec_ {
     fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
     fp_st iso_Dy[ELLP_Dy_LEN];
+    #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;

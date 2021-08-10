@@ -136,7 +136,7 @@ func BenchmarkHashToG1(b *testing.B) {
 // The test vector is taken from the original sage implementation
 // https://github.com/kwantam/bls12-381_hash from the author of
 // https://eprint.iacr.org/2019/403.pdf.
-func TestOpSwuHashToG1(t *testing.T) {
+/*func TestOpSwuHashToG1(t *testing.T) {
 	blsInstance.reInit()
 	inputs := []string{
 		"0e58bd6d947af8aec009ff396cd83a3636614f917423db76e8948e9c25130ae04e721beb924efca3ce585540b2567cf6",
@@ -167,7 +167,7 @@ func TestOpSwuHashToG1(t *testing.T) {
 		OpSwUUnitTest(output, input)
 		assert.Equal(t, expected[i], hex.EncodeToString(output), "hash to G1 is not equal to the expected value")
 	}
-}
+}*/
 
 // test Bowe subgroup check in G1
 // The test compares Bowe's check result to multiplying by the group order

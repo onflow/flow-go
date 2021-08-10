@@ -404,11 +404,15 @@ void opswu_test(uint8_t *out, const uint8_t *msg, int len){
     clear_cofactor(p, p); // map to G1
     ep_write_bin_compact(out, p, SIGNATURE_LEN);
 }
+#endif
 
 // computes a hash of input data to G1
 void map_to_G1(ep_t h, const byte* data, const int len) {
+    #if hashToPoint==OPSWU
     // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
     map_to_G1_opswu(h, data, len);
+    #elif hashToPoint==RELIC_OPSWU
+    ep_map_from_field(h, data, len);
     #endif
 }
 
