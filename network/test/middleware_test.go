@@ -11,12 +11,14 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -26,11 +28,31 @@ import (
 
 const testChannel = "test-channel"
 
+type TagsObserver struct {
+	tags chan string
+}
+
+func (co *TagsObserver) OnNext(peertag interface{}) {
+	pt, ok := peertag.(PeerTag)
+
+	if ok {
+		co.tags <- fmt.Sprintf("peer: %v tag: %v", pt.peer, pt.tag)
+	}
+
+}
+func (co *TagsObserver) OnError(err error) {
+	close(co.tags)
+}
+func (co *TagsObserver) OnComplete() {
+	close(co.tags)
+}
+
 type MiddlewareTestSuite struct {
 	suite.Suite
 	size    int               // used to determine number of middlewares under test
 	mws     []*p2p.Middleware // used to keep track of middlewares under test
 	ov      []*mocknetwork.Overlay
+	obs     chan string  // used to keep track of Protect events tagged by pubsub messages
 	ids     []*flow.Identity
 	metrics *metrics.NoopCollector // no-op performance monitoring simulation
 }
@@ -48,9 +70,21 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
 
-	// create and start the middlewares
-	m.ids, m.mws, _ = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+	// create and start the middlewares and inject a connection observer
+	var obs []observable.Observable
+	peerChannel := make(chan string)
+	ob := TagsObserver{
+		tags: peerChannel,
+	}
 
+	m.ids, m.mws, obs = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+
+	for _, observableConnMgr := range obs {
+		observableConnMgr.Subscribe(&ob)
+	}
+	m.obs = peerChannel
+
+	require.Len(m.Suite.T(), obs, m.size)
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
@@ -354,8 +388,10 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		require.NoError(m.Suite.T(), err)
 	}
 
-	// wait for nodes to form a mesh
-	time.Sleep(2 * time.Second)
+	// set up waiting for m.size pubsub tags indicating a mesh has formed
+	for i := 0; i < m.size; i++ {
+		<-m.obs
+	}
 
 	origin := 0
 	target := m.size - 1
