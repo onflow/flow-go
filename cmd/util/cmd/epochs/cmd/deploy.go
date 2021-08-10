@@ -220,7 +220,7 @@ func convertDeployEpochTransactionArguments(
 	args = append(args, cdcNumCollectorClusters)
 
 	// add FLOWSupplyIncreasePercentage
-	cdcFlowSupplyIncreasePercentage, err := cadence.NewFix64(FLOWsupplyIncreasePercentage)
+	cdcFlowSupplyIncreasePercentage, err := cadence.NewUFix64(FLOWsupplyIncreasePercentage)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not convert `FLOWSupplyIncreasePercentage` to cadence representation")
 	}
