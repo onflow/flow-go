@@ -50,21 +50,19 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	resolver, err := dns.NewResolver(
 		metrics.NewNoopCollector(),
 		dns.WithBasicResolver(&basicResolver),
-		dns.WithTTL(2*time.Second)) // cache timeout set to 2 seconds for this test
+		dns.WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
 
 	require.NoError(t, err)
 
-	size := 10 // we have 10 txt and 10 ip lookup test cases
+	size := 2  // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 10 times
 	txtTestCases := txtLookupFixture(size)
 	ipTestCase := ipLookupFixture(size)
-	wg := &sync.WaitGroup{}
-	wg.Add(times)
-	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, true, 2)
+	wg := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, true, 2)
 
 	queryResolver(t, times, resolver, txtTestCases, ipTestCase)
 
-	time.Sleep(5 * time.Second) // waits enough for cache to get invalidated
+	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
 
 	queryResolver(t, times, resolver, txtTestCases, ipTestCase)
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
@@ -161,6 +159,7 @@ func mockBasicResolverForDomains(t *testing.T,
 	txtRequested := make(map[string]int)
 
 	wg := &sync.WaitGroup{}
+	fmt.Println("wg: ", times*(len(txtLookupTestCases)+len(ipLookupTestCases)))
 	wg.Add(times * (len(txtLookupTestCases) + len(ipLookupTestCases))) // each test case requested `times` times!
 
 	mu := sync.Mutex{}
