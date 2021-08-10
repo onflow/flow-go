@@ -179,6 +179,8 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	return sk, nil
 }
 
+const invalidBLSSignatureHeader = byte(0xE0)
+
 // BLSInvalidSignature returns an invalid signature that fails when verified
 // with any message and public key.
 //
@@ -186,7 +188,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 // makes the verification fail early. The verification would return (false, nil).
 func BLSInvalidSignature() Signature {
 	signature := make([]byte, SignatureLenBLSBLS12381)
-	signature[0] = 0xC1 // invalid header as per C.ep_read_bin_compact
+	signature[0] = invalidBLSSignatureHeader // invalid header as per C.ep_read_bin_compact
 	return signature
 }
 
