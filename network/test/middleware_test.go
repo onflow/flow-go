@@ -52,7 +52,7 @@ type MiddlewareTestSuite struct {
 	size    int               // used to determine number of middlewares under test
 	mws     []*p2p.Middleware // used to keep track of middlewares under test
 	ov      []*mocknetwork.Overlay
-	obs     chan string  // used to keep track of Protect events tagged by pubsub messages
+	obs     chan string // used to keep track of Protect events tagged by pubsub messages
 	ids     []*flow.Identity
 	metrics *metrics.NoopCollector // no-op performance monitoring simulation
 }
