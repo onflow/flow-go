@@ -186,15 +186,6 @@ func readPointG1(a *pointG1, src []byte) error {
 }
 
 // This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
-// in go test files.
-//
-// This wraps a subgroup check in G1
-func checkInG1Test(pt *pointG1) bool {
-	return C.check_membership_G1((*C.ep_st)(pt)) == valid
-}
-
-// This is only a TEST function.
 // It wraps calls to the relic hash-to-G1 map since cgo can't be used
 // in go test files.
 //
@@ -209,13 +200,20 @@ func mapToG1RelicTest(dest *pointG1, msg, dst []byte) {
 }
 
 // This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
+// It wraps calls to subgroup check tests since cgo can't be used
 // in go test files.
 // if inG1 is true, the function tests the membership of a point in G1,
 // otherwise, a point in E1\G1 membership is tested.
 // method is the index of the membership check method as defined in bls12381_utils.h
 func checkG1Test(inG1 int, method int) bool {
 	return C.subgroup_check_G1_test((C.int)(inG1), (C.int)(method)) == valid
+}
+
+// This is only a TEST function.
+// It wraps a call to a subgroup check in G1 since cgo can't be used
+// in go test files.
+func checkInG1Test(pt *pointG1) bool {
+	return C.check_membership_G1((*C.ep_st)(pt)) == valid
 }
 
 // This is only a TEST function.

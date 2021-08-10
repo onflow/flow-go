@@ -440,7 +440,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	// an invalid signature with an incorrect header but correct length
 	invalidSig := make([]byte, signatureLengthBLSBLS12381)
-	invalidSig[0] = 0xC1 // incorrect header
+	invalidSig[0] = invalidBLSSignatureHeader // incorrect header
 	for _, sig := range sigs {
 		if len(sig) == signatureLengthBLSBLS12381 {
 			flatSigs = append(flatSigs, sig...)
