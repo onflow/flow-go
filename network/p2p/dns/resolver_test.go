@@ -26,12 +26,12 @@ func TestResolver_HappyPath(t *testing.T) {
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
-	size := 2         // we have 10 txt and 10 ip lookup test cases
-	times := 5 * size // each domain is queried for resolution 5 times
+	size := 2  // we have 10 txt and 10 ip lookup test cases
+	times := 5 // each domain is queried for resolution 5 times
 	txtTestCases := txtLookupFixture(size)
 	ipTestCases := ipLookupFixture(size)
 
-	wg := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, true, times)
+	wg := mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, true, 1)
 
 	ctx := context.Background()
 	// each test case is repeated 5 times, since resolver has been mocked only once per test case
@@ -60,8 +60,6 @@ func TestResolver_HappyPath(t *testing.T) {
 	}
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
-
-	basicResolver.AssertExpectations(t) // asserts that basic resolver is invoked exactly once per domain
 }
 
 //// TestResolver_HappyPath evaluates the happy path behavior of dns resolver against concurrent invocations. Each unique domain
@@ -201,7 +199,11 @@ func mockBasicResolverForDomains(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(times * (len(txtLookupTestCases) + len(ipLookupTestCases))) // each test case requested `times` times!
 
+	mu := sync.Mutex{}
 	resolver.On("LookupIPAddr", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		// method should be called on expected parameters
 		_, ok := args[0].(context.Context)
 		require.True(t, ok)
@@ -211,8 +213,13 @@ func mockBasicResolverForDomains(t *testing.T,
 
 		// requested domain should be expected.
 		// number of requests should not exceed the `times`.
-		count, ok := ipRequested[domain]
+		_, ok = ipLookupTestCases[domain]
 		require.True(t, ok)
+
+		count, ok := ipRequested[domain]
+		if !ok {
+			count = 0
+		}
 		require.Less(t, count, times)
 
 		count++
@@ -235,6 +242,9 @@ func mockBasicResolverForDomains(t *testing.T,
 		})
 
 	resolver.On("LookupTXT", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		mu.Lock()
+		defer mu.Unlock()
+
 		// method should be called on expected parameters
 		_, ok := args[0].(context.Context)
 		require.True(t, ok)
@@ -244,8 +254,13 @@ func mockBasicResolverForDomains(t *testing.T,
 
 		// requested domain should be expected.
 		// number of requests should not exceed the `times`.
-		count, ok := txtRequested[domain]
+		_, ok = txtLookupTestCases[domain]
 		require.True(t, ok)
+
+		count, ok := txtRequested[domain]
+		if !ok {
+			count = 0
+		}
 		require.Less(t, count, times)
 
 		count++
