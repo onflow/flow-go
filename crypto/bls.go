@@ -183,7 +183,7 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 // with any message and public key.
 //
 // The signature bytes represent an invalid serialization of a point which
-// makes the verification fail early.
+// makes the verification fail early. The verification would return (false, nil).
 func BLSInvalidSignature() Signature {
 	signature := make([]byte, SignatureLenBLSBLS12381)
 	signature[0] = 0xC1 // invalid header as per C.ep_read_bin_compact

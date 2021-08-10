@@ -115,6 +115,15 @@ func TestBLSInvalidSignature(t *testing.T) {
 	// check the returned error
 	require.Error(t, err)
 	assert.IsType(t, expectedError, err)
+
+	// check the
+	kmac := NewBLSKMAC("tag")
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	pk := randomSK(t, seed).PublicKey()
+	msg := []byte("message")
+	valid, err := pk.Verify(s, msg, kmac)
+	assert.NoError(t, err)
+	assert.False(t, valid)
 }
 
 /////////////////////////////////////////
