@@ -387,31 +387,16 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
 		RLC_THROW(ERR_CAUGHT);
 	}
 }
-
-// This is a testing funstion for the Optimized SwU core
-void opswu_test(uint8_t *out, const uint8_t *msg, int len){
-    fp_t t;
-    bn_t tmp;
-    bn_new(tmp);
-    bn_read_bin(tmp, msg, len);
-    fp_prime_conv(t, tmp);
-    bn_free(tmp);
-
-    ep_t p;
-    ep_new(p);
-    map_to_E1_swu(p, t); // map to E1
-    eval_iso11(p, p); // map to E
-    clear_cofactor(p, p); // map to G1
-    ep_write_bin_compact(out, p, SIGNATURE_LEN);
-}
 #endif
 
 // computes a hash of input data to G1
+// construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
 void map_to_G1(ep_t h, const byte* data, const int len) {
     #if hashToPoint==OPSWU
-    // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
+    // implementation using different mapping parameters than the IRTF draft
     map_to_G1_opswu(h, data, len);
     #elif hashToPoint==RELIC_OPSWU
+    // relic implementation compliant the IRTF draft
     ep_map_from_field(h, data, len);
     #endif
 }

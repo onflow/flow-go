@@ -421,15 +421,6 @@ func hashToG1(data []byte) *pointG1 {
 }
 
 // This is only a TEST function.
-// It wraps a call to optimized SwU algorithm since cgo can't be used
-// in go test files
-/*func OpSwUUnitTest(output []byte, input []byte) {
-	C.opswu_test((*C.uchar)(&output[0]),
-		(*C.uchar)(&input[0]),
-		(C.int)(len(input)))
-}*/
-
-// This is only a TEST function.
 // It wraps a call to signing using Relic to get a curve point, internally using XMD:SHA256
 //
 // (since cgo can't be used in go test files)
