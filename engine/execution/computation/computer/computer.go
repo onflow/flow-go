@@ -241,9 +241,24 @@ func (e *blockComputer) executeSystemCollection(
 
 	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
+
 	if err != nil {
 		return txIndex, err
 	}
+	if res.TransactionResults[txIndex].ErrorMessage != "" {
+		// This log is used as the data source for an alert on grafana.
+		// The system_chunk_error field must not be changed without adding the corresponding
+		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
+		e.log.Error().
+			Str("error_message", res.TransactionResults[txIndex].ErrorMessage).
+			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
+			Bool("system_chunk_error", true).
+			Bool("critical_error", true).
+			Msg("error executing system chunk transaction")
+
+		return txIndex, err
+	}
+
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
 	return txIndex, err
@@ -307,7 +322,6 @@ func (e *blockComputer) executeTransaction(
 	txIndex uint32,
 	res *execution.ComputationResult,
 ) error {
-
 	startedAt := time.Now()
 	var txSpan opentracing.Span
 	var traceID string
