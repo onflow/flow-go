@@ -143,7 +143,7 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 	done := make(chan error, 1)
 	defer close(done)
 
-	timer := time.NewTimer(PingTimeoutSecs)
+	timer := time.NewTimer(PingTimeout)
 	defer timer.Stop()
 
 	// create a new stream to the remote node
