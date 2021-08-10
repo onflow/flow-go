@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -89,7 +91,7 @@ func deployRun(cmd *cobra.Command, args []string) {
 	txArgs := getDeployEpochTransactionArguments(snapshot)
 	log.Info().Msg("extracted `deploy_epoch_relative` transaction arguments from snapshot")
 
-	// ancode to JSON
+	// encode to JSON
 	enc, err := epochcmdutil.EncodeArgs(txArgs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not encode epoch transaction arguments")
@@ -116,24 +118,13 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 		log.Fatal().Err(err).Msgf("could not get head from snapshot")
 	}
 
-	// root chain id and system contractsRegister
-	chainID := head.ChainID
-	systemContracts, err := systemcontracts.SystemContractsForChain(chainID)
-	if err != nil {
-		log.Fatal().Err(err).Str("chain_id", chainID.String()).Msgf("could not get system contracts for chainID")
-	}
+	epochContractName := systemcontracts.ContractNameEpoch
 
 	// current epoch counter
 	currentEpochCounter, err := currentEpoch.Counter()
 	if err != nil {
 		log.Fatal().Err(err).Msgf("could not get `currentEpochCounter` from snapshot")
 	}
-
-	// epoch contract name and get code for contract
-	epochContractName := systemcontracts.ContractNameEpoch
-	epochContractCode := contracts.FlowEpoch(flagFungibleTokenAddress,
-		flagFlowTokenAddress, flagIDTableAddress,
-		systemContracts.ClusterQC.Address.Hex(), systemContracts.DKG.Address.Hex())
 
 	// get final view from snapshot
 	finalView, err := currentEpoch.FinalView()
@@ -167,8 +158,8 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 		log.Fatal().Err(err).Msgf("could not get `randomSource` for current epoch from snapshot")
 	}
 
-	return convertDeployEpochTransactionArguments(epochContractName,
-		epochContractCode,
+	return convertDeployEpochTransactionArguments(
+		epochContractName,
 		currentEpochCounter,
 		numViewsInEpoch,
 		numViewsInStakingAuction,
@@ -181,9 +172,17 @@ func getDeployEpochTransactionArguments(snapshot *inmem.Snapshot) []cadence.Valu
 }
 
 // convertDeployEpochTransactionArguments converts the `deploy_epoch_relative` transaction arguments to cadence representations
-func convertDeployEpochTransactionArguments(contractName string, contractCode []byte, currentCounter uint64,
-	numViewsInEpoch, numViewsInStakingAuction, numViewsInDKGPhase uint64, numCollectorClusters int,
-	FLOWsupplyIncreasePercentage string, randomSource []byte, clustering flow.ClusterList) []cadence.Value {
+func convertDeployEpochTransactionArguments(
+	contractName string,
+	currentCounter uint64,
+	numViewsInEpoch uint64,
+	numViewsInStakingAuction uint64,
+	numViewsInDKGPhase uint64,
+	numCollectorClusters int,
+	FLOWsupplyIncreasePercentage string,
+	randomSource []byte,
+	clustering flow.ClusterList,
+) []cadence.Value {
 
 	// arguments array
 	args := make([]cadence.Value, 0)
@@ -194,10 +193,6 @@ func convertDeployEpochTransactionArguments(contractName string, contractCode []
 		log.Fatal().Err(err).Msgf("could not convert `contractName` to cadence representation")
 	}
 	args = append(args, cdcContractName)
-
-	// add epoch contract code
-	cdcContractCode := epochcmdutil.BytesToCadenceUInt8Array(contractCode)
-	args = append(args, cdcContractCode)
 
 	// add epoch current counter
 	cdcCurrentCounter := cadence.NewUInt64(currentCounter)
@@ -234,4 +229,54 @@ func convertDeployEpochTransactionArguments(contractName string, contractCode []
 	args = append(args, cdcRandomSource)
 
 	return args
+}
+
+// getDeployEpochTransactionText returns the transaction text for the transaction
+// to deploy FlowEpoch for the given snapshot. Primarily this involves setting
+// the appropriate import addresses and injecting the FlowEpoch contract code
+// as a literal in the transaction text.
+func getDeployEpochTransactionText(snapshot *inmem.Snapshot) []byte {
+
+	head, err := snapshot.Head()
+	if err != nil {
+		log.Fatal().Err(err).Msgf("could not get head from snapshot")
+	}
+
+	// root chain id and system contractsRegister
+	chainID := head.ChainID
+	systemContracts, err := systemcontracts.SystemContractsForChain(chainID)
+	if err != nil {
+		log.Fatal().Err(err).Str("chain_id", chainID.String()).Msgf("could not get system contracts for chainID")
+	}
+
+	// epoch contract name and get code for contract
+	epochContractCode := contracts.FlowEpoch(
+		flagFungibleTokenAddress,
+		flagFlowTokenAddress,
+		flagIDTableAddress,
+		systemContracts.ClusterQC.Address.Hex(),
+		systemContracts.DKG.Address.Hex(),
+	)
+
+	// convert the epoch contract code to an [UInt8] literal string that can be
+	// injected to the Cadence transaction text.
+	// NOTE: this is encoded as a literal in the transaction text rather than an
+	// argument because the size of the encoded argument could exceed the stack
+	// limit.
+	builder := new(strings.Builder)
+	builder.WriteString("[")
+	for i, codeByte := range epochContractCode {
+		if i < len(epochContractCode)-1 {
+			builder.WriteString(fmt.Sprintf("%d,", codeByte))
+			continue
+		}
+		builder.WriteString(fmt.Sprintf("%d", codeByte))
+	}
+	builder.WriteString("]")
+
+	epochContractCodeAsCadenceLiteral := builder.String()
+
+	deployEpochTransactionText := fmt.Sprintf(deployEpochTransactionTemplate, epochContractCodeAsCadenceLiteral)
+
+	return []byte(deployEpochTransactionText)
 }
