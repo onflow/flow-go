@@ -103,6 +103,7 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 
 	// setup blocks cache for protocol state
 	s.Blocks = make(map[flow.Identifier]*flow.Header)
+	s.Blocks[s.ParentBlock.ID()] = &s.ParentBlock
 	s.Blocks[s.Block.ID()] = &s.Block
 	s.Blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
 
@@ -150,6 +151,9 @@ func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 			}
 		},
 	)
+
+	s.SealsPL.On("Size").Return(uint(0)).Maybe()                       // for metrics
+	s.SealsPL.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe() // noop on pruning
 }
 
 func (s *BaseAssignmentCollectorTestSuite) MarkFinalized(block *flow.Header) {
