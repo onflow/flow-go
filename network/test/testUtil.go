@@ -202,15 +202,15 @@ func GenerateNetworks(t *testing.T,
 	return nets
 }
 
-// returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness connect events
+// returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
 	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable) {
 
-	ids, libP2PNodes, connectObservables := GenerateIDs(t, logger, n, dryRunMode, opts...)
+	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, opts...)
 	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
-	return ids, mws, connectObservables
+	return ids, mws, protectObservables
 }
 
 func GenerateIDsMiddlewaresNetworks(t *testing.T,

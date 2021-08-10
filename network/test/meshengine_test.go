@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,11 +50,12 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 
-	// set up a channl to receive pubsub tags from connManagers of the nodes
+	// set up a channel to receive pubsub tags from connManagers of the nodes
 	var obs []observable.Observable
 	peerChannel := make(chan string)
-	ob := TagsObserver{
+	ob := tagsObserver{
 		tags: peerChannel,
+		log:  logger,
 	}
 
 	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
@@ -163,10 +165,13 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	}
 
 	// allow nodes to heartbeat and discover each other
-	// each node will register ~D protect messages, where D is the default out-degree (6)
-	// see https://github.com/libp2p/go-libp2p-pubsub/blob/0c7092d1f50091ae88407ba93103ac5868da3d0a/gossipsub.go#L33
-	for i := 0; i < 6*count; i++ {
-		<-suite.obs
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
 	}
 
 	// Each node broadcasting a message to all others
@@ -239,10 +244,13 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	}
 
 	// allow nodes to heartbeat and discover each other
-	// each node will register ~D protect messages, where D is the default out-degree (6)
-	// see https://github.com/libp2p/go-libp2p-pubsub/blob/0c7092d1f50091ae88407ba93103ac5868da3d0a/gossipsub.go#L33
-	for i := 0; i < 6*count; i++ {
-		<-suite.obs
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
 	}
 
 	// choose half of the nodes as target
@@ -296,10 +304,13 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	}
 
 	// allow nodes to heartbeat and discover each other
-	// each node will register ~D protect messages per mesh setup, where D is the default out-degree (6)
-	// see https://github.com/libp2p/go-libp2p-pubsub/blob/0c7092d1f50091ae88407ba93103ac5868da3d0a/gossipsub.go#L33
-	for i := 0; i < 6*count; i++ {
-		<-suite.obs
+	// each node will register ~D protect messages per mesh setup, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
 	}
 	// others keeps the identifier of all nodes except node that is sender.
 	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
@@ -346,10 +357,13 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	}
 
 	// allow nodes to heartbeat and discover each other
-	// each node will register ~D protect messages, where D is the default out-degree (6)
-	// see https://github.com/libp2p/go-libp2p-pubsub/blob/0c7092d1f50091ae88407ba93103ac5868da3d0a/gossipsub.go#L33
-	for i := 0; i < 6*count; i++ {
-		<-suite.obs
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
 	}
 
 	// unregister a random engine from the test topic by calling close on it's conduit

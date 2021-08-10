@@ -28,11 +28,12 @@ import (
 
 const testChannel = "test-channel"
 
-type TagsObserver struct {
+type tagsObserver struct {
 	tags chan string
+	log  zerolog.Logger
 }
 
-func (co *TagsObserver) OnNext(peertag interface{}) {
+func (co *tagsObserver) OnNext(peertag interface{}) {
 	pt, ok := peertag.(PeerTag)
 
 	if ok {
@@ -40,10 +41,11 @@ func (co *TagsObserver) OnNext(peertag interface{}) {
 	}
 
 }
-func (co *TagsObserver) OnError(err error) {
+func (co *tagsObserver) OnError(err error) {
+	co.log.Error().Err(err).Msg("Tags Observer closed on an error")
 	close(co.tags)
 }
-func (co *TagsObserver) OnComplete() {
+func (co *tagsObserver) OnComplete() {
 	close(co.tags)
 }
 
@@ -73,8 +75,9 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	// create and start the middlewares and inject a connection observer
 	var obs []observable.Observable
 	peerChannel := make(chan string)
-	ob := TagsObserver{
+	ob := tagsObserver{
 		tags: peerChannel,
+		log:  logger,
 	}
 
 	m.ids, m.mws, obs = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
@@ -390,7 +393,11 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 
 	// set up waiting for m.size pubsub tags indicating a mesh has formed
 	for i := 0; i < m.size; i++ {
-		<-m.obs
+		select {
+		case <-m.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(m.T(), "could not receive pubsub tag indicating mesh formed")
+		}
 	}
 
 	origin := 0
