@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 // MeshEngine is a simple engine that is used for testing the correctness of
 // driving the engines with libp2p, it simply receives and stores the incoming messages
 type MeshEngine struct {
+	sync.Mutex
 	t        *testing.T
 	con      network.Conduit      // used to directly communicate with the network
 	originID flow.Identifier      // used to keep track of the id of the sender of the messages
@@ -64,6 +66,9 @@ func (e *MeshEngine) ProcessLocal(event interface{}) error {
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // MeshEngine. It then flags the received channel on reception of an event.
 func (e *MeshEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
+	e.Lock()
+	defer e.Unlock()
+
 	// stores the message locally
 	e.originID = originID
 	e.channel <- channel
