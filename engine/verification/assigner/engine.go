@@ -29,6 +29,7 @@ type Engine struct {
 	tracer                module.Tracer
 	me                    module.Local
 	state                 protocol.State
+	blocks                storage.Blocks
 	assigner              module.ChunkAssigner      // to determine chunks this node should verify.
 	chunksQueue           storage.ChunksQueue       // to store chunks to be verified.
 	newChunkListener      module.NewJobListener     // to notify chunk queue consumer about a new chunk.
@@ -41,6 +42,7 @@ func New(
 	tracer module.Tracer,
 	me module.Local,
 	state protocol.State,
+	blocks storage.Blocks,
 	assigner module.ChunkAssigner,
 	chunksQueue storage.ChunksQueue,
 	newChunkListener module.NewJobListener,
@@ -52,6 +54,7 @@ func New(
 		tracer:           tracer,
 		me:               me,
 		state:            state,
+		blocks:           blocks,
 		assigner:         assigner,
 		chunksQueue:      chunksQueue,
 		newChunkListener: newChunkListener,
@@ -63,7 +66,24 @@ func (e *Engine) WithBlockConsumerNotifier(notifier module.ProcessingNotifier) {
 }
 
 func (e *Engine) Ready() <-chan struct{} {
+	e.reprocessBlock(uint64(39596045))
 	return e.unit.Ready()
+}
+
+// a debugging function to re-process a certain block in order to reproduce the issue in
+// the some verification work of that block
+func (e *Engine) reprocessBlock(height uint64) {
+	header, err := e.state.AtHeight(height).Head()
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("could not find block at height: %v", height)
+	}
+
+	block, err := e.blocks.ByID(header.ID())
+	if err != nil {
+		e.log.Fatal().Err(err).Msgf("could not find block body for height: %v", height)
+	}
+
+	e.ProcessFinalizedBlock(block)
 }
 
 func (e *Engine) Done() <-chan struct{} {

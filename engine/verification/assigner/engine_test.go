@@ -28,6 +28,7 @@ type AssignerEngineTestSuite struct {
 	tracer           *trace.NoopTracer
 	assigner         *module.ChunkAssigner
 	chunksQueue      *storage.ChunksQueue
+	blocks           *storage.Blocks
 	newChunkListener *module.NewJobListener
 	notifier         *module.ProcessingNotifier
 
@@ -111,6 +112,7 @@ func NewAssignerEngine(s *AssignerEngineTestSuite) *assigner.Engine {
 		s.tracer,
 		s.me,
 		s.state,
+		s.blocks,
 		s.assigner,
 		s.chunksQueue,
 		s.newChunkListener)

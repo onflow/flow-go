@@ -189,14 +189,15 @@ func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow
 func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 	// skips processing a chunk if it belongs to a sealed block.
 	chunkID := chunk.ID()
-	sealed, blockHeight, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
+	_, blockHeight, err := e.blockIsSealed(chunk.ChunkBody.BlockID)
 	if err != nil {
 		return false, 0, fmt.Errorf("could not determine whether block has been sealed: %w", err)
 	}
-	if sealed {
-		e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
-		return false, blockHeight, nil
-	}
+	// verify the chunk anyway regardless it's sealed or not.
+	// if sealed {
+	// 	e.chunkConsumerNotifier.Notify(chunkLocatorID) // tells consumer that we are done with this chunk.
+	// 	return false, blockHeight, nil
+	// }
 
 	// adds chunk status as a pending chunk to mempool.
 	status := &verification.ChunkStatus{

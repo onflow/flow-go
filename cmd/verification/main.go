@@ -235,6 +235,7 @@ func main() {
 				node.Tracer,
 				node.Me,
 				node.State,
+				node.Storage.Blocks,
 				chunkAssigner,
 				chunkQueue,
 				chunkConsumer)

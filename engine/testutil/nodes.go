@@ -764,6 +764,7 @@ func VerificationNode(t testing.TB,
 			node.Tracer,
 			node.Me,
 			node.State,
+			node.Blocks,
 			assigner,
 			node.ChunksQueue,
 			node.ChunkConsumer)
