@@ -84,16 +84,24 @@ func (csm *StateMachine) Status() hotstuff.VoteCollectorStatus {
 	return csm.atomicLoadCollector().Status()
 }
 
-func (csm *StateMachine) ChangeProcessingStatus(expectedCurrentStatus, newStatus hotstuff.VoteCollectorStatus) error {
+// ChangeProcessingStatus changes the VoteCollector's internal processing
+// status. The operation is implemented as an atomic compare-and-swap, i.e. the
+// state transition is only executed if VoteCollector's internal state is
+// equal to `expectedValue`. The return indicates whether the state was updated.
+// The implementation only allows the transitions
+//         CachingVotes   -> VerifyingVotes
+//         CachingVotes   -> Invalid
+//         VerifyingVotes -> Invalid
+func (csm *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.VoteCollectorStatus) error {
 	// don't transition between same states
-	if expectedCurrentStatus == newStatus {
+	if currentStatus == newStatus {
 		return nil
 	}
 
-	if (expectedCurrentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
+	if (currentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
 		cachingCollector, err := csm.caching2Verifying()
 		if err != nil {
-			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), err)
+			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", currentStatus.String(), newStatus.String(), err)
 		}
 
 		csm.workerPool.Submit(func() {
@@ -106,7 +114,9 @@ func (csm *StateMachine) ChangeProcessingStatus(expectedCurrentStatus, newStatus
 		return nil
 	}
 
-	return fmt.Errorf("cannot transition from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), ErrInvalidCollectorStateTransition)
+	// TODO: handle state transition from caching to invalid
+
+	return fmt.Errorf("cannot transition from %s to %s: %w", currentStatus.String(), newStatus.String(), ErrInvalidCollectorStateTransition)
 }
 
 // caching2Verifying ensures that the collector is currently in state `CachingVotes`

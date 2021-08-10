@@ -62,8 +62,9 @@ type VoteCollector interface {
 	// state transition is only executed if VoteCollector's internal state is
 	// equal to `expectedValue`. The return indicates whether the state was updated.
 	// The implementation only allows the transitions
-	//         CachingVotes -> VerifyingVotes
-	//    and                  VerifyingVotes -> Invalid
+	//         CachingVotes   -> VerifyingVotes
+	//         CachingVotes   -> Invalid
+	//         VerifyingVotes -> Invalid
 	// Error returns:
 	// * nil if the state transition was successfully executed
 	// * ErrDifferentCollectorState if the VoteCollector's state is different than expectedCurrentStatus
