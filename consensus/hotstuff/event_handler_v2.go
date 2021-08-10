@@ -4,11 +4,14 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EventHandler runs a state machine to process proposals, QC and local timeouts.
-type EventHandler interface {
-	OnReceiveVote(vote *model.Vote) error
+type EventHandlerV2 interface {
+
+	// OnQCConstructed processes a valid qc constructed by internal vote aggregator.
+	OnQCConstructed(qc *flow.QuorumCertificate) error
 
 	// OnReceiveProposal processes a block proposal received fro another HotStuff
 	// consensus participant.
