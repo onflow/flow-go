@@ -158,21 +158,21 @@ func (e *Engine) onChunkDataRequest(
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
 
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkID)).
 		Logger()
 
-	log.Debug().Msg("received chunk data pack request")
+	lg.Debug().Msg("received chunk data pack request")
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
+	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
-		log.Warn().Msg("chunk not found")
+		lg.Warn().Msg("chunk data pack not found")
 		return nil
 	}
 
@@ -180,33 +180,22 @@ func (e *Engine) onChunkDataRequest(
 		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
 	}
 
-	origin, err := e.ensureStaked(cdp.ChunkID, originID)
+	origin, err := e.ensureStaked(chunkDataPack.ChunkID, originID)
 	if err != nil {
 		return err
 	}
 
-	var collection flow.Collection
-	if cdp.CollectionID != flow.ZeroID {
-		// retrieves collection of non-zero chunks
-		coll, err := e.execState.GetCollection(cdp.CollectionID)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
-		}
-		collection = *coll
-	}
-
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *cdp,
+		ChunkDataPack: *chunkDataPack,
 		Nonce:         rand.Uint64(),
-		Collection:    collection,
 	}
 
 	sinceProcess := time.Since(processStart)
 
-	log = log.With().Dur("sinceProcess", sinceProcess).Logger()
+	lg = lg.With().Dur("sinceProcess", sinceProcess).Logger()
 
 	if sinceProcess > e.chdpQueryTimeout {
-		log.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
+		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
 
 	// sends requested chunk data pack to the requester
@@ -216,20 +205,26 @@ func (e *Engine) onChunkDataRequest(
 		err := e.chunksConduit.Unicast(response, originID)
 
 		sinceDeliver := time.Since(deliveryStart)
-		log = log.With().Dur("since_deliver", sinceDeliver).Logger()
+		lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
 
 		if sinceDeliver > e.chdpDeliveryTimeout {
-			log.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
+			lg.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
 		}
 
 		if err != nil {
-			log.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
+			lg.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
 			return
 		}
 
-		log.Debug().
-			Hex("collection_id", logging.ID(response.Collection.ID())).
-			Msg("chunk data pack request successfully replied")
+		if response.ChunkDataPack.Collection != nil {
+			// logging collection id of non-system chunks.
+			// A system chunk has both the collection and collection id set to nil.
+			lg = lg.With().
+				Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
+				Logger()
+		}
+
+		lg.Debug().Msg("chunk data pack request successfully replied")
 	})
 
 	return nil

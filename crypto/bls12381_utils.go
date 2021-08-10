@@ -134,6 +134,8 @@ func readScalar(x *scalar, src []byte) {
 }
 
 // writePointG2 writes a G2 point in a slice of bytes
+// The slice should be of size PubKeyLenBLSBLS12381 and the serialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG2(dest []byte, a *pointG2) {
 	C.ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
@@ -141,7 +143,19 @@ func writePointG2(dest []byte, a *pointG2) {
 	)
 }
 
-// readVerifVector reads a G2 point from a slice of bytes
+// writePointG1 writes a G1 point in a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the serialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
+func writePointG1(dest []byte, a *pointG1) {
+	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
+		(*C.ep_st)(a),
+		(C.int)(signatureLengthBLSBLS12381),
+	)
+}
+
+// readPointG2 reads a G2 point from a slice of bytes
+// The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func readPointG2(a *pointG2, src []byte) error {
 	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
@@ -153,6 +167,45 @@ func readPointG2(a *pointG2, src []byte) error {
 	default:
 		return errors.New("reading a G2 point has failed")
 	}
+}
+
+// readPointG1 reads a G1 point from a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the deserialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
+func readPointG1(a *pointG1, src []byte) error {
+	switch C.ep_read_bin_compact((*C.ep_st)(a),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("input is not a G1 point")
+	default:
+		return errors.New("reading a G1 point has failed")
+	}
+}
+
+// This is only a TEST function.
+// It wraps calls to subgroup checks since cgo can't be used
+// in go test files.
+//
+// This wraps a subgroup check in G1
+func checkInG1Test(pt *pointG1) bool {
+	return C.check_membership_G1((*C.ep_st)(pt)) == valid
+}
+
+// This is only a TEST function.
+// It wraps calls to the relic hash-to-G1 map since cgo can't be used
+// in go test files.
+//
+// This map uses, by default, XMD:SH256 for hash-to-field, and can be
+// configured to use several XMD:(SHA|BS) variants, see:
+// https://github.com/relic-toolkit/relic/blob/43f2cd4695ff29a35dfab5bbf368439d4ff20d14/include/relic_md.h
+//
+// TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
+// ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
+func mapToG1RelicTest(dest *pointG1, msg, dst []byte) {
+	C.ep_map_dst((*C.ep_st)(dest), (*C.uchar)(&msg[0]), (C.int)(len(msg)), (*C.uchar)(&dst[0]), (C.int)(len(dst)))
 }
 
 // This is only a TEST function.

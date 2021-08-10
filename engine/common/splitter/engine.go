@@ -29,14 +29,12 @@ func New(
 	log zerolog.Logger,
 	channel network.Channel,
 ) *Engine {
-	e := &Engine{
+	return &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "splitter").Logger(),
 		engines: make(map[module.Engine]struct{}),
 		channel: channel,
 	}
-
-	return e
 }
 
 // RegisterEngine registers a new engine with the splitter. Events
@@ -95,6 +93,10 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
+		if channel != e.channel {
+			e.log.Fatal().Err(fmt.Errorf("received event on unknown channel")).Str("channel", channel.String())
+		}
+
 		e.enginesMu.RLock()
 		defer e.enginesMu.RUnlock()
 		for eng := range e.engines {
