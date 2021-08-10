@@ -65,6 +65,9 @@ func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resol
 
 // LookupIPAddr implements BasicResolver interface for libp2p.
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	r.Lock()
+	defer r.Unlock()
+
 	started := time.Now()
 
 	addr, err := r.lookupIPAddr(ctx, domain)
@@ -94,6 +97,9 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 
 // LookupTXT implements BasicResolver interface for libp2p.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
+	r.Lock()
+	defer r.Unlock()
+
 	started := time.Now()
 
 	addr, err := r.lookupTXT(ctx, txt)
@@ -123,9 +129,6 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 // resolveIPCache resolves the domain through the cache if it is available.
 func (r *Resolver) resolveIPCache(domain string) ([]net.IPAddr, bool) {
-	r.Lock()
-	defer r.Unlock()
-
 	entry, ok := r.ipCache[domain]
 
 	if !ok {
@@ -143,9 +146,6 @@ func (r *Resolver) resolveIPCache(domain string) ([]net.IPAddr, bool) {
 
 // resolveIPCache resolves the txt through the cache if it is available.
 func (r *Resolver) resolveTXTCache(txt string) ([]string, bool) {
-	r.Lock()
-	defer r.Unlock()
-
 	entry, ok := r.txtCache[txt]
 
 	if !ok {
@@ -163,9 +163,6 @@ func (r *Resolver) resolveTXTCache(txt string) ([]string, bool) {
 
 // updateIPCache updates the cache entry for the domain.
 func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.ipCache[domain] = &ipCacheEntry{
 		addresses: addr,
 		timestamp: time.Now(),
@@ -174,9 +171,6 @@ func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
 
 // updateTXTCache updates the cache entry for the txt.
 func (r *Resolver) updateTXTCache(txt string, addr []string) {
-	r.Lock()
-	defer r.Unlock()
-
 	r.txtCache[txt] = &txtCacheEntry{
 		addresses: addr,
 		timestamp: time.Now(),
