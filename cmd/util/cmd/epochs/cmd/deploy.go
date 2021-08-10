@@ -22,6 +22,7 @@ import (
 )
 
 const deployArgsFileName = "deploy-epoch-args.json"
+const deployTxFileName = "deploy-epoch-tx.cdc"
 
 // deployCmd represents a command to generate `deploy_epoch_relative` transaction arguments and writes it to the
 // working directory this command was run.
@@ -103,6 +104,10 @@ func deployRun(cmd *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
 	log.Info().Str("path", argsPath).Msg("wrote `deploy_epoch_relative` transaction arguments")
+
+	// write the transaction text to a file
+	tx := getDeployEpochTransactionText(snapshot)
+	err = io.WriteFile(deployTxFileName, tx)
 }
 
 // getDeployEpochTransactionArguments pulls out required arguments for the `deploy_epoch_relative` transaction from the root
