@@ -244,15 +244,17 @@ func (e *blockComputer) executeSystemCollection(
 
 	if err != nil {
 		return txIndex, err
-	} else if res.TransactionResults[txIndex].ErrorMessage != ""{
+	}
+	if res.TransactionResults[txIndex].ErrorMessage != "" {
 		// This log is used as the data source for an alert on grafana.
 		// The system_chunk_error field must not be changed without adding the corresponding
 		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
-		e.log.Err(fmt.Errorf(res.TransactionResults[txIndex].ErrorMessage)).
+		e.log.Error().
+			Str("error_message", res.TransactionResults[txIndex].ErrorMessage).
 			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
-			Str("system_chunk_error", "true").
-			Str("critical_error", "true").
-			Msgf("error executing system chunk transaction")
+			Bool("system_chunk_error", true).
+			Bool("critical_error", true).
+			Msg("error executing system chunk transaction")
 
 		return txIndex, err
 	}
