@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
 	"github.com/onflow/flow-go/engine/common/requester"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
@@ -129,6 +131,7 @@ type FlowAccessNodeBuilder struct {
 	SyncCore                   *synchronization.Core
 	RpcEng                     *rpc.Engine
 	FinalizationDistributor    *pubsub.FinalizationDistributor
+	FinalizedHeader            *synceng.FinalizedHeaderCache
 	CollectionRPC              access.AccessAPIClient
 	ConCache                   *buffer.PendingBlocks // pending block cache for follower
 	TransactionTimings         *stdmap.TransactionTimings
@@ -173,7 +176,8 @@ func (builder *FlowAccessNodeBuilder) parseFlags() {
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
+	nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
@@ -191,7 +195,8 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier,
 		},
 	}
 
-	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(builder.Logger,
+	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
+		builder.Logger,
 		nodeID,
 		builder.unstakedNetworkBindAddr,
 		networkKey,
