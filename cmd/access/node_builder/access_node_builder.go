@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
@@ -579,13 +580,22 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	nodeID flow.Identifier,
 	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
+	// The staked nodes act as the DHT servers
+	dhtOptions := []dht.Option{p2p.AsServer(builder.IsStaked())}
+
+	// if this is an unstaked access node, then seed the DHT with the boostrap identities
+	if !builder.IsStaked() {
+		bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentites)
+		builder.MustNot(err)
+		dhtOptions = append(dhtOptions, bootstrapPeersOpt)
+	}
+
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.unstakedNetworkBindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID().String()).
 			// unlike the staked network where currently all the node addresses are known upfront,
 			// for the unstaked network the nodes need to discover each other using DHT Discovery.
-			// The staked nodes act as the DHT servers
-			SetPubsubOptions(p2p.WithDHTDiscovery(p2p.AsServer(builder.IsStaked()))).
+			SetPubsubOptions(p2p.WithDHTDiscovery(dhtOptions...)).
 			SetLogger(builder.Logger).
 			Build(ctx)
 		if err != nil {
