@@ -637,16 +637,23 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	require.NoError(t, err)
 
 	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(log,
-		identity.NodeID,
-		identity.Address,
-		NewConnManager(log, noopMetrics),
-		key,
-		allowList,
-		rootID,
-		pingInfoProvider,
-		resolver)
+	connManager := NewConnManager(log, noopMetrics)
+
+	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
+		SetRootBlockID(rootID).
+		SetConnectionManager(connManager).
+		SetPingInfoProvider(pingInfoProvider).
+		SetLogger(log)
+
+	if allowList {
+		connGater := NewConnGater(log)
+		builder.SetConnectionGater(connGater)
+	}
+
+	ctx := context.Background()
+	n, err := builder.Build(ctx)
 	require.NoError(t, err)
+
 	n.SetFlowProtocolStreamHandler(handlerFunc)
 
 	require.Eventuallyf(t, func() bool {

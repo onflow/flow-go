@@ -1,6 +1,7 @@
-package main
+package node_builder
 
 import (
+	"context"
 	"strings"
 	"time"
 
@@ -25,9 +26,12 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 
 func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	builder.Cancel = cancel
+
 	builder.validateParams()
 
-	builder.enqueueUnstakedNetworkInit()
+	builder.enqueueUnstakedNetworkInit(ctx)
 
 	builder.EnqueueMetricsServerInit()
 
@@ -74,7 +78,7 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
-func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -90,7 +94,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
 		// network metrics
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
+		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
 		builder.MustNot(err)
 
 		// use the default validators for the staked access node unstaked networks
@@ -100,6 +104,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		peerUpdateInterval := time.Hour
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+			node.UnicastMessageTimeout,
 			false, // no connection gating for the unstaked network
 			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 			msgValidators...)
