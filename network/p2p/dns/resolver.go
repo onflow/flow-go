@@ -15,6 +15,7 @@ import (
 //go:linkname runtimeNano runtime.nanotime
 func runtimeNano() int64
 
+// defaultTimeToLive is the default duration a dns result is cached.
 const defaultTimeToLive = 5 * time.Minute
 
 // Resolver is a cache-based dns resolver for libp2p.
