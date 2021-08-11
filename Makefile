@@ -29,30 +29,21 @@ K8S_YAMLS_LOCATION_STAGING=./k8s/staging
 export CONTAINER_REGISTRY := gcr.io/flow-container-registry
 export DOCKER_BUILDKIT := 1
 
-# relic versions in script and submodule
-export LOCAL_VERSION := $(shell git submodule status | egrep '\s[0-9a-f]' | cut -c 2-9)
-export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{8}"' ./crypto/build_dependency.sh| cut -c 16-23)
-
-.PHONY: crypto/relic
-crypto/relic:
-	rm -rf crypto/relic
-	git submodule update --init --recursive
-
 .PHONY: crypto/relic/build
-crypto/relic/build: crypto/relic
-	./crypto/relic_build.sh
+crypto/relic/build:
+	cd ./crypto &&	go generate
+
+# relic versions in script and submodule
+export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
+export SCRIPT_VERSION := $(shell egrep 'relic_version="[0-9a-f]{40}"' ./crypto/build_dependency.sh | cut -c 16-55)
 
 .PHONY: crypto/relic/check
 crypto/relic/check:
 ifeq ($(SCRIPT_VERSION), $(LOCAL_VERSION))
-	@echo "Relic submodule version matches script, good!"
+	@echo "local relic version matches the version required by the crypto package"
 else
-	$(error Mismatch between relic submodule commit and the version in ./crypto/build_dependency.sh)
+	$(error local relic version doesn't match the version required by the crypto package)
 endif
-
-
-crypto/relic/update:
-	git submodule update --recursive
 
 cmd/collection/collection:
 	go build -o cmd/collection/collection cmd/collection/main.go
@@ -110,6 +101,7 @@ generate-proto:
 
 .PHONY: generate-mocks
 generate-mocks:
+	GO111MODULE=on mockery -name '(ReadyDoneAwareNetwork|Connector|PingInfoProvider)' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockgen -destination=storage/mocks/storage.go -package=mocks github.com/onflow/flow-go/storage Blocks,Headers,Payloads,Collections,Commits,Events,ServiceEvents,TransactionResults
 	GO111MODULE=on mockgen -destination=module/mocks/network.go -package=mocks github.com/onflow/flow-go/module Network,Local,Requester
 	GO111MODULE=on mockgen -destination=network/mocknetwork/engine.go -package=mocknetwork github.com/onflow/flow-go/network Engine
@@ -131,7 +123,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'SubscriptionManager' -dir=network/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./module/forest" -case=underscore -output="./module/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
@@ -147,7 +138,7 @@ generate-mocks:
 
 # this ensures there is no unused dependency being added by accident
 .PHONY: tidy
-tidy: crypto/relic/check
+tidy:
 	go mod tidy
 	cd integration; go mod tidy
 	cd crypto; go mod tidy

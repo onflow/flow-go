@@ -5,6 +5,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// OnQCCreated is a callback which will be used by VoteCollector to submit a QC when it's able to create it
+type OnQCCreated func(*flow.QuorumCertificate)
+
 // VoteCollectorStatus indicates the VoteCollector's status
 // It has three different status.
 type VoteCollectorStatus int
@@ -23,33 +26,48 @@ const (
 	VoteCollectorStatusInvalid
 )
 
-// VoteCollectors holds a map from block ID to vote collector state machine.
-// It manages the concurrent access to the map.
-type VoteCollectors interface {
-	// Get finds a vote collector state machine by the block ID.
-	// It returns the vote collector state machine and true if found,
-	// It returns nil and false if not found
-	GetOrCreate(blockID flow.Identifier) (VoteCollectorStateMachine, bool)
-
-	// ProcessBlock triggers the state transition of the vote colletor state machine from
-	// caching status to verifying status.
-	ProcessBlock(block model.Proposal) error
-
-	// Prune the vote collectors whose view is below the given view
-	PruneByView(view uint64) error
-}
-
-// VoteCollectorStateMachine is the state machine for transitioning different status of the vote collector
-type VoteCollectorStateMachine interface {
-	VoteCollector() VoteCollector
-}
-
 // VoteCollector collects votes for the same block, produces QC when enough votes are collected
 // VoteCollector takes a callback function to report the event that a QC has been produced.
+var collectorStatusNames = [...]string{"VoteCollectorStatusCaching",
+	"VoteCollectorStatusVerifying",
+	"VoteCollectorStatusInvalid"}
+
+func (ps VoteCollectorStatus) String() string {
+	if ps < 0 || int(ps) > len(collectorStatusNames) {
+		return "UNKNOWN"
+	}
+	return collectorStatusNames[ps]
+}
+
 type VoteCollector interface {
+	VoteCollectorState
+	// ChangeProcessingStatus changes the VoteCollector's internal processing
+	// status. The operation is implemented as an atomic compare-and-swap, i.e. the
+	// state transition is only executed if VoteCollector's internal state is
+	// equal to `expectedValue`. The return indicates whether the state was updated.
+	// The implementation only allows the transitions
+	//         CachingVotes   -> VerifyingVotes
+	//         CachingVotes   -> Invalid
+	//         VerifyingVotes -> Invalid
+	// Error returns:
+	// * nil if the state transition was successfully executed
+	// * ErrDifferentCollectorState if the VoteCollector's state is different than expectedCurrentStatus
+	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
+	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
+	ChangeProcessingStatus(expectedValue, newValue VoteCollectorStatus) error
+
+	// ProcessBlock performs validation of block signature and processes block with respected collector.
+	// Calling this function will mark conflicting collector as stale and change state of valid collectors
+	// It returns nil if the block is valid.
+	// It returns model.InvalidBlockError if block is invalid.
+	// It returns other error if there is exception processing the block.
+	ProcessBlock(block *model.Block) error
+}
+
+// VoteCollectorState collects votes for the same block, produces QC when enough votes are collected
+// VoteCollectorState takes a callback function to report the event that a QC has been produced.
+type VoteCollectorState interface {
 	// AddVote adds a vote to the collector
-	// returns true if the vote was added
-	// returns false otherwise
 	// return error if the signature is invalid
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
 	// passed to EventLoop through a callback.
