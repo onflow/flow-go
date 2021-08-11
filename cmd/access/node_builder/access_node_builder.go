@@ -86,7 +86,7 @@ type AccessNodeConfig struct {
 	staked                       bool
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
-	bootstrapIdentites flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	bootstrapIdentites           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	unstakedNetworkBindAddr      string
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
