@@ -37,24 +37,6 @@ func (ps VoteCollectorStatus) String() string {
 	return collectorStatusNames[ps]
 }
 
-// VoteCollectorState collects votes for the same block, produces QC when enough votes are collected
-// VoteCollectorState takes a callback function to report the event that a QC has been produced.
-type VoteCollectorState interface {
-	// AddVote adds a vote to the collector
-	// return error if the signature is invalid
-	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
-	// passed to EventLoop through a callback.
-	// ToDo: document sentinel errors expected during normal operation
-	AddVote(vote *model.Vote) error
-
-	// BlockID returns the block ID that this instance is collecting votes for.
-	// This method is useful when adding the newly created vote collector to vote collectors map.
-	BlockID() flow.Identifier
-
-	// Status returns the status of the vote collector
-	Status() VoteCollectorStatus
-}
-
 type VoteCollector interface {
 	VoteCollectorState
 	// ChangeProcessingStatus changes the VoteCollector's internal processing
@@ -71,4 +53,29 @@ type VoteCollector interface {
 	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
 	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
 	ChangeProcessingStatus(expectedValue, newValue VoteCollectorStatus) error
+
+	// ProcessBlock performs validation of block signature and processes block with respected collector.
+	// Calling this function will mark conflicting collector as stale and change state of valid collectors
+	// It returns nil if the block is valid.
+	// It returns model.InvalidBlockError if block is invalid.
+	// It returns other error if there is exception processing the block.
+	ProcessBlock(block *model.Block) error
+}
+
+// VoteCollectorState collects votes for the same block, produces QC when enough votes are collected
+// VoteCollectorState takes a callback function to report the event that a QC has been produced.
+type VoteCollectorState interface {
+	// AddVote adds a vote to the collector
+	// return error if the signature is invalid
+	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
+	// passed to EventLoop through a callback.
+	// ToDo: document sentinel errors expected during normal operation
+	AddVote(vote *model.Vote) error
+
+	// BlockID returns the block ID that this instance is collecting votes for.
+	// This method is useful when adding the newly created vote collector to vote collectors map.
+	BlockID() flow.Identifier
+
+	// Status returns the status of the vote collector
+	Status() VoteCollectorStatus
 }
