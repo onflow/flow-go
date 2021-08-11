@@ -80,6 +80,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetPubsubOptions(psOptions...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
+			SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
@@ -91,6 +92,7 @@ type NodeBuilder interface {
 	SetPubsubOptions(...pubsub.Option) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
+	SetResolver(resolver *madns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -101,6 +103,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
+	resolver         *madns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []pubsub.Option
@@ -148,6 +151,11 @@ func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBu
 	return builder
 }
 
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) NodeBuilder {
+	builder.resolver = resolver
+	return builder
+}
+
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
 		id:     builder.id,
@@ -183,6 +191,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
+	}
+
+	if builder.resolver != nil { // sets DNS resolver
+		opts = append(opts, libp2p.MultiaddrResolver(builder.resolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -579,7 +591,8 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
+func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
+	error) {
 	defaultOptions, err := DefaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
@@ -630,7 +643,6 @@ func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
 		libp2p.Identity(libp2pKey),          // pass in the networking key
 		transport,                           // set the protocol
-		libp2p.MultiaddrResolver(resolver),
 	}
 
 	return options, nil
