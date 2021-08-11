@@ -18,7 +18,9 @@ type SigValidator interface {
 	// return model.InvalidBlockError if the block's signature is invalid
 	// return other error if there is exception
 	ValidateBlock(block *model.Proposal) error
+}
 
+type QCValidator interface {
 	// return nil if the QC's signature is valid
 	// return model.InvalidBlockError if the QC's signature is invalid
 	// return other error if there is exception
