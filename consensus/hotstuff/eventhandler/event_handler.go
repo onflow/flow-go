@@ -330,7 +330,7 @@ func (e *EventHandler) startNewView() error {
 // events are only for HotStuff-External components. The interaction of the HotStuff-internal
 // components is directly handled by the EventHandler.
 func (e *EventHandler) pruneSubcomponents() {
-	e.voteAggregator.PruneUpToView(e.forks.FinalizedView())
+	e.voteAggregator.PruneByView(e.forks.FinalizedView())
 }
 
 // processBlockForCurrentView processes the block for the current view.

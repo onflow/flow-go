@@ -11,5 +11,5 @@ import (
 // TestVerifyingVoteCollector_ProcessingStatus tests that processing status is expected
 func TestVerifyingVoteCollector_ProcessingStatus(t *testing.T) {
 	collector := NewConsensusClusterVoteCollector(CollectionBase{})
-	require.Equal(t, hotstuff.VoteCollectorStatusVerifying, collector.Status())
+	require.Equal(t, hotstuff.VoteCollectorStatus(hotstuff.VoteCollectorStatusVerifying), collector.Status())
 }

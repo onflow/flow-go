@@ -33,7 +33,7 @@ func (ps *PendingVotes) AddVote(vote *model.Vote) bool {
 func (ps *PendingVotes) All() []*model.Vote {
 	ps.lock.RLock()
 	defer ps.lock.RUnlock()
-	votes := make([]*model.Vote, 0, len(ps.orderedVotes))
+	votes := make([]*model.Vote, len(ps.orderedVotes))
 	copy(votes, ps.orderedVotes)
 	return votes
 }

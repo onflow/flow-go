@@ -47,7 +47,7 @@ func TestCachingVoteCollector_AddVote(t *testing.T) {
 func TestCachingVoteCollector_ProcessingStatus(t *testing.T) {
 	t.Parallel()
 	collector := NewCachingVoteCollector(NewCollectionBase(unittest.IdentifierFixture()))
-	require.Equal(t, hotstuff.CachingVotes, collector.ProcessingStatus())
+	require.Equal(t, hotstuff.VoteCollectorStatus(hotstuff.VoteCollectorStatusCaching), collector.Status())
 }
 
 // TestCachingVoteCollector_BlockID tests that blockID is expected

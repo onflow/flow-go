@@ -945,7 +945,7 @@ func (as *AggregatorSuite) newMockVote(view uint64, blockID flow.Identifier, sig
 }
 
 func getStateLength(aggregator *VoteAggregator) (uint64, int, int, int, int) {
-	return aggregator.highestPrunedView, len(aggregator.viewToBlockIDSet), len(aggregator.viewToVoteID), len(aggregator.queuedVotes.votes), len(aggregator.blockIDToVotingStatus)
+	return aggregator.highestPrunedView, len(aggregator.viewToBlockIDSet), len(aggregator.viewToVoteID), len(aggregator.pendingVotes.votes), len(aggregator.blockIDToVotingStatus)
 }
 
 func (as *AggregatorSuite) qcForBlock(proposal *model.Proposal, expectedQcContributors *expectedQcContributors) interface{} {
