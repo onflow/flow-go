@@ -21,37 +21,31 @@ const defaultTimeToLive = 5 * time.Minute
 // Resolver is a cache-based dns resolver for libp2p.
 type Resolver struct {
 	sync.RWMutex
-	ttl       time.Duration // time-to-live for cache entry
-	res       madns.BasicResolver
+	ttl       time.Duration       // time-to-live for cache entry
+	res       madns.BasicResolver // underlying resolver
 	collector module.ResolverMetrics
 	ipCache   map[string]*ipCacheEntry
 	txtCache  map[string]*txtCacheEntry
 }
 
-type ipCacheEntry struct {
-	addresses []net.IPAddr
-	timestamp int64
-}
-
-type txtCacheEntry struct {
-	addresses []string
-	timestamp int64
-}
-
+// optFunc is the option function for Resolver.
 type optFunc func(resolver *Resolver)
 
+// WithBasicResolver is an option function for setting the basic resolver of this Resolver.
 func WithBasicResolver(basic madns.BasicResolver) func(resolver *Resolver) {
 	return func(resolver *Resolver) {
 		resolver.res = basic
 	}
 }
 
+// WithTTL is an option function for setting the time to live for cache entries.
 func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 	return func(resolver *Resolver) {
 		resolver.ttl = ttl
 	}
 }
 
+// NewResolver is the factory function for creating an instance of this resolver.
 func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Resolver, error) {
 	resolver := &Resolver{
 		res:       madns.DefaultResolver,
@@ -68,7 +62,7 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Reso
 	return madns.NewResolver(madns.WithDefaultResolver(resolver))
 }
 
-// LookupIPAddr implements BasicResolver interface for libp2p.
+// LookupIPAddr implements BasicResolver interface for libp2p for looking up ip addresses through resolver.
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	r.Lock()
 	defer r.Unlock()
@@ -82,6 +76,7 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	return addr, err
 }
 
+// lookupIPAddr encapsulates the logic of resolving an ip address through cache.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	if addr, ok := r.resolveIPCache(domain); ok {
 		// resolving address from cache
