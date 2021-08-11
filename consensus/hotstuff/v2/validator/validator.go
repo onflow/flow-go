@@ -15,14 +15,14 @@ import (
 type Validator struct {
 	committee hotstuff.Committee
 	forks     hotstuff.ForksReader
-	verifier  hotstuff.Verifier
+	verifier  hotstuff.QCValidator
 }
 
 // New creates a new Validator instance
 func New(
 	committee hotstuff.Committee,
 	forks hotstuff.ForksReader,
-	verifier hotstuff.Verifier,
+	verifier hotstuff.QCValidator,
 ) *Validator {
 	return &Validator{
 		committee: committee,
@@ -61,14 +61,14 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	valid, err := v.verifier.VerifyQC(signers, qc.SigData, block)
+	valid, err := v.verifier.ValidateSignature(signers, qc.SigData, block)
 	if errors.Is(err, signature.ErrInvalidFormat) {
 		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
 	}
 	if err != nil {
 		return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
 	}
-	if !valid {
+	if valid {
 		return newInvalidBlockError(block, fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
 	}
 
@@ -141,22 +141,6 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving voter Identity at block %x: %w", block.BlockID, err)
-	}
-
-	// check whether the signature data is valid for the vote in the hotstuff context
-	valid, err := v.verifier.VerifyVote(voter, vote.SigData, block)
-	if err != nil {
-		switch {
-		case errors.Is(err, signature.ErrInvalidFormat):
-			return nil, newInvalidVoteError(vote, err)
-		case errors.Is(err, model.ErrInvalidSigner):
-			return nil, newInvalidVoteError(vote, err)
-		default:
-			return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
-		}
-	}
-	if !valid {
-		return nil, newInvalidVoteError(vote, model.ErrInvalidSignature)
 	}
 
 	return voter, nil

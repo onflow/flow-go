@@ -24,5 +24,5 @@ type QCValidator interface {
 	// return nil if the QC's signature is valid
 	// return model.InvalidBlockError if the QC's signature is invalid
 	// return other error if there is exception
-	ValidateQC(qc *flow.QuorumCertificate) error
+	ValidateSignature(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error)
 }
