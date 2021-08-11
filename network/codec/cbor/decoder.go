@@ -10,29 +10,36 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-// Decoder implements a stream decoder for JSON.
+// Decoder implements a stream decoder for CBOR.
 type Decoder struct {
 	dec *cbor.Decoder
 }
 
-// Decode will decode the next JSON value from the stream.
+// Decode will decode the next CBOR value from the stream.
 func (d *Decoder) Decode() (interface{}, error) {
 
-	// decode the next envelope
+	// read from stream and extract code
 	var data []byte
-	//bs := binstat.EnterTime(binstat.BinNet + ":strm>1(cbor)")
+	//bs1 := binstat.EnterTime(binstat.BinNet + ":strm>1(cbor)iowriter2payload2envelope")
 	err := d.dec.Decode(data)
-	//binstat.LeaveVal(bs, int64(len(data)))
+	//binstat.LeaveVal(bs1, int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("could not decode envelope: %w", err)
 	}
 
-	code := data[len(data)-1] // only last byte
+	code := data[0] // only first byte
 
-	// decode the embedded value
-	v, err := env2vDecode(data[:len(data)-1], code, ":strm>2(cbor)") // all but last byte
+	what, v, err := envelopeCode2v(code)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode value: %w", err)
+		return nil, fmt.Errorf("could not determine interface from code: %w", err)
+	}
+
+	// unmarshal the payload
+	//bs2 := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, ":strm>2(cbor)", what, code), int64(len(data))) // e.g. ~3net:strm>2(cbor)CodeEntityRequest:23
+	err = cbor.Unmarshal(data[1:], v) // all but first byte
+	//binstat.Leave(bs2)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode cbor payload of type %s: %w", what, err)
 	}
 
 	return v, nil

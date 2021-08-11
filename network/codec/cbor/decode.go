@@ -3,15 +3,11 @@
 package cbor
 
 import (
-	"fmt"
-
-	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/model/messages"
-	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 func switchenv2v(code uint8) (interface{}, error) {
@@ -181,26 +177,18 @@ func switchenv2what(code uint8) (string, error) {
 }
 
 // decode will decode the envelope into an entity.
-func env2vDecode(data []byte, code uint8, via string) (interface{}, error) {
+func envelopeCode2v(code uint8) (string, interface{}, error) {
 
 	// create the desired message
 	v, err := switchenv2v(code)
 	if nil != err {
-		return nil, err
+		return "", nil, err
 	}
 
 	what, err := switchenv2what(code)
 	if nil != err {
-		return nil, err
+		return "", nil, err
 	}
 
-	// unmarshal the payload
-	//bs := binstat.EnterTimeVal(fmt.Sprintf("%s%s%s:%d", binstat.BinNet, via, what, code), int64(len(data))) // e.g. ~3net:wire>4(cbor)CodeEntityRequest:23
-	err = cbor.Unmarshal(data, v)
-	//binstat.Leave(bs)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode cbor payload of type %s: %w", what, err)
-	}
-
-	return v, nil
+	return what, v, nil
 }
