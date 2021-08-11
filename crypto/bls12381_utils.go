@@ -238,3 +238,7 @@ func hashToG1Bytes(data, dst []byte) []byte {
 	writePointG1(pointBytes, &point)
 	return pointBytes
 }
+
+func ZZ() []byte {
+	return nil
+}
