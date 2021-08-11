@@ -1,6 +1,6 @@
 # Flow Cryptography
 
-This Go package provides the cryptography tools needed by Flow blockchain.
+This Go package provides the cryptography tools needed by the Flow blockchain.
 Most of the primitives and protocols can be used in other projects and are not specific to Flow.
 
 Flow is an ongoing project, which means that new features will still be added and modifications will still be made to improve security and performance of the cryptography package.
@@ -19,10 +19,13 @@ If you wish to only import the Flow cryptography package to your Go project, ple
 ```
 go get github.com/onflow/flow-go/crypto
 ```
-- Install [CMake](https://cmake.org/install/), which is used for building the package.
-- From the package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. For instance:
+
+This isn't enough to run the package code as it relies on an extrnal C library ([Relic](https://github.com/relic-toolkit/relic)) for lower level mathematical operations. An extra step is required to compile the external dependency locally. 
+
+- Install [CMake](https://cmake.org/install/), which is used for building the package. The build also requires [Git](http://git-scm.com/) and bash scripting.  
+- From the Go package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. For instance:
 ```
-cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.12.0/
+cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.18.0/
 go generate
 ```
 
