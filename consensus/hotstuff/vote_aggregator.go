@@ -24,6 +24,6 @@ type VoteAggregator interface {
 	// case enough votes can be accumulated for it.
 	BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error)
 
-	// PruneUpToView will remove any data held for the provided view.
-	PruneUpToView(view uint64)
+	// PruneByView will remove any data held for the provided view.
+	PruneByView(view uint64)
 }
