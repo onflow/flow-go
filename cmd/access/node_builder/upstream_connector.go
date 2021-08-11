@@ -1,4 +1,4 @@
-package main
+package node_builder
 
 import (
 	"context"
@@ -90,6 +90,8 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 	return connector.lm.Started()
 }
 
+// result is the result returned by the connect worker. The ID is the ID of the bootstrap peer that was attempted,
+// err is the error that occurred or nil
 type result struct {
 	id  flow.Identity
 	err error

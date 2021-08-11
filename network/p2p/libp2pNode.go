@@ -69,7 +69,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 
 type NodeBuilder interface {
 	SetRootBlockID(string) NodeBuilder
-	SetConnectionManager(*ConnManager) NodeBuilder
+	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
@@ -82,7 +82,7 @@ type DefaultLibP2PNodeBuilder struct {
 	rootBlockID      string
 	logger           zerolog.Logger
 	connGater        *ConnGater
-	connMngr         *ConnManager
+	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
@@ -106,7 +106,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) Node
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr *ConnManager) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr TagLessConnManager) NodeBuilder {
 	builder.connMngr = connMngr
 	return builder
 }
@@ -163,6 +163,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		opts = append(opts, libp2p.ConnectionManager(builder.connMngr))
 		node.connMgr = builder.connMngr
 	}
+
+	if builder.rootBlockID == "" {
+		return nil, errors.New("root block ID must be provided")
+	}
+	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
@@ -221,7 +226,7 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	pingService          *PingService
-	connMgr              *ConnManager
+	connMgr              TagLessConnManager
 }
 
 // Stop stops the libp2p node.

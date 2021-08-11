@@ -636,7 +636,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	connManager := NewConnManager(log, noopMetrics)
 
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
-		SetRootBlockID(rootBlockID).
+		SetRootBlockID(rootID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetLogger(log)

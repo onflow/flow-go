@@ -1,9 +1,10 @@
-package main
+package node_builder
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"strings"
 
 	"github.com/onflow/flow-go/cmd"
@@ -15,7 +16,6 @@ import (
 )
 
 type UnstakedAccessNodeBuilder struct {
-	bootstrapIdentites flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	*FlowAccessNodeBuilder
 }
 
@@ -122,17 +122,16 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		// Networking key
 		unstakedNetworkKey := node.NetworkKey
 
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
-		builder.MustNot(err)
-
-		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
-
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory,
-			msgValidators...)
+		libP2PFactory, err := builder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
+		builder.MustNot(err)
+
+		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
+
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		participants := flow.IdentityList{}

@@ -67,7 +67,7 @@ require (
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
-	pgregory.net/rapid v0.4.6
+	pgregory.net/rapid v0.4.7
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1

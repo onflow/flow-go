@@ -1,9 +1,11 @@
-package main
+package node_builder
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/onflow/flow-go/cmd"
+	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -45,6 +47,27 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	return builder
 }
 
+func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
+	anb.FlowAccessNodeBuilder.
+		Build().
+		Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ping, err := pingeng.New(
+				node.Logger,
+				node.State,
+				node.Me,
+				anb.PingMetrics,
+				anb.pingEnabled,
+				node.Middleware,
+				anb.nodeInfoFile,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ping engine: %w", err)
+			}
+			return ping, nil
+		})
+	return anb
+}
+
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
 
@@ -58,7 +81,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 		// TODO: set a different networking key of the staked access node on the unstaked network
 		unstakedNetworkKey := builder.NetworkKey
 
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
+		libP2PFactory, err := builder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
 		builder.MustNot(err)
 
 		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
