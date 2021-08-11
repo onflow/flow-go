@@ -167,12 +167,12 @@ func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
 	nc.dnsLookupDuration.Observe(float64(duration.Milliseconds()))
 }
 
-// DNSLookupResolution tracks the total number of time dns requests resolved through looking up the network.
+// DNSLookupResolution tracks the total number of dns requests resolved through looking up the network.
 func (nc *NetworkCollector) DNSLookupResolution() {
 	nc.dnsLookupCount.Inc()
 }
 
-// DNSCacheResolution tracks the total number of time dns requests resolved through the cache without
+// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
 // looking up the network.
 func (nc *NetworkCollector) DNSCacheResolution() {
 	nc.dnsCacheHitCount.Inc()
