@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/encodable"
@@ -54,8 +56,8 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() {
 		builder.Logger.Fatal().Msg("unstaked bind address not set")
 	}
 
-	if len(builder.bootstrapNodePublicKeys) != len(builder.bootstrapNodeAddresses) {
-		builder.Logger.Fatal().Msg("number of networking public keys and staked access node addresses should match")
+	if len(builder.bootstrapNodeAddresses) != len(builder.bootstrapNodePublicKeys) {
+		builder.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
 	}
 }
 
@@ -67,6 +69,12 @@ func (builder *UnstakedAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 	for i, address := range builder.bootstrapNodeAddresses {
 		key := builder.bootstrapNodePublicKeys[i]
 
+		// json unmarshaller needs a quotes before and after the string
+		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
+		// hence this additional check to ensure the key is indeed quoted
+		if !strings.HasPrefix(key, "\"") {
+			key = fmt.Sprintf("\"%s\"", key)
+		}
 		// networking public key
 		var networkKey encodable.NetworkPubKey
 		err := json.Unmarshal([]byte(key), &networkKey)

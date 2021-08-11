@@ -75,7 +75,7 @@ func main() {
 		flags.StringToIntVar(&anb.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&anb.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
 		flags.StringSliceVar(&anb.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
-		flags.StringSliceVar(&anb.bootstrapNodePublicKeys, "bootstrap--node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
+		flags.StringSliceVar(&anb.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.StringVar(&anb.unstakedNetworkBindAddr, "unstaked-bind-addr", defaultConfig.unstakedNetworkBindAddr, "address to bind on for the unstaked network")
 	})
 
