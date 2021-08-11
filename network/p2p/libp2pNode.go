@@ -31,7 +31,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -67,10 +66,10 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 		// no discovery
 	}
 
-	resolver, err := dns.NewResolver(metrics)
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	}
+	//resolver, err := dns.NewResolver(metrics)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	//}
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
@@ -80,7 +79,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetPubsubOptions(psOptions...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
-			SetResolver(resolver).
+			// SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
