@@ -22,7 +22,7 @@ type Resolver struct {
 	sync.RWMutex
 	ttl       time.Duration // time-to-live for cache entry
 	res       madns.BasicResolver
-	collector module.NetworkMetrics
+	collector module.ResolverMetrics
 	ipCache   map[string]*ipCacheEntry
 	txtCache  map[string]*txtCacheEntry
 }
@@ -51,7 +51,7 @@ func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 	}
 }
 
-func NewResolver(collector module.NetworkMetrics, opts ...optFunc) (*madns.Resolver, error) {
+func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Resolver, error) {
 	resolver := &Resolver{
 		res:       madns.DefaultResolver,
 		ttl:       defaultTimeToLive,
@@ -84,12 +84,12 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	if addr, ok := r.resolveIPCache(domain); ok {
 		// resolving address from cache
-		r.collector.DNSCacheResolution()
+		r.collector.OnDNSCacheHit()
 		return addr, nil
 	}
 
 	// resolves domain through underlying resolver
-	r.collector.DNSLookupResolution()
+	r.collector.OnDNSCacheMiss()
 	addr, err := r.res.LookupIPAddr(ctx, domain)
 	if err != nil {
 		return nil, err
@@ -117,12 +117,12 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
 	if addr, ok := r.resolveTXTCache(txt); ok {
 		// resolving address from cache
-		r.collector.DNSCacheResolution()
+		r.collector.OnDNSCacheHit()
 		return addr, nil
 	}
 
 	// resolves txt through underlying resolver
-	r.collector.DNSLookupResolution()
+	r.collector.OnDNSCacheMiss()
 	addr, err := r.res.LookupTXT(ctx, txt)
 	if err != nil {
 		return nil, err

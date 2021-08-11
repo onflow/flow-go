@@ -14,12 +14,12 @@ type ResolverMetrics interface {
 	// DNSLookupDuration tracks the time spent to resolve a DNS address.
 	DNSLookupDuration(duration time.Duration)
 
-	// DNSLookupResolution tracks the total number of dns requests resolved through looking up the network.
-	DNSLookupResolution()
+	// OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
+	OnDNSCacheMiss()
 
 	// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
 	// looking up the network.
-	DNSCacheResolution()
+	OnDNSCacheHit()
 }
 
 type NetworkMetrics interface {

@@ -25,7 +25,7 @@ type NetworkCollector struct {
 	outboundConnectionCount  prometheus.Gauge
 	inboundConnectionCount   prometheus.Gauge
 	dnsLookupDuration        prometheus.Histogram
-	dnsLookupCount           prometheus.Counter
+	dnsCacheMissCount        prometheus.Counter
 	dnsCacheHitCount         prometheus.Counter
 }
 
@@ -64,11 +64,11 @@ func NewNetworkCollector() *NetworkCollector {
 			Help:      "the time spent on resolving a dns lookup (including cache hits)",
 		}),
 
-		dnsLookupCount: promauto.NewCounter(prometheus.CounterOpts{
+		dnsCacheMissCount: promauto.NewCounter(prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_lookup_total",
-			Help:      "the number of dns lookups made through network",
+			Name:      "dns_cache_miss_total",
+			Help:      "the number of dns lookups that miss the cache and made through network",
 		}),
 
 		dnsCacheHitCount: promauto.NewCounter(prometheus.CounterOpts{
@@ -167,13 +167,13 @@ func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
 	nc.dnsLookupDuration.Observe(float64(duration.Milliseconds()))
 }
 
-// DNSLookupResolution tracks the total number of dns requests resolved through looking up the network.
-func (nc *NetworkCollector) DNSLookupResolution() {
-	nc.dnsLookupCount.Inc()
+// OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
+func (nc *NetworkCollector) OnDNSCacheMiss() {
+	nc.dnsCacheMissCount.Inc()
 }
 
-// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
+// OnDNSCacheHit tracks the total number of dns requests resolved through the cache without
 // looking up the network.
-func (nc *NetworkCollector) DNSCacheResolution() {
+func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
 }

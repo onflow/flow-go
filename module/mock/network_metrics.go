@@ -14,7 +14,7 @@ type NetworkMetrics struct {
 }
 
 // DNSCacheResolution provides a mock function with given fields:
-func (_m *NetworkMetrics) DNSCacheResolution() {
+func (_m *NetworkMetrics) OnDNSCacheHit() {
 	_m.Called()
 }
 
@@ -24,7 +24,7 @@ func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 }
 
 // DNSLookupResolution provides a mock function with given fields:
-func (_m *NetworkMetrics) DNSLookupResolution() {
+func (_m *NetworkMetrics) OnDNSCacheMiss() {
 	_m.Called()
 }
 
