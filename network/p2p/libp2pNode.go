@@ -67,7 +67,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 		// no discovery
 	}
 
-	resolver, err := dns.NewResolver(metrics)
+	resolver, err := dns.NewResolver(metrics, dns.WithTTL(0*time.Millisecond))
 	if err != nil {
 		return nil, fmt.Errorf("could not create dns resolver: %w", err)
 	}
