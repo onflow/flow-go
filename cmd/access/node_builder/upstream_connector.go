@@ -18,36 +18,34 @@ type upstreamConnector struct {
 	bootstrapIdentities flow.IdentityList
 	logger              zerolog.Logger
 	unstakedNode        *p2p.Node
-	ctx                 context.Context
 	cancel              context.CancelFunc
 }
 
-func newUpstreamConnector(ctx context.Context, bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
-
-	ctx, cancel := context.WithCancel(ctx)
+func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
 	return &upstreamConnector{
 		lm:                  lifecycle.NewLifecycleManager(),
 		bootstrapIdentities: bootstrapIdentities,
 		unstakedNode:        unstakedNode,
 		logger:              logger,
-		ctx:                 ctx,
-		cancel:              cancel,
 	}
 }
 func (connector *upstreamConnector) Ready() <-chan struct{} {
 	connector.lm.OnStart(func() {
+		// eventually, context will be passed in to Start method: https://github.com/dapperlabs/flow-go/issues/5730
+		ctx, cancel := context.WithCancel(context.TODO())
+		connector.cancel = cancel
 
 		bootstrapPeerCnt := len(connector.bootstrapIdentities)
 		resultChan := make(chan result, bootstrapPeerCnt)
 		defer close(resultChan)
 
 		// a shorter context for the connection worker
-		ctx, cancel := context.WithTimeout(connector.ctx, 5*time.Second)
+		workerCtx, workerCancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
 		// spawn a connect worker for each bootstrap node
 		for _, b := range connector.bootstrapIdentities {
-			go connector.connect(ctx, *b, resultChan)
+			go connector.connect(workerCtx, *b, resultChan)
 		}
 
 		var successfulConnects []string
@@ -68,8 +66,8 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 				}
 
 				// premature exits if needed
-			case <-connector.ctx.Done():
-				connector.logger.Warn().Msg("context done before connection to bootstrap node could be established")
+			case <-workerCtx.Done():
+				connector.logger.Warn().Msg("timed out before connections to bootstrap nodes could be established")
 				return
 			}
 		}
@@ -118,6 +116,8 @@ func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer f
 
 func (connector *upstreamConnector) Done() <-chan struct{} {
 	connector.lm.OnStop(func() {
+		// this function will only be executed if connector.lm.OnStart was previously called,
+		// in which case connector.cancel != nil
 		connector.cancel()
 	})
 	return connector.lm.Stopped()
