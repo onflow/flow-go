@@ -8,11 +8,11 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: common-tests execution-tests verification-tests collection-tests consensus-tests
+integration-test: common-tests execution-tests verification-tests collection-tests consensus-tests epoch-tests
 
 # NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
 .PHONY: ci-integration-test
-ci-integration-test: common-tests execution-tests # collection-tests # consensus-tests # verification-tests
+ci-integration-test: common-tests execution-tests epoch-tests verification-tests # collection-tests # consensus-tests
 
 .PHONY: collection-tests
 collection-tests:
@@ -21,6 +21,10 @@ collection-tests:
 .PHONY: consensus-tests
 consensus-tests:
 	GO111MODULE=on go test -tags relic -count=1 ./tests/consensus
+
+.PHONY: epoch-tests
+epoch-tests:
+	GO111MODULE=on go test -tags relic -count=1 ./tests/epochs
 
 .PHONY: common-tests
 common-tests:

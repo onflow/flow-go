@@ -43,16 +43,16 @@ typedef uint8_t byte;
 #define MEMBERSHIP_CHECK_G1 BOWE
 #define MEMBERSHIP_CHECK_G2 EXP_ORDER
 
-// Structure of precomputed data
-#if (hashToPoint == OPSWU)
-    #define ELLP_Nx_LEN 12
-    #define ELLP_Dx_LEN 10
-    #define ELLP_Ny_LEN 16
-    #define ELLP_Dy_LEN 15
-#endif
 
+// constants used in the optimized SWU hash to curve
+#define ELLP_Nx_LEN 12
+#define ELLP_Dx_LEN 10
+#define ELLP_Ny_LEN 16
+#define ELLP_Dy_LEN 15
+
+
+// Structure of precomputed data
 typedef struct prec_ {
-    #if (hashToPoint == OPSWU)
     bn_st p_3div4;
     fp_st fp_p_1div2; 
     // coefficients of E1(Fp)
@@ -63,7 +63,6 @@ typedef struct prec_ {
     fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
     fp_st iso_Dy[ELLP_Dy_LEN];
-    #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;
@@ -74,10 +73,11 @@ typedef struct prec_ {
 // Utility functions
 int      get_valid();
 int      get_invalid();
+void     bn_new_wrapper(bn_t a);
 
 ctx_t*   relic_init_BLS12_381();
 prec_st* init_precomputed_data_BLS12_381();
-void     precomputed_data_set(prec_st* p);
+void     precomputed_data_set(const prec_st* p);
 void     seed_relic(byte*, int);
 
 int      ep_read_bin_compact(ep_t, const byte *, const int);
@@ -100,6 +100,7 @@ void     ep2_sum_vector(ep2_t, ep2_st*, const int);
 int      ep_sum_vector_byte(byte*, const byte*, const int);
 void     ep2_subtract_vector(ep2_t res, ep2_t x, ep2_st* y, const int len);
 
+int check_membership_G1(const ep_t p);
 int simple_subgroup_check_G1(const ep_t);
 int simple_subgroup_check_G2(const ep2_t);
 void ep_rand_G1(ep_t);
@@ -109,6 +110,7 @@ int bowe_subgroup_check_G1(const ep_t);
 #endif
 int subgroup_check_G1_test(int, int);
 int subgroup_check_G1_bench();
+
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);

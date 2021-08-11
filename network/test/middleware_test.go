@@ -11,13 +11,15 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mockery "github.com/stretchr/testify/mock"
+
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/module/observable"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
@@ -26,11 +28,33 @@ import (
 
 const testChannel = "test-channel"
 
+type tagsObserver struct {
+	tags chan string
+	log  zerolog.Logger
+}
+
+func (co *tagsObserver) OnNext(peertag interface{}) {
+	pt, ok := peertag.(PeerTag)
+
+	if ok {
+		co.tags <- fmt.Sprintf("peer: %v tag: %v", pt.peer, pt.tag)
+	}
+
+}
+func (co *tagsObserver) OnError(err error) {
+	co.log.Error().Err(err).Msg("Tags Observer closed on an error")
+	close(co.tags)
+}
+func (co *tagsObserver) OnComplete() {
+	close(co.tags)
+}
+
 type MiddlewareTestSuite struct {
 	suite.Suite
 	size    int               // used to determine number of middlewares under test
 	mws     []*p2p.Middleware // used to keep track of middlewares under test
 	ov      []*mocknetwork.Overlay
+	obs     chan string // used to keep track of Protect events tagged by pubsub messages
 	ids     []*flow.Identity
 	metrics *metrics.NoopCollector // no-op performance monitoring simulation
 }
@@ -47,9 +71,23 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
-	// create and start the middlewares
-	m.ids, m.mws = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
 
+	// create and start the middlewares and inject a connection observer
+	var obs []observable.Observable
+	peerChannel := make(chan string)
+	ob := tagsObserver{
+		tags: peerChannel,
+		log:  logger,
+	}
+
+	m.ids, m.mws, obs = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+
+	for _, observableConnMgr := range obs {
+		observableConnMgr.Subscribe(&ob)
+	}
+	m.obs = peerChannel
+
+	require.Len(m.Suite.T(), obs, m.size)
 	require.Len(m.Suite.T(), m.ids, m.size)
 	require.Len(m.Suite.T(), m.mws, m.size)
 
@@ -158,7 +196,6 @@ func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
 func (m *MiddlewareTestSuite) MultiPing(count int) {
 	wg := sync.WaitGroup{}
 	// extracts sender id based on the mock option
-	var err error
 	// mocks Overlay.Receive for  middleware.Overlay.Receive(*nodeID, payload)
 	firstNode := 0
 	lastNode := m.size - 1
@@ -171,7 +208,7 @@ func (m *MiddlewareTestSuite) MultiPing(count int) {
 			})
 		go func() {
 			// sends a direct message from first node to the last node
-			err = m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
+			err := m.mws[firstNode].SendDirect(msg, m.ids[lastNode].NodeID)
 			require.NoError(m.Suite.T(), err)
 		}()
 	}
@@ -208,7 +245,7 @@ func (m *MiddlewareTestSuite) TestEcho() {
 		Run(func(args mockery.Arguments) {
 			wg.Done()
 			// echos back the same message back to the sender
-			err = m.mws[last].SendDirect(replyMsg, firstNode)
+			err := m.mws[last].SendDirect(replyMsg, firstNode)
 			assert.NoError(m.T(), err)
 
 		})
@@ -251,7 +288,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
 		Text: string(payload),
 	}
 
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -281,7 +318,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	// set the message type to a known large message type
 	msg.Type = "messages.ChunkDataResponse"
 
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -301,7 +338,7 @@ func (m *MiddlewareTestSuite) TestLargeMessageSize_SendDirect() {
 	require.NoError(m.Suite.T(), err)
 
 	// check message reception on target
-	unittest.RequireCloseBefore(m.T(), ch, 3*time.Second, "source node failed to send large message to target")
+	unittest.RequireCloseBefore(m.T(), ch, 15*time.Second, "source node failed to send large message to target")
 
 	m.ov[targetIndex].AssertExpectations(m.T())
 }
@@ -328,7 +365,7 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 		Text: string(payload),
 	}
 
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	encodedEvent, err := codec.Encode(event)
 	require.NoError(m.T(), err)
 
@@ -354,8 +391,14 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		require.NoError(m.Suite.T(), err)
 	}
 
-	// wait for nodes to form a mesh
-	time.Sleep(2 * time.Second)
+	// set up waiting for m.size pubsub tags indicating a mesh has formed
+	for i := 0; i < m.size; i++ {
+		select {
+		case <-m.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(m.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	origin := 0
 	target := m.size - 1
