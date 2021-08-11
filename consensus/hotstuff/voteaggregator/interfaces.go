@@ -14,9 +14,10 @@ type VoteCollectors interface {
 	// GetOrCreateCollector is used for getting hotstuff.VoteCollector, calling this function for first time
 	// will create a new collector.
 	// collector is indexed by blockID and view
-	// It returns the vote collector state machine and true if found,
-	// It returns nil and false if not found
-	GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, bool)
+	// It returns the vote collector state machine, true and nil if found,
+	// It returns (nil, false, nil) if not found
+	// It returns (nil, false, nil) if failed to create vote collector state machine
+	GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, bool, error)
 
 	// Prune the vote collectors whose view is below the given view
 	PruneUpToView(view uint64) error

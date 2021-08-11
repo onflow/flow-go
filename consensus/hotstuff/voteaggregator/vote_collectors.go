@@ -15,7 +15,7 @@ type voteCollectors struct {
 }
 
 // GetOrCreateCollector performs lazy initialization of collectors based on their view and blockID
-func (v *voteCollectors) GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, bool) {
+func (v *voteCollectors) GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, bool, error) {
 	panic("implement me")
 }
 
