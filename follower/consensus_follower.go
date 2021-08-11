@@ -22,11 +22,12 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	nodeID               flow.Identifier // the node ID of this node
-	upstreamAccessNodeID flow.Identifier // the node ID of the upstream access node
-	bindAddr             string          // address to bind on
-	dataDir              string          // directory to store the protocol state
-	bootstrapDir         string          // path to the bootstrap directory
+	nodeID                  flow.Identifier // the node ID of this node
+	bootstrapNodeAddresses  []string        // the addresses of the boostrap peers
+	bootstrapNodePublicKeys []string        // the network public keys of the bootstrap peers (in the same order as the bootstrap addresses)
+	bindAddr                string          // address to bind on
+	dataDir                 string          // directory to store the protocol state
+	bootstrapDir            string          // path to the bootstrap directory
 }
 
 type Option func(c *Config)
@@ -43,11 +44,18 @@ func WithBootstrapDir(bootstrapDir string) Option {
 	}
 }
 
-func getAccessNodeOptions(config *Config) []access.Option {
+func getAccessNodeOptions(config *Config) ([]access.Option, error) {
+
+	ids, err := access.BoostrapIdentities(config.bootstrapNodeAddresses, config.bootstrapNodePublicKeys)
+	if err != nil {
+		return nil, err
+	}
+
 	return []access.Option{
+		access.WithBootStrapPeers(ids...),
 		access.WithUnstakedNetworkBindAddr(config.bindAddr),
 		access.WithBaseOptions(getBaseOptions(config)),
-	}
+	}, nil
 }
 
 func getBaseOptions(config *Config) []cmd.Option {
@@ -84,28 +92,33 @@ type ConsensusFollowerImpl struct {
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
 	nodeID flow.Identifier,
-	upstreamAccessNodeID flow.Identifier,
+	bootstrapNodeAddresses []string,
+	bootstrapNodePublicKeys []string,
 	bindAddr string,
 	opts ...Option,
-) *ConsensusFollowerImpl {
+) (*ConsensusFollowerImpl, error) {
 	config := &Config{
-		nodeID:               nodeID,
-		upstreamAccessNodeID: upstreamAccessNodeID,
-		bindAddr:             bindAddr,
+		nodeID:                  nodeID,
+		bootstrapNodeAddresses:  bootstrapNodeAddresses,
+		bootstrapNodePublicKeys: bootstrapNodePublicKeys,
+		bindAddr:                bindAddr,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	accessNodeOptions := getAccessNodeOptions(config)
-	anb := buildAccessNode(accessNodeOptions)
+	accessNodeOptions, err := getAccessNodeOptions(config)
+	if err != nil {
+		return nil, err
+	}
 
+	anb := buildAccessNode(accessNodeOptions)
 	consensusFollower := &ConsensusFollowerImpl{nodeBuilder: anb}
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
-	return consensusFollower
+	return consensusFollower, nil
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.

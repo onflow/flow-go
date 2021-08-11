@@ -2,13 +2,8 @@ package node_builder
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-
-	"strings"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
@@ -64,31 +59,9 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() {
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstreap peers from the parameters.
 // These are the identity of the staked and unstaked AN also acting as the DHT bootstrap server
 func (builder *UnstakedAccessNodeBuilder) deriveBootstrapPeerIdentities() {
-
-	builder.bootstrapIdentites = make([]*flow.Identity, len(builder.bootstrapNodeAddresses))
-	for i, address := range builder.bootstrapNodeAddresses {
-		key := builder.bootstrapNodePublicKeys[i]
-
-		// json unmarshaller needs a quotes before and after the string
-		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
-		// hence this additional check to ensure the key is indeed quoted
-		if !strings.HasPrefix(key, "\"") {
-			key = fmt.Sprintf("\"%s\"", key)
-		}
-		// networking public key
-		var networkKey encodable.NetworkPubKey
-		err := json.Unmarshal([]byte(key), &networkKey)
-		builder.MustNot(err)
-
-		// create the identity of the peer by setting only the relevant fields
-		id := &flow.Identity{
-			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
-			Address:       address,
-			Role:          flow.RoleAccess, // the upstream node has to be an access node
-			NetworkPubKey: networkKey,
-		}
-		builder.bootstrapIdentites[i] = id
-	}
+	ids, err := BoostrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	builder.MustNot(err)
+	builder.bootstrapIdentites = ids
 }
 
 // initUnstakedLocal initializes the unstaked node ID, network key and network address

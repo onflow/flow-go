@@ -68,7 +68,7 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 				}
 
 				// premature exits if needed
-			case <-connector.ctx.Done():
+			case <-ctx.Done():
 				connector.logger.Warn().Msg("context done before connection to bootstrap node could be established")
 				return
 			}

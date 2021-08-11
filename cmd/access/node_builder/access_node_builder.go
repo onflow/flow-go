@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -488,9 +489,9 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 
 type Option func(*AccessNodeConfig)
 
-func WithBootStrapPeers(bootstapNodes ...*flow.Identity) Option {
+func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	return func(config *AccessNodeConfig) {
-		config.bootstrapIdentites = bootstapNodes
+		config.bootstrapIdentites = bootstrapNodes
 	}
 }
 
@@ -617,7 +618,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		nodeID,
 		networkMetrics,
 		builder.RootBlock.ID().String(),
-		time.Hour, // TODO: this is pretty meaningless since there is no peermaanger in play.
+		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating for the unstaked network
 		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
@@ -660,4 +661,43 @@ func unstakedNetworkMsgValidators(selfID flow.Identifier) []network.MessageValid
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
 	}
+}
+
+// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
+// each Flow Identity is initialized with the passed address, the networking key
+// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
+func BoostrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+
+	if len(addresses) != len(keys) {
+		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
+	}
+
+	ids := make([]*flow.Identity, len(addresses))
+	for i, address := range addresses {
+
+		key := keys[i]
+		// json unmarshaller needs a quotes before and after the string
+		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
+		// hence this additional check to ensure the key is indeed quoted
+		if !strings.HasPrefix(key, "\"") {
+			key = fmt.Sprintf("\"%s\"", key)
+		}
+		// networking public key
+		var networkKey encodable.NetworkPubKey
+		err := json.Unmarshal([]byte(key), &networkKey)
+		if err != nil {
+			return nil, err
+		}
+
+		// create the identity of the peer by setting only the relevant fields
+		id := &flow.Identity{
+			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
+			Address:       address,
+			Role:          flow.RoleAccess, // the upstream node has to be an access node
+			NetworkPubKey: networkKey,
+		}
+
+		ids = append(ids, id)
+	}
+	return ids, nil
 }
