@@ -245,12 +245,13 @@ func (e *blockComputer) executeSystemCollection(
 	if err != nil {
 		return txIndex, err
 	}
-	if res.TransactionResults[len(res.TransactionResults)-1].ErrorMessage != "" {
+	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
+	if systemChunkTxResult.ErrorMessage != "" {
 		// This log is used as the data source for an alert on grafana.
 		// The system_chunk_error field must not be changed without adding the corresponding
 		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
 		e.log.Error().
-			Str("error_message", res.TransactionResults[txIndex].ErrorMessage).
+			Str("error_message", systemChunkTxResult.ErrorMessage).
 			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
 			Bool("system_chunk_error", true).
 			Bool("critical_error", true).
