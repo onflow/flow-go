@@ -24,7 +24,8 @@ type BlockSigner interface {
 // When enough votes have been collected, it builds a QC and send it to the EventLoop
 // VoteAggregator also detects protocol violation, including invalid votes, double voting etc, and
 // notifies a HotStuff consumer for slashing.
-type VoteAggregator interface {
+// TODO: rename to remove V2 when replacing V1
+type VoteAggregatorV2 interface {
 	// AddVote verifies and aggregates a vote.
 	// The voting block could either be known or unknown.
 	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.

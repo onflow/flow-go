@@ -8,7 +8,8 @@ import (
 )
 
 // EventHandler runs a state machine to process proposals, QC and local timeouts.
-type EventHandler interface {
+// TODO: rename to remove V2 when replacing V1
+type EventHandlerV2 interface {
 
 	// OnQCConstructed processes a valid qc constructed by internal vote aggregator.
 	OnQCConstructed(qc *flow.QuorumCertificate) error
