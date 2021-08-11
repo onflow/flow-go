@@ -37,6 +37,31 @@ func (ps VoteCollectorStatus) String() string {
 	return collectorStatusNames[ps]
 }
 
+type VoteCollector interface {
+	VoteCollectorState
+	// ChangeProcessingStatus changes the VoteCollector's internal processing
+	// status. The operation is implemented as an atomic compare-and-swap, i.e. the
+	// state transition is only executed if VoteCollector's internal state is
+	// equal to `expectedValue`. The return indicates whether the state was updated.
+	// The implementation only allows the transitions
+	//         CachingVotes   -> VerifyingVotes
+	//         CachingVotes   -> Invalid
+	//         VerifyingVotes -> Invalid
+	// Error returns:
+	// * nil if the state transition was successfully executed
+	// * ErrDifferentCollectorState if the VoteCollector's state is different than expectedCurrentStatus
+	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
+	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
+	ChangeProcessingStatus(expectedValue, newValue VoteCollectorStatus) error
+
+	// ProcessBlock performs validation of block signature and processes block with respected collector.
+	// Calling this function will mark conflicting collector as stale and change state of valid collectors
+	// It returns nil if the block is valid.
+	// It returns model.InvalidBlockError if block is invalid.
+	// It returns other error if there is exception processing the block.
+	ProcessBlock(block *model.Block) error
+}
+
 // VoteCollectorState collects votes for the same block, produces QC when enough votes are collected
 // VoteCollectorState takes a callback function to report the event that a QC has been produced.
 type VoteCollectorState interface {
@@ -53,21 +78,4 @@ type VoteCollectorState interface {
 
 	// Status returns the status of the vote collector
 	Status() VoteCollectorStatus
-}
-
-type VoteCollector interface {
-	VoteCollectorState
-	// ChangeProcessingStatus changes the VoteCollector's internal processing
-	// status. The operation is implemented as an atomic compare-and-swap, i.e. the
-	// state transition is only executed if VoteCollector's internal state is
-	// equal to `expectedValue`. The return indicates whether the state was updated.
-	// The implementation only allows the transitions
-	//         CachingVotes -> VerifyingVotes
-	//    and                  VerifyingVotes -> Invalid
-	// Error returns:
-	// * nil if the state transition was successfully executed
-	// * ErrDifferentCollectorState if the VoteCollector's state is different than expectedCurrentStatus
-	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
-	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-	ChangeProcessingStatus(expectedValue, newValue VoteCollectorStatus) error
 }

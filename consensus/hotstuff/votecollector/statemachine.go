@@ -28,8 +28,8 @@ type StateMachine struct {
 	createVerifyingCollector NewVerifyingCollectorFactoryMethod
 }
 
-func (csm *StateMachine) atomicLoadCollector() hotstuff.VoteCollectorState {
-	return csm.collector.Load().(*atomicValueWrapper).collector
+func (m *StateMachine) atomicLoadCollector() hotstuff.VoteCollectorState {
+	return m.collector.Load().(*atomicValueWrapper).collector
 }
 
 // atomic.Value doesn't allow storing interfaces as atomic values,
@@ -55,8 +55,8 @@ func NewStateMachine(base CollectionBase) *StateMachine {
 // delegate function call, otherwise we will return an error indicating wrong collector state.
 // ATTENTION: this might be changed if CreateVote and state transitions will be called in parallel
 // something like compare-and-repeat might need to be implemented.
-func (csm *StateMachine) CreateVote(block *model.Block) (*model.Vote, error) {
-	collector := csm.atomicLoadCollector()
+func (m *StateMachine) CreateVote(block *model.Block) (*model.Vote, error) {
+	collector := m.atomicLoadCollector()
 	blockSigner, ok := collector.(hotstuff.BlockSigner)
 	if ok {
 		return blockSigner.CreateVote(block)
@@ -64,15 +64,15 @@ func (csm *StateMachine) CreateVote(block *model.Block) (*model.Vote, error) {
 	return nil, ErrDifferentCollectorState
 }
 
-func (csm *StateMachine) AddVote(vote *model.Vote) error {
+func (m *StateMachine) AddVote(vote *model.Vote) error {
 	for {
-		collector := csm.atomicLoadCollector()
+		collector := m.atomicLoadCollector()
 		currentState := collector.Status()
 		err := collector.AddVote(vote)
 		if err != nil {
 			return fmt.Errorf("could not add vote %v: %w", vote.ID(), err)
 		}
-		if currentState != csm.Status() {
+		if currentState != m.Status() {
 			continue
 		}
 
@@ -80,33 +80,71 @@ func (csm *StateMachine) AddVote(vote *model.Vote) error {
 	}
 }
 
-func (csm *StateMachine) Status() hotstuff.VoteCollectorStatus {
-	return csm.atomicLoadCollector().Status()
+func (m *StateMachine) Status() hotstuff.VoteCollectorStatus {
+	return m.atomicLoadCollector().Status()
 }
 
-func (csm *StateMachine) ChangeProcessingStatus(expectedCurrentStatus, newStatus hotstuff.VoteCollectorStatus) error {
+// ChangeProcessingStatus changes the VoteCollector's internal processing
+// status. The operation is implemented as an atomic compare-and-swap, i.e. the
+// state transition is only executed if VoteCollector's internal state is
+// equal to `expectedValue`. The return indicates whether the state was updated.
+// The implementation only allows the transitions
+//         CachingVotes   -> VerifyingVotes
+//         CachingVotes   -> Invalid
+//         VerifyingVotes -> Invalid
+func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.VoteCollectorStatus) error {
 	// don't transition between same states
-	if expectedCurrentStatus == newStatus {
+	if currentStatus == newStatus {
 		return nil
 	}
 
-	if (expectedCurrentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
-		cachingCollector, err := csm.caching2Verifying()
+	if (currentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
+		cachingCollector, err := m.caching2Verifying()
 		if err != nil {
-			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), err)
+			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", currentStatus.String(), newStatus.String(), err)
 		}
 
-		csm.workerPool.Submit(func() {
+		m.workerPool.Submit(func() {
 			for _, vote := range cachingCollector.GetVotes() {
-				task := csm.reIngestVoteTask(vote)
-				csm.workerPool.Submit(task)
+				task := m.reIngestVoteTask(vote)
+				m.workerPool.Submit(task)
 			}
 		})
 
 		return nil
 	}
 
-	return fmt.Errorf("cannot transition from %s to %s: %w", expectedCurrentStatus.String(), newStatus.String(), ErrInvalidCollectorStateTransition)
+	// TODO: handle state transition from caching to invalid
+
+	return fmt.Errorf("cannot transition from %s to %s: %w", currentStatus.String(), newStatus.String(), ErrInvalidCollectorStateTransition)
+}
+
+// ProcessBlock performs validation of block signature and processes block with respected collector.
+func (m *StateMachine) ProcessBlock(block *model.Block) error {
+	// TODO: implement logic for validating block proposal, converting it to vote and further processing
+
+	currentStatus := m.Status()
+	err := m.ChangeProcessingStatus(currentStatus, hotstuff.VoteCollectorStatusVerifying)
+	if err != nil {
+		return fmt.Errorf("could not change processing status for block %x: %w", block.BlockID, err)
+	}
+
+	m.workerPool.Submit(func() {
+		// TODO: check if SigData is correct
+		vote := &model.Vote{
+			View:     block.View,
+			BlockID:  block.BlockID,
+			SignerID: block.ProposerID,
+			SigData:  block.QC.SigData,
+		}
+
+		err := m.AddVote(vote)
+		if err != nil {
+			m.log.Err(err).Msgf("failed to process vote from proposal %x", block.BlockID)
+		}
+	})
+
+	return nil
 }
 
 // caching2Verifying ensures that the collector is currently in state `CachingVotes`
@@ -115,28 +153,28 @@ func (csm *StateMachine) ChangeProcessingStatus(expectedCurrentStatus, newStatus
 // * CachingVoteCollector as of before the update
 // * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-func (csm *StateMachine) caching2Verifying() (*CachingVoteCollector, error) {
-	csm.Lock()
-	defer csm.Unlock()
-	clr := csm.atomicLoadCollector()
+func (m *StateMachine) caching2Verifying() (*CachingVoteCollector, error) {
+	m.Lock()
+	defer m.Unlock()
+	clr := m.atomicLoadCollector()
 	cachingCollector, ok := clr.(*CachingVoteCollector)
 	if !ok {
 		return nil, fmt.Errorf("collector's current state is %s: %w", clr.Status().String(), ErrDifferentCollectorState)
 	}
 
-	verifyingCollector, err := csm.createVerifyingCollector(csm.CollectionBase)
+	verifyingCollector, err := m.createVerifyingCollector(m.CollectionBase)
 	if err != nil {
 		return nil, fmt.Errorf("could not create verifying vote collector")
 	}
 
-	csm.collector.Store(&atomicValueWrapper{collector: verifyingCollector})
+	m.collector.Store(&atomicValueWrapper{collector: verifyingCollector})
 
 	return cachingCollector, nil
 }
 
 // reIngestIncorporatedResultTask returns a functor for re-ingesting the specified
 // IncorporatedResults; functor handles all potential business logic errors.
-func (csm *StateMachine) reIngestVoteTask(vote *model.Vote) func() {
+func (m *StateMachine) reIngestVoteTask(vote *model.Vote) func() {
 	panic("implement me")
 	task := func() {
 	}

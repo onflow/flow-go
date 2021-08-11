@@ -2,45 +2,27 @@ package hotstuff
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// BlockSigner abstracts the implementation of how a signature of a block or a voteis produced
-// and stored in a stateful crypto object for aggregation.
-// The VoteAggregator implements both the VoteAggregator interface and the BlockSigner interface so that
-// The EventHandler could use the VoteAggregator interface to send Block, and Voter/BlockProducer can use
-// the BlockSigner interface to create vote.
-// When `CreateVote` is called, it internally creates stateful VoteCollector object, which also has the ability
-// to verify the block and generate the vote signature.
-// The created vote collector will be added to the vote collectors map. These
-// implementation details are abstracted to Voter/BlockProducer.
-type BlockSigner interface {
-	// CreateVote returns a vote for the given block.
-	// return (vote, nil) if vote is created
-	// return (nil , module.InvalidBlockError) if the block is invalid.
-	CreateVote(*model.Block) (*model.Vote, error)
-}
-
-// VoteAggregator verifies and aggregates votes to build QC.
-// When enough votes have been collected, it builds a QC and send it to the EventLoop
-// VoteAggregator also detects protocol violation, including invalid votes, double voting etc, and
-// notifies a HotStuff consumer for slashing.
+// VoteAggregator aggregates votes and produces quorum certificates.
 type VoteAggregator interface {
-	// AddVote verifies and aggregates a vote.
-	// The voting block could either be known or unknown.
-	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.
-	// This method can be called concurrently, votes will be queued and processed asynchronously.
-	// ToDo: document sentinel errors expected during normal operation
-	AddVote(vote *model.Vote) error
 
-	// AddBlock notifies the VoteAggregator about a known block so that it can start processing
-	// pending votes whose block was unknown.
-	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
-	// ToDo: document sentinel errors expected during normal operation
-	AddBlock(block *model.Proposal) (bool, error)
+	// StorePendingVote is used to store a vote for a block for which we don't
+	// have a block yet.
+	StorePendingVote(vote *model.Vote) (bool, error)
 
-	// InvalidBlock notifies the VoteAggregator about an invalid block, so that it can process votes for the invalid
-	// block and slash the voters.
-	InvalidBlock(block *model.Proposal) error
+	// StoreVoteAndBuildQC will store a vote and build the QC related to the
+	// voted upon block if enough votes can be accumulated.
+	StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error)
+
+	// StoreProposerVote stores the vote of the proposer of the block and is
+	// used to separate vote and block handling.
+	StoreProposerVote(vote *model.Vote) bool
+
+	// BuildQCOnReceivedBlock will try to build a QC for the received block in
+	// case enough votes can be accumulated for it.
+	BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error)
 
 	// PruneUpToView will remove any data held for the provided view.
 	PruneUpToView(view uint64)
