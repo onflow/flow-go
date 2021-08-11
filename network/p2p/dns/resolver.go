@@ -5,7 +5,7 @@ import (
 	"net"
 	"sync"
 	"time"
-	_ "unsafe"
+	_ "unsafe" // for linking runtimeNano
 
 	madns "github.com/multiformats/go-multiaddr-dns"
 
