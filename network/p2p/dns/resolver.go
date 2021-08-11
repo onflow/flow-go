@@ -11,6 +11,9 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+//go:linkname runtimeNano runtime.nanotime
+func runtimeNano() int64
+
 const defaultTimeToLive = 5 * time.Minute
 
 // Resolver is a cache-based dns resolver for libp2p.
@@ -25,12 +28,12 @@ type Resolver struct {
 
 type ipCacheEntry struct {
 	addresses []net.IPAddr
-	timestamp time.Time
+	timestamp int64
 }
 
 type txtCacheEntry struct {
 	addresses []string
-	timestamp time.Time
+	timestamp int64
 }
 
 type optFunc func(resolver *Resolver)
@@ -68,11 +71,12 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	r.Lock()
 	defer r.Unlock()
 
-	started := time.Now()
+	started := runtimeNano()
 
 	addr, err := r.lookupIPAddr(ctx, domain)
 
-	r.collector.DNSLookupDuration(time.Since(started))
+	r.collector.DNSLookupDuration(
+		time.Duration(runtimeNano() - started))
 	return addr, err
 }
 
@@ -100,11 +104,12 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 	r.Lock()
 	defer r.Unlock()
 
-	started := time.Now()
+	started := runtimeNano()
 
 	addr, err := r.lookupTXT(ctx, txt)
 
-	r.collector.DNSLookupDuration(time.Since(started))
+	r.collector.DNSLookupDuration(
+		time.Duration(runtimeNano() - started))
 	return addr, err
 }
 
@@ -135,7 +140,7 @@ func (r *Resolver) resolveIPCache(domain string) ([]net.IPAddr, bool) {
 		return nil, false
 	}
 
-	if time.Now().After(entry.timestamp.Add(r.ttl)) {
+	if time.Duration(runtimeNano()-entry.timestamp) > r.ttl {
 		// invalidates cache entry
 		delete(r.ipCache, domain)
 		return nil, false
@@ -152,7 +157,7 @@ func (r *Resolver) resolveTXTCache(txt string) ([]string, bool) {
 		return nil, false
 	}
 
-	if time.Now().After(entry.timestamp.Add(r.ttl)) {
+	if time.Duration(runtimeNano()-entry.timestamp) > r.ttl {
 		// invalidates cache entry
 		delete(r.txtCache, txt)
 		return nil, false
@@ -165,7 +170,7 @@ func (r *Resolver) resolveTXTCache(txt string) ([]string, bool) {
 func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
 	r.ipCache[domain] = &ipCacheEntry{
 		addresses: addr,
-		timestamp: time.Now(),
+		timestamp: runtimeNano(),
 	}
 }
 
@@ -173,6 +178,6 @@ func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
 func (r *Resolver) updateTXTCache(txt string, addr []string) {
 	r.txtCache[txt] = &txtCacheEntry{
 		addresses: addr,
-		timestamp: time.Now(),
+		timestamp: runtimeNano(),
 	}
 }
