@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	_ "unsafe"
 
 	madns "github.com/multiformats/go-multiaddr-dns"
 
