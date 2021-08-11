@@ -109,9 +109,9 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -125,7 +125,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -155,7 +155,7 @@ func (e *Engine) Done() <-chan struct{} {
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch resource := event.(type) {
 	case *messages.ChunkDataResponse:
-		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack, &resource.Collection)
+		e.handleChunkDataPackWithTracing(originID, &resource.ChunkDataPack)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
@@ -164,7 +164,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 }
 
 // handleChunkDataPackWithTracing encapsulates the logic of handling a chunk data pack with tracing enabled.
-func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
+func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
 	if !ok {
 		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
@@ -174,18 +174,21 @@ func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkD
 
 	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
 	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataResponse, func() {
-		e.handleChunkDataPack(originID, chunkDataPack, collection)
+		e.handleChunkDataPack(originID, chunkDataPack)
 	})
 }
 
-// handleChunkDataPack sends the received chunk data pack and its collection to the registered handler, and cleans up its request status.
-func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
+// handleChunkDataPack sends the received chunk data pack to the registered handler, and cleans up its request status.
+func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 	chunkID := chunkDataPack.ChunkID
-	collectionID := collection.ID()
 	lg := e.log.With().
 		Hex("chunk_id", logging.ID(chunkID)).
-		Hex("collection_id", logging.ID(collectionID)).
 		Logger()
+
+	if chunkDataPack.Collection != nil {
+		collectionID := chunkDataPack.Collection.ID()
+		lg = lg.With().Hex("collection_id", logging.ID(collectionID)).Logger()
+	}
 	lg.Debug().Msg("chunk data pack received")
 
 	e.metrics.OnChunkDataPackResponseReceivedFromNetworkByRequester()
@@ -197,7 +200,7 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		return
 	}
 
-	e.handler.HandleChunkDataPack(originID, chunkDataPack, collection)
+	e.handler.HandleChunkDataPack(originID, chunkDataPack)
 
 	e.metrics.OnChunkDataPackSentToFetcher()
 	lg.Info().Msg("successfully sent the chunk data pack to the handler")

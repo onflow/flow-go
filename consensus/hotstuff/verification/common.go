@@ -9,12 +9,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// makeVoteMessage generates the message we have to sign in order to be able
+// MakeVoteMessage generates the message we have to sign in order to be able
 // to verify signatures without having the full block. To that effect, each data
 // structure that is signed contains the sometimes redundant view number and
 // block ID; this allows us to create the signed message and verify the signed
 // message without having the full block contents.
-func makeVoteMessage(view uint64, blockID flow.Identifier) []byte {
+func MakeVoteMessage(view uint64, blockID flow.Identifier) []byte {
 	msg := flow.MakeID(struct {
 		BlockID flow.Identifier
 		View    uint64
@@ -80,7 +80,7 @@ type stakingKeysAggregator struct {
 func newStakingKeysAggregator() *stakingKeysAggregator {
 	aggregator := &stakingKeysAggregator{
 		lastStakingSigners: map[flow.Identifier]*flow.Identity{},
-		lastStakingKey:     crypto.NeutralBLSPublicKey(),
+		lastStakingKey:     NeutralBLSPublicKey(),
 		RWMutex:            sync.RWMutex{},
 	}
 	return aggregator
@@ -107,12 +107,12 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 	newSignerKeys, missingSignerKeys, updatedSignerSet := identitiesDeltaKeys(signers, lastSet)
 	// add the new keys
 	var err error
-	updatedKey, err := crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
+	updatedKey, err := AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
 	if err != nil {
 		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
 	}
 	// remove the missing keys
-	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
+	updatedKey, err = RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
 	if err != nil {
 		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
 	}

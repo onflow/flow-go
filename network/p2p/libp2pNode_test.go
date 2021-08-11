@@ -248,11 +248,14 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	ch := make(chan string, count)
 
 	// Create the handler function
-	handler := func(s network.Stream) {
-		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-		str, err := rw.ReadString('\n')
-		assert.NoError(suite.T(), err)
-		ch <- str
+	handler := func(t *testing.T) network.StreamHandler {
+		h := func(s network.Stream) {
+			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+			str, err := rw.ReadString('\n')
+			assert.NoError(t, err)
+			ch <- str
+		}
+		return h
 	}
 
 	// Creates nodes
@@ -315,7 +318,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	require.Len(suite.T(), identities, 1)
 
 	// create a silent node which never replies
-	listener, silentNodeId := suite.silentNodeFixture()
+	listener, silentNodeId := silentNodeFixture(suite.T())
 	defer func() {
 		require.NoError(suite.T(), listener.Close())
 	}()
@@ -344,7 +347,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	require.Len(suite.T(), goodNodeIds, 2)
 
 	// create a silent node which never replies
-	listener, silentNodeId := suite.silentNodeFixture()
+	listener, silentNodeId := silentNodeFixture(suite.T())
 	defer func() {
 		require.NoError(suite.T(), listener.Close())
 	}()
@@ -414,30 +417,34 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 	defer close(done)
 
 	// Create the handler function
-	handler := func(s network.Stream) {
-		go func(s network.Stream) {
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			for {
-				str, err := rw.ReadString('\n')
-				if err != nil {
-					if errors.Is(err, io.EOF) {
-						err := s.Close()
-						assert.NoError(suite.T(), err)
+	handler := func(t *testing.T) network.StreamHandler {
+		h := func(s network.Stream) {
+			go func(s network.Stream) {
+				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+				for {
+					str, err := rw.ReadString('\n')
+					if err != nil {
+						if errors.Is(err, io.EOF) {
+							err := s.Close()
+							assert.NoError(t, err)
+							return
+						}
+						assert.Fail(t, fmt.Sprintf("received error %v", err))
+						err = s.Reset()
+						assert.NoError(t, err)
 						return
 					}
-					assert.Fail(suite.T(), fmt.Sprintf("received error %v", err))
-					err = s.Reset()
-					assert.NoError(suite.T(), err)
-					return
+					select {
+					case <-done:
+						return
+					default:
+						ch <- str
+					}
 				}
-				select {
-				case <-done:
-					return
-				default:
-					ch <- str
-				}
-			}
-		}(s)
+			}(s)
+
+		}
+		return h
 	}
 
 	// Creates nodes
@@ -491,13 +498,23 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 	node1Id := *identities[0]
 	node2Id := *identities[1]
 
+	_, expectedVersion, expectedHeight := MockPingInfoProvider()
+
 	// test node1 can ping node 2
-	_, _, err := node1.Ping(suite.ctx, node2Id)
-	require.NoError(suite.T(), err)
+	testPing(suite.T(), node1, node2Id, expectedVersion, expectedHeight)
 
 	// test node 2 can ping node 1
-	_, _, err = node2.Ping(suite.ctx, node1Id)
-	require.NoError(suite.T(), err)
+	testPing(suite.T(), node2, node1Id, expectedVersion, expectedHeight)
+}
+
+func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64) {
+	pctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resp, rtt, err := source.Ping(pctx, target)
+	assert.NoError(t, err)
+	assert.NotZero(t, rtt)
+	assert.Equal(t, expectedVersion, resp.Version)
+	assert.Equal(t, expectedHeight, resp.BlockHeight)
 }
 
 // TestConnectionGating tests node allow listing by peer.ID
@@ -557,9 +574,24 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 	})
 }
 
+func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
+	// Create a Node with AllowList = false
+	node, identity := suite.NodesFixture(1, nil, false)
+	node1 := node[0]
+	node1Id := identity[0]
+	defer StopNode(suite.T(), node1)
+
+	suite.Run("updating allowlist of node w/o ConnGater does not crash", func() {
+
+		// node1 allowlists node1
+		err := node1.UpdateAllowList(flow.IdentityList{node1Id})
+		require.Error(suite.T(), err)
+	})
+}
+
 // NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
+func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -585,14 +617,14 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler network.Stream
 
 // NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID string, handler network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
+func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID string, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
 	var handlerFunc network.StreamHandler
 	if handler != nil {
 		// use the callback that has been passed in
-		handlerFunc = handler
+		handlerFunc = handler(t)
 	} else {
 		// use a default call back
 		handlerFunc = func(network.Stream) {}
@@ -601,15 +633,23 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
 	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(log,
-		identity.NodeID,
-		identity.Address,
-		NewConnManager(log, noopMetrics),
-		key,
-		allowList,
-		rootID,
-		pingInfoProvider)
+	connManager := NewConnManager(log, noopMetrics)
+
+	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
+		SetRootBlockID(rootID).
+		SetConnectionManager(connManager).
+		SetPingInfoProvider(pingInfoProvider).
+		SetLogger(log)
+
+	if allowList {
+		connGater := NewConnGater(log)
+		builder.SetConnectionGater(connGater)
+	}
+
+	ctx := context.Background()
+	n, err := builder.Build(ctx)
 	require.NoError(t, err)
+
 	n.SetFlowProtocolStreamHandler(handlerFunc)
 
 	require.Eventuallyf(t, func() bool {
@@ -662,36 +702,36 @@ func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.Priv
 	key := generateNetworkingKey(t)
 
 	// translates flow key into libp2p key
-	libP2Pkey, err := privKey(key)
+	libP2Pkey, err := PrivKey(key)
 	require.NoError(t, err)
 
 	return libP2Pkey, key
 }
 
 // silentNodeFixture returns a TCP listener and a node which never replies
-func (suite *LibP2PNodeTestSuite) silentNodeFixture() (net.Listener, flow.Identity) {
-	key := generateNetworkingKey(suite.T())
+func silentNodeFixture(t *testing.T) (net.Listener, flow.Identity) {
+	key := generateNetworkingKey(t)
 
 	lst, err := net.Listen("tcp4", ":0")
-	require.NoError(suite.T(), err)
+	require.NoError(t, err)
 
 	addr, err := manet.FromNetAddr(lst.Addr())
-	require.NoError(suite.T(), err)
+	require.NoError(t, err)
 
 	addrs := []multiaddr.Multiaddr{addr}
 	addrs, err = addrutil.ResolveUnspecifiedAddresses(addrs, nil)
-	require.NoError(suite.T(), err)
+	require.NoError(t, err)
 
-	go suite.acceptAndHang(lst)
+	go acceptAndHang(t, lst)
 
 	ip, port, err := IPPortFromMultiAddress(addrs...)
-	require.NoError(suite.T(), err)
+	require.NoError(t, err)
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(ip+":"+port))
 	return lst, *identity
 }
 
-func (suite *LibP2PNodeTestSuite) acceptAndHang(l net.Listener) {
+func acceptAndHang(t *testing.T, l net.Listener) {
 	conns := make([]net.Conn, 0, 10)
 	for {
 		c, err := l.Accept()
@@ -703,6 +743,6 @@ func (suite *LibP2PNodeTestSuite) acceptAndHang(l net.Listener) {
 		}
 	}
 	for _, c := range conns {
-		require.NoError(suite.T(), c.Close())
+		require.NoError(t, c.Close())
 	}
 }

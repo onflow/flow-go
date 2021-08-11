@@ -23,6 +23,19 @@ type ConnectionFactory interface {
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
 }
 
+type ProxyConnectionFactory struct {
+	ConnectionFactory
+	targetAddress string
+}
+
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
+}
+
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
+}
+
 type ConnectionFactoryImpl struct {
 	CollectionGRPCPort        uint
 	ExecutionGRPCPort         uint

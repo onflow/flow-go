@@ -37,6 +37,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 		vmCtx: vmCtx,
 		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
 			fvm.WithRestrictedDeployment(false),
+			fvm.WithTransactionFeesEnabled(false),
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
@@ -54,7 +55,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 	}
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
-	for i, txBody := range vc.Collection.Transactions {
+	for i, txBody := range vc.ChunkDataPack.Collection.Transactions {
 		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
@@ -74,7 +75,7 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 
 	// transaction body of system chunk
 	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
-	tx := fvm.Transaction(txBody, uint32(0))
+	tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
 	systemChunkContext := fvm.NewContextFromParent(fcv.systemChunkCtx,
@@ -205,7 +206,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		computedServiceEvents := make(flow.ServiceEventList, len(result.ServiceEvents))
 
 		for i, serviceEvent := range serviceEvents {
-			realServiceEvent, err := convert.ServiceEvent(serviceEvent)
+			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
 			if err != nil {
 				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
 			}

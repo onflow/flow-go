@@ -178,7 +178,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		return emptyHash, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
 
-	return ledger.RootHash(newTrie.RootHash()), nil
+	return newTrie.RootHash(), nil
 }
 
 // Proofs returns a batch proof for the given paths.

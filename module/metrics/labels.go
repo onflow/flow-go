@@ -51,6 +51,7 @@ const (
 	ResourceCollection               = "collection"
 	ResourceApproval                 = "approval"
 	ResourceSeal                     = "seal"
+	ResourcePendingIncorporatedSeal  = "pending_incorporated_seal"
 	ResourceCommit                   = "commit"
 	ResourceTransaction              = "transaction"
 	ResourceClusterPayload           = "cluster_payload"
@@ -73,15 +74,17 @@ const (
 	ResourceEpochSetup               = "epoch_setup"
 	ResourceEpochCommit              = "epoch_commit"
 	ResourceEpochStatus              = "epoch_status"
-	ResourceApprovalQueue            = "sealing_approval_queue"          // consensus node, sealing engine
-	ResourceReceiptQueue             = "sealing_receipt_queue"           // consensus node, sealing engine
-	ResourceApprovalResponseQueue    = "sealing_approval_response_queue" // consensus node, sealing engine
-	ResourceBlockProposalQueue       = "compliance_proposal_queue"       // consensus node, compliance engine
-	ResourceBlockVoteQueue           = "compliance_vote_queue"           // consensus node, compliance engine
-	ResourceChunkDataPack            = "chunk_data_pack"                 // execution node
-	ResourceEvents                   = "events"                          // execution node
-	ResourceServiceEvents            = "service_events"                  // execution node
-	ResourceTransactionResults       = "transaction_results"             // execution node
+
+	ResourceDKGKey                = "dkg-key"                         // consensus node, DKG engine
+	ResourceApprovalQueue         = "sealing_approval_queue"          // consensus node, sealing engine
+	ResourceReceiptQueue          = "sealing_receipt_queue"           // consensus node, sealing engine
+	ResourceApprovalResponseQueue = "sealing_approval_response_queue" // consensus node, sealing engine
+	ResourceBlockProposalQueue    = "compliance_proposal_queue"       // consensus node, compliance engine
+	ResourceBlockVoteQueue        = "compliance_vote_queue"           // consensus node, compliance engine
+	ResourceChunkDataPack         = "chunk_data_pack"                 // execution node
+	ResourceEvents                = "events"                          // execution node
+	ResourceServiceEvents         = "service_events"                  // execution node
+	ResourceTransactionResults    = "transaction_results"             // execution node
 )
 
 const (

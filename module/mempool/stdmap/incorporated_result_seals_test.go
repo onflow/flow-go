@@ -16,14 +16,11 @@ import (
 type icrSealsMachine struct {
 	icrs  *IncorporatedResultSeals       // icrSeals being tested
 	state []*flow.IncorporatedResultSeal // model of the icrSeals
-	limit uint
 }
 
 // Init is an action for initializing a icrSeals instance.
 func (m *icrSealsMachine) Init(t *rapid.T) {
-	n := uint(rapid.IntRange(1, 1000).Draw(t, "n").(int))
-	m.icrs = NewIncorporatedResultSeals(n)
-	m.limit = n
+	m.icrs = NewIncorporatedResultSeals(1000)
 }
 
 // Add is a conditional action which adds an item to the icrSeals.
@@ -47,30 +44,6 @@ func (m *icrSealsMachine) Add(t *rapid.T) {
 
 	if unmet && seal.Header.Height >= m.icrs.lowestHeight {
 		m.state = append(m.state, seal)
-		if len(m.state) > int(m.limit) {
-			// we remove one of the max height elements if we're beyond the mempool limit
-			maxHeight := m.icrs.lowestHeight
-			for _, v := range m.state {
-				if v.Header.Height > maxHeight {
-					maxHeight = v.Header.Height
-				}
-			}
-			filtered_state := make([]*flow.IncorporatedResultSeal, 0)
-			for _, v := range m.state {
-				if v.Header.Height < maxHeight {
-					// only max height elements are ejected, others should be kept
-					filtered_state = append(filtered_state, v)
-				} else {
-					// the actual removed elements are chosen at random by the backend,
-					// so we probe among all that verify the height constraint
-					_, still_there := m.icrs.ByID(v.ID())
-					if still_there {
-						filtered_state = append(filtered_state, v)
-					}
-				}
-			}
-			m.state = filtered_state
-		}
 	}
 }
 
@@ -272,24 +245,6 @@ func TestIncorporatedResultSeals(t *testing.T) {
 		require.NoError(t, err)
 		verifyAbsent(t, pool, seals[:3]...)
 		verifyPresent(t, pool, seals[3:]...)
-	})
-
-	t.Run("test ejection", func(t *testing.T) {
-		pool := NewIncorporatedResultSeals(3)
-
-		seals := make([]*flow.IncorporatedResultSeal, 0, 6)
-		for _, h := range []uint64{7, 10, 5, 12, 8} {
-			seal := unittest.IncorporatedResultSeal.Fixture(func(s *flow.IncorporatedResultSeal) {
-				s.Header.Height = h
-			})
-			seals = append(seals, seal)
-			ok, err := pool.Add(seal)
-			require.NoError(t, err)
-			require.True(t, ok)
-		}
-
-		verifyPresent(t, pool, seals[0], seals[2], seals[4])
-		verifyAbsent(t, pool, seals[1], seals[3])
 	})
 }
 

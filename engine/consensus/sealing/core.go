@@ -3,11 +3,11 @@
 package sealing
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
@@ -23,12 +23,13 @@ import (
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // DefaultRequiredApprovalsForSealConstruction is the default number of approvals required to construct a candidate seal
 // for subsequent inclusion in block.
-const DefaultRequiredApprovalsForSealConstruction = 0
+// when set to 1, it requires at least 1 approval to build a seal
+// when set to 0, it can build seal without any approval
+const DefaultRequiredApprovalsForSealConstruction = 1
 
 // DefaultEmergencySealingActive is a flag which indicates when emergency sealing is active, this is a temporary measure
 // to make fire fighting easier while seal & verification is under development.
@@ -57,6 +58,7 @@ func DefaultConfig() Config {
 // 	- pruning already processed collectorTree
 type Core struct {
 	unit                       *engine.Unit
+	workerPool                 *workerpool.WorkerPool             // worker pool used by collectors
 	log                        zerolog.Logger                     // used to log relevant actions with context
 	collectorTree              *approvals.AssignmentCollectorTree // levelled forest for assignment collectors
 	approvalsCache             *approvals.LruCache                // in-memory cache of approvals that weren't verified
@@ -75,6 +77,7 @@ type Core struct {
 
 func NewCore(
 	log zerolog.Logger,
+	workerPool *workerpool.WorkerPool,
 	tracer module.Tracer,
 	conMetrics module.ConsensusMetrics,
 	sealingTracker consensus.SealingTracker,
@@ -95,6 +98,7 @@ func NewCore(
 
 	core := &Core{
 		log:                        log.With().Str("engine", "sealing.Core").Logger(),
+		workerPool:                 workerPool,
 		tracer:                     tracer,
 		metrics:                    conMetrics,
 		sealingTracker:             sealingTracker,
@@ -107,12 +111,17 @@ func NewCore(
 		seals:                      sealsDB,
 		sealsMempool:               sealsMempool,
 		config:                     config,
-		requestTracker:             approvals.NewRequestTracker(10, 30),
+		requestTracker:             approvals.NewRequestTracker(headers, 10, 30),
 	}
 
-	factoryMethod := func(result *flow.ExecutionResult) (*approvals.AssignmentCollector, error) {
-		return approvals.NewAssignmentCollector(core.log, result, core.state, core.headers, assigner, sealsMempool, verifier,
+	factoryMethod := func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
+		base, err := approvals.NewAssignmentCollectorBase(core.log, core.workerPool, result, core.state, core.headers,
+			assigner, sealsMempool, verifier,
 			approvalConduit, core.requestTracker, config.RequiredApprovalsForSealConstruction)
+		if err != nil {
+			return nil, fmt.Errorf("could not create base collector: %w", err)
+		}
+		return approvals.NewAssignmentCollectorStateMachine(base), nil
 	}
 
 	core.collectorTree = approvals.NewAssignmentCollectorTree(lastSealed, headers, factoryMethod)
@@ -146,12 +155,6 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		return fmt.Errorf("could not retrieve latest sealed block (%x): %w", latestSealedBlockID, err)
 	}
 
-	// usually we start with empty collectors tree, prune it to minimum height
-	_, err = c.collectorTree.PruneUpToHeight(latestSealedBlock.Height)
-	if err != nil {
-		return fmt.Errorf("could not prune execution tree to height %d: %w", latestSealedBlock.Height, err)
-	}
-
 	blocksProcessed := uint64(0)
 	totalBlocks := finalized.Height - latestSealedBlock.Height
 
@@ -164,12 +167,10 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 		}
 
 		for _, result := range payload.Results {
-			// TODO: change this when migrating to sealing & verification phase 3.
-			// Incorporated result is created this way only for phase 2.
-			incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+			incorporatedResult := flow.NewIncorporatedResult(blockID, result)
 			err = c.ProcessIncorporatedResult(incorporatedResult)
 			if err != nil {
-				return fmt.Errorf("could not process incorporated result for block %s: %w", blockID, err)
+				return fmt.Errorf("could not process incorporated result from block %s: %w", blockID, err)
 			}
 		}
 
@@ -202,12 +203,26 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 
 	c.log.Info().Msgf("reloading assignments from %d unfinalized blocks into collector tree", len(validPending))
 
+	// We use AssignmentCollectorTree for collecting approvals for each incorporated result.
+	// In order to verify the received approvals, the verifier assignment for each incorporated result
+	// needs to be known.
+	// The verifier assignment is random, its Source of Randomness (SoR) is only available if a valid
+	// child block exists.
+	// In other words, the parent of a valid block must have the SoR available. Therefore, we traverse
+	// through valid pending blocks which already have a valid child, and load each result in those block
+	// into the AssignmentCollectorTree.
 	for _, blockID := range validPending {
 		block, err := c.headers.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", blockID, err)
 		}
-		err = resultProcessor(block)
+
+		parent, err := c.headers.ByBlockID(block.ParentID)
+		if err != nil {
+			return fmt.Errorf("could not retrieve header for unfinalized block %x: %w", block.ParentID, err)
+		}
+
+		err = resultProcessor(parent)
 		if err != nil {
 			return fmt.Errorf("failed to process results for unfinalized block %x at height %d: %w", blockID, block.Height, err)
 		}
@@ -223,52 +238,52 @@ func (c *Core) RepopulateAssignmentCollectorTree(payloads storage.Payloads) erro
 // * engine.OutdatedInputError - result is outdated for instance block was already sealed
 // * exception in case of any other error, usually this is not expected
 // * nil - successfully processed incorporated result
-func (c *Core) processIncorporatedResult(result *flow.IncorporatedResult) error {
-	err := c.checkBlockOutdated(result.Result.BlockID)
+func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error {
+	err := c.checkBlockOutdated(incRes.Result.BlockID)
 	if err != nil {
-		return fmt.Errorf("won't process outdated or unverifiable execution result %s: %w", result.Result.BlockID, err)
+		return fmt.Errorf("won't process outdated or unverifiable execution incRes %s: %w", incRes.Result.BlockID, err)
 	}
-
-	incorporatedBlock, err := c.headers.ByBlockID(result.IncorporatedBlockID)
+	incorporatedBlock, err := c.headers.ByBlockID(incRes.IncorporatedBlockID)
 	if err != nil {
 		return fmt.Errorf("could not get block height for incorporated block %s: %w",
-			result.IncorporatedBlockID, err)
+			incRes.IncorporatedBlockID, err)
 	}
 	incorporatedAtHeight := incorporatedBlock.Height
 
-	// check if we are dealing with finalized block or an orphan
+	// For incorporating blocks at heights that are already finalized, we check that the incorporating block
+	// is on the finalized fork. Otherwise, the incorporating block is orphaned, and we can drop the result.
 	if incorporatedAtHeight <= c.counterLastFinalizedHeight.Value() {
 		finalized, err := c.headers.ByHeight(incorporatedAtHeight)
 		if err != nil {
 			return fmt.Errorf("could not retrieve finalized block at height %d: %w", incorporatedAtHeight, err)
 		}
-		if finalized.ID() != result.IncorporatedBlockID {
-			// it means that we got incorporated result for a block which doesn't extend our chain
+		if finalized.ID() != incRes.IncorporatedBlockID {
+			// it means that we got incorporated incRes for a block which doesn't extend our chain
 			// and should be discarded from future processing
-			return engine.NewOutdatedInputErrorf("won't process incorporated result from orphan block %s", result.IncorporatedBlockID)
+			return engine.NewOutdatedInputErrorf("won't process incorporated incRes from orphan block %s", incRes.IncorporatedBlockID)
 		}
 	}
 
-	// in case block is not finalized, we will create collector and start processing approvals
-	// no checks for orphans can be made at this point
-	// we expect that assignment collector will cleanup orphan IRs whenever new finalized block is processed
-	lazyCollector, err := c.collectorTree.GetOrCreateCollector(result.Result)
+	// Get (or create) assignment collector for the respective result (atomic operation) and
+	// add the assignment for the incorporated result to it. (No-op if assignment already known).
+	// Here, we just add assignment collectors to the tree. Cleanup of orphaned and sealed assignments
+	// IRs whenever new finalized block is processed
+	lazyCollector, err := c.collectorTree.GetOrCreateCollector(incRes.Result)
 	if err != nil {
 		return fmt.Errorf("cannot create collector: %w", err)
 	}
-
-	err = lazyCollector.Collector.ProcessIncorporatedResult(result)
+	err = lazyCollector.Collector.ProcessIncorporatedResult(incRes)
 	if err != nil {
-		return fmt.Errorf("could not process incorporated result: %w", err)
+		return fmt.Errorf("could not process incorporated incRes: %w", err)
 	}
 
 	// process pending approvals only if it's a new collector
-	// pending approvals are those we haven't received its result yet,
-	// once we received a result and created a new collector, we find the pending
-	// approvals for this result, and process them
+	// pending approvals are those we haven't received its incRes yet,
+	// once we received a incRes and created a new collector, we find the pending
+	// approvals for this incRes, and process them
 	// newIncorporatedResult should be true only for one goroutine even if multiple access this code at the same
 	// time, ensuring that processing of pending approvals happens once for particular assignment
-	if lazyCollector.Created && lazyCollector.Processable {
+	if lazyCollector.Created {
 		err = c.processPendingApprovals(lazyCollector.Collector)
 		if err != nil {
 			return fmt.Errorf("could not process cached approvals:  %w", err)
@@ -287,7 +302,7 @@ func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error 
 	err := c.processIncorporatedResult(result)
 	span.Finish()
 
-	// We expect only engine.IsOutdatedInputError. If we encounter OutdatedInputError, InvalidInputError, we
+	// We expect only engine.OutdatedInputError. If we encounter UnverifiableInputError or InvalidInputError, we
 	// have a serious problem, because these results are coming from the node's local HotStuff, which is trusted.
 	if engine.IsOutdatedInputError(err) {
 		c.log.Debug().Err(err).Msgf("dropping outdated incorporated result %v", result.ID())
@@ -336,29 +351,26 @@ func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 	approvalSpan.Finish()
 
 	if err != nil {
-		// only engine.UnverifiableInputError,
-		// engine.OutdatedInputError, engine.InvalidInputError are expected, otherwise it's an exception
-		if engine.IsUnverifiableInputError(err) || engine.IsOutdatedInputError(err) || engine.IsInvalidInputError(err) {
-			logger := c.log.Info()
-			if engine.IsInvalidInputError(err) {
-				logger = c.log.Error()
-			}
+		if engine.IsOutdatedInputError(err) {
+			return nil // potentially delayed input
+		}
 
-			logger.Err(err).
-				Hex("approval_id", logging.Entity(approval)).
-				Msgf("could not process result approval")
-
+		lg := c.log.With().
+			Err(err).
+			Str("approver_id", approval.Body.ApproverID.String()).
+			Str("executed_block_id", approval.Body.BlockID.String()).
+			Str("result_id", approval.Body.ExecutionResultID.String()).
+			Str("approval_id", approval.ID().String()).
+			Logger()
+		if engine.IsUnverifiableInputError(err) {
+			lg.Warn().Msg("received approval for unknown block (this node is potentially behind)")
 			return nil
 		}
-
-		marshalled, err := json.Marshal(approval)
-		if err != nil {
-			marshalled = []byte("json_marshalling_failed")
+		if engine.IsInvalidInputError(err) {
+			lg.Error().Msg("received invalid approval")
+			return nil
 		}
-		c.log.Error().Err(err).
-			Hex("approval_id", logging.Entity(approval)).
-			Str("approval", string(marshalled)).
-			Msgf("unexpected error processing result approval")
+		lg.Error().Msg("unexpected error processing result approval")
 
 		return fmt.Errorf("internal error processing result approval %x: %w", approval.ID(), err)
 	}
@@ -379,11 +391,7 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 		return fmt.Errorf("won't process approval for oudated block (%x): %w", approval.Body.BlockID, err)
 	}
 
-	if collector, processable := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
-		if !processable {
-			return engine.NewOutdatedInputErrorf("collector for %s is marked as non processable", approval.Body.ExecutionResultID)
-		}
-
+	if collector := c.collectorTree.GetCollector(approval.Body.ExecutionResultID); collector != nil {
 		// if there is a collector it means that we have received execution result and we are ready
 		// to process approvals
 		err = collector.ProcessApproval(approval)
@@ -425,14 +433,15 @@ func (c *Core) checkEmergencySealing(observer consensus.SealingObservation, last
 	return nil
 }
 
-func (c *Core) processPendingApprovals(collector *approvals.AssignmentCollector) error {
+func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorState) error {
+	resultID := collector.ResultID()
 	// filter cached approvals for concrete execution result
-	for _, approval := range c.approvalsCache.TakeByResultID(collector.ResultID) {
+	for _, approval := range c.approvalsCache.TakeByResultID(resultID) {
 		err := collector.ProcessApproval(approval)
 		if err != nil {
 			if engine.IsInvalidInputError(err) {
 				c.log.Debug().
-					Hex("result_id", collector.ResultID[:]).
+					Hex("result_id", resultID[:]).
 					Err(err).
 					Msgf("invalid approval with id %s", approval.ID())
 			} else {
@@ -484,7 +493,7 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 	c.log.Info().Msgf("processing finalized block %v at height %d, lastSealedHeight %d", finalizedBlockID, finalized.Height, lastSealed.Height)
 	err = c.prune(processFinalizedBlockSpan, finalized, lastSealed)
 	if err != nil {
-		return fmt.Errorf("updating to finalized block %v and seald block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
+		return fmt.Errorf("updating to finalized block %v and sealed block %v failed: %w", finalizedBlockID, lastSealed.ID(), err)
 	}
 
 	// STEP 2: Check emergency sealing and re-request missing approvals
@@ -531,11 +540,11 @@ func (c *Core) prune(parentSpan opentracing.Span, finalized, lastSealed *flow.He
 	if err != nil {
 		return fmt.Errorf("AssignmentCollectorTree failed to update its finalization state: %w", err)
 	}
-	pruned, err := c.collectorTree.PruneUpToHeight(lastSealed.Height) // prune AssignmentCollectorTree
-	if err != nil {
-		return fmt.Errorf("could not prune collectorTree up to height %d: %w", lastSealed.Height, err)
+
+	err = c.requestTracker.PruneUpToHeight(lastSealed.Height)
+	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
+		return fmt.Errorf("could not request tracker at block up to height %d: %w", lastSealed.Height, err)
 	}
-	c.requestTracker.Remove(pruned...) // drop any approval requests for pruned assignments
 
 	err = c.sealsMempool.PruneUpToHeight(lastSealed.Height) // prune candidate seals mempool
 	if err != nil && !mempool.IsDecreasingPruningHeightError(err) {
