@@ -264,6 +264,8 @@ func generateLibP2PNode(t *testing.T,
 	connGater := p2p.NewConnGater(logger)
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, noopMetrics)
+
+	// dns resolver
 	resolver, err := dns.NewResolver(noopMetrics)
 	require.NoError(t, err)
 
@@ -273,6 +275,7 @@ func generateLibP2PNode(t *testing.T,
 		SetConnectionManager(connManager).
 		SetPubsubOptions(psOptions...).
 		SetPingInfoProvider(pingInfoProvider).
+		SetResolver(resolver).
 		SetLogger(logger).
 		Build(ctx)
 	require.NoError(t, err)

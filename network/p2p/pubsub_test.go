@@ -173,7 +173,9 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 		psOption := pubsub.WithDiscovery(d)
 
+		// dns resolver
 		resolver, err := dns.NewResolver(metrics.NewNoopCollector())
+		require.NoError(suite.T(), err)
 
 		ctx := context.Background()
 		connManager := NewConnManager(logger, noopMetrics)
@@ -183,6 +185,7 @@ func (suite *PubSubTestSuite) CreateNodes(count int, d *mockDiscovery) (nodes []
 			SetConnectionManager(connManager).
 			SetPubsubOptions(psOption).
 			SetPingInfoProvider(pingInfoProvider).
+			SetResolver(resolver).
 			SetLogger(logger).
 			Build(ctx)
 		require.NoError(suite.T(), err)
