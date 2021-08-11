@@ -27,6 +27,7 @@ func extractExecutionState(
 	log zerolog.Logger,
 	migrate bool,
 	report bool,
+	safeMode bool,
 ) error {
 
 	diskWal, err := wal.NewDiskWAL(
@@ -61,6 +62,7 @@ func extractExecutionState(
 		storageFormatV5Migration := mgr.StorageFormatV5Migration{
 			Log:       log,
 			OutputDir: outputDir,
+			SafeMode:  safeMode,
 		}
 		migrations = []ledger.Migration{
 			storageFormatV5Migration.Migrate,
