@@ -18,8 +18,8 @@ type TargetValidator struct {
 	log    zerolog.Logger
 }
 
-// NewTargetValidator returns a new TargetValidator for the given target id
-func NewTargetValidator(log zerolog.Logger, target flow.Identifier) *TargetValidator {
+// ValidateTarget returns a new TargetValidator for the given target id
+func ValidateTarget(log zerolog.Logger, target flow.Identifier) network.MessageValidator {
 	tv := &TargetValidator{
 		target: target[:],
 		log:    log,
