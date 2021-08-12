@@ -44,7 +44,7 @@ func setPubKey(c elliptic.Curve, x *big.Int, y *big.Int) *goecdsa.PublicKey {
 // These utility functions convert a Flow crypto key to a LibP2P key (Flow --> LibP2P)
 
 // PrivKey converts a Flow private key to a LibP2P Private key
-func PrivKey(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
+func LibP2PPrivKeyFromFlow(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 	// get the signature algorithm
 	keyType, err := keyType(fpk.Algorithm())
 	if err != nil {
@@ -75,7 +75,7 @@ func PrivKey(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
 }
 
 // PublicKey converts a Flow public key to a LibP2P public key
-func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
+func LibP2PPublicKeyFromFlow(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 	keyType, err := keyType(fpk.Algorithm())
 	if err != nil {
 		return nil, err
@@ -111,7 +111,7 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 // This converts some libp2p PubKeys to a flow PublicKey
 // - the supported key types are ECDSA P-256 and ECDSA Secp256k1 public keys,
 // - libp2p also supports RSA and Ed25519 keys, which Flow doesn't, their conversion will return an error.
-func PublicKeyFromNetwork(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
+func FlowPublicKeyFromLibP2P(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
 
 	switch ktype := lpk.Type(); ktype {
 	case lcrypto_pb.KeyType_ECDSA:

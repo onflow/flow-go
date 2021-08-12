@@ -598,7 +598,7 @@ func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateK
 // DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
 func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
-	libp2pKey, err := PrivKey(key)
+	libp2pKey, err := LibP2PPrivKeyFromFlow(key)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}

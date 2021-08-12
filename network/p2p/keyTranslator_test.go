@@ -45,7 +45,7 @@ func (k *KeyTranslatorTestSuite) TestPrivateKeyConversion() {
 			require.NoError(k.T(), err)
 
 			// convert it to a LibP2P private key
-			lpk, err := PrivKey(fpk)
+			lpk, err := LibP2PPrivKeyFromFlow(fpk)
 			require.NoError(k.T(), err)
 
 			// get the raw bytes of both the keys
@@ -91,7 +91,7 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 			fpublic := fpk.PublicKey()
 
 			// convert the Flow public key to a Libp2p public key
-			lpublic, err := PublicKey(fpublic)
+			lpublic, err := LibP2PPublicKeyFromFlow(fpublic)
 			require.NoError(k.T(), err)
 
 			// compare raw bytes of the public keys
@@ -125,10 +125,10 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyRoundTrip() {
 			fpublic := fpk.PublicKey()
 
 			// convert the Flow public key to a Libp2p public key
-			lpublic, err := PublicKey(fpublic)
+			lpublic, err := LibP2PPublicKeyFromFlow(fpublic)
 			require.NoError(k.T(), err)
 
-			fpublic2, err := PublicKeyFromNetwork(lpublic)
+			fpublic2, err := FlowPublicKeyFromLibP2P(lpublic)
 			require.NoError(k.T(), err)
 			require.Equal(k.T(), fpublic, fpublic2)
 
@@ -150,7 +150,7 @@ func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	fpublic := fpk.PublicKey()
 
 	// convert it to the Libp2p Public key
-	lconverted, err := PublicKey(fpublic)
+	lconverted, err := LibP2PPublicKeyFromFlow(fpublic)
 	require.NoError(k.T(), err)
 
 	// check that the LibP2P Id generation is deterministic
