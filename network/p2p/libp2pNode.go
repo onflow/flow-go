@@ -341,14 +341,20 @@ func (n *Node) RemovePeer(ctx context.Context, identity flow.Identity) error {
 }
 
 // CreateStream returns an existing stream connected to identity, if it exists or adds one to identity as a peer and creates a new stream with it.
-func (n *Node) CreateStream(ctx context.Context, identity flow.Identity) (libp2pnet.Stream, error) {
+func (n *Node) CreateStream(ctx context.Context, nodeID flow.Identifier) (libp2pnet.Stream, error) {
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
-	stream, err := n.tryCreateNewStream(ctx, identity, maxConnectAttempt)
+	stream, err := n.tryCreateNewStream(ctx, nodeID, maxConnectAttempt)
 	if err != nil {
+		n.host.Peerstore().Addrs()
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (node_id: %s, address: %s): %w", identity.NodeID.String(),
 			identity.Address, err))
 	}
 	return stream, nil
+}
+
+func (n *Node) GetPeerIPPort(nodeID flow.Identifier) (string, string, error) {
+	// TODO: first get peer ID
+	x := n.host.Peerstore().Addrs()
 }
 
 // tryCreateNewStream makes at most maxAttempts to create a stream with the identity.
