@@ -11,8 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	fcrypto "github.com/onflow/flow-go/crypto"
-
-	"github.com/btcsuite/btcd/btcec"
 )
 
 // This module is meant to help libp2p <-> flow public key conversions
@@ -145,9 +143,11 @@ func PublicKeyFromNetwork(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
 		if !ok {
 			return nil, lcrypto.ErrBadKeyType
 		}
-		pk_uncompressed := (*btcec.PublicKey)(lpk_secp256k1).SerializeUncompressed()
-		// the first bit is the compression bit of X9.62
-		pk, err := crypto.DecodePublicKey(crypto.ECDSASecp256k1, pk_uncompressed[1:])
+		secpBytes, err := lpk_secp256k1.Raw()
+		if err != nil { // this never errors
+			return nil, lcrypto.ErrBadKeyType
+		}
+		pk, err := crypto.DecodePublicKeyCompressed(crypto.ECDSASecp256k1, secpBytes)
 		if err != nil {
 			return nil, lcrypto.ErrNotECDSAPubKey
 		}
