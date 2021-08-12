@@ -35,7 +35,7 @@ func TestResolver_HappyPath(t *testing.T) {
 	ipTestCases := ipLookupFixture(size)
 
 	// going through the cache, each domain should only being resolved once over the underlying resolver.
-	mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 1)
+	mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath)
 
 	// each test case is repeated 5 times, since resolver has been mocked only once per test case
 	// it ensures that the rest 4 calls are made through the cache and not the resolver.
@@ -60,14 +60,16 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	times := 5 // each domain is queried for resolution 10 times
 	txtTestCases := txtLookupFixture(size)
 	ipTestCase := ipLookupFixture(size)
-	wg := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
-	queryResolver(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath)
+	wg := queryResolver(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
 
 	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
 
-	queryResolver(t, times, resolver, txtTestCases, ipTestCase, happyPath)
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "could not resolve all addresses")
+	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath)
+	wg = queryResolver(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
 }
 
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
@@ -84,11 +86,11 @@ func TestResolver_Error(t *testing.T) {
 	// mocks underlying basic resolver invoked 5 times per domain and returns an error each time.
 	// this evaluates that upon returning an error, the result is not cached, so the next invocation again goes
 	// through the resolver.
-	wg := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, times) // sets false to return an error
+	mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath) // sets false to return an error
 
 	// each test case is repeated 5 times, and since underlying basic resolver is mocked to return error, it ensures
 	// that all calls go through the resolver without ever getting cached.
-	queryResolver(t, times, resolver, txtTestCases, ipTestCase, !happyPath)
+	wg := queryResolver(t, times, resolver, txtTestCases, ipTestCase, !happyPath)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
 }
@@ -109,72 +111,62 @@ func queryResolver(t *testing.T,
 	txtTestCases map[string]*txtLookupTestCase,
 	ipTestCases map[string]*ipLookupTestCase,
 	happyPath bool) *sync.WaitGroup {
-	ctx := context.Background()
 
+	ctx := context.Background()
 	wg := &sync.WaitGroup{}
 	wg.Add(times * (len(txtTestCases) + len(ipTestCases)))
 
 	for _, txttc := range txtTestCases {
-		txtc := make(chan struct{})
-
-		for i := 0; i < times; i++ {
-			go func(tc *txtLookupTestCase, index int) {
-				if index != 0 {
-					// other invocations of each test wait for the first time to get through and
-					// cached and then go concurrently.
-					<-txtc
-				}
-
-				addrs, err := resolver.LookupTXT(ctx, tc.domain)
-				if happyPath {
-					require.NoError(t, err)
-					require.ElementsMatch(t, addrs, tc.result)
-				} else {
-					require.Error(t, err)
-				}
-
-				if index == 0 {
-					close(txtc) // now lets other invocations go
-				}
-
-				wg.Done()
-
-			}(txttc, i)
-		}
+		cacheAndQuery(t, func(domain string) (interface{}, error) {
+			return resolver.LookupTXT(ctx, domain)
+		}, txttc.domain, txttc.result, times, wg, happyPath)
 	}
 
 	for _, iptc := range ipTestCases {
-		ipc := make(chan struct{})
-
-		for i := 0; i < times; i++ {
-			go func(tc *ipLookupTestCase, index int) {
-				if index != 0 {
-					// other invocations (except first one) of each test
-					// wait for the first time to get through and
-					// cached and then go concurrently.
-					<-ipc
-				}
-
-				addrs, err := resolver.LookupIPAddr(ctx, tc.domain)
-
-				if happyPath {
-					require.NoError(t, err)
-					require.ElementsMatch(t, addrs, tc.result)
-				} else {
-					require.Error(t, err)
-				}
-
-				if index == 0 {
-					close(ipc) // now lets other invocations go
-				}
-
-				wg.Done()
-
-			}(iptc, i)
-		}
+		cacheAndQuery(t, func(domain string) (interface{}, error) {
+			return resolver.LookupIPAddr(ctx, domain)
+		}, iptc.domain, iptc.result, times, wg, happyPath)
 	}
 
 	return wg
+}
+
+func cacheAndQuery(t *testing.T,
+	resolver func(domain string) (interface{}, error),
+	domain string,
+	result interface{},
+	times int,
+	wg *sync.WaitGroup,
+	happyPath bool) {
+
+	firstCallDone := make(chan interface{})
+
+	for i := 0; i < times; i++ {
+		go func(index int) {
+			if index != 0 {
+				// other invocations (except first one) of each test
+				// wait for the first time to get through and
+				// cached and then go concurrently.
+				<-firstCallDone
+			}
+
+			addrs, err := resolver(domain)
+
+			if happyPath {
+				require.NoError(t, err)
+				require.ElementsMatch(t, addrs, result)
+			} else {
+				require.Error(t, err)
+			}
+
+			if index == 0 {
+				close(firstCallDone) // now lets other invocations go
+			}
+
+			wg.Done()
+
+		}(i)
+	}
 }
 
 // mockBasicResolverForDomains mocks the resolver for the ip and txt lookup test cases.
@@ -182,15 +174,11 @@ func mockBasicResolverForDomains(t *testing.T,
 	resolver *mocknetwork.BasicResolver,
 	ipLookupTestCases map[string]*ipLookupTestCase,
 	txtLookupTestCases map[string]*txtLookupTestCase,
-	happyPath bool,
-	times int) *sync.WaitGroup {
+	happyPath bool) {
 
 	// keeping track of requested domains
 	ipRequested := make(map[string]struct{})
 	txtRequested := make(map[string]struct{})
-
-	wg := &sync.WaitGroup{}
-	wg.Add(len(txtLookupTestCases) + len(ipLookupTestCases)) // each test case requested only once
 
 	mu := sync.Mutex{}
 	resolver.On("LookupIPAddr", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -212,8 +200,6 @@ func mockBasicResolverForDomains(t *testing.T,
 		_, ok = ipRequested[domain]
 		require.False(t, ok)
 		ipRequested[domain] = struct{}{}
-
-		wg.Done()
 
 	}).Return(
 		func(ctx context.Context, domain string) []net.IPAddr {
@@ -249,8 +235,6 @@ func mockBasicResolverForDomains(t *testing.T,
 		require.False(t, ok)
 		txtRequested[domain] = struct{}{}
 
-		wg.Done()
-
 	}).Return(
 		func(ctx context.Context, domain string) []string {
 			if !happyPath {
@@ -264,8 +248,6 @@ func mockBasicResolverForDomains(t *testing.T,
 			}
 			return nil
 		})
-
-	return wg
 }
 
 func ipLookupFixture(count int) map[string]*ipLookupTestCase {
