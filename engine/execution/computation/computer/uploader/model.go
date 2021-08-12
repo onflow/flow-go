@@ -12,7 +12,7 @@ type BlockData struct {
 	Collections []*entity.CompleteCollection
 	TxResults   []*flow.TransactionResult
 	Events      []*flow.Event
-	TrieUpdate  []*ledger.TrieUpdate
+	TrieUpdates []*ledger.TrieUpdate
 }
 
 func ComputationResultToBlockData(computationResult *execution.ComputationResult) *BlockData {
@@ -34,6 +34,6 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		Collections: computationResult.ExecutableBlock.Collections(),
 		TxResults:   txResults,
 		Events:      events,
-		TrieUpdate:  computationResult.TrieUpdates,
+		TrieUpdates: computationResult.TrieUpdates,
 	}
 }
