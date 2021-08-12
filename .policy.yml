@@ -1,0 +1,11 @@
+# the high level policy
+policy:
+  approval:
+    - bors
+
+# the list of rules
+approval_rules:
+  - name: bors
+    if:
+      has_author_in:
+        users: ["bors[bot]"]
