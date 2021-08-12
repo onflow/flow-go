@@ -1,7 +1,9 @@
 status = [
   "Lint",
-  "Unit Tests%",
-  "Integration Tests%",
+  "Unit Tests (1.15)",
+  "Unit Tests (1.16)",
+  "Integration Tests (1.15)",
+  "Integration Tests (1.16)",
 ]
 
 delete_merged_branches = true
