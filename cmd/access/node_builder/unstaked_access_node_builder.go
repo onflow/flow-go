@@ -1,4 +1,4 @@
-package main
+package node_builder
 
 import (
 	"context"
@@ -104,6 +104,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		peerUpdateInterval := time.Hour
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval,
+			node.UnicastMessageTimeout,
 			false, // no connection gating for the unstaked network
 			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 			msgValidators...)

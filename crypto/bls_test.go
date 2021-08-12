@@ -39,6 +39,7 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 	benchVerify(b, BLSBLS12381, halg)
 }
 
+// utility function to generate a random private key
 func randomSK(t *testing.T, seed []byte) PrivateKey {
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
@@ -105,6 +106,26 @@ func TestBLSEncodeDecode(t *testing.T) {
 	require.Error(t, err, "the key decoding should fail - key value is identity")
 	assert.IsType(t, expectedError, err)
 }
+
+// TestBLSInvalidSignature tests the function BLSInvalidSignature
+func TestBLSInvalidSignature(t *testing.T) {
+	s := BLSInvalidSignature()
+	var point pointG1
+	err := readPointG1(&point, s)
+	// check the returned error
+	require.Error(t, err)
+	assert.IsType(t, expectedError, err)
+
+	// check the signature verification behavior
+	kmac := NewBLSKMAC("tag")
+	seed := make([]byte, KeyGenSeedMinLenBLSBLS12381)
+	pk := randomSK(t, seed).PublicKey()
+	msg := []byte("message")
+	valid, err := pk.Verify(s, msg, kmac)
+	assert.NoError(t, err)
+	assert.False(t, valid)
+}
+
 /////////////////////////////////////////
 //             Rapid tests             //
 /////////////////////////////////////////
@@ -255,23 +276,32 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 	blstPass := res != nil
 	require.True(t, blsPass && blstPass, "deserialization of the private key %x differs", skBytes)
 
-		var sigBLST blst.P1Affine
-		sigBLST.Sign(&skBLST, msgBytes, blsCipher)
-		sigBytesBLST := sigBLST.Compress()
+	var sigBLST blst.P1Affine
+	sigBLST.Sign(&skBLST, msgBytes, blsCipher)
+	sigBytesBLST := sigBLST.Compress()
 
-		skBLS, ok := sk.(*PrKeyBLSBLS12381)
-		require.True(t, ok, "incoherent key type assertion")
+	skBLS, ok := sk.(*PrKeyBLSBLS12381)
+	require.True(t, ok, "incoherent key type assertion")
 
-		sig := skBLS.signWithRelicMapTest(msgBytes)
-		sigBytesBLS := sig.Bytes()
-		assert.Equal(t, sigBytesBLST, sigBytesBLS)
+	sig := skBLS.signWithRelicMapTest(msgBytes)
+	sigBytesBLS := sig.Bytes()
+	assert.Equal(t, sigBytesBLST, sigBytesBLS)
 
 }
 
-func TestBLSCrossBLST(t *testing.T) {
+func TestCrossEncodeDecodeScalar(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
+}
+
+func TestCrossEncodeDecodePubKey(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
+}
+
+func TestCrossEncodeDecodeSignature(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeSignatureCrossBLST)
+}
+
+func TestCrossSign(t *testing.T) {
 	rapid.Check(t, testBLSWithRelicSignCrossBLST)
 }
 
