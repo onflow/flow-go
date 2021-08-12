@@ -31,7 +31,7 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.enqueueUnstakedNetworkInit(ctx)
 
-	builder.enqueueConnectWithStakedAN(ctx)
+	builder.enqueueConnectWithStakedAN()
 
 	builder.EnqueueMetricsServerInit()
 
@@ -132,8 +132,8 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 // (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an unstaked AN could end up not being
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
-func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN(ctx context.Context) {
+func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return newUpstreamConnector(ctx, builder.bootstrapIdentites, builder.UnstakedLibP2PNode, builder.Logger), nil
+		return newUpstreamConnector(builder.bootstrapIdentites, builder.UnstakedLibP2PNode, builder.Logger), nil
 	})
 }
