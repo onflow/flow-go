@@ -15,17 +15,12 @@ import (
 //go:linkname runtimeNano runtime.nanotime
 func runtimeNano() int64
 
-// defaultTimeToLive is the default duration a dns result is cached.
-const defaultTimeToLive = 5 * time.Minute
-
 // Resolver is a cache-based dns resolver for libp2p.
 type Resolver struct {
 	sync.RWMutex
-	ttl       time.Duration       // time-to-live for cache entry
+	c         *cache
 	res       madns.BasicResolver // underlying resolver
 	collector module.ResolverMetrics
-	ipCache   map[string]*ipCacheEntry
-	txtCache  map[string]*txtCacheEntry
 }
 
 // optFunc is the option function for Resolver.
@@ -41,7 +36,7 @@ func WithBasicResolver(basic madns.BasicResolver) func(resolver *Resolver) {
 // WithTTL is an option function for setting the time to live for cache entries.
 func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 	return func(resolver *Resolver) {
-		resolver.ttl = ttl
+		resolver.c.ttl = ttl
 	}
 }
 
@@ -49,10 +44,8 @@ func WithTTL(ttl time.Duration) func(resolver *Resolver) {
 func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Resolver, error) {
 	resolver := &Resolver{
 		res:       madns.DefaultResolver,
-		ttl:       defaultTimeToLive,
+		c:         newCache(),
 		collector: collector,
-		ipCache:   make(map[string]*ipCacheEntry),
-		txtCache:  make(map[string]*txtCacheEntry),
 	}
 
 	for _, opt := range opts {
@@ -78,7 +71,7 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 
 // lookupIPAddr encapsulates the logic of resolving an ip address through cache.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	if addr, ok := r.resolveIPCache(domain); ok {
+	if addr, ok := r.c.resolveIPCache(domain); ok {
 		// resolving address from cache
 		r.collector.OnDNSCacheHit()
 		return addr, nil
@@ -91,7 +84,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		return nil, err
 	}
 
-	r.updateIPCache(domain, addr) // updates cache
+	r.c.updateIPCache(domain, addr) // updates cache
 
 	return addr, nil
 }
@@ -111,7 +104,7 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 }
 
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
-	if addr, ok := r.resolveTXTCache(txt); ok {
+	if addr, ok := r.c.resolveTXTCache(txt); ok {
 		// resolving address from cache
 		r.collector.OnDNSCacheHit()
 		return addr, nil
@@ -124,57 +117,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 		return nil, err
 	}
 
-	r.updateTXTCache(txt, addr) // updates cache
+	r.c.updateTXTCache(txt, addr) // updates cache
 
 	return addr, err
-}
-
-// resolveIPCache resolves the domain through the cache if it is available.
-func (r *Resolver) resolveIPCache(domain string) ([]net.IPAddr, bool) {
-	entry, ok := r.ipCache[domain]
-
-	if !ok {
-		return nil, false
-	}
-
-	if time.Duration(runtimeNano()-entry.timestamp) > r.ttl {
-		// invalidates cache entry
-		delete(r.ipCache, domain)
-		return nil, false
-	}
-
-	return entry.addresses, true
-}
-
-// resolveIPCache resolves the txt through the cache if it is available.
-func (r *Resolver) resolveTXTCache(txt string) ([]string, bool) {
-	entry, ok := r.txtCache[txt]
-
-	if !ok {
-		return nil, false
-	}
-
-	if time.Duration(runtimeNano()-entry.timestamp) > r.ttl {
-		// invalidates cache entry
-		delete(r.txtCache, txt)
-		return nil, false
-	}
-
-	return entry.addresses, true
-}
-
-// updateIPCache updates the cache entry for the domain.
-func (r *Resolver) updateIPCache(domain string, addr []net.IPAddr) {
-	r.ipCache[domain] = &ipCacheEntry{
-		addresses: addr,
-		timestamp: runtimeNano(),
-	}
-}
-
-// updateTXTCache updates the cache entry for the txt.
-func (r *Resolver) updateTXTCache(txt string, addr []string) {
-	r.txtCache[txt] = &txtCacheEntry{
-		addresses: addr,
-		timestamp: runtimeNano(),
-	}
 }
