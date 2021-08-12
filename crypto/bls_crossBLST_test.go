@@ -50,21 +50,6 @@ func validSignatureBytesFlow(t *rapid.T) []byte {
 	return signature
 }
 
-// validPrivateKeyBytesBLST generates bytes of a valid private key in BLST library
-func validPrivateKeyBytesBLST(t *rapid.T) []byte {
-	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
-	ikm := randomSlice.Draw(t, "ikm").([]byte)
-	return blst.KeyGen(ikm).Serialize()
-}
-
-// validPublicKeyBytesBLST generates bytes of a valid public key in BLST library
-func validPublicKeyBytesBLST(t *rapid.T) []byte {
-	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
-	blstS := blst.KeyGen(ikm)
-	blstG2 := new(blst.P2Affine).From(blstS)
-	return blstG2.Compress()
-}
-
 // validSignatureBytesBLST generates bytes of a valid signature in BLST library
 func validSignatureBytesBLST(t *rapid.T) []byte {
 	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
@@ -78,9 +63,8 @@ func validSignatureBytesBLST(t *rapid.T) []byte {
 func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381)
 	validSliceFlow := rapid.Custom(validPrivateKeyBytesFlow)
-	validSliceBLST := rapid.Custom(validPrivateKeyBytesBLST)
 	// skBytes are bytes of either a valid or a random private key
-	skBytes := rapid.OneOf(randomSlice, validSliceFlow, validSliceBLST).Example().([]byte)
+	skBytes := rapid.OneOf(randomSlice, validSliceFlow).Example().([]byte)
 
 	// check decoding results are consistent
 	skFlow, err := DecodePrivateKey(BLSBLS12381, skBytes)
@@ -105,9 +89,8 @@ func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
 func testEncodeDecodePublicKeyCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
 	validSliceFlow := rapid.Custom(validPublicKeyBytesFlow)
-	validSliceBLST := rapid.Custom(validPublicKeyBytesBLST)
 	// pkBytes are bytes of either a valid or a random public key
-	pkBytes := rapid.OneOf(randomSlice, validSliceFlow, validSliceBLST).Example().([]byte)
+	pkBytes := rapid.OneOf(randomSlice, validSliceFlow).Example().([]byte)
 
 	// check decoding results are consistent
 	pkFlow, err := DecodePublicKey(BLSBLS12381, pkBytes)
@@ -197,9 +180,18 @@ func testSignHashCrossBLST(t *rapid.T) {
 	assert.Equal(t, sigBytesBLST, sigBytesFlow)
 }
 
-func TestFlowCrossBLST(t *testing.T) {
+func TestEncodeDecodePrivateKeyCrossBLST(t *testing.T) {
 	rapid.Check(t, testEncodeDecodePrivateKeyCrossBLST)
+}
+
+func TestEncodeDecodePublicKeyCrossBLST(t *testing.T) {
 	rapid.Check(t, testEncodeDecodePublicKeyCrossBLST)
+}
+
+func TestEncodeDecodeSignatureCrossBLST(t *testing.T) {
 	rapid.Check(t, testEncodeDecodeSignatureCrossBLST)
+}
+
+func TestSignHashCrossBLST(t *testing.T) {
 	rapid.Check(t, testSignHashCrossBLST)
 }
