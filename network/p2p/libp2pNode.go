@@ -655,9 +655,9 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	}
 	return []PubsubOption{
 		// skip message signing
-		pubSubOptionFunc(pubsub.WithMessageSigning(false)),
+		pubSubOptionFunc(pubsub.WithMessageSigning(true)),
 		// skip message signature
-		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(false)),
+		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
 		// set max message size limit for 1-k PubSub messaging
 		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
