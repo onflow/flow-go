@@ -110,6 +110,33 @@ func (k *KeyTranslatorTestSuite) TestPublicKeyConversion() {
 	}
 }
 
+func (k *KeyTranslatorTestSuite) TestPublicKeyRoundTrip() {
+	sa := []fcrypto.SigningAlgorithm{fcrypto.ECDSAP256, fcrypto.ECDSASecp256k1}
+	loops := 50
+	for _, s := range sa {
+		for i := 0; i < loops; i++ {
+
+			// generate seed
+			seed := k.createSeed()
+			fpk, err := fcrypto.GeneratePrivateKey(s, seed)
+			require.NoError(k.T(), err)
+
+			// get the Flow public key
+			fpublic := fpk.PublicKey()
+
+			// convert the Flow public key to a Libp2p public key
+			lpublic, err := PublicKey(fpublic)
+			require.NoError(k.T(), err)
+
+			fpublic2, err := PublicKeyFromNetwork(lpublic)
+			require.NoError(k.T(), err)
+			require.Equal(k.T(), fpublic, fpublic2)
+
+		}
+	}
+
+}
+
 // TestLibP2PIDGenerationIsConsistent tests that a LibP2P peer ID generated using Flow ECDSA key is deterministic
 func (k *KeyTranslatorTestSuite) TestPeerIDGenerationIsConsistent() {
 	// generate a seed which will be used for both - Flow keys and Libp2p keys

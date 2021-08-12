@@ -11,7 +11,18 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	fcrypto "github.com/onflow/flow-go/crypto"
+
+	"github.com/btcsuite/btcd/btcec"
 )
+
+// This module is meant to help libp2p <-> flow public key conversions
+// Flow's Network Public Keys and LibP2P's public keys are a marshalling standard away from each other and inter-convertible.
+// Libp2p supports keys as ECDSA public Keys on either the NIST P-256 curve or the "Bitcoin" secp256k1 curve, see https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md#peer-ids
+// libp2p represents the P-256 keys as ASN1-DER and the secp256k1 keys as X9.62 encodings in compressed format
+//
+// While Flow's key types supports both secp256k1 and P-256 keys (under crypto/ecdsa), note that Flow's networking keys are always P-256 keys.
+// Flow represents both the P-256 keys and the secp256k1 keys in uncompressed representation, but their byte serializations (Encode) do not include the X9.62 compression bit
+// Flow also makes a X9.62 compressed format (with compression bit) accessible (EncodeCompressed)
 
 // assigns a big.Int input to a Go ecdsa private key
 func setPrKey(c elliptic.Curve, k *big.Int) *goecdsa.PrivateKey {
@@ -92,11 +103,59 @@ func PublicKey(fpk fcrypto.PublicKey) (lcrypto.PubKey, error) {
 		}
 	} else if keyType == lcrypto_pb.KeyType_Secp256k1 {
 		bytes = make([]byte, crypto.PubKeyLenECDSASecp256k1+1) // libp2p requires an extra byte
-		bytes[0] = 4                                           // magic number in libp2p to refer to an uncompressed key
+		bytes[0] = 4                                           // signals uncompressed form as specified in section 4.3.6/7 of ANSI X9.62.
 		copy(bytes[1:], tempBytes)
 	}
 
 	return um(bytes)
+}
+
+// This converts some libp2p PubKeys to a flow PublicKey
+// - the supported key types are ECDSA P-256 and ECDSA Secp256k1 public keys,
+// - libp2p also supports RSA and Ed25519 keys, which Flow doesn't, their conversion will return an error.
+func PublicKeyFromNetwork(lpk lcrypto.PubKey) (fcrypto.PublicKey, error) {
+
+	switch ktype := lpk.Type(); ktype {
+	case lcrypto_pb.KeyType_ECDSA:
+		pubB, err := lpk.Raw()
+		if err != nil {
+			return nil, lcrypto.ErrBadKeyType
+		}
+		key, err := x509.ParsePKIXPublicKey(pubB)
+		if err != nil {
+			// impossible to decode from ASN1.DER
+			return nil, lcrypto.ErrBadKeyType
+		}
+		cryptoKey, ok := key.(*goecdsa.PublicKey)
+		if !ok {
+			// not recognized as crypto.P-256
+			return nil, lcrypto.ErrNotECDSAPubKey
+		}
+		// ferrying through DecodePublicKey to get the curve checks
+		pk_uncompressed := elliptic.Marshal(cryptoKey, cryptoKey.X, cryptoKey.Y)
+		// the first bit is the compression bit of X9.62
+		pubKey, err := crypto.DecodePublicKey(crypto.ECDSAP256, pk_uncompressed[1:])
+		if err != nil {
+			return nil, lcrypto.ErrNotECDSAPubKey
+		}
+		return pubKey, nil
+	case lcrypto_pb.KeyType_Secp256k1:
+		// libp2p uses the compressed representation, flow the uncompressed one
+		lpk_secp256k1, ok := lpk.(*lcrypto.Secp256k1PublicKey)
+		if !ok {
+			return nil, lcrypto.ErrBadKeyType
+		}
+		pk_uncompressed := (*btcec.PublicKey)(lpk_secp256k1).SerializeUncompressed()
+		// the first bit is the compression bit of X9.62
+		pk, err := crypto.DecodePublicKey(crypto.ECDSASecp256k1, pk_uncompressed[1:])
+		if err != nil {
+			return nil, lcrypto.ErrNotECDSAPubKey
+		}
+		return pk, nil
+	default:
+		return nil, lcrypto.ErrBadKeyType
+	}
+
 }
 
 // keyType translates Flow signing algorithm constants to the corresponding LibP2P constants
