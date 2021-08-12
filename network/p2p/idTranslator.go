@@ -16,6 +16,24 @@ type UnstakedNetworkPeerIDProvider struct {
 	// whether this be, with caching or not
 }
 
+func NewUnstakedNetworkPeerIDProvider() *UnstakedNetworkPeerIDProvider {
+	return &UnstakedNetworkPeerIDProvider{}
+}
+
+func GetPeerID(flowID flow.Identifier) (peer.ID, bool) {
+	Flow
+	return
+}
+
+func GetFlowID(peerID peer.ID) (flow.Identifier, bool) {
+	Flow
+	return
+}
+
+func FlowIDToPeerID(flowID flow.Identifier) peer.ID {
+
+}
+
 func IdentityToPeerID(id *flow.Identity) (pid peer.ID, err error) {
 	pk, err := PublicKey(id.NetworkPubKey)
 	if err != nil {
