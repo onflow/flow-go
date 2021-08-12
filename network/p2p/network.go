@@ -51,6 +51,14 @@ type Network struct {
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
 }
 
+type NetworkOption func(*Network)
+
+func WithIdentifierProvider(provider id.IdentifierProvider) NetworkOption {
+	return func(net *Network) {
+		net.idProvider = provider
+	}
+}
+
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
 // using the given state & cache interfaces to track volatile information.
@@ -92,6 +100,10 @@ func NewNetwork(
 
 	// create workers to read from the queue and call queueSubmitFunc
 	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+
+	for _, opt := range opts {
+		opt(o)
+	}
 
 	return o, nil
 }
@@ -164,7 +176,7 @@ func (n *Network) Identities() flow.IdentityList {
 
 // Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
-func (n *Network) Topology() (flow.IdentityList, error) {
+func (n *Network) Topology() (flow.IdentifierList, error) {
 	n.Lock()
 	defer n.Unlock()
 
@@ -274,6 +286,12 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	}
 
 	return msg, nil
+}
+
+func (n *Network) SetDefaultIdentifierProvider(provider id.IdentifierProvider) {
+	n.Lock()
+	n.defaultIdProvider = provider
+	n.Unlock()
 }
 
 // unicast sends the message in a reliable way to the given recipient.

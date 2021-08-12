@@ -2,7 +2,7 @@ package topology
 
 import (
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
+	idFilter "github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -17,14 +17,14 @@ func NewFixedListTopology(nodeID flow.Identifier) FixedListTopology {
 	}
 }
 
-func (r FixedListTopology) GenerateFanout(ids flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
-	return ids.Filter(filter.HasNodeID(r.fixedNodeID)), nil
+func (r FixedListTopology) GenerateFanout(ids flow.IdentifierList, _ network.ChannelList) (flow.IdentifierList, error) {
+	return ids.Filter(idFilter.Is(r.fixedNodeID)), nil
 }
 
 // EmptyListTopology always returns an empty list as the fanout
 type EmptyListTopology struct {
 }
 
-func (r EmptyListTopology) GenerateFanout(_ flow.IdentityList, _ network.ChannelList) (flow.IdentityList, error) {
-	return flow.IdentityList{}, nil
+func (r EmptyListTopology) GenerateFanout(_ flow.IdentifierList, _ network.ChannelList) (flow.IdentifierList, error) {
+	return flow.IdentifierList{}, nil
 }

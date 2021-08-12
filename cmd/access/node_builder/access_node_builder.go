@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -43,7 +44,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -489,7 +489,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 
 type Option func(*AccessNodeConfig)
 
-func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
+func WithUpstreamAccessNodeID(upstreamAccessNodeID flow.Identifier) Option {
 	return func(config *AccessNodeConfig) {
 		config.bootstrapIdentities = bootstrapNodes
 	}
