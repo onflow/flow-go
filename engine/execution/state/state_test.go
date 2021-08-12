@@ -6,6 +6,8 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/mock/gomock"
+	ledger2 "github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,8 +77,29 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, "", "", flow.RegisterValue("carrot"))
 		assert.NoError(t, err)
 
-		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, update, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
+
+		assert.Equal(t, sc1[:], update.RootHash[:])
+		assert.Len(t, update.Paths, 2)
+		assert.Len(t, update.Payloads, 2)
+
+		key1 := ledger2.NewKey([]ledger2.KeyPart{ledger2.NewKeyPart(0, []byte(registerID1)), ledger2.NewKeyPart(1, []byte("")), ledger2.NewKeyPart(2, []byte(""))})
+		path1, err := pathfinder.KeyToPath(key1, ledger.DefaultPathFinderVersion)
+		assert.NoError(t, err)
+
+		key2 := ledger2.NewKey([]ledger2.KeyPart{ledger2.NewKeyPart(0, []byte(registerID2)), ledger2.NewKeyPart(1, []byte("")), ledger2.NewKeyPart(2, []byte(""))})
+		path2, err := pathfinder.KeyToPath(key2, ledger.DefaultPathFinderVersion)
+		assert.NoError(t, err)
+
+		assert.Equal(t, path1, update.Paths[0])
+		assert.Equal(t, path2, update.Paths[1])
+
+		assert.Equal(t, key1, update.Payloads[0].Key)
+		assert.Equal(t, key2, update.Payloads[1].Key)
+
+		assert.Equal(t, []byte("apple"), []byte(update.Payloads[0].Value))
+		assert.Equal(t, []byte("carrot"), []byte(update.Payloads[1].Value))
 
 		view2 := es.NewView(sc2)
 
@@ -98,7 +121,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		err = view1.Set(registerID1, "", "", []byte("apple"))
 		assert.NoError(t, err)
-		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -106,7 +129,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view2.Set(registerID1, "", "", []byte("orange"))
 		assert.NoError(t, err)
 
-		sc3, err := state.CommitDelta(l, view2.Delta(), sc2)
+		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -138,7 +161,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, "", "", []byte("apple"))
 		assert.NoError(t, err)
 
-		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// update value and get resulting state commitment
@@ -146,7 +169,7 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view2.Delete(registerID1, "", "")
 		assert.NoError(t, err)
 
-		sc3, err := state.CommitDelta(l, view2.Delta(), sc2)
+		sc3, _, err := state.CommitDelta(l, view2.Delta(), sc2)
 		assert.NoError(t, err)
 
 		// create a view for previous state version
@@ -178,11 +201,11 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 		err = view1.Set(registerID2, "", "", flow.RegisterValue("apple"))
 		assert.NoError(t, err)
 
-		sc2, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2, _, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		// committing for the second time should be OK
-		sc2Same, err := state.CommitDelta(l, view1.Delta(), sc1)
+		sc2Same, _, err := state.CommitDelta(l, view1.Delta(), sc1)
 		assert.NoError(t, err)
 
 		require.Equal(t, sc2, sc2Same)

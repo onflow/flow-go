@@ -8,6 +8,7 @@ import (
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution"
@@ -50,6 +51,7 @@ type Manager struct {
 	blockComputer      computer.BlockComputer
 	programsCache      *ProgramsCache
 	scriptLogThreshold time.Duration
+	uploader           uploader.Uploader
 }
 
 func New(
@@ -63,6 +65,7 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
+	uploader uploader.Uploader,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -94,6 +97,7 @@ func New(
 		blockComputer:      blockComputer,
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
+		uploader:           uploader,
 	}
 
 	return &e, nil
@@ -208,6 +212,13 @@ func (e *Manager) ComputeBlock(
 	}
 
 	e.programsCache.Set(block.ID(), toInsert)
+
+	if e.uploader != nil {
+		err = e.uploader.Upload(result)
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload block result: %w", err)
+		}
+	}
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
