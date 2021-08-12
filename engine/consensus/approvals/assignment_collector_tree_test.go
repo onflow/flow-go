@@ -1,6 +1,8 @@
 package approvals_test
 
 import (
+	"fmt"
+	mock2 "github.com/stretchr/testify/mock"
 	"sync"
 	"testing"
 
@@ -18,22 +20,30 @@ func TestAssignmentCollectorTree(t *testing.T) {
 	suite.Run(t, new(AssignmentCollectorTreeSuite))
 }
 
+type mockedCollectorWrapper struct {
+	collector *mock.AssignmentCollector
+	status    approvals.ProcessingStatus
+}
+
 type AssignmentCollectorTreeSuite struct {
 	approvals.BaseAssignmentCollectorTestSuite
 
 	collectorTree    *approvals.AssignmentCollectorTree
 	factoryMethod    approvals.NewCollectorFactoryMethod
-	mockedCollectors map[flow.Identifier]*mock.AssignmentCollector
+	mockedCollectors map[flow.Identifier]*mockedCollectorWrapper
 }
 
 func (s *AssignmentCollectorTreeSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
 	s.factoryMethod = func(result *flow.ExecutionResult) (approvals.AssignmentCollector, error) {
-		return s.mockedCollectors[result.ID()], nil
+		if wrapper, found := s.mockedCollectors[result.ID()]; found {
+			return wrapper.collector, nil
+		}
+		return nil, fmt.Errorf("mocked collector %v not found", result.ID())
 	}
 
-	s.mockedCollectors = make(map[flow.Identifier]*mock.AssignmentCollector)
+	s.mockedCollectors = make(map[flow.Identifier]*mockedCollectorWrapper)
 	s.collectorTree = approvals.NewAssignmentCollectorTree(&s.ParentBlock, s.Headers, s.factoryMethod)
 
 	s.prepareMockedCollector(s.IncorporatedResult.Result)
@@ -41,7 +51,7 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
 // to create new collector when factory method will be called
-func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.ExecutionResult) *mock.AssignmentCollector {
+func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.ExecutionResult) *mockedCollectorWrapper {
 	collector := &mock.AssignmentCollector{}
 	collector.On("ResultID").Return(result.ID()).Maybe()
 	collector.On("Result").Return(result).Maybe()
@@ -49,9 +59,24 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	collector.On("Block").Return(func() *flow.Header {
 		return s.Blocks[result.BlockID]
 	}).Maybe()
-	collector.On("ProcessingStatus").Return(approvals.CachingApprovals)
-	s.mockedCollectors[result.ID()] = collector
-	return collector
+
+	wrapper := &mockedCollectorWrapper{
+		collector: collector,
+		status:    approvals.CachingApprovals,
+	}
+
+	collector.On("ProcessingStatus").Return(func() approvals.ProcessingStatus {
+		return wrapper.status
+	})
+	s.mockedCollectors[result.ID()] = wrapper
+	return wrapper
+}
+
+func mockCollectorStateTransition(wrapper *mockedCollectorWrapper, oldState, newState approvals.ProcessingStatus) {
+	wrapper.collector.On("ChangeProcessingStatus",
+		oldState, newState).Return(nil).Run(func(args mock2.Arguments) {
+		wrapper.status = newState
+	}).Once()
 }
 
 // TestGetSize_ConcurrentAccess tests if assignment collector tree correctly returns size when concurrently adding
@@ -98,6 +123,42 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollector() {
 	require.True(s.T(), expectedCollector.Created)
 	collector := s.collectorTree.GetCollector(result.ID())
 	require.Equal(s.T(), collector, expectedCollector.Collector)
+
+	// get collector for unknown result ID should return nil
+	collector = s.collectorTree.GetCollector(unittest.IdentifierFixture())
+	require.Nil(s.T(), collector)
+}
+
+// TestGetCollectorsByInterval tests that GetCollectorsByInterval returns expected array of AssignmentCollector
+// in proposed interval
+func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
+	chain := unittest.ChainFixtureFrom(10, &s.ParentBlock)
+	receipts := unittest.ReceiptChainFor(chain, s.IncorporatedResult.Result)
+	for _, block := range chain {
+		s.Blocks[block.ID()] = block.Header
+	}
+
+	// process all receipts except first one, this will build a chain of collectors but all of them will be
+	// in caching state
+	for index, receipt := range receipts {
+		result := &receipt.ExecutionResult
+		mockedCollector := s.prepareMockedCollector(result)
+		mockCollectorStateTransition(mockedCollector, approvals.CachingApprovals, approvals.VerifyingApprovals)
+		if index > 0 {
+			createdCollector, err := s.collectorTree.GetOrCreateCollector(result)
+			require.NoError(s.T(), err)
+			require.True(s.T(), createdCollector.Created)
+		}
+	}
+
+	collectors := s.collectorTree.GetCollectorsByInterval(0, s.Block.Height+100)
+	require.Empty(s.T(), collectors)
+
+	_, err := s.collectorTree.GetOrCreateCollector(&receipts[0].ExecutionResult)
+	require.NoError(s.T(), err)
+
+	collectors = s.collectorTree.GetCollectorsByInterval(0, s.Block.Height+100)
+	require.Len(s.T(), collectors, len(receipts))
 }
 
 // TestFinalizeForkAtLevel_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
@@ -160,12 +221,13 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 	// at this point collectors for forks[0] should be processable and for forks[1] not
 	for forkIndex := range forks {
 		for _, result := range results[forkIndex] {
-			collector, found := s.mockedCollectors[result.Result.ID()]
+			wrapper, found := s.mockedCollectors[result.Result.ID()]
 			require.True(s.T(), found)
+
 			if forkIndex == 0 {
-				collector.On("ChangeProcessingStatus", approvals.CachingApprovals, approvals.VerifyingApprovals).Return(nil).Once()
+				mockCollectorStateTransition(wrapper, approvals.CachingApprovals, approvals.VerifyingApprovals)
 			} else {
-				collector.On("ChangeProcessingStatus", approvals.CachingApprovals, approvals.Orphaned).Return(nil).Once()
+				mockCollectorStateTransition(wrapper, approvals.CachingApprovals, approvals.Orphaned)
 			}
 		}
 	}
