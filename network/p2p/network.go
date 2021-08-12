@@ -329,7 +329,7 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 // The selector could be used to optimize or restrict delivery.
 func (n *Network) publish(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
 
-	err := n.sendOnChannel(channel, message, targetIDs, n.removeSelfFilter)
+	err := n.sendOnChannel(channel, message, flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()))
 
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel %s: %w", channel, err)
@@ -342,9 +342,13 @@ func (n *Network) publish(channel network.Channel, message interface{}, targetID
 // selected from the specified targetIDs.
 func (n *Network) multicast(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
 
-	filters := []identifierFilter{n.removeSelfFilter, sampleFilter(num)}
+	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
 
-	err := n.sendOnChannel(channel, message, targetIDs, filters...)
+	if len(selectedIDs) == 0 {
+		return network.EmptyTargetList
+	}
+
+	err := n.sendOnChannel(channel, message, targetIDs)
 
 	// publishes the message to the selected targets
 	if err != nil {
@@ -355,40 +359,14 @@ func (n *Network) multicast(channel network.Channel, message interface{}, num ui
 }
 
 // removeSelfFilter removes the flow.Identifier of this node if present, from the list of nodes
-func (n *Network) removeSelfFilter(ids ...flow.Identifier) ([]flow.Identifier, error) {
-	targetIDMinusSelf := make([]flow.Identifier, 0, len(ids))
-	for _, t := range ids {
-		if t != n.me.NodeID() {
-			targetIDMinusSelf = append(targetIDMinusSelf, t)
-		}
-	}
-	return targetIDMinusSelf, nil
-}
-
-// sampleFilter returns an identifier filter which returns a random sample from ids.
-func sampleFilter(size uint) identifierFilter {
-	return func(ids ...flow.Identifier) ([]flow.Identifier, error) {
-		return flow.Sample(size, ids...), nil
+func (n *Network) removeSelfFilter() flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		return id != n.me.NodeID()
 	}
 }
 
 // sendOnChannel sends the message on channel to targets after applying the all the filters to targets.
-func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier, filters ...identifierFilter) error {
-
-	var err error
-	// filter the targetIDs
-	for _, f := range filters {
-		targetIDs, err = f(targetIDs...)
-		// if filter failed
-		if err != nil {
-			return err
-		}
-		// if the filtration resulted in an empty list, throw an error
-		if len(targetIDs) == 0 {
-			return network.EmptyTargetList
-		}
-	}
-
+func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
 	// generate network message (encoding) based on list of recipients
 	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
 	if err != nil {
