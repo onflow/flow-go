@@ -5,10 +5,12 @@ on:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - v0.20
   pull_request:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - v0.20
 
 jobs:
   golangci:
