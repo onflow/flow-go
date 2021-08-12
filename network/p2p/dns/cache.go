@@ -9,6 +9,7 @@ import (
 // defaultTimeToLive is the default duration a dns result is cached.
 const defaultTimeToLive = 5 * time.Minute
 
+// cache is a ttl-based cache for dns entries
 type cache struct {
 	sync.Mutex
 	ttl      time.Duration // time-to-live for cache entry

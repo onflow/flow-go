@@ -3,7 +3,6 @@ package dns
 import (
 	"context"
 	"net"
-	"sync"
 	"time"
 	_ "unsafe" // for linking runtimeNano
 
@@ -17,7 +16,6 @@ func runtimeNano() int64
 
 // Resolver is a cache-based dns resolver for libp2p.
 type Resolver struct {
-	sync.RWMutex
 	c         *cache
 	res       madns.BasicResolver // underlying resolver
 	collector module.ResolverMetrics
@@ -57,9 +55,6 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Reso
 
 // LookupIPAddr implements BasicResolver interface for libp2p for looking up ip addresses through resolver.
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	r.Lock()
-	defer r.Unlock()
-
 	started := runtimeNano()
 
 	addr, err := r.lookupIPAddr(ctx, domain)
@@ -91,8 +86,6 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 
 // LookupTXT implements BasicResolver interface for libp2p.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
-	r.Lock()
-	defer r.Unlock()
 
 	started := runtimeNano()
 
