@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	idFilter "github.com/onflow/flow-go/model/flow/filter/id"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -15,14 +17,15 @@ import (
 // TopicBasedTopology is a deterministic topology mapping that creates a connected graph component among the nodes
 // involved in each topic.
 type TopicBasedTopology struct {
-	myNodeID flow.Identifier // used to keep identifier of the node
-	state    protocol.State  // used to keep a read only protocol state
-	logger   zerolog.Logger
-	seed     int64
+	myNodeID         flow.Identifier // used to keep identifier of the node
+	state            protocol.State  // used to keep a read only protocol state
+	logger           zerolog.Logger
+	seed             int64
+	identityProvider id.IdentityProvider
 }
 
 // NewTopicBasedTopology returns an instance of the TopicBasedTopology.
-func NewTopicBasedTopology(nodeID flow.Identifier, logger zerolog.Logger, state protocol.State) (*TopicBasedTopology, error) {
+func NewTopicBasedTopology(nodeID flow.Identifier, idProvider id.IdentityProvider, logger zerolog.Logger, state protocol.State) (*TopicBasedTopology, error) {
 	seed, err := intSeedFromID(nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
@@ -38,19 +41,19 @@ func NewTopicBasedTopology(nodeID flow.Identifier, logger zerolog.Logger, state 
 	return t, nil
 }
 
-// GenerateFanout receives IdentityList of entire network and constructs the fanout IdentityList
-// of this instance. A node directly communicates with its fanout IdentityList on epidemic dissemination
+// GenerateFanout receives IdentifierList of entire network and constructs the fanout IdentifierList
+// of this instance. A node directly communicates with its fanout IdentifierList on epidemic dissemination
 // of the messages (i.e., publish and multicast).
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other.
-func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (t TopicBasedTopology) GenerateFanout(ids flow.IdentifierList, channels network.ChannelList) (flow.IdentifierList, error) {
 	myUniqueChannels := engine.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
 		t.logger.Warn().Msg("skips generating fanout with no subscribed channels")
-		return flow.IdentityList{}, nil
+		return flow.IdentifierList{}, nil
 	}
 
 	// finds all interacting roles with this node
@@ -64,7 +67,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 	}
 
 	// builds a connected component per role this node interact with,
-	var myFanout flow.IdentityList
+	var myFanout flow.IdentifierList
 	for _, role := range myInteractingRoles {
 		if role == flow.RoleCollection {
 			// we do not build connected component for collection nodes based on their role
@@ -98,32 +101,36 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 	return myFanout, nil
 }
 
-// subsetChannel returns a random subset of the identity list that is passed. `shouldHave` represents set of
-// identities that should be included in the returned subset.
-// Returned identities should all subscribed to the specified `channel`.
-// Note: this method should not include identity of its executor.
-func (t *TopicBasedTopology) subsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+// subsetChannel returns a random subset of the identifier list that is passed. `shouldHave` represents set of
+// identifiers that should be included in the returned subset.
+// Returned identifiers should all subscribed to the specified `channel`.
+// Note: this method should not include identifier of its executor.
+func (t *TopicBasedTopology) subsetChannel(ids flow.IdentifierList, shouldHave flow.IdentifierList, channel network.Channel) (flow.IdentifierList, error) {
 	if _, ok := engine.ClusterChannel(channel); ok {
 		return t.clusterChannelHandler(ids, shouldHave)
 	}
 	return t.nonClusterChannelHandler(ids, shouldHave, channel)
 }
 
-// subsetRole returns a random subset of the identity list that is passed. `shouldHave` represents set of
-// identities that should be included in the returned subset.
-// Returned identities should all be of one of the specified `roles`.
-// Note: this method should not include identity of its executor.
-func (t TopicBasedTopology) subsetRole(ids flow.IdentityList, shouldHave flow.IdentityList, roles flow.RoleList) (flow.IdentityList, error) {
+// subsetRole returns a random subset of the identifier list that is passed. `shouldHave` represents set of
+// identifiers that should be included in the returned subset.
+// Returned identifiers should all be of one of the specified `roles`.
+// Note: this method should not include the identifier of its executor.
+func (t TopicBasedTopology) subsetRole(ids flow.IdentifierList, shouldHave flow.IdentifierList, roles flow.RoleList) (flow.IdentifierList, error) {
 	// excludes irrelevant roles and the node itself from both should have and ids set
-	shouldHave = shouldHave.Filter(filter.And(
-		filter.HasRole(roles...),
-		filter.Not(filter.HasNodeID(t.myNodeID)),
-	))
+	shouldHave = t.identityProvider.
+		Identities(filter.HasNodeID(shouldHave...)).
+		Filter(filter.And(
+			filter.HasRole(roles...),
+			filter.Not(filter.HasNodeID(t.myNodeID)),
+		)).NodeIDs()
 
-	ids = ids.Filter(filter.And(
-		filter.HasRole(roles...),
-		filter.Not(filter.HasNodeID(t.myNodeID)),
-	))
+	ids = t.identityProvider.
+		Identities(filter.HasNodeID(ids...)).
+		Filter(filter.And(
+			filter.HasRole(roles...),
+			filter.Not(filter.HasNodeID(t.myNodeID)),
+		)).NodeIDs()
 
 	sample, err := t.sampleConnectedGraph(ids, shouldHave)
 	if err != nil {
@@ -138,11 +145,11 @@ func (t TopicBasedTopology) subsetRole(ids flow.IdentityList, shouldHave flow.Id
 // different nodes, should create a connected graph.
 // Fanout is the set of nodes that this instance should get connected to in order to create a
 // connected graph.
-func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentifierList, shouldHave flow.IdentifierList) (flow.IdentifierList, error) {
 
 	if len(all) == 0 {
 		t.logger.Debug().Msg("skips sampling connected graph with zero nodes")
-		return flow.IdentityList{}, nil
+		return flow.IdentifierList{}, nil
 	}
 
 	if len(shouldHave) == 0 {
@@ -153,9 +160,9 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 
 	}
 	// checks `shouldHave` be a subset of `all`
-	nonMembers := shouldHave.Filter(filter.Not(filter.In(all)))
+	nonMembers := shouldHave.Filter(idFilter.Not(idFilter.In(all...)))
 	if len(nonMembers) != 0 {
-		return nil, fmt.Errorf("should have identities is not a subset of all: %v", nonMembers)
+		return nil, fmt.Errorf("should have identifiers is not a subset of all: %v", nonMembers)
 	}
 
 	// total sample size
@@ -170,7 +177,7 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 	subsetSize := totalSize - len(shouldHave)
 
 	// others are all excluding should have ones
-	others := all.Filter(filter.Not(filter.In(shouldHave)))
+	others := all.Filter(idFilter.Not(idFilter.In(shouldHave...)))
 	others = others.DeterministicSample(uint(subsetSize), t.seed)
 
 	return others.Union(shouldHave), nil
@@ -178,7 +185,7 @@ func (t TopicBasedTopology) sampleConnectedGraph(all flow.IdentityList, shouldHa
 }
 
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
-func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityList) (flow.IdentityList, error) {
+func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentifierList) (flow.IdentifierList, error) {
 	// extracts cluster peer ids to which the node belongs to.
 	clusterPeers, err := clusterPeers(t.myNodeID, t.state)
 	if err != nil {
@@ -186,18 +193,18 @@ func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityL
 	}
 
 	// checks all cluster peers belong to the passed ids list
-	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
+	nonMembers := clusterPeers.Filter(idFilter.Not(idFilter.In(ids...)))
 	if len(nonMembers) > 0 {
 		return nil, fmt.Errorf("cluster peers not belonged to sample space: %v", nonMembers)
 	}
 
 	// samples a connected graph topology from the cluster peers
-	return t.subsetRole(clusterPeers, shouldHave.Filter(filter.HasNodeID(clusterPeers.NodeIDs()...)), flow.RoleList{flow.RoleCollection})
+	return t.subsetRole(clusterPeers, shouldHave.Filter(idFilter.In(clusterPeers...)), flow.RoleList{flow.RoleCollection})
 }
 
 // nonClusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
 // The returned sample contains `shouldHave` ones that also subscribed to `channel`.
-func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentifierList, channel network.Channel) (flow.IdentifierList, error) {
 	if _, ok := engine.ClusterChannel(channel); ok {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
@@ -209,5 +216,5 @@ func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.Identi
 	}
 
 	// samples a connected graph topology
-	return t.subsetRole(ids.Filter(filter.HasRole(roles...)), shouldHave, roles)
+	return t.subsetRole(ids, shouldHave, roles)
 }

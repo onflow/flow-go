@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/peer"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
 
 	"github.com/onflow/flow-go/crypto"
@@ -102,13 +101,9 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 
 	// convert the Flow.crypto key to LibP2P key for easy comparision using LibP2P TLS utils
-	expectedLibP2PKey, err := p2p.LibP2PPublicKeyFromFlow(expectedPublicKey)
+	remotePeerLibP2PID, err := p2p.ExtractPeerID(expectedPublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate a libp2p key from a Flow key: %w", err)
-	}
-	remotePeerLibP2PID, err := peer.IDFromPublicKey(expectedLibP2PKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to derive the libp2p Peer ID from the libp2p public key: %w", err)
+		return nil, fmt.Errorf("failed to derive the libp2p Peer ID from the Flow key: %w", err)
 	}
 
 	// We're using InsecureSkipVerify, so the verifiedChains parameter will always be empty.
