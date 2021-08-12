@@ -14,7 +14,6 @@ fi
 rm -rf "${RELIC_DIR}"
 
 # relic version or tag
-#relic_version="3dd26f5ae28234e02fa4da375422ba954b7b1e53"
 relic_version="9a0128631841c7ade82460e8e80f8289cf9120b5"
 
 # clone a specific version of Relic without history if it's tagged.
