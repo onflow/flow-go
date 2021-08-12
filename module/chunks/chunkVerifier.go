@@ -262,7 +262,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	expEndStateComm, err := psmt.Set(update)
+	expEndStateComm, _, err := psmt.Set(update)
 
 	if err != nil {
 		if errors.Is(err, ledger.ErrMissingKeys{}) {

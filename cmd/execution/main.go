@@ -249,6 +249,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
+				nil,
 			)
 			if err != nil {
 				return nil, err
