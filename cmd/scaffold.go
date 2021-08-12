@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -176,15 +177,16 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
 			true,
+			fnb.IDTranslator,
 			fnb.MsgValidators...)
 
-		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
-
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State)
+		top, err := topology.NewTopicBasedTopology(
+			fnb.NodeID,
+			fnb.IdentityProvider,
+			fnb.Logger,
+			fnb.State,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
@@ -193,21 +195,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
-			participants,
 			fnb.Me,
 			fnb.Middleware,
 			p2p.DefaultCacheSize,
 			topologyCache,
 			subscriptionManager,
-			fnb.Metrics.Network)
+			fnb.Metrics.Network,
+			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
 
 		fnb.Network = net
 
-		idRefresher := p2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
-		idEvents := gadgets.NewIdentityDeltas(idRefresher.OnIdentityTableChanged)
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateAllowList)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, err
@@ -414,6 +416,20 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Statuses:     statuses,
 		DKGKeys:      dkgKeys,
 	}
+}
+
+func (fnb *FlowNodeBuilder) InitIDProviders() {
+	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
+		idCache, err := p2p.NewProtocolStateIDCache(node.State, fnb.ProtocolEvents)
+		if err != nil {
+			return err
+		}
+
+		fnb.IdentityProvider = idCache
+		fnb.IDTranslator = idCache
+		fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NetworkingSetFilter, idCache)
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -714,6 +730,8 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 	fnb.BaseFlags()
 
 	fnb.ParseAndPrintFlags()
+
+	fnb.InitIDProviders()
 
 	fnb.EnqueueNetworkInit(ctx)
 

@@ -42,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
@@ -456,7 +457,13 @@ func main() {
 				followerEng,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				id.NewFilteredIdentifierProvider(
+					filter.And(
+						filter.HasRole(flow.RoleConsensus),
+						filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					),
+					node.IdentityProvider,
+				),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

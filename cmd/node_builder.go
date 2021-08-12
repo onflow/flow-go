@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -42,6 +43,9 @@ type NodeBuilder interface {
 
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
+
+	// InitIDProviders initializes the IdentityProvider and IDTranslator
+	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
 	EnqueueNetworkInit(ctx context.Context)
@@ -132,6 +136,11 @@ type NodeConfig struct {
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
+
+	// TODO: initialize these in scaffold and unstaked node
+	IdentityProvider             id.IdentityProvider
+	IDTranslator                 p2p.IDTranslator
+	NetworkingIdentifierProvider id.IdentifierProvider
 
 	// root state information
 	RootBlock   *flow.Block

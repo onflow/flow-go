@@ -7,7 +7,9 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/topology"
 )
@@ -24,10 +26,38 @@ func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBui
 	}
 }
 
+func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
+	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		idCache, err := p2p.NewProtocolStateIDCache(node.State, fnb.ProtocolEvents)
+		if err != nil {
+			return err
+		}
+
+		fnb.IdentityProvider = idCache
+		// translator
+		// networking provider
+		fnb.SyncEngineParticipantsProvider = id.NewFilteredIdentifierProvider(
+			filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+			),
+			idCache,
+		)
+
+		// TODO: need special providers here
+		// for network, needs one that recognizes both protocl state and peerstore
+		// same for translator
+
+		return nil
+	})
+}
+
 func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	builder.Cancel = cancel
+
+	builder.InitIDProviders()
 
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
@@ -93,14 +123,10 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
 
-		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
-		// TODO: this list should be the unstaked addresses of all the staked AN that participate in the unstaked network
-		participants := flow.IdentityList{}
-
 		// topology returns empty list since peers are not known upfront
 		top := topology.EmptyListTopology{}
 
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, top)
 		builder.MustNot(err)
 
 		builder.UnstakedNetwork = network
