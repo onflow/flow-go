@@ -1,16 +1,40 @@
 package crypto
 
 import (
+	"math"
 	"testing"
 
 	"crypto/elliptic"
 	"crypto/rand"
 	"math/big"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func createSeed(t *testing.T) []byte {
+	seedLen := int(math.Max(KeyGenSeedMinLenECDSAP256, KeyGenSeedMinLenECDSASecp256k1))
+	seed := make([]byte, seedLen)
+	n, err := rand.Read(seed)
+	require.NoError(t, err)
+	require.Equal(t, n, seedLen)
+
+	return seed
+}
+
+// keyType returns an elliptic.Curve for an fcrypto.SigningAlgorithm if it exists
+func ecdsaCurveType(sa SigningAlgorithm) (elliptic.Curve, error) {
+	switch sa {
+	case ECDSAP256:
+		return elliptic.P256(), nil
+	case ECDSASecp256k1:
+		return btcec.S256(), nil
+	default:
+		return nil, newInvalidInputsError("Input does not correspond to an ECDSA Algorithm")
+	}
+}
 
 // ECDSA tests
 func TestECDSA(t *testing.T) {
@@ -282,5 +306,41 @@ func TestSignatureFormatCheck(t *testing.T) {
 			assert.Nil(t, err)
 			assert.False(t, valid)
 		})
+	}
+}
+
+func TestCompressionRoundTrip(t *testing.T) {
+	sa := []SigningAlgorithm{ECDSAP256, ECDSASecp256k1}
+	loops := 50
+	for _, s := range sa {
+		ct, err := ecdsaCurveType(s)
+		require.NoError(t, err)
+
+		for i := 0; i < loops; i++ {
+
+			// generate seed
+			seed := createSeed(t)
+			fpk, err := GeneratePrivateKey(s, seed)
+			require.NoError(t, err)
+
+			// get the Flow public key
+			fpublic := fpk.PublicKey()
+
+			// retrieve the ECDSA variant
+			fpublicEcdsa := fpublic.(*PubKeyECDSA)
+
+			// get the compressed bytes
+			fpublicBytes := fpublicEcdsa.encodeCompressed()
+
+			// test the length  (it's the same value for PubKeyLenECDSASecp256k1)
+			require.Len(t, fpublicBytes, PubKeyLenECDSAP256/2+1)
+
+			// get the key back
+			fpublicOut, err := decodeCompressed(ct, fpublicBytes)
+
+			require.NoError(t, err)
+			require.Equal(t, fpublicEcdsa, fpublicOut)
+
+		}
 	}
 }
