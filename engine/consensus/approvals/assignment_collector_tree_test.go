@@ -1,6 +1,7 @@
 package approvals_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -34,6 +35,8 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 
 	s.mockedCollectors = make(map[flow.Identifier]*mock.AssignmentCollector)
 	s.collectorTree = approvals.NewAssignmentCollectorTree(&s.ParentBlock, s.Headers, s.factoryMethod)
+
+	s.prepareMockedCollector(s.IncorporatedResult.Result)
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
@@ -49,6 +52,52 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	collector.On("ProcessingStatus").Return(approvals.CachingApprovals)
 	s.mockedCollectors[result.ID()] = collector
 	return collector
+}
+
+// TestGetSize_ConcurrentAccess tests if assignment collector tree correctly returns size when concurrently adding
+// items
+func (s *AssignmentCollectorTreeSuite) TestGetSize_ConcurrentAccess() {
+	numberOfWorkers := 10
+	batchSize := 10
+	chain := unittest.ChainFixtureFrom(numberOfWorkers*batchSize, &s.IncorporatedBlock)
+	result0 := unittest.ExecutionResultFixture()
+	receipts := unittest.ReceiptChainFor(chain, result0)
+	for _, block := range chain {
+		s.Blocks[block.ID()] = block.Header
+	}
+	for _, receipt := range receipts {
+		s.prepareMockedCollector(&receipt.ExecutionResult)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(numberOfWorkers)
+	for worker := 0; worker < numberOfWorkers; worker++ {
+		go func(workerIndex int) {
+			defer wg.Done()
+			for i := 0; i < batchSize; i++ {
+				result := &receipts[workerIndex*batchSize+i].ExecutionResult
+				collector, err := s.collectorTree.GetOrCreateCollector(result)
+				require.NoError(s.T(), err)
+				require.True(s.T(), collector.Created)
+			}
+		}(worker)
+	}
+	wg.Wait()
+
+	require.Equal(s.T(), uint64(len(receipts)), s.collectorTree.GetSize())
+}
+
+// TestGetCollector tests basic case where previously created collector can be retrieved
+func (s *AssignmentCollectorTreeSuite) TestGetCollector() {
+	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+		result.BlockID = s.IncorporatedBlock.ID()
+	})
+	s.prepareMockedCollector(result)
+	expectedCollector, err := s.collectorTree.GetOrCreateCollector(result)
+	require.NoError(s.T(), err)
+	require.True(s.T(), expectedCollector.Created)
+	collector := s.collectorTree.GetCollector(result.ID())
+	require.Equal(s.T(), collector, expectedCollector.Collector)
 }
 
 // TestFinalizeForkAtLevel_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
