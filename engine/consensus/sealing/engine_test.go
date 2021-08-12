@@ -101,7 +101,7 @@ func (s *SealingEngineSuite) TestOnBlockIncorporated() {
 		index.ResultIDs = append(index.ReceiptIDs, result.ID())
 		s.results.On("ByID", result.ID()).Return(result, nil).Once()
 
-		IR := flow.NewIncorporatedResult(result.BlockID, result)
+		IR := flow.NewIncorporatedResult(parentBlock.ID(), result)
 		s.core.On("ProcessIncorporatedResult", IR).Return(nil).Once()
 	}
 	s.index.On("ByBlockID", parentBlock.ID()).Return(index, nil)

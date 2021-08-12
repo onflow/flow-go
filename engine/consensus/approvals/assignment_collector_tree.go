@@ -38,7 +38,6 @@ type AssignmentCollectorTree struct {
 	forest              *forest.LevelledForest
 	lock                sync.RWMutex
 	createCollector     NewCollectorFactoryMethod
-	size                uint64
 	lastSealedID        flow.Identifier
 	lastSealedHeight    uint64
 	lastFinalizedHeight uint64
@@ -50,7 +49,6 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 		forest:              forest.NewLevelledForest(lastSealed.Height),
 		lock:                sync.RWMutex{},
 		createCollector:     createCollector,
-		size:                0,
 		lastSealedID:        lastSealed.ID(),
 		lastFinalizedHeight: lastSealed.Height,
 		lastSealedHeight:    lastSealed.Height,
@@ -61,11 +59,12 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 func (t *AssignmentCollectorTree) GetSize() uint64 {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	return t.size
+	//locking is still needed, since forest.GetSize is not concurrent safe.
+	return t.forest.GetSize()
 }
 
 // GetCollector returns assignment collector for the given result.
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollectorState {
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollector {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
@@ -225,7 +224,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []Ass
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
-	Collector AssignmentCollectorState
+	Collector AssignmentCollector
 	Created   bool // whether collector was created or retrieved from cache
 }
 
@@ -268,7 +267,6 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		return nil, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
 	}
 	t.forest.AddVertex(vertex)
-	t.size += 1
 
 	// An assignment collector is processable if and only if:
 	// either (i) the parent result is the latest sealed result (seal is finalized)
@@ -301,19 +299,11 @@ func (t *AssignmentCollectorTree) pruneUpToHeight(limit uint64) error {
 		return nil
 	}
 
-	elementsPruned := uint64(0)
-	if t.size > 0 {
-		for l := t.forest.LowestLevel; l < limit; l++ {
-			elementsPruned += uint64(t.forest.GetNumberOfVerticesAtLevel(l))
-		}
-	}
-
 	// remove vertices and adjust size
 	err := t.forest.PruneUpToLevel(limit)
 	if err != nil {
 		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
-	t.size -= elementsPruned
 
 	return nil
 }

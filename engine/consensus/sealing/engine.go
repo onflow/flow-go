@@ -262,7 +262,7 @@ func (e *Engine) processAvailableMessages() error {
 
 		event, ok := e.pendingIncorporatedResults.Pop()
 		if ok {
-			err := e.processIncorporatedResult(event.(*flow.ExecutionResult))
+			err := e.processIncorporatedResult(event.(*flow.IncorporatedResult))
 			if err != nil {
 				return fmt.Errorf("could not process incorporated result: %w", err)
 			}
@@ -344,10 +344,7 @@ func (e *Engine) loop() {
 // processIncorporatedResult is a function that creates incorporated result and submits it for processing
 // to sealing core. In phase 2, incorporated result is incorporated at same block that is being executed.
 // This will be changed in phase 3.
-func (e *Engine) processIncorporatedResult(result *flow.ExecutionResult) error {
-	// TODO: change this when migrating to sealing & verification phase 3.
-	// Incorporated result is created this way only for phase 2.
-	incorporatedResult := flow.NewIncorporatedResult(result.BlockID, result)
+func (e *Engine) processIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
 	err := e.core.ProcessIncorporatedResult(incorporatedResult)
 	e.engineMetrics.MessageHandled(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	return err
@@ -467,7 +464,9 @@ func (e *Engine) processIncorporatedBlock(incorporatedBlockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not retrieve receipt incorporated in block %v: %w", incorporatedBlock.ParentID, err)
 		}
-		added := e.pendingIncorporatedResults.Push(result)
+
+		incorporatedResult := flow.NewIncorporatedResult(incorporatedBlock.ParentID, result)
+		added := e.pendingIncorporatedResults.Push(incorporatedResult)
 		if !added {
 			// Not being able to queue an incorporated result is a fatal edge case. It might happen, if the
 			// queue capacity is depleted. However, we cannot dropped the incorporated result, because there

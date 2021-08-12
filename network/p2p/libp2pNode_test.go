@@ -574,6 +574,21 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 	})
 }
 
+func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
+	// Create a Node with AllowList = false
+	node, identity := suite.NodesFixture(1, nil, false)
+	node1 := node[0]
+	node1Id := identity[0]
+	defer StopNode(suite.T(), node1)
+
+	suite.Run("updating allowlist of node w/o ConnGater does not crash", func() {
+
+		// node1 allowlists node1
+		err := node1.UpdateAllowList(flow.IdentityList{node1Id})
+		require.Error(suite.T(), err)
+	})
+}
+
 // NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
 func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
@@ -618,15 +633,23 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
 	noopMetrics := metrics.NewNoopCollector()
-	n, err := NewLibP2PNode(log,
-		identity.NodeID,
-		identity.Address,
-		NewConnManager(log, noopMetrics),
-		key,
-		allowList,
-		rootID,
-		pingInfoProvider)
+	connManager := NewConnManager(log, noopMetrics)
+
+	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
+		SetRootBlockID(rootID).
+		SetConnectionManager(connManager).
+		SetPingInfoProvider(pingInfoProvider).
+		SetLogger(log)
+
+	if allowList {
+		connGater := NewConnGater(log)
+		builder.SetConnectionGater(connGater)
+	}
+
+	ctx := context.Background()
+	n, err := builder.Build(ctx)
 	require.NoError(t, err)
+
 	n.SetFlowProtocolStreamHandler(handlerFunc)
 
 	require.Eventuallyf(t, func() bool {
