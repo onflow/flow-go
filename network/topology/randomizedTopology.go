@@ -9,6 +9,8 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	idFilter "github.com/onflow/flow-go/model/flow/filter/id"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 )
@@ -17,15 +19,16 @@ import (
 // By random topology we mean a node is connected to any other co-channel nodes with some
 // edge probability.
 type RandomizedTopology struct {
-	myNodeID flow.Identifier // used to keep identifier of the node
-	state    protocol.State  // used to keep a read only protocol state
-	chance   uint64          // used to translate connectedness probability into a number in [0, 100]
-	rng      random.Rand     // used as a stateful random number generator to sample edges
-	logger   zerolog.Logger
+	myNodeID   flow.Identifier // used to keep identifier of the node
+	state      protocol.State  // used to keep a read only protocol state
+	chance     uint64          // used to translate connectedness probability into a number in [0, 100]
+	rng        random.Rand     // used as a stateful random number generator to sample edges
+	logger     zerolog.Logger
+	idProvider id.IdentityProvider
 }
 
 // NewRandomizedTopology returns an instance of the RandomizedTopology.
-func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgeProb float64, state protocol.State) (*RandomizedTopology, error) {
+func NewRandomizedTopology(nodeID flow.Identifier, idProvider id.IdentityProvider, logger zerolog.Logger, edgeProb float64, state protocol.State) (*RandomizedTopology, error) {
 	// edge probability should be a positive value between 0 and 1. However,
 	// we like it to be strictly greater than zero. Also, at the current scale of
 	// Flow, we need it to be greater than 0.01 to support probabilistic connectedness.
@@ -44,33 +47,34 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 	}
 
 	t := &RandomizedTopology{
-		myNodeID: nodeID,
-		state:    state,
-		chance:   uint64(100 * edgeProb),
-		rng:      rng,
-		logger:   logger.With().Str("component:", "randomized-topology").Logger(),
+		myNodeID:   nodeID,
+		state:      state,
+		chance:     uint64(100 * edgeProb),
+		rng:        rng,
+		logger:     logger.With().Str("component:", "randomized-topology").Logger(),
+		idProvider: idProvider,
 	}
 
 	return t, nil
 }
 
-// GenerateFanout receives IdentityList of entire network and constructs the fanout IdentityList
-// of this instance. A node directly communicates with its fanout IdentityList on epidemic dissemination
+// GenerateFanout receives IdentifierList of entire network and constructs the fanout IdentifierList
+// of this instance. A node directly communicates with its fanout IdentifierList on epidemic dissemination
 // of the messages (i.e., publish and multicast).
 // Independent invocations of GenerateFanout on different nodes collaboratively must construct a cohesive
 // connected graph of nodes that enables them talking to each other. This should be done with a very high probability
 // in randomized topology.
-func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+func (r RandomizedTopology) GenerateFanout(ids flow.IdentifierList, channels network.ChannelList) (flow.IdentifierList, error) {
 	myUniqueChannels := engine.UniqueChannels(channels)
 	if len(myUniqueChannels) == 0 {
 		// no subscribed channel, hence skip topology creation
 		// we do not return an error at this state as invocation of MakeTopology may happen before
 		// node subscribing to all its channels.
 		r.logger.Warn().Msg("skips generating fanout with no subscribed channels")
-		return flow.IdentityList{}, nil
+		return flow.IdentifierList{}, nil
 	}
 
-	var myFanout flow.IdentityList
+	var myFanout flow.IdentifierList
 
 	// generates a randomized subgraph per channel
 	for _, myChannel := range myUniqueChannels {
@@ -90,12 +94,12 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 	return myFanout, nil
 }
 
-// subsetChannel returns a random subset of the identity list that is passed.
-// Returned identities should all subscribed to the specified `channel`.
-// Note: this method should not include identity of its executor.
-func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+// subsetChannel returns a random subset of the identifier list that is passed.
+// Returned identifiers should all subscribed to the specified `channel`.
+// Note: this method should not include identifier of its executor.
+func (r RandomizedTopology) subsetChannel(ids flow.IdentifierList, channel network.Channel) (flow.IdentifierList, error) {
 	// excludes node itself
-	sampleSpace := ids.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
+	sampleSpace := ids.Filter(idFilter.Not(idFilter.Is(r.myNodeID)))
 
 	// samples a random graph based on whether channel is cluster-based or not.
 	if _, ok := engine.ClusterChannel(channel); ok {
@@ -109,12 +113,12 @@ func (r RandomizedTopology) subsetChannel(ids flow.IdentityList, channel network
 // Independent invocations of this method over different nodes, should create a connected graph.
 // Fanout is the set of nodes that this instance should get connected to in order to create a
 // connected graph.
-func (r RandomizedTopology) sampleFanout(ids flow.IdentityList) (flow.IdentityList, error) {
+func (r RandomizedTopology) sampleFanout(ids flow.IdentifierList) (flow.IdentifierList, error) {
 	if len(ids) == 0 {
-		return nil, fmt.Errorf("empty identity list")
+		return nil, fmt.Errorf("empty identifier list")
 	}
 
-	fanout := flow.IdentityList{}
+	fanout := flow.IdentifierList{}
 	for _, id := range ids {
 		// tosses a biased coin and adds id to fanout accordingly.
 		// biased coin follows the edge probability distribution.
@@ -127,7 +131,7 @@ func (r RandomizedTopology) sampleFanout(ids flow.IdentityList) (flow.IdentityLi
 }
 
 // clusterChannelHandler returns a connected graph fanout of peers in the same cluster as executor of this instance.
-func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.IdentityList, error) {
+func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentifierList) (flow.IdentifierList, error) {
 	// extracts cluster peer ids to which the node belongs to.
 	clusterPeers, err := clusterPeers(r.myNodeID, r.state)
 	if err != nil {
@@ -135,10 +139,10 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 	}
 
 	// excludes node itself from cluster
-	clusterPeers = clusterPeers.Filter(filter.Not(filter.HasNodeID(r.myNodeID)))
+	clusterPeers = clusterPeers.Filter(idFilter.Not(idFilter.Is(r.myNodeID)))
 
 	// checks all cluster peers belong to the passed ids list
-	nonMembers := clusterPeers.Filter(filter.Not(filter.In(ids)))
+	nonMembers := clusterPeers.Filter(idFilter.Not(idFilter.In(ids...)))
 	if len(nonMembers) > 0 {
 		return nil, fmt.Errorf("cluster peers not belonged to sample space: %v", nonMembers)
 	}
@@ -148,7 +152,7 @@ func (r RandomizedTopology) clusterChannelHandler(ids flow.IdentityList) (flow.I
 }
 
 // clusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
-func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
+func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentifierList, channel network.Channel) (flow.IdentifierList, error) {
 	if _, ok := engine.ClusterChannel(channel); ok {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
@@ -160,7 +164,16 @@ func (r RandomizedTopology) nonClusterChannelHandler(ids flow.IdentityList, chan
 	}
 
 	// samples fanout among interacting roles
-	return r.sampleFanout(ids.Filter(filter.HasRole(roles...)))
+	return r.sampleFanout(
+		r.idProvider.
+			Identities(
+				filter.And(
+					filter.HasNodeID(ids...),
+					filter.HasRole(roles...),
+				),
+			).
+			NodeIDs(),
+	)
 }
 
 // tossBiasedBit returns true with probability equal `r.chance/100`, and returns false otherwise.
