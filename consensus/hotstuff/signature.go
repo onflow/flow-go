@@ -52,6 +52,6 @@ type Packer interface {
 		[]flow.Identifier, // threshold signers
 		crypto.Signature, // aggregated staking sig
 		crypto.Signature, // aggregated threshold sig
-		crypto.Siganture, // reconstructed threshold sig
+		crypto.Signature, // reconstructed threshold sig
 		error)
 }
