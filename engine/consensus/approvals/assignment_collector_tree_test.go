@@ -2,10 +2,10 @@ package approvals_test
 
 import (
 	"fmt"
-	mock2 "github.com/stretchr/testify/mock"
 	"sync"
 	"testing"
 
+	mock2 "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -196,6 +196,17 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentI
 	require.NoError(s.T(), err)
 	require.True(s.T(), lazyCollector.Created)
 	require.Equal(s.T(), approvals.VerifyingApprovals, lazyCollector.Collector.ProcessingStatus())
+}
+
+// TestGetOrCreateCollector_AddingFinalizedCollector tests a case when we are trying to add collector which is already finalized.
+// Leveled forest doesn't accept vertexes lower than the lowest height.
+func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingFinalizedCollector() {
+	block := unittest.BlockFixture()
+	block.Header.Height = s.ParentBlock.Height - 10
+	result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
+	require.Error(s.T(), err)
+	require.Nil(s.T(), lazyCollector)
 }
 
 // TestFinalizeForkAtLevel_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
