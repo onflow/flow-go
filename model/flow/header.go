@@ -28,15 +28,19 @@ type Header struct {
 
 	View uint64 // View is the view number at which this block was proposed.
 
-	ParentVoterIDs []Identifier // List of voters who signed the parent block. Used as QC.SignerIDs
-	// aggregated signature over the parent block.
+	ParentVoterIDs []Identifier // List of voters who signed the parent block.
+	// A quorum certificate can be extrated from the header.
+	// This field is the SignerIDs field of the extracted quorum certificate.
 
-	ParentVoterSig []byte // Used as QC.SigData. Not a crypto.Signature since it could be a serialization of multi sigs
+	ParentVoterSig []byte // aggregated signature over the parent block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	// A quorum certificate can be extracted from the header.
+	// This field is the SigData field of the extracted quorum certificate.
 
 	ProposerID Identifier // proposer identifier for the block
 
-	ProposerSig []byte // signature of the proposer over the new block.
-	// Not a crypto.Signature, since it could be a serialization of multi sigs
+	ProposerSig []byte // signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 }
 
 // Body returns the immutable part of the block header.
