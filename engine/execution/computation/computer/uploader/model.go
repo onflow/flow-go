@@ -1,6 +1,9 @@
 package uploader
 
 import (
+	"io"
+
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -36,4 +39,12 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 		Events:      events,
 		TrieUpdates: computationResult.TrieUpdates,
 	}
+}
+
+func WriteComputationResultsTo(computationResult *execution.ComputationResult, writer io.Writer) error {
+	blockData := ComputationResultToBlockData(computationResult)
+
+	encoder := cbor.NewEncoder(writer)
+
+	return encoder.Encode(blockData)
 }

@@ -15,6 +15,32 @@ import (
 
 func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 
+	cr := generateComputationResult(t)
+
+	blockData := ComputationResultToBlockData(cr)
+
+	assert.Equal(t, cr.ExecutableBlock.Block, blockData.Block)
+	assert.Equal(t, cr.ExecutableBlock.Collections(), blockData.Collections)
+	require.Equal(t, len(cr.TransactionResults), len(blockData.TxResults))
+	for i, result := range cr.TransactionResults {
+		assert.Equal(t, result, *blockData.TxResults[i])
+	}
+
+	eventsCombined := make([]flow.Event, 0)
+	for _, eventsList := range cr.Events {
+		eventsCombined = append(eventsCombined, eventsList...)
+	}
+	require.Equal(t, len(eventsCombined), len(blockData.Events))
+
+	for i, event := range eventsCombined {
+		assert.Equal(t, event, *blockData.Events[i])
+	}
+
+	assert.Equal(t, cr.TrieUpdates, blockData.TrieUpdates)
+}
+
+func generateComputationResult(t *testing.T) *execution.ComputationResult {
+
 	update1, err := ledger.NewUpdate(
 		ledger.State(unittest.StateCommitmentFixture()),
 		[]ledger.Key{
@@ -71,7 +97,7 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 	trieUpdate4, err := pathfinder.UpdateToTrieUpdate(update4, complete.DefaultPathFinderVersion)
 	require.NoError(t, err)
 
-	cr := &execution.ComputationResult{
+	return &execution.ComputationResult{
 		ExecutableBlock: unittest.ExecutableBlockFixture([][]flow.Identifier{
 			{unittest.IdentifierFixture()},
 			{unittest.IdentifierFixture()},
@@ -117,25 +143,4 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 			trieUpdate4,
 		},
 	}
-
-	blockData := ComputationResultToBlockData(cr)
-
-	assert.Equal(t, cr.ExecutableBlock.Block, blockData.Block)
-	assert.Equal(t, cr.ExecutableBlock.Collections(), blockData.Collections)
-	require.Equal(t, len(cr.TransactionResults), len(blockData.TxResults))
-	for i, result := range cr.TransactionResults {
-		assert.Equal(t, result, *blockData.TxResults[i])
-	}
-
-	eventsCombined := make([]flow.Event, 0)
-	for _, eventsList := range cr.Events {
-		eventsCombined = append(eventsCombined, eventsList...)
-	}
-	require.Equal(t, len(eventsCombined), len(blockData.Events))
-
-	for i, event := range eventsCombined {
-		assert.Equal(t, event, *blockData.Events[i])
-	}
-
-	assert.Equal(t, cr.TrieUpdates, blockData.TrieUpdates)
 }

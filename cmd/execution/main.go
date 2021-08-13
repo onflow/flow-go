@@ -97,6 +97,7 @@ func main() {
 		scriptLogThreshold          time.Duration
 		chdpQueryTimeout            uint
 		chdpDeliveryTimeout         uint
+		enableBlockDataUpload       bool
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -124,6 +125,7 @@ func main() {
 			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
+			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to GCP Bucket")
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -160,6 +162,12 @@ func main() {
 		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
+		}).
+		Component("Block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if enableBlockDataUpload {
+				return
+			}
+
 		}).
 		Module("state deltas mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)

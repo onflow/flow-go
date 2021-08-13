@@ -344,6 +344,10 @@ type ExecutionMetrics interface {
 
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
+
+	ExecutionBlockDataUploadStarted()
+
+	ExecutionBlockDataUploadFinished()
 }
 
 type TransactionMetrics interface {
