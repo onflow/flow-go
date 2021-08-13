@@ -35,7 +35,7 @@ func (e *Encoder) Encode(v interface{}) error {
 	err = encoder.Encode(v)
 	//binstat.LeaveVal(bs1, int64(data.Len()))
 	if err != nil {
-		return fmt.Errorf("could not encode cbor payload of type %s: %w", what, err)
+		return fmt.Errorf("could not encode CBOR payload with envelope code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	// encode / append the envelope code and write to stream

@@ -178,6 +178,14 @@ func switchv2what(v interface{}) (string, error) {
 	return what, nil
 }
 
+// Given a Golang interface 'v', return a uint8 'code' uniquely
+// identifying the interface, and a string 'what' naming the interface
+// for debugging purposes.
+// Return an error if the interface is unknown.
+// NOTE: 'v' is the network message payload in unserialized form.
+// NOTE: 'code' is the message type.
+// NOTE: 'what' is the 'code' name for debugging / instrumentation.
+// NOTE: 'envelope' contains 'code' & servialized 'v'.
 func v2envelopeCode(v interface{}) (string, uint8, error) {
 
 	// determine the message type

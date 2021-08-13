@@ -36,7 +36,13 @@ func (c *Codec) NewDecoder(r io.Reader) network.Decoder {
 	return &Decoder{dec: dec}
 }
 
-// Encode will encode the givene entity and return the bytes.
+// Given a Golang interface 'v', return a []byte 'envelope'.
+// Return an error if packing the envelope fails.
+// NOTE: 'v' is the network message payload in unserialized form.
+// NOTE: 'code' is the message type.
+// NOTE: 'what' is the 'code' name for debugging / instrumentation.
+// NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
+// i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
 func (c *Codec) Encode(v interface{}) ([]byte, error) {
 
 	// encode the value
@@ -60,7 +66,7 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	err = encoder.Encode(v)
 	//binstat.LeaveVal(bs2, int64(data.Len()))
 	if err != nil {
-		return nil, fmt.Errorf("could not encode cbor payload of type %s: %w", what, err)
+		return nil, fmt.Errorf("could not encode CBOR payload with envelope code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	dataBytes := data.Bytes()
@@ -68,7 +74,13 @@ func (c *Codec) Encode(v interface{}) ([]byte, error) {
 	return dataBytes, nil
 }
 
-// Decode will attempt to decode the given entity from bytes.
+// Given a []byte 'envelope', eturn a Golang interface 'v'.
+// Return an error if unpacking the envelope fails.
+// NOTE: 'v' is the network message payload in unserialized form.
+// NOTE: 'code' is the message type.
+// NOTE: 'what' is the 'code' name for debugging / instrumentation.
+// NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
+// i.e.  1st byte is 'code' and remaining bytes are CBOR encoded 'v'.
 func (c *Codec) Decode(data []byte) (interface{}, error) {
 
 	// decode the envelope
@@ -86,7 +98,7 @@ func (c *Codec) Decode(data []byte) (interface{}, error) {
 	err = cbor.Unmarshal(data[1:], v) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode cbor payload of type %s: %w", what, err)
+		return nil, fmt.Errorf("could not decode CBOR payload with envelope code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	return v, nil

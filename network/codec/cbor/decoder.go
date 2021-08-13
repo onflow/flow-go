@@ -23,8 +23,8 @@ func (d *Decoder) Decode() (interface{}, error) {
 	//bs1 := binstat.EnterTime(binstat.BinNet + ":strm>1(cbor)iowriter2payload2envelope")
 	err := d.dec.Decode(data)
 	//binstat.LeaveVal(bs1, int64(len(data)))
-	if err != nil {
-		return nil, fmt.Errorf("could not decode envelope: %w", err)
+	if err != nil || len(data) == 0 {
+		return nil, fmt.Errorf("could not decode envelope; len(data)=%d: %w", len(data), err)
 	}
 
 	code := data[0] // only first byte
@@ -39,7 +39,7 @@ func (d *Decoder) Decode() (interface{}, error) {
 	err = cbor.Unmarshal(data[1:], v) // all but first byte
 	//binstat.Leave(bs2)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode cbor payload of type %s: %w", what, err)
+		return nil, fmt.Errorf("could not decode CBOR payload with envelop code %d AKA %s: %w", code, what, err) // e.g. 2, "CodeBlockProposal", <CBOR error>
 	}
 
 	return v, nil

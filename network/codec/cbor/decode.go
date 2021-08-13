@@ -176,7 +176,13 @@ func switchenv2what(code uint8) (string, error) {
 	return what, nil
 }
 
-// decode will decode the envelope into an entity.
+// Given a uint8 'code', return a Golang interface 'v', and a string
+// 'what' naming the interface for debugging purposes.
+// Return an error if the 'code' is unknown.
+// NOTE: 'v' is the network message payload in unserialized form.
+// NOTE: 'code' is the message type.
+// NOTE: 'what' is the 'code' name for debugging / instrumentation.
+// NOTE: 'envelope' contains 'code' & serialized / encoded 'v'.
 func envelopeCode2v(code uint8) (string, interface{}, error) {
 
 	// create the desired message
