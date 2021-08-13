@@ -13,15 +13,15 @@ type RandomBeaconReconstructor interface {
 	Reconstruct() (crypto.Signature, error)
 }
 
-// ThresholdSigAggregator aggregates the threshold signatures
-type ThresholdSigAggregator interface {
+// RandomBeaconAggregtor aggregates the random beacon signatures
+type RandomBeaconAggregtor interface {
 	// TrustedAdd adds an already verified signature.
 	// return (true, nil) means the signature has been added
 	// return (false, nil) means the signature is a duplication
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 	// Aggregate assumes enough shares have been collected, it aggregates the signatures
 	// and return the aggregated signature.
-	// if called concurrently, only one threshold will be running the aggregation.
+	// if called concurrently, only one thread will be running the aggregation.
 	Aggregate() ([]byte, error)
 }
 
@@ -34,24 +34,20 @@ type StakingSigAggregator interface {
 
 	// Aggregate assumes enough shares have been collected, it aggregates the signatures
 	// and return the aggregated signature.
-	// if called concurrently, only one threshold will be running the aggregation.
+	// if called concurrently, only one thread will be running the aggregation.
 	Aggregate() ([]byte, error)
 }
 
-type Packer interface {
-	Combine(
-		stakingSigners []flow.Identifier,
-		thresholdSigners []flow.Identifier,
-		aggregatedStakingSig crypto.Signature,
-		aggregatedThresholdSig crypto.Signature,
-		reconstructedThresholdSig crypto.Signature,
-	) ([]flow.Identifier, []byte, error)
+type AggregatedSignatureData struct {
+	StakingSigners               []flow.Identifier
+	ThresholdSigners             []flow.Identifier
+	AggregatedStakingSig         crypto.Signature
+	AggregatedRandomBeaconSig    crypto.Signature
+	ReconstructedRandomBeaconSig crypto.Signature
+}
 
-	Split(signerIDs []flow.Identifier, sigData []byte) (
-		[]flow.Identifier, // staking signers
-		[]flow.Identifier, // threshold signers
-		crypto.Signature, // aggregated staking sig
-		crypto.Signature, // aggregated threshold sig
-		crypto.Siganture, // reconstructed threshold sig
-		error)
+type Packer interface {
+	Combine(sig *AggregatedSignatureData) ([]flow.Identifier, []byte, error)
+
+	Split(signerIDs []flow.Identifier, sigData []byte) (*AggregatedSignatureData, error)
 }
