@@ -62,37 +62,49 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkConduit.AssertExpectations(t)
 	})
 
-	//t.Run("unstaked (0 stake) origin", func(t *testing.T) {
-	//	ps := new(mockprotocol.State)
-	//	ss := new(mockprotocol.Snapshot)
-	//
-	//	execState := new(state.ExecutionState)
-	//
-	//	e := Engine{state: ps, unit: engine.NewUnit(), execState: execState, metrics: metrics.NewNoopCollector(), checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
-	//
-	//	originID := unittest.IdentifierFixture()
-	//	chunkID := unittest.IdentifierFixture()
-	//	blockID := unittest.IdentifierFixture()
-	//	chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
-	//
-	//	ps.On("AtBlockID", blockID).Return(ss)
-	//	ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
-	//	execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
-	//	execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
-	//
-	//	req := &messages.ChunkDataRequest{
-	//		ChunkID: chunkID,
-	//		Nonce:   rand.Uint64(),
-	//	}
-	//	// submit using origin ID with zero stake
-	//	err := e.onChunkDataRequest(context.Background(), originID, req)
-	//	assert.Error(t, err)
-	//
-	//	ps.AssertExpectations(t)
-	//	ss.AssertExpectations(t)
-	//	execState.AssertExpectations(t)
-	//})
-	//
+	t.Run("unstaked (0 stake) origin", func(t *testing.T) {
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
+
+		execState := new(state.ExecutionState)
+		chunkConduit := mocknetwork.Conduit{}
+
+		e := Engine{
+			state:              ps,
+			unit:               engine.NewUnit(),
+			execState:          execState,
+			metrics:            metrics.NewNoopCollector(),
+			chunksConduit:      &chunkConduit,
+			checkStakedAtBlock: func(_ flow.Identifier) (bool, error) { return true, nil }}
+
+		originID := unittest.IdentifierFixture()
+		chunkID := unittest.IdentifierFixture()
+		blockID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+
+		ps.On("AtBlockID", blockID).Return(ss)
+		ss.On("Identity", originID).Return(unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution), unittest.WithStake(0)), nil)
+		execState.On("ChunkDataPackByChunkID", mock.Anything, mock.Anything).Return(chunkDataPack, nil)
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
+
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+		// submit using origin ID with zero stake
+		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
+		e.onChunkDataRequest(context.Background(), originID, req)
+		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
+
+		// no chunk data pack response should be sent to a request coming from (0)-stake node
+		chunkConduit.AssertNotCalled(t, "Unicast")
+
+		ps.AssertExpectations(t)
+		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
+		chunkConduit.AssertExpectations(t)
+	})
+
 	//t.Run("unstaked (not found origin) origin", func(t *testing.T) {
 	//	ps := new(mockprotocol.State)
 	//	ss := new(mockprotocol.Snapshot)
