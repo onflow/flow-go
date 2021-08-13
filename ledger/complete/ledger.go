@@ -2,19 +2,24 @@ package complete
 
 import (
 	"fmt"
+	"io"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module"
 )
+
+const DefaultCacheSize = 1000
+const DefaultPathFinderVersion = 1
 
 // Ledger (complete) is a fast memory-efficient fork-aware thread-safe trie-based key/value storage.
 // Ledger holds an array of registers (key-value pairs) and keeps tracks of changes over a limited time.
@@ -28,26 +33,23 @@ import (
 // tries and purge the old ones (LRU-based); in other words, Ledger is not designed to be used
 // for archival usage but make it possible for other software components to reconstruct very old tries using write-ahead logs.
 type Ledger struct {
-	forest  *mtrie.Forest
-	wal     *wal.LedgerWAL
-	metrics module.LedgerMetrics
-	logger  zerolog.Logger
+	forest            *mtrie.Forest
+	wal               wal.LedgerWAL
+	metrics           module.LedgerMetrics
+	logger            zerolog.Logger
+	pathFinderVersion uint8
 }
 
 // NewLedger creates a new in-memory trie-backed ledger storage with persistence.
-func NewLedger(dbDir string,
+func NewLedger(
+	wal wal.LedgerWAL,
 	capacity int,
 	metrics module.LedgerMetrics,
 	log zerolog.Logger,
-	reg prometheus.Registerer) (*Ledger, error) {
+	pathFinderVer uint8) (*Ledger, error) {
 
-	w, err := wal.NewWAL(nil, reg, dbDir, capacity, pathfinder.PathByteSize, wal.SegmentSize)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create LedgerWAL: %w", err)
-	}
-
-	forest, err := mtrie.NewForest(pathfinder.PathByteSize, dbDir, capacity, metrics, func(evictedTrie *trie.MTrie) error {
-		return w.RecordDelete(evictedTrie.RootHash())
+	forest, err := mtrie.NewForest(capacity, metrics, func(evictedTrie *trie.MTrie) error {
+		return wal.RecordDelete(evictedTrie.RootHash())
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create forest: %w", err)
@@ -56,16 +58,23 @@ func NewLedger(dbDir string,
 	logger := log.With().Str("ledger", "complete").Logger()
 
 	storage := &Ledger{
-		forest:  forest,
-		wal:     w,
-		metrics: metrics,
-		logger:  logger,
+		forest:            forest,
+		wal:               wal,
+		metrics:           metrics,
+		logger:            logger,
+		pathFinderVersion: pathFinderVer,
 	}
 
-	err = w.ReplayOnForest(forest)
+	// pause records to prevent double logging trie removals
+	wal.PauseRecord()
+	defer wal.UnpauseRecord()
+
+	err = wal.ReplayOnForest(forest)
 	if err != nil {
 		return nil, fmt.Errorf("cannot restore LedgerWAL: %w", err)
 	}
+
+	wal.UnpauseRecord()
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
 	metrics.ForestApproxMemorySize(0)
@@ -84,14 +93,13 @@ func (l *Ledger) Ready() <-chan struct{} {
 // Done implements interface module.ReadyDoneAware
 // it closes all the open write-ahead log files.
 func (l *Ledger) Done() <-chan struct{} {
-	_ = l.wal.Close()
 	done := make(chan struct{})
 	close(done)
 	return done
 }
 
-// InitState returns the state of an empty ledger
-func (l *Ledger) InitState() ledger.State {
+// InitialState returns the state of an empty ledger
+func (l *Ledger) InitialState() ledger.State {
 	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
@@ -99,7 +107,7 @@ func (l *Ledger) InitState() ledger.State {
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 	start := time.Now()
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -136,22 +144,28 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		return update.State(), nil
 	}
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, 0)
+	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return nil, err
+		return ledger.State(hash.DummyHash), err
 	}
 
 	l.metrics.UpdateCount()
 	l.metrics.UpdateValuesNumber(uint64(len(trieUpdate.Paths)))
 
-	err = l.wal.RecordUpdate(trieUpdate)
-	if err != nil {
-		return nil, fmt.Errorf("cannot update state, error while writing LedgerWAL: %w", err)
-	}
+	walChan := make(chan error)
+
+	go func() {
+		walChan <- l.wal.RecordUpdate(trieUpdate)
+	}()
 
 	newRootHash, err := l.forest.Update(trieUpdate)
+	walError := <-walChan
+
 	if err != nil {
-		return nil, fmt.Errorf("cannot update state: %w", err)
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot update state: %w", err)
+	}
+	if walError != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("error while writing LedgerWAL: %w", walError)
 	}
 
 	// TODO update to proper value once https://github.com/onflow/flow-go/pull/3720 is merged
@@ -165,17 +179,22 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 		l.metrics.UpdateDurationPerItem(durationPerValue)
 	}
 
-	l.logger.Info().Hex("from", update.State()).
+	state := update.State()
+	l.logger.Info().Hex("from", state[:]).
 		Hex("to", newRootHash[:]).
 		Int("update_size", update.Size()).
 		Msg("ledger updated")
 	return ledger.State(newRootHash), nil
 }
 
-// Prove provides proofs for a ledger query and errors (if any)
+// Prove provides proofs for a ledger query and errors (if any).
+//
+// Proves are generally _not_ provided in the register order of the query.
+// In the current implementation, proofs are sorted in a deterministic order specified by the
+// forest and mtrie implementation.
 func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 
-	paths, err := pathfinder.KeysToPaths(query.Keys(), 0)
+	paths, err := pathfinder.KeysToPaths(query.Keys(), l.pathFinderVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -192,23 +211,13 @@ func (l *Ledger) Prove(query *ledger.Query) (proof ledger.Proof, err error) {
 		l.metrics.ProofSize(uint32(len(proofToGo) / len(paths)))
 	}
 
-	return ledger.Proof(proofToGo), err
-}
-
-// CloseStorage closes the DB
-func (l *Ledger) CloseStorage() {
-	_ = l.wal.Close()
+	return proofToGo, err
 }
 
 // MemSize return the amount of memory used by ledger
 // TODO implement an approximate MemSize method
 func (l *Ledger) MemSize() (int64, error) {
 	return 0, nil
-}
-
-// DiskSize returns the amount of disk space used by the storage (in bytes)
-func (l *Ledger) DiskSize() (int64, error) {
-	return l.forest.DiskSize()
 }
 
 // ForestSize returns the number of tries stored in the forest
@@ -223,4 +232,143 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 		return nil, fmt.Errorf("cannot create checkpointer for compactor: %w", err)
 	}
 	return checkpointer, nil
+}
+
+// ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
+func (l *Ledger) ExportCheckpointAt(state ledger.State,
+	migrations []ledger.Migration,
+	reporters []ledger.Reporter,
+	targetPathFinderVersion uint8,
+	outputDir, outputFile string) (ledger.State, error) {
+
+	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
+
+	// get trie
+	t, err := l.forest.GetTrie(ledger.RootHash(state))
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
+	}
+
+	// clean up tries to release memory
+	err = l.keepOnlyOneTrie(state)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
+	}
+
+	// TODO enable validity check of trie
+	// only check validity of the trie we are interested in
+	// l.logger.Info().Msg("Checking validity of the trie at the given state...")
+	// if !t.IsAValidTrie() {
+	//	 return nil, fmt.Errorf("trie is not valid: %w", err)
+	// }
+	// l.logger.Info().Msg("Trie is valid.")
+
+	// get all payloads
+	payloads := t.AllPayloads()
+	payloadSize := len(payloads)
+
+	// migrate payloads
+	for i, migrate := range migrations {
+		l.logger.Info().Msgf("migration %d is underway", i)
+
+		payloads, err = migrate(payloads)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
+		}
+
+		newPayloadSize := len(payloads)
+
+		if payloadSize != newPayloadSize {
+			l.logger.Warn().
+				Int("migration_step", i).
+				Int("expected_size", payloadSize).
+				Int("outcome_size", newPayloadSize).
+				Msg("payload counts has changed during migration, make sure this is expected.")
+		}
+		l.logger.Info().Msgf("migration %d is done", i)
+
+		payloadSize = newPayloadSize
+	}
+
+	// run reporters
+	for i, reporter := range reporters {
+		err = reporter.Report(payloads)
+		if err != nil {
+			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
+		}
+	}
+
+	l.logger.Info().Msgf("constructing a new trie with migrated payloads (count: %d)...", len(payloads))
+
+	// get paths
+	paths, err := pathfinder.PathsFromPayloads(payloads, targetPathFinderVersion)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("cannot export checkpoint, can't construct paths: %w", err)
+	}
+
+	emptyTrie := trie.NewEmptyMTrie()
+
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
+	}
+
+	l.logger.Info().Msg("creating a checkpoint for the new trie")
+
+	writer, err := wal.CreateCheckpointWriterForFile(outputDir, outputFile)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to create a checkpoint writer: %w", err)
+	}
+
+	flatTrie, err := flattener.FlattenTrie(newTrie)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to flatten the trie: %w", err)
+	}
+
+	l.logger.Info().Msg("storing the checkpoint to the file")
+
+	err = wal.StoreCheckpoint(flatTrie.ToFlattenedForestWithASingleTrie(), writer)
+	if err != nil {
+		return ledger.State(hash.DummyHash), fmt.Errorf("failed to store the checkpoint: %w", err)
+	}
+	writer.Close()
+
+	return ledger.State(newTrie.RootHash()), nil
+}
+
+// MostRecentTouchedState returns a state which is most recently touched.
+func (l *Ledger) MostRecentTouchedState() (ledger.State, error) {
+	root, err := l.forest.MostRecentTouchedRootHash()
+	return ledger.State(root), err
+}
+
+// DumpTrieAsJSON export trie at specific state as JSONL (each line is JSON encoding of a payload)
+func (l *Ledger) DumpTrieAsJSON(state ledger.State, writer io.Writer) error {
+	fmt.Println(ledger.RootHash(state))
+	trie, err := l.forest.GetTrie(ledger.RootHash(state))
+	if err != nil {
+		return fmt.Errorf("cannot find the target trie: %w", err)
+	}
+	return trie.DumpAsJSON(writer)
+}
+
+// this operation should only be used for exporting
+func (l *Ledger) keepOnlyOneTrie(state ledger.State) error {
+	// don't write things to WALs
+	l.wal.PauseRecord()
+	defer l.wal.UnpauseRecord()
+
+	allTries, err := l.forest.GetTries()
+	if err != nil {
+		return err
+	}
+
+	targetRootHash := ledger.RootHash(state)
+	for _, trie := range allTries {
+		trieRootHash := trie.RootHash()
+		if trieRootHash != targetRootHash {
+			l.forest.RemoveTrie(trieRootHash)
+		}
+	}
+	return nil
 }

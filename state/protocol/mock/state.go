@@ -62,22 +62,6 @@ func (_m *State) Final() protocol.Snapshot {
 	return r0
 }
 
-// Mutate provides a mock function with given fields:
-func (_m *State) Mutate() protocol.Mutator {
-	ret := _m.Called()
-
-	var r0 protocol.Mutator
-	if rf, ok := ret.Get(0).(func() protocol.Mutator); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(protocol.Mutator)
-		}
-	}
-
-	return r0
-}
-
 // Params provides a mock function with given fields:
 func (_m *State) Params() protocol.Params {
 	ret := _m.Called()

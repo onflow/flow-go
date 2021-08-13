@@ -5,6 +5,10 @@
 /cmd/verification/verification
 /cmd/testclient/testclient
 /cmd/util/util
+/cmd/bootstrap/bootstrap
+
+# crypto relic folder
+crypto/relic/
 
 # Test binary, build with `go test -c`
 *.test
@@ -15,8 +19,15 @@
 # Output from logging to debug
 *.log
 
+# Output from binstat
+*.binstat.txt*
+
+# Output from pprof
+*.pprof.txt
+
 # Coverage artifacts
 coverage.zip
+coverage.txt
 cover.json
 cover-summary
 index.html
@@ -43,4 +54,7 @@ language/tools/vscode-extension/out/*
 # Mock generation
 **/gomock_reflect*/*
 
-
+# command line tool
+read-badger
+read-protocol-state
+remove-execution-fork

@@ -3,12 +3,15 @@ package flow
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"regexp"
 	"sort"
 	"strconv"
 
+	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
@@ -20,10 +23,26 @@ var rxid = regexp.MustCompile(`^(collection|consensus|execution|verification|acc
 
 // Identity represents a node identity.
 type Identity struct {
-	NodeID        Identifier
-	Address       string
-	Role          Role
-	Stake         uint64
+	// NodeID uniquely identifies a particular node. A node's ID is fixed for
+	// the duration of that node's participation in the network.
+	NodeID  Identifier
+	Address string
+	Role    Role
+	// Stake represents the node's *weight*. The stake (quantity of $FLOW held
+	// in escrow during the node's participation) is strictly managed by the
+	// service account. The protocol software strictly considers weight, which
+	// represents how much voting power a given node has.
+	//
+	// NOTE: Nodes that are registered for an upcoming epoch, or that are in
+	// the process of un-staking, have 0 weight.
+	//
+	// TODO: to be renamed to Weight
+	Stake uint64
+	// Ejected represents whether a node has been permanently removed from the
+	// network. A node may be ejected for either:
+	// * committing one protocol felony
+	// * committing a series of protocol misdemeanours
+	Ejected       bool
 	StakingPubKey crypto.PublicKey
 	NetworkPubKey crypto.PublicKey
 }
@@ -96,11 +115,23 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 func (iy Identity) MarshalJSON() ([]byte, error) {
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
-		return nil, fmt.Errorf("could not convert to encodable: %w", err)
+		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
 	data, err := json.Marshal(encodable)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
+	}
+	return data, nil
+}
+
+func (iy Identity) MarshalCBOR() ([]byte, error) {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
+	}
+	data, err := cbor.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode cbor: %w", err)
 	}
 	return data, nil
 }
@@ -115,6 +146,18 @@ func (iy Identity) MarshalMsgpack() ([]byte, error) {
 		return nil, fmt.Errorf("could not encode msgpack: %w", err)
 	}
 	return data, nil
+}
+
+func (iy Identity) EncodeRLP(w io.Writer) error {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return fmt.Errorf("could not convert to encodable: %w", err)
+	}
+	err = rlp.Encode(w, encodable)
+	if err != nil {
+		return fmt.Errorf("could not encode rlp: %w", err)
+	}
+	return nil
 }
 
 func identityFromEncodable(ie encodableIdentity, identity *Identity) error {
@@ -144,7 +187,20 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	}
 	err = identityFromEncodable(encodable, iy)
 	if err != nil {
-		return fmt.Errorf("could not convert from encodable: %w", err)
+		return fmt.Errorf("could not convert from encodable json: %w", err)
+	}
+	return nil
+}
+
+func (iy *Identity) UnmarshalCBOR(b []byte) error {
+	var encodable encodableIdentity
+	err := cbor.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = identityFromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable cbor: %w", err)
 	}
 	return nil
 }
@@ -157,9 +213,44 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 	}
 	err = identityFromEncodable(encodable, iy)
 	if err != nil {
-		return fmt.Errorf("could not convert from encodable: %w", err)
+		return fmt.Errorf("could not convert from encodable msgpack: %w", err)
 	}
 	return nil
+}
+
+func (iy *Identity) EqualTo(other *Identity) bool {
+	if iy.NodeID != other.NodeID {
+		return false
+	}
+	if iy.Address != other.Address {
+		return false
+	}
+	if iy.Role != other.Role {
+		return false
+	}
+	if iy.Stake != other.Stake {
+		return false
+	}
+	if iy.Ejected != other.Ejected {
+		return false
+	}
+	if (iy.StakingPubKey != nil && other.StakingPubKey == nil) ||
+		(iy.StakingPubKey == nil && other.StakingPubKey != nil) {
+		return false
+	}
+	if iy.StakingPubKey != nil && !iy.StakingPubKey.Equals(other.StakingPubKey) {
+		return false
+	}
+
+	if (iy.NetworkPubKey != nil && other.NetworkPubKey == nil) ||
+		(iy.NetworkPubKey == nil && other.NetworkPubKey != nil) {
+		return false
+	}
+	if iy.NetworkPubKey != nil && !iy.NetworkPubKey.Equals(other.NetworkPubKey) {
+		return false
+	}
+
+	return true
 }
 
 // IdentityFilter is a filter on identities.
@@ -167,6 +258,10 @@ type IdentityFilter func(*Identity) bool
 
 // IdentityOrder is a sort for identities.
 type IdentityOrder func(*Identity, *Identity) bool
+
+// IdentityMapFunc is a modifier function for map operations for identities.
+// Identities are COPIED from the source slice.
+type IdentityMapFunc func(Identity) Identity
 
 // IdentityList is a list of nodes.
 type IdentityList []*Identity
@@ -184,28 +279,72 @@ IDLoop:
 	return dup
 }
 
+// Map returns a new identity list with the map function f applied to a copy of
+// each identity.
+//
+// CAUTION: this relies on structure copy semantics. Map functions that modify
+// an object referenced by the input Identity structure will modify identities
+// in the source slice as well.
+func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
+	dup := make(IdentityList, 0, len(il))
+	for _, identity := range il {
+		next := f(*identity)
+		dup = append(dup, &next)
+	}
+	return dup
+}
+
+// Copy returns a copy of the receiver. The resulting slice uses a different
+// backing array, meaning appends and insert operations on either slice are
+// guaranteed to only affect that slice.
+//
+// Copy should be used when modifying an existing identity list by either
+// appending new elements, re-ordering, or inserting new elements in an
+// existing index.
+func (il IdentityList) Copy() IdentityList {
+	return il.Map(func(identity Identity) Identity {
+		return identity
+	})
+}
+
 // Selector returns an identity filter function that selects only identities
 // within this identity list.
 func (il IdentityList) Selector() IdentityFilter {
 
-	lookup := make(map[Identifier]struct{})
-	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
-	}
+	lookup := il.Lookup()
 	return func(identity *Identity) bool {
 		_, exists := lookup[identity.NodeID]
 		return exists
 	}
 }
 
-// Order will sort the list using the given sort function.
-func (il IdentityList) Order(less IdentityOrder) IdentityList {
-	dup := make(IdentityList, 0, len(il))
-	dup = append(dup, il...)
+func (il IdentityList) Lookup() map[Identifier]*Identity {
+	lookup := make(map[Identifier]*Identity, len(il))
+	for _, identity := range il {
+		lookup[identity.NodeID] = identity
+	}
+	return lookup
+}
+
+// Sort will sort the list using the given ordering.
+func (il IdentityList) Sort(less IdentityOrder) IdentityList {
+	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
 		return less(dup[i], dup[j])
 	})
 	return dup
+}
+
+// Sorted returns whether the list is sorted by the input ordering.
+func (il IdentityList) Sorted(less IdentityOrder) bool {
+	for i := 0; i < len(il)-1; i++ {
+		a := il[i]
+		b := il[i+1]
+		if !less(a, b) {
+			return false
+		}
+	}
+	return true
 }
 
 // NodeIDs returns the NodeIDs of the nodes in the list.
@@ -268,6 +407,23 @@ func (il IdentityList) Sample(size uint) IdentityList {
 	return dup[:size]
 }
 
+// DeterministicSample returns deterministic random sample from the `IdentityList` using the given seed
+func (il IdentityList) DeterministicSample(size uint, seed int64) IdentityList {
+	rand.Seed(seed)
+	return il.Sample(size)
+}
+
+// DeterministicShuffle randomly and deterministically shuffles the identity
+// list, returning the shuffled list without modifying the receiver.
+func (il IdentityList) DeterministicShuffle(seed int64) IdentityList {
+	dup := il.Copy()
+	rng := rand.New(rand.NewSource(seed))
+	rng.Shuffle(len(il), func(i, j int) {
+		dup[i], dup[j] = dup[j], dup[i]
+	})
+	return dup
+}
+
 // SamplePct returns a random sample from the receiver identity list. The
 // sample contains `pct` percentage of the list. The sample is rounded up
 // if `pct>0`, so this will always select at least one identity.
@@ -288,11 +444,38 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 	return il.Sample(size)
 }
 
-// StakingKeys returns a list of the staking public keys for the identities.
-func (il IdentityList) StakingKeys() []crypto.PublicKey {
-	keys := make([]crypto.PublicKey, 0, len(il))
-	for _, identity := range il {
-		keys = append(keys, identity.StakingPubKey)
+// Union returns a new identity list containing every identity that occurs in
+// either `il`, or `other`, or both. There are no duplicates in the output,
+// where duplicates are identities with the same node ID.
+func (il IdentityList) Union(other IdentityList) IdentityList {
+
+	// stores the output, the union of the two lists
+	union := make(IdentityList, 0, len(il)+len(other))
+	// efficient lookup to avoid duplicates
+	lookup := make(map[Identifier]struct{})
+
+	// add all identities, omitted duplicates
+	for _, identity := range append(il.Copy(), other...) {
+		if _, exists := lookup[identity.NodeID]; exists {
+			continue
+		}
+		union = append(union, identity)
+		lookup[identity.NodeID] = struct{}{}
 	}
-	return keys
+
+	return union
+}
+
+// EqualTo checks if the other list if the same, that it contains the same elements
+// in the same order
+func (il IdentityList) EqualTo(other IdentityList) bool {
+	if len(il) != len(other) {
+		return false
+	}
+	for i, identity := range il {
+		if !identity.EqualTo(other[i]) {
+			return false
+		}
+	}
+	return true
 }

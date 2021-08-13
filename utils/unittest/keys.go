@@ -2,8 +2,11 @@ package unittest
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {
@@ -54,4 +57,35 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 	}
 
 	return keys, nil
+}
+
+func DKGParticipantPriv() *dkg.DKGParticipantPriv {
+	privKey, _ := StakingKey()
+	randBeaconKey := encodable.RandomBeaconPrivKey{
+		PrivateKey: privKey,
+	}
+	return &dkg.DKGParticipantPriv{
+		NodeID:              IdentifierFixture(),
+		RandomBeaconPrivKey: randBeaconKey,
+	}
+}
+
+func MustDecodePublicKeyHex(algo crypto.SigningAlgorithm, keyHex string) crypto.PublicKey {
+	keyBytes, err := hex.DecodeString(keyHex)
+	if err != nil {
+		panic(err)
+	}
+	key, err := crypto.DecodePublicKey(algo, keyBytes)
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
+func MustDecodeSignatureHex(sigHex string) crypto.Signature {
+	sigBytes, err := hex.DecodeString(sigHex)
+	if err != nil {
+		panic(err)
+	}
+	return sigBytes
 }

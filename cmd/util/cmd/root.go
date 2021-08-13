@@ -10,10 +10,13 @@ import (
 	"github.com/spf13/viper"
 
 	checkpoint_list_tries "github.com/onflow/flow-go/cmd/util/cmd/checkpoint-list-tries"
+	epochs "github.com/onflow/flow-go/cmd/util/cmd/epochs/cmd"
 	export "github.com/onflow/flow-go/cmd/util/cmd/exec-data-json-export"
 	extract "github.com/onflow/flow-go/cmd/util/cmd/execution-state-extract"
-	"github.com/onflow/flow-go/cmd/util/cmd/find-block"
-	"github.com/onflow/flow-go/cmd/util/cmd/read-execution-state"
+	ledger_json_exporter "github.com/onflow/flow-go/cmd/util/cmd/export-json-execution-state"
+	read_badger "github.com/onflow/flow-go/cmd/util/cmd/read-badger/cmd"
+	read_protocol_state "github.com/onflow/flow-go/cmd/util/cmd/read-protocol-state/cmd"
+	truncate_database "github.com/onflow/flow-go/cmd/util/cmd/truncate-database"
 )
 
 var (
@@ -49,9 +52,12 @@ func init() {
 func addCommands() {
 	rootCmd.AddCommand(extract.Cmd)
 	rootCmd.AddCommand(export.Cmd)
-	rootCmd.AddCommand(find.Cmd)
-	rootCmd.AddCommand(read.Cmd)
 	rootCmd.AddCommand(checkpoint_list_tries.Cmd)
+	rootCmd.AddCommand(truncate_database.Cmd)
+	rootCmd.AddCommand(read_badger.RootCmd)
+	rootCmd.AddCommand(read_protocol_state.RootCmd)
+	rootCmd.AddCommand(ledger_json_exporter.Cmd)
+	rootCmd.AddCommand(epochs.RootCmd)
 }
 
 func initConfig() {

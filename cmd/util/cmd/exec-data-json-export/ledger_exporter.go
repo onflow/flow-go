@@ -1,114 +1,59 @@
 package jsonexporter
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
-	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/mtrie"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/flattener"
-	"github.com/onflow/flow-go/storage/ledger/mtrie/trie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 // ExportLedger exports ledger key value pairs at the given blockID
-func ExportLedger(blockID flow.Identifier, dbPath string, ledgerPath string, outputPath string) error {
-	db := common.InitStorage(dbPath)
-	defer db.Close()
+func ExportLedger(ledgerPath string, targetstate string, outputPath string) error {
 
-	cache := &metrics.NoopCollector{}
-	commits := badger.NewCommits(cache, db)
-
-	targetHash, err := commits.ByBlockID(blockID)
-	if err != nil {
-		return fmt.Errorf("cannot get state commitment for block: %w", err)
-	}
-
-	w, err := wal.NewWAL(nil, nil, ledgerPath, ledger.CacheSize, ledger.RegisterKeySize, wal.SegmentSize)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, &metrics.NoopCollector{}, ledgerPath, complete.DefaultCacheSize, pathfinder.PathByteSize, wal.SegmentSize)
 	if err != nil {
 		return fmt.Errorf("cannot create WAL: %w", err)
 	}
 	defer func() {
-		_ = w.Close()
+		<-diskWal.Done()
 	}()
-
-	// TODO port this to use new forest
-	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, outputPath, 1000, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error { return nil })
+	led, err := complete.NewLedger(diskWal, complete.DefaultCacheSize, &metrics.NoopCollector{}, log.Logger, 0)
 	if err != nil {
-		return fmt.Errorf("cannot create mForest: %w", err)
+		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
+	}
+	stateBytes, err := hex.DecodeString(targetstate)
+	if err != nil {
+		return fmt.Errorf("failed to decode hex code of state: %w", err)
+	}
+	state, err := ledger.ToState(stateBytes)
+	if err != nil {
+		return fmt.Errorf("cannot use the input state: %w", err)
 	}
 
-	i := 0
-	valuesSize := 0
-	valuesCount := 0
-	startTime := time.Now()
-	found := false
-	FoundHashError := fmt.Errorf("found hash %s", targetHash)
+	path := filepath.Join(outputPath, state.String()+".trie.jsonl")
 
-	err = w.ReplayLogsOnly(
-		func(forestSequencing *flattener.FlattenedForest) error {
-			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
-			if err != nil {
-				return fmt.Errorf("rebuilding forest from sequenced nodes failed: %w", err)
-			}
-			err = mForest.AddTries(rebuiltTries)
-			if err != nil {
-				return fmt.Errorf("adding rebuilt tries to forest failed: %w", err)
-			}
-			return nil
-		},
-		func(stateCommitment flow.StateCommitment, keys [][]byte, values [][]byte) error {
-
-			newTrie, err := mForest.Update(stateCommitment, keys, values)
-
-			for _, value := range values {
-				valuesSize += len(value)
-			}
-
-			valuesCount += len(values)
-
-			if err != nil {
-				return fmt.Errorf("error while updating mForest: %w", err)
-			}
-
-			if bytes.Equal(targetHash, newTrie.RootHash()) {
-				found = true
-				return FoundHashError
-			}
-
-			i++
-			if i%1000 == 0 {
-				log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Msg("progress")
-			}
-
-			return err
-		},
-		func(commitment flow.StateCommitment) error {
-			return nil
-		})
-
-	duration := time.Since(startTime)
-
-	if !errors.Is(err, FoundHashError) {
-		return fmt.Errorf("error while processing WAL: %w", err)
+	fi, err := os.Create(path)
+	if err != nil {
+		return err
 	}
+	defer fi.Close()
 
-	if !found {
-		return fmt.Errorf("no value found: %w", err)
+	writer := bufio.NewWriter(fi)
+	defer writer.Flush()
+
+	err = led.DumpTrieAsJSON(state, writer)
+	if err != nil {
+		return fmt.Errorf("cannot dump trie as json: %w", err)
 	}
-
-	log.Info().Int("values_count", valuesCount).Int("values_size_bytes", valuesSize).Int("updates_count", i).Float64("total_time_s", duration.Seconds()).Msg("finished seeking")
-	log.Info().Msg("writing root checkpoint")
-
-	return mForest.DumpTrieAsJSON(targetHash, filepath.Join(outputPath, hex.EncodeToString(targetHash)+".trie.jsonl"))
+	return nil
 }

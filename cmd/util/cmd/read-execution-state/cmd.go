@@ -3,15 +3,19 @@ package read
 import (
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	list_accounts "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-accounts"
 	list_tries "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-tries"
+	list_wals "github.com/onflow/flow-go/cmd/util/cmd/read-execution-state/list-wals"
+
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/storage/ledger"
-	"github.com/onflow/flow-go/storage/ledger/mtrie"
-	"github.com/onflow/flow-go/storage/ledger/wal"
 )
 
 var (
@@ -36,33 +40,38 @@ func init() {
 func addSubcommands() {
 	Cmd.AddCommand(list_tries.Init(loadExecutionState))
 	Cmd.AddCommand(list_accounts.Init(loadExecutionState))
+	Cmd.AddCommand(list_wals.Init())
 }
 
-func loadExecutionState() *mtrie.MForest {
+func loadExecutionState() *mtrie.Forest {
 
-	w, err := wal.NewWAL(
+	w, err := wal.NewDiskWAL(
+		zerolog.Nop(),
 		nil,
-		nil,
+		metrics.NewNoopCollector(),
 		flagExecutionStateDir,
-		ledger.CacheSize,
-		ledger.RegisterKeySize,
+		complete.DefaultCacheSize,
+		pathfinder.PathByteSize,
 		wal.SegmentSize,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating WAL")
 	}
+	defer func() {
+		<-w.Done()
+	}()
 
-	mForest, err := mtrie.NewMForest(ledger.RegisterKeySize, flagExecutionStateDir, ledger.CacheSize, metrics.NewNoopCollector(), nil)
+	forest, err := mtrie.NewForest(complete.DefaultCacheSize, metrics.NewNoopCollector(), nil)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while creating mForest")
 	}
 
-	err = w.ReplayOnMForest(mForest)
+	err = w.ReplayOnForest(forest)
 	if err != nil {
 		log.Fatal().Err(err).Msg("error while replaying execution state")
 	}
 
-	return mForest
+	return forest
 }
 
 func run(*cobra.Command, []string) {

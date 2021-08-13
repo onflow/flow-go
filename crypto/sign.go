@@ -2,7 +2,10 @@
 package crypto
 
 import (
+	"crypto/elliptic"
 	"fmt"
+
+	"github.com/btcsuite/btcd/btcec"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -21,26 +24,67 @@ type signer interface {
 	decodePublicKey([]byte) (PublicKey, error)
 }
 
-// newNonRelicSigner initializes a signer that does not depend on the Relic library.
+// newNonRelicSigner returns a signer that does not depend on Relic library.
 func newNonRelicSigner(algo SigningAlgorithm) (signer, error) {
 	switch algo {
 	case ECDSAP256:
-		return newECDSAP256(), nil
+		return p256Instance, nil
 	case ECDSASecp256k1:
-		return newECDSASecp256k1(), nil
+		return secp256k1Instance, nil
 	default:
-		return nil, fmt.Errorf("the signature scheme %s is not supported.", algo)
+		return nil, newInvalidInputsError("the signature scheme %s is not supported", algo)
 	}
+}
+
+// Initialize the context of all algos not requiring Relic
+func initNonRelic() {
+	// P-256
+	p256Instance = &(ecdsaAlgo{
+		curve: elliptic.P256(),
+		algo:  ECDSAP256,
+	})
+
+	// secp256k1
+	secp256k1Instance = &(ecdsaAlgo{
+		curve: btcec.S256(),
+		algo:  ECDSASecp256k1,
+	})
+}
+
+// Signature format Check for non-relic algos (ECDSA)
+func signatureFormatCheckNonRelic(algo SigningAlgorithm, s Signature) (bool, error) {
+	switch algo {
+	case ECDSAP256:
+		return p256Instance.signatureFormatCheck(s), nil
+	case ECDSASecp256k1:
+		return secp256k1Instance.signatureFormatCheck(s), nil
+	default:
+		return false, newInvalidInputsError(
+			"the signature scheme %s is not supported",
+			algo)
+	}
+}
+
+// SignatureFormatCheck verifies the format of a serialized signature,
+// regardless of messages or public keys.
+//
+// This function is only defined for ECDSA algos for now.
+//
+// If SignatureFormatCheck returns false then the input is not a valid
+// signature and will fail a verification against any message and public key.
+func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
+	// For now, signatureFormatCheckNonRelic is only defined for non-Relic algos.
+	return signatureFormatCheckNonRelic(algo, s)
 }
 
 // GeneratePrivateKey generates a private key of the algorithm using the entropy of the given seed.
 //
 // It is recommended to use a secure crypto RNG to generate the seed.
-// The seed must have a minimum entropy (depending on the algorithm) and should be uniformly random.
+// The seed must have enough entropy and should be sampled uniformly at random.
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("key generation failed: %w", err)
+		return nil, newInvalidInputsError("key generation failed: %s", err)
 	}
 	return signer.generatePrivateKey(seed)
 }
@@ -49,7 +93,7 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("decode private key failed: %w", err)
+		return nil, newInvalidInputsError("decode private key failed: %s", err)
 	}
 	return signer.decodePrivateKey(data)
 }
@@ -58,7 +102,7 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("decode public key failed: %w", err)
+		return nil, newInvalidInputsError("decode public key failed: %s", err)
 	}
 	return signer.decodePublicKey(data)
 }
@@ -95,9 +139,6 @@ type PrivateKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PrivateKey) bool
-	// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-	// using the given hasher.
-	GeneratePOP(hash.Hasher) (Signature, error)
 }
 
 // PublicKey is an unspecified signature scheme public key.
@@ -116,7 +157,4 @@ type PublicKey interface {
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.
 	Equals(PublicKey) bool
-	// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-	// using the given hasher.
-	VerifyPOP(Signature, hash.Hasher) (bool, error)
 }

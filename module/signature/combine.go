@@ -1,74 +1,54 @@
 package signature
 
 import (
-	"encoding/binary"
-	"fmt"
-
 	"github.com/onflow/flow-go/crypto"
 )
 
-// lengthSize is how many bytes we use to encode the length of each signature.
-const lengthSize = 4
-
-// Combiner creates a simple implementation for joining and splitting signatures
+// Combiner creates a simple implementation for joining and splitting 2 signatures
 // on a level above the cryptographic implementation. It simply concatenates
-// signatures together with their length information and uses this information
+// signatures together and uses the stored information about signature lengths
 // to split the concatenated bytes into its signature parts again.
-type Combiner struct{}
+type Combiner struct {
+	lengthSig1 uint
+	lengthSig2 uint
+}
 
 // NewCombiner creates a new combiner to join and split signatures.
-func NewCombiner() *Combiner {
-	c := &Combiner{}
+func NewCombiner(lengthSig1, lengthSig2 uint) *Combiner {
+
+	c := &Combiner{
+		lengthSig1: lengthSig1,
+		lengthSig2: lengthSig2,
+	}
 	return c
 }
 
-// Join will concatenate the provided signatures into a common byte slice, with
-// added length information. It will never fail.
-func (c *Combiner) Join(sigs ...crypto.Signature) ([]byte, error) {
-	var combined []byte
-	for _, sig := range sigs {
-		length := make([]byte, 4)
-		binary.LittleEndian.PutUint32(length, uint32(len(sig)))
-		combined = append(combined, length...)
-		combined = append(combined, sig...)
+// Join will concatenate the provided 2 signatures into a common byte slice.
+//
+// Returns ErrInvalidFormat if one of the input signature has an invalid length.
+func (c *Combiner) Join(sig1, sig2 crypto.Signature) ([]byte, error) {
+	if uint(len(sig1)) != c.lengthSig1 || uint(len(sig2)) != c.lengthSig2 {
+		return nil, ErrInvalidFormat
 	}
+
+	combined := make([]byte, 0, len(sig1)+len(sig2))
+	combined = append(combined, sig1...)
+	combined = append(combined, sig2...)
 	return combined, nil
 }
 
 // Split will split the given byte slice into its signature parts, using the
-// embedded length information. If any length is invalid, it will fail.
-func (c *Combiner) Split(combined []byte) ([]crypto.Signature, error) {
+// embedded length information.
+//
+// Returns ErrInvalidFormat if the combined signature length is invalid.
+func (c *Combiner) Split(combined []byte) (crypto.Signature, crypto.Signature, error) {
 
-	var sigs []crypto.Signature
-	for next := 0; next < len(combined); {
-
-		// check that we have at least 4 bytes of length information
-		remaining := len(combined) - next
-		if remaining < lengthSize {
-			return nil, fmt.Errorf("insufficient remaining bytes for length information (remaining: %d, min: %d)", remaining, 4)
-		}
-
-		// get the next length information
-		length := int(binary.LittleEndian.Uint32(combined[next : next+4]))
-
-		// create the beginning marker for the signature
-		from := next + lengthSize
-		if from >= len(combined) {
-			return nil, fmt.Errorf("invalid from marker for next signature (from: %d, max: %d)", from, len(combined)-1)
-		}
-
-		// create the end marker for the signature
-		to := from + length
-		if to > len(combined) {
-			return nil, fmt.Errorf("invalid to marker for next signature (to: %d, max: %d)", to, len(combined))
-		}
-
-		// get the signature
-		sig := make([]byte, length)
-		copy(sig[:], combined[from:to])
-		sigs = append(sigs, sig)
-		next = next + lengthSize + length
+	if uint(len(combined)) != c.lengthSig1+c.lengthSig2 {
+		return nil, nil, ErrInvalidFormat
 	}
 
-	return sigs, nil
+	sig1 := combined[:c.lengthSig1]
+	sig2 := combined[c.lengthSig1:]
+
+	return sig1, sig2, nil
 }

@@ -41,6 +41,14 @@ func (s *Suite) AccessClient() *testnet.Client {
 	return client
 }
 
+func (s *Suite) ExecutionClient() *testnet.Client {
+	execNode := s.net.ContainerByID(s.exe1ID)
+	chain := s.net.Root().Header.ChainID.Chain()
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
+	require.NoError(s.T(), err, "could not get execution client")
+	return client
+}
+
 func (s *Suite) AccessPort() string {
 	return s.net.AccessPorts[testnet.AccessNodeAPIPort]
 }
@@ -86,12 +94,20 @@ func (s *Suite) SetupTest() {
 
 	// add the ghost (verification) node config
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
+	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification,
+		testnet.WithID(s.ghostID),
+		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generate the network config
-	netConfig := testnet.NewNetworkConfig("execution_tests", s.nodeConfigs)
+	netConfig := testnet.NewNetworkConfig(
+		"execution_tests",
+		s.nodeConfigs,
+		// set long staking phase to avoid QC/DKG transactions during test run
+		testnet.WithViewsInStakingAuction(10_000),
+		testnet.WithViewsInEpoch(100_000),
+	)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)

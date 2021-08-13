@@ -16,10 +16,34 @@ type ComputationOrder struct {
 }
 
 type ComputationResult struct {
-	ExecutableBlock   *entity.ExecutableBlock
-	StateSnapshots    []*delta.Snapshot
-	Events            []flow.Event
-	TransactionResult []flow.TransactionResult
-	GasUsed           uint64
-	StateReads        uint64
+	ExecutableBlock    *entity.ExecutableBlock
+	StateSnapshots     []*delta.SpockSnapshot
+	StateCommitments   []flow.StateCommitment
+	Proofs             [][]byte
+	Events             []flow.EventsList
+	EventsHashes       []flow.Identifier
+	ServiceEvents      flow.EventsList
+	TransactionResults []flow.TransactionResult
+	ComputationUsed    uint64
+	StateReads         uint64
+}
+
+func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
+	cr.Events[chunkIndex] = append(cr.Events[chunkIndex], inp...)
+}
+
+func (cr *ComputationResult) AddServiceEvents(inp []flow.Event) {
+	cr.ServiceEvents = append(cr.ServiceEvents, inp...)
+}
+
+func (cr *ComputationResult) AddTransactionResult(inp *flow.TransactionResult) {
+	cr.TransactionResults = append(cr.TransactionResults, *inp)
+}
+
+func (cr *ComputationResult) AddComputationUsed(inp uint64) {
+	cr.ComputationUsed += inp
+}
+
+func (cr *ComputationResult) AddStateSnapshot(inp *delta.SpockSnapshot) {
+	cr.StateSnapshots = append(cr.StateSnapshots, inp)
 }

@@ -9,9 +9,8 @@ import (
 
 // implements the interface sha3.ShakeHash
 type kmac128 struct {
-	// Common hasher
-	// includes the output size of KMAC
-	*commonHasher
+	// the output size of KMAC
+	outputSize int
 	// embeds ShakeHash
 	// stores the encoding of the function name and customization string
 	// Using the io.Writer interface changes the internal state
@@ -26,34 +25,35 @@ type kmac128 struct {
 const cSHAKE128BlockSize = 168
 
 // NewKMAC_128 returns a new KMAC instance
-// - key is the KMAC key (the key length is not compared to the security level, if the parameter
-//	is used as a security key and not a domain tag, the caller must make sure the key length is
-//  larger than the security level)
+// - key is the KMAC key (the key size is compared to the security level, although
+//	the parameter is used as a domain tag in Flow and not as a security key).
 // - customizer is the customization string. It can be left empty if no customizer
 //   is required.
 func NewKMAC_128(key []byte, customizer []byte, outputSize int) (Hasher, error) {
 	var k kmac128
-	// check the lengths as per NIST.SP.800-185
-	if len(key) >= KmacMaxParamsLen || len(customizer) >= KmacMaxParamsLen {
+	if outputSize < 0 {
 		return nil,
-			fmt.Errorf("kmac key and customizer lengths must be less than %d", KmacMaxParamsLen)
+			fmt.Errorf("kmac output cannot be negative, got %d", outputSize)
 	}
-	if outputSize >= KmacMaxParamsLen || outputSize < 0 {
+
+	// check the key size (required if the key is used as a security key)
+	if len(key) < KmacMinKeyLen {
 		return nil,
-			fmt.Errorf("kmac output size must be a positive number less than %d", KmacMaxParamsLen)
+			fmt.Errorf("kmac key size must be at least %d", KmacMinKeyLen)
 	}
-	k.commonHasher = &commonHasher{
-		algo:       KMAC128,
-		outputSize: outputSize}
+
+	k.outputSize = outputSize
 	// initialize the cSHAKE128 instance
 	k.ShakeHash = sha3.NewCShake128([]byte("KMAC"), customizer)
-	// key length should be larger than the bit-security level
-	// This is not checked here as the key is public and only used
-	// as a domain tag
+
 	// store the encoding of the key
 	k.initBlock = bytepad(encodeString(key), cSHAKE128BlockSize)
 	_, _ = k.Write(k.initBlock)
 	return &k, nil
+}
+
+func (k *kmac128) Algorithm() HashingAlgorithm {
+	return KMAC128
 }
 
 const maxEncodeLen = 9
@@ -112,6 +112,7 @@ func leftEncode(value uint64) []byte {
 
 // bytepad function as defined in NIST SP 800-185
 // copied from golang.org/x/crypto/sha3
+// The caller must make sure parameter (w) is strictly positive.
 //
 // Copyright (c) 2009 The Go Authors. All rights reserved.
 func bytepad(input []byte, w int) []byte {
@@ -143,11 +144,12 @@ func (k *kmac128) Reset() {
 	_, _ = k.Write(k.initBlock)
 }
 
-// ComputeHash adds the input data to the a mac state copy
-// and returns the mac output
-// It does not change the underlying hash state.
+// ComputeHash computes the mac of the input data.
+// It does not update the underlying hash state (the function is thread safe).
 func (k *kmac128) ComputeHash(data []byte) Hash {
 	cshake := k.ShakeHash.Clone()
+	cshake.Reset()
+	cshake.Write(k.initBlock)
 	cshake.Write(data)
 	cshake.Write(rightEncode(uint64(k.outputSize * 8)))
 	// read the cshake output
@@ -156,9 +158,8 @@ func (k *kmac128) ComputeHash(data []byte) Hash {
 	return h
 }
 
-// SumHash finalizes the mac computations using a state copy,
-// and returns the hash output
-// It does not change the underlying hash state.
+// SumHash finalizes the mac computations and returns the output.
+// It does not reset the state to allow further writing.
 func (k *kmac128) SumHash() Hash {
 	cshake := k.ShakeHash.Clone()
 	cshake.Write(rightEncode(uint64(k.outputSize * 8)))

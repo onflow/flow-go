@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
@@ -365,8 +366,12 @@ func (h *Handler) GetEventsForHeightRange(
 		return nil, err
 	}
 
+	resultEvents, err := blockEventsToMessages(results)
+	if err != nil {
+		return nil, err
+	}
 	return &access.EventsResponse{
-		Results: blockEventsToMessages(results),
+		Results: resultEvents,
 	}, nil
 }
 
@@ -390,8 +395,25 @@ func (h *Handler) GetEventsForBlockIDs(
 		return nil, err
 	}
 
+	resultEvents, err := blockEventsToMessages(results)
+	if err != nil {
+		return nil, err
+	}
+
 	return &access.EventsResponse{
-		Results: blockEventsToMessages(results),
+		Results: resultEvents,
+	}, nil
+}
+
+// GetLatestProtocolStateSnapshot returns the latest serializable Snapshot
+func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *access.GetLatestProtocolStateSnapshotRequest) (*access.ProtocolStateSnapshotResponse, error) {
+	snapshot, err := h.api.GetLatestProtocolStateSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &access.ProtocolStateSnapshotResponse{
+		SerializedSnapshot: snapshot,
 	}, nil
 }
 
@@ -417,25 +439,30 @@ func blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, erro
 	}, nil
 }
 
-func blockEventsToMessages(blocks []flow.BlockEvents) []*access.EventsResponse_Result {
+func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {
 	results := make([]*access.EventsResponse_Result, len(blocks))
 
 	for i, block := range blocks {
-		results[i] = blockEventsToMessage(block)
+		event, err := blockEventsToMessage(block)
+		if err != nil {
+			return nil, err
+		}
+		results[i] = event
 	}
 
-	return results
+	return results, nil
 }
 
-func blockEventsToMessage(block flow.BlockEvents) *access.EventsResponse_Result {
+func blockEventsToMessage(block flow.BlockEvents) (*access.EventsResponse_Result, error) {
 	eventMessages := make([]*entities.Event, len(block.Events))
 	for i, event := range block.Events {
 		eventMessages[i] = convert.EventToMessage(event)
 	}
-
+	timestamp := timestamppb.New(block.BlockTimestamp)
 	return &access.EventsResponse_Result{
-		BlockId:     block.BlockID[:],
-		BlockHeight: block.BlockHeight,
-		Events:      eventMessages,
-	}
+		BlockId:        block.BlockID[:],
+		BlockHeight:    block.BlockHeight,
+		BlockTimestamp: timestamp,
+		Events:         eventMessages,
+	}, nil
 }

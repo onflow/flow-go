@@ -33,7 +33,7 @@ func ExportEvents(blockID flow.Identifier, dbPath string, outputPath string) err
 
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
-	events := badger.NewEvents(db)
+	events := badger.NewEvents(cacheMetrics, db)
 	activeBlockID := blockID
 
 	outputFile := filepath.Join(outputPath, "events.jsonl")

@@ -2,9 +2,12 @@ package ledger
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -17,8 +20,8 @@ type Ledger interface {
 	// ledger implements methods needed to be ReadyDone aware
 	module.ReadyDoneAware
 
-	// InitState returns the initial state of the ledger
-	InitState() State
+	// InitialState returns the initial state of the ledger
+	InitialState() State
 
 	// Get returns values for the given slice of keys at specific state
 	Get(query *Query) (values []Value, err error)
@@ -113,18 +116,36 @@ func NewUpdate(sc State, keys []Key, values []Value) (*Update, error) {
 }
 
 // State captures an state of the ledger
-type State []byte
+type State hash.Hash
 
+// DummyState is an arbitrary value used in function failure cases,
+// although it can represent a valid state.
+var DummyState = State(hash.DummyHash)
+
+// String returns the hex encoding of the state
 func (sc State) String() string {
-	return hex.EncodeToString(sc)
+	return hex.EncodeToString(sc[:])
+}
+
+// Base64 return the base64 encoding of the state
+func (sc State) Base64() string {
+	return base64.StdEncoding.EncodeToString(sc[:])
 }
 
 // Equals compares the state to another state
 func (sc State) Equals(o State) bool {
-	if o == nil {
-		return false
+	return sc == o
+}
+
+// ToState converts a byte slice into a State.
+// It returns an error if the slice has an invalid length.
+func ToState(stateBytes []byte) (State, error) {
+	var state State
+	if len(stateBytes) != len(state) {
+		return DummyState, fmt.Errorf("expecting %d bytes but got %d bytes", len(state), len(stateBytes))
 	}
-	return bytes.Equal(sc, o)
+	copy(state[:], stateBytes)
+	return state, nil
 }
 
 // Proof is a byte slice capturing encoded version of a batch proof
@@ -148,8 +169,8 @@ type Key struct {
 }
 
 // NewKey construct a new key
-func NewKey(kp []KeyPart) *Key {
-	return &Key{KeyParts: kp}
+func NewKey(kp []KeyPart) Key {
+	return Key{KeyParts: kp}
 }
 
 // Size returns the byte size needed to encode the key
@@ -162,15 +183,19 @@ func (k *Key) Size() int {
 	return size
 }
 
-func (k *Key) String() string {
+// CanonicalForm returns a byte slice describing the key
+// Warning, Changing this has an impact on how leaf hashes are computed
+// don't use this to reconstruct the key later
+func (k *Key) CanonicalForm() []byte {
 	ret := ""
 	for _, kp := range k.KeyParts {
-		ret += "/"
-		ret += string(kp.Type)
-		ret += "/"
-		ret += string(kp.Value)
+		ret += fmt.Sprintf("/%d/%v", kp.Type, string(kp.Value))
 	}
-	return ret
+	return []byte(ret)
+}
+
+func (k *Key) String() string {
+	return string(k.CanonicalForm())
 }
 
 // DeepCopy returns a deep copy of the key
@@ -205,8 +230,8 @@ type KeyPart struct {
 }
 
 // NewKeyPart construct a new key part
-func NewKeyPart(typ uint16, val []byte) *KeyPart {
-	return &KeyPart{Type: typ, Value: val}
+func NewKeyPart(typ uint16, val []byte) KeyPart {
+	return KeyPart{Type: typ, Value: val}
 }
 
 // Equals compares this key part to another key part
@@ -222,9 +247,19 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
-	newV := make([]byte, len(kp.Value))
-	copy(newV, kp.Value)
+	newV := make([]byte, 0, len(kp.Value))
+	newV = append(newV, kp.Value...)
 	return &KeyPart{Type: kp.Type, Value: newV}
+}
+
+func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  uint16
+		Value string
+	}{
+		Type:  kp.Type,
+		Value: hex.EncodeToString(kp.Value),
+	})
 }
 
 // Value holds the value part of a ledger key value pair
@@ -241,8 +276,8 @@ func (v Value) String() string {
 
 // DeepCopy returns a deep copy of the value
 func (v Value) DeepCopy() Value {
-	newV := make([]byte, len(v))
-	copy(newV, v)
+	newV := make([]byte, 0, len(v))
+	newV = append(newV, []byte(v)...)
 	return newV
 }
 
@@ -252,4 +287,16 @@ func (v Value) Equals(other Value) bool {
 		return false
 	}
 	return bytes.Equal(v, other)
+}
+
+func (v Value) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(v))
+}
+
+// Migration defines how to convert the given slice of input payloads into an slice of output payloads
+type Migration func(payloads []Payload) ([]Payload, error)
+
+// Reporter accepts slice ledger payloads and reports the state of the ledger
+type Reporter interface {
+	Report(payloads []Payload) error
 }

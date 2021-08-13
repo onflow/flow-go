@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -29,7 +30,7 @@ func main() {
 			*metrics.MempoolCollector
 		}{
 			HotstuffCollector:   metrics.NewHotstuffCollector("some_chain_id"),
-			ConsensusCollector:  metrics.NewConsensusCollector(tracer),
+			ConsensusCollector:  metrics.NewConsensusCollector(tracer, prometheus.DefaultRegisterer),
 			NetworkCollector:    metrics.NewNetworkCollector(),
 			ComplianceCollector: metrics.NewComplianceCollector(),
 			MempoolCollector:    metrics.NewMempoolCollector(5 * time.Second),
@@ -62,14 +63,16 @@ func main() {
 				collector.FinishBlockToSeal(flow.HashToID(entityID))
 			}
 
-			collProvider := engine.TestNetwork
-			collIngest := engine.TestMetrics
+			collProvider := engine.TestNetwork.String()
+			collIngest := engine.TestMetrics.String()
+			message1 := "CollectionRequest"
+			message2 := "ClusterBlockProposal"
 
-			collector.NetworkMessageSent(rand.Intn(1000), collProvider)
-			collector.NetworkMessageSent(rand.Intn(1000), collIngest)
+			collector.NetworkMessageSent(rand.Intn(1000), collProvider, message1)
+			collector.NetworkMessageSent(rand.Intn(1000), collIngest, message2)
 
-			collector.NetworkMessageReceived(rand.Intn(1000), collProvider)
-			collector.NetworkMessageReceived(rand.Intn(1000), collIngest)
+			collector.NetworkMessageReceived(rand.Intn(1000), collProvider, message1)
+			collector.NetworkMessageReceived(rand.Intn(1000), collIngest, message2)
 
 			time.Sleep(1 * time.Second)
 		}

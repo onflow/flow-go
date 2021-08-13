@@ -9,10 +9,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/verification/match"
-	"github.com/onflow/flow-go/engine/verification/test"
+	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/messages"
-	vermodel "github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -34,8 +32,7 @@ func main() {
 	}
 }
 
-// happyPathExample captures the metrics on running VerificationHappyPath with
-// a single execution receipt of 10 chunks
+// happyPathExample captures the metrics on running VerificationHappyPath with 10 blocks, each with 10 execution receipts of 10 chunks.
 func happyPathExample() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
 		tracer, err := trace.NewTracer(logger, "verification")
@@ -50,8 +47,24 @@ func happyPathExample() {
 
 		// starts happy path
 		t := &testing.T{}
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
-		test.VerificationHappyPath(t, 1, 10, verificationCollector, mempoolCollector)
+		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
+
+		ops := []vertestutils.CompleteExecutionReceiptBuilderOpt{
+			vertestutils.WithResults(10),
+			vertestutils.WithChunksCount(10),
+			vertestutils.WithCopies(1),
+		}
+		blockCount := 10
+		eventRepetition := 1
+		trials := 1
+		vertestutils.NewVerificationHappyPathTest(t,
+			true,
+			blockCount,
+			eventRepetition,
+			verificationCollector,
+			mempoolCollector,
+			trials,
+			ops...)
 		<-mempoolCollector.Done()
 	})
 }
@@ -65,28 +78,18 @@ func demo() {
 			panic(err)
 		}
 
-		verificationCollector := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer, logger)
-		mempoolCollector := metrics.NewMempoolCollector(5 * time.Second)
+		vc := metrics.NewVerificationCollector(tracer, prometheus.DefaultRegisterer)
+		mc := metrics.NewMempoolCollector(5 * time.Second)
 
 		// starts periodic launch of mempoolCollector
-		<-mempoolCollector.Ready()
+		<-mc.Ready()
 
 		// creates a receipt mempool and registers a metric on its size
 		receipts, err := stdmap.NewReceipts(100)
 		if err != nil {
 			panic(err)
 		}
-		err = mempoolCollector.Register(metrics.ResourceReceipt, receipts.Size)
-		if err != nil {
-			panic(err)
-		}
-
-		// creates a pending receipts mempool and registers a metric on its size
-		pendingReceipts, err := stdmap.NewReceiptDataPacks(100)
-		if err != nil {
-			panic(err)
-		}
-		err = mempoolCollector.Register(metrics.ResourcePendingReceipt, pendingReceipts.Size)
+		err = mc.Register(metrics.ResourceReceipt, receipts.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -96,7 +99,7 @@ func demo() {
 		if err != nil {
 			panic(err)
 		}
-		err = mempoolCollector.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
+		err = mc.Register(metrics.ResourcePendingReceiptIDsByBlock, receiptIDsByBlock.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -106,21 +109,7 @@ func demo() {
 		if err != nil {
 			panic(err)
 		}
-		err = mempoolCollector.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
-		if err != nil {
-			panic(err)
-		}
-
-		// creates pending results mempool, and registers size method of backend for metrics
-		pendingResults := stdmap.NewResultDataPacks(100)
-		err = mempoolCollector.Register(metrics.ResourcePendingResult, pendingResults.Size)
-		if err != nil {
-			panic(err)
-		}
-
-		// creates pending chunks mempool, and registers size method of backend for metrics
-		pendingChunks := match.NewChunks(100)
-		err = mempoolCollector.Register(metrics.ResourcePendingChunk, pendingChunks.Size)
+		err = mc.Register(metrics.ResourceReceiptIDsByResult, receiptIDsByResult.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -130,14 +119,14 @@ func demo() {
 		if err != nil {
 			panic(err)
 		}
-		err = mempoolCollector.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
+		err = mc.Register(metrics.ResourceProcessedResultID, processedResultsIDs.Size)
 		if err != nil {
 			panic(err)
 		}
 
 		// creates consensus cache for follower engine, and registers size method of backend for metrics
 		pendingBlocks := buffer.NewPendingBlocks()
-		err = mempoolCollector.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
+		err = mc.Register(metrics.ResourcePendingBlock, pendingBlocks.Size)
 		if err != nil {
 			panic(err)
 		}
@@ -148,98 +137,85 @@ func demo() {
 		// This is done to stretch metrics and scatter their pattern
 		// for a clear visualization.
 		for i := 0; i < 100; i++ {
-			// finder
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnExecutionReceiptReceived()
-			}
+			// consumer
+			tryRandomCall(func() {
+				vc.OnBlockConsumerJobDone(rand.Uint64() % 10000)
+			})
+			tryRandomCall(func() {
+				vc.OnChunkConsumerJobDone(rand.Uint64() % 10000)
+			})
 
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnExecutionResultSent()
-			}
+			// assigner
+			tryRandomCall(func() {
+				vc.OnFinalizedBlockArrivedAtAssigner(uint64(i))
+			})
+			tryRandomCall(func() {
+				vc.OnChunksAssignmentDoneAtAssigner(rand.Int() % 10)
+			})
+			tryRandomCall(vc.OnAssignedChunkProcessedAtAssigner)
+			tryRandomCall(vc.OnExecutionResultReceivedAtAssignerEngine)
 
-			// match
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnExecutionResultReceived()
-			}
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnChunkDataPackReceived()
-			}
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnVerifiableChunkSent()
-			}
+			// fetcher
+			tryRandomCall(vc.OnAssignedChunkReceivedAtFetcher)
+			tryRandomCall(vc.OnVerifiableChunkSentToVerifier)
+			tryRandomCall(vc.OnChunkDataPackArrivedAtFetcher)
+			tryRandomCall(vc.OnChunkDataPackRequestSentByFetcher)
+
+			// requester
+			tryRandomCall(vc.OnChunkDataPackRequestReceivedByRequester)
+			tryRandomCall(vc.OnChunkDataPackRequestDispatchedInNetworkByRequester)
+			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetworkByRequester)
+			tryRandomCall(vc.OnChunkDataPackSentToFetcher)
 
 			// verifier
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnVerifiableChunkReceived()
-			}
+			tryRandomCall(vc.OnVerifiableChunkReceivedAtVerifierEngine)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetworkByVerifier)
 
-			// mempools
-			// creates and add a receipt
+			// memory pools
 			receipt := unittest.ExecutionReceiptFixture()
-			if rand.Int()%2 == 0 {
+			tryRandomCall(func() {
 				receipts.Add(receipt)
-			}
+			})
 
-			if rand.Int()%2 == 0 {
-				pendingReceipts.Add(&vermodel.ReceiptDataPack{
-					Receipt:  receipt,
-					OriginID: unittest.IdentifierFixture(),
-				})
-			}
-
-			if rand.Int()%2 == 0 {
+			tryRandomCall(func() {
 				err := receiptIDsByBlock.Append(receipt.ExecutionResult.BlockID, receipt.ID())
 				if err != nil {
 					panic(err)
 				}
-			}
+			})
 
-			if rand.Int()%2 == 0 {
+			tryRandomCall(func() {
 				err = receiptIDsByResult.Append(receipt.ExecutionResult.BlockID, receipt.ExecutionResult.ID())
 				if err != nil {
 					panic(err)
 				}
-			}
+			})
 
-			if rand.Int()%2 == 0 {
-				pendingResults.Add(&vermodel.ResultDataPack{
-					ExecutorID:      receipt.ExecutorID,
-					ExecutionResult: &receipt.ExecutionResult,
-				})
-			}
-
-			if rand.Int()%2 == 0 {
-				pendingChunks.Add(&match.ChunkStatus{
-					Chunk:             receipt.ExecutionResult.Chunks[0],
-					ExecutionResultID: receipt.ExecutionResult.ID(),
-					ExecutorID:        receipt.ExecutorID,
-					LastAttempt:       time.Time{},
-					Attempt:           0,
-				})
-			}
-
-			if rand.Int()%2 == 0 {
+			tryRandomCall(func() {
 				processedResultsIDs.Add(receipt.ExecutionResult.ID())
-			}
+			})
 
-			if rand.Int()%2 == 0 {
+			tryRandomCall(func() {
 				block := unittest.BlockFixture()
 				pendingBlocks.Add(unittest.IdentifierFixture(), &messages.BlockProposal{
 					Header:  block.Header,
 					Payload: block.Payload,
 				})
-			}
+			})
 
 			// adds a synthetic 1 s delay for verification duration
 			time.Sleep(1 * time.Second)
 
-			if rand.Int()%2 == 0 {
-				verificationCollector.OnResultApproval()
-			}
-
-			// storage tests
-			// making randomized verifiable chunks that capture all storage per chunk
-			verificationCollector.LogVerifiableChunkSize(rand.Float64() * 10000.0)
+			tryRandomCall(vc.OnResultApprovalDispatchedInNetworkByVerifier)
 		}
 	})
+}
+
+// tryRandomCall executes function f with a probability of 1/2 that does not necessarily follow a uniform distribution.
+//
+// DISCLAIMER: this function should not be utilized for production code. Solely meant for testing and demo.
+func tryRandomCall(f func()) {
+	if rand.Int()%2 == 0 {
+		f()
+	}
 }

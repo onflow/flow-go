@@ -8,8 +8,24 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+func eventPrefix(prefix byte, blockID flow.Identifier, event flow.Event) []byte {
+	return makePrefix(prefix, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex)
+}
+
 func InsertEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) error {
-	return insert(makePrefix(codeEvent, blockID, event.TransactionID, event.TransactionIndex, event.EventIndex), event)
+	return insert(eventPrefix(codeEvent, blockID, event), event)
+}
+
+func BatchInsertEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
+	return batchInsert(eventPrefix(codeEvent, blockID, event), event)
+}
+
+func InsertServiceEvent(blockID flow.Identifier, event flow.Event) func(*badger.Txn) error {
+	return insert(eventPrefix(codeServiceEvent, blockID, event), event)
+}
+
+func BatchInsertServiceEvent(blockID flow.Identifier, event flow.Event) func(batch *badger.WriteBatch) error {
+	return batchInsert(eventPrefix(codeServiceEvent, blockID, event), event)
 }
 
 func RetrieveEvents(blockID flow.Identifier, transactionID flow.Identifier, events *[]flow.Event) func(*badger.Txn) error {
@@ -20,6 +36,11 @@ func RetrieveEvents(blockID flow.Identifier, transactionID flow.Identifier, even
 func LookupEventsByBlockID(blockID flow.Identifier, events *[]flow.Event) func(*badger.Txn) error {
 	iterationFunc := eventIterationFunc(events)
 	return traverse(makePrefix(codeEvent, blockID), iterationFunc)
+}
+
+func LookupServiceEventsByBlockID(blockID flow.Identifier, events *[]flow.Event) func(*badger.Txn) error {
+	iterationFunc := eventIterationFunc(events)
+	return traverse(makePrefix(codeServiceEvent, blockID), iterationFunc)
 }
 
 func LookupEventsByBlockIDEventType(blockID flow.Identifier, eventType flow.EventType, events *[]flow.Event) func(*badger.Txn) error {

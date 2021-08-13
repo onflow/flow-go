@@ -46,6 +46,7 @@ func genconfigCmdRun(_ *cobra.Command, _ []string) {
 var genconfigCmd = &cobra.Command{
 	Use:   "genconfig",
 	Short: "Generate node-config.json",
+	Long:  "example: go run -tags relic ./cmd/bootstrap genconfig --address-format \"%s-%03d.devnet19.nodes.onflow.org:3569\" --access 2 --collection 3 --consensus 3 --execution 2 --verification 1 --stake 1000",
 	Run:   genconfigCmdRun,
 }
 
@@ -55,7 +56,7 @@ func init() {
 	genconfigCmd.Flags().StringVar(&flagConfig, "config", "node-config.json",
 		"path to output JSON file that will contain generated node configurations (fields Role, Address, Stake)")
 	genconfigCmd.Flags().StringVar(&flagAddressFormat, "address-format", "%s-%03d.benchmarknet.nodes.onflow.org:3569",
-		"format that should be used for the addresses that are generated, first arg is the role string, second one is the number (e. g. `%v-%3d.benchmarknet.nodes.onflow.org:3569`)")
+		"format that should be used for the addresses that are generated, first arg is the role string, second one is the number (e. g. `%v-%03d.benchmarknet.nodes.onflow.org:3569`)")
 	genconfigCmd.Flags().IntVar(&flagNodesAccess, "access", 2, "number of access nodes")
 	genconfigCmd.Flags().IntVar(&flagNodesCollection, "collection", 3, "number of collection nodes")
 	genconfigCmd.Flags().IntVar(&flagNodesConsensus, "consensus", 3, "number of consensus nodes")

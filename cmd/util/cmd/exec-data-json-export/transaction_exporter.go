@@ -32,7 +32,7 @@ type transactionInContext struct {
 	ProposalSequenceNumber uint64   `json:"proposal_sequence_number"`
 	AuthorizersAddressHex  []string `json:"authorizers_address_hex"`
 	EnvelopeSize           int      `json:"envelope_size"`
-	// Address(hex) + ~ + SignerIndex + ~ + KeyID + ~ + Signature(hex)
+	// Address(hex) + ~ + SignerIndex + ~ + KeyIndex + ~ + Signature(hex)
 	CompactPayloadSignatures  []string `json:"compact_payload_signatures"`
 	CompactEnvelopeSignatures []string `json:"compact_envelope_signatures"`
 	// ErrorMessage              string   `json:"error_message"`
@@ -49,9 +49,11 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 	index := badger.NewIndex(cacheMetrics, db)
 	guarantees := badger.NewGuarantees(cacheMetrics, db)
 	seals := badger.NewSeals(cacheMetrics, db)
+	results := badger.NewExecutionResults(cacheMetrics, db)
+	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results)
 	transactions := badger.NewTransactions(cacheMetrics, db)
 	headers := badger.NewHeaders(cacheMetrics, db)
-	payloads := badger.NewPayloads(db, index, guarantees, seals)
+	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := badger.NewBlocks(db, headers, payloads)
 	collections := badger.NewCollections(db, transactions)
 
@@ -102,13 +104,13 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 
 				psig := make([]string, 0)
 				for _, s := range tx.PayloadSignatures {
-					cs := hex.EncodeToString(s.Address[:]) + "~" + fmt.Sprint(s.SignerIndex) + "~" + fmt.Sprint(s.KeyID) + "~" + hex.EncodeToString(s.Signature)
+					cs := hex.EncodeToString(s.Address[:]) + "~" + fmt.Sprint(s.SignerIndex) + "~" + fmt.Sprint(s.KeyIndex) + "~" + hex.EncodeToString(s.Signature)
 					psig = append(psig, cs)
 				}
 
 				esig := make([]string, 0)
 				for _, s := range tx.EnvelopeSignatures {
-					cs := hex.EncodeToString(s.Address[:]) + "~" + fmt.Sprint(s.SignerIndex) + "~" + fmt.Sprint(s.KeyID) + "~" + hex.EncodeToString(s.Signature)
+					cs := hex.EncodeToString(s.Address[:]) + "~" + fmt.Sprint(s.SignerIndex) + "~" + fmt.Sprint(s.KeyIndex) + "~" + hex.EncodeToString(s.Signature)
 					esig = append(esig, cs)
 				}
 
@@ -125,7 +127,7 @@ func ExportExecutedTransactions(blockID flow.Identifier, dbPath string, outputPa
 					GasLimit:                  tx.GasLimit,
 					PayerAddressHex:           hex.EncodeToString(tx.Payer[:]),
 					ProposalKeyAddressHex:     hex.EncodeToString(tx.ProposalKey.Address[:]),
-					ProposalKeyID:             tx.ProposalKey.KeyID,
+					ProposalKeyID:             tx.ProposalKey.KeyIndex,
 					ProposalSequenceNumber:    tx.ProposalKey.SequenceNumber,
 					AuthorizersAddressHex:     auths,
 					EnvelopeSize:              computeEnvelopeSize(tx),

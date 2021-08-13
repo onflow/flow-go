@@ -17,13 +17,16 @@ type ChunkDataRequest struct {
 // It contains the chunk data pack of the interest.
 type ChunkDataResponse struct {
 	ChunkDataPack flow.ChunkDataPack
-	Collection    flow.Collection
 	Nonce         uint64 // so that we aren't deduplicated by the network layer
 }
 
+// ExecutionStateSyncRequest represents a request for state deltas between
+// the block at the `FromHeight` and the block at the `ToHeight`
+// since the state sync request only requests for sealed blocks, heights
+// should be enough to specify the block deterministically.
 type ExecutionStateSyncRequest struct {
-	CurrentBlockID flow.Identifier
-	TargetBlockID  flow.Identifier
+	FromHeight uint64
+	ToHeight   uint64
 }
 
 type ExecutionStateDelta struct {
@@ -31,6 +34,7 @@ type ExecutionStateDelta struct {
 	StateInteractions  []*delta.Snapshot
 	EndState           flow.StateCommitment
 	Events             []flow.Event
+	ServiceEvents      []flow.Event
 	TransactionResults []flow.TransactionResult
 }
 

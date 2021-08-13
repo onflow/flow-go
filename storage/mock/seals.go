@@ -58,13 +58,13 @@ func (_m *Seals) ByID(sealID flow.Identifier) (*flow.Seal, error) {
 	return r0, r1
 }
 
-// Store provides a mock function with given fields: guarantee
-func (_m *Seals) Store(guarantee *flow.Seal) error {
-	ret := _m.Called(guarantee)
+// Store provides a mock function with given fields: seal
+func (_m *Seals) Store(seal *flow.Seal) error {
+	ret := _m.Called(seal)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(*flow.Seal) error); ok {
-		r0 = rf(guarantee)
+		r0 = rf(seal)
 	} else {
 		r0 = ret.Error(0)
 	}

@@ -93,3 +93,15 @@ Here's an example of a Prometheus query that filters by the `consensus` role:
 ```
 avg(rate(consensus_finalized_blocks{role="consensus"}[2m]))
 ```
+
+## Loader
+
+Localnet can be loaded easily as well
+
+```
+make load
+```
+
+The command by default will load your localnet with 1 tps for 30s, then 10 tps for 30s, and finally 100 tps indefinitely.
+
+More about the loader can be found in the loader module.

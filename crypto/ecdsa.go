@@ -11,14 +11,10 @@ import (
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
-
-	"github.com/btcsuite/btcd/btcec"
 )
 
 // ecdsaAlgo embeds SignAlgo
@@ -29,36 +25,12 @@ type ecdsaAlgo struct {
 	algo SigningAlgorithm
 }
 
-//  Once variables to use a unique instance
+//  ECDSA contexts for each supported curve
+// NIST P-256 curve
 var p256Instance *ecdsaAlgo
-var p256Once sync.Once
 
-// returns NIST P-256 curve
-func newECDSAP256() *ecdsaAlgo {
-	p256Once.Do(func() {
-		p256Instance = &(ecdsaAlgo{
-			curve: elliptic.P256(),
-			algo:  ECDSAP256,
-		})
-	})
-	return p256Instance
-}
-
-//  Once variables to use a unique instance
+// SECG secp256k1 curve https://www.secg.org/sec2-v2.pdf
 var secp256k1Instance *ecdsaAlgo
-var secp256k1Once sync.Once
-
-// returns SECG secp256k1 curve.
-// https://www.secg.org/sec2-v2.pdf
-func newECDSASecp256k1() *ecdsaAlgo {
-	secp256k1Once.Do(func() {
-		secp256k1Instance = &(ecdsaAlgo{
-			curve: btcec.S256(),
-			algo:  ECDSASecp256k1,
-		})
-	})
-	return secp256k1Instance
-}
 
 func bitsToBytes(bits int) int {
 	return (bits + 7) >> 3
@@ -83,15 +55,16 @@ func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 }
 
 // Sign signs an array of bytes
-// It only reads the private key without modifiying it while hashers sha2 and sha3 are
+//
+// The private key is read only while sha2 and sha3 hashers are
 // modified temporarily.
-// the resulting signature is the concatenation bytes(r)||bytes(s)
-// where r and s are padded to the curve order size
+// The resulting signature is the concatenation bytes(r)||bytes(s),
+// where r and s are padded to the curve order size.
 func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return nil, errors.New("Sign requires a Hasher")
+		return nil, newInvalidInputsError("Sign requires a Hasher")
 	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
@@ -99,40 +72,65 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 
 // verifyHash implements ECDSA signature verification
 func (pk *PubKeyECDSA) verifyHash(sig Signature, h hash.Hash) (bool, error) {
+	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
+
+	if len(sig) != 2*Nlen {
+		return false, nil
+	}
+
 	var r big.Int
 	var s big.Int
-	Nlen := bitsToBytes((pk.alg.curve.Params().N).BitLen())
 	r.SetBytes(sig[:Nlen])
 	s.SetBytes(sig[Nlen:])
 	return goecdsa.Verify(pk.goPubKey, h, &r, &s), nil
 }
 
-// Verify verifies a signature of a byte array
-// It only reads the public key. hashers sha2 and sha3 are
-// modified temporarily
+// Verify verifies a signature of an input data under the public key.
+//
+// If the input signature slice has an invalid length or fails to deserialize into valid
+// scalars, the function returns false without an error.
+//
+// Public keys are read only, sha2 and sha3 hashers are
+// modified temporarily.
 func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return false, errors.New("Verify requires a Hasher")
+		return false, newInvalidInputsError("Verify requires a Hasher")
 	}
 
 	h := alg.ComputeHash(data)
 	return pk.verifyHash(sig, h)
 }
 
-// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-// using the given hasher.
-func (sk *PrKeyECDSA) GeneratePOP(h hash.Hasher) (Signature, error) {
-	// sign the public key
-	return sk.Sign(sk.PublicKey().Encode(), h)
-}
+// signatureFormatCheck verifies the format of a serialized signature,
+// regardless of messages or public keys.
+// If FormatCheck returns false then the input is not a valid ECDSA
+// signature and will fail a verification against any message and public key.
+func (a *ecdsaAlgo) signatureFormatCheck(sig Signature) bool {
+	N := a.curve.Params().N
+	Nlen := bitsToBytes(N.BitLen())
 
-// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-// using the given hasher.
-func (pk *PubKeyECDSA) VerifyPOP(s Signature, h hash.Hasher) (bool, error) {
-	// verify the signature against the public key
-	return pk.Verify(s, pk.Encode(), h)
+	if len(sig) != 2*Nlen {
+		return false
+	}
+
+	var r big.Int
+	var s big.Int
+	r.SetBytes(sig[:Nlen])
+	s.SetBytes(sig[Nlen:])
+
+	if r.Sign() == 0 || s.Sign() == 0 {
+		return false
+	}
+
+	if r.Cmp(N) >= 0 || s.Cmp(N) >= 0 {
+		return false
+	}
+
+	// We could also check whether r and r+N are quadratic residues modulo (p)
+	// using Euler's criterion.
+	return true
 }
 
 var one = new(big.Int).SetInt64(1)
@@ -153,13 +151,17 @@ func goecdsaGenerateKey(c elliptic.Curve, seed []byte) *goecdsa.PrivateKey {
 }
 
 // generatePrivateKey generates a private key for ECDSA
-// deterministically using the input seed
+// deterministically using the input seed.
+//
+// It is recommended to use a secure crypto RNG to generate the seed.
+// The seed must have enough entropy and should be sampled uniformly at random.
 func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	Nlen := bitsToBytes((a.curve.Params().N).BitLen())
 	// use extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
-	if len(seed) < minSeedLen {
-		return nil, fmt.Errorf("seed should be at least %d bytes", minSeedLen)
+	if len(seed) < minSeedLen || len(seed) > KeyGenSeedMaxLenECDSA {
+		return nil, newInvalidInputsError("seed byte length should be between %d and %d",
+			minSeedLen, KeyGenSeedMaxLenECDSA)
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
 	return &PrKeyECDSA{
@@ -173,13 +175,13 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	n := a.curve.Params().N
 	nlen := bitsToBytes(n.BitLen())
 	if len(der) != nlen {
-		return nil, errors.New("raw private key size is not valid")
+		return nil, newInvalidInputsError("input has incorrect %s key size", a.algo)
 	}
 	var d big.Int
 	d.SetBytes(der)
 
 	if d.Cmp(n) >= 0 {
-		return nil, errors.New("raw public key value is not valid")
+		return nil, newInvalidInputsError("input is not a valid %s key", a.algo)
 	}
 
 	priv := goecdsa.PrivateKey{
@@ -202,7 +204,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	p := (a.curve.Params().P)
 	plen := bitsToBytes(p.BitLen())
 	if len(der) != 2*plen {
-		return nil, errors.New("raw public key size is not valid")
+		return nil, newInvalidInputsError("input has incorrect %s key size", a.algo)
 	}
 	var x, y big.Int
 	x.SetBytes(der[:plen])
@@ -211,7 +213,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	// all the curves supported for now have a cofactor equal to 1,
 	// so that IsOnCurve guarantees the point is on the right subgroup.
 	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
-		return nil, errors.New("raw public key value is not valid")
+		return nil, newInvalidInputsError("input is not a valid %s key", a.algo)
 	}
 
 	pk := goecdsa.PublicKey{

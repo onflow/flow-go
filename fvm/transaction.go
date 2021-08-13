@@ -1,99 +1,60 @@
 package fvm
 
 import (
-	"fmt"
+	"github.com/opentracing/opentracing-go"
 
-	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
-
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func Transaction(tx *flow.TransactionBody) *TransactionProcedure {
+func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
 	return &TransactionProcedure{
 		ID:          tx.ID(),
 		Transaction: tx,
+		TxIndex:     txIndex,
 	}
-}
-
-type TransactionProcedure struct {
-	ID          flow.Identifier
-	Transaction *flow.TransactionBody
-	Logs        []string
-	Events      []cadence.Event
-	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
 }
 
 type TransactionProcessor interface {
-	Process(*VirtualMachine, Context, *TransactionProcedure, state.Ledger) error
+	Process(*VirtualMachine, *Context, *TransactionProcedure, *state.StateHolder, *programs.Programs) error
 }
 
-func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+type TransactionProcedure struct {
+	ID              flow.Identifier
+	Transaction     *flow.TransactionBody
+	TxIndex         uint32
+	Logs            []string
+	Events          []flow.Event
+	ServiceEvents   []flow.Event
+	ComputationUsed uint64
+	Err             errors.Error
+	Retried         int
+	TraceSpan       opentracing.Span
+}
+
+func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
+	proc.TraceSpan = traceSpan
+}
+
+func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
+
 	for _, p := range ctx.TransactionProcessors {
-		err := p.Process(vm, ctx, proc, ledger)
-		vmErr, fatalErr := handleError(err)
-		if fatalErr != nil {
-			return fatalErr
+		err := p.Process(vm, &ctx, proc, st, programs)
+		txErr, failure := errors.SplitErrorTypes(err)
+		if failure != nil {
+			// log the full error path
+			ctx.Logger.Err(err).Msg("fatal error when execution a transaction")
+			return failure
 		}
 
-		if vmErr != nil {
-			proc.Err = vmErr
-			return nil
-		}
-	}
-
-	return nil
-}
-
-func (proc *TransactionProcedure) ConvertEvents(txIndex uint32) ([]flow.Event, error) {
-	flowEvents := make([]flow.Event, len(proc.Events))
-
-	for i, event := range proc.Events {
-		payload, err := jsoncdc.Encode(event)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode event: %w", err)
-		}
-
-		flowEvents[i] = flow.Event{
-			Type:             flow.EventType(event.EventType.ID()),
-			TransactionID:    proc.ID,
-			TransactionIndex: txIndex,
-			EventIndex:       uint32(i),
-			Payload:          payload,
+		if txErr != nil {
+			proc.Err = txErr
+			// TODO we should not break here we should continue for fee deductions
+			break
 		}
 	}
-
-	return flowEvents, nil
-}
-
-type TransactionInvocator struct{}
-
-func NewTransactionInvocator() *TransactionInvocator {
-	return &TransactionInvocator{}
-}
-
-func (i *TransactionInvocator) Process(
-	vm *VirtualMachine,
-	ctx Context,
-	proc *TransactionProcedure,
-	ledger state.Ledger,
-) error {
-	env := newEnvironment(ctx, ledger)
-	env.setTransaction(vm, proc.Transaction)
-
-	location := runtime.TransactionLocation(proc.ID[:])
-
-	err := vm.Runtime.ExecuteTransaction(proc.Transaction.Script, proc.Transaction.Arguments, env, location)
-	if err != nil {
-		return err
-	}
-
-	proc.Events = env.getEvents()
-	proc.Logs = env.getLogs()
 
 	return nil
 }

@@ -18,30 +18,27 @@ import (
 // as a consensus follower, when a block is received and saved,
 // if it's not finalized yet, this block should be returned by latest
 func TestSaveBlockAsReplica(t *testing.T) {
-	util.RunWithProtocolState(t, func(db *badger.DB, state *protocol.State) {
-
-		participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-		b0, result, seal := unittest.BootstrapFixture(participants)
-
-		err := state.Mutate().Bootstrap(b0, result, seal)
-		require.NoError(t, err)
-
-		b1 := unittest.BlockWithParentFixture(b0.Header)
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+	b0, err := rootSnapshot.Head()
+	require.NoError(t, err)
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		b1 := unittest.BlockWithParentFixture(b0)
 		b1.SetPayload(flow.Payload{})
 
-		err = state.Mutate().Extend(&b1)
+		err = state.Extend(&b1)
 		require.NoError(t, err)
 
 		b2 := unittest.BlockWithParentFixture(b1.Header)
 		b2.SetPayload(flow.Payload{})
 
-		err = state.Mutate().Extend(&b2)
+		err = state.Extend(&b2)
 		require.NoError(t, err)
 
 		b3 := unittest.BlockWithParentFixture(b2.Header)
 		b3.SetPayload(flow.Payload{})
 
-		err = state.Mutate().Extend(&b3)
+		err = state.Extend(&b3)
 		require.NoError(t, err)
 
 		metrics := metrics.NewNoopCollector()

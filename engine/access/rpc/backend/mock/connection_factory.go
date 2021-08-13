@@ -5,6 +5,8 @@ package mock
 import (
 	access "github.com/onflow/flow/protobuf/go/flow/access"
 
+	execution "github.com/onflow/flow/protobuf/go/flow/execution"
+
 	io "io"
 
 	mock "github.com/stretchr/testify/mock"
@@ -25,6 +27,38 @@ func (_m *ConnectionFactory) GetAccessAPIClient(address string) (access.AccessAP
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(access.AccessAPIClient)
+		}
+	}
+
+	var r1 io.Closer
+	if rf, ok := ret.Get(1).(func(string) io.Closer); ok {
+		r1 = rf(address)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(io.Closer)
+		}
+	}
+
+	var r2 error
+	if rf, ok := ret.Get(2).(func(string) error); ok {
+		r2 = rf(address)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// GetExecutionAPIClient provides a mock function with given fields: address
+func (_m *ConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+	ret := _m.Called(address)
+
+	var r0 execution.ExecutionAPIClient
+	if rf, ok := ret.Get(0).(func(string) execution.ExecutionAPIClient); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(execution.ExecutionAPIClient)
 		}
 	}
 

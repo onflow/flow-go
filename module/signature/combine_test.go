@@ -1,52 +1,69 @@
 package signature
 
 import (
-	rand "math/rand"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/crypto"
 )
 
-// TODO: make tests more robust by testing unhappy paths of splitter
-
-const NUM_SIGS = 10
-
 func TestCombinerJoinSplitEven(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	c := &Combiner{}
-	sigs := make([]crypto.Signature, 0, NUM_SIGS)
-	for i := 0; i < NUM_SIGS; i++ {
-		sig := make([]byte, 32)
-		n, err := rand.Read(sig[:])
-		require.Equal(t, n, len(sig))
-		require.NoError(t, err)
-		sigs = append(sigs, sig)
-	}
-	combined, err := c.Join(sigs...)
+
+	length := uint(32)
+	c := NewCombiner(length, length)
+
+	sig1 := randomByteSliceT(t, length)
+	sig2 := randomByteSliceT(t, length)
+
+	// test valid format
+	combined, err := c.Join(sig1, sig2)
 	require.NoError(t, err)
-	splitted, err := c.Split(combined)
+	split1, split2, err := c.Split(combined)
 	assert.NoError(t, err)
-	assert.Equal(t, sigs, splitted)
+	assert.Equal(t, sig1, []byte(split1))
+	assert.Equal(t, sig2, []byte(split2))
+
+	// test invalid
+	invalidSig1 := randomByteSliceT(t, length-1)
+	invalidSig2 := randomByteSliceT(t, length+1)
+
+	_, err = c.Join(invalidSig1, sig2) // sig1 invalid
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, err = c.Join(sig1, invalidSig2) // sig2 is invalid
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, err = c.Join(invalidSig1, invalidSig2) // both lengths are invalid but total length is valid
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, _, err = c.Split(combined[:len(combined)-1])
+	assert.ErrorIs(t, err, ErrInvalidFormat)
 }
 
 func TestCombinerJoinSplitUneven(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	c := &Combiner{}
-	sigs := make([]crypto.Signature, 0, NUM_SIGS)
-	for i := 0; i < NUM_SIGS; i++ {
-		sig := make([]byte, rand.Intn(128)+1)
-		n, err := rand.Read(sig[:])
-		require.Equal(t, n, len(sig))
-		require.NoError(t, err)
-		sigs = append(sigs, sig)
-	}
-	combined, err := c.Join(sigs...)
+
+	len1 := uint(18)
+	len2 := uint(27)
+	c := NewCombiner(uint(len1), uint(len2))
+
+	sig1 := randomByteSliceT(t, len1)
+	sig2 := randomByteSliceT(t, len2)
+
+	// test valid format
+	combined, err := c.Join(sig1, sig2)
 	require.NoError(t, err)
-	splitted, err := c.Split(combined)
-	assert.NoError(t, err)
-	assert.Equal(t, sigs, splitted)
+	split1, split2, err := c.Split(combined)
+	require.NoError(t, err)
+	assert.Equal(t, sig1, []byte(split1))
+	assert.Equal(t, sig2, []byte(split2))
+
+	// test invalid format
+	invalidSig1 := randomByteSliceT(t, len1-1)
+	invalidSig2 := randomByteSliceT(t, len2+1)
+
+	_, err = c.Join(invalidSig1, sig2) // sig1 invalid
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, err = c.Join(sig1, invalidSig2) // sig2 is invalid
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, err = c.Join(invalidSig1, invalidSig2) // both lengths are invalid but total length is valid
+	assert.ErrorIs(t, err, ErrInvalidFormat)
+	_, _, err = c.Split(combined[:len(combined)-1])
+	assert.ErrorIs(t, err, ErrInvalidFormat)
 }

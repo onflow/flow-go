@@ -48,11 +48,11 @@ func (f *BuilderFactory) Create(
 
 	build := builder.NewBuilder(
 		f.db,
+		f.trace,
 		f.mainChainHeaders,
 		clusterHeaders,
 		clusterPayloads,
 		pool,
-		f.trace,
 		f.opts...,
 	)
 

@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 // Blocks implements a simple block storage around a badger DB.
@@ -20,6 +21,7 @@ type Blocks struct {
 	payloads *Payloads
 }
 
+// NewBlocks ...
 func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	b := &Blocks{
 		db:       db,
@@ -29,8 +31,8 @@ func NewBlocks(db *badger.DB, headers *Headers, payloads *Payloads) *Blocks {
 	return b
 }
 
-func (b *Blocks) StoreTx(block *flow.Block) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
+func (b *Blocks) StoreTx(block *flow.Block) func(*transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
 		err := b.headers.storeTx(block.Header)(tx)
 		if err != nil {
 			return fmt.Errorf("could not store header: %w", err)
@@ -61,25 +63,31 @@ func (b *Blocks) retrieveTx(blockID flow.Identifier) func(*badger.Txn) (*flow.Bl
 	}
 }
 
+// Store ...
 func (b *Blocks) Store(block *flow.Block) error {
-	return operation.RetryOnConflict(b.db.Update, b.StoreTx(block))
+	return operation.RetryOnConflictTx(b.db, transaction.Update, b.StoreTx(block))
 }
 
+// ByID ...
 func (b *Blocks) ByID(blockID flow.Identifier) (*flow.Block, error) {
 	tx := b.db.NewTransaction(false)
 	defer tx.Discard()
 	return b.retrieveTx(blockID)(tx)
 }
 
+// ByHeight ...
 func (b *Blocks) ByHeight(height uint64) (*flow.Block, error) {
-	var blockID flow.Identifier
-	err := b.db.View(operation.LookupBlockHeight(height, &blockID))
+	tx := b.db.NewTransaction(false)
+	defer tx.Discard()
+
+	blockID, err := b.headers.retrieveIdByHeightTx(height)(tx)
 	if err != nil {
-		return nil, fmt.Errorf("could not look up block: %w", err)
+		return nil, err
 	}
-	return b.ByID(blockID)
+	return b.retrieveTx(blockID)(tx)
 }
 
+// ByCollectionID ...
 func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	var blockID flow.Identifier
 	err := b.db.View(operation.LookupCollectionBlock(collID, &blockID))
@@ -89,6 +97,7 @@ func (b *Blocks) ByCollectionID(collID flow.Identifier) (*flow.Block, error) {
 	return b.ByID(blockID)
 }
 
+// IndexBlockForCollections ...
 func (b *Blocks) IndexBlockForCollections(blockID flow.Identifier, collIDs []flow.Identifier) error {
 	for _, collID := range collIDs {
 		err := operation.RetryOnConflict(b.db.Update, operation.SkipDuplicates(operation.IndexCollectionBlock(collID, blockID)))
@@ -123,6 +132,7 @@ func (b *Blocks) UpdateLastFullBlockHeight(height uint64) error {
 	})
 }
 
+// GetLastFullBlockHeight ...
 func (b *Blocks) GetLastFullBlockHeight() (uint64, error) {
 	var h uint64
 	err := b.db.View(operation.RetrieveLastCompleteBlockHeight(&h))

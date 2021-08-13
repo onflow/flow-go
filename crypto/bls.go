@@ -3,7 +3,7 @@
 package crypto
 
 // BLS signature scheme implementation using BLS12-381 curve
-// ([zcash]https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#bls12-381)
+// ([zcash]https://electriccoin.co/blog/new-snark-curve/)
 // Pairing, ellipic curve and modular arithmetic is using Relic library.
 // This implementation does not include any security against side-channel attacks.
 
@@ -11,17 +11,19 @@ package crypto
 //  - the implementation is optimized for shorter signatures (on G1)
 //  - public keys are longer (on G2)
 //  - serialization of points on G1 and G2 is compressed ([zcash]
-//     https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization)
+//     https://www.ietf.org/archive/id/draft-irtf-cfrg-pairing-friendly-curves-08.html#name-zcash-serialization-format-)
 //  - hash to curve is using the optimized SWU map
 //    (https://eprint.iacr.org/2019/403.pdf section 4)
 //  - expanding the message is using a cSHAKE-based KMAC128 with a domain separation tag
 //  - signature verification checks the membership of signature in G1
 //  - the public key membership check in G2 is implemented separately from the signature verification.
 //  - membership check in G1 is implemented using fast Bowe's check (https://eprint.iacr.org/2019/814.pdf)
-//  - membership check in G2 is using a simple scalar multiplication with the group order
+//  - membership check in G2 is using a simple scalar multiplication with the group order.
+//  - multi-signature tools are defined in bls_multisg.go
+//  - SPoCK scheme based on BLS: verifies two signatures have been generated from the same message,
+//    that is unknown to the verifier.
 
 // future features:
-//  - multi-signature and batch verification
 //  - membership checks G2 using Bowe's method (https://eprint.iacr.org/2019/814.pdf)
 //  - implement a G1/G2 swap (signatures on G2 and public keys on G1)
 
@@ -33,7 +35,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -46,146 +47,189 @@ type blsBLS12381Algo struct {
 	algo SigningAlgorithm
 }
 
-//  Once variable to use a unique instance
+//  BLS context on the BLS 12-381 curve
 var blsInstance *blsBLS12381Algo
-var once sync.Once
 
-// returns a new BLS signer on curve BLS12-381
-func newBLSBLS12381() *blsBLS12381Algo {
-	once.Do(func() {
-		blsInstance = &(blsBLS12381Algo{
-			algo: BLSBLS12381,
-		})
-		blsInstance.init()
-	})
-	return blsInstance
+// NewBLSKMAC returns a new KMAC128 instance with the right parameters
+// chosen for BLS signatures and verifications.
+//
+// It expands the message into 1024 bits (required for the optimal SwU hash to curve).
+// tag is the domain separation tag, it is recommended to use a different tag for each signature domain.
+// The returned KMAC is customized by the tag and is guaranteed to be different than the KMAC used
+// to generate proofs of possession.
+func NewBLSKMAC(tag string) hash.Hasher {
+	// application tag is guaranteed to be different than the tag used
+	// to generate proofs of possession.
+	appTag := applicationTagPrefix + tag
+	return internalBLSKMAC(appTag)
+}
+
+// returns a customized KMAC instance for BLS
+func internalBLSKMAC(tag string) hash.Hasher {
+	// postfix the tag with the BLS ciphersuite
+	key := []byte(tag + blsCipherSuite)
+	// blsKMACFunction is the customizer used for KMAC in BLS
+	const blsKMACFunction = "H2C"
+	// the error is ignored as the parameter lengths are chosen to be in the correct range for kmac
+	// (tested by TestBLSBLS12381Hasher)
+	kmac, _ := hash.NewKMAC_128(key, []byte(blsKMACFunction), minHashSizeBLSBLS12381)
+	return kmac
 }
 
 // Sign signs an array of bytes using the private key
 //
 // Signature is compressed [zcash]
 // https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
-// This function only reads the private key
-// If the hasher used is KMAC128, the hasher is only read.
+// The private key is read only.
+// If the hasher used is KMAC128, the hasher is read only.
 // It is recommended to use Sign with the hasher from NewBLSKMAC. If not, the hasher used
 // must expand the message to 1024 bits. It is also recommended to use a hasher
 // with a domain separation tag.
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
-		return nil, errors.New("Sign requires a Hasher")
+		return nil, newInvalidInputsError("Sign requires a Hasher")
 	}
 	// check hasher output size
-	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return nil, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
-			opSwUInputLenBLSBLS12381, kmac.Size())
+	if kmac.Size() < minHashSizeBLSBLS12381 {
+		return nil, newInvalidInputsError(
+			"Hasher with at least %d output byte size is required, current size is %d",
+			minHashSizeBLSBLS12381,
+			kmac.Size())
 	}
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
-	return newBLSBLS12381().blsSign(&sk.scalar, h), nil
-}
 
-// blsKMACFunction is the customizer used for KMAC in BLS
-const blsKMACFunction = "H2C"
+	// set BLS context
+	blsInstance.reInit()
 
-// NewBLSKMAC returns a new KMAC128 instance with the right parameters
-// chosen for BLS signatures and verifications.
-// It expands the message into 1024 bits (required for the optimal SwU hash to curve)
-// tag is the domain separation tag, it is recommended to use a different tag for each signature domain
-func NewBLSKMAC(tag string) hash.Hasher {
-	// the error is ignored as the parameter lengths are in the correct range for kmac
-	kmac, _ := hash.NewKMAC_128([]byte(tag), []byte(blsKMACFunction), opSwUInputLenBLSBLS12381)
-	return kmac
+	s := make([]byte, SignatureLenBLSBLS12381)
+	C.bls_sign((*C.uchar)(&s[0]),
+		(*C.bn_st)(&sk.scalar),
+		(*C.uchar)(&h[0]),
+		(C.int)(len(h)))
+	return s, nil
 }
 
 // Verify verifies a signature of a byte array using the public key and the input hasher.
 //
+// If the input signature slice has an invalid length or fails to deserialize into a curve
+// point, the function returns false without an error.
+//
 // The function assumes the public key is in the valid G2 subgroup as it is
-// either generated by the library or read through the DecodePublicKey function.
-// The signature membership check in G1 is included in the verifcation
-// If the hasher used is KMAC128, the hasher is only read.
-// The public key is only read by the function.
+// either generated by the library or read through the DecodePublicKey function,
+// which includes a validity check.
+// The signature membership check in G1 is included in the verifcation.
+//
+// If the hasher used is KMAC128, the hasher is read only.
 func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) (bool, error) {
+	if len(s) != signatureLengthBLSBLS12381 {
+		return false, nil
+	}
+
 	if kmac == nil {
-		return false, errors.New("VerifyBytes requires a Hasher")
+		return false, newInvalidInputsError("verification requires a Hasher")
 	}
 	// check hasher output size
-	if kmac.Size() < opSwUInputLenBLSBLS12381 {
-		return false, fmt.Errorf("Hasher with at least %d output byte size is required, current size is %d",
-			opSwUInputLenBLSBLS12381, kmac.Size())
+	if kmac.Size() < minHashSizeBLSBLS12381 {
+		return false, newInvalidInputsError(
+			"Hasher with at least %d output byte size is required, current size is %d",
+			minHashSizeBLSBLS12381,
+			kmac.Size())
 	}
+
 	// hash the input to 128 bytes
 	h := kmac.ComputeHash(data)
 
-	return newBLSBLS12381().blsVerify(&pk.point, s, h), nil
+	// intialize BLS context
+	blsInstance.reInit()
+
+	verif := C.bls_verify((*C.ep2_st)(&pk.point),
+		(*C.uchar)(&s[0]),
+		(*C.uchar)(&h[0]),
+		(C.int)(len(h)))
+
+	switch verif {
+	case invalid:
+		return false, nil
+	case valid:
+		return true, nil
+	default:
+		return false, fmt.Errorf("signature verification failed")
+	}
 }
 
-// generatePrivateKey generates a private key for BLS on BLS12381 curve.
-// The minimum size of the input seed is 48 bytes (for a sceurity of 128 bits)
+// generatePrivateKey generates a private key for BLS on BLS12-381 curve.
+// The minimum size of the input seed is 48 bytes.
+//
+// It is recommended to use a secure crypto RNG to generate the seed.
+// The seed must have enough entropy and should be sampled uniformly at random.
 func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	if len(seed) < KeyGenSeedMinLenBLSBLS12381 || len(seed) > KeyGenSeedMaxLenBLSBLS12381 {
-		return nil, fmt.Errorf("seed length should be between %d and %d bytes",
-			KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
+		return nil, newInvalidInputsError(
+			"seed length should be between %d and %d bytes",
+			KeyGenSeedMinLenBLSBLS12381,
+			KeyGenSeedMaxLenBLSBLS12381)
 	}
 
-	sk := &PrKeyBLSBLS12381{
-		// public key is only computed when needed
-		pk: nil,
-	}
+	sk := newPrKeyBLSBLS12381(nil)
 
 	// maps the seed to a private key
-	// error is not checked as it is guaranteed to be nil; len(seed)<maxScalarSize
-	mapToZr(&(sk.scalar), seed)
+	// error is not checked as it is guaranteed to be nil
+	mapToZr(&sk.scalar, seed)
 	return sk, nil
 }
 
-// GeneratePOP returns a proof of possession (PoP) for the receiver private key
-// using the given hasher.
-//
-// The hasher must be independant from the hashers used for signatures
-// or SPoCK proofs. In the case of KMAC, this means a specific domain tag must
-// be used for PoP and not used for other domains.
-func (sk *PrKeyBLSBLS12381) GeneratePOP(kmac hash.Hasher) (Signature, error) {
-	// sign the public key
-	return sk.Sign(sk.PublicKey().Encode(), kmac)
-}
+const invalidBLSSignatureHeader = byte(0xE0)
 
-// VerifyPOP verifies a proof of possession (PoP) for the receiver public key
-// using the given hasher.
-func (pk *PubKeyBLSBLS12381) VerifyPOP(s Signature, kmac hash.Hasher) (bool, error) {
-	// verify the signature against the public key
-	return pk.Verify(s, pk.Encode(), kmac)
+// BLSInvalidSignature returns an invalid signature that fails when verified
+// with any message and public key.
+//
+// The signature bytes represent an invalid serialization of a point which
+// makes the verification fail early. The verification would return (false, nil).
+func BLSInvalidSignature() Signature {
+	signature := make([]byte, SignatureLenBLSBLS12381)
+	signature[0] = invalidBLSSignatureHeader // invalid header as per C.ep_read_bin_compact
+	return signature
 }
 
 // decodePrivateKey decodes a slice of bytes into a private key.
 // This function checks the scalar is less than the group order
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	if len(privateKeyBytes) != prKeyLengthBLSBLS12381 {
-		return nil, fmt.Errorf("the input length has to be equal to %d", prKeyLengthBLSBLS12381)
+		return nil, newInvalidInputsError(
+			"the input length has to be equal to %d",
+			prKeyLengthBLSBLS12381)
 	}
-	sk := &PrKeyBLSBLS12381{
-		pk: nil,
-	}
+	sk := newPrKeyBLSBLS12381(nil)
+
 	readScalar(&sk.scalar, privateKeyBytes)
-	if sk.scalar.checkMembershipZr() {
+	if C.check_membership_Zr((*C.bn_st)(&sk.scalar)) == valid {
 		return sk, nil
 	}
-	return nil, errors.New("the private key is not a valid BLS12-381 curve key")
+
+	return nil, newInvalidInputsError("the private key is not a valid BLS12-381 curve key")
 }
 
 // decodePublicKey decodes a slice of bytes into a public key.
-// This function includes a membership check in G2
+// This function includes a membership check in G2 and rejects the infinity point.
 func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
-		return nil, fmt.Errorf("the input length has to be equal to %d", pubKeyLengthBLSBLS12381)
+		return nil, newInvalidInputsError(
+			"the input length has to be %d",
+			pubKeyLengthBLSBLS12381)
 	}
 	var pk PubKeyBLSBLS12381
-	if readPointG2(&pk.point, publicKeyBytes) != nil {
-		return nil, errors.New("the input slice does not encode a public key")
+	err := readPointG2(&pk.point, publicKeyBytes)
+	if err != nil {
+		if IsInvalidInputsError(err) {
+			return nil, newInvalidInputsError("the input does not encode a BLS12-381 point")
+		}
+		return nil, errors.New("decode public key failed")
 	}
-	if pk.point.checkMembershipG2() {
-		return &pk, nil
+	if !pk.point.checkValidPublicKeyPoint() {
+		return nil, newInvalidInputsError("the input is infinity or does not encode a BLS12-381 point in the valid group")
 	}
-	return nil, errors.New("the public key is not a valid BLS12-381 curve key")
+	return &pk, nil
 }
 
 // PrKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
@@ -194,6 +238,22 @@ type PrKeyBLSBLS12381 struct {
 	pk *PubKeyBLSBLS12381
 	// private key data
 	scalar scalar
+}
+
+// newPrKeyBLSBLS12381 creates a new BLS private key with the given scalar.
+// If no scalar is provided, the function allocates an
+// empty scalar.
+func newPrKeyBLSBLS12381(x *scalar) *PrKeyBLSBLS12381 {
+	var sk PrKeyBLSBLS12381
+	if x == nil {
+		// initialize the scalar
+		C.bn_new_wrapper((*C.bn_st)(&sk.scalar))
+	} else {
+		// set the scalar
+		sk.scalar = *x
+	}
+	// the embedded public key is only computed when needed
+	return &sk
 }
 
 // Algorithm returns the Signing Algorithm
@@ -254,6 +314,18 @@ type PubKeyBLSBLS12381 struct {
 	point pointG2
 }
 
+// newPubKeyBLSBLS12381 creates a new BLS public key with the given point.
+// If no scalar is provided, the function allocates an
+// empty scalar.
+func newPubKeyBLSBLS12381(p *pointG2) *PubKeyBLSBLS12381 {
+	if p != nil {
+		return &PubKeyBLSBLS12381{
+			point: *p,
+		}
+	}
+	return &PubKeyBLSBLS12381{}
+}
+
 // Algorithm returns the Signing Algorithm
 func (pk *PubKeyBLSBLS12381) Algorithm() SigningAlgorithm {
 	return BLSBLS12381
@@ -292,7 +364,7 @@ var signatureLengthBLSBLS12381 = int(C.get_signature_len())
 var pubKeyLengthBLSBLS12381 = int(C.get_pk_len())
 var prKeyLengthBLSBLS12381 = int(C.get_sk_len())
 
-// init sets the context of BLS12381 curve
+// init sets the context of BLS12-381 curve
 func (a *blsBLS12381Algo) init() error {
 	// initializes relic context and sets the B12_381 parameters
 	if err := a.context.initContext(); err != nil {
@@ -303,58 +375,39 @@ func (a *blsBLS12381Algo) init() error {
 	if signatureLengthBLSBLS12381 != SignatureLenBLSBLS12381 ||
 		pubKeyLengthBLSBLS12381 != PubKeyLenBLSBLS12381 ||
 		prKeyLengthBLSBLS12381 != PrKeyLenBLSBLS12381 {
-		return errors.New("BLS on BLS-12381 settings are not correct")
+		return errors.New("BLS-12381 length settings in Go and C are not consistent, check hardcoded lengths and compressions")
 	}
 	return nil
 }
 
-// reInit the context of BLS12381 curve assuming there was a previous call to init().
-// If the implementation evolves and relic has multiple contexts,
-// reinit should be called at every a. operation.
+// set the context of BLS 12-381 curve in the lower C and Relic layers assuming the context
+// was previously initialized with a call to init().
+//
+// If the implementation evolves to support multiple contexts,
+// reinit should be called at every blsBLS12381Algo operation.
 func (a *blsBLS12381Algo) reInit() {
-	a.context.reInitContext()
+	a.context.setContext()
 }
 
-// computes a bls signature through the C layer
-func (a *blsBLS12381Algo) blsSign(sk *scalar, data []byte) Signature {
-	s := make([]byte, SignatureLenBLSBLS12381)
-
-	C.bls_sign((*C.uchar)(&s[0]),
-		(*C.bn_st)(sk),
-		(*C.uchar)(&data[0]),
-		(C.int)(len(data)))
-	return s
-}
-
-// Checks the validity of a bls signature through the C layer
-func (a *blsBLS12381Algo) blsVerify(pk *pointG2, s Signature, data []byte) bool {
-	if len(s) != signatureLengthBLSBLS12381 {
-		return false
-	}
-	verif := C.bls_verify((*C.ep2_st)(pk),
-		(*C.uchar)(&s[0]),
-		(*C.uchar)(&data[0]),
-		(C.int)(len(data)))
-
-	return (verif == valid)
-}
-
-// checkMembershipZr checks a scalar is less than the group order (r)
-func (sk *scalar) checkMembershipZr() bool {
-	verif := C.check_membership_Zr((*C.bn_st)(sk))
-	return verif == valid
-}
-
-// membershipCheckG2 runs a membership check of BLS public keys on BLS12-381 curve.
-// Returns true if the public key is on the correct subgroup of the curve
-// and false otherwise
+// checkValidPublicKeyPoint checks whether the input point is a valid public key for BLS
+// on the BLS12-381 curve, considering public keys are in G2.
+// It returns true if the public key is non-infinity and on the correct subgroup of the curve
+// and false otherwise.
+//
 // It is necessary to run this test once for every public key before
 // it is used to verify BLS signatures. The library calls this function whenever
 // it imports a key through the function DecodePublicKey.
-// The membership check is separated from the signature verification to optimize
-// multiple verification calls using the same public key
-func (pk *pointG2) checkMembershipG2() bool {
-	verif := C.check_membership_G2((*C.ep2_st)(pk))
+// The validity check is separated from the signature verification to optimize
+// multiple verification calls using the same public key.
+func (pk *pointG2) checkValidPublicKeyPoint() bool {
+	// check point is non-infinity
+	verif := C.ep2_is_infty((*C.ep2_st)(pk))
+	if verif != valid {
+		return false
+	}
+
+	// membership check in G2
+	verif = C.check_membership_G2((*C.ep2_st)(pk))
 	return verif == valid
 }
 
@@ -373,5 +426,23 @@ func hashToG1(data []byte) *pointG1 {
 func OpSwUUnitTest(output []byte, input []byte) {
 	C.opswu_test((*C.uchar)(&output[0]),
 		(*C.uchar)(&input[0]),
-		SignatureLenBLSBLS12381)
+		(C.int)(len(input)))
+}
+
+// This is only a TEST function.
+// It wraps a call to signing using Relic to get a curve point, internally using XMD:SHA256
+//
+// (since cgo can't be used in go test files)
+func (sk *PrKeyBLSBLS12381) signWithRelicMapTest(data []byte) Signature {
+	var point pointG1
+	mapToG1RelicTest(&point, data, []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_"))
+
+	// set BLS context
+	blsInstance.reInit()
+
+	s := make([]byte, SignatureLenBLSBLS12381)
+	C.bls_sign_ep((*C.uchar)(&s[0]),
+		(*C.bn_st)(&sk.scalar),
+		(*C.ep_st)(&point))
+	return s
 }

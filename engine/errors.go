@@ -7,6 +7,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var (
+	// IncompatibleInputTypeError indicates that the input has an incompatible type
+	IncompatibleInputTypeError = errors.New("incompatible input type")
+)
+
 // InvalidInputError are errors for caused by invalid inputs.
 // It's useful to distinguish these known errors from exceptions.
 // By distinguishing errors from exceptions, we can log them
@@ -68,10 +73,64 @@ func IsOutdatedInputError(err error) bool {
 	return errors.As(err, &errOutdatedInputError)
 }
 
+// UnverifiableInputError are for inputs that cannot be verified at this moment.
+// Usually it means that we don't have enough data to verify it. A good example is missing
+// data in DB to process input.
+type UnverifiableInputError struct {
+	err error
+}
+
+func NewUnverifiableInputError(msg string, args ...interface{}) error {
+	return UnverifiableInputError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e UnverifiableInputError) Unwrap() error {
+	return e.err
+}
+
+func (e UnverifiableInputError) Error() string {
+	return e.err.Error()
+}
+
+func IsUnverifiableInputError(err error) bool {
+	var errUnverifiableInputError UnverifiableInputError
+	return errors.As(err, &errUnverifiableInputError)
+}
+
+type DuplicatedEntryError struct {
+	err error
+}
+
+func NewDuplicatedEntryErrorf(msg string, args ...interface{}) error {
+	return DuplicatedEntryError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e DuplicatedEntryError) Unwrap() error {
+	return e.err
+}
+
+func (e DuplicatedEntryError) Error() string {
+	return e.err.Error()
+}
+
+func IsDuplicatedEntryError(err error) bool {
+	var errDuplicatedEntryError DuplicatedEntryError
+	return errors.As(err, &errDuplicatedEntryError)
+}
+
 // LogError logs the engine processing error
 func LogError(log zerolog.Logger, err error) {
+	LogErrorWithMsg(log, "could not process message", err)
+}
 
-	msg := "could not process message"
+func LogErrorWithMsg(log zerolog.Logger, msg string, err error) {
+	if err == nil {
+		return
+	}
 
 	// Invalid input errors could be logged as warning, because they can be
 	// part of normal operations when the network is open and anyone can send
@@ -93,6 +152,14 @@ func LogError(log zerolog.Logger, err error) {
 		return
 	}
 
+	// Unverifiable input errors may be due to out-of-date node state, or could
+	// indicate a malicious/unexpected message from another node. Since we don't
+	// know, log as warning.
+	if IsUnverifiableInputError(err) {
+		log.Warn().Str("error_type", "unverifiable_input").Err(err).Msg(msg)
+		return
+	}
+
 	// all other errors should just be logged as usual
-	log.Error().Str("error_type", "generic_error").Err(err).Msg(msg)
+	log.Error().Str("error_type", "internal_error").Err(err).Msg(msg)
 }

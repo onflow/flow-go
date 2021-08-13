@@ -1,15 +1,18 @@
 package convert
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/golang/protobuf/ptypes"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -74,7 +77,7 @@ func MessageToTransaction(m *entities.Transaction, chain flow.Chain) (flow.Trans
 func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	proposalKeyMessage := &entities.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),
-		KeyId:          uint32(tb.ProposalKey.KeyID),
+		KeyId:          uint32(tb.ProposalKey.KeyIndex),
 		SequenceNumber: tb.ProposalKey.SequenceNumber,
 	}
 
@@ -88,7 +91,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entities.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -98,7 +101,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entities.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -119,10 +122,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entities.Transaction {
 func BlockHeaderToMessage(h *flow.Header) (*entities.BlockHeader, error) {
 	id := h.ID()
 
-	t, err := ptypes.TimestampProto(h.Timestamp)
-	if err != nil {
-		return nil, err
-	}
+	t := timestamppb.New(h.Timestamp)
 
 	return &entities.BlockHeader{
 		Id:        id[:],
@@ -137,11 +137,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t, err := ptypes.TimestampProto(h.Header.Timestamp)
-	if err != nil {
-		return nil, err
-	}
-
+	t := timestamppb.New(h.Header.Timestamp)
 	cg := make([]*entities.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {
 		cg[i] = collectionGuaranteeToMessage(g)
@@ -244,10 +240,10 @@ func MessageToAccount(m *entities.Account) (*flow.Account, error) {
 	}
 
 	return &flow.Account{
-		Address: flow.BytesToAddress(m.GetAddress()),
-		Balance: m.GetBalance(),
-		Code:    m.GetCode(),
-		Keys:    accountKeys,
+		Address:   flow.BytesToAddress(m.GetAddress()),
+		Balance:   m.GetBalance(),
+		Keys:      accountKeys,
+		Contracts: m.Contracts,
 	}, nil
 }
 
@@ -262,10 +258,11 @@ func AccountToMessage(a *flow.Account) (*entities.Account, error) {
 	}
 
 	return &entities.Account{
-		Address: a.Address.Bytes(),
-		Balance: a.Balance,
-		Code:    a.Code,
-		Keys:    keys,
+		Address:   a.Address.Bytes(),
+		Balance:   a.Balance,
+		Code:      nil,
+		Keys:      keys,
+		Contracts: a.Contracts,
 	}, nil
 }
 
@@ -289,6 +286,7 @@ func MessageToAccountKey(m *entities.AccountKey) (*flow.AccountPublicKey, error)
 		HashAlgo:  hashAlgo,
 		Weight:    int(m.GetWeight()),
 		SeqNumber: uint64(m.GetSequenceNumber()),
+		Revoked:   m.GetRevoked(),
 	}, nil
 }
 
@@ -356,4 +354,30 @@ func MessagesToIdentifiers(l [][]byte) []flow.Identifier {
 		results[i] = MessageToIdentifier(item)
 	}
 	return results
+}
+
+// SnapshotToBytes converts a `protocol.Snapshot` to bytes, encoded as JSON
+func SnapshotToBytes(snapshot protocol.Snapshot) ([]byte, error) {
+	serializable, err := inmem.FromSnapshot(snapshot)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := json.Marshal(serializable.Encodable())
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
+}
+
+// BytesToInmemSnapshot converts an array of bytes to `inmem.Snapshot`
+func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
+	var encodable inmem.EncodableSnapshot
+	err := json.Unmarshal(bytes, &encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal snapshot data retreived from access node: %w", err)
+	}
+
+	return inmem.SnapshotFromEncodable(encodable), nil
 }

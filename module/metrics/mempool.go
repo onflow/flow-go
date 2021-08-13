@@ -8,16 +8,15 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module"
 )
-
-type EntriesFunc func() uint
 
 type MempoolCollector struct {
 	unit         *engine.Unit
 	entries      *prometheus.GaugeVec
 	interval     time.Duration
 	delay        time.Duration
-	entriesFuncs map[string]EntriesFunc // keeps map of registered EntriesFunc of mempools
+	entriesFuncs map[string]module.EntriesFunc // keeps map of registered EntriesFunc of mempools
 }
 
 func NewMempoolCollector(interval time.Duration) *MempoolCollector {
@@ -26,7 +25,7 @@ func NewMempoolCollector(interval time.Duration) *MempoolCollector {
 		unit:         engine.NewUnit(),
 		interval:     interval,
 		delay:        0,
-		entriesFuncs: make(map[string]EntriesFunc),
+		entriesFuncs: make(map[string]module.EntriesFunc),
 
 		entries: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "entries_total",
@@ -44,7 +43,7 @@ func (mc *MempoolCollector) MempoolEntries(resource string, entries uint) {
 }
 
 // Register registers entriesFunc for a resource
-func (mc *MempoolCollector) Register(resource string, entriesFunc EntriesFunc) error {
+func (mc *MempoolCollector) Register(resource string, entriesFunc module.EntriesFunc) error {
 	mc.unit.Lock()
 	defer mc.unit.Unlock()
 

@@ -45,8 +45,7 @@ func DefaultConfig() Config {
 // Core should be wrapped by a type-aware engine that manages the specifics of
 // each chain. Example: https://github.com/onflow/flow-go/blob/master/engine/common/synchronization/engine.go
 //
-// Core is NOT safe for concurrent use by multiple goroutines. Wrapping engines
-// are responsible for avoid concurrent access.
+// Core is safe for concurrent use by multiple goroutines.
 type Core struct {
 	log      zerolog.Logger
 	Config   Config
@@ -57,7 +56,7 @@ type Core struct {
 
 func New(log zerolog.Logger, config Config) (*Core, error) {
 	core := &Core{
-		log:      log,
+		log:      log.With().Str("module", "synchronization").Logger(),
 		Config:   config,
 		heights:  make(map[uint64]*Status),
 		blockIDs: make(map[flow.Identifier]*Status),
@@ -97,9 +96,6 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 // If the height difference between local and the reported height, we do nothing.
 // Otherwise, we queue each missing height.
 func (c *Core) HandleHeight(final *flow.Header, height uint64) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	// don't bother queueing anything if we're within tolerance
 	if c.WithinTolerance(final, height) {
 		return
@@ -107,6 +103,8 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 
 	// if we are sufficiently behind, we want to sync the missing blocks
 	if height > final.Height {
+		c.mu.Lock()
+		defer c.mu.Unlock()
 		for h := final.Height + 1; h <= height; h++ {
 			c.queueByHeight(h)
 		}
@@ -241,8 +239,9 @@ func (c *Core) prune(final *flow.Header) {
 		}
 	}
 
-	prunedHeights := len(c.heights) - initialHeights
-	prunedBlockIDs := len(c.blockIDs) - initialBlockIDs
+	prunedHeights := initialHeights - len(c.heights)
+	prunedBlockIDs := initialBlockIDs - len(c.blockIDs)
+
 	c.log.Debug().
 		Uint64("final_height", final.Height).
 		Msgf("pruned %d heights, %d block IDs", prunedHeights, prunedBlockIDs)

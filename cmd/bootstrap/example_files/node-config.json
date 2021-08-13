@@ -15,6 +15,21 @@
     "Stake": 110
   },
   {
+    "Role": "collection",
+    "Address": "123.0.1.13",
+    "Stake": 110
+  },
+  {
+    "Role": "collection",
+    "Address": "123.0.1.14",
+    "Stake": 110
+  },
+  {
+    "Role": "collection",
+    "Address": "123.0.1.15",
+    "Stake": 110
+  },
+  {
     "Role": "consensus",
     "Address": "123.0.2.10",
     "Stake": 220

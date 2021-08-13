@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type EpochSetups struct {
@@ -14,12 +15,13 @@ type EpochSetups struct {
 	cache *Cache
 }
 
+// NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		id := key.(flow.Identifier)
 		setup := val.(*flow.EpochSetup)
-		return operation.InsertEpochSetup(id, setup)
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochSetup(id, setup)))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -33,18 +35,17 @@ func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 	es := &EpochSetups{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEpochSetup,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochSetup)),
+			withRetrieve(retrieve)),
 	}
 
 	return es
 }
 
-func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *badger.Txn) error {
-	return es.cache.Put(setup.ID(), setup)
+func (es *EpochSetups) StoreTx(setup *flow.EpochSetup) func(tx *transaction.Tx) error {
+	return es.cache.PutTx(setup.ID(), setup)
 }
 
 func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) (*flow.EpochSetup, error) {
@@ -55,11 +56,6 @@ func (es *EpochSetups) retrieveTx(setupID flow.Identifier) func(tx *badger.Txn) 
 		}
 		return val.(*flow.EpochSetup), nil
 	}
-}
-
-// TODO: can we remove this method? Its not contained in the interface.
-func (es *EpochSetups) Store(setup *flow.EpochSetup) error {
-	return operation.RetryOnConflict(es.db.Update, es.StoreTx(setup))
 }
 
 func (es *EpochSetups) ByID(setupID flow.Identifier) (*flow.EpochSetup, error) {

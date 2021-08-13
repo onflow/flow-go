@@ -12,15 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/indices"
+	"github.com/onflow/flow-go/state/protocol"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee"
-	"github.com/onflow/flow-go/consensus/hotstuff/committee/leader"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state"
 	protomock "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -48,7 +49,7 @@ func (as *AggregatorSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
-	// generate the validator set with qualified majority threshold of 5
+	// generate the validator set with super-majority threshold of 5
 	as.participants = unittest.IdentityListFixture(7, unittest.WithRole(flow.RoleConsensus))
 
 	// create a mocked snapshot
@@ -68,33 +69,35 @@ func (as *AggregatorSuite) SetupTest() {
 	as.protocol = &protomock.State{}
 	as.protocol.On("Final").Return(as.snapshot)
 
+	// mock out epoch, used for leader selection
+	epochs := &protomock.EpochQuery{}
+	epoch := &protomock.Epoch{}
+	as.snapshot.On("Epochs").Return(epochs)
+	epochs.On("Current").Return(epoch)
+	epoch.On("Counter").Return(uint64(1), nil)
+	epoch.On("InitialIdentities").Return(as.participants, nil)
+	var params []interface{}
+	for _, param := range indices.ProtocolConsensusLeaderSelection {
+		params = append(params, param)
+	}
+	seed := unittest.SeedFixture(32)
+	epoch.On("Seed", params...).Return(seed, nil)
+	epoch.On("FirstView").Return(uint64(0), nil)
+	epoch.On("FinalView").Return(uint64(1000), nil)
+	// there is no previous epoch
+	previousEpoch := &protomock.Epoch{}
+	epochs.On("Previous").Return(previousEpoch)
+	previousEpoch.On("Counter").Return(uint64(0), protocol.ErrNoPreviousEpoch)
+
 	// create a mocked forks
 	as.forks = &mocks.Forks{}
 
 	rootHeader := &flow.Header{}
-
-	sig1 := make([]byte, 32)
-	rand.Read(sig1[:])
-	sig2 := make([]byte, 32)
-	rand.Read(sig2[:])
-	c := &signature.Combiner{}
-	combined, err := c.Join(sig1, sig2)
-	require.NoError(as.T(), err)
-
-	rootQC := &flow.QuorumCertificate{
-		View:      rootHeader.View,
-		BlockID:   rootHeader.ID(),
-		SignerIDs: nil,
-		SigData:   combined,
-	}
-
 	as.MockProtocolByBlockID(rootHeader.ID())
 
-	// initialize and pre-generate leader selections from the seed
-	selection, err := leader.NewSelectionForConsensus(10000, rootHeader, rootQC, as.protocol)
-	require.NoError(as.T(), err)
 	// create hotstuff.Committee
-	as.committee, err = committee.NewMainConsensusCommitteeState(as.protocol, as.participants[0].NodeID, selection)
+	var err error
+	as.committee, err = committees.NewConsensusCommittee(as.protocol, as.participants[0].NodeID)
 	require.NoError(as.T(), err)
 
 	// created a mocked signer that can sign proposals
@@ -575,6 +578,45 @@ func (as *AggregatorSuite) TestDuplicateVotesBeforeBlock() {
 	require.NoError(as.T(), err)
 }
 
+// UNHAPPY PATH
+// TestEquivocation_DoubleProposal tests that VoteAggregator handles a double
+// proposal equivocation correctly. There are two ways, we can feed a double
+// proposal into the VoteAggregator:
+//   *  VoteAggregator.BuildQCOnReceivedBlock
+//   *  VoteAggregator.StoreVoteAndBuildQC
+// We test that both handle the double proposal gracefully (without error).
+func (as *AggregatorSuite) TestEquivocation_DoubleProposal() {
+	testView := uint64(5)
+	bp1 := newMockBlock(as, testView, as.participants[0].NodeID)
+	bp2 := newMockBlock(as, testView, as.participants[0].NodeID)
+
+	// Each of the blocks contain the proposer's signature. Hence, the proposer
+	// votes for both of its conflicting blocks => expect double vote notification
+	as.notifier.On("OnDoubleVotingDetected", bp1.ProposerVote(), bp2.ProposerVote()).Return()
+
+	as.aggregator.StoreProposerVote(bp1.ProposerVote())
+	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp1.Block)
+	require.Nil(as.T(), qc)
+	require.False(as.T(), built)
+	require.NoError(as.T(), err)
+
+	// Feed double proposal into VoteAggregator.BuildQCOnReceivedBlock
+	as.aggregator.StoreProposerVote(bp2.ProposerVote())
+	qc, built, err = as.aggregator.BuildQCOnReceivedBlock(bp2.Block)
+	require.NoError(as.T(), err)
+	require.False(as.T(), built)
+	require.Nil(as.T(), qc)
+
+	// Feed double proposal into VoteAggregator.StoreVoteAndBuildQC
+	vote2 := as.newMockVote(testView, bp2.Block.BlockID, as.participants[2].NodeID)
+	qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote2, bp2.Block)
+	require.NoError(as.T(), err)
+	require.False(as.T(), built)
+	require.Nil(as.T(), qc)
+
+	as.notifier.AssertExpectations(as.T())
+}
+
 // ORDER
 // receive 5 votes, and the block, the QC should contain leader's vote, and the first 4 votes.
 func (as *AggregatorSuite) TestVoteOrderAfterBlock() {
@@ -880,17 +922,14 @@ func (as *AggregatorSuite) TestSufficientRBSig() {
 }
 
 func newMockBlock(as *AggregatorSuite, view uint64, proposerID flow.Identifier) *model.Proposal {
-	blockHeader := unittest.BlockHeaderFixture()
-	blockHeader.View = view
 	block := &model.Block{
 		View:       view,
-		BlockID:    blockHeader.ID(),
+		BlockID:    unittest.IdentifierFixture(),
 		ProposerID: proposerID,
 	}
-	sig := crypto.Signature{}
 	bp := &model.Proposal{
 		Block:   block,
-		SigData: sig,
+		SigData: crypto.Signature{},
 	}
 	as.RegisterProposal(bp)
 	return bp

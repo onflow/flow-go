@@ -319,7 +319,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
 
 	// initialize the voter
-	in.voter = voter.New(in.signer, in.forks, in.persist, DefaultVoted())
+	in.voter = voter.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
 
 	// initialize the event handler
 	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)

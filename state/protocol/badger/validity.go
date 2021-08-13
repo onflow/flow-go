@@ -3,17 +3,17 @@ package badger
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
-func validSetup(setup *flow.EpochSetup) error {
+func isValidEpochSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
-	if len(setup.RandomSource) < crypto.MinSeedLength {
-		return fmt.Errorf("seed has insufficient length (%d < %d)", len(setup.RandomSource), crypto.MinSeedLength)
+	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
+		return fmt.Errorf("seed has incorrect length (%d != %d)", len(setup.RandomSource), flow.EpochSetupRandomSourceLength)
 	}
 
 	// STEP 2: sanity checks of all nodes listed as participants
@@ -46,6 +46,11 @@ func validSetup(setup *flow.EpochSetup) error {
 		}
 	}
 
+	// the participants must be ordered by canonical order
+	if !setup.Participants.Sorted(order.Canonical) {
+		return fmt.Errorf("participants are not canonically ordered")
+	}
+
 	// STEP 3: sanity checks for individual roles
 	// IMPORTANT: here we remove all nodes with zero weight, as they are allowed to partake
 	// in communication but not in respective node functions
@@ -69,6 +74,11 @@ func validSetup(setup *flow.EpochSetup) error {
 		return fmt.Errorf("need at least one verification node")
 	}
 
+	// first view must be before final view
+	if setup.FirstView >= setup.FinalView {
+		return fmt.Errorf("first view (%d) must be before final view (%d)", setup.FirstView, setup.FinalView)
+	}
+
 	// we need at least one collection cluster
 	if len(setup.Assignments) == 0 {
 		return fmt.Errorf("need at least one collection cluster")
@@ -83,10 +93,14 @@ func validSetup(setup *flow.EpochSetup) error {
 	return nil
 }
 
-func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
+func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
 		return fmt.Errorf("number of clusters (%d) does not number of QCs (%d)", len(setup.Assignments), len(commit.ClusterQCs))
+	}
+
+	if commit.Counter != setup.Counter {
+		return fmt.Errorf("inconsistent epoch counter between commit (%d) and setup (%d) events in same epoch", commit.Counter, setup.Counter)
 	}
 
 	// make sure we have a valid DKG public key
@@ -94,19 +108,80 @@ func validCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 		return fmt.Errorf("missing DKG public group key")
 	}
 
-	participants := setup.Participants.Filter(filter.HasRole(flow.RoleConsensus))
-
-	// make sure each participant of the epoch has a DKG entry
-	for _, participant := range participants {
-		_, exists := commit.DKGParticipants[participant.NodeID]
-		if !exists {
-			return fmt.Errorf("missing DKG participant data (%x)", participant.NodeID)
-		}
+	participants := setup.Participants.Filter(filter.IsValidDKGParticipant)
+	if len(participants) != len(commit.DKGParticipantKeys) {
+		return fmt.Errorf("participant list (len=%d) does not match dkg key list (len=%d)", len(participants), len(commit.DKGParticipantKeys))
 	}
 
-	// make sure that there is no extra data
-	if len(participants) != len(commit.DKGParticipants) {
-		return fmt.Errorf("DKG data contains extra entries")
+	return nil
+}
+
+// isValidRootSnapshot checks internal consistency of root state snapshot
+func isValidRootSnapshot(snap protocol.Snapshot) error {
+
+	segment, err := snap.SealingSegment()
+	if err != nil {
+		return fmt.Errorf("could not get sealing segment: %w", err)
+	}
+	result, seal, err := snap.SealedResult()
+	if err != nil {
+		return fmt.Errorf("could not latest sealed result: %w", err)
+	}
+
+	if len(segment) == 0 {
+		return fmt.Errorf("invalid empty sealing segment")
+	}
+	// TAIL <- ... <- HEAD
+	head := segment[len(segment)-1] // reference block of the snapshot
+	tail := segment[0]              // last sealed block
+	headID := head.ID()
+	tailID := tail.ID()
+
+	if result.BlockID != tailID {
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, tail.ID())
+	}
+
+	if seal.BlockID != tailID {
+		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
+	}
+
+	if seal.ResultID != result.ID() {
+		return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+	}
+
+	// identities must be canonically ordered
+	identities, err := snap.Identities(filter.Any)
+	if err != nil {
+		return fmt.Errorf("could not get identities for root snapshot: %w", err)
+	}
+	if !identities.Sorted(order.Canonical) {
+		return fmt.Errorf("identities are not canonically ordered")
+	}
+
+	// root qc must be for reference block of snapshot
+	qc, err := snap.QuorumCertificate()
+	if err != nil {
+		return fmt.Errorf("could not get qc for root snapshot: %w", err)
+	}
+	if qc.BlockID != headID {
+		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, headID)
+	}
+
+	firstView, err := snap.Epochs().Current().FirstView()
+	if err != nil {
+		return fmt.Errorf("could not get first view: %w", err)
+	}
+	finalView, err := snap.Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("could not get final view: %w", err)
+	}
+
+	// the segment must be fully within the current epoch
+	if firstView > tail.Header.View {
+		return fmt.Errorf("tail block of sealing segment has lower view than first view of epoch")
+	}
+	if head.Header.View >= finalView {
+		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
 	return nil

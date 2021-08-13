@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/engine/collection/proposal"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -20,7 +19,6 @@ type ProposalEngineFactory struct {
 	engMetrics     module.EngineMetrics
 	mempoolMetrics module.MempoolMetrics
 	protoState     protocol.State
-	pool           mempool.Transactions // TODO make this cluster-specific
 	transactions   storage.Transactions
 }
 
@@ -33,7 +31,6 @@ func NewProposalEngineFactory(
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
-	pool mempool.Transactions,
 	transactions storage.Transactions,
 ) (*ProposalEngineFactory, error) {
 
@@ -45,13 +42,12 @@ func NewProposalEngineFactory(
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,
 		protoState:     protoState,
-		pool:           pool,
 		transactions:   transactions,
 	}
 	return factory, nil
 }
 
-func (f *ProposalEngineFactory) Create(clusterState cluster.State, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
+func (f *ProposalEngineFactory) Create(clusterState cluster.MutableState, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
 	engine, err := proposal.New(
@@ -63,7 +59,6 @@ func (f *ProposalEngineFactory) Create(clusterState cluster.State, headers stora
 		f.mempoolMetrics,
 		f.protoState,
 		clusterState,
-		f.pool,
 		f.transactions,
 		headers,
 		payloads,

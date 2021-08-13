@@ -1,16 +1,20 @@
 package run
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func GenerateRootSeal(result *flow.ExecutionResult, setup *flow.EpochSetup, commit *flow.EpochCommit) *flow.Seal {
-	seal := &flow.Seal{
-		BlockID:       result.BlockID,
-		ResultID:      result.ID(),
-		InitialState:  nil,
-		FinalState:    result.FinalStateCommit,
-		ServiceEvents: []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()},
+func GenerateRootSeal(result *flow.ExecutionResult) (*flow.Seal, error) {
+	finalState, err := result.FinalStateCommitment()
+	if err != nil {
+		return nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
-	return seal
+	seal := &flow.Seal{
+		BlockID:    result.BlockID,
+		ResultID:   result.ID(),
+		FinalState: finalState,
+	}
+	return seal, nil
 }

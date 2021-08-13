@@ -177,11 +177,12 @@ SearchLoop:
 	// create a chunk for the execution result
 	chunk := flow.Chunk{
 		ChunkBody: flow.ChunkBody{
-			CollectionIndex:      0,           // irrelevant for consensus node
-			StartState:           nil,         // irrelevant for consensus node
-			EventCollection:      flow.ZeroID, // irrelevant for consensus node
-			TotalComputationUsed: 0,           // irrelevant for consensus node
-			NumberOfTransactions: 0,           // irrelevant for consensus node
+			CollectionIndex:      0,                         // irrelevant for consensus node
+			StartState:           flow.DummyStateCommitment, // irrelevant for consensus node
+			EventCollection:      flow.ZeroID,               // irrelevant for consensus node
+			BlockID:              targetID,
+			TotalComputationUsed: 0, // irrelevant for consensus node
+			NumberOfTransactions: 0, // irrelevant for consensus node
 		},
 		Index:    0,                                 // should start at zero
 		EndState: unittest.StateCommitmentFixture(), // random end execution state
@@ -191,13 +192,9 @@ SearchLoop:
 
 	// create the execution result for the target block
 	result := flow.ExecutionResult{
-		ExecutionResultBody: flow.ExecutionResultBody{
-			PreviousResultID: resultID,               // need genesis result
-			BlockID:          targetID,               // refer the target block
-			FinalStateCommit: chunk.EndState,         // end state of only chunk
-			Chunks:           flow.ChunkList{&chunk}, // include only chunk
-		},
-		Signatures: nil,
+		PreviousResultID: resultID,               // need genesis result
+		BlockID:          targetID,               // refer the target block
+		Chunks:           flow.ChunkList{&chunk}, // include only chunk
 	}
 
 	ss.T().Logf("execution result generated (result: %x)", result.ID())

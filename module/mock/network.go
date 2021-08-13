@@ -13,13 +13,13 @@ type Network struct {
 	mock.Mock
 }
 
-// Register provides a mock function with given fields: channelID, engine
-func (_m *Network) Register(channelID string, engine network.Engine) (network.Conduit, error) {
-	ret := _m.Called(channelID, engine)
+// Register provides a mock function with given fields: channel, engine
+func (_m *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+	ret := _m.Called(channel, engine)
 
 	var r0 network.Conduit
-	if rf, ok := ret.Get(0).(func(string, network.Engine) network.Conduit); ok {
-		r0 = rf(channelID, engine)
+	if rf, ok := ret.Get(0).(func(network.Channel, network.Engine) network.Conduit); ok {
+		r0 = rf(channel, engine)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.Conduit)
@@ -27,8 +27,8 @@ func (_m *Network) Register(channelID string, engine network.Engine) (network.Co
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(string, network.Engine) error); ok {
-		r1 = rf(channelID, engine)
+	if rf, ok := ret.Get(1).(func(network.Channel, network.Engine) error); ok {
+		r1 = rf(channel, engine)
 	} else {
 		r1 = ret.Error(1)
 	}

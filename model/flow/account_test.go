@@ -11,7 +11,7 @@ import (
 )
 
 func TestAccountPublicKey_MarshalJSON(t *testing.T) {
-	accountPrivateKey, err := unittest.AccountKeyFixture()
+	accountPrivateKey, err := unittest.AccountKeyDefaultFixture()
 	assert.NoError(t, err)
 
 	accountKeyA := accountPrivateKey.PublicKey(42)

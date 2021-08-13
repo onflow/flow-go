@@ -12,7 +12,6 @@ package crypto
 import "C"
 import (
 	"errors"
-	"fmt"
 )
 
 // Go wrappers to Relic C types
@@ -47,19 +46,22 @@ func (ct *ctx) initContext() error {
 // relic context must be initialized before seeding.
 func seedRelic(seed []byte) error {
 	if len(seed) < (securityBits / 8) {
-		return fmt.Errorf("seed length needs to be larger than %d",
+		return newInvalidInputsError(
+			"seed length needs to be larger than %d",
 			securityBits/8)
 	}
 	if len(seed) > maxRelicPrgSeed {
-		return fmt.Errorf("seed length needs to be less than %x",
+		return newInvalidInputsError(
+			"seed length needs to be less than %x",
 			maxRelicPrgSeed)
 	}
 	C.seed_relic((*C.uchar)(&seed[0]), (C.int)(len(seed)))
 	return nil
 }
 
-// reInitContext re init the context of the C layer with pre-saved data
-func (ct *ctx) reInitContext() {
+// setContext sets the context (previously initialized) of the C layer with
+// pre-saved data.
+func (ct *ctx) setContext() {
 	C.core_set(ct.relicCtx)
 	C.precomputed_data_set(ct.precCtx)
 }
@@ -69,7 +71,7 @@ func (p *pointG1) scalarMultG1(res *pointG1, expo *scalar) {
 	C.ep_mult((*C.ep_st)(res), (*C.ep_st)(p), (*C.bn_st)(expo))
 }
 
-// This function is for DEBUG/TEST only
+// This function is for TEST only
 // Exponentiation of g1 in G1
 func genScalarMultG1(res *pointG1, expo *scalar) {
 	C.ep_mult_gen((*C.ep_st)(res), (*C.bn_st)(expo))
@@ -105,17 +107,14 @@ func randZrStar(x *scalar) {
 // the resulting scalar is in the range 0 < k < r
 func mapToZr(x *scalar, src []byte) error {
 	if len(src) > maxScalarSize {
-		return fmt.Errorf("input slice length must be less than %d", maxScalarSize)
+		return newInvalidInputsError(
+			"input slice length must be less than %d",
+			maxScalarSize)
 	}
 	C.bn_map_to_Zr_star((*C.bn_st)(x),
 		(*C.uchar)(&src[0]),
 		(C.int)(len(src)))
 	return nil
-}
-
-// sets a scalar to a small integer
-func (x *scalar) setInt(a int) {
-	C.bn_set_dig((*C.bn_st)(x), (C.uint64_t)(a))
 }
 
 // writeScalar writes a G2 point in a slice of bytes
@@ -135,6 +134,8 @@ func readScalar(x *scalar, src []byte) {
 }
 
 // writePointG2 writes a G2 point in a slice of bytes
+// The slice should be of size PubKeyLenBLSBLS12381 and the serialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func writePointG2(dest []byte, a *pointG2) {
 	C.ep2_write_bin_compact((*C.uchar)(&dest[0]),
 		(*C.ep2_st)(a),
@@ -142,25 +143,77 @@ func writePointG2(dest []byte, a *pointG2) {
 	)
 }
 
-// readVerifVector reads a G2 point from a slice of bytes
+// writePointG1 writes a G1 point in a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the serialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
+func writePointG1(dest []byte, a *pointG1) {
+	C.ep_write_bin_compact((*C.uchar)(&dest[0]),
+		(*C.ep_st)(a),
+		(C.int)(signatureLengthBLSBLS12381),
+	)
+}
+
+// readPointG2 reads a G2 point from a slice of bytes
+// The slice is expected to be of size PubKeyLenBLSBLS12381 and the deserialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
 func readPointG2(a *pointG2, src []byte) error {
-	if C.ep2_read_bin_compact((*C.ep2_st)(a),
+	switch C.ep2_read_bin_compact((*C.ep2_st)(a),
 		(*C.uchar)(&src[0]),
-		(C.int)(len(src)),
-	) != valid {
+		(C.int)(len(src))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("input is not a G2 point")
+	default:
 		return errors.New("reading a G2 point has failed")
 	}
-	return nil
+}
+
+// readPointG1 reads a G1 point from a slice of bytes
+// The slice should be of size SignatureLenBLSBLS12381 and the deserialization will
+// follow the Zcash format specified in draft-irtf-cfrg-pairing-friendly-curves
+func readPointG1(a *pointG1, src []byte) error {
+	switch C.ep_read_bin_compact((*C.ep_st)(a),
+		(*C.uchar)(&src[0]),
+		(C.int)(len(src))) {
+	case valid:
+		return nil
+	case invalid:
+		return newInvalidInputsError("input is not a G1 point")
+	default:
+		return errors.New("reading a G1 point has failed")
+	}
 }
 
 // This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
+// It wraps calls to the relic hash-to-G1 map since cgo can't be used
+// in go test files.
+//
+// This map uses, by default, XMD:SH256 for hash-to-field, and can be
+// configured to use several XMD:(SHA|BS) variants, see:
+// https://github.com/relic-toolkit/relic/blob/43f2cd4695ff29a35dfab5bbf368439d4ff20d14/include/relic_md.h
+//
+// TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
+// ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
+func mapToG1RelicTest(dest *pointG1, msg, dst []byte) {
+	C.ep_map_dst((*C.ep_st)(dest), (*C.uchar)(&msg[0]), (C.int)(len(msg)), (*C.uchar)(&dst[0]), (C.int)(len(dst)))
+}
+
+// This is only a TEST function.
+// It wraps calls to subgroup check tests since cgo can't be used
 // in go test files.
 // if inG1 is true, the function tests the membership of a point in G1,
 // otherwise, a point in E1\G1 membership is tested.
 // method is the index of the membership check method as defined in bls12381_utils.h
 func checkG1Test(inG1 int, method int) bool {
 	return C.subgroup_check_G1_test((C.int)(inG1), (C.int)(method)) == valid
+}
+
+// This is only a TEST function.
+// It wraps a call to a subgroup check in G1 since cgo can't be used
+// in go test files.
+func checkInG1Test(pt *pointG1) bool {
+	return C.check_membership_G1((*C.ep_st)(pt)) == valid
 }
 
 // This is only a TEST function.

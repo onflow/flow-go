@@ -26,16 +26,16 @@ func NewMetricsWrapper(signer hotstuff.SignerVerifier, metrics module.HotstuffMe
 	}
 }
 
-func (w SignerMetricsWrapper) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+func (w SignerMetricsWrapper) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 	processStart := time.Now()
-	valid, err := w.signer.VerifyVote(voterID, sigData, block)
+	valid, err := w.signer.VerifyVote(voter, sigData, block)
 	w.metrics.SignerProcessingDuration(time.Since(processStart))
 	return valid, err
 }
 
-func (w SignerMetricsWrapper) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+func (w SignerMetricsWrapper) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 	processStart := time.Now()
-	valid, err := w.signer.VerifyQC(voterIDs, sigData, block)
+	valid, err := w.signer.VerifyQC(signers, sigData, block)
 	w.metrics.SignerProcessingDuration(time.Since(processStart))
 	return valid, err
 }

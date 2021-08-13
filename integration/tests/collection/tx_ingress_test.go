@@ -37,14 +37,10 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 			tx.SetReferenceBlockID(sdk.EmptyID)
 		})
 
-		expected := access.IncompleteTransactionError{
-			MissingFields: []string{flow.TransactionFieldRefBlockID.String()},
-		}
-
 		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 		defer cancel()
 		err := client.SendTransaction(ctx, *malformed)
-		unittest.AssertErrSubstringMatch(t, expected, err)
+		suite.Assert().Error(err)
 	})
 
 	t.Run("missing script", func(t *testing.T) {

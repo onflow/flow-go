@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state"
@@ -35,9 +34,8 @@ type Engine struct {
 	mempoolMetrics module.MempoolMetrics
 	conduit        network.Conduit
 	me             module.Local
-	protoState     protocol.State  // flow-wide protocol chain state
-	clusterState   clusterkv.State // cluster-specific chain state
-	pool           mempool.Transactions
+	protoState     protocol.State         // flow-wide protocol chain state
+	clusterState   clusterkv.MutableState // cluster-specific chain state
 	transactions   storage.Transactions
 	headers        storage.Headers
 	payloads       storage.ClusterPayloads
@@ -57,8 +55,7 @@ func New(
 	engMetrics module.EngineMetrics,
 	mempoolMetrics module.MempoolMetrics,
 	protoState protocol.State,
-	clusterState clusterkv.State,
-	pool mempool.Transactions,
+	clusterState clusterkv.MutableState,
 	transactions storage.Transactions,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
@@ -86,7 +83,6 @@ func New(
 		me:             me,
 		protoState:     protoState,
 		clusterState:   clusterState,
-		pool:           pool,
 		transactions:   transactions,
 		headers:        headers,
 		payloads:       payloads,
@@ -96,8 +92,13 @@ func New(
 		sync:           nil, // must use WithSync
 	}
 
+	chainID, err := clusterState.Params().ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
+	}
+
 	// register network conduit
-	conduit, err := net.Register(engine.ConsensusCluster, e)
+	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), e)
 	if err != nil {
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
@@ -134,18 +135,28 @@ func (e *Engine) Ready() <-chan struct{} {
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done()
+	return e.unit.Done(func() {
+		err := e.conduit.Close()
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not close conduit")
+		}
+	})
 }
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -156,12 +167,14 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -170,6 +183,13 @@ func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
 // SendVote will send a vote to the desired node.
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
+	log := e.log.With().
+		Hex("collection_id", blockID[:]).
+		Uint64("collection_view", view).
+		Hex("recipient_id", recipientID[:]).
+		Logger()
+	log.Info().Msg("processing vote transmission request from hotstuff")
+
 	// build the vote message
 	vote := &messages.ClusterBlockVote{
 		BlockID: blockID,
@@ -177,18 +197,17 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 		SigData: sigData,
 	}
 
-	err := e.conduit.Unicast(vote, recipientID)
-	if err != nil {
-		return fmt.Errorf("could not send vote: %w", err)
-	}
-
-	e.log.Debug().
-		Hex("block_id", blockID[:]).
-		Uint64("view", view).
-		Hex("recipient_id", recipientID[:]).
-		Msg("sending vote")
-
-	e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+	// TODO: this is a hot-fix to mitigate the effects of the following Unicast call blocking occasionally
+	e.unit.Launch(func() {
+		// send the vote the desired recipient
+		err := e.conduit.Unicast(vote, recipientID)
+		if err != nil {
+			log.Warn().Err(err).Msg("could not send vote")
+			return
+		}
+		e.engMetrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+		log.Info().Msg("collection vote transmitted")
+	})
 
 	return nil
 }
@@ -254,7 +273,10 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Payload: payload,
 		}
 
-		err = e.conduit.Publish(msg, recipients.NodeIDs()...)
+		err := e.conduit.Publish(msg, recipients.NodeIDs()...)
+		if errors.Is(err, network.EmptyTargetList) {
+			return
+		}
 		if err != nil {
 			log.Error().Err(err).Msg("could not broadcast proposal")
 			return
@@ -343,7 +365,6 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Cl
 	log.Debug().Msg("received proposal")
 
 	e.prunePendingCache()
-	e.mempoolMetrics.MempoolEntries(metrics.ResourceTransaction, e.pool.Size())
 
 	// first, we reject all blocks that we don't need to process:
 	// 1) blocks already in the cache; they will already be processed later
@@ -462,7 +483,7 @@ func (e *Engine) processBlockProposal(proposal *messages.ClusterBlockProposal) e
 		Payload: proposal.Payload,
 	}
 
-	err := e.clusterState.Mutate().Extend(block)
+	err := e.clusterState.Extend(block)
 	// if the error is a known invalid extension of the cluster state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {
@@ -519,7 +540,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 		Msg("processing pending children")
 
 	// then try to process children only this once
-	var result *multierror.Error
+	result := new(multierror.Error)
 	for _, child := range children {
 		proposal := &messages.ClusterBlockProposal{
 			Header:  child.Header,
@@ -534,6 +555,8 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 	// remove children from cache
 	e.pending.DropForParent(blockID)
 
+	// flatten out the error tree before returning the error
+	result = multierror.Flatten(result).(*multierror.Error)
 	return result.ErrorOrNil()
 }
 

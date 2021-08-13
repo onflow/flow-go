@@ -5,36 +5,39 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/prometheus/tsdb/fileutil"
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/metrics"
+	utilsio "github.com/onflow/flow-go/utils/io"
 )
 
 const checkpointFilenamePrefix = "checkpoint."
 
 const MagicBytes uint16 = 0x2137
 const VersionV1 uint16 = 0x01
-const VersionV2 uint16 = 0x02
 
-const RootCheckpointFilename = "root.checkpoint"
+// Versions was reset while changing trie format, so now bump it to 3 to avoid conflicts
+// Version 3 contains a file checksum for detecting corrupted checkpoint files.
+const VersionV3 uint16 = 0x03
 
 type Checkpointer struct {
 	dir            string
-	wal            *LedgerWAL
+	wal            *DiskWAL
 	keyByteSize    int
 	forestCapacity int
 }
 
-func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Checkpointer {
+func NewCheckpointer(wal *DiskWAL, keyByteSize int, forestCapacity int) *Checkpointer {
 	return &Checkpointer{
 		dir:            wal.wal.Dir(),
 		wal:            wal,
@@ -43,28 +46,53 @@ func NewCheckpointer(wal *LedgerWAL, keyByteSize int, forestCapacity int) *Check
 	}
 }
 
-// LatestCheckpoint returns number of latest checkpoint or -1 if there are no checkpoints
-func (c *Checkpointer) LatestCheckpoint() (int, error) {
+// listCheckpoints returns all the numbers (unsorted) of the checkpoint files, and the number of the last checkpoint.
+func (c *Checkpointer) listCheckpoints() ([]int, int, error) {
 
-	files, err := fileutil.ReadDir(c.dir)
+	list := make([]int, 0)
+
+	files, err := ioutil.ReadDir(c.dir)
 	if err != nil {
-		return -1, err
+		return nil, -1, fmt.Errorf("cannot list directory [%s] content: %w", c.dir, err)
 	}
 	last := -1
 	for _, fn := range files {
-		if !strings.HasPrefix(fn, checkpointFilenamePrefix) {
+		if !strings.HasPrefix(fn.Name(), checkpointFilenamePrefix) {
 			continue
 		}
-		justNumber := fn[len(checkpointFilenamePrefix):]
+		justNumber := fn.Name()[len(checkpointFilenamePrefix):]
 		k, err := strconv.Atoi(justNumber)
 		if err != nil {
 			continue
 		}
 
-		last = k
+		list = append(list, k)
+
+		// the last check point is the one with the highest number
+		if k > last {
+			last = k
+		}
 	}
 
-	return last, nil
+	return list, last, nil
+}
+
+// Checkpoints returns all the checkpoint numbers in asc order
+func (c *Checkpointer) Checkpoints() ([]int, error) {
+	list, _, err := c.listCheckpoints()
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch all checkpoints: %w", err)
+	}
+
+	sort.Ints(list)
+
+	return list, nil
+}
+
+// LatestCheckpoint returns number of latest checkpoint or -1 if there are no checkpoints
+func (c *Checkpointer) LatestCheckpoint() (int, error) {
+	_, last, err := c.listCheckpoints()
+	return last, err
 }
 
 // NotCheckpointedSegments - returns numbers of segments which are not checkpointed yet,
@@ -76,7 +104,7 @@ func (c *Checkpointer) NotCheckpointedSegments() (from, to int, err error) {
 		return -1, -1, fmt.Errorf("cannot get last checkpoint: %w", err)
 	}
 
-	first, last, err := c.wal.wal.Segments()
+	first, last, err := c.wal.Segments()
 	if err != nil {
 		return -1, -1, fmt.Errorf("cannot get range of segments: %w", err)
 	}
@@ -125,7 +153,7 @@ func (c *Checkpointer) Checkpoint(to int, targetWriter func() (io.WriteCloser, e
 		return fmt.Errorf("no segments to checkpoint to %d, latests not checkpointed segment: %d", to, notCheckpointedTo)
 	}
 
-	forest, err := mtrie.NewForest(c.keyByteSize, c.dir, c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
+	forest, err := mtrie.NewForest(c.forestCapacity, &metrics.NoopCollector{}, func(evictedTrie *trie.MTrie) error {
 		return nil
 	})
 	if err != nil {
@@ -182,59 +210,50 @@ func NumberToFilename(n int) string {
 	return fmt.Sprintf("%s%s", checkpointFilenamePrefix, NumberToFilenamePart(n))
 }
 
-type SyncOnCloseFile struct {
-	file *os.File
-	*bufio.Writer
-}
-
-func (s *SyncOnCloseFile) Close() error {
-	defer func() {
-		err := s.file.Close()
-		if err != nil {
-			fmt.Printf("error while closing file: %s", err)
-		}
-	}()
-
-	err := s.Flush()
-	if err != nil {
-		return fmt.Errorf("cannot flush buffer: %w", err)
-	}
-	return s.file.Sync()
-}
-
 func (c *Checkpointer) CheckpointWriter(to int) (io.WriteCloser, error) {
 	return CreateCheckpointWriter(c.dir, to)
 }
 
 func CreateCheckpointWriter(dir string, fileNo int) (io.WriteCloser, error) {
-	filename := path.Join(dir, NumberToFilename(fileNo))
-	return CreateCheckpointWriterForFile(filename)
+	return CreateCheckpointWriterForFile(dir, NumberToFilename(fileNo))
 }
 
-func CreateCheckpointWriterForFile(filename string) (io.WriteCloser, error) {
-	file, err := os.Create(filename)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create file for checkpoint %s: %w", filename, err)
+// CreateCheckpointWriterForFile returns a file writer that will write to a temporary file and then move it to the checkpoint folder by renaming it.
+func CreateCheckpointWriterForFile(dir, filename string) (io.WriteCloser, error) {
+
+	fullname := path.Join(dir, filename)
+
+	if utilsio.FileExists(fullname) {
+		return nil, fmt.Errorf("checkpoint file %s already exists", fullname)
 	}
 
-	writer := bufio.NewWriter(file)
-	return &SyncOnCloseFile{
-		file:   file,
-		Writer: writer,
+	tmpFile, err := ioutil.TempFile(dir, "writing-chkpnt-*")
+	if err != nil {
+		return nil, fmt.Errorf("cannot create temporary file for checkpoint %v: %w", tmpFile, err)
+	}
+
+	writer := bufio.NewWriter(tmpFile)
+	return &SyncOnCloseRenameFile{
+		file:       tmpFile,
+		targetName: fullname,
+		Writer:     writer,
 	}, nil
 }
 
-func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.WriteCloser) error {
+// StoreCheckpoint writes the given checkpoint to disk, and also append with a CRC32 file checksum for integrity check.
+func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writer) error {
 	storableNodes := forestSequencing.Nodes
 	storableTries := forestSequencing.Tries
 	header := make([]byte, 4+8+2)
 
+	crc32Writer := NewCRC32Writer(writer)
+
 	pos := writeUint16(header, 0, MagicBytes)
-	pos = writeUint16(header, pos, VersionV1)
+	pos = writeUint16(header, pos, VersionV3)
 	pos = writeUint64(header, pos, uint64(len(storableNodes)-1)) // -1 to account for 0 node meaning nil
 	writeUint16(header, pos, uint16(len(storableTries)))
 
-	_, err := writer.Write(header)
+	_, err := crc32Writer.Write(header)
 	if err != nil {
 		return fmt.Errorf("cannot write checkpoint header: %w", err)
 	}
@@ -242,7 +261,7 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 	// 0 element = nil, we don't need to store it
 	for i := 1; i < len(storableNodes); i++ {
 		bytes := flattener.EncodeStorableNode(storableNodes[i])
-		_, err = writer.Write(bytes)
+		_, err = crc32Writer.Write(bytes)
 		if err != nil {
 			return fmt.Errorf("error while writing node date: %w", err)
 		}
@@ -250,10 +269,19 @@ func StoreCheckpoint(forestSequencing *flattener.FlattenedForest, writer io.Writ
 
 	for _, storableTrie := range storableTries {
 		bytes := flattener.EncodeStorableTrie(storableTrie)
-		_, err = writer.Write(bytes)
+		_, err = crc32Writer.Write(bytes)
 		if err != nil {
 			return fmt.Errorf("error while writing trie date: %w", err)
 		}
+	}
+
+	// add CRC32 sum
+	crc32buf := make([]byte, 4)
+	writeUint32(crc32buf, 0, crc32Writer.Crc32())
+
+	_, err = writer.Write(crc32buf)
+	if err != nil {
+		return fmt.Errorf("cannot write crc32: %w", err)
 	}
 
 	return nil
@@ -265,18 +293,22 @@ func (c *Checkpointer) LoadCheckpoint(checkpoint int) (*flattener.FlattenedFores
 }
 
 func (c *Checkpointer) LoadRootCheckpoint() (*flattener.FlattenedForest, error) {
-	filepath := path.Join(c.dir, RootCheckpointFilename)
+	filepath := path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)
 	return LoadCheckpoint(filepath)
 }
 
 func (c *Checkpointer) HasRootCheckpoint() (bool, error) {
-	if _, err := os.Stat(path.Join(c.dir, RootCheckpointFilename)); err == nil {
+	if _, err := os.Stat(path.Join(c.dir, bootstrap.FilenameWALRootCheckpoint)); err == nil {
 		return true, nil
 	} else if os.IsNotExist(err) {
 		return false, nil
 	} else {
 		return false, err
 	}
+}
+
+func (c *Checkpointer) RemoveCheckpoint(checkpoint int) error {
+	return os.Remove(path.Join(c.dir, NumberToFilename(checkpoint)))
 }
 
 func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
@@ -288,11 +320,18 @@ func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 		_ = file.Close()
 	}()
 
-	reader := bufio.NewReader(file)
+	return ReadCheckpoint(file)
+}
+
+func ReadCheckpoint(r io.Reader) (*flattener.FlattenedForest, error) {
+
+	var bufReader io.Reader = bufio.NewReader(r)
+	crcReader := NewCRC32Reader(bufReader)
+	var reader io.Reader = crcReader
 
 	header := make([]byte, 4+8+2)
 
-	_, err = io.ReadFull(reader, header)
+	_, err := io.ReadFull(reader, header)
 	if err != nil {
 		return nil, fmt.Errorf("cannot read header bytes: %w", err)
 	}
@@ -305,8 +344,12 @@ func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 	if magicBytes != MagicBytes {
 		return nil, fmt.Errorf("unknown file format. Magic constant %x does not match expected %x", magicBytes, MagicBytes)
 	}
-	if version != VersionV1 && version != VersionV2 {
+	if version != VersionV1 && version != VersionV3 {
 		return nil, fmt.Errorf("unsupported file version %x ", version)
+	}
+
+	if version != VersionV3 {
+		reader = bufReader //switch back to plain reader
 	}
 
 	nodes := make([]*flattener.StorableNode, nodesCount+1) //+1 for 0 index meaning nil
@@ -329,6 +372,21 @@ func LoadCheckpoint(filepath string) (*flattener.FlattenedForest, error) {
 		tries[i] = storableTrie
 	}
 
+	if version == VersionV3 {
+		crc32buf := make([]byte, 4)
+		_, err := bufReader.Read(crc32buf)
+		if err != nil {
+			return nil, fmt.Errorf("error while reading CRC32 checksum: %w", err)
+		}
+		readCrc32, _ := readUint32(crc32buf, 0)
+
+		calculatedCrc32 := crcReader.Crc32()
+
+		if calculatedCrc32 != readCrc32 {
+			return nil, fmt.Errorf("checkpoint checksum failed! File contains %x but read data checksums to %x", readCrc32, calculatedCrc32)
+		}
+	}
+
 	return &flattener.FlattenedForest{
 		Nodes: nodes,
 		Tries: tries,
@@ -344,6 +402,16 @@ func writeUint16(buffer []byte, location int, value uint16) int {
 func readUint16(buffer []byte, location int) (uint16, int) {
 	value := binary.BigEndian.Uint16(buffer[location:])
 	return value, location + 2
+}
+
+func writeUint32(buffer []byte, location int, value uint32) int {
+	binary.BigEndian.PutUint32(buffer[location:], value)
+	return location + 4
+}
+
+func readUint32(buffer []byte, location int) (uint32, int) {
+	value := binary.BigEndian.Uint32(buffer[location:])
+	return value, location + 4
 }
 
 func readUint64(buffer []byte, location int) (uint64, int) {

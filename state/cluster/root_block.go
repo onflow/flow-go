@@ -19,7 +19,6 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentityList) *cluster.B
 
 	chainID := CanonicalClusterID(epoch, participants)
 	payload := cluster.EmptyPayload(flow.ZeroID)
-	payload.ReferenceEpoch = epoch
 	header := &flow.Header{
 		ChainID:        chainID,
 		ParentID:       flow.ZeroID,

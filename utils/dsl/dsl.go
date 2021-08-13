@@ -70,6 +70,7 @@ func (i Import) ToCadence() string {
 
 type UpdateAccountCode struct {
 	Code string
+	Name string
 }
 
 func (u UpdateAccountCode) ToCadence() string {
@@ -80,8 +81,8 @@ func (u UpdateAccountCode) ToCadence() string {
 
 	return fmt.Sprintf(`
 		let code = "%s"
-        signer.setCode(code.decodeHex())
-    `, hexCode)
+        signer.contracts.add(name: "%s", code: code.decodeHex())
+    `, hexCode, u.Name)
 }
 
 type Main struct {

@@ -11,18 +11,20 @@ functionality required by the Flow protocol.
 import (
     "github.com/onflow/cadence/runtime"
     "github.com/onflow/flow-go/fvm"
+    "github.com/onflow/flow-go/fvm/state"
     "github.com/onflow/flow-go/model/flow"
 )
 
 vm := fvm.New(runtime.NewInterpreterRuntime())
 
 tx := flow.NewTransactionBody().
-    SetScript(`transaction { execute { log("Hello, World!") } }`)
+    SetScript([]byte(`transaction { execute { log("Hello, World!") } }`))
 
 ctx := fvm.NewContext()
-ledger := make(fvm.MapLedger)
+ledger := state.NewMapLedger()
 
-txProc := fvm.Transaction(tx)
+txIndex := uint32(0)
+txProc := fvm.Transaction(tx, txIndex)
 
 err := vm.Run(ctx, txProc, ledger)
 if err != nil {
@@ -47,8 +49,9 @@ A transaction procedure can be created from a `flow.TransactionBody`:
 
 ```go
 var tx flow.TransactionBody
+var txIndex uint32
 
-i := fvm.Transaction(tx)
+i := fvm.Transaction(tx, txIndex)
 ```
 
 A transaction procedure has the following steps:

@@ -7,44 +7,57 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
+// Transactions ...
 type Transactions struct {
 	db    *badger.DB
 	cache *Cache
 }
 
+// NewTransactions ...
 func NewTransactions(cacheMetrics module.CacheMetrics, db *badger.DB) *Transactions {
-
-	store := func(key interface{}, val interface{}) func(tx *badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		txID := key.(flow.Identifier)
 		flowTx := val.(*flow.TransactionBody)
-		return operation.SkipDuplicates(operation.InsertTransaction(txID, flowTx))
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertTransaction(txID, flowTx)))
 	}
 
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		txID := key.(flow.Identifier)
 		var flowTx flow.TransactionBody
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := db.View(operation.RetrieveTransaction(txID, &flowTx))
+			err := operation.RetrieveTransaction(txID, &flowTx)(tx)
 			return &flowTx, err
 		}
 	}
 
 	t := &Transactions{
 		db: db,
-		cache: newCache(cacheMetrics,
+		cache: newCache(cacheMetrics, metrics.ResourceTransaction,
 			withLimit(flow.DefaultTransactionExpiry+100),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceTransaction)),
+			withRetrieve(retrieve)),
 	}
 
 	return t
 }
 
-func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*badger.Txn) error {
-	return t.cache.Put(flowTx.ID(), flowTx)
+// Store ...
+func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
+	return operation.RetryOnConflictTx(t.db, transaction.Update, t.storeTx(flowTx))
+}
+
+// ByID ...
+func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
+	tx := t.db.NewTransaction(false)
+	defer tx.Discard()
+	return t.retrieveTx(txID)(tx)
+}
+
+func (t *Transactions) storeTx(flowTx *flow.TransactionBody) func(*transaction.Tx) error {
+	return t.cache.PutTx(flowTx.ID(), flowTx)
 }
 
 func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow.TransactionBody, error) {
@@ -55,14 +68,4 @@ func (t *Transactions) retrieveTx(txID flow.Identifier) func(*badger.Txn) (*flow
 		}
 		return val.(*flow.TransactionBody), err
 	}
-}
-
-func (t *Transactions) Store(flowTx *flow.TransactionBody) error {
-	return operation.RetryOnConflict(t.db.Update, t.storeTx(flowTx))
-}
-
-func (t *Transactions) ByID(txID flow.Identifier) (*flow.TransactionBody, error) {
-	tx := t.db.NewTransaction(false)
-	defer tx.Discard()
-	return t.retrieveTx(txID)(tx)
 }

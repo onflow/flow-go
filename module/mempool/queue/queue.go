@@ -1,8 +1,6 @@
 package queue
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -47,6 +45,8 @@ func (q *Queue) Size() int {
 }
 
 // Returns difference between lowest and highest element in the queue
+// Formally, the Queue stores a tree. The height of the tree is the
+// number of edges on the longest downward path between the root and any leaf.
 func (q *Queue) Height() uint64 {
 	return q.Highest.Item.Height() - q.Head.Item.Height()
 }
@@ -96,11 +96,13 @@ func dequeue(queue *Queue) *Queue {
 	cache := make(map[flow.Identifier]*Node)
 
 	//copy all but head caches
+	headID := queue.Head.Item.ID() // ID computation is about as expensive 1000 Go int additions
 	for key, val := range queue.Nodes {
-		if key != queue.Head.Item.ID() {
+		if key != headID {
 			cache[key] = val
 		}
 	}
+
 	return &Queue{
 		Head:    onlyChild,
 		Nodes:   cache,
@@ -108,41 +110,47 @@ func dequeue(queue *Queue) *Queue {
 	}
 }
 
-// TryAdd tries to add a new Node to the queue and returns if the operation has been successful
-func (q *Queue) TryAdd(executableBlock Blockify) bool {
-	n, ok := q.Nodes[executableBlock.ParentID()]
-	if !ok {
-		return false
+// TryAdd tries to add a new element to the queue.
+// A element can only be added if the parent exists in the queue.
+// TryAdd(elmt) is an idempotent operation for the same elmt, i.e.
+// after the first, subsequent additions of the same elements are NoOps.
+// Returns:
+// stored = True if and only if _after_ the operation, the element is stored in the
+// queue. This is the case if (a) element was newly added to the queue or
+// (b) element was already stored in the queue _before_ the call.
+// new = Indicates if element was new to the queue, when `stored` was true. It lets
+// distinguish (a) and (b) cases.
+// Adding an element fails with return value `false` for `stored` in the following cases:
+//   * element.ParentID() is _not_ stored in the queue
+//   * element's height is _unequal to_ its parent's height + 1
+func (q *Queue) TryAdd(element Blockify) (stored bool, new bool) {
+	if _, found := q.Nodes[element.ID()]; found {
+		// (b) element was already stored in the queue _before_ the call.
+		return true, false
 	}
-	if n.Item.Height() != executableBlock.Height()-1 {
-		return false
+	// at this point, we are sure that the element is _not_ in the queue and therefore,
+	// the element cannot be referenced as a child by any other element in the queue
+	n, ok := q.Nodes[element.ParentID()]
+	if !ok {
+		return false, false
+	}
+	if n.Item.Height() != element.Height()-1 {
+		return false, false
 	}
 	newNode := &Node{
-		Item:     executableBlock,
+		Item:     element,
 		Children: nil,
 	}
+	// we know: element is _not_ (yet) in the queue
+	// => it cannot be in _any_ nodes Children list
+	// => the following operation is guaranteed to _not_ produce
+	//    duplicates in the Children list
 	n.Children = append(n.Children, newNode)
-	q.Nodes[executableBlock.ID()] = newNode
-	if executableBlock.Height() > q.Highest.Item.Height() {
+	q.Nodes[element.ID()] = newNode
+	if element.Height() > q.Highest.Item.Height() {
 		q.Highest = newNode
 	}
-	return true
-}
-
-// Attach joins two queues together, fails if new queue head cannot be attached
-func (q *Queue) Attach(other *Queue) error {
-	n, ok := q.Nodes[other.Head.Item.ParentID()]
-	if !ok {
-		return fmt.Errorf("cannot join queues, other queue head does not reference known parent")
-	}
-	n.Children = append(n.Children, other.Head)
-	for identifier, node := range other.Nodes {
-		q.Nodes[identifier] = node
-	}
-	if other.Highest.Item.Height() > q.Highest.Item.Height() {
-		q.Highest = other.Highest
-	}
-	return nil
+	return true, true
 }
 
 // Dismount removes the head element, returns it and it's children as new queues
