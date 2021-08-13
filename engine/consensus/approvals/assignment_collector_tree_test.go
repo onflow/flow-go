@@ -161,6 +161,43 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	require.Len(s.T(), collectors, len(receipts))
 }
 
+// TestGetOrCreateCollector tests that getting collector creates one on first call and returns from cache on second one.
+func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_ReturnFromCache() {
+	result := unittest.ExecutionResultFixture(func(result *flow.ExecutionResult) {
+		result.BlockID = s.IncorporatedBlock.ID()
+	})
+	s.prepareMockedCollector(result)
+	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
+	require.NoError(s.T(), err)
+	require.True(s.T(), lazyCollector.Created)
+	require.Equal(s.T(), approvals.CachingApprovals, lazyCollector.Collector.ProcessingStatus())
+
+	lazyCollector, err = s.collectorTree.GetOrCreateCollector(result)
+	require.NoError(s.T(), err)
+	// should be returned from cache
+	require.False(s.T(), lazyCollector.Created)
+}
+
+// TestGetOrCreateCollector_FactoryError tests that AssignmentCollectorTree correctly handles factory method error
+func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_FactoryError() {
+	result := unittest.ExecutionResultFixture()
+	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
+	require.Error(s.T(), err)
+	require.Nil(s.T(), lazyCollector)
+}
+
+// TestGetOrCreateCollector_CollectorParentIsSealed tests a case where we add a result for collector with sealed parent.
+// In this specific case collector has to become verifying instead of caching.
+func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentIsSealed() {
+	result := s.IncorporatedResult.Result
+	mockCollectorStateTransition(s.mockedCollectors[result.ID()],
+		approvals.CachingApprovals, approvals.VerifyingApprovals)
+	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
+	require.NoError(s.T(), err)
+	require.True(s.T(), lazyCollector.Created)
+	require.Equal(s.T(), approvals.VerifyingApprovals, lazyCollector.Collector.ProcessingStatus())
+}
+
 // TestFinalizeForkAtLevel_ProcessableAfterSealedParent tests scenario that finalized collector becomes processable
 // after parent block gets sealed. More specifically this case:
 // P <- A <- B[ER{A}] <- C[ER{B}] <- D[ER{C}]
