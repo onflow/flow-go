@@ -11,11 +11,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicSubscriptionFilter(t *testing.T) {
+func TestTopicValidator(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelDebug)
 	ctx := context.Background()
 	host1, err := libp2p.New(ctx)
@@ -32,20 +31,24 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	topicname1 := "testtopic1"
 	topicname2 := "testtopic2"
 
-	filter := &Filter{
-		allowedIDs: make(map[peer.ID]struct{}),
-		topic: topicname2,
-	}
-	filter.allowedIDs[host1.ID()] = struct{}{}
-	filter.allowedIDs[host2.ID()] = struct{}{}
 
+	ps1, err := pubsub.NewGossipSub(ctx, host1)
+	require.NoError(t, err)
 
-	ps1, err := pubsub.NewGossipSub(ctx, host1, pubsub.WithSubscriptionFilter(filter))
+	ps2, err := pubsub.NewGossipSub(ctx, host2)
 	require.NoError(t, err)
-	ps2, err := pubsub.NewGossipSub(ctx, host2, pubsub.WithSubscriptionFilter(filter))
-	require.NoError(t, err)
+
 	ps3, err := pubsub.NewGossipSub(ctx, host3)
 	require.NoError(t, err)
+
+	validator := &topicValidator{
+		allowedIDs: make(map[peer.ID]struct{}),
+		blackListFunc: ps1.BlacklistPeer,
+	}
+	validator.allowedIDs[host1.ID()] = struct{}{}
+	validator.allowedIDs[host2.ID()] = struct{}{}
+	ps1.RegisterTopicValidator(topicname2, validator.validate)
+
 
 	topic1, err := ps1.Join(topicname1)
 	require.NoError(t, err)
@@ -102,6 +105,14 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 
 	time.Sleep(2 * time.Second)
 
+
+	fmt.Print("host 1 peers\n")
+	fmt.Printf("\t For %s", topicname1)
+	fmt.Println(ps1.ListPeers(topicname1))
+	fmt.Printf("\t For %s", topicname2)
+	fmt.Println(ps1.ListPeers(topicname2))
+	fmt.Println(host1.Peerstore().Peers())
+
 	msg, err := subscriberHost2Topic2.Next(ctx)
 	require.NoError(t, err)
 	fmt.Printf(" message recvd on topic %s from peer %s\n", *msg.Topic, msg.ReceivedFrom.String())
@@ -112,35 +123,17 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	fmt.Printf(" message recvd on topic %s from peer %s\n", *msg.Topic, msg.ReceivedFrom.String())
 	fmt.Println(msg)
 
-	fmt.Print("host 2 peers\n")
-	fmt.Printf("\t For %s", topicname1)
-	fmt.Println(ps2.ListPeers(topicname1))
-	fmt.Printf("\t For %s", topicname2)
-	fmt.Println(ps2.ListPeers(topicname2))
+
 }
 
-
-var _ pubsub.SubscriptionFilter = (*Filter)(nil)
-type Filter struct {
+type topicValidator struct {
 	allowedIDs map[peer.ID]struct{}
-	topic string
+	blackListFunc func(id peer.ID)
 }
-
-func (filter *Filter) CanSubscribe(topic string) bool {
-	return true
-}
-
-func (filter *Filter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
-	if _, found := filter.allowedIDs[from]; !found {
-		var newopts []*pb.RPC_SubOpts
-		for _, opt := range opts {
-			if *opt.Topicid != filter.topic {
-				newopts = append(newopts, opt)
-			} else {
-				return nil, fmt.Errorf(">>>>>> message received on a topic on which peer %s should not publish", from.String())
-			}
-		}
-		return newopts, nil
-	}
-	return opts, nil
+func(validator *topicValidator) validate(ctx context.Context, from peer.ID, _ *pubsub.Message) bool {
+	 _, found := validator.allowedIDs[from]
+	 if !found {
+	 	validator.blackListFunc(from)
+	 }
+	 return found
 }
