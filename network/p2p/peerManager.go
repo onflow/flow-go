@@ -123,8 +123,8 @@ func (pm *PeerManager) updatePeers() {
 	}
 
 	if IsUnconvertibleIdentitiesError(err) {
-		// log conversion error as fatal since it indicates a bad identity table
-		pm.logger.Fatal().Err(err).Msg("failed to connect to peers")
+		// one of more identities in the identity table are not in the right format.
+		pm.logger.Error().Err(err).Msg("failed to connect to peers")
 		return
 	}
 
