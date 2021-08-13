@@ -21,27 +21,23 @@ import (
 
 const happyPath = true
 
-// TestResolver_HappyPath evaluates the happy path behavior of dns resolver against concurrent invocations. Each unique domain
-// invocation should go through the underlying basic resolver only once, and the result should get cached for subsequent invocations.
-// the test evaluates the correctness of invocations as well as resolution through cache on repetition.
+// TestResolver_HappyPath evaluates once the request for a domain gets cached, the subsequent requests are going through the cache
+// instead of going through the underlying basic resolver, and hence through the network.
 func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 	require.NoError(t, err)
 
-	size := 10 // we have 10 txt and 10 ip lookup test cases
-	times := 5 // each domain is queried for resolution 5 times
+	size := 10 // 10 text and 10 ip domains.
+	times := 5 // each domain is queried 5 times.
 	txtTestCases := txtLookupFixture(size)
 	ipTestCases := ipLookupFixture(size)
 
-	// going through the cache, each domain should only being resolved once over the underlying resolver.
+	// each domain is resolved only once through the underlying resolver, and then is cached for subsequent times.
 	mockBasicResolverForDomains(t, &basicResolver, ipTestCases, txtTestCases, happyPath, 1)
-
-	// each test case is repeated 5 times, since resolver has been mocked only once per test case
-	// it ensures that the rest 4 calls are made through the cache and not the resolver.
 	wg := queryResolver(t, times, resolver, txtTestCases, ipTestCases, happyPath)
 
-	unittest.RequireReturnsBefore(t, wg.Wait, 10*time.Second, "could not resolve all addresses")
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not resolve all addresses")
 }
 
 // TestResolver_HappyPath evaluates the happy path behavior of dns resolver against concurrent invocations. Each unique domain
