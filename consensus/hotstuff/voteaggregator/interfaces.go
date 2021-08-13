@@ -16,7 +16,7 @@ type VoteCollectors interface {
 	// collector is indexed by blockID and view
 	// It returns the vote collector state machine, true and nil if found,
 	// It returns (nil, false, nil) if not found
-	// It returns (nil, false, nil) if failed to create vote collector state machine
+	// It returns (nil, false, error) if failed to create vote collector state machine
 	GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, bool, error)
 
 	// Prune the vote collectors whose view is below the given view
