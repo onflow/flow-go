@@ -531,13 +531,14 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	}
 
 	// generates peer address information for all identities
-	allowlist := make([]peer.AddrInfo, len(identities))
-	var err error
-	for i, identity := range identities {
-		allowlist[i], err = PeerAddressInfo(*identity)
+	allowlist := make([]peer.AddrInfo, 0, len(identities))
+	for _, identity := range identities {
+		addressInfo, err := PeerAddressInfo(*identity)
 		if err != nil {
 			n.logger.Err(err).Str("identity", identity.String()).Msg("could not generate address info")
+			continue
 		}
+		allowlist = append(allowlist, addressInfo)
 	}
 
 	n.connGater.update(allowlist)
