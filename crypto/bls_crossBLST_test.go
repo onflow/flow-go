@@ -50,6 +50,21 @@ func validSignatureBytesFlow(t *rapid.T) []byte {
 	return signature
 }
 
+// validPrivateKeyBytesBLST generates bytes of a valid private key in BLST library
+func validPrivateKeyBytesBLST(t *rapid.T) []byte {
+	randomSlice := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381)
+	ikm := randomSlice.Draw(t, "ikm").([]byte)
+	return blst.KeyGen(ikm).Serialize()
+}
+
+// validPublicKeyBytesBLST generates bytes of a valid public key in BLST library
+func validPublicKeyBytesBLST(t *rapid.T) []byte {
+	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
+	blstS := blst.KeyGen(ikm)
+	blstG2 := new(blst.P2Affine).From(blstS)
+	return blstG2.Compress()
+}
+
 // validSignatureBytesBLST generates bytes of a valid signature in BLST library
 func validSignatureBytesBLST(t *rapid.T) []byte {
 	ikm := rapid.SliceOfN(rapid.Byte(), KeyGenSeedMinLenBLSBLS12381, KeyGenSeedMaxLenBLSBLS12381).Draw(t, "ikm").([]byte)
