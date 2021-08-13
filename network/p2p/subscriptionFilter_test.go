@@ -54,7 +54,7 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	require.NoError(t, err)
 	topic1, err = ps1.Join(topicname2)
 	require.NoError(t, err)
-	_, err = topic1.Subscribe()
+	subscriberHost1Topic2, err := topic1.Subscribe()
 	require.NoError(t, err)
 
 	topic2, err := ps2.Join(topicname1)
@@ -104,6 +104,11 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	msg, err := subscriberHost2Topic2.Next(ctx)
+	require.NoError(t, err)
+	fmt.Printf(" message recvd on topic %s from peer %s\n", *msg.Topic, msg.ReceivedFrom.String())
+	fmt.Println(msg)
+
+	msg, err = subscriberHost1Topic2.Next(ctx)
 	require.NoError(t, err)
 	fmt.Printf(" message recvd on topic %s from peer %s\n", *msg.Topic, msg.ReceivedFrom.String())
 	fmt.Println(msg)
