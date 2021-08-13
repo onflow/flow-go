@@ -419,6 +419,9 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	}, nil
 }
 
+// GetExecutionResultForBlockID returns the latest received execution result for the given block ID.
+// AN might receive multiple receipts with conflicting results for unsealed blocks.
+// If this case happens, since AN is not able to determine which result is the correct one until the block is sealed, it has to pick one result to respond to this query. For now, we return the result from the latest received receipt.
 func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
 	blockID := convert.MessageToIdentifier(req.GetBlockId())
 
