@@ -248,7 +248,7 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
 	newV := make([]byte, 0, len(kp.Value))
-	newV = append(newV, []byte(kp.Value)...)
+	newV = append(newV, kp.Value...)
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 

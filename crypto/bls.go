@@ -179,6 +179,19 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	return sk, nil
 }
 
+const invalidBLSSignatureHeader = byte(0xE0)
+
+// BLSInvalidSignature returns an invalid signature that fails when verified
+// with any message and public key.
+//
+// The signature bytes represent an invalid serialization of a point which
+// makes the verification fail early. The verification would return (false, nil).
+func BLSInvalidSignature() Signature {
+	signature := make([]byte, SignatureLenBLSBLS12381)
+	signature[0] = invalidBLSSignatureHeader // invalid header as per C.ep_read_bin_compact
+	return signature
+}
+
 // decodePrivateKey decodes a slice of bytes into a private key.
 // This function checks the scalar is less than the group order
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
@@ -414,4 +427,22 @@ func OpSwUUnitTest(output []byte, input []byte) {
 	C.opswu_test((*C.uchar)(&output[0]),
 		(*C.uchar)(&input[0]),
 		(C.int)(len(input)))
+}
+
+// This is only a TEST function.
+// It wraps a call to signing using Relic to get a curve point, internally using XMD:SHA256
+//
+// (since cgo can't be used in go test files)
+func (sk *PrKeyBLSBLS12381) signWithRelicMapTest(data []byte) Signature {
+	var point pointG1
+	mapToG1RelicTest(&point, data, []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_"))
+
+	// set BLS context
+	blsInstance.reInit()
+
+	s := make([]byte, SignatureLenBLSBLS12381)
+	C.bls_sign_ep((*C.uchar)(&s[0]),
+		(*C.bn_st)(&sk.scalar),
+		(*C.ep_st)(&point))
+	return s
 }
