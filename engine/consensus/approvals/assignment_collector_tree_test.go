@@ -15,11 +15,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// AssignmentCollectorTreeSuite performs isolated testing of AssignmentCollectorTree
+// AssignmentCollectorTreeSuite performs isolated testing of AssignmentCollectorTree.
+// AssignmentCollectorTreeSuite has to correctly create collectors, cache them and maintain pruned state
+// based on finalization and sealing events.
 func TestAssignmentCollectorTree(t *testing.T) {
 	suite.Run(t, new(AssignmentCollectorTreeSuite))
 }
 
+// mockedCollectorWrapper is a helper structure for holding mock.AssignmentCollector and ProcessingStatus
+// this is needed for simplifying mocking of state transitions.
 type mockedCollectorWrapper struct {
 	collector *mock.AssignmentCollector
 	status    approvals.ProcessingStatus
