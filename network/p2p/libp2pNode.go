@@ -285,13 +285,8 @@ func (n *Node) Stop() (chan struct{}, error) {
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
-func (n *Node) AddPeer(ctx context.Context, identity flow.Identity) error {
-	pInfo, err := PeerAddressInfo(identity)
-	if err != nil {
-		return fmt.Errorf("failed to add peer %s: %w", identity.String(), err)
-	}
-
-	err = n.host.Connect(ctx, pInfo)
+func (n *Node) AddPeer(ctx context.Context, peerID peer.ID) error {
+	err := n.host.Connect(ctx, peer.AddrInfo{ID: peerID})
 	if err != nil {
 		return err
 	}
@@ -299,51 +294,29 @@ func (n *Node) AddPeer(ctx context.Context, identity flow.Identity) error {
 	return nil
 }
 
-// RemovePeer closes the connection with the identity.
-func (n *Node) RemovePeer(ctx context.Context, identity flow.Identity) error {
-	pInfo, err := PeerAddressInfo(identity)
+// RemovePeer closes the connection with the peer.
+func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
+	err := n.host.Network().ClosePeer(peerID)
 	if err != nil {
-		return fmt.Errorf("failed to remove peer %x: %w", identity, err)
-	}
-
-	err = n.host.Network().ClosePeer(pInfo.ID)
-	if err != nil {
-		return fmt.Errorf("failed to remove peer %s: %w", identity, err)
+		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
 	return nil
 }
 
-// CreateStream returns an existing stream connected to identity, if it exists or adds one to identity as a peer and creates a new stream with it.
-func (n *Node) CreateStream(ctx context.Context, nodeID flow.Identifier) (libp2pnet.Stream, error) {
+// CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
+func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
-	stream, err := n.tryCreateNewStream(ctx, nodeID, maxConnectAttempt)
+	stream, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
-		n.host.Peerstore().Addrs()
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (node_id: %s, address: %s): %w", identity.NodeID.String(),
-			identity.Address, err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s): %w", peerID, err))
 	}
 	return stream, nil
 }
 
-func (n *Node) GetPeerIPPort(nodeID flow.Identifier) (string, string, error) {
-	// TODO: first get peer ID
-	x := n.host.Peerstore().Addrs()
-}
-
-// tryCreateNewStream makes at most maxAttempts to create a stream with the identity.
+// tryCreateNewStream makes at most maxAttempts to create a stream with the peer.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, maxAttempts int) (libp2pnet.Stream, error) {
-	_, _, key, err := networkingInfo(identity)
-	if err != nil {
-		return nil, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
-	}
-
-	peerID, err := peer.IDFromPublicKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("could not get peer ID: %w", err)
-	}
-
+func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, error) {
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted
 	n.connMgr.ProtectPeer(peerID)
@@ -376,7 +349,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		err = n.AddPeer(ctx, identity)
+		err := n.AddPeer(ctx, peerID)
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
@@ -498,23 +471,18 @@ func (n *Node) Publish(ctx context.Context, topic flownet.Topic, data []byte) er
 }
 
 // Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
-func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingResponse, time.Duration, error) {
-
+func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, time.Duration, error) {
 	pingError := func(err error) error {
-		return fmt.Errorf("failed to ping %s (%s): %w", identity.NodeID.String(), identity.Address, err)
+		return fmt.Errorf("failed to ping peer %s: %w", peerID, err)
 	}
 
-	// convert the target node address to libp2p peer info
-	targetInfo, err := PeerAddressInfo(identity)
-	if err != nil {
-		return message.PingResponse{}, -1, pingError(err)
-	}
+	targetInfo := peer.AddrInfo{ID: peerID}
 
 	n.connMgr.ProtectPeer(targetInfo.ID)
 	defer n.connMgr.UnprotectPeer(targetInfo.ID)
 
 	// connect to the target node
-	err = n.host.Connect(ctx, targetInfo)
+	err := n.host.Connect(ctx, targetInfo)
 	if err != nil {
 		return message.PingResponse{}, -1, pingError(err)
 	}
@@ -529,24 +497,13 @@ func (n *Node) Ping(ctx context.Context, identity flow.Identity) (message.PingRe
 }
 
 // UpdateAllowList allows the peer allow list to be updated.
-func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
-	// if the node was so far not under allowList
+func (n *Node) UpdateAllowList(peers []peer.ID) {
 	if n.connGater == nil {
-		return fmt.Errorf("could not add an allow list, this node was started without allow listing")
+		n.logger.Debug().Hex("node_id", logging.ID(n.id)).Msg("skipping update allow list, connection gating is not enabled")
+		return
 	}
 
-	// generates peer address information for all identities
-	allowlist := make([]peer.AddrInfo, len(identities))
-	var err error
-	for i, identity := range identities {
-		allowlist[i], err = PeerAddressInfo(*identity)
-		if err != nil {
-			return fmt.Errorf("could not generate address info: %w", err)
-		}
-	}
-
-	n.connGater.update(allowlist)
-	return nil
+	n.connGater.update(peers)
 }
 
 // Host returns pointer to host object of node.
@@ -565,13 +522,9 @@ func (n *Node) SetPingStreamHandler(handler libp2pnet.StreamHandler) {
 }
 
 // IsConnected returns true is address is a direct peer of this node else false
-func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
-	pInfo, err := PeerAddressInfo(identity)
-	if err != nil {
-		return false, err
-	}
+func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	// query libp2p for connectedness status of this peer
-	isConnected := n.host.Network().Connectedness(pInfo.ID) == libp2pnet.Connected
+	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
 	return isConnected, nil
 }
 

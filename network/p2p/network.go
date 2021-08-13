@@ -41,6 +41,7 @@ type ReadyDoneAwareNetwork interface {
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
+	id.IdentifierProvider
 	logger           zerolog.Logger
 	codec            network.Codec
 	me               module.Local
@@ -53,7 +54,6 @@ type Network struct {
 	cancel           context.CancelFunc
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
-	idProvider       id.IdentifierProvider
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -78,6 +78,7 @@ func NewNetwork(
 	}
 
 	o := &Network{
+		IdentifierProvider: idProvider,
 		logger:           log,
 		codec:            codec,
 		me:               me,
@@ -162,14 +163,6 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
-func (n *Network) RefreshConnectionRules() {
-	n.logger.Info().Msg("updating network allow list upon identity table change")
-	err := n.mw.UpdateAllowList()
-	if err != nil {
-		n.logger.Err(err).Msg("failed to update network allow list")
-	}
-}
-
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
@@ -177,7 +170,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
-	top, err := n.top.GenerateFanout(n.idProvider.Identifiers(), subscribedChannels)
+	top, err := n.top.GenerateFanout(n.Identifiers(), subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}

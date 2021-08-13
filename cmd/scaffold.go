@@ -198,7 +198,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 
 		fnb.Network = net
 
-		idEvents := gadgets.NewIdentityDeltas(net.RefreshConnectionRules)
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateAllowList)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, err

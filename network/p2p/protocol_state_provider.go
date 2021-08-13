@@ -66,7 +66,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	flowIDs := make(map[peer.ID]flow.Identifier, nIds)
 
 	for _, identity := range identities {
-		pid, err := IdentityToPeerID(identity)
+		pid, err := ExtractPeerID(identity)
 		if err != nil {
 			// maybe don't log fatal here. It's probably okay if we miss some ppl in our mapping
 		}
@@ -112,7 +112,7 @@ func (p *ProtocolStateIDCache) GetFlowID(peerID peer.ID) (fid flow.Identifier, e
 	return
 }
 
-func IdentityToPeerID(id *flow.Identity) (pid peer.ID, err error) {
+func ExtractPeerID(id *flow.Identity) (pid peer.ID, err error) {
 	pk, err := PublicKey(id.NetworkPubKey)
 	if err != nil {
 		// TODO: format the error
