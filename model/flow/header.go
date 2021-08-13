@@ -32,39 +32,39 @@ type Header struct {
 	// A quorum certificate can be extrated from the header.
 	// This field is the SignerIDs field of the extracted quorum certificate.
 
-	ParentVoterSig []byte // aggregated signature over the parent block. Not a single cryptographic
+	ParentVoterSigData []byte // aggregated signature over the parent block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 	// A quorum certificate can be extracted from the header.
 	// This field is the SigData field of the extracted quorum certificate.
 
 	ProposerID Identifier // proposer identifier for the block
 
-	ProposerSig []byte // signature of the proposer over the new block. Not a single cryptographic
+	ProposerSigData []byte // signature of the proposer over the new block. Not a single cryptographic
 	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		ChainID        ChainID
-		ParentID       Identifier
-		Height         uint64
-		PayloadHash    Identifier
-		Timestamp      uint64
-		View           uint64
-		ParentVoterIDs []Identifier
-		ParentVoterSig []byte
-		ProposerID     Identifier
+		ChainID            ChainID
+		ParentID           Identifier
+		Height             uint64
+		PayloadHash        Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentVoterIDs     []Identifier
+		ParentVoterSigData []byte
+		ProposerID         Identifier
 	}{
-		ChainID:        h.ChainID,
-		ParentID:       h.ParentID,
-		Height:         h.Height,
-		PayloadHash:    h.PayloadHash,
-		Timestamp:      uint64(h.Timestamp.UnixNano()),
-		View:           h.View,
-		ParentVoterIDs: h.ParentVoterIDs,
-		ParentVoterSig: h.ParentVoterSig,
-		ProposerID:     h.ProposerID,
+		ChainID:            h.ChainID,
+		ParentID:           h.ParentID,
+		Height:             h.Height,
+		PayloadHash:        h.PayloadHash,
+		Timestamp:          uint64(h.Timestamp.UnixNano()),
+		View:               h.View,
+		ParentVoterIDs:     h.ParentVoterIDs,
+		ParentVoterSigData: h.ParentVoterSigData,
+		ProposerID:         h.ProposerID,
 	}
 }
 
