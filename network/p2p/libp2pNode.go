@@ -536,7 +536,7 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	for i, identity := range identities {
 		allowlist[i], err = PeerAddressInfo(*identity)
 		if err != nil {
-			return fmt.Errorf("could not generate address info: %w", err)
+			n.logger.Err(err).Str("identity", identity.String()).Msg("could not generate address info")
 		}
 	}
 
