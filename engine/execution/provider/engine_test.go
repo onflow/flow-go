@@ -242,67 +242,65 @@ func TestProviderEngine_onChunkDataRequest(t *testing.T) {
 		chunkConduit.AssertExpectations(t)
 	})
 
-	//t.Run("reply to chunk data pack request only when staked", func(t *testing.T) {
-	//
-	//	ps := new(mockprotocol.State)
-	//	ss := new(mockprotocol.Snapshot)
-	//	con := new(mocknetwork.Conduit)
-	//
-	//	execState := new(state.ExecutionState)
-	//
-	//	currentStakedState := true
-	//	checkStakedAtBlock := func(_ flow.Identifier) (bool, error) { return currentStakedState, nil }
-	//
-	//	e := Engine{
-	//		state:              ps,
-	//		unit:               engine.NewUnit(),
-	//		chunksConduit:      con,
-	//		execState:          execState,
-	//		metrics:            metrics.NewNoopCollector(),
-	//		checkStakedAtBlock: checkStakedAtBlock,
-	//	}
-	//
-	//	originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	//
-	//	chunkID := unittest.IdentifierFixture()
-	//	chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
-	//	blockID := unittest.IdentifierFixture()
-	//
-	//	execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
-	//	ps.On("AtBlockID", blockID).Return(ss)
-	//
-	//	ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
-	//	con.On("Unicast", mock.Anything, originIdentity.NodeID).
-	//		Run(func(args mock.Arguments) {
-	//			res, ok := args[0].(*messages.ChunkDataResponse)
-	//			require.True(t, ok)
-	//
-	//			actualChunkID := res.ChunkDataPack.ChunkID
-	//			assert.Equal(t, chunkID, actualChunkID)
-	//		}).
-	//		Return(nil).Once()
-	//
-	//	execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil).Twice()
-	//
-	//	req := &messages.ChunkDataRequest{
-	//		ChunkID: chunkID,
-	//		Nonce:   rand.Uint64(),
-	//	}
-	//
-	//	err := e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
-	//	assert.NoError(t, err)
-	//
-	//	currentStakedState = false
-	//
-	//	err = e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
-	//	assert.Error(t, err)
-	//
-	//	ps.AssertExpectations(t)
-	//	ss.AssertExpectations(t)
-	//	execState.AssertExpectations(t)
-	//
-	//	assert.Eventually(t, func() bool {
-	//		return con.AssertExpectations(t)
-	//	}, time.Second, time.Millisecond)
-	//})
+	t.Run("reply to chunk data pack request only when staked", func(t *testing.T) {
+
+		ps := new(mockprotocol.State)
+		ss := new(mockprotocol.Snapshot)
+		chunkConduit := new(mocknetwork.Conduit)
+
+		execState := new(state.ExecutionState)
+
+		currentStakedState := true
+		checkStakedAtBlock := func(_ flow.Identifier) (bool, error) { return currentStakedState, nil }
+
+		e := Engine{
+			state:              ps,
+			unit:               engine.NewUnit(),
+			chunksConduit:      chunkConduit,
+			execState:          execState,
+			metrics:            metrics.NewNoopCollector(),
+			checkStakedAtBlock: checkStakedAtBlock,
+		}
+
+		originIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+
+		chunkID := unittest.IdentifierFixture()
+		chunkDataPack := unittest.ChunkDataPackFixture(chunkID)
+		blockID := unittest.IdentifierFixture()
+
+		execState.On("GetBlockIDByChunkID", chunkID).Return(blockID, nil)
+		ps.On("AtBlockID", blockID).Return(ss)
+
+		ss.On("Identity", originIdentity.NodeID).Return(originIdentity, nil).Once()
+		chunkConduit.On("Unicast", mock.Anything, originIdentity.NodeID).
+			Run(func(args mock.Arguments) {
+				res, ok := args[0].(*messages.ChunkDataResponse)
+				require.True(t, ok)
+
+				actualChunkID := res.ChunkDataPack.ChunkID
+				assert.Equal(t, chunkID, actualChunkID)
+			}).
+			Return(nil).Once()
+
+		execState.On("ChunkDataPackByChunkID", mock.Anything, chunkID).Return(chunkDataPack, nil).Twice()
+
+		req := &messages.ChunkDataRequest{
+			ChunkID: chunkID,
+			Nonce:   rand.Uint64(),
+		}
+
+		unittest.RequireCloseBefore(t, e.Ready(), 100*time.Millisecond, "could not start engine")
+
+		// an staked request followed by an unstaked one
+		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+		currentStakedState = false
+		e.onChunkDataRequest(context.Background(), originIdentity.NodeID, req)
+
+		unittest.RequireCloseBefore(t, e.Done(), 100*time.Millisecond, "could not stop engine")
+
+		ps.AssertExpectations(t)
+		ss.AssertExpectations(t)
+		execState.AssertExpectations(t)
+		chunkConduit.AssertExpectations(t)
+	})
 }
