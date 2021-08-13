@@ -71,7 +71,7 @@ type VoteCollectorState interface {
 	// return error if the signature is invalid
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
 	// passed to EventLoop through a callback.
-	AddVote(vote *model.Vote) (bool, error)
+	AddVote(vote *model.Vote) error
 
 	// BlockID returns the block ID that this instance is collecting votes for.
 	// This method is useful when adding the newly created vote collector to vote collectors map.
