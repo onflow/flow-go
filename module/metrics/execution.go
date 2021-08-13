@@ -65,6 +65,7 @@ type ExecutionCollector struct {
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
 	executionStateDiskUsage          prometheus.Gauge
+	blockDataUploadsInProgress       prometheus.Gauge
 }
 
 func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -319,6 +320,13 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Help:      "the total number of chunk data pack requests provider engine received",
 	})
 
+	blockDataUploadsInProgress := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemBlockDataUploader,
+		Name:      "block_data_upload_in_progress",
+		Help:      "number of concurrently running Block Data upload operations",
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
 	registerer.MustRegister(latestTrieRegCount)
@@ -353,6 +361,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(scriptExecutionTime)
 	registerer.MustRegister(scriptComputationUsed)
 	registerer.MustRegister(totalChunkDataPackRequests)
+	registerer.MustRegister(blockDataUploadsInProgress)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
@@ -391,6 +400,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		scriptExecutionTime:         scriptExecutionTime,
 		scriptComputationUsed:       scriptComputationUsed,
 		totalChunkDataPackRequests:  totalChunkDataPackRequests,
+		blockDataUploadsInProgress:  blockDataUploadsInProgress,
 
 		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -634,6 +644,14 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
 	ec.collectionRequestRetried.Inc()
+}
+
+func (ec *ExecutionCollector) ExecutionBlockDataUploadStarted() {
+	ec.blockDataUploadsInProgress.Inc()
+}
+
+func (ec *ExecutionCollector) ExecutionBlockDataUploadFinished() {
+	ec.blockDataUploadsInProgress.Dec()
 }
 
 // TransactionParsed reports the time spent parsing a single transaction
