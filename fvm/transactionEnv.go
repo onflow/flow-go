@@ -238,9 +238,9 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 	return len(v) > 0, nil
 }
 
-// AllocateStorageAddress allocates new storage address under the owner accounts to store a new register
-func (e *TransactionEnv) AllocateStorageAddress(owner common.Address) (uint64, error) {
-	v, err := e.accounts.AllocateStorageAddress(flow.BytesToAddress(owner.Bytes()))
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return 0, fmt.Errorf("storage address allocation failed: %w", err)
 	}

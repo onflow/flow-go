@@ -42,7 +42,7 @@ func NewAccounts(stateHolder *StateHolder) *Accounts {
 	}
 }
 
-func (a *Accounts) AllocateStorageAddress(address flow.Address) (uint64, error) {
+func (a *Accounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
 	var index uint64
 	indexBytes, err := a.getValue(address, false, KeyStorageIndex)
 	if err != nil {
