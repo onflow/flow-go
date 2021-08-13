@@ -175,11 +175,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			true,
 			fnb.MsgValidators...)
 
-		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
-
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
 		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State)
 		if err != nil {
@@ -190,7 +185,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
-			participants,
+			fnb.IdentifierProvider,
 			fnb.Me,
 			fnb.Middleware,
 			p2p.DefaultCacheSize,
@@ -203,8 +198,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 
 		fnb.Network = net
 
-		idRefresher := p2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
-		idEvents := gadgets.NewIdentityDeltas(idRefresher.OnIdentityTableChanged)
+		idEvents := gadgets.NewIdentityDeltas(net.RefreshConnectionRules)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, err

@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -114,22 +115,23 @@ type BaseConfig struct {
 type NodeConfig struct {
 	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
-	Logger            zerolog.Logger
-	NodeID            flow.Identifier
-	Me                *local.Local
-	Tracer            module.Tracer
-	MetricsRegisterer prometheus.Registerer
-	Metrics           Metrics
-	DB                *badger.DB
-	Storage           Storage
-	ProtocolEvents    *events.Distributor
-	State             protocol.State
-	Middleware        *p2p.Middleware
-	Network           *p2p.Network
-	MsgValidators     []network.MessageValidator
-	FvmOptions        []fvm.Option
-	StakingKey        crypto.PrivateKey
-	NetworkKey        crypto.PrivateKey
+	Logger             zerolog.Logger
+	NodeID             flow.Identifier
+	Me                 *local.Local
+	Tracer             module.Tracer
+	MetricsRegisterer  prometheus.Registerer
+	Metrics            Metrics
+	DB                 *badger.DB
+	Storage            Storage
+	ProtocolEvents     *events.Distributor
+	State              protocol.State
+	Middleware         *p2p.Middleware
+	Network            *p2p.Network
+	MsgValidators      []network.MessageValidator
+	FvmOptions         []fvm.Option
+	StakingKey         crypto.PrivateKey
+	NetworkKey         crypto.PrivateKey
+	IdentifierProvider id.IdentityProvider // TODO: initialize these in scaffold and unstaked node
 
 	// root state information
 	RootBlock   *flow.Block

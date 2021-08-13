@@ -12,7 +12,9 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -21,6 +23,14 @@ import (
 )
 
 const DefaultCacheSize = 10e6
+
+// NetworkingSetFilter is an identity filter that, when applied to the identity
+// table at a given snapshot, returns all nodes that we should communicate with
+// over the networking layer.
+//
+// NOTE: The protocol state includes nodes from the previous/next epoch that should
+// be included in network communication. We omit any nodes that have been ejected.
+var NetworkingSetFilter = filter.Not(filter.Ejected)
 
 type ReadyDoneAwareNetwork interface {
 	module.Network
@@ -33,7 +43,6 @@ type Network struct {
 	sync.RWMutex
 	logger           zerolog.Logger
 	codec            network.Codec
-	ids              flow.IdentityList
 	me               module.Local
 	mw               network.Middleware
 	top              network.Topology // used to determine fanout connections
@@ -44,7 +53,7 @@ type Network struct {
 	cancel           context.CancelFunc
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
-	ReadyDoneAwareNetwork
+	idProvider       id.IdentifierProvider
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -54,7 +63,7 @@ type Network struct {
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
-	ids flow.IdentityList,
+	idProvider id.IdentifierProvider,
 	me module.Local,
 	mw network.Middleware,
 	csize int,
@@ -80,7 +89,6 @@ func NewNetwork(
 		lifecycleManager: lifecycle.NewLifecycleManager(),
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
-	o.ids = ids
 
 	// setup the message queue
 	// create priority queue
@@ -154,15 +162,12 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
-// Identity returns a map of all flow.Identifier to flow identity by querying the flow state
-func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
-	n.RLock()
-	defer n.RUnlock()
-	identifierToID := make(map[flow.Identifier]flow.Identity)
-	for _, id := range n.ids {
-		identifierToID[id.NodeID] = *id
+func (n *Network) RefreshConnectionRules() {
+	n.logger.Info().Msg("updating network allow list upon identity table change")
+	err := n.mw.UpdateAllowList()
+	if err != nil {
+		n.logger.Err(err).Msg("failed to update network allow list")
 	}
-	return identifierToID, nil
 }
 
 // Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
@@ -172,7 +177,7 @@ func (n *Network) Topology() (flow.IdentityList, error) {
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
-	top, err := n.top.GenerateFanout(n.ids, subscribedChannels)
+	top, err := n.top.GenerateFanout(n.idProvider.Identifiers(), subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
@@ -184,25 +189,6 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
-	return nil
-}
-
-// SetIDs updates the identity list cached by the network layer
-func (n *Network) SetIDs(ids flow.IdentityList) error {
-
-	// remove self from id
-	ids = ids.Filter(n.me.NotMeFilter())
-
-	n.Lock()
-	n.ids = ids
-	n.Unlock()
-
-	// update the allow list
-	err := n.mw.UpdateAllowList()
-	if err != nil {
-		return fmt.Errorf("failed to update middleware allow list: %w", err)
-	}
-
 	return nil
 }
 

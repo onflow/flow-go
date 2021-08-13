@@ -533,7 +533,6 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	// if the node was so far not under allowList
 	if n.connGater == nil {
 		return fmt.Errorf("could not add an allow list, this node was started without allow listing")
-
 	}
 
 	// generates peer address information for all identities
