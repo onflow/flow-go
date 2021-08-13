@@ -246,6 +246,17 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
+		tries, _ := l.forest.GetTries()
+		hashes := make(map[string]struct{})
+		for _, trie := range tries {
+			h := trie.RootHash().String()
+			if _, ok := hashes[h]; ok {
+				continue
+			}
+			l.logger.Info().Str("h", h).Msgf("h")
+			hashes[h] = struct{}{}
+		}
+
 		return ledger.State(hash.DummyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
