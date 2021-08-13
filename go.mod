@@ -38,7 +38,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.1
-	github.com/onflow/cadence v0.18.1-0.20210729032048-d0f3783eccd9
+	github.com/onflow/cadence v0.18.1-0.20210729032058-d9eb6683d6ed
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
@@ -66,7 +66,7 @@ require (
 	google.golang.org/grpc v1.36.1
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
-	pgregory.net/rapid v0.4.6
+	pgregory.net/rapid v0.4.7
 )
 
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
