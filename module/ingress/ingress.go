@@ -7,24 +7,26 @@ import (
 	"fmt"
 	"net"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/collection/ingest"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/network"
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection/ingest"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the ingress server.
 type Config struct {
-	ListenAddr string
-	MaxMsgSize int // In bytes
+	ListenAddr        string
+	MaxMsgSize        int  // In bytes
+	RpcMetricsEnabled bool // enable GRPC metrics
 }
 
 // Ingress implements a gRPC server with a simplified version of the Observation
@@ -42,6 +44,20 @@ func New(config Config, e *ingest.Engine, chainID flow.ChainID) *Ingress {
 	if config.MaxMsgSize == 0 {
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
+
+	// create a GRPC server to serve GRPC clients
+	grpcOpts := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	}
+
+	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
+	if config.RpcMetricsEnabled {
+		grpcOpts = append(grpcOpts, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+	}
+
+	server := grpc.NewServer(grpcOpts...)
+
 	ingress := &Ingress{
 		unit: engine.NewUnit(),
 		handler: &handler{
@@ -49,11 +65,13 @@ func New(config Config, e *ingest.Engine, chainID flow.ChainID) *Ingress {
 			engine:                       e,
 			chainID:                      chainID,
 		},
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
+		server: server,
 		config: config,
+	}
+
+	if config.RpcMetricsEnabled {
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(server)
 	}
 
 	access.RegisterAccessAPIServer(ingress.server, ingress.handler)

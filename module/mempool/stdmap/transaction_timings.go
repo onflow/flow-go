@@ -3,7 +3,7 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TransactionTimings implements the transaction timings memory pool of access nodes,

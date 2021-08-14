@@ -41,12 +41,19 @@ const (
 	CodeChunkDataRequest
 	CodeChunkDataResponse
 
+	// result approvals
+	CodeApprovalRequest
+	CodeApprovalResponse
+
 	// generic entity exchange engines
 	CodeEntityRequest
 	CodeEntityResponse
 
 	// testing
 	CodeEcho
+
+	// DKG
+	CodeDKGMessage
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

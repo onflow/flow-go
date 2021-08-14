@@ -6,7 +6,7 @@ import (
 
 	"github.com/onflow/cadence"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Used below with random service key
@@ -19,12 +19,13 @@ import (
 const ServiceAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
 
 // Pre-calculated state commitment with root account with the above private key
-const GenesisStateCommitmentHex = "71496a154529a087d899b2cc54d477b5d2710b431d950609f1f7fcf593a8413b"
+const GenesisStateCommitmentHex = "e821d24672039a895babe57ffd4654d9f56a8d1dda61acdaa08254c275674e76"
 
 var GenesisStateCommitment flow.StateCommitment
 
 var GenesisTokenSupply = func() cadence.UFix64 {
-	value, err := cadence.NewUFix64("10000000.00000000")
+	//value, err := cadence.NewUFix64("10000000000.0") // 10 billion
+	value, err := cadence.NewUFix64("1000000000.0") // 1 billion
 	if err != nil {
 		panic(fmt.Errorf("invalid genesis token supply: %w", err))
 	}
@@ -36,9 +37,13 @@ var ServiceAccountPublicKey flow.AccountPublicKey
 
 func init() {
 	var err error
-	GenesisStateCommitment, err = hex.DecodeString(GenesisStateCommitmentHex)
+	GenesisStateCommitmentBytes, err := hex.DecodeString(GenesisStateCommitmentHex)
 	if err != nil {
 		panic("error while hex decoding hardcoded state commitment")
+	}
+	GenesisStateCommitment, err = flow.ToStateCommitment(GenesisStateCommitmentBytes)
+	if err != nil {
+		panic("genesis state commitment size is invalid")
 	}
 
 	serviceAccountPrivateKeyBytes, err := hex.DecodeString(ServiceAccountPrivateKeyHex)

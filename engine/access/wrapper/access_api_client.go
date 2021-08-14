@@ -7,3 +7,7 @@ import "github.com/onflow/flow/protobuf/go/flow/access"
 type AccessAPIClient interface {
 	access.AccessAPIClient
 }
+
+type AccessAPIServer interface {
+	access.AccessAPIServer
+}

@@ -7,13 +7,14 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
-	"github.com/dapperlabs/flow-go/engine"
-	ghost "github.com/dapperlabs/flow-go/engine/ghost/protobuf"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/network"
-	jsoncodec "github.com/dapperlabs/flow-go/network/codec/json"
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/engine"
+	ghost "github.com/onflow/flow-go/engine/ghost/protobuf"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/network"
+	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/state/protocol"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -39,7 +40,7 @@ type RPC struct {
 }
 
 // New returns a new RPC engine.
-func New(net module.Network, log zerolog.Logger, me module.Local, config Config) (*RPC, error) {
+func New(net module.Network, log zerolog.Logger, me module.Local, state protocol.State, config Config) (*RPC, error) {
 
 	log = log.With().Str("engine", "rpc").Logger()
 
@@ -65,7 +66,7 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 		codec:    codec,
 	}
 
-	conduitMap, err := registerConduits(net, eng)
+	conduitMap, err := registerConduits(net, state, eng)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize RPC: %w", err)
 	}
@@ -79,13 +80,12 @@ func New(net module.Network, log zerolog.Logger, me module.Local, config Config)
 }
 
 // registerConduits registers for ALL channels and returns a map of engine id to conduit
-func registerConduits(net module.Network, eng network.Engine) (map[string]network.Conduit, error) {
+func registerConduits(net module.Network, state protocol.State, eng network.Engine) (map[network.Channel]network.Conduit, error) {
 
-	allEngineIDs := []string{
+	// create a list of all channels that don't change over time
+	channels := network.ChannelList{
 		engine.ConsensusCommittee,
-		engine.ConsensusCluster,
 		engine.SyncCommittee,
-		engine.SyncCluster,
 		engine.SyncExecution,
 		engine.PushTransactions,
 		engine.PushGuarantees,
@@ -96,10 +96,34 @@ func registerConduits(net module.Network, eng network.Engine) (map[string]networ
 		engine.RequestChunks,
 	}
 
-	conduitMap := make(map[string]network.Conduit, len(allEngineIDs))
+	// add channels that are dependent on protocol state and change over time
+	// TODO need to update to register dynamic channels that are created on later epoch transitions
+	epoch := state.Final().Epochs().Current()
+
+	clusters, err := epoch.Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+
+	for i := range clusters {
+		cluster, err := epoch.Cluster(uint(i))
+		if err != nil {
+			return nil, fmt.Errorf("could not get cluster: %w", err)
+		}
+		clusterID := cluster.RootBlock().Header.ChainID
+
+		// add the dynamic channels for the cluster
+		channels = append(
+			channels,
+			engine.ChannelConsensusCluster(clusterID),
+			engine.ChannelSyncCluster(clusterID),
+		)
+	}
+
+	conduitMap := make(map[network.Channel]network.Conduit, len(channels))
 
 	// Register for ALL channels here and return a map of conduits
-	for _, e := range allEngineIDs {
+	for _, e := range channels {
 		c, err := net.Register(e, eng)
 		if err != nil {
 			return nil, fmt.Errorf("could not register collection provider engine: %w", err)
@@ -127,13 +151,18 @@ func (e *RPC) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *RPC) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *RPC) Submit(originID flow.Identifier, event interface{}) {
+func (e *RPC) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -144,12 +173,14 @@ func (e *RPC) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *RPC) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *RPC) Process(originID flow.Identifier, event interface{}) error {
+func (e *RPC) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

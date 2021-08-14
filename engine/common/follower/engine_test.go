@@ -9,28 +9,28 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/common/follower"
-	"github.com/dapperlabs/flow-go/model/flow"
-	metrics "github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/model/flow"
+	metrics "github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	realstorage "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
 	suite.Suite
 
 	net      *module.Network
-	con      *network.Conduit
+	con      *mocknetwork.Conduit
 	me       *module.Local
 	cleaner  *storage.Cleaner
 	headers  *storage.Headers
 	payloads *storage.Payloads
-	state    *protocol.State
-	mutator  *protocol.Mutator
+	state    *protocol.MutableState
 	snapshot *protocol.Snapshot
 	cache    *module.PendingBlockBuffer
 	follower *module.HotStuffFollower
@@ -42,13 +42,12 @@ type Suite struct {
 func (suite *Suite) SetupTest() {
 
 	suite.net = new(module.Network)
-	suite.con = new(network.Conduit)
+	suite.con = new(mocknetwork.Conduit)
 	suite.me = new(module.Local)
 	suite.cleaner = new(storage.Cleaner)
 	suite.headers = new(storage.Headers)
 	suite.payloads = new(storage.Payloads)
-	suite.state = new(protocol.State)
-	suite.mutator = new(protocol.Mutator)
+	suite.state = new(protocol.MutableState)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.cache = new(module.PendingBlockBuffer)
 	suite.follower = new(module.HotStuffFollower)
@@ -58,7 +57,6 @@ func (suite *Suite) SetupTest() {
 	suite.cleaner.On("RunGC").Return()
 	suite.headers.On("Store", mock.Anything).Return(nil)
 	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil)
-	suite.state.On("Mutate").Return(suite.mutator)
 	suite.state.On("Final").Return(suite.snapshot)
 	suite.cache.On("PruneByHeight", mock.Anything).Return()
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
@@ -97,7 +95,7 @@ func (suite *Suite) TestHandlePendingBlock() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(originID, proposal)
+	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertNotCalled(suite.T(), "SubmitProposal", mock.Anything)
@@ -123,7 +121,7 @@ func (suite *Suite) TestHandleProposal() {
 	// the parent is the last finalized state
 	suite.snapshot.On("Head").Return(parent.Header, nil).Once()
 	// we should be able to extend the state with the block
-	suite.mutator.On("Extend", &block).Return(nil).Once()
+	suite.state.On("Extend", &block).Return(nil).Once()
 	// we should be able to get the parent header by its ID
 	suite.headers.On("ByBlockID", block.Header.ParentID).Return(parent.Header, nil).Twice()
 	// we do not have any children cached
@@ -133,7 +131,7 @@ func (suite *Suite) TestHandleProposal() {
 
 	// submit the block
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(originID, proposal)
+	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())
@@ -164,8 +162,8 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 	// first time calling, assume it's not there
 	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound).Once()
 	// should extend state with new block
-	suite.mutator.On("Extend", &block).Return(nil).Once()
-	suite.mutator.On("Extend", &child).Return(nil).Once()
+	suite.state.On("Extend", &block).Return(nil).Once()
+	suite.state.On("Extend", &child).Return(nil).Once()
 	// we have already received and stored the parent
 	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
 	suite.headers.On("ByBlockID", block.ID()).Return(block.Header, nil).Once()
@@ -187,7 +185,7 @@ func (suite *Suite) TestHandleProposalWithPendingChildren() {
 
 	// submit the block proposal
 	proposal := unittest.ProposalFromBlock(&block)
-	err := suite.engine.Process(originID, proposal)
+	err := suite.engine.Process(engine.ReceiveBlocks, originID, proposal)
 	assert.Nil(suite.T(), err)
 
 	suite.follower.AssertExpectations(suite.T())

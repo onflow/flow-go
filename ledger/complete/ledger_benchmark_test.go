@@ -8,13 +8,16 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
-	"github.com/dapperlabs/flow-go/ledger/complete"
-	"github.com/dapperlabs/flow-go/ledger/partial/ptrie"
-	"github.com/dapperlabs/flow-go/module/metrics"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/partial/ptrie"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 // GENERAL COMMENT:
@@ -26,7 +29,6 @@ func BenchmarkStorage(b *testing.B) { benchmarkStorage(100, b) }
 // BenchmarkStorage benchmarks the performance of the storage layer
 func benchmarkStorage(steps int, b *testing.B) {
 	// assumption: 1000 key updates per collection
-	pathByteSize := 32
 	numInsPerStep := 1000
 	keyNumberOfParts := 10
 	keyPartMinByteSize := 1
@@ -40,7 +42,13 @@ func benchmarkStorage(steps int, b *testing.B) {
 		b.Fatal(err)
 	}
 
-	led, err := complete.NewLedger(dir, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, nil)
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, steps+1, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+	defer func() {
+		<-diskWal.Done()
+	}()
+
+	led, err := complete.NewLedger(diskWal, steps+1, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
 	defer led.Done()
 	if err != nil {
 		b.Fatal("can't create a new complete ledger")
@@ -52,7 +60,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 	totalProofSize := 0
 	totalPTrieConstTimeMS := 0
 
-	state := led.InitState()
+	state := led.InitialState()
 	for i := 0; i < steps; i++ {
 
 		keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
@@ -102,7 +110,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 		p, _ := encoding.DecodeTrieBatchProof(proof)
 
 		// construct a partial trie using proofs
-		_, err = ptrie.NewPSMT(newState, pathByteSize, p)
+		_, err = ptrie.NewPSMT(ledger.RootHash(newState), p)
 		if err != nil {
 			b.Fatal("failed to create PSMT")
 		}
@@ -124,4 +132,168 @@ func benchmarkStorage(steps int, b *testing.B) {
 	b.ReportMetric(float64(totalProofSize/steps), "proof_size_(MB)")
 	b.ReportMetric(float64(totalPTrieConstTimeMS/steps), "ptrie_const_time_(ms)")
 
+}
+
+// BenchmarkTrieUpdate benchmarks the performance of a trie update
+func BenchmarkTrieUpdate(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+	defer func() {
+		<-diskWal.Done()
+	}()
+
+	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := led.Set(update)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkTrieUpdate benchmarks the performance of a trie read
+func BenchmarkTrieRead(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+	defer func() {
+		<-diskWal.Done()
+	}()
+
+	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	newState, err := led.Set(update)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	query, err := ledger.NewQuery(newState, keys)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err = led.Get(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
+}
+
+// BenchmarkTrieUpdate benchmarks the performance of a trie prove
+func BenchmarkTrieProve(b *testing.B) {
+	// key updates per iteration
+	numInsPerStep := 10000
+	keyNumberOfParts := 10
+	keyPartMinByteSize := 1
+	keyPartMaxByteSize := 100
+	valueMaxByteSize := 32
+	rand.Seed(1)
+
+	dir, err := ioutil.TempDir("", "test-mtrie-")
+	defer os.RemoveAll(dir)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, 101, pathfinder.PathByteSize, wal.SegmentSize)
+	require.NoError(b, err)
+	defer func() {
+		<-diskWal.Done()
+	}()
+
+	led, err := complete.NewLedger(diskWal, 101, &metrics.NoopCollector{}, zerolog.Logger{}, complete.DefaultPathFinderVersion)
+	defer led.Done()
+	if err != nil {
+		b.Fatal("can't create a new complete ledger")
+	}
+
+	state := led.InitialState()
+
+	keys := utils.RandomUniqueKeys(numInsPerStep, keyNumberOfParts, keyPartMinByteSize, keyPartMaxByteSize)
+	values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
+
+	update, err := ledger.NewUpdate(state, keys, values)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	newState, err := led.Set(update)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	query, err := ledger.NewQuery(newState, keys)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := led.Prove(query)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	b.StopTimer()
 }

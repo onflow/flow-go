@@ -10,14 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestEntityByID(t *testing.T) {
@@ -111,7 +111,7 @@ func TestDispatchRequestVarious(t *testing.T) {
 
 	var nonce uint64
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			request := args.Get(0).(*messages.EntityRequest)
@@ -185,7 +185,7 @@ func TestDispatchRequestBatchSize(t *testing.T) {
 		items[item.EntityID] = item
 	}
 
-	con := &network.Conduit{}
+	con := &mocknetwork.Conduit{}
 	con.On("Unicast", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			request := args.Get(0).(*messages.EntityRequest)
@@ -304,4 +304,90 @@ func TestOnEntityResponseValid(t *testing.T) {
 
 	// check that the missing items timestamp was reset
 	assert.Equal(t, iunavailable.LastRequested, time.Time{})
+}
+
+func TestOnEntityIntegrityCheck(t *testing.T) {
+	identities := unittest.IdentityListFixture(16)
+	targetID := identities[0].NodeID
+
+	final := &protocol.Snapshot{}
+	final.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return identities.Filter(selector)
+		},
+		nil,
+	)
+
+	state := &protocol.State{}
+	state.On("Final").Return(final)
+
+	nonce := rand.Uint64()
+
+	wanted := unittest.CollectionFixture(1)
+	wanted2 := unittest.CollectionFixture(2)
+
+	now := time.Now()
+
+	iwanted := &Item{
+		EntityID:       wanted.ID(),
+		LastRequested:  now,
+		ExtraSelector:  filter.Any,
+		checkIntegrity: true,
+	}
+
+	assert.NotEqual(t, wanted, wanted2)
+
+	// prepare payload from different entity
+	bwanted, _ := msgpack.Marshal(wanted2)
+
+	res := &messages.EntityResponse{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+		Blobs:     [][]byte{bwanted},
+	}
+
+	req := &messages.EntityRequest{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+	}
+
+	called := 0
+	request := Engine{
+		unit:     engine.NewUnit(),
+		metrics:  metrics.NewNoopCollector(),
+		state:    state,
+		items:    make(map[flow.Identifier]*Item),
+		requests: make(map[uint64]*messages.EntityRequest),
+		selector: filter.HasNodeID(targetID),
+		create:   func() flow.Entity { return &flow.Collection{} },
+		handle:   func(flow.Identifier, flow.Entity) { called++ },
+	}
+
+	request.items[iwanted.EntityID] = iwanted
+
+	request.requests[req.Nonce] = req
+
+	err := request.onEntityResponse(targetID, res)
+	assert.NoError(t, err)
+
+	// check that the request was removed
+	assert.NotContains(t, request.requests, nonce)
+
+	// check that the provided item wasn't removed
+	assert.Contains(t, request.items, wanted.ID())
+
+	// make sure we didn't process items
+	assert.Equal(t, 0, called)
+
+	iwanted.checkIntegrity = false
+	request.items[iwanted.EntityID] = iwanted
+	request.requests[req.Nonce] = req
+
+	err = request.onEntityResponse(targetID, res)
+	assert.NoError(t, err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	// make sure we process item without checking integrity
+	assert.Equal(t, 1, called)
 }

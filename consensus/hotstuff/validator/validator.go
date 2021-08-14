@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/verification"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -19,7 +19,11 @@ type Validator struct {
 }
 
 // New creates a new Validator instance
-func New(committee hotstuff.Committee, forks hotstuff.ForksReader, verifier hotstuff.Verifier) *Validator {
+func New(
+	committee hotstuff.Committee,
+	forks hotstuff.ForksReader,
+	verifier hotstuff.Verifier,
+) *Validator {
 	return &Validator{
 		committee: committee,
 		forks:     forks,
@@ -46,8 +50,8 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 		return fmt.Errorf("could not get consensus participants for block %s: %w", block.BlockID, err)
 	}
 	signers := allParticipants.Filter(filter.HasNodeID(qc.SignerIDs...)) // resulting IdentityList contains no duplicates
-	if len(signers) < len(qc.SignerIDs) {
-		return newInvalidBlockError(block, fmt.Errorf("some qc signers are not valid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
+	if len(signers) != len(qc.SignerIDs) {
+		return newInvalidBlockError(block, fmt.Errorf("some qc signers are duplicated or invalid consensus participants at block %x: %w", block.BlockID, model.ErrInvalidSigner))
 	}
 
 	// determine whether signers reach minimally required stake threshold for consensus
@@ -57,12 +61,12 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	valid, err := v.verifier.VerifyQC(qc.SignerIDs, qc.SigData, block)
-	if errors.Is(err, verification.ErrInvalidFormat) {
+	valid, err := v.verifier.VerifyQC(signers, qc.SigData, block)
+	if errors.Is(err, signature.ErrInvalidFormat) {
 		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
 	}
 	if err != nil {
-		return fmt.Errorf("cannot verify qc's aggregated signature, qc.BlockID: %s", qc.BlockID)
+		return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
 	}
 	if !valid {
 		return newInvalidBlockError(block, fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
@@ -131,20 +135,19 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		return nil, newInvalidVoteError(vote, fmt.Errorf("vote's view %d is inconsistent with referenced block (view %d)", vote.View, block.View))
 	}
 
-	// TODO: this lookup is duplicated in Verifier
 	voter, err := v.committee.Identity(block.BlockID, vote.SignerID)
 	if errors.Is(err, model.ErrInvalidSigner) {
 		return nil, newInvalidVoteError(vote, err)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving voter Identity %x: %w", block.BlockID, err)
+		return nil, fmt.Errorf("error retrieving voter Identity at block %x: %w", block.BlockID, err)
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
-	valid, err := v.verifier.VerifyVote(vote.SignerID, vote.SigData, block)
+	valid, err := v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, verification.ErrInvalidFormat):
+		case errors.Is(err, signature.ErrInvalidFormat):
 			return nil, newInvalidVoteError(vote, err)
 		case errors.Is(err, model.ErrInvalidSigner):
 			return nil, newInvalidVoteError(vote, err)

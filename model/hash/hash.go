@@ -3,7 +3,7 @@ package hash
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // DefaultHasher is the default hasher used by Flow.

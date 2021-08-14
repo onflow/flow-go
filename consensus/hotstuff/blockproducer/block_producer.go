@@ -3,10 +3,10 @@ package blockproducer
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // BlockProducer is responsible for producing new block proposals
@@ -60,7 +60,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 	// retrieve a fully built block header from the builder
 	header, err := bp.builder.BuildOn(qc.BlockID, setHotstuffFields)
 	if err != nil {
-		return nil, fmt.Errorf("could not build header: %w", err)
+		return nil, fmt.Errorf("could not build block proposal on top of %v: %w", qc.BlockID, err)
 	}
 
 	// turn the signed flow header into a proposal

@@ -3,7 +3,7 @@ package model
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Block is the HotStuff algorithm's concept of a block, which - in the bigger picture - corresponds

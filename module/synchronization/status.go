@@ -5,7 +5,7 @@ package synchronization
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Status keeps track of a block download status.

@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSealInsertCheckRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.SealFixture()
+		expected := unittest.Seal.Fixture()
 
 		err := db.Update(InsertSeal(expected.ID(), expected))
 		require.Nil(t, err)
@@ -30,8 +30,8 @@ func TestSealInsertCheckRetrieve(t *testing.T) {
 
 func TestSealIndexAndLookup(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		seal1 := unittest.SealFixture()
-		seal2 := unittest.SealFixture()
+		seal1 := unittest.Seal.Fixture()
+		seal2 := unittest.Seal.Fixture()
 
 		seals := []*flow.Seal{seal1, seal2}
 

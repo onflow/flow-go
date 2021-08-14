@@ -5,21 +5,21 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/sync"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 type ProviderEngine interface {
@@ -30,38 +30,46 @@ type ProviderEngine interface {
 // An Engine provides means of accessing data about execution state and broadcasts execution receipts to nodes in the network.
 // Also generates and saves execution receipts
 type Engine struct {
-	unit          *engine.Unit
-	log           zerolog.Logger
-	tracer        module.Tracer
-	receiptCon    network.Conduit
-	state         protocol.ReadOnlyState
-	execState     state.ReadOnlyExecutionState
-	me            module.Local
-	chunksConduit network.Conduit
-	metrics       module.ExecutionMetrics
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	tracer              module.Tracer
+	receiptCon          network.Conduit
+	state               protocol.State
+	execState           state.ReadOnlyExecutionState
+	me                  module.Local
+	chunksConduit       network.Conduit
+	metrics             module.ExecutionMetrics
+	checkStakedAtBlock  func(blockID flow.Identifier) (bool, error)
+	chdpQueryTimeout    time.Duration
+	chdpDeliveryTimeout time.Duration
 }
 
 func New(
 	logger zerolog.Logger,
 	tracer module.Tracer,
 	net module.Network,
-	state protocol.ReadOnlyState,
+	state protocol.State,
 	me module.Local,
 	execState state.ReadOnlyExecutionState,
-	stateSync sync.StateSynchronizer,
 	metrics module.ExecutionMetrics,
+	checkStakedAtBlock func(blockID flow.Identifier) (bool, error),
+	chdpQueryTimeout uint,
+	chdpDeliveryTimeout uint,
 ) (*Engine, error) {
 
 	log := logger.With().Str("engine", "receipts").Logger()
 
 	eng := Engine{
-		unit:      engine.NewUnit(),
-		log:       log,
-		tracer:    tracer,
-		state:     state,
-		me:        me,
-		execState: execState,
-		metrics:   metrics,
+		unit:                engine.NewUnit(),
+		log:                 log,
+		tracer:              tracer,
+		state:               state,
+		me:                  me,
+		execState:           execState,
+		metrics:             metrics,
+		checkStakedAtBlock:  checkStakedAtBlock,
+		chdpQueryTimeout:    time.Duration(chdpQueryTimeout) * time.Second,
+		chdpDeliveryTimeout: time.Duration(chdpDeliveryTimeout) * time.Second,
 	}
 
 	var err error
@@ -81,12 +89,17 @@ func New(
 }
 
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.ProcessLocal(event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -94,7 +107,9 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 }
 
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Ready returns a channel that will close when the engine has
@@ -109,7 +124,7 @@ func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -138,71 +153,119 @@ func (e *Engine) onChunkDataRequest(
 	req *messages.ChunkDataRequest,
 ) error {
 
+	processStart := time.Now()
+
 	// extracts list of verifier nodes id
 	chunkID := req.ChunkID
 
-	log := e.log.With().
+	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkID)).
 		Logger()
 
-	log.Debug().Msg("received chunk data pack request")
+	lg.Debug().Msg("received chunk data pack request")
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
 
-	origin, err := e.state.Final().Identity(originID)
-	if err != nil {
-		return engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
-	}
-
-	// only verifier nodes are allowed to request chunk data packs
-	if origin.Role != flow.RoleVerification {
-		return engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
-	}
-
-	cdp, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
+	chunkDataPack, err := e.execState.ChunkDataPackByChunkID(ctx, chunkID)
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
-		log.Warn().Msg("chunk not found")
+		lg.Warn().Msg("chunk data pack not found")
 		return nil
 	}
 
 	if err != nil {
-		return fmt.Errorf("could not retrieve chunk ID (%s): %w", origin, err)
+		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
 	}
 
-	var collection flow.Collection
-	if cdp.CollectionID != flow.ZeroID {
-		// retrieves collection of non-zero chunks
-		coll, err := e.execState.GetCollection(cdp.CollectionID)
-		if err != nil {
-			return fmt.Errorf("cannot retrieve collection %x for chunk %x: %w", cdp.CollectionID, cdp.ChunkID, err)
-		}
-		collection = *coll
+	origin, err := e.ensureStaked(chunkDataPack.ChunkID, originID)
+	if err != nil {
+		return err
 	}
 
 	response := &messages.ChunkDataResponse{
-		ChunkDataPack: *cdp,
+		ChunkDataPack: *chunkDataPack,
 		Nonce:         rand.Uint64(),
-		Collection:    collection,
+	}
+
+	sinceProcess := time.Since(processStart)
+
+	lg = lg.With().Dur("sinceProcess", sinceProcess).Logger()
+
+	if sinceProcess > e.chdpQueryTimeout {
+		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
 
 	// sends requested chunk data pack to the requester
-	err = e.chunksConduit.Submit(response, originID)
-	if err != nil {
-		return fmt.Errorf("could not send requested chunk data pack to (%s): %w", origin, err)
-	}
+	e.unit.Launch(func() {
+		deliveryStart := time.Now()
 
-	log.Debug().
-		Hex("collection_id", logging.ID(response.Collection.ID())).
-		Msg("chunk data pack request successfully replied")
+		err := e.chunksConduit.Unicast(response, originID)
+
+		sinceDeliver := time.Since(deliveryStart)
+		lg = lg.With().Dur("since_deliver", sinceDeliver).Logger()
+
+		if sinceDeliver > e.chdpDeliveryTimeout {
+			lg.Warn().Msgf("chunk data pack response delivery takes longer than %v secs", e.chdpDeliveryTimeout.Seconds())
+		}
+
+		if err != nil {
+			lg.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
+			return
+		}
+
+		if response.ChunkDataPack.Collection != nil {
+			// logging collection id of non-system chunks.
+			// A system chunk has both the collection and collection id set to nil.
+			lg = lg.With().
+				Hex("collection_id", logging.ID(response.ChunkDataPack.Collection.ID())).
+				Logger()
+		}
+
+		lg.Debug().Msg("chunk data pack request successfully replied")
+	})
 
 	return nil
 }
 
+func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {
+
+	blockID, err := e.execState.GetBlockIDByChunkID(chunkID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("cannot find blockID corresponding to chunk data pack: %w", err)
+	}
+
+	stakedAt, err := e.checkStakedAtBlock(blockID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("cannot check block staking status: %w", err)
+	}
+	if !stakedAt {
+		return nil, engine.NewInvalidInputErrorf("this node is not staked at the block (%s) corresponding to chunk data pack (%s)", blockID.String(), chunkID.String())
+	}
+
+	origin, err := e.state.AtBlockID(blockID).Identity(originID)
+	if err != nil {
+		return nil, engine.NewInvalidInputErrorf("invalid origin id (%s): %w", origin, err)
+	}
+
+	// only verifier nodes are allowed to request chunk data packs
+	if origin.Role != flow.RoleVerification {
+		return nil, engine.NewInvalidInputErrorf("invalid role for receiving collection: %s", origin.Role)
+	}
+
+	if origin.Stake == 0 {
+		return nil, engine.NewInvalidInputErrorf("node %s is not staked at the block (%s) corresponding to chunk data pack (%s)", originID, blockID.String(), chunkID.String())
+	}
+	return origin, nil
+}
+
 func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.ExecutionReceipt) error {
+	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
+	if err != nil {
+		return fmt.Errorf("could not get final state: %w", err)
+	}
 
 	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEBroadcastExecutionReceipt)
 	defer span.Finish()
@@ -210,7 +273,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 	e.log.Debug().
 		Hex("block_id", logging.ID(receipt.ExecutionResult.BlockID)).
 		Hex("receipt_id", logging.Entity(receipt)).
-		Hex("final_state", receipt.ExecutionResult.FinalStateCommit).
+		Hex("final_state", finalState[:]).
 		Msg("broadcasting execution receipt")
 
 	identities, err := e.state.Final().Identities(filter.HasRole(flow.RoleAccess, flow.RoleConsensus,
@@ -219,7 +282,7 @@ func (e *Engine) BroadcastExecutionReceipt(ctx context.Context, receipt *flow.Ex
 		return fmt.Errorf("could not get consensus and verification identities: %w", err)
 	}
 
-	err = e.receiptCon.Submit(receipt, identities.NodeIDs()...)
+	err = e.receiptCon.Publish(receipt, identities.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit execution receipts: %w", err)
 	}

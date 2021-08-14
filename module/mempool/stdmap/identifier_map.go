@@ -3,8 +3,8 @@ package stdmap
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/model"
 )
 
 // IdentifierMap represents a concurrency-safe memory pool for IdMapEntity.
@@ -63,21 +63,28 @@ func (i *IdentifierMap) Append(key, id flow.Identifier) error {
 // Get returns list of all identifiers associated with key and true, if the key exists in the mempool.
 // Otherwise it returns nil and false.
 func (i *IdentifierMap) Get(key flow.Identifier) ([]flow.Identifier, bool) {
-	entity, ok := i.Backend.ByID(key)
-	if !ok {
+	ids := make([]flow.Identifier, 0)
+	err := i.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, ok := backdata[key]
+		if !ok {
+			return fmt.Errorf("could not retrieve key from backend")
+		}
+
+		mapEntity, ok := entity.(model.IdMapEntity)
+		if !ok {
+			return fmt.Errorf("could not assert entity as IdMapEntity")
+		}
+
+		for id := range mapEntity.IDs {
+			ids = append(ids, id)
+		}
+
+		return nil
+	})
+
+	if err != nil {
 		return nil, false
 	}
-
-	mapEntity, ok := entity.(model.IdMapEntity)
-	if !ok {
-		return nil, false
-	}
-
-	ids := make([]flow.Identifier, 0, len(mapEntity.IDs))
-	for id := range mapEntity.IDs {
-		ids = append(ids, id)
-	}
-
 	return ids, true
 }
 

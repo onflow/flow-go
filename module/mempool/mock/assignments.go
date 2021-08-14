@@ -3,8 +3,8 @@
 package mempool
 
 import (
-	chunks "github.com/dapperlabs/flow-go/model/chunks"
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	chunks "github.com/onflow/flow-go/model/chunks"
+	flow "github.com/onflow/flow-go/model/flow"
 
 	mock "github.com/stretchr/testify/mock"
 )

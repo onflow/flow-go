@@ -7,8 +7,20 @@ linters-settings:
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
-    local-prefixes: github.com/dapperlabs/flow-go
+    local-prefixes: github.com/onflow/flow-go
+
+  gosec:
+    # To select a subset of rules to run.
+    # Available rules: https://github.com/securego/gosec#available-rules
+    includes:
+      - G401
+      - G402
+      - G501
+      - G502
+      - G503
+      - G505
 
 linters:
   enable:
     - goimports
+    - gosec

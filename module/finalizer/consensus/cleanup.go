@@ -3,11 +3,11 @@ package consensus
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage"
 )
 
 // CleanupFunc is called after a block was finalized to allow other components
@@ -20,7 +20,13 @@ func CleanupNothing() CleanupFunc {
 	}
 }
 
-func CleanupMempools(collector module.MempoolMetrics, spans module.ConsensusMetrics, payloads storage.Payloads, guarantees mempool.Guarantees, seals mempool.Seals) CleanupFunc {
+func CleanupMempools(
+	collector module.MempoolMetrics,
+	spans module.ConsensusMetrics,
+	payloads storage.Payloads,
+	guarantees mempool.Guarantees,
+	seals mempool.IncorporatedResultSeals) CleanupFunc {
+
 	return func(blockID flow.Identifier) error {
 
 		payload, err := payloads.ByBlockID(blockID)

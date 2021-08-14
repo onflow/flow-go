@@ -5,8 +5,9 @@ import (
 
 	"github.com/onflow/cadence"
 	encoding "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type Events struct {
@@ -22,12 +23,13 @@ func EventGenerator() *Events {
 }
 
 func (g *Events) New() flow.Event {
+	location := common.StringLocation("test")
 	identifier := fmt.Sprintf("FooEvent%d", g.count)
-	typeID := "test." + identifier
+	typeID := location.TypeID(identifier)
 
 	testEventType := &cadence.EventType{
-		TypeID:     typeID,
-		Identifier: identifier,
+		Location:            location,
+		QualifiedIdentifier: identifier,
 		Fields: []cadence.Field{
 			{
 				Identifier: "a",
@@ -40,10 +42,15 @@ func (g *Events) New() flow.Event {
 		},
 	}
 
+	fooString, err := cadence.NewString("foo")
+	if err != nil {
+		panic(fmt.Sprintf("unexpected error while creating cadence string: %s", err))
+	}
+
 	testEvent := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewInt(int(g.count)),
-			cadence.NewString("foo"),
+			fooString,
 		}).WithType(testEventType)
 
 	payload, err := encoding.Encode(testEvent)

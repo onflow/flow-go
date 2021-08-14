@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -20,4 +20,9 @@ func (_m *Requester) EntityByID(entityID flow.Identifier, selector flow.Identity
 // Force provides a mock function with given fields:
 func (_m *Requester) Force() {
 	_m.Called()
+}
+
+// Query provides a mock function with given fields: key, selector
+func (_m *Requester) Query(key flow.Identifier, selector flow.IdentityFilter) {
+	_m.Called(key, selector)
 }

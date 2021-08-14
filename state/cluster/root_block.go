@@ -3,8 +3,8 @@ package cluster
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // CanonicalClusterID returns the canonical chain ID for the given cluster in
@@ -19,7 +19,6 @@ func CanonicalRootBlock(epoch uint64, participants flow.IdentityList) *cluster.B
 
 	chainID := CanonicalClusterID(epoch, participants)
 	payload := cluster.EmptyPayload(flow.ZeroID)
-	payload.ReferenceEpoch = epoch
 	header := &flow.Header{
 		ChainID:        chainID,
 		ParentID:       flow.ZeroID,

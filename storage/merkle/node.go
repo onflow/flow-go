@@ -3,7 +3,7 @@
 package merkle
 
 import (
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 type node interface{}

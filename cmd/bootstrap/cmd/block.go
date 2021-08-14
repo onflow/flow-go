@@ -4,9 +4,8 @@ import (
 	"encoding/hex"
 	"time"
 
-	"github.com/dapperlabs/flow-go/cmd/bootstrap/run"
-	model "github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, rootTimestamp string) *flow.Block {
@@ -18,8 +17,6 @@ func constructRootBlock(rootChain string, rootParent string, rootHeight uint64, 
 
 	block := run.GenerateRootBlock(chainID, parentID, height, timestamp)
 
-	writeJSON(model.PathRootBlock, block)
-
 	return block
 }
 
@@ -29,8 +26,12 @@ func parseChainID(chainID string) flow.ChainID {
 		return flow.Mainnet
 	case "test":
 		return flow.Testnet
-	case "emulator":
-		return flow.Emulator
+	case "canary":
+		return flow.Canary
+	case "bench":
+		return flow.Benchnet
+	case "local":
+		return flow.Localnet
 	default:
 		log.Fatal().Str("chain_id", chainID).Msg("invalid chain ID")
 		return ""

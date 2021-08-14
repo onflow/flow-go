@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"os"
 	"os/user"
 	"path/filepath"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/integration/client"
-	"github.com/dapperlabs/flow-go/model/bootstrap"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/integration/client"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
@@ -68,16 +69,29 @@ func toNodeInfos(confs []ContainerConfig) []bootstrap.NodeInfo {
 	return infos
 }
 
+// filterContainerConfigs filters a list of container configs.
+func filterContainerConfigs(confs []ContainerConfig, shouldInclude func(ContainerConfig) bool) []ContainerConfig {
+	filtered := make([]ContainerConfig, 0, len(confs))
+	for _, conf := range confs {
+		if !shouldInclude(conf) {
+			continue
+		}
+		filtered = append(filtered, conf)
+	}
+	return filtered
+}
+
 func getSeed() ([]byte, error) {
-	seed := make([]byte, crypto.SeedMinLenDKG)
+	seedLen := int(math.Max(crypto.SeedMinLenDKG, crypto.KeyGenSeedMinLenBLSBLS12381))
+	seed := make([]byte, seedLen)
 	n, err := rand.Read(seed)
-	if err != nil || n != crypto.SeedMinLenDKG {
+	if err != nil || n != seedLen {
 		return nil, err
 	}
 	return seed, nil
 }
 
-func writeJSON(path string, data interface{}) error {
+func WriteJSON(path string, data interface{}) error {
 	err := os.MkdirAll(filepath.Dir(path), 0755)
 	if err != nil {
 		return err

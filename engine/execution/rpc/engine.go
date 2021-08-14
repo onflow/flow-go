@@ -3,8 +3,12 @@ package rpc
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
+	"strings"
+	"unicode/utf8"
 
+	grpc_prometheus "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -12,18 +16,20 @@ import (
 
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/engine/execution/ingestion"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
-	grpcutils "github.com/dapperlabs/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/engine/execution/ingestion"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 // Config defines the configurable options for the gRPC server.
 type Config struct {
-	ListenAddr string
-	MaxMsgSize int // In bytes
+	ListenAddr        string
+	MaxMsgSize        int  // In bytes
+	RpcMetricsEnabled bool // enable GRPC metrics reporting
+
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -51,6 +57,18 @@ func New(
 		config.MaxMsgSize = grpcutils.DefaultMaxMsgSize
 	}
 
+	serverOptions := []grpc.ServerOption{
+		grpc.MaxRecvMsgSize(config.MaxMsgSize),
+		grpc.MaxSendMsgSize(config.MaxMsgSize),
+	}
+
+	// if rpc metrics is enabled, add the grpc metrics interceptor as a server option
+	if config.RpcMetricsEnabled {
+		serverOptions = append(serverOptions, grpc.UnaryInterceptor(grpc_prometheus.UnaryServerInterceptor))
+	}
+
+	server := grpc.NewServer(serverOptions...)
+
 	eng := &Engine{
 		log:  log,
 		unit: engine.NewUnit(),
@@ -61,12 +79,15 @@ func New(
 			events:             events,
 			exeResults:         exeResults,
 			transactionResults: txResults,
+			log:                log,
 		},
-		server: grpc.NewServer(
-			grpc.MaxRecvMsgSize(config.MaxMsgSize),
-			grpc.MaxSendMsgSize(config.MaxMsgSize),
-		),
+		server: server,
 		config: config,
+	}
+
+	if config.RpcMetricsEnabled {
+		grpc_prometheus.EnableHandlingTimeHistogram()
+		grpc_prometheus.Register(server)
 	}
 
 	execution.RegisterExecutionAPIServer(eng.server, eng.handler)
@@ -114,6 +135,7 @@ type handler struct {
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
+	log                zerolog.Logger
 }
 
 var _ execution.ExecutionAPIServer = &handler{}
@@ -208,14 +230,6 @@ func (h *handler) GetTransactionResult(
 		return nil, err
 	}
 
-	// lookup events by block id and transaction ID
-	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
-	}
-
-	events := convert.EventsToMessages(blockEvents)
-
 	var statusCode uint32 = 0
 	errMsg := ""
 
@@ -228,10 +242,30 @@ func (h *handler) GetTransactionResult(
 
 		return nil, status.Errorf(codes.Internal, "failed to get transaction result: %v", err)
 	}
+
 	if txResult.ErrorMessage != "" {
+		cadenceErrMessage := txResult.ErrorMessage
+		if !utf8.ValidString(cadenceErrMessage) {
+			h.log.Warn().
+				Str("block_id", blockID.String()).
+				Str("transaction_id", txID.String()).
+				Str("error_mgs", fmt.Sprintf("%q", cadenceErrMessage)).
+				Msg("invalid character in Cadence error message")
+			// convert non UTF-8 string to a UTF-8 string for safe GRPC marshaling
+			cadenceErrMessage = strings.ToValidUTF8(txResult.ErrorMessage, "?")
+		}
+
 		statusCode = 1 // for now a statusCode of 1 indicates an error and 0 indicates no error
-		errMsg = txResult.ErrorMessage
+		errMsg = cadenceErrMessage
 	}
+
+	// lookup events by block id and transaction ID
+	blockEvents, err := h.events.ByBlockIDTransactionID(blockID, txID)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get events for block: %v", err)
+	}
+
+	events := convert.EventsToMessages(blockEvents)
 
 	// compose a response with the events and the transaction error
 	return &execution.GetTransactionResultResponse{

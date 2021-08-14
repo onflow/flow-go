@@ -3,11 +3,11 @@ package verification
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // SingleSignerVerifier wraps single signer and verifier.
@@ -51,7 +51,7 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 	}
 
 	// create the message to be signed and generate signature
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	sig, err := s.signer.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
@@ -70,7 +70,7 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 func (s *SingleSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 	// create the message to be signed and generate signature
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	sig, err := s.signer.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
@@ -92,6 +92,7 @@ func (s *SingleSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 func (s *SingleSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 
 	// check the consistency of the votes
+	// TODO: is checking the view and block id needed? (single votes are supposed to be already checked)
 	err := checkVotesValidity(votes)
 	if err != nil {
 		return nil, fmt.Errorf("votes are not valid: %w", err)

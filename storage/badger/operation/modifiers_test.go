@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSkipDuplicates(t *testing.T) {

@@ -1,7 +1,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // Signer is a simple cryptographic signer that can sign a simple message to
@@ -24,5 +24,9 @@ type AggregatingSigner interface {
 type ThresholdSigner interface {
 	ThresholdVerifier
 	Sign(msg []byte) (crypto.Signature, error)
-	Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error)
+	Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error)
+}
+
+type ThresholdSignerStore interface {
+	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }

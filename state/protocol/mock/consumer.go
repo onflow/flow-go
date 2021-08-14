@@ -3,7 +3,7 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
+	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -17,17 +17,22 @@ func (_m *Consumer) BlockFinalized(block *flow.Header) {
 	_m.Called(block)
 }
 
-// EpochCommittedPhaseStarted provides a mock function with given fields: epoch, first
-func (_m *Consumer) EpochCommittedPhaseStarted(epoch uint64, first *flow.Header) {
-	_m.Called(epoch, first)
+// BlockProcessable provides a mock function with given fields: block
+func (_m *Consumer) BlockProcessable(block *flow.Header) {
+	_m.Called(block)
 }
 
-// EpochSetupPhaseStarted provides a mock function with given fields: epoch, first
-func (_m *Consumer) EpochSetupPhaseStarted(epoch uint64, first *flow.Header) {
-	_m.Called(epoch, first)
+// EpochCommittedPhaseStarted provides a mock function with given fields: currentEpochCounter, first
+func (_m *Consumer) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+	_m.Called(currentEpochCounter, first)
 }
 
-// EpochTransition provides a mock function with given fields: newEpoch, first
-func (_m *Consumer) EpochTransition(newEpoch uint64, first *flow.Header) {
-	_m.Called(newEpoch, first)
+// EpochSetupPhaseStarted provides a mock function with given fields: currentEpochCounter, first
+func (_m *Consumer) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+	_m.Called(currentEpochCounter, first)
+}
+
+// EpochTransition provides a mock function with given fields: newEpochCounter, first
+func (_m *Consumer) EpochTransition(newEpochCounter uint64, first *flow.Header) {
+	_m.Called(newEpochCounter, first)
 }

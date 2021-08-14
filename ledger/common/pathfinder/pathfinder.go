@@ -5,13 +5,15 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/ledger"
 )
 
 // PathByteSize captures number of bytes each path takes
 const PathByteSize = 32
 
 // KeyToPath converts key into a path
+// version zero applies sha2-256 on value of the key parts (in order ignoring types)
 func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 	switch version {
 	case 0:
@@ -23,12 +25,29 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 			h := sha256.New()
 			_, err := h.Write(ret)
 			if err != nil {
-				return nil, err
+				return ledger.DummyPath, err
 			}
-			return ledger.Path(h.Sum(nil)), nil
+			path, err := ledger.ToPath(h.Sum(nil))
+			if err != nil {
+				return ledger.DummyPath, err
+			}
+			return path, nil
+		}
+	case 1:
+		{
+			hasher := hash.NewSHA3_256()
+			_, err := hasher.Write(key.CanonicalForm())
+			if err != nil {
+				panic(err)
+			}
+			path, err := ledger.ToPath(hasher.SumHash())
+			if err != nil {
+				return ledger.DummyPath, err
+			}
+			return path, nil
 		}
 	}
-	return nil, fmt.Errorf("unsuported key to path version")
+	return ledger.DummyPath, fmt.Errorf("unsupported key to path version")
 }
 
 // KeysToPaths converts an slice of keys into a paths
@@ -82,6 +101,19 @@ func PayloadsToValues(payloads []*ledger.Payload) ([]ledger.Value, error) {
 		ret = append(ret, p.Value)
 	}
 	return ret, nil
+}
+
+// PathsFromPayloads constructs paths from an slice of payload
+func PathsFromPayloads(payloads []ledger.Payload, version uint8) ([]ledger.Path, error) {
+	paths := make([]ledger.Path, 0)
+	for _, pay := range payloads {
+		p, err := KeyToPath(pay.Key, version)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, p)
+	}
+	return paths, nil
 }
 
 // UpdateToPayloads constructs an slice of payloads given ledger update

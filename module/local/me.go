@@ -3,15 +3,15 @@
 package local
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 )
 
 type Local struct {
 	me *flow.Identity
-	sk crypto.PrivateKey // instance of the node's private key
+	sk crypto.PrivateKey // instance of the node's private staking key
 }
 
 func New(id *flow.Identity, sk crypto.PrivateKey) (*Local, error) {

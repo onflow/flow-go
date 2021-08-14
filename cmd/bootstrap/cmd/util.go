@@ -8,19 +8,21 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/utils/io"
+	"github.com/onflow/flow-go/crypto"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/io"
 )
 
-func generateRandomSeeds(n int) [][]byte {
+func GenerateRandomSeeds(n int) [][]byte {
 	seeds := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
-		seeds = append(seeds, generateRandomSeed())
+		seeds = append(seeds, GenerateRandomSeed())
 	}
 	return seeds
 }
 
-func generateRandomSeed() []byte {
+func GenerateRandomSeed() []byte {
 	seed := make([]byte, randomSeedBytes)
 	if n, err := rand.Read(seed); err != nil || n != randomSeedBytes {
 		log.Fatal().Err(err).Msg("cannot generate random seeds")
@@ -35,7 +37,7 @@ func readJSON(path string, target interface{}) {
 	}
 	err = json.Unmarshal(dat, target)
 	if err != nil {
-		log.Fatal().Err(err).Msg("cannot unmarshal json in file")
+		log.Fatal().Err(err).Msgf("cannot unmarshal json in file %s", path)
 	}
 }
 
@@ -69,12 +71,48 @@ func pubKeyToString(key crypto.PublicKey) string {
 }
 
 func filesInDir(dir string) ([]string, error) {
+	exists, err := pathExists(dir)
+	if err != nil {
+		return nil, fmt.Errorf("could not check if dir exists: %w", err)
+	}
+
+	if !exists {
+		return nil, fmt.Errorf("dir %v does not exist", dir)
+	}
+
 	var files []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
 			files = append(files, path)
 		}
 		return nil
 	})
 	return files, err
+}
+
+// pathExists
+func pathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func nodeCountByRole(nodes []model.NodeInfo) map[flow.Role]uint16 {
+	roleCounts := map[flow.Role]uint16{
+		flow.RoleCollection:   0,
+		flow.RoleConsensus:    0,
+		flow.RoleExecution:    0,
+		flow.RoleVerification: 0,
+		flow.RoleAccess:       0,
+	}
+	for _, node := range nodes {
+		roleCounts[node.Role] = roleCounts[node.Role] + 1
+	}
+
+	return roleCounts
 }

@@ -3,8 +3,8 @@ package module
 import (
 	"context"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // ClusterRootQCVoter is responsible for submitting a vote to the cluster QC
@@ -35,4 +35,11 @@ type QCContractClient interface {
 	// Voted returns true if we have successfully submitted a vote to the
 	// cluster QC aggregator smart contract for the current epoch.
 	Voted(ctx context.Context) (bool, error)
+}
+
+// EpochLookup provides a method to find epochs by view.
+type EpochLookup interface {
+
+	// EpochForView returns the counter of the epoch that the view belongs to.
+	EpochForView(view uint64) (epochCounter uint64, err error)
 }

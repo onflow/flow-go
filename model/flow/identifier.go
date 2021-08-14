@@ -8,14 +8,18 @@ import (
 	"math/rand"
 	"reflect"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/fingerprint"
-	"github.com/dapperlabs/flow-go/storage/merkle"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/fingerprint"
+	"github.com/onflow/flow-go/storage/merkle"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Identifier represents a 32-byte unique identifier for an entity.
 type Identifier [32]byte
+
+// IdentifierFilter is a filter on identifiers.
+type IdentifierFilter func(Identifier) bool
 
 var (
 	// ZeroID is the lowest value in the 32-byte ID space.
@@ -34,6 +38,14 @@ func HexStringToIdentifier(hexString string) (Identifier, error) {
 		return identifier, fmt.Errorf("malformed input, expected 32 bytes (64 characters), decoded %d", i)
 	}
 	return identifier, nil
+}
+
+func MustHexStringToIdentifier(hexString string) Identifier {
+	id, err := HexStringToIdentifier(hexString)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }
 
 // String returns the hex string representation of the identifier.
@@ -77,9 +89,15 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
+	//bs1 := binstat.EnterTime(binstat.BinMakeID + ".??lock.Fingerprint")
+	data := fingerprint.Fingerprint(entity)
+	//binstat.LeaveVal(bs1, int64(len(data)))
+	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
 	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(fingerprint.Fingerprint(entity))
-	return HashToID(hash)
+	hash := hasher.ComputeHash(data)
+	id := HashToID(hash)
+	//binstat.Leave(bs2)
+	return id
 }
 
 // PublicKeyToID creates an ID from a public key.

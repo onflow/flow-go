@@ -5,7 +5,7 @@ package mock
 import (
 	context "context"
 
-	model "github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	model "github.com/onflow/flow-go/consensus/hotstuff/model"
 	mock "github.com/stretchr/testify/mock"
 )
 

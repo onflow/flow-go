@@ -5,11 +5,15 @@ package operation
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func InsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(*badger.Txn) error {
 	return insert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
+}
+
+func BatchInsertTransactionResult(blockID flow.Identifier, transactionResult *flow.TransactionResult) func(batch *badger.WriteBatch) error {
+	return batchInsert(makePrefix(codeTransactionResult, blockID, transactionResult.TransactionID), transactionResult)
 }
 
 func RetrieveTransactionResult(blockID flow.Identifier, transactionID flow.Identifier, transactionResult *flow.TransactionResult) func(*badger.Txn) error {
@@ -33,5 +37,5 @@ func LookupTransactionResultsByBlockID(blockID flow.Identifier, txResults *[]flo
 		return check, create, handle
 	}
 
-	return traverse(makePrefix(codeEvent, blockID), txErrIterFunc)
+	return traverse(makePrefix(codeTransactionResult, blockID), txErrIterFunc)
 }

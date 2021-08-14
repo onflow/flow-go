@@ -6,23 +6,48 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ComplianceCollector struct {
 	finalizedHeight          prometheus.Gauge
 	sealedHeight             prometheus.Gauge
-	finalizedBlocks          prometheus.Counter
+	finalizedBlocks          *prometheus.CounterVec
 	sealedBlocks             prometheus.Counter
+	blockProposalDuration    prometheus.Counter
 	finalizedPayload         *prometheus.CounterVec
 	sealedPayload            *prometheus.CounterVec
 	lastBlockFinalizedAt     time.Time
 	finalizedBlocksPerSecond prometheus.Summary
+	committedEpochFinalView  prometheus.Gauge
+	currentEpochCounter      prometheus.Gauge
+	currentEpochPhase        prometheus.Gauge
 }
 
 func NewComplianceCollector() *ComplianceCollector {
 
 	cc := &ComplianceCollector{
+
+		currentEpochCounter: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_epoch_counter",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the current epoch's counter",
+		}),
+
+		currentEpochPhase: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_epoch_phase",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the current epoch's phase",
+		}),
+
+		committedEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "committed_epoch_final_view",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the final view of the committed epoch with the greatest counter",
+		}),
 
 		finalizedHeight: promauto.NewGauge(prometheus.GaugeOpts{
 			Name:      "finalized_height",
@@ -38,18 +63,25 @@ func NewComplianceCollector() *ComplianceCollector {
 			Help:      "the last sealed height",
 		}),
 
-		finalizedBlocks: promauto.NewCounter(prometheus.CounterOpts{
+		finalizedBlocks: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "finalized_blocks_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of finalized blocks",
-		}),
+		}, []string{LabelProposer}),
 
 		sealedBlocks: promauto.NewCounter(prometheus.CounterOpts{
 			Name:      "sealed_blocks_total",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the number of sealed blocks",
+		}),
+
+		blockProposalDuration: promauto.NewCounter(prometheus.CounterOpts{
+			Name:      "consensus_committee_block_proposal_duration_seconds_total",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "time spent processing block proposals in seconds",
 		}),
 
 		finalizedPayload: promauto.NewCounterVec(prometheus.CounterOpts{
@@ -100,7 +132,7 @@ func (cc *ComplianceCollector) BlockFinalized(block *flow.Block) {
 	}
 	cc.lastBlockFinalizedAt = now
 
-	cc.finalizedBlocks.Inc()
+	cc.finalizedBlocks.With(prometheus.Labels{LabelProposer: block.Header.ProposerID.String()}).Inc()
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.finalizedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
 }
@@ -115,4 +147,20 @@ func (cc *ComplianceCollector) BlockSealed(block *flow.Block) {
 	cc.sealedBlocks.Inc()
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceGuarantee}).Add(float64(len(block.Payload.Guarantees)))
 	cc.sealedPayload.With(prometheus.Labels{LabelResource: ResourceSeal}).Add(float64(len(block.Payload.Seals)))
+}
+
+func (cc *ComplianceCollector) BlockProposalDuration(duration time.Duration) {
+	cc.blockProposalDuration.Add(duration.Seconds())
+}
+
+func (cc *ComplianceCollector) CommittedEpochFinalView(view uint64) {
+	cc.committedEpochFinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {
+	cc.currentEpochCounter.Set(float64(counter))
+}
+
+func (cc *ComplianceCollector) CurrentEpochPhase(phase flow.EpochPhase) {
+	cc.currentEpochCounter.Set(float64(phase))
 }

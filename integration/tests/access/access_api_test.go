@@ -10,9 +10,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type AccessSuite struct {
@@ -55,7 +55,9 @@ func (suite *AccessSuite) SetupTest() {
 	// need three consensus nodes (unused ghost)
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(conID), testnet.AsGhost())
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
+			testnet.WithID(conID),
+			testnet.AsGhost())
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 	}
 

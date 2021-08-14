@@ -3,7 +3,7 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Guarantees represents a concurrency-safe memory pool for collection guarantees.

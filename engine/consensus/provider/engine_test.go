@@ -3,156 +3,88 @@
 package provider
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	"github.com/dapperlabs/flow-go/module/trace"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestOnBlockProposalValid(t *testing.T) {
+type Suite struct {
+	suite.Suite
 
-	me := &module.Local{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
-	con := &network.Conduit{}
-	metrics := metrics.NewNoopCollector()
+	me      *module.Local
+	conduit *mocknetwork.Conduit
+	state   *protocol.State
+	final   *protocol.Snapshot
 
-	e := &Engine{
-		me:      me,
-		state:   state,
-		con:     con,
-		message: metrics,
+	identities flow.IdentityList
+
+	engine *Engine
+}
+
+func TestProviderEngine(t *testing.T) {
+	suite.Run(t, new(Suite))
+}
+
+func (suite *Suite) SetupTest() {
+
+	suite.me = new(module.Local)
+	suite.conduit = new(mocknetwork.Conduit)
+	suite.state = new(protocol.State)
+	suite.final = new(protocol.Snapshot)
+
+	suite.engine = &Engine{
+		me:      suite.me,
+		state:   suite.state,
+		con:     suite.conduit,
+		message: metrics.NewNoopCollector(),
 		tracer:  trace.NewNoopTracer(),
 	}
 
+	suite.identities = unittest.CompleteIdentitySet()
+	localID := suite.identities[0].NodeID
+
+	suite.me.On("NodeID").Return(localID)
+	suite.state.On("Final").Return(suite.final)
+	suite.final.On("Identities", mock.Anything).Return(
+		func(f flow.IdentityFilter) flow.IdentityList { return suite.identities.Filter(f) },
+		func(flow.IdentityFilter) error { return nil },
+	)
+}
+
+// proposals submitted by remote nodes should not be accepted.
+func (suite Suite) TestOnBlockProposal_RemoteOrigin() {
+
 	proposal := unittest.ProposalFixture()
-	identities := unittest.IdentityListFixture(100)
-	localID := identities[0].NodeID
+	// message submitted by remote node
+	err := suite.engine.onBlockProposal(suite.identities[1].NodeID, proposal)
+	suite.Assert().Error(err)
+}
+
+func (suite *Suite) OnBlockProposal_Success() {
+
+	proposal := unittest.ProposalFixture()
 
 	params := []interface{}{proposal}
-	for _, id := range identities[1:] {
-		params = append(params, id.NodeID)
+	for _, identity := range suite.identities {
+		// skip consensus nodes
+		if identity.Role == flow.RoleConsensus {
+			continue
+		}
+		params = append(params, identity.NodeID)
 	}
 
-	me.On("NodeID").Return(localID)
-	state.On("Final").Return(final).Once()
-	final.On("Identities", mock.Anything).Return(identities[1:], nil).Once()
-	con.On("Publish", params...).Return(nil).Once()
+	suite.conduit.On("Publish", params...).Return(nil).Once()
 
-	err := e.onBlockProposal(localID, proposal)
-	require.NoError(t, err)
-
-	me.AssertExpectations(t)
-	state.AssertExpectations(t)
-	final.AssertExpectations(t)
-	con.AssertExpectations(t)
-}
-
-func TestOnBlockProposalRemoteOrigin(t *testing.T) {
-
-	me := &module.Local{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
-	con := &network.Conduit{}
-	metrics := metrics.NewNoopCollector()
-
-	e := &Engine{
-		me:      me,
-		state:   state,
-		con:     con,
-		message: metrics,
-		tracer:  trace.NewNoopTracer(),
-	}
-	proposal := unittest.ProposalFixture()
-	identities := unittest.IdentityListFixture(100)
-	localID := identities[0].NodeID
-	remoteID := identities[1].NodeID
-
-	me.On("NodeID").Return(localID)
-
-	err := e.onBlockProposal(remoteID, proposal)
-	require.Error(t, err)
-
-	me.AssertExpectations(t)
-	state.AssertExpectations(t)
-	final.AssertExpectations(t)
-	con.AssertExpectations(t)
-}
-
-func TestOnBlockProposalIdentitiesError(t *testing.T) {
-
-	me := &module.Local{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
-	con := &network.Conduit{}
-	metrics := metrics.NewNoopCollector()
-
-	e := &Engine{
-		me:      me,
-		state:   state,
-		con:     con,
-		message: metrics,
-		tracer:  trace.NewNoopTracer(),
-	}
-	proposal := unittest.ProposalFixture()
-	identities := unittest.IdentityListFixture(100)
-	localID := identities[0].NodeID
-
-	me.On("NodeID").Return(localID)
-	state.On("Final").Return(final).Once()
-	final.On("Identities", mock.Anything).Return(nil, errors.New("no identities")).Once()
-
-	err := e.onBlockProposal(localID, proposal)
-	require.Error(t, err)
-
-	me.AssertExpectations(t)
-	state.AssertExpectations(t)
-	final.AssertExpectations(t)
-	con.AssertExpectations(t)
-}
-
-func TestOnBlockProposalSubmitFail(t *testing.T) {
-
-	me := &module.Local{}
-	state := &protocol.State{}
-	final := &protocol.Snapshot{}
-	con := &network.Conduit{}
-	metrics := metrics.NewNoopCollector()
-
-	e := &Engine{
-		me:      me,
-		state:   state,
-		con:     con,
-		message: metrics,
-		tracer:  trace.NewNoopTracer(),
-	}
-	proposal := unittest.ProposalFixture()
-	identities := unittest.IdentityListFixture(100)
-	localID := identities[0].NodeID
-
-	params := []interface{}{proposal}
-	for _, id := range identities[1:] {
-		params = append(params, id.NodeID)
-	}
-
-	me.On("NodeID").Return(localID)
-	state.On("Final").Return(final).Once()
-	final.On("Identities", mock.Anything).Return(identities[1:], nil).Once()
-	con.On("Publish", params...).Return(errors.New("submit failed")).Once()
-
-	err := e.onBlockProposal(localID, proposal)
-	require.Error(t, err)
-
-	me.AssertExpectations(t)
-	state.AssertExpectations(t)
-	final.AssertExpectations(t)
-	con.AssertExpectations(t)
+	err := suite.engine.onBlockProposal(suite.me.NodeID(), proposal)
+	suite.Require().Nil(err)
+	suite.conduit.AssertExpectations(suite.T())
 }

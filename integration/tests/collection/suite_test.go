@@ -11,19 +11,17 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	ghostclient "github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/convert"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	clusterstate "github.com/dapperlabs/flow-go/state/cluster"
-	clusterstateimpl "github.com/dapperlabs/flow-go/state/cluster/badger"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	ghostclient "github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	clusterstate "github.com/onflow/flow-go/state/cluster"
+	clusterstateimpl "github.com/onflow/flow-go/state/cluster/badger"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const (
@@ -122,8 +120,8 @@ func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
 }
 
 func (suite *CollectorSuite) Clusters() flow.ClusterList {
-	seal := suite.net.Seal()
-	setup, ok := seal.ServiceEvents[0].Event.(*flow.EpochSetup)
+	result := suite.net.Result()
+	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
 
 	collectors := suite.net.Identities().Filter(filter.HasRole(flow.RoleCollection))
@@ -138,7 +136,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	tx := sdk.NewTransaction().
 		SetScript(unittest.NoopTxScript()).
 		SetReferenceBlockID(convert.ToSDKID(suite.net.Root().ID())).
-		SetProposalKey(acct.addr, acct.key.ID, acct.key.SequenceNumber).
+		SetProposalKey(acct.addr, acct.key.Index, acct.key.SequenceNumber).
 		SetPayer(acct.addr).
 		AddAuthorizer(acct.addr)
 
@@ -146,7 +144,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 		apply(tx)
 	}
 
-	err := tx.SignEnvelope(acct.addr, acct.key.ID, acct.signer)
+	err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
 	require.Nil(suite.T(), err)
 
 	suite.acct.key.SequenceNumber++
@@ -164,7 +162,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.ID, acct.signer)
+		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.Index, acct.signer)
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
@@ -309,7 +307,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
 
-	setup, ok := suite.net.Seal().ServiceEvents[0].Event.(*flow.EpochSetup)
+	setup, ok := suite.net.Result().ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok, "could not get root seal setup")
 	rootBlock := clusterstate.CanonicalRootBlock(setup.Counter, myCluster)
 	node := suite.net.ContainerByID(id)
@@ -317,13 +315,10 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 	db, err := node.DB()
 	require.Nil(suite.T(), err, "could not get node db")
 
-	metrics := metrics.NewNoopCollector()
+	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
+	suite.NoError(err)
+	clusterState, err := clusterstateimpl.Bootstrap(db, clusterStateRoot)
+	require.NoError(suite.T(), err, "could not get cluster state")
 
-	headers := storage.NewHeaders(metrics, db)
-	payloads := storage.NewClusterPayloads(metrics, db)
-
-	state, err := clusterstateimpl.NewState(db, rootBlock.Header.ChainID, headers, payloads)
-	require.Nil(suite.T(), err, "could not get cluster state")
-
-	return state
+	return clusterState
 }

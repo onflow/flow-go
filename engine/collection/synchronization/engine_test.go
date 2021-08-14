@@ -12,21 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	model "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	synccore "github.com/dapperlabs/flow-go/module/synchronization"
-	netint "github.com/dapperlabs/flow-go/network"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	clusterint "github.com/dapperlabs/flow-go/state/cluster"
-	cluster "github.com/dapperlabs/flow-go/state/cluster/mock"
-	storerr "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	model "github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	synccore "github.com/onflow/flow-go/module/synchronization"
+	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	clusterint "github.com/onflow/flow-go/state/cluster"
+	cluster "github.com/onflow/flow-go/state/cluster/mock"
+	storerr "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSyncEngine(t *testing.T) {
@@ -41,12 +42,13 @@ type SyncSuite struct {
 	heights      map[uint64]*model.Block
 	blockIDs     map[flow.Identifier]*model.Block
 	net          *module.Network
-	conduit      *network.Conduit
+	conduit      *mocknetwork.Conduit
 	me           *module.Local
 	state        *cluster.State
 	snapshot     *cluster.Snapshot
+	params       *cluster.Params
 	blocks       *storage.ClusterBlocks
-	comp         *network.Engine
+	comp         *mocknetwork.Engine
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -66,18 +68,20 @@ func (ss *SyncSuite) SetupTest() {
 	// create maps to enable block returns
 	ss.heights = make(map[uint64]*model.Block)
 	ss.blockIDs = make(map[flow.Identifier]*model.Block)
+	clusterID := header.ChainID
 
 	// set up the network module mock
 	ss.net = &module.Network{}
-	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code string, engine netint.Engine) netint.Conduit {
+	ss.net.On("Register", engine.ChannelSyncCluster(clusterID), mock.Anything).Return(
+		func(network netint.Channel, engine netint.Engine) netint.Conduit {
 			return ss.conduit
 		},
 		nil,
 	)
 
 	// set up the network conduit mock
-	ss.conduit = &network.Conduit{}
+	ss.conduit = &mocknetwork.Conduit{}
+	ss.conduit.On("Close").Return(nil).Maybe()
 
 	// set up the local module mock
 	ss.me = &module.Local{}
@@ -94,6 +98,14 @@ func (ss *SyncSuite) SetupTest() {
 			return ss.snapshot
 		},
 	)
+
+	ss.params = &cluster.Params{}
+	ss.state.On("Params").Return(
+		func() clusterint.Params {
+			return ss.params
+		},
+	)
+	ss.params.On("ChainID").Return(ss.head.ChainID, nil)
 
 	// set up the snapshot mock
 	ss.snapshot = &cluster.Snapshot{}
@@ -138,7 +150,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &network.Engine{}
+	ss.comp = &mocknetwork.Engine{}
 	ss.comp.On("SubmitLocal", mock.Anything).Return()
 
 	// set up sync core

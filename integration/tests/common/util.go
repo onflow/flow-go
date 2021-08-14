@@ -6,15 +6,16 @@ import (
 	"math/rand"
 
 	"github.com/onflow/cadence"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/convert"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/dsl"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/dsl"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var (
@@ -73,12 +74,14 @@ func ReadCounterScript(contractAddress sdk.Address, accountAddress sdk.Address) 
 			Address: contractAddress,
 		},
 		ReturnType: "Int",
-		Code: fmt.Sprintf(`
-			let account = getAccount(0x%s)
-			if let cap = account.getCapability(/public/counter) {
-				return cap.borrow<&Testing.Counter>()?.count ?? -3
-			}
-			return -3`, accountAddress.Hex()),
+		Code: fmt.Sprintf(
+			`
+			  let account = getAccount(0x%s)
+			  let cap = account.getCapability(/public/counter)
+              return cap.borrow<&Testing.Counter>()?.count ?? -3
+            `,
+			accountAddress.Hex(),
+		),
 	}
 }
 
@@ -176,7 +179,7 @@ func SDKTransactionFixture(opts ...func(*sdk.Transaction)) sdk.Transaction {
 		ProposalKey:        convert.ToSDKProposalKey(unittest.ProposalKeyFixture()),
 		Payer:              sdk.Address(unittest.AddressFixture()),
 		Authorizers:        []sdk.Address{sdk.Address(unittest.AddressFixture())},
-		PayloadSignatures:  []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
+		PayloadSignatures:  []sdk.TransactionSignature{},
 		EnvelopeSignatures: []sdk.TransactionSignature{convert.ToSDKTransactionSignature(unittest.TransactionSignatureFixture())},
 	}
 
@@ -196,5 +199,25 @@ func WithTransactionDSL(txDSL dsl.Transaction) func(tx *sdk.Transaction) {
 func WithReferenceBlock(id sdk.Identifier) func(tx *sdk.Transaction) {
 	return func(tx *sdk.Transaction) {
 		tx.ReferenceBlockID = id
+	}
+}
+
+// WithChainID modifies the default fixture to use addresses consistent with the
+// given chain ID.
+func WithChainID(chainID flow.ChainID) func(tx *sdk.Transaction) {
+	service := convert.ToSDKAddress(chainID.Chain().ServiceAddress())
+	return func(tx *sdk.Transaction) {
+		tx.Payer = service
+		tx.Authorizers = []sdk.Address{service}
+
+		tx.ProposalKey.Address = service
+		for i, sig := range tx.PayloadSignatures {
+			sig.Address = service
+			tx.PayloadSignatures[i] = sig
+		}
+		for i, sig := range tx.EnvelopeSignatures {
+			sig.Address = service
+			tx.EnvelopeSignatures[i] = sig
+		}
 	}
 }

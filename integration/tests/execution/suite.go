@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/ghost/client"
-	"github.com/dapperlabs/flow-go/integration/testnet"
-	"github.com/dapperlabs/flow-go/integration/tests/common"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/ghost/client"
+	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/tests/common"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -38,6 +38,14 @@ func (s *Suite) AccessClient() *testnet.Client {
 	chain := s.net.Root().Header.ChainID.Chain()
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(s.T(), err, "could not get access client")
+	return client
+}
+
+func (s *Suite) ExecutionClient() *testnet.Client {
+	execNode := s.net.ContainerByID(s.exe1ID)
+	chain := s.net.Root().Header.ChainID.Chain()
+	client, err := testnet.NewClient(fmt.Sprintf(":%s", execNode.Ports[testnet.ExeNodeAPIPort]), chain)
+	require.NoError(s.T(), err, "could not get execution client")
 	return client
 }
 
@@ -86,12 +94,20 @@ func (s *Suite) SetupTest() {
 
 	// add the ghost (verification) node config
 	s.ghostID = unittest.IdentifierFixture()
-	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(s.ghostID), testnet.AsGhost(),
+	ghostConfig := testnet.NewNodeConfig(flow.RoleVerification,
+		testnet.WithID(s.ghostID),
+		testnet.AsGhost(),
 		testnet.WithLogLevel(zerolog.InfoLevel))
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generate the network config
-	netConfig := testnet.NewNetworkConfig("execution_tests", s.nodeConfigs)
+	netConfig := testnet.NewNetworkConfig(
+		"execution_tests",
+		s.nodeConfigs,
+		// set long staking phase to avoid QC/DKG transactions during test run
+		testnet.WithViewsInStakingAuction(10_000),
+		testnet.WithViewsInEpoch(100_000),
+	)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)

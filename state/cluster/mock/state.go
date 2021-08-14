@@ -3,8 +3,8 @@
 package mock
 
 import (
-	flow "github.com/dapperlabs/flow-go/model/flow"
-	cluster "github.com/dapperlabs/flow-go/state/cluster"
+	flow "github.com/onflow/flow-go/model/flow"
+	cluster "github.com/onflow/flow-go/state/cluster"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -46,16 +46,16 @@ func (_m *State) Final() cluster.Snapshot {
 	return r0
 }
 
-// Mutate provides a mock function with given fields:
-func (_m *State) Mutate() cluster.Mutator {
+// Params provides a mock function with given fields:
+func (_m *State) Params() cluster.Params {
 	ret := _m.Called()
 
-	var r0 cluster.Mutator
-	if rf, ok := ret.Get(0).(func() cluster.Mutator); ok {
+	var r0 cluster.Params
+	if rf, ok := ret.Get(0).(func() cluster.Params); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(cluster.Mutator)
+			r0 = ret.Get(0).(cluster.Params)
 		}
 	}
 

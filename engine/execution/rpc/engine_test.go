@@ -14,12 +14,12 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/entities"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	ingestion "github.com/dapperlabs/flow-go/engine/execution/ingestion/mock"
-	"github.com/dapperlabs/flow-go/model/flow"
-	realstorage "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	ingestion "github.com/onflow/flow-go/engine/execution/ingestion/mock"
+	"github.com/onflow/flow-go/model/flow"
+	realstorage "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -61,7 +61,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		eventsForBlock := make([]flow.Event, eventsPerBlock)
 		eventMessages := make([]*entities.Event, eventsPerBlock)
 		for j := range eventsForBlock {
-			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
+			e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
 			eventsForBlock[j] = e
 			eventMessages[j] = convert.EventToMessage(e)
 		}
@@ -245,7 +245,7 @@ func (suite *Suite) TestGetTransactionResult() {
 	eventsForTx := make([]flow.Event, totalEvents)
 	eventMessages := make([]*entities.Event, totalEvents)
 	for j := range eventsForTx {
-		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture())
+		e := unittest.EventFixture(flow.EventAccountCreated, uint32(j), uint32(j), unittest.IdentifierFixture(), 0)
 		eventsForTx[j] = e
 		eventMessages[j] = convert.EventToMessage(e)
 	}
@@ -361,7 +361,12 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with transaction ID as nil
 		req := concoctReq(bID[:], nil)
 
-		handler := createHandler(nil)
+		// expect a call to lookup transaction result by block ID and transaction ID, return an error
+		txResults := new(storage.TransactionResults)
+
+		txResults.On("ByBlockIDTransactionID", bID, nil).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+
+		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -379,7 +384,11 @@ func (suite *Suite) TestGetTransactionResult() {
 		// create an API request with a nil block id
 		req := concoctReq(nil, txID[:])
 
-		handler := createHandler(nil)
+		txResults := new(storage.TransactionResults)
+
+		txResults.On("ByBlockIDTransactionID", nil, txID).Return(nil, status.Error(codes.InvalidArgument, "")).Once()
+
+		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 
@@ -396,13 +405,14 @@ func (suite *Suite) TestGetTransactionResult() {
 
 		wrongTxID := unittest.IdentifierFixture()
 
-		// expect a storage call for the invalid bID but return an error
-		suite.events.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, errors.New("")).Once()
-
 		// create an API request with the invalid transaction ID
 		req := concoctReq(bID[:], wrongTxID[:])
 
-		handler := createHandler(nil)
+		// expect a storage call for the invalid tx ID but return an error
+		txResults := new(storage.TransactionResults)
+		txResults.On("ByBlockIDTransactionID", bID, wrongTxID).Return(nil, status.Error(codes.Internal, "")).Once()
+
+		handler := createHandler(txResults)
 
 		_, err := handler.GetTransactionResult(context.Background(), req)
 

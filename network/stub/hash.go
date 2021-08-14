@@ -4,14 +4,15 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/model/encoding"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 )
 
-// eventKey generates a unique fingerprint for the tuple of (sender, event, type of event, channelID)
-func eventKey(from flow.Identifier, channelID string, event interface{}) (string, error) {
-	tag, err := encoding.DefaultEncoder.Encode([]byte(fmt.Sprintf("testthenetwork %s %T", channelID, event)))
+// eventKey generates a unique fingerprint for the tuple of (sender, event, type of event, channel)
+func eventKey(from flow.Identifier, channel network.Channel, event interface{}) (string, error) {
+	tag, err := encoding.DefaultEncoder.Encode([]byte(fmt.Sprintf("testthenetwork %s %T", channel, event)))
 	if err != nil {
 		return "", fmt.Errorf("could not encode the tag: %w", err)
 	}

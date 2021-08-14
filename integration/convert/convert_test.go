@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/dapperlabs/flow-go/integration/convert"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/integration/convert"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestConvertTx(t *testing.T) {

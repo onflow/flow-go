@@ -3,10 +3,13 @@ package fvm
 import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/common"
 
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/hash"
+	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/hash"
 )
 
 func Script(code []byte) *ScriptProcedure {
@@ -24,14 +27,13 @@ type ScriptProcedure struct {
 	Arguments [][]byte
 	Value     cadence.Value
 	Logs      []string
-	Events    []cadence.Event
-	// TODO: report gas consumption: https://github.com/dapperlabs/flow-go/issues/4139
-	GasUsed uint64
-	Err     Error
+	Events    []flow.Event
+	GasUsed   uint64
+	Err       errors.Error
 }
 
 type ScriptProcessor interface {
-	Process(*VirtualMachine, Context, *ScriptProcedure, state.Ledger) error
+	Process(*VirtualMachine, Context, *ScriptProcedure, *state.StateHolder, *programs.Programs) error
 }
 
 func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
@@ -42,16 +44,15 @@ func (proc *ScriptProcedure) WithArguments(args ...[]byte) *ScriptProcedure {
 	}
 }
 
-func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, ledger state.Ledger) error {
+func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error {
 	for _, p := range ctx.ScriptProcessors {
-		err := p.Process(vm, ctx, proc, ledger)
-		vmErr, fatalErr := handleError(err)
-		if fatalErr != nil {
-			return fatalErr
+		err := p.Process(vm, ctx, proc, sth, programs)
+		txError, failure := errors.SplitErrorTypes(err)
+		if failure != nil {
+			return failure
 		}
-
-		if vmErr != nil {
-			proc.Err = vmErr
+		if txError != nil {
+			proc.Err = txError
 			return nil
 		}
 	}
@@ -69,20 +70,29 @@ func (i ScriptInvocator) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *ScriptProcedure,
-	ledger state.Ledger,
+	sth *state.StateHolder,
+	programs *programs.Programs,
 ) error {
-	env := newEnvironment(ctx, ledger)
+	env := NewScriptEnvironment(ctx, vm, sth, programs)
+	location := common.ScriptLocation(proc.ID[:])
+	value, err := vm.Runtime.ExecuteScript(
+		runtime.Script{
+			Source:    proc.Script,
+			Arguments: proc.Arguments,
+		},
+		runtime.Context{
+			Interface: env,
+			Location:  location,
+		},
+	)
 
-	location := runtime.ScriptLocation(proc.ID[:])
-
-	value, err := vm.Runtime.ExecuteScript(proc.Script, proc.Arguments, env, location)
 	if err != nil {
-		return err
+		return errors.HandleRuntimeError(err)
 	}
 
 	proc.Value = value
-	proc.Logs = env.getLogs()
-	proc.Events = env.getEvents()
-
+	proc.Logs = env.Logs()
+	proc.Events = env.Events()
+	proc.GasUsed = env.GetComputationUsed()
 	return nil
 }

@@ -1,9 +1,9 @@
 package epochmgr
 
 import (
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // EpochComponentsFactory is responsible for creating epoch-scoped components
@@ -14,6 +14,8 @@ type EpochComponentsFactory interface {
 	// be used either for an ongoing epoch (for example, after a restart) or
 	// for an epoch that will start soon. It is safe to call multiple times for
 	// a given epoch counter.
+	//
+	// Must return ErrUnstakedForEpoch if this node is not staked in the epoch.
 	Create(epoch protocol.Epoch) (
 		state cluster.State,
 		proposal module.Engine,

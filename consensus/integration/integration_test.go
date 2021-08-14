@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func runNodes(nodes []*Node) {
@@ -22,19 +23,14 @@ func runNodes(nodes []*Node) {
 
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
-	nodes, stopper, hub := createNodes(t, 3, 5, 0)
+	stopper := NewStopper(5, 0)
+	rootSnapshot := createRootSnapshot(t, 3)
+	nodes, hub := createNodes(t, stopper, rootSnapshot)
 
 	hub.WithFilter(blockNothing)
 	runNodes(nodes)
 
-	assert.Eventually(t, func() bool {
-		select {
-		case <-stopper.stopped:
-			return true
-		default:
-			return false
-		}
-	}, 30*time.Second, 20*time.Millisecond)
+	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
@@ -46,7 +42,9 @@ func Test3Nodes(t *testing.T) {
 func Test5Nodes(t *testing.T) {
 
 	// 4 nodes should be able finalize at least 3 blocks.
-	nodes, stopper, hub := createNodes(t, 5, 2, 1)
+	stopper := NewStopper(2, 1)
+	rootSnapshot := createRootSnapshot(t, 5)
+	nodes, hub := createNodes(t, stopper, rootSnapshot)
 
 	hub.WithFilter(blockNodes(nodes[0]))
 	runNodes(nodes)
@@ -116,10 +114,10 @@ func chainViews(t *testing.T, node *Node) []uint64 {
 	return low2high
 }
 
-type BlockOrDelayFunc func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration)
+type BlockOrDelayFunc func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration)
 
 // block nothing
-func blockNothing(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+func blockNothing(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 	return false, 0
 }
 
@@ -129,7 +127,7 @@ func blockNodes(denyList ...*Node) BlockOrDelayFunc {
 	for _, n := range denyList {
 		blackList[n.id.ID()] = n
 	}
-	return func(channelID string, event interface{}, sender, receiver *Node) (bool, time.Duration) {
+	return func(channel network.Channel, event interface{}, sender, receiver *Node) (bool, time.Duration) {
 		block, notBlock := true, false
 		if _, ok := blackList[sender.id.ID()]; ok {
 			return block, 0

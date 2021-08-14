@@ -7,15 +7,15 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 // RetrieveFunc is a function provided to the provider engine upon construction.
@@ -35,7 +35,7 @@ type Engine struct {
 	me       module.Local
 	state    protocol.State
 	con      network.Conduit
-	channel  string
+	channel  network.Channel
 	selector flow.IdentityFilter
 	retrieve RetrieveFunc
 }
@@ -44,7 +44,7 @@ type Engine struct {
 // from a node within the set obtained by applying the provided selector filter. It uses the injected retrieve function
 // to manage the fullfilment of these requests.
 func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
-	channel string, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
+	channel network.Channel, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
 	// make sure we don't respond to requests sent by self or non-staked nodes
 	selector = filter.And(
@@ -90,15 +90,20 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an message originating on the local node.
 func (e *Engine) SubmitLocal(message interface{}) {
-	e.Submit(e.me.NodeID(), message)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), message)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given message from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, message interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, message)
+		err := e.Process(channel, originID, message)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -107,12 +112,14 @@ func (e *Engine) Submit(originID flow.Identifier, message interface{}) {
 
 // ProcessLocal processes an message originating on the local node.
 func (e *Engine) ProcessLocal(message interface{}) error {
-	return e.Process(e.me.NodeID(), message)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), message)
+	})
 }
 
 // Process processes the given message from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, message interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, message)
 	})
@@ -121,8 +128,8 @@ func (e *Engine) Process(originID flow.Identifier, message interface{}) error {
 // process processes events for the propagation engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
-	e.metrics.MessageReceived(e.channel, metrics.MessageEntityRequest)
-	defer e.metrics.MessageHandled(e.channel, metrics.MessageEntityRequest)
+	e.metrics.MessageReceived(e.channel.String(), metrics.MessageEntityRequest)
+	defer e.metrics.MessageHandled(e.channel.String(), metrics.MessageEntityRequest)
 
 	e.unit.Lock()
 	defer e.unit.Unlock()
@@ -193,7 +200,7 @@ func (e *Engine) onEntityRequest(originID flow.Identifier, req *messages.EntityR
 		return fmt.Errorf("could not send response: %w", err)
 	}
 
-	e.metrics.MessageSent(e.channel, metrics.MessageEntityResponse)
+	e.metrics.MessageSent(e.channel.String(), metrics.MessageEntityResponse)
 
 	return nil
 }

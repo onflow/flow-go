@@ -3,7 +3,7 @@
 package mock
 
 import (
-	crypto "github.com/dapperlabs/flow-go/crypto"
+	crypto "github.com/onflow/flow-go/crypto"
 	mock "github.com/stretchr/testify/mock"
 )
 

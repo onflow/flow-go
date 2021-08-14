@@ -1,21 +1,21 @@
 package factories
 
 import (
-	"errors"
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/model/indices"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/mempool"
-	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/state/protocol"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/mempool/epochs"
+	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/cluster/badger"
+	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage"
 )
 
 type EpochComponentsFactory struct {
 	me       module.Local
-	pool     mempool.Transactions // TODO make per-epoch
+	pools    *epochs.TransactionPools
 	builder  *BuilderFactory
 	state    *ClusterStateFactory
 	hotstuff *HotStuffFactory
@@ -25,7 +25,7 @@ type EpochComponentsFactory struct {
 
 func NewEpochComponentsFactory(
 	me module.Local,
-	pool mempool.Transactions, // TODO make per-epoch
+	pools *epochs.TransactionPools,
 	builder *BuilderFactory,
 	state *ClusterStateFactory,
 	hotstuff *HotStuffFactory,
@@ -35,7 +35,7 @@ func NewEpochComponentsFactory(
 
 	factory := &EpochComponentsFactory{
 		me:       me,
-		pool:     pool,
+		pools:    pools,
 		builder:  builder,
 		state:    state,
 		hotstuff: hotstuff,
@@ -54,6 +54,24 @@ func (factory *EpochComponentsFactory) Create(
 	hotstuff module.HotStuff,
 	err error,
 ) {
+
+	counter, err := epoch.Counter()
+	if err != nil {
+		err = fmt.Errorf("could not get epoch counter: %w", err)
+		return
+	}
+
+	// if we are not a staked participant in this epoch, return a sentinel
+	identities, err := epoch.InitialIdentities()
+	if err != nil {
+		err = fmt.Errorf("could not get initial identities for epoch: %w", err)
+		return
+	}
+	_, exists := identities.ByNodeID(factory.me.NodeID())
+	if !exists {
+		err = fmt.Errorf("%w (node_id=%x, epoch=%d)", epochmgr.ErrUnstakedForEpoch, factory.me.NodeID(), counter)
+		return
+	}
 
 	// determine this node's cluster for the epoch
 	clusters, err := epoch.Clustering()
@@ -78,39 +96,30 @@ func (factory *EpochComponentsFactory) Create(
 		payloads storage.ClusterPayloads
 		blocks   storage.ClusterBlocks
 	)
-	state, headers, payloads, blocks, err = factory.state.Create(cluster.ChainID())
+
+	stateRoot, err := badger.NewStateRoot(cluster.RootBlock())
+	if err != nil {
+		err = fmt.Errorf("could not create valid state root: %w", err)
+		return
+	}
+	var mutableState *badger.MutableState
+	mutableState, headers, payloads, blocks, err = factory.state.Create(stateRoot)
+	state = mutableState
 	if err != nil {
 		err = fmt.Errorf("could not create cluster state: %w", err)
 		return
 	}
-	_, err = state.Final().Head()
-	// storage layer error while checking state - fail fast
-	if err != nil && !errors.Is(err, storage.ErrNotFound) {
-		err = fmt.Errorf("could not check cluster state db: %w", err)
-		return
-	}
-	if errors.Is(err, storage.ErrNotFound) {
-		// no existing cluster state, bootstrap with root block for epoch
-		err = state.Mutate().Bootstrap(cluster.RootBlock())
-		if err != nil {
-			err = fmt.Errorf("could not bootstrap cluster state: %w", err)
-			return
-		}
-	}
 
-	builder, finalizer, err := factory.builder.Create(headers, payloads, factory.pool)
+	// get the transaction pool for the epoch
+	pool := factory.pools.ForEpoch(counter)
+
+	builder, finalizer, err := factory.builder.Create(headers, payloads, pool)
 	if err != nil {
 		err = fmt.Errorf("could not create builder/finalizer: %w", err)
 		return
 	}
 
-	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(clusterIndex)...)
-	if err != nil {
-		err = fmt.Errorf("could not get leader selection seed: %w", err)
-		return
-	}
-
-	proposalEng, err := factory.proposal.Create(state, headers, payloads)
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return
@@ -123,17 +132,14 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	hotstuff, err = factory.hotstuff.Create(
-		cluster.ChainID(),
-		cluster.Members(),
+		epoch,
+		cluster,
 		state,
 		headers,
 		payloads,
-		seed,
 		builder,
 		finalizer,
 		proposalEng,
-		cluster.RootBlock().Header,
-		cluster.RootQC(),
 	)
 	if err != nil {
 		err = fmt.Errorf("could not create hotstuff: %w", err)

@@ -9,19 +9,21 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	model "github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/badger"
-	"github.com/dapperlabs/flow-go/state/protocol/events"
-	storage "github.com/dapperlabs/flow-go/storage/badger"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
-	"github.com/dapperlabs/flow-go/storage/badger/procedure"
-	"github.com/dapperlabs/flow-go/storage/util"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	model "github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/state/protocol"
+	pbadger "github.com/onflow/flow-go/state/protocol/badger"
+	storage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/procedure"
+	"github.com/onflow/flow-go/storage/util"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type SnapshotSuite struct {
@@ -32,10 +34,9 @@ type SnapshotSuite struct {
 	genesis *model.Block
 	chainID flow.ChainID
 
-	protoState *protocol.State
+	protoState protocol.State
 
-	state   cluster.State
-	mutator cluster.Mutator
+	state cluster.MutableState
 }
 
 // runs before each test runs
@@ -52,24 +53,25 @@ func (suite *SnapshotSuite) SetupTest() {
 	suite.db = unittest.BadgerDB(suite.T(), suite.dbdir)
 
 	metrics := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
 
-	headers, _, seals, index, conPayloads, blocks, setups, commits, statuses := util.StorageLayer(suite.T(), suite.db)
+	headers, _, seals, _, _, blocks, setups, commits, statuses, results := util.StorageLayer(suite.T(), suite.db)
 	colPayloads := storage.NewClusterPayloads(metrics, suite.db)
 
-	suite.state, err = NewState(suite.db, suite.chainID, headers, colPayloads)
+	clusterStateRoot, err := NewStateRoot(suite.genesis)
 	suite.Assert().Nil(err)
-	suite.mutator = suite.state.Mutate()
-	consumer := events.NewNoop()
+	clusterState, err := Bootstrap(suite.db, clusterStateRoot)
+	suite.Assert().Nil(err)
+	suite.state, err = NewMutableState(clusterState, tracer, headers, colPayloads)
+	suite.Assert().Nil(err)
 
-	// just bootstrap with a genesis block, we'll use this as reference
-	suite.protoState, err = protocol.NewState(metrics, suite.db, headers, seals, index, conPayloads, blocks, setups, commits, statuses, consumer)
-	suite.Assert().Nil(err)
 	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
-	genesis, result, seal := unittest.BootstrapFixture(participants)
-	err = suite.protoState.Mutate().Bootstrap(genesis, result, seal)
-	suite.Require().Nil(err)
+	root := unittest.RootSnapshotFixture(participants)
 
-	suite.Bootstrap()
+	suite.protoState, err = pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, root)
+	require.NoError(suite.T(), err)
+
+	suite.Require().Nil(err)
 }
 
 // runs after each test finishes
@@ -77,11 +79,6 @@ func (suite *SnapshotSuite) TearDownTest() {
 	err := suite.db.Close()
 	suite.Assert().Nil(err)
 	err = os.RemoveAll(suite.dbdir)
-	suite.Assert().Nil(err)
-}
-
-func (suite *SnapshotSuite) Bootstrap() {
-	err := suite.mutator.Bootstrap(suite.genesis)
 	suite.Assert().Nil(err)
 }
 
@@ -193,17 +190,17 @@ func (suite *SnapshotSuite) TestFinalizedBlock() {
 
 	// create a new finalized block on genesis (height=1)
 	finalizedBlock1 := suite.Block()
-	err := suite.mutator.Extend(&finalizedBlock1)
+	err := suite.state.Extend(&finalizedBlock1)
 	assert.Nil(t, err)
 
 	// create an un-finalized block on genesis (height=1)
 	unFinalizedBlock1 := suite.Block()
-	err = suite.mutator.Extend(&unFinalizedBlock1)
+	err = suite.state.Extend(&unFinalizedBlock1)
 	assert.Nil(t, err)
 
 	// create a second un-finalized on top of the finalized block (height=2)
 	unFinalizedBlock2 := suite.BlockWithParent(&finalizedBlock1)
-	err = suite.mutator.Extend(&unFinalizedBlock2)
+	err = suite.state.Extend(&unFinalizedBlock2)
 	assert.Nil(t, err)
 
 	// finalize the block
@@ -284,4 +281,11 @@ func (suite *SnapshotSuite) TestPending_Grandchildren() {
 		// mark this block as seen
 		parents[header.ID()] = struct{}{}
 	}
+}
+
+func (suite *SnapshotSuite) TestParams_ChainID() {
+
+	chainID, err := suite.state.Params().ChainID()
+	suite.Require().Nil(err)
+	suite.Assert().Equal(suite.genesis.Header.ChainID, chainID)
 }

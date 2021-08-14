@@ -1,8 +1,8 @@
 package bootstrap
 
 import (
-	"github.com/dapperlabs/flow-go/model/encodable"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // PartnerNodeInfoPub represents public information about a partner/external

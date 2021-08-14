@@ -4,15 +4,15 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/protobuf/ptypes"
 	accessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/legacy/entities"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
-	"github.com/dapperlabs/flow-go/access"
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
-	"github.com/dapperlabs/flow-go/engine/common/rpc/convert"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/engine/common/rpc/convert"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var ErrEmptyMessage = errors.New("protobuf message is empty")
@@ -77,7 +77,7 @@ func MessageToTransaction(m *entitiesproto.Transaction, chain flow.Chain) (flow.
 func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	proposalKeyMessage := &entitiesproto.Transaction_ProposalKey{
 		Address:        tb.ProposalKey.Address.Bytes(),
-		KeyId:          uint32(tb.ProposalKey.KeyID),
+		KeyId:          uint32(tb.ProposalKey.KeyIndex),
 		SequenceNumber: tb.ProposalKey.SequenceNumber,
 	}
 
@@ -91,7 +91,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	for i, sig := range tb.PayloadSignatures {
 		payloadSigMessages[i] = &entitiesproto.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -101,7 +101,7 @@ func TransactionToMessage(tb flow.TransactionBody) *entitiesproto.Transaction {
 	for i, sig := range tb.EnvelopeSignatures {
 		envelopeSigMessages[i] = &entitiesproto.Transaction_Signature{
 			Address:   sig.Address.Bytes(),
-			KeyId:     uint32(sig.KeyID),
+			KeyId:     uint32(sig.KeyIndex),
 			Signature: sig.Signature,
 		}
 	}
@@ -131,10 +131,7 @@ func TransactionResultToMessage(result access.TransactionResult) *accessproto.Tr
 func BlockHeaderToMessage(h *flow.Header) (*entitiesproto.BlockHeader, error) {
 	id := h.ID()
 
-	t, err := ptypes.TimestampProto(h.Timestamp)
-	if err != nil {
-		return nil, err
-	}
+	t := timestamppb.New(h.Timestamp)
 
 	return &entitiesproto.BlockHeader{
 		Id:        id[:],
@@ -148,10 +145,7 @@ func BlockToMessage(h *flow.Block) (*entitiesproto.Block, error) {
 	id := h.ID()
 
 	parentID := h.Header.ParentID
-	t, err := ptypes.TimestampProto(h.Header.Timestamp)
-	if err != nil {
-		return nil, err
-	}
+	t := timestamppb.New(h.Header.Timestamp)
 
 	cg := make([]*entitiesproto.CollectionGuarantee, len(h.Payload.Guarantees))
 	for i, g := range h.Payload.Guarantees {
@@ -231,7 +225,7 @@ func AccountToMessage(a *flow.Account) (*entitiesproto.Account, error) {
 	return &entitiesproto.Account{
 		Address: a.Address.Bytes(),
 		Balance: a.Balance,
-		Code:    a.Code,
+		Code:    nil,
 		Keys:    keys,
 	}, nil
 }

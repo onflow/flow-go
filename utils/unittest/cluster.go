@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 )
 
 // TransactionForCluster generates a transaction that will be assigned to the
@@ -27,7 +27,9 @@ func AlterTransactionForCluster(tx flow.TransactionBody, clusters flow.ClusterLi
 	for i := 0; i < 10000; i++ {
 		tx.Script = append(tx.Script, '/', '/')
 
-		after(&tx)
+		if after != nil {
+			after(&tx)
+		}
 		routed, ok := clusters.ByTxID(tx.ID())
 		if !ok {
 			panic(fmt.Sprintf("unable to find cluster by txID: %x", tx.ID()))
@@ -59,4 +61,14 @@ func ClusterAssignment(n uint, nodes flow.IdentityList) flow.AssignmentList {
 	}
 
 	return assignments
+}
+
+func ClusterList(n uint, nodes flow.IdentityList) flow.ClusterList {
+	assignments := ClusterAssignment(n, nodes)
+	clusters, err := flow.NewClusterList(assignments, nodes.Filter(filter.HasRole(flow.RoleCollection)))
+	if err != nil {
+		panic(err)
+	}
+
+	return clusters
 }

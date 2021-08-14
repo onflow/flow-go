@@ -3,7 +3,7 @@
 package filter
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Any will always be true.
@@ -68,6 +68,11 @@ func HasStake(hasStake bool) flow.IdentityFilter {
 	}
 }
 
+// Ejected is a filter that returns true if the node is ejected.
+func Ejected(identity *flow.Identity) bool {
+	return identity.Ejected
+}
+
 // HasRole returns a filter for nodes with one of the input roles.
 func HasRole(roles ...flow.Role) flow.IdentityFilter {
 	lookup := make(map[flow.Role]struct{})
@@ -79,3 +84,22 @@ func HasRole(roles ...flow.Role) flow.IdentityFilter {
 		return ok
 	}
 }
+
+// IsValidCurrentEpochParticipant is an identity filter for members of the
+// current epoch in good standing.
+var IsValidCurrentEpochParticipant = And(
+	HasStake(true),
+	Not(Ejected),
+)
+
+// IsVotingConsensusCommitteeMember is a identity filter for all members of
+// the consensus committee allowed to vote.
+var IsVotingConsensusCommitteeMember = And(
+	HasRole(flow.RoleConsensus),
+	IsValidCurrentEpochParticipant,
+)
+
+// IsValidDKGParticipant is an identity filter for all DKG participants. It is
+// equivalent to the filter for consensus committee members, as these are
+// the same group for now.
+var IsValidDKGParticipant = IsVotingConsensusCommitteeMember

@@ -6,8 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestQueue(t *testing.T) {
@@ -35,58 +35,72 @@ func TestQueue(t *testing.T) {
 	queue := NewQueue(a)
 
 	t.Run("Adding", func(t *testing.T) {
-		added := queue.TryAdd(b) //parent not added yet
+		stored, _ := queue.TryAdd(b) //parent not stored yet
 		size := queue.Size()
 		height := queue.Height()
-		assert.False(t, added)
+		assert.False(t, stored)
 		assert.Equal(t, 1, size)
 		assert.Equal(t, uint64(0), height)
 
-		added = queue.TryAdd(c)
+		stored, new := queue.TryAdd(c)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 2, size)
 		assert.Equal(t, uint64(1), height)
 
-		added = queue.TryAdd(b)
+		stored, new = queue.TryAdd(b)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 3, size)
 		assert.Equal(t, uint64(2), height)
 
-		added = queue.TryAdd(f) //parent not added yet
-		assert.False(t, added)
-
-		added = queue.TryAdd(d)
+		stored, new = queue.TryAdd(b) //repeat
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.False(t, new)
+		assert.Equal(t, 3, size)
+		assert.Equal(t, uint64(2), height)
+
+		stored, _ = queue.TryAdd(f) //parent not stored yet
+		assert.False(t, stored)
+
+		stored, new = queue.TryAdd(d)
+		size = queue.Size()
+		height = queue.Height()
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 4, size)
 		assert.Equal(t, uint64(2), height)
 
-		added = queue.TryAdd(dBroken) // wrong height
-		assert.False(t, added)
+		stored, _ = queue.TryAdd(dBroken) // wrong height
+		assert.False(t, stored)
 
-		added = queue.TryAdd(e)
+		stored, new = queue.TryAdd(e)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 5, size)
 		assert.Equal(t, uint64(3), height)
 
-		added = queue.TryAdd(f)
+		stored, new = queue.TryAdd(f)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 6, size)
 		assert.Equal(t, uint64(3), height)
 
-		added = queue.TryAdd(g)
+		stored, new = queue.TryAdd(g)
 		size = queue.Size()
 		height = queue.Height()
-		assert.True(t, added)
+		assert.True(t, stored)
+		assert.True(t, new)
 		assert.Equal(t, 7, size)
 		assert.Equal(t, uint64(3), height)
 	})
@@ -170,39 +184,109 @@ func TestQueue(t *testing.T) {
 		assert.Less(t, indices[d], indices[e])
 	})
 
-	t.Run("Attaching", func(t *testing.T) {
+	//t.Run("Attaching", func(t *testing.T) {
+	//	queue := NewQueue(a)
+	//
+	//	added, new := queue.TryAdd(c)
+	//	assert.True(t, added)
+	//	assert.True(t, new)
+	//	assert.Equal(t, 2, queue.Size())
+	//	assert.Equal(t, uint64(1), queue.Height())
+	//
+	//	queueB := NewQueue(b)
+	//	added, new = queueB.TryAdd(g)
+	//	assert.True(t, added)
+	//	assert.True(t, new)
+	//
+	//	assert.Equal(t, 2, queueB.Size())
+	//	assert.Equal(t, uint64(1), queueB.Height())
+	//
+	//	queueF := NewQueue(f)
+	//
+	//	err := queue.Attach(queueF) // node D is missing
+	//	assert.Error(t, err)
+	//
+	//	err = queue.Attach(queueB)
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, 4, queue.Size())
+	//	assert.Equal(t, uint64(3), queue.Height())
+	//
+	//	added, new = queue.TryAdd(d)
+	//	assert.True(t, added)
+	//	assert.True(t, new)
+	//	assert.Equal(t, 5, queue.Size())
+	//	assert.Equal(t, uint64(3), queue.Height())
+	//
+	//	err = queue.Attach(queueF) // node D is now in the queue
+	//	assert.NoError(t, err)
+	//	assert.Equal(t, 6, queue.Size())
+	//	assert.Equal(t, uint64(3), queue.Height())
+	//})
+
+	// Creating queue:
+	//    f--d--c-a
+	// Addingan element should be an idempotent operation:
+	//   * adding c a second time
+	//   * Dequeueing single head:
+	//     we should only get one child queue f--d--c
+	t.Run("Adding_Idempotent", func(t *testing.T) {
 		queue := NewQueue(a)
+		add, new := queue.TryAdd(c)
+		assert.True(t, add)
+		assert.True(t, new)
 
-		added := queue.TryAdd(c)
-		assert.True(t, added)
-		assert.Equal(t, 2, queue.Size())
-		assert.Equal(t, uint64(1), queue.Height())
+		add, new = queue.TryAdd(d)
+		assert.True(t, add)
+		assert.True(t, new)
 
-		queueB := NewQueue(b)
-		added = queueB.TryAdd(g)
-		assert.True(t, added)
+		add, new = queue.TryAdd(f)
+		assert.True(t, add)
+		assert.True(t, new)
 
-		assert.Equal(t, 2, queueB.Size())
-		assert.Equal(t, uint64(1), queueB.Height())
-
-		queueF := NewQueue(f)
-
-		err := queue.Attach(queueF) // node D is missing
-		assert.Error(t, err)
-
-		err = queue.Attach(queueB)
-		assert.NoError(t, err)
 		assert.Equal(t, 4, queue.Size())
 		assert.Equal(t, uint64(3), queue.Height())
 
-		added = queue.TryAdd(d)
-		assert.True(t, added)
-		assert.Equal(t, 5, queue.Size())
-		assert.Equal(t, uint64(3), queue.Height())
+		// adding c a second time
+		add, new = queue.TryAdd(c)
+		assert.True(t, add)
+		assert.False(t, new)
 
-		err = queue.Attach(queueF) // node D is now in the queue
-		assert.NoError(t, err)
-		assert.Equal(t, 6, queue.Size())
-		assert.Equal(t, uint64(3), queue.Height())
+		// Dequeueing a
+		head, childQueues := queue.Dismount()
+		assert.Equal(t, a, head)
+		assert.Equal(t, 1, len(childQueues), "There should only be a single child queue")
+		assert.Equal(t, c.ID(), childQueues[0].Head.Item.ID())
 	})
+
+	// Testing attaching overlapping queues:
+	// queue A:
+	//   g-b
+	//      \
+	//       c
+	// queue B:
+	//    d--c-a
+	// attach queueA to queueB: we expect an error as the queues have nodes in common
+	//t.Run("Attaching_partially_overlapped_queue", func(t *testing.T) {
+	//	queueA := NewQueue(c)
+	//	add, new := queueA.TryAdd(b)
+	//	assert.True(t, add)
+	//	assert.True(t, new)
+	//
+	//	add, new = queueA.TryAdd(g)
+	//	assert.True(t, add)
+	//	assert.True(t, new)
+	//
+	//	queueB := NewQueue(a)
+	//	add, new = queueB.TryAdd(c)
+	//	assert.True(t, add)
+	//	assert.True(t, new)
+	//
+	//	add, new = queueB.TryAdd(d)
+	//	assert.True(t, add)
+	//	assert.True(t, new)
+	//
+	//	err := queueB.Attach(queueA)
+	//	assert.Error(t, err)
+	//})
+
 }

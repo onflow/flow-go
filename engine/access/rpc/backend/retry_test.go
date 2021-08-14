@@ -10,11 +10,11 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	realstorage "github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	realstorage "github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestTransactionRetry tests that the retry mechanism will send retries at specific times
@@ -40,8 +40,9 @@ func (suite *Suite) TestTransactionRetry() {
 	// txID := transactionBody.ID()
 	// blockID := block.ID()
 	// Setup Handler + Retry
-	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
+	backend := New(suite.state, suite.colClient, nil, suite.blocks, suite.headers,
+		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), nil,
+		false, DefaultMaxHeightRange, nil, nil, suite.log)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 
@@ -97,9 +98,14 @@ func (suite *Suite) TestSuccessfulTransactionsDontRetry() {
 		Events: nil,
 	}
 
+	_, enIDs := suite.setupReceipts(&block)
+	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
+	connFactory := suite.setupConnectionFactory()
+
 	// Setup Handler + Retry
-	backend := New(suite.state, suite.execClient, suite.colClient, suite.blocks, suite.headers,
-		suite.collections, suite.transactions, suite.chainID, metrics.NewNoopCollector(), 0, nil, false)
+	backend := New(suite.state, suite.colClient, nil, suite.blocks, suite.headers,
+		suite.collections, suite.transactions, suite.receipts, suite.chainID, metrics.NewNoopCollector(), connFactory,
+		false, DefaultMaxHeightRange, nil, nil, suite.log)
 	retry := newRetry().SetBackend(backend).Activate()
 	backend.retry = retry
 

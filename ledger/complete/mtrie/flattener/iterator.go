@@ -1,8 +1,9 @@
 package flattener
 
 import (
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/node"
-	"github.com/dapperlabs/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
+	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
 )
 
 // NodeIterator is an iterator over the nodes in a trie.
@@ -65,8 +66,8 @@ type NodeIterator struct {
 // When re-building the Trie from the sequence of nodes, one can build the trie on the fly,
 // as for each node, the children have been previously encountered.
 func NewNodeIterator(mTrie *trie.MTrie) *NodeIterator {
-	// for a Trie with k := mTrie.KeyLength() [bytes], the longest possible path can contain at most 8k+1 vertices
-	stackSize := mTrie.PathLength()*8 + 1
+	// for a Trie with height H (measured by number of edges), the longest possible path contains H+1 vertices
+	stackSize := ledger.NodeMaxHeight + 1
 	i := &NodeIterator{
 		stack: make([]*node.Node, 0, stackSize),
 	}
@@ -92,7 +93,7 @@ func (i *NodeIterator) Next() bool {
 		// we still need to dig into the right child is, if n is p's left child.
 		parent := i.peek()
 		if parent.LeftChild() == n {
-			i.dig(parent.RigthChild())
+			i.dig(parent.RightChild())
 		}
 		return true
 	}
@@ -107,6 +108,9 @@ func (i *NodeIterator) Value() *node.Node {
 }
 
 func (i *NodeIterator) pop() *node.Node {
+	if len(i.stack) == 0 {
+		return nil
+	}
 	headIdx := len(i.stack) - 1
 	head := i.stack[headIdx]
 	i.stack = i.stack[:headIdx]
@@ -127,7 +131,7 @@ func (i *NodeIterator) dig(n *node.Node) {
 			n = lChild
 			continue
 		}
-		if rChild := n.RigthChild(); rChild != nil {
+		if rChild := n.RightChild(); rChild != nil {
 			n = rChild
 			continue
 		}

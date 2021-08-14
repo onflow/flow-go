@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Proposal represent a new proposed block within HotStuff (and thus a

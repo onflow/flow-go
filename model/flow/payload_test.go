@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestPayloadEncodeJSON(t *testing.T) {
@@ -22,7 +22,7 @@ func TestPayloadEncodeJSON(t *testing.T) {
 	require.NoError(t, err)
 	decodedHash := decoded.Hash()
 	assert.Equal(t, payloadHash, decodedHash)
-	assert.Equal(t, payload, &decoded)
+	assert.Equal(t, payload, decoded)
 }
 
 func TestPayloadEncodingMsgpack(t *testing.T) {
@@ -35,5 +35,5 @@ func TestPayloadEncodingMsgpack(t *testing.T) {
 	require.NoError(t, err)
 	decodedHash := decoded.Hash()
 	assert.Equal(t, payloadHash, decodedHash)
-	assert.Equal(t, payload, &decoded)
+	assert.Equal(t, payload, decoded)
 }

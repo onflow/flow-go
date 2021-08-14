@@ -6,8 +6,8 @@ import (
 
 	"go.uber.org/atomic"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/notifications"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type StopperConsumer struct {

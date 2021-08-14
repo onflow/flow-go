@@ -7,10 +7,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/module/metrics/example"
-	"github.com/dapperlabs/flow-go/module/trace"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics/example"
+	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // main runs a local tracer server on the machine and starts monitoring some metrics for sake of execution, which
@@ -35,10 +35,11 @@ func main() {
 			blockID := unittest.BlockFixture().ID()
 			collector.StartBlockReceivedToExecuted(blockID)
 
+			duration := time.Duration(rand.Int31n(2000)) * time.Millisecond
 			// adds a random delay for execution duration, between 0 and 2 seconds
-			time.Sleep(time.Duration(rand.Int31n(2000)) * time.Millisecond)
+			time.Sleep(duration)
 
-			collector.ExecutionGasUsedPerBlock(uint64(rand.Int63n(1e6)))
+			collector.ExecutionBlockExecuted(duration, uint64(rand.Int63n(1e6)), 1, 1)
 			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
 
 			diskIncrease := rand.Int63n(1024 ^ 2)

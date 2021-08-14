@@ -7,10 +7,10 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff"
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -218,6 +218,10 @@ func (e *EventHandler) Start() error {
 // startNewView will only be called when there is a view change from pacemaker.
 // It reads the current view, and check if it needs to propose or vote in this view.
 func (e *EventHandler) startNewView() error {
+
+	// track the start time
+	start := time.Now()
+
 	curView := e.paceMaker.CurView()
 
 	err := e.persist.PutStarted(curView)
@@ -267,7 +271,14 @@ func (e *EventHandler) startNewView() error {
 
 		// broadcast the proposal
 		header := model.ProposalToFlow(proposal)
-		err = e.communicator.BroadcastProposalWithDelay(header, e.paceMaker.BlockRateDelay())
+		delay := e.paceMaker.BlockRateDelay()
+		elapsed := time.Since(start)
+		if elapsed > delay {
+			delay = 0
+		} else {
+			delay = delay - elapsed
+		}
+		err = e.communicator.BroadcastProposalWithDelay(header, delay)
 		if err != nil {
 			log.Warn().Err(err).Msg("could not forward proposal")
 		}

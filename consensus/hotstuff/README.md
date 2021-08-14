@@ -52,9 +52,9 @@ Payloads are generated outside of the HotStuff core logic. HotStuff only incorpo
 #### Structure of votes 
 In Flow's HotStuff implementation, votes are used for two purposes: 
 1. Prove that a super-majority of committee nodes considers the respective block a valid extension of the chain. 
-Therefore, nodes include a `StakingSignature` (BLS with curve BLS12381) in their vote.  
+Therefore, nodes include a `StakingSignature` (BLS with curve BLS12-381) in their vote.  
 2. Construct a Source of Randomness as described in [Dfinity's Random Beacon](https://dfinity.org/pdf-viewer/library/dfinity-consensus.pdf).
-Therefore, consensus nodes include a `RandomBeaconSignature` (BLS based on Joint-Feldman DKG for threshold signatures) in their vote.  
+Therefore, consensus nodes include a `RandomBeaconSignature` (also BLS with curve BLS12-381, used in a threshold signature scheme) in their vote.  
 
 When the primary collects the votes, it verifies the `StakingSignature` and the `RandomBeaconSignature`.
 If either signature is invalid, the entire vote is discarded. From all valid votes, the
@@ -129,7 +129,7 @@ In other words, we transition into the next view due to reaching quorum in the l
 A central, non-trivial functionality of the PaceMaker is to _skip views_. 
 Specifically, given a QC with view `qc.view`, the Pacemaker will skip ahead to view `qc.view + 1` if `currentView ≤ qc.view`.
   
-<img src="https://github.com/dapperlabs/flow-go/blob/79f48bf9fe067778a19f89f6b9b5ee03972b6c78/docs/PaceMaker.png" width="200">
+<img src="https://github.com/onflow/flow-go/blob/master/docs/PaceMaker.png" width="200">
  
  
 

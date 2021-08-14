@@ -5,16 +5,16 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state"
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/fvm"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
+	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
 type Bootstrapper struct {
@@ -29,25 +29,32 @@ func NewBootstrapper(logger zerolog.Logger) *Bootstrapper {
 
 // BootstrapLedger adds the above root account to the ledger and initializes execution node-only data
 func (b *Bootstrapper) BootstrapLedger(
-	ledger storage.Ledger,
+	ledger ledger.Ledger,
 	servicePublicKey flow.AccountPublicKey,
-	initialTokenSupply cadence.UFix64,
 	chain flow.Chain,
+	opts ...fvm.BootstrapProcedureOption,
 ) (flow.StateCommitment, error) {
-	view := delta.NewView(state.LedgerGetRegister(ledger, ledger.EmptyStateCommitment()))
+	view := delta.NewView(state.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
+	programs := programs.NewEmptyPrograms()
 
-	vm := fvm.New(runtime.NewInterpreterRuntime())
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
 
-	ctx := fvm.NewContext(fvm.WithChain(chain))
+	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
 
-	err := vm.Run(ctx, fvm.Bootstrap(servicePublicKey, initialTokenSupply), view)
+	bootstrap := fvm.Bootstrap(
+		servicePublicKey,
+		opts...,
+	)
+
+	err := vm.Run(ctx, bootstrap, view, programs)
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), ledger.EmptyStateCommitment())
+	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
-		return nil, err
+		return flow.DummyStateCommitment, err
 	}
 
 	return newStateCommitment, nil
@@ -68,11 +75,11 @@ func (b *Bootstrapper) IsBootstrapped(db *badger.DB) (flow.StateCommitment, bool
 	})
 
 	if errors.Is(err, storage.ErrNotFound) {
-		return nil, false, nil
+		return flow.DummyStateCommitment, false, nil
 	}
 
 	if err != nil {
-		return nil, false, err
+		return flow.DummyStateCommitment, false, err
 	}
 
 	return commit, true, nil

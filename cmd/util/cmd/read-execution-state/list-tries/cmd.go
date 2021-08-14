@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
 )
 
 var cmd = &cobra.Command{
@@ -16,9 +16,9 @@ var cmd = &cobra.Command{
 	Run:   run,
 }
 
-var stateLoader func() *mtrie.MForest = nil
+var stateLoader func() *mtrie.Forest = nil
 
-func Init(f func() *mtrie.MForest) *cobra.Command {
+func Init(f func() *mtrie.Forest) *cobra.Command {
 	stateLoader = f
 
 	return cmd
@@ -35,7 +35,7 @@ func run(*cobra.Command, []string) {
 	}
 
 	for _, trie := range tries {
-		fmt.Printf("%s\n", trie.StringRootHash())
+		fmt.Printf("%x\n", trie.RootHash())
 	}
 
 	duration := time.Since(startTime)

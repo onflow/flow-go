@@ -1,8 +1,8 @@
 package integration_test
 
 import (
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type Signer struct {
@@ -39,10 +39,10 @@ func (*Signer) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
 	return qc, nil
 }
 
-func (*Signer) VerifyVote(voterID flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+func (*Signer) VerifyVote(voterID *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 	return true, nil
 }
 
-func (*Signer) VerifyQC(voterIDs []flow.Identifier, sigData []byte, block *model.Block) (bool, error) {
+func (*Signer) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 	return true, nil
 }

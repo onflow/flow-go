@@ -1,7 +1,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto"
 )
 
 // Verifier is responsible for generating a signature on the given message.

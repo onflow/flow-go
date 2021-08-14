@@ -10,11 +10,41 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
-// insert will encode the given entity using JSON and will insert the resulting
+// batchInsert will encode the given entity using msgpack and will upsert the resulting
+// binary data in the badger wrote batch under the provided key - if the value already exists
+// in the database it will be overridden
+func batchInsert(key []byte, entity interface{}) func(writeBatch *badger.WriteBatch) error {
+	return func(writeBatch *badger.WriteBatch) error {
+
+		// update the maximum key size if the inserted key is bigger
+		if uint32(len(key)) > max {
+			max = uint32(len(key))
+			err := SetMax(writeBatch)
+			if err != nil {
+				return fmt.Errorf("could not update max tracker: %w", err)
+			}
+		}
+
+		// serialize the entity data
+		val, err := msgpack.Marshal(entity)
+		if err != nil {
+			return fmt.Errorf("could not encode entity: %w", err)
+		}
+
+		// persist the entity data into the DB
+		err = writeBatch.Set(key, val)
+		if err != nil {
+			return fmt.Errorf("could not store data: %w", err)
+		}
+		return nil
+	}
+}
+
+// insert will encode the given entity using msgpack and will insert the resulting
 // binary data in the badger DB under the provided key. It will error if the
 // key already exists.
 func insert(key []byte, entity interface{}) func(*badger.Txn) error {
@@ -34,8 +64,9 @@ func insert(key []byte, entity interface{}) func(*badger.Txn) error {
 		if err == nil {
 			return storage.ErrAlreadyExists
 		}
-		if err != badger.ErrKeyNotFound {
-			return fmt.Errorf("could not check key: %w", err)
+
+		if !errors.Is(err, badger.ErrKeyNotFound) {
+			return fmt.Errorf("could not retrieve key: %w", err)
 		}
 
 		// serialize the entity data
@@ -90,7 +121,7 @@ func remove(key []byte) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		// retrieve the item from the key-value store
 		_, err := tx.Get(key)
-		if err == badger.ErrKeyNotFound {
+		if errors.Is(err, badger.ErrKeyNotFound) {
 			return storage.ErrNotFound
 		}
 		if err != nil {
@@ -203,7 +234,7 @@ func iterate(start []byte, end []byte, iteration iterationFunc) func(*badger.Txn
 		// simple lexicographic comparison (ie. bytes.Compare) rather than
 		// explicitly comparing prefixes.
 		//
-		// See https://github.com/dapperlabs/flow-go/pull/3310#issuecomment-618127494
+		// See https://github.com/onflow/flow-go/pull/3310#issuecomment-618127494
 		// for discussion and more detail on this.
 
 		// If start is bigger than end, we have a backwards iteration:

@@ -1,6 +1,6 @@
 package flow
 
-import "github.com/dapperlabs/flow-go/model/fingerprint"
+import "github.com/onflow/flow-go/model/fingerprint"
 
 // Collection is set of transactions.
 type Collection struct {

@@ -10,10 +10,14 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
-	"github.com/dapperlabs/flow-go/engine/execution/state/delta"
-	"github.com/dapperlabs/flow-go/fvm/state"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/storage/ledger/mtrie"
+	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	"github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/mtrie"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var cmd = &cobra.Command{
@@ -22,11 +26,11 @@ var cmd = &cobra.Command{
 	Run:   run,
 }
 
-var stateLoader func() *mtrie.MForest = nil
+var stateLoader func() *mtrie.Forest = nil
 var flagStateCommitment string
 var flagChain string
 
-func Init(f func() *mtrie.MForest) *cobra.Command {
+func Init(f func() *mtrie.Forest) *cobra.Command {
 	stateLoader = f
 
 	cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
@@ -53,15 +57,16 @@ func getChain(chainName string) (chain flow.Chain, err error) {
 func run(*cobra.Command, []string) {
 	startTime := time.Now()
 
-	mForest := stateLoader()
+	forest := stateLoader()
 
-	stateCommitment, err := hex.DecodeString(flagStateCommitment)
+	stateCommitmentBytes, err := hex.DecodeString(flagStateCommitment)
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid flag, cannot decode")
 	}
 
-	if len(stateCommitment) != 32 {
-		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitment), 32)
+	stateCommitment, err := flow.ToStateCommitment(stateCommitmentBytes)
+	if err != nil {
+		log.Fatal().Err(err).Msgf("invalid number of bytes, got %d expected %d", len(stateCommitmentBytes), len(stateCommitment))
 	}
 
 	chain, err := getChain(flagChain)
@@ -69,21 +74,32 @@ func run(*cobra.Command, []string) {
 		log.Fatal().Err(err).Msgf("invalid chain name")
 	}
 
-	ledger := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
-		values, err := mForest.Read(stateCommitment, [][]byte{state.RegisterID(owner, controller, key)})
+	ldg := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+
+		ledgerKey := executionState.RegisterIDToKey(flow.NewRegisterID(owner, controller, key))
+		path, err := pathfinder.KeyToPath(ledgerKey, complete.DefaultPathFinderVersion)
+		if err != nil {
+			log.Fatal().Err(err).Msgf("cannot convert key to path")
+		}
+
+		read := &ledger.TrieRead{
+			RootHash: ledger.RootHash(stateCommitment),
+			Paths: []ledger.Path{
+				path,
+			},
+		}
+
+		payload, err := forest.Read(read)
 		if err != nil {
 			return nil, err
 		}
-		return values[0], nil
+
+		return payload[0].Value, nil
 	})
 
-	accounts := state.NewAccounts(ledger, chain)
-
-	finalGenerator, err := accounts.GetAddressGeneratorState()
-	if err != nil {
-		log.Fatal().Err(err).Msgf("cannot get current address state")
-	}
-
+	sth := state.NewStateHolder(state.NewState(ldg))
+	accounts := state.NewAccounts(sth)
+	finalGenerator := state.NewStateBoundAddressGenerator(sth, chain)
 	finalState := finalGenerator.Bytes()
 
 	generator := chain.NewAddressGenerator()

@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Guarantees represents persistent storage for collection guarantees.

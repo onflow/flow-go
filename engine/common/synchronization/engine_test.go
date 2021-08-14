@@ -12,20 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/model/events"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	synccore "github.com/dapperlabs/flow-go/module/synchronization"
-	netint "github.com/dapperlabs/flow-go/network"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocolint "github.com/dapperlabs/flow-go/state/protocol"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	storerr "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/events"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	synccore "github.com/onflow/flow-go/module/synchronization"
+	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	protocolint "github.com/onflow/flow-go/state/protocol"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storerr "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSyncEngine(t *testing.T) {
@@ -40,12 +42,12 @@ type SyncSuite struct {
 	heights      map[uint64]*flow.Block
 	blockIDs     map[flow.Identifier]*flow.Block
 	net          *module.Network
-	con          *network.Conduit
+	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
 	blocks       *storage.Blocks
-	comp         *network.Engine
+	comp         *mocknetwork.Engine
 	core         *module.SyncCore
 	e            *Engine
 }
@@ -69,14 +71,14 @@ func (ss *SyncSuite) SetupTest() {
 	// set up the network module mock
 	ss.net = &module.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(code string, engine netint.Engine) netint.Conduit {
+		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return ss.con
 		},
 		nil,
 	)
 
 	// set up the network conduit mock
-	ss.con = &network.Conduit{}
+	ss.con = &mocknetwork.Conduit{}
 
 	// set up the local module mock
 	ss.me = &module.Local{}
@@ -93,6 +95,15 @@ func (ss *SyncSuite) SetupTest() {
 			return ss.snapshot
 		},
 	)
+	ss.state.On("AtBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) protocolint.Snapshot {
+			if ss.head.ID() == blockID {
+				return ss.snapshot
+			} else {
+				return unittest.StateSnapshotForUnknownBlock()
+			}
+		},
+	).Maybe()
 
 	// set up the snapshot mock
 	ss.snapshot = &protocol.Snapshot{}
@@ -137,7 +148,7 @@ func (ss *SyncSuite) SetupTest() {
 	)
 
 	// set up compliance engine mock
-	ss.comp = &network.Engine{}
+	ss.comp = &mocknetwork.Engine{}
 	ss.comp.On("SubmitLocal", mock.Anything).Return()
 
 	// set up sync core
@@ -146,7 +157,11 @@ func (ss *SyncSuite) SetupTest() {
 	// initialize the engine
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
-	e, err := New(log, metrics, ss.net, ss.me, ss.state, ss.blocks, ss.comp, ss.core)
+
+	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
+	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
+
+	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader, ss.state)
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -164,7 +179,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	// regardless of request height, if within tolerance, we should not respond
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(true)
-	err := ss.e.onSyncRequest(originID, req)
+	err := ss.e.requestHandler.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
@@ -172,7 +187,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 	req.Height = ss.head.Height + 1
 	ss.core.On("HandleHeight", ss.head, req.Height)
 	ss.core.On("WithinTolerance", ss.head, req.Height).Return(false)
-	err = ss.e.onSyncRequest(originID, req)
+	err = ss.e.requestHandler.onSyncRequest(originID, req)
 	ss.Assert().NoError(err, "same height sync request should pass")
 	ss.con.AssertNotCalled(ss.T(), "Unicast", mock.Anything, mock.Anything)
 
@@ -189,7 +204,7 @@ func (ss *SyncSuite) TestOnSyncRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original sender")
 		},
 	)
-	err = ss.e.onSyncRequest(originID, req)
+	err = ss.e.requestHandler.onSyncRequest(originID, req)
 	require.NoError(ss.T(), err, "smaller height sync request should pass")
 
 	ss.core.AssertExpectations(ss.T())
@@ -206,8 +221,7 @@ func (ss *SyncSuite) TestOnSyncResponse() {
 
 	// the height should be handled
 	ss.core.On("HandleHeight", ss.head, res.Height)
-	err := ss.e.onSyncResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onSyncResponse(originID, res)
 	ss.core.AssertExpectations(ss.T())
 }
 
@@ -232,14 +246,14 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	// empty range should be a no-op
 	req.FromHeight = ref
 	req.ToHeight = ref - 1
-	err := ss.e.onRangeRequest(originID, req)
+	err := ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "empty range request should pass")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// range with only unknown block should be a no-op
 	req.FromHeight = ref + 1
 	req.ToHeight = ref + 3
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "unknown range request should pass")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
@@ -256,7 +270,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 		},
 	)
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "range request with higher to height should pass")
 
 	// a request for a range that we partially have should send partial response
@@ -272,7 +286,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 		},
 	)
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range with missing blocks should fail")
 
 	// a request for a range we entirely have should send all blocks
@@ -288,7 +302,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
 		},
 	)
-	err = ss.e.onRangeRequest(originID, req)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range request should pass")
 }
 
@@ -303,13 +317,13 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 
 	// an empty request should not lead to response
 	req.BlockIDs = []flow.Identifier{}
-	err := ss.e.onBatchRequest(originID, req)
+	err := ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass empty request")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
 	// a non-empty request for missing block ID should be a no-op
 	req.BlockIDs = unittest.IdentifierListFixture(1)
-	err = ss.e.onBatchRequest(originID, req)
+	err = ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request for missing block")
 	ss.con.AssertNumberOfCalls(ss.T(), "Unicast", 0)
 
@@ -327,7 +341,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
 		},
 	)
-	err = ss.e.onBatchRequest(originID, req)
+	err = ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request with valid block")
 }
 
@@ -357,8 +371,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	},
 	)
 
-	err := ss.e.onBlockResponse(originID, res)
-	ss.Assert().Nil(err)
+	ss.e.onBlockResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }
@@ -373,8 +386,7 @@ func (ss *SyncSuite) TestPollHeight() {
 			require.Equal(ss.T(), ss.head.Height, req.Height, "request should contain finalized height")
 		},
 	)
-	err := ss.e.pollHeight()
-	ss.Require().Nil(err)
+	ss.e.pollHeight()
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -402,8 +414,8 @@ func (ss *SyncSuite) TestSendRequests() {
 	)
 	ss.core.On("BatchRequested", batches[0])
 
-	err := ss.e.sendRequests(ranges, batches)
-	ss.Assert().Nil(err)
+	// exclude my node ID
+	ss.e.sendRequests(ss.participants[1:], ranges, batches)
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -413,4 +425,53 @@ func (ss *SyncSuite) TestStartStop() {
 		<-ss.e.Ready()
 		<-ss.e.Done()
 	}, time.Second)
+}
+
+// TestProcessingMultipleItems tests that items are processed in async way
+func (ss *SyncSuite) TestProcessingMultipleItems() {
+	<-ss.e.Ready()
+
+	originID := unittest.IdentifierFixture()
+	for i := 0; i < 5; i++ {
+		msg := &messages.SyncResponse{
+			Nonce:  uint64(i),
+			Height: uint64(1000 + i),
+		}
+		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+	}
+
+	finalHeight := ss.head.Height
+	for i := 0; i < 5; i++ {
+		msg := &messages.SyncRequest{
+			Nonce:  uint64(i),
+			Height: finalHeight - 100,
+		}
+
+		originID := unittest.IdentifierFixture()
+		ss.core.On("WithinTolerance", mock.Anything, mock.Anything).Return(false)
+		ss.core.On("HandleHeight", mock.Anything, msg.Height).Once()
+		ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
+
+		require.NoError(ss.T(), ss.e.Process(engine.SyncCommittee, originID, msg))
+	}
+
+	// give at least some time to process items
+	time.Sleep(time.Millisecond * 100)
+
+	ss.core.AssertExpectations(ss.T())
+}
+
+// TestOnFinalizedBlock tests that when new finalized block is discovered engine updates cached variables
+// to latest state
+func (ss *SyncSuite) TestOnFinalizedBlock() {
+	finalizedBlock := unittest.BlockHeaderWithParentFixture(ss.head)
+	// change head
+	ss.head = &finalizedBlock
+
+	err := ss.e.finalizedHeader.updateHeader()
+	require.NoError(ss.T(), err)
+	actualHeader := ss.e.finalizedHeader.Get()
+	require.ElementsMatch(ss.T(), ss.e.getParticipants(actualHeader.ID()), ss.participants[1:])
+	require.Equal(ss.T(), actualHeader, &finalizedBlock)
 }

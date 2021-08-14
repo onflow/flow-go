@@ -13,19 +13,19 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/engine"
-	"github.com/dapperlabs/flow-go/engine/access/rpc"
-	"github.com/dapperlabs/flow-go/model/flow"
+	hotmodel "github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/mocknetwork"
 
-	"github.com/dapperlabs/flow-go/module/mempool/stdmap"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	storerr "github.com/dapperlabs/flow-go/storage"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storerr "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -33,19 +33,19 @@ type Suite struct {
 
 	// protocol state
 	proto struct {
-		state    *protocol.State
+		state    *protocol.MutableState
 		snapshot *protocol.Snapshot
 		params   *protocol.Params
-		mutator  *protocol.Mutator
 	}
 
 	me           *module.Local
 	request      *module.Requester
-	provider     *network.Engine
+	provider     *mocknetwork.Engine
 	blocks       *storage.Blocks
 	headers      *storage.Headers
 	collections  *storage.Collections
 	transactions *storage.Transactions
+	receipts     *storage.ExecutionReceipts
 
 	eng *Engine
 }
@@ -60,7 +60,7 @@ func (suite *Suite) SetupTest() {
 	obsIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
 
 	// mock out protocol state
-	suite.proto.state = new(protocol.State)
+	suite.proto.state = new(protocol.MutableState)
 	suite.proto.snapshot = new(protocol.Snapshot)
 	suite.proto.params = new(protocol.Params)
 	suite.proto.state.On("Identity").Return(obsIdentity, nil)
@@ -71,13 +71,13 @@ func (suite *Suite) SetupTest() {
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 
 	net := new(module.Network)
-	conduit := new(network.Conduit)
+	conduit := new(mocknetwork.Conduit)
 	net.On("Register", engine.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).
 		Once()
 	suite.request = new(module.Requester)
 
-	suite.provider = new(network.Engine)
+	suite.provider = new(mocknetwork.Engine)
 	suite.blocks = new(storage.Blocks)
 	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)
@@ -90,10 +90,10 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, flow.Testnet, metrics.NewNoopCollector(), 0, false)
+		suite.transactions, suite.receipts, flow.Testnet, metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
+		suite.transactions, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
@@ -105,7 +105,10 @@ func (suite *Suite) SetupTest() {
 func (suite *Suite) TestOnFinalizedBlock() {
 
 	block := unittest.BlockFixture()
-	modelBlock := model.Block{
+	block.SetPayload(unittest.PayloadFixture(
+		unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+	))
+	hotstuffBlock := hotmodel.Block{
 		BlockID: block.ID(),
 	}
 
@@ -135,7 +138,7 @@ func (suite *Suite) TestOnFinalizedBlock() {
 	)
 
 	// process the block through the finalized callback
-	suite.eng.OnFinalizedBlock(&modelBlock)
+	suite.eng.OnFinalizedBlock(&hotstuffBlock)
 
 	// wait for engine shutdown
 	done := suite.eng.unit.Done()
@@ -250,6 +253,9 @@ func (suite *Suite) TestRequestMissingCollections() {
 	var collIDs []flow.Identifier
 	for i := 0; i < blkCnt; i++ {
 		block := unittest.BlockFixture()
+		block.SetPayload(unittest.PayloadFixture(
+			unittest.WithGuarantees(unittest.CollectionGuaranteesFixture(4)...),
+		))
 		// some blocks may not be present hence add a gap
 		height := startHeight + uint64(i)
 		block.Header.Height = height
@@ -365,17 +371,17 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 
 	// generate the test blocks, cgs and collections
 	for i := 0; i < blkCnt; i++ {
-		cgs := make([]*flow.CollectionGuarantee, collPerBlk)
+		guarantees := make([]*flow.CollectionGuarantee, collPerBlk)
 		for j := 0; j < collPerBlk; j++ {
 			coll := unittest.CollectionFixture(2).Light()
 			collMap[coll.ID()] = &coll
 			cg := unittest.CollectionGuaranteeFixture(func(cg *flow.CollectionGuarantee) {
 				cg.CollectionID = coll.ID()
 			})
-			cgs[j] = cg
+			guarantees[j] = cg
 		}
 		block := unittest.BlockFixture()
-		block.Payload.Guarantees = cgs
+		block.SetPayload(unittest.PayloadFixture(unittest.WithGuarantees(guarantees...)))
 		// set the height
 		height := startHeight + uint64(i)
 		block.Header.Height = height

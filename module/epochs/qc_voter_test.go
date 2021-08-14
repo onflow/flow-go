@@ -1,4 +1,4 @@
-package epochs
+package epochs_test
 
 import (
 	"context"
@@ -11,11 +11,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	hotstuff "github.com/dapperlabs/flow-go/consensus/hotstuff/mocks"
-	"github.com/dapperlabs/flow-go/model/flow"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
+	module "github.com/onflow/flow-go/module/mock"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -37,7 +38,7 @@ type Suite struct {
 	me         *flow.Identity
 	clustering flow.ClusterList // cluster assignment for epoch
 
-	voter *RootQCVoter
+	voter *epochs.RootQCVoter
 }
 
 func (suite *Suite) SetupTest() {
@@ -81,7 +82,7 @@ func (suite *Suite) SetupTest() {
 	suite.epoch.On("Clustering").Return(suite.clustering, nil)
 	suite.signer.On("CreateVote", mock.Anything).Return(unittest.VoteFixture(), nil)
 
-	suite.voter = NewRootQCVoter(log, suite.local, suite.signer, suite.state, suite.client)
+	suite.voter = epochs.NewRootQCVoter(log, suite.local, suite.signer, suite.state, suite.client)
 }
 
 func TestRootQCVoter(t *testing.T) {
@@ -118,7 +119,6 @@ func (suite *Suite) TestAlreadyVoted() {
 
 // should succeed and exit if voting succeeds
 func (suite *Suite) TestVoting() {
-
 	err := suite.voter.Vote(context.Background(), suite.epoch)
 	suite.Assert().Nil(err)
 }

@@ -3,9 +3,9 @@ package wal
 import (
 	"fmt"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 type WALOperation uint8
@@ -47,7 +47,7 @@ func EncodeUpdate(update *ledger.TrieUpdate) []byte {
 func EncodeDelete(rootHash ledger.RootHash) []byte {
 	buf := make([]byte, 0)
 	buf = append(buf, byte(WALDelete))
-	buf = utils.AppendShortData(buf, rootHash)
+	buf = utils.AppendShortData(buf, rootHash[:])
 	return buf
 }
 
@@ -63,13 +63,20 @@ func Decode(data []byte) (operation WALOperation, rootHash ledger.RootHash, upda
 		update, err = encoding.DecodeTrieUpdate(data[1:])
 		return
 	case WALDelete:
-		rootHash, _, err = utils.ReadShortData(data[1:])
+		var rootHashBytes []byte
+		rootHashBytes, _, err = utils.ReadShortData(data[1:])
 		if err != nil {
 			err = fmt.Errorf("cannot read state commitment: %w", err)
+			return
+		}
+		rootHash, err = ledger.ToRootHash(rootHashBytes)
+		if err != nil {
+			err = fmt.Errorf("invalid root hash: %w", err)
+			return
 		}
 		return
 	default:
 		err = fmt.Errorf("unknown operation type, given: %x", operation)
+		return
 	}
-	return
 }

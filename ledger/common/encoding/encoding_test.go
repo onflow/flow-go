@@ -5,9 +5,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/ledger"
-	"github.com/dapperlabs/flow-go/ledger/common/encoding"
-	"github.com/dapperlabs/flow-go/ledger/common/utils"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/encoding"
+	"github.com/onflow/flow-go/ledger/common/utils"
 )
 
 // TODO add tests for raw byte values (useful for versioning)
@@ -16,7 +16,7 @@ import (
 func Test_KeyPartEncodingDecoding(t *testing.T) {
 
 	kp := utils.KeyPartFixture(1, "key part 1")
-	encoded := encoding.EncodeKeyPart(kp)
+	encoded := encoding.EncodeKeyPart(&kp)
 	newkp, err := encoding.DecodeKeyPart(encoded)
 	require.NoError(t, err)
 	require.True(t, kp.Equals(newkp))
@@ -26,7 +26,7 @@ func Test_KeyPartEncodingDecoding(t *testing.T) {
 	require.Error(t, err)
 
 	// test wrong version decoding
-	encoded[0] = byte(uint8(1))
+	encoded[0] = uint8(1)
 	_, err = encoding.DecodeKeyPart(encoded)
 	require.Error(t, err)
 }
@@ -35,11 +35,11 @@ func Test_KeyPartEncodingDecoding(t *testing.T) {
 func Test_KeyEncodingDecoding(t *testing.T) {
 	kp1 := utils.KeyPartFixture(1, "key part 1")
 	kp2 := utils.KeyPartFixture(22, "key part 2")
-	k := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
-	encoded := encoding.EncodeKey(k)
+	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	encoded := encoding.EncodeKey(&k)
 	newk, err := encoding.DecodeKey(encoded)
 	require.NoError(t, err)
-	require.True(t, newk.Equals(k))
+	require.True(t, newk.Equals(&k))
 }
 
 // Test_ValueEncodingDecoding tests encoding decoding functionality of a ledger value
@@ -61,9 +61,9 @@ func Test_PayloadEncodingDecoding(t *testing.T) {
 	kp2v := []byte("key part 2")
 	kp2 := ledger.NewKeyPart(kp2t, kp2v)
 
-	k := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
+	k := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
 	v := ledger.Value([]byte{'A'})
-	p := ledger.NewPayload(*k, v)
+	p := ledger.NewPayload(k, v)
 
 	encoded := encoding.EncodePayload(p)
 	newp, err := encoding.DecodePayload(encoded)
@@ -92,16 +92,16 @@ func Test_BatchProofEncodingDecoding(t *testing.T) {
 // Test_TrieUpdateEncodingDecoding tests encoding decoding functionality of a trie update
 func Test_TrieUpdateEncodingDecoding(t *testing.T) {
 
-	p1 := utils.TwoBytesPath(2)
+	p1 := utils.PathByUint16(2)
 	kp1 := ledger.NewKeyPart(uint16(1), []byte("key 1 part 1"))
 	kp2 := ledger.NewKeyPart(uint16(22), []byte("key 1 part 2"))
-	k1 := ledger.NewKey([]ledger.KeyPart{*kp1, *kp2})
-	pl1 := ledger.NewPayload(*k1, ledger.Value([]byte{'A'}))
+	k1 := ledger.NewKey([]ledger.KeyPart{kp1, kp2})
+	pl1 := ledger.NewPayload(k1, []byte{'A'})
 
-	p2 := utils.TwoBytesPath(2)
+	p2 := utils.PathByUint16(2)
 	kp3 := ledger.NewKeyPart(uint16(1), []byte("key2 part 1"))
-	k2 := ledger.NewKey([]ledger.KeyPart{*kp3})
-	pl2 := ledger.NewPayload(*k2, ledger.Value([]byte{'B'}))
+	k2 := ledger.NewKey([]ledger.KeyPart{kp3})
+	pl2 := ledger.NewPayload(k2, []byte{'B'})
 
 	tu := &ledger.TrieUpdate{
 		RootHash: utils.RootHashFixture(),

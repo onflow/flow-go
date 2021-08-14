@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dapperlabs/flow-go/cmd/util/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd"
 )
 
 func main() {

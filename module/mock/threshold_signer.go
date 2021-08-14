@@ -3,7 +3,7 @@
 package mock
 
 import (
-	crypto "github.com/dapperlabs/flow-go/crypto"
+	crypto "github.com/onflow/flow-go/crypto"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,8 +12,8 @@ type ThresholdSigner struct {
 	mock.Mock
 }
 
-// Combine provides a mock function with given fields: size, shares, indices
-func (_m *ThresholdSigner) Combine(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
+// Reconstruct provides a mock function with given fields: size, shares, indices
+func (_m *ThresholdSigner) Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
 	ret := _m.Called(size, shares, indices)
 
 	var r0 crypto.Signature

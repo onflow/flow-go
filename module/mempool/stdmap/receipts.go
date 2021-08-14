@@ -3,7 +3,7 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Receipts implements the execution receipts memory pool of the consensus node,

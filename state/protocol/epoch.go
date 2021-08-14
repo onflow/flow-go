@@ -1,21 +1,29 @@
 package protocol
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // EpochQuery defines the different ways to query for epoch information
 // given a Snapshot. It only exists to simplify the main Snapshot interface.
 type EpochQuery interface {
 
-	// Current returns the current epoch as of this snapshot.
+	// Current returns the current epoch as of this snapshot. All valid snapshots
+	// have a current epoch.
 	Current() Epoch
 
-	// Next returns the next epoch as of this snapshot.
+	// Next returns the next epoch as of this snapshot. Valid snapshots must
+	// have a next epoch available after the transition to epoch setup phase.
 	Next() Epoch
 
-	// ByCounter returns an arbitrary epoch by counter.
-	ByCounter(counter uint64) Epoch
+	// Previous returns the previous epoch as of this snapshot. Valid snapshots
+	// must have a previous epoch for all epochs except that immediately after
+	// the root block - in other words, if a previous epoch exists, implementations
+	// must arrange to expose it here.
+	//
+	// Returns ErrNoPreviousEpoch in the case that this method is queried w.r.t.
+	// a snapshot from the first epoch after the root block.
+	Previous() Epoch
 }
 
 // Epoch contains the information specific to a certain Epoch (defined
@@ -38,8 +46,23 @@ type Epoch interface {
 	// Counter returns the Epoch's counter.
 	Counter() (uint64, error)
 
+	// FirstView returns the first view of this epoch.
+	FirstView() (uint64, error)
+
+	// DKGPhase1FinalView returns the final view of DKG phase 1
+	DKGPhase1FinalView() (uint64, error)
+
+	// DKGPhase2FinalView returns the final view of DKG phase 2
+	DKGPhase2FinalView() (uint64, error)
+
+	// DKGPhase3FinalView returns the final view of DKG phase 3
+	DKGPhase3FinalView() (uint64, error)
+
 	// FinalView returns the largest view number which still belongs to this epoch.
 	FinalView() (uint64, error)
+
+	// RandomSource returns the underlying random source of this epoch.
+	RandomSource() ([]byte, error)
 
 	// Seed generates a random seed using the source of randomness for this
 	// epoch, specified in the EpochSetup service event.

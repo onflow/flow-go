@@ -2,8 +2,8 @@
 package mempool
 
 import (
-	chunkmodels "github.com/dapperlabs/flow-go/model/chunks"
-	"github.com/dapperlabs/flow-go/model/flow"
+	chunkmodels "github.com/onflow/flow-go/model/chunks"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Assignments represents a concurrency-safe memory pool for chunk assignments

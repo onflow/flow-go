@@ -3,13 +3,13 @@ package factories
 import (
 	"github.com/rs/zerolog"
 
-	syncengine "github.com/dapperlabs/flow-go/engine/collection/synchronization"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	chainsync "github.com/dapperlabs/flow-go/module/synchronization"
-	"github.com/dapperlabs/flow-go/network"
-	"github.com/dapperlabs/flow-go/state/cluster"
-	"github.com/dapperlabs/flow-go/storage"
+	syncengine "github.com/onflow/flow-go/engine/collection/synchronization"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/state/cluster"
+	"github.com/onflow/flow-go/storage"
 )
 
 type SyncEngineFactory struct {

@@ -1,8 +1,8 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/model"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/model"
 )
 
 // Identifiers represents a concurrency-safe memory pool for IDs.

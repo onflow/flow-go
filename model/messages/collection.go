@@ -1,8 +1,8 @@
 package messages
 
 import (
-	"github.com/dapperlabs/flow-go/model/cluster"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/cluster"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // SubmitCollectionGuarantee is a request to submit the given collection

@@ -1,8 +1,8 @@
 package storage
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // Ledger takes care of storing registers (key, value pairs) providing proof of correctness

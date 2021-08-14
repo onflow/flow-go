@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/engine"
+	"github.com/onflow/flow-go/engine"
 )
 
 type AutoProfiler struct {

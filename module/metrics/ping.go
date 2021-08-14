@@ -1,14 +1,17 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type PingCollector struct {
-	reachable *prometheus.GaugeVec
+	reachable    *prometheus.GaugeVec
+	sealedHeight *prometheus.GaugeVec
 }
 
 func NewPingCollector() *PingCollector {
@@ -18,15 +21,40 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
-		}, []string{LabelNodeID, LabelNodeRole}),
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
+		sealedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "sealed_height",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Help:      "the last sealed height of a node",
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo, LabelNodeVersion}),
 	}
+
 	return pc
 }
 
-func (pc *PingCollector) NodeReachable(node *flow.Identity, reachable bool) {
-	var val float64
-	if reachable {
-		val = 1
+func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration) {
+	var rttValue float64
+	if rtt > 0 {
+		rttValue = float64(rtt.Milliseconds())
+	} else {
+		rttValue = -1
 	}
-	pc.reachable.With(prometheus.Labels{LabelNodeID: node.String(), LabelNodeRole: node.Role.String()}).Set(val)
+
+	pc.reachable.With(prometheus.Labels{
+		LabelNodeID:      node.NodeID.String(),
+		LabelNodeAddress: node.Address,
+		LabelNodeRole:    node.Role.String(),
+		LabelNodeInfo:    nodeInfo}).
+		Set(rttValue)
+}
+
+func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64) {
+	pc.sealedHeight.With(prometheus.Labels{
+		LabelNodeID:      node.NodeID.String(),
+		LabelNodeAddress: node.Address,
+		LabelNodeRole:    node.Role.String(),
+		LabelNodeInfo:    nodeInfo,
+		LabelNodeVersion: version}).
+		Set(float64(sealedHeight))
 }

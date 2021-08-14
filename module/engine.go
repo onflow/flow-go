@@ -1,7 +1,7 @@
 package module
 
 import (
-	"github.com/dapperlabs/flow-go/network"
+	"github.com/onflow/flow-go/network"
 )
 
 // Engine is the interface all engines should implement in order to have a

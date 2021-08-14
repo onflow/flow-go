@@ -4,10 +4,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 
-	"github.com/dapperlabs/flow-go/utils/logging"
+	"github.com/onflow/flow-go/utils/logging"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // TelemetryConsumer implements the hotstuff.Consumer interface.
@@ -155,7 +155,7 @@ func (t *TelemetryConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate)
 	t.pathHandler.NextStep().
 		Uint64("qc_block_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
-		Msg("OnQcIncorporated")
+		Msg("OnQcConstructedFromVotes")
 }
 
 func (t *TelemetryConsumer) OnQcIncorporated(qc *flow.QuorumCertificate) {

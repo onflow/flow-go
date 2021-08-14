@@ -18,7 +18,7 @@ Code structure:
 The bootstrapping will generate the following information:
 
 #### Per node
-* Staking key (BLS key with curve BLS12381)
+* Staking key (BLS key with curve BLS12-381)
 * Networking key (ECDSA key)
 * Random beacon key; _only_ for consensus nodes (BLS based on Joint-Feldman DKG for threshold signatures)
 
@@ -97,7 +97,7 @@ Each input is a config file specified as a command line parameter:
 
 #### Example
 ```bash
-go run -tags relic ./cmd/bootstrap finalize
+go run -tags relic ./cmd/bootstrap finalize \
  --fast-kg \
   --root-chain main \
   --root-height 0 \
@@ -106,6 +106,7 @@ go run -tags relic ./cmd/bootstrap finalize
   --config ./cmd/bootstrap/example_files/node-config.json \
   --partner-dir ./cmd/bootstrap/example_files/partner-node-infos \
   --partner-stakes ./cmd/bootstrap/example_files/partner-stakes.json \
+  --epoch-counter 1 \
   -o ./bootstrap/root-infos
 ```
 

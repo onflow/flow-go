@@ -1,7 +1,0 @@
-name-template: 'v$NEXT_PATCH_VERSION'
-tag-template: 'v$NEXT_PATCH_VERSION'
-change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
-template: |
-  ## Changes
-
-  $CHANGES

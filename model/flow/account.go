@@ -7,18 +7,18 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/dapperlabs/flow-go/crypto"
-	"github.com/dapperlabs/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 )
 
 // Account represents an account on the Flow network.
 //
 // An account can be an externally owned account or a contract account with code.
 type Account struct {
-	Address Address
-	Balance uint64
-	Code    []byte
-	Keys    []AccountPublicKey
+	Address   Address
+	Balance   uint64
+	Keys      []AccountPublicKey
+	Contracts map[string][]byte
 }
 
 // AccountPublicKey is a public key associated with an account.

@@ -8,8 +8,8 @@ import (
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestRetrieveEventByBlockIDTxID tests event insertion, event retrieval by block id, block id and transaction id,
@@ -42,7 +42,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 					eEvents := make([]flow.Event, 0)
 
-					event := unittest.EventFixture(etype, uint32(i), uint32(j), tx)
+					event := unittest.EventFixture(etype, uint32(i), uint32(j), tx, 0)
 
 					// insert event into the db
 					err := db.Update(InsertEvent(b, event))

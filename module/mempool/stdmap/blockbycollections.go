@@ -3,14 +3,21 @@
 package stdmap
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module/mempool/entity"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/entity"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
+// Hold all the missing collections.
+// Each entry is a missing collection, and all the blocks that contain
+// this collection
 type BlockByCollections struct {
 	*Backend
 }
 
+// BlockByCollectionBackdata contains all the collections is being requested,
+// for each collection it stores the blocks that contains the collection.
+// the Backdata is essentially map<collectionID>map<blockID>*ExecutableBlock
 type BlockByCollectionBackdata struct {
 	*Backdata
 }
@@ -29,10 +36,15 @@ func (b *BlockByCollections) Get(collID flow.Identifier) (*entity.BlocksByCollec
 }
 
 func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) error) error {
+	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(BlockByCollections).Run")
 	b.Lock()
-	defer b.Unlock()
+	//binstat.Leave(bs1)
 
+	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(BlockByCollections).Run)")
+	defer b.Unlock()
 	err := f(&BlockByCollectionBackdata{&b.Backdata})
+	//binstat.Leave(bs2)
+
 	if err != nil {
 		return err
 	}

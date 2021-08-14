@@ -3,7 +3,7 @@ package hotstuff
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
 // EventHandler runs a state machine to process proposals, votes and local timeouts.

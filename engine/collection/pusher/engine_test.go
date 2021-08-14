@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/dapperlabs/flow-go/engine/collection/pusher"
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/model/flow/filter"
-	"github.com/dapperlabs/flow-go/model/messages"
-	mempool "github.com/dapperlabs/flow-go/module/mempool/mock"
-	metrics "github.com/dapperlabs/flow-go/module/metrics"
-	module "github.com/dapperlabs/flow-go/module/mock"
-	network "github.com/dapperlabs/flow-go/network/mock"
-	protocol "github.com/dapperlabs/flow-go/state/protocol/mock"
-	storage "github.com/dapperlabs/flow-go/storage/mock"
-	"github.com/dapperlabs/flow-go/utils/unittest"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/collection/pusher"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/messages"
+	metrics "github.com/onflow/flow-go/module/metrics"
+	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storage "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type Suite struct {
@@ -27,9 +27,8 @@ type Suite struct {
 	identities   flow.IdentityList
 	state        *protocol.State
 	snapshot     *protocol.Snapshot
-	conduit      *network.Conduit
+	conduit      *mocknetwork.Conduit
 	me           *module.Local
-	pool         *mempool.Transactions
 	collections  *storage.Collections
 	transactions *storage.Transactions
 
@@ -55,13 +54,12 @@ func (suite *Suite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 
 	net := new(module.Network)
-	suite.conduit = new(network.Conduit)
+	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(me.NodeID)
 
-	suite.pool = new(mempool.Transactions)
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
 
@@ -72,7 +70,6 @@ func (suite *Suite) SetupTest() {
 		metrics,
 		metrics,
 		suite.me,
-		suite.pool,
 		suite.collections,
 		suite.transactions,
 	)
@@ -112,7 +109,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
 	}
-	err := suite.engine.Process(sender.NodeID, msg)
+	err := suite.engine.Process(engine.PushGuarantees, sender.NodeID, msg)
 	suite.Require().Error(err)
 
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)

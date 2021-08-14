@@ -1,4 +1,4 @@
-# Consensus 
+# Consensus
 
 The consensus node is responsible for deciding on the subjective ordering of the transactions that will be executed by the execution nodes. They do so by running a consensus algorithm for the blockchain, whereas each block payload contains an ordered list of collection guarantees received from collection node clusters.
 
@@ -21,7 +21,7 @@ This document provides a high-level overview of the consensus node architecture.
   - [Compliance](#compliance)
   - [Synchronization](#synchronization)
   - [Provider](#provider)
-  - [Matching](#matching)
+  - [Sealing](#sealing)
 - [Modules](#modules)
   - [Protocol State](#protocol-state)
   - [Block Builder](#block-builder)
@@ -116,13 +116,13 @@ The `provider` engine is responsible for providing blocks to the non-consensus p
 
 At the moment, it simply receives each block proposal from the compliance engine and broadcasts it to all interested nodes on its communication channel.
 
-### [Matching](../../engine/consensus/matching)
+### [Sealing](../../engine/consensus/sealing)
 
-The `matching` engine is responsible for receiving execution receipts and result approvals, as well as generating the block seals for them.
+The `sealing` engine is responsible for receiving execution receipts and result approvals, as well as generating the block seals for them.
 
-Whenever an execution receipt or a result approval are received by the matching engine, it will perform all possible validity checks on it before adding it to the respective memory pool.
+Whenever an execution receipt or a result approval are received by the sealing engine, it will perform all possible validity checks on it before adding it to the respective memory pool.
 
-If the related result or chunk is new, the matching engine checks if there are any results in its memory pool that can be fully verified with the received result approvals. Once this is the case, it creates the related block seal and adds it to the memory pool for block construction.
+If the related result or chunk is new, the sealing engine checks if there are any results in its memory pool that can be fully verified with the received result approvals. Once this is the case, it creates the related block seal and adds it to the memory pool for block construction.
 
 
 ## Modules

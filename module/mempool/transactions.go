@@ -3,7 +3,7 @@
 package mempool
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Transactions represents a concurrency-safe memory pool for transactions.
@@ -31,6 +31,9 @@ type Transactions interface {
 	// All will retrieve all transactions that are currently in the memory pool
 	// as a slice.
 	All() []*flow.TransactionBody
+
+	// Clear removes all transactions from the mempool.
+	Clear()
 
 	// Hash will return a fingerprint has representing the contents of the
 	// entire memory pool.

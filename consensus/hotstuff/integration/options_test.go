@@ -3,8 +3,8 @@ package integration
 import (
 	"errors"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/pacemaker/timeout"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 var errStopCondition = errors.New("stop condition reached")

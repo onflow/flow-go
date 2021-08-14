@@ -3,7 +3,7 @@ package ingestion
 import (
 	"context"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // IngestRPC represents the RPC calls that the execution ingest engine exposes to support the Access Node API calls

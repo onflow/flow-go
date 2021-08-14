@@ -1,8 +1,8 @@
 package hotstuff
 
 import (
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/state/protocol"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Committee accounts for the fact that we might have multiple HotStuff instances
@@ -36,7 +36,9 @@ type Committee interface {
 	// CAUTION: per liveness requirement of HotStuff, the leader must be fork-independent.
 	//          Therefore, a node retains its proposer view slots even if it is slashed.
 	//          Its proposal is simply considered invalid, as it is not from a legitimate participant.
-	// Can error if view is in a future Epoch for which the HotStuff committee hasn't been determined yet.
+	// Returns the following expected errors for invalid inputs:
+	//  * epoch containing the requested view has not been set up (protocol.ErrNextEpochNotSetup)
+	//  * epoch is too far in the past (leader.InvalidViewError)
 	LeaderForView(view uint64) (flow.Identifier, error)
 
 	// Self returns our own node identifier.

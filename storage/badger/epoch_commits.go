@@ -3,10 +3,11 @@ package badger
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/dapperlabs/flow-go/model/flow"
-	"github.com/dapperlabs/flow-go/module"
-	"github.com/dapperlabs/flow-go/module/metrics"
-	"github.com/dapperlabs/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
 type EpochCommits struct {
@@ -16,10 +17,10 @@ type EpochCommits struct {
 
 func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits {
 
-	store := func(key interface{}, val interface{}) func(*badger.Txn) error {
+	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		id := key.(flow.Identifier)
 		commit := val.(*flow.EpochCommit)
-		return operation.InsertEpochCommit(id, commit)
+		return transaction.WithTx(operation.SkipDuplicates(operation.InsertEpochCommit(id, commit)))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
@@ -33,18 +34,17 @@ func NewEpochCommits(collector module.CacheMetrics, db *badger.DB) *EpochCommits
 
 	ec := &EpochCommits{
 		db: db,
-		cache: newCache(collector,
+		cache: newCache(collector, metrics.ResourceEpochCommit,
 			withLimit(4*flow.DefaultTransactionExpiry),
 			withStore(store),
-			withRetrieve(retrieve),
-			withResource(metrics.ResourceEpochCommit)),
+			withRetrieve(retrieve)),
 	}
 
 	return ec
 }
 
-func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(tx *badger.Txn) error {
-	return ec.cache.Put(commit.ID(), commit)
+func (ec *EpochCommits) StoreTx(commit *flow.EpochCommit) func(*transaction.Tx) error {
+	return ec.cache.PutTx(commit.ID(), commit)
 }
 
 func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn) (*flow.EpochCommit, error) {
@@ -59,7 +59,7 @@ func (ec *EpochCommits) retrieveTx(commitID flow.Identifier) func(tx *badger.Txn
 
 // TODO: can we remove this method? Its not contained in the interface.
 func (ec *EpochCommits) Store(commit *flow.EpochCommit) error {
-	return operation.RetryOnConflict(ec.db.Update, ec.StoreTx(commit))
+	return operation.RetryOnConflictTx(ec.db, transaction.Update, ec.StoreTx(commit))
 }
 
 func (ec *EpochCommits) ByID(commitID flow.Identifier) (*flow.EpochCommit, error) {

@@ -3,8 +3,8 @@ package hotstuff
 import (
 	"time"
 
-	"github.com/dapperlabs/flow-go/consensus/hotstuff/model"
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // PaceMaker for HotStuff. The component is passive in that it only reacts to method calls.

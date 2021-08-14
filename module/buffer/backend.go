@@ -3,7 +3,7 @@ package buffer
 import (
 	"sync"
 
-	"github.com/dapperlabs/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // item represents an item in the cache: a block header, payload, and the ID
