@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,11 +23,11 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	nodeID               flow.Identifier // the node ID of this node
-	upstreamAccessNodeID flow.Identifier // the node ID of the upstream access node
-	bindAddr             string          // address to bind on
-	dataDir              string          // directory to store the protocol state
-	bootstrapDir         string          // path to the bootstrap directory
+	networkPubKey        crypto.PublicKey // the network public key of this node
+	upstreamAccessNodeID flow.Identifier  // the node ID of the upstream access node
+	bindAddr             string           // address to bind on
+	dataDir              string           // directory to store the protocol state
+	bootstrapDir         string           // path to the bootstrap directory
 }
 
 type Option func(c *Config)
@@ -46,14 +47,14 @@ func WithBootstrapDir(bootstrapDir string) Option {
 func getAccessNodeOptions(config *Config) []access.Option {
 	return []access.Option{
 		access.WithUpstreamAccessNodeID(config.upstreamAccessNodeID),
-		access.WithUnstakedNetworkBindAddr(config.bindAddr),
+		access.WithBindAddr(config.bindAddr),
 		access.WithBaseOptions(getBaseOptions(config)),
 	}
 }
 
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
-		cmd.WithNodeID(config.nodeID),
+		cmd.WithNetworkPublicKey(config.networkPubKey),
 		cmd.WithMetricsEnabled(false),
 	}
 	if config.bootstrapDir != "" {
@@ -84,13 +85,13 @@ type ConsensusFollowerImpl struct {
 
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
-	nodeID flow.Identifier,
+	networkPublicKey crypto.PublicKey,
 	upstreamAccessNodeID flow.Identifier,
 	bindAddr string,
 	opts ...Option,
 ) *ConsensusFollowerImpl {
 	config := &Config{
-		nodeID:               nodeID,
+		networkPublicKey:     networkPublicKey,
 		upstreamAccessNodeID: upstreamAccessNodeID,
 		bindAddr:             bindAddr,
 	}
