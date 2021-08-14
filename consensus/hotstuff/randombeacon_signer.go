@@ -2,7 +2,7 @@ package hotstuff
 
 import "github.com/onflow/flow-go/crypto"
 
-type ThresholdSigner interface {
+type RandomBeaconSigner interface {
 	// Verify verifies whether the signature is from the signer specified by the given signer index
 	// it allows concurrent verification of the given signature
 	// return nil if signature is valid
@@ -39,7 +39,7 @@ type ThresholdSigner interface {
 	Reconstruct() (crypto.Signature, error)
 }
 
-// This provides a mock implementation of ThresholdSigner in crypto/thresholdsign.go
+// This provides a mock implementation of RandomBeaconSigner in crypto/thresholdsign.go
 // TODO: remove when crypto/thresholdsign supports concurrent calls.
 type ThresholdSignerImpl struct {
 	// dependencies
