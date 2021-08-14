@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
@@ -98,6 +100,8 @@ func main() {
 		chdpQueryTimeout            uint
 		chdpDeliveryTimeout         uint
 		enableBlockDataUpload       bool
+		gcpBucketName               string
+		blockDataUploader           uploader.Uploader
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -126,6 +130,15 @@ func main() {
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to GCP Bucket")
+			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+		}).
+		ValidateFlags(func() error {
+			if enableBlockDataUpload {
+				if gcpBucketName == "" {
+					return fmt.Errorf("invalid flag. gcp-bucket-name required when blockdata-uploader is enabled")
+				}
+			}
+			return nil
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -164,8 +177,32 @@ func main() {
 		}).
 		Component("Block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			if enableBlockDataUpload {
-				return
+
+				logger := node.Logger.With().Str("component_name", "block_data_uploader").Logger()
+				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
+					context.Background(),
+					gcpBucketName,
+					logger,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
+				}
+
+				asyncUploader := uploader.NewAsyncUploader(
+					gcpBucketUploader,
+					logger,
+					collector,
+				)
+
+				blockDataUploader = asyncUploader
+
+				return asyncUploader, nil
 			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadDoneAware{}, nil
 
 		}).
 		Module("state deltas mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -256,7 +293,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
-				nil,
+				blockDataUploader,
 			)
 			if err != nil {
 				return nil, err

@@ -58,11 +58,18 @@ func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) e
 func NewGCPBucketUploader(ctx context.Context, bucketName string, log zerolog.Logger) (*GCPBucketUploader, error) {
 
 	// no need to close the client according to documentation
-	client, err := storage.NewClient(context.Background())
+	ctx = context.Background()
+	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create GCP Bucket client: %w", err)
 	}
 	bucket := client.Bucket(bucketName)
+
+	// try accessing buckets to validate settings
+	_, err = bucket.Attrs(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error while listing bucket attributes: %w", err)
+	}
 
 	return &GCPBucketUploader{
 		bucket: bucket,
@@ -79,12 +86,22 @@ type GCPBucketUploader struct {
 
 func (u *GCPBucketUploader) Upload(computationResult *execution.ComputationResult) error {
 
-	object := u.bucket.Object(fmt.Sprintf("%s.cbor", computationResult.ExecutableBlock.ID().String()))
+	objectName := GCPBlockDataObjectName(computationResult)
+	object := u.bucket.Object(objectName)
 
 	writer := object.NewWriter(u.ctx)
-	defer writer.Close()
+	defer func() {
+		err := writer.Close()
+		if err != nil {
+			u.log.Warn().Err(err).Str("object_name", objectName).Msg("error while closing GCP object")
+		}
+	}()
 
 	return WriteComputationResultsTo(computationResult, writer)
+}
+
+func GCPBlockDataObjectName(computationResult *execution.ComputationResult) string {
+	return fmt.Sprintf("%s.cbor", computationResult.ExecutableBlock.ID().String())
 }
 
 func NewFileUploader(dir string) *FileUploader {
