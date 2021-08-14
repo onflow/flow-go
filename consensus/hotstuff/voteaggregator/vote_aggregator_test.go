@@ -304,8 +304,6 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 
 	proposerVote := bp.ProposerVote()
 	expectedVoters.AddVote(proposerVote)
-	_, _, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
-	require.NoError(as.T(), err)
 	for i := 0; i < 6; i++ {
 		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		if i < 4 { // only the first 4 votes from nodes _other_ than proposer should be included in QC
