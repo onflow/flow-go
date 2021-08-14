@@ -6,15 +6,15 @@ import (
 )
 
 type RandomBeaconReconstructor interface {
-	// Add a share
+	// Add a beacon share without verifying it. 
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 	HasSufficientShares() bool
-	// assume it has sufficient shares
+	// Reconstruct the beacon signature if there are enough shares. It errors if not enough shares were collected.
 	Reconstruct() (crypto.Signature, error)
 }
 
-// RandomBeaconAggregtor aggregates the random beacon signatures
-type RandomBeaconAggregtor interface {
+// RandomBeaconAggregator aggregates the random beacon signatures
+type RandomBeaconAggregator interface {
 	// TrustedAdd adds an already verified signature.
 	// return (true, nil) means the signature has been added
 	// return (false, nil) means the signature is a duplication
@@ -40,7 +40,7 @@ type StakingSigAggregator interface {
 
 type AggregatedSignatureData struct {
 	StakingSigners               []flow.Identifier
-	ThresholdSigners             []flow.Identifier
+	RandomBeaconSigners             []flow.Identifier
 	AggregatedStakingSig         crypto.Signature
 	AggregatedRandomBeaconSig    crypto.Signature
 	ReconstructedRandomBeaconSig crypto.Signature

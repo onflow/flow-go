@@ -1,5 +1,5 @@
 package signature
 
-// RandomBeaconAggregtor aggregates the threshold signatures
+// RandomBeaconAggregtor aggregates the random beacon signatures
 type RandomBeaconAggregtor struct {
 }

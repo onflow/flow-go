@@ -5,24 +5,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SigValidator only validate a message's signature part.
-// It transforms the vote or block into a message, and uses the verifier, which doesn't have
-// the knowledge of vote/block, to verify the signature.
+// SigValidator only validates the cryptographic signature of an entity (Vote, Block or QC).
+// It builds the message corresponding to the entity, and uses the cryptographic verifier to validate
+// the signature. The verifier used does not have any knowledge about the entity.
 type SigValidator interface {
-	// return nil if the vote's signature is valid
-	// return model.InvalidVoteError if the vote's signature is invalid
-	// return other error if there is exception
+      // ValidateVote validates the cryptographic signature of a vote.
+	// It returns: 
+	//   - nil if the vote's signature is valid
+	//   - model.InvalidVoteError if the vote's signature is invalid
+	//   - other error if there is an exception
 	ValidateVote(vote *model.Vote) error
 
-	// return nil if the block's signature is valid
-	// return model.InvalidBlockError if the block's signature is invalid
-	// return other error if there is exception
+      // ValidateVote validates the cryptographic signature of a block.
+	// It returns: 
+	//   - nil if the blocks's signature is valid
+	//   - model.InvalidBlockError if the block's signature is invalid
+	//   - other error if there is an exception
 	ValidateBlock(block *model.Proposal) error
 }
 
 type QCValidator interface {
-	// return nil if the QC's signature is valid
-	// return model.InvalidBlockError if the QC's signature is invalid
-	// return other error if there is exception
+      // ValidateVote validates the cryptographic signature of a QC.
+	// It returns: 
+	//   - nil if the QC's signature is valid
+	//   - model.InvalidQCError if the block's signature is invalid
+	//   - other error if there is an exception
 	ValidateQC(qc *flow.QuorumCertificate) error
 }
