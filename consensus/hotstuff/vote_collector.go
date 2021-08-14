@@ -26,6 +26,8 @@ const (
 	VoteCollectorStatusInvalid
 )
 
+// VoteCollector collects votes for the same block, produces QC when enough votes are collected
+// VoteCollector takes a callback function to report the event that a QC has been produced.
 var collectorStatusNames = [...]string{"VoteCollectorStatusCaching",
 	"VoteCollectorStatusVerifying",
 	"VoteCollectorStatusInvalid"}
@@ -69,7 +71,6 @@ type VoteCollectorState interface {
 	// return error if the signature is invalid
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
 	// passed to EventLoop through a callback.
-	// ToDo: document sentinel errors expected during normal operation
 	AddVote(vote *model.Vote) error
 
 	// BlockID returns the block ID that this instance is collecting votes for.
@@ -78,4 +79,14 @@ type VoteCollectorState interface {
 
 	// Status returns the status of the vote collector
 	Status() VoteCollectorStatus
+}
+
+// VerifyingVoteCollector is a VoteCollector and also implement the same interface as BlockSigner, so that
+// when the voter ask VoteAggregator(via BlockSigner interface)
+// to sign the block, and VoteAggregator will read the VerifyingVoteCollector from the vote collectors
+// map and produce the vote.
+// Note CachingVoteCollector can't create vote, only VerifyingVoteCollector can
+type VerifyingVoteCollector interface {
+	VoteCollector
+	BlockSigner
 }

@@ -10,6 +10,5 @@ type Voter interface {
 	// If it decides to vote, it returns (&vote, nil). The call will call into VoteAggregator's GetVoteCreator method to get a
 	// `createVote` function and create a vote with it,
 	// If it decides not to vote, it returns (nil, NoVoteError)
-	// ToDo: document sentinel errors expected during normal operation
 	ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error)
 }
