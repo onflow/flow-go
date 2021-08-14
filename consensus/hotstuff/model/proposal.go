@@ -29,7 +29,7 @@ func ProposalFromFlow(header *flow.Header, parentView uint64) *Proposal {
 
 	proposal := Proposal{
 		Block:   block,
-		SigData: header.ProposerSig,
+		SigData: header.ProposerSigData,
 	}
 
 	return &proposal
@@ -45,9 +45,9 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 		Timestamp:      block.Timestamp,
 		View:           block.View,
 		ParentVoterIDs: block.QC.SignerIDs,
-		ParentVoterSig: block.QC.SigData,
+		ParentVoterSigData: block.QC.SigData,
 		ProposerID:     block.ProposerID,
-		ProposerSig:    proposal.SigData,
+		ProposerSigData:    proposal.SigData,
 	}
 
 	return &header
