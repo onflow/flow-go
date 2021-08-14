@@ -78,6 +78,10 @@ type NodeBuilder interface {
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics()
+
+	// ValidateFlags is an extra method called after parsing flags, intended for extra check of flag validity
+	// for example where certain combinations aren't allowed
+	ValidateFlags(func() error) NodeBuilder
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params

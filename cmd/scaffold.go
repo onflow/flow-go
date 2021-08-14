@@ -94,13 +94,14 @@ type namedDoneObject struct {
 // of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	*NodeConfig
-	flags       *pflag.FlagSet
-	modules     []namedModuleFunc
-	components  []namedComponentFunc
-	doneObject  []namedDoneObject
-	sig         chan os.Signal
-	preInitFns  []func(NodeBuilder, *NodeConfig)
-	postInitFns []func(NodeBuilder, *NodeConfig)
+	flags          *pflag.FlagSet
+	modules        []namedModuleFunc
+	components     []namedComponentFunc
+	doneObject     []namedDoneObject
+	sig            chan os.Signal
+	preInitFns     []func(NodeBuilder, *NodeConfig)
+	postInitFns    []func(NodeBuilder, *NodeConfig)
+	extraFlagCheck func() error
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -236,6 +237,11 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
 	})
 
 	log.Msg("flags loaded")
+}
+
+func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
+	fnb.extraFlagCheck = f
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
@@ -669,6 +675,8 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
+	fnb.extraFlagsValidation()
+
 	fnb.EnqueueNetworkInit()
 
 	fnb.EnqueueMetricsServerInit()
@@ -759,6 +767,15 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 		fnb.Logger.Error().
 			Err(err).
 			Msg("could not close database")
+	}
+}
+
+func (fnb *FlowNodeBuilder) extraFlagsValidation() {
+	if fnb.extraFlagCheck != nil {
+		err := fnb.extraFlagCheck()
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("invalid flags")
+		}
 	}
 }
 
