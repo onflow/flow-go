@@ -289,10 +289,19 @@ func testBLSWithRelicSignCrossBLST(t *rapid.T) {
 
 }
 
-func TestBLSCrossBLST(t *testing.T) {
+func TestCrossEncodeDecodeScalar(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeScalarCrossBLST)
+}
+
+func TestCrossEncodeDecodePubKey(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodePubKeyCrossBLST)
+}
+
+func TestCrossEncodeDecodeSignature(t *testing.T) {
 	rapid.Check(t, testBLSEncodeDecodeSignatureCrossBLST)
+}
+
+func TestCrossSign(t *testing.T) {
 	rapid.Check(t, testBLSWithRelicSignCrossBLST)
 }
 

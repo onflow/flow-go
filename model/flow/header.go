@@ -7,7 +7,6 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/vmihailenco/msgpack/v4"
 
-	"github.com/onflow/flow-go/crypto"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -25,41 +24,47 @@ type Header struct {
 	PayloadHash Identifier // PayloadHash is a hash of the payload of this block.
 
 	Timestamp time.Time // Timestamp is the time at which this block was proposed.
+	// The proposer can choose any time, so this should not be trusted as accurate.
 
 	View uint64 // View number at which this block was proposed.
 
-	ParentVoterIDs []Identifier // List of voters who signed the parent block. Used as QC.SignerIDs
+	ParentVoterIDs []Identifier // List of voters who signed the parent block.
+	// A quorum certificate can be extrated from the header.
+	// This field is the SignerIDs field of the extracted quorum certificate.
 
-	ParentVoterSig []byte // Used as QC.SigData. Might be a serialization of multiple signatures and therefore not a crypto.Signature.
+	ParentVoterSigData []byte // aggregated signature over the parent block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
+	// A quorum certificate can be extracted from the header.
+	// This field is the SigData field of the extracted quorum certificate.
 
 	ProposerID Identifier // proposer identifier for the block
 
-	ProposerSig []byte // signature of the proposer over the new block.
-	// Might be a serialization of multiple signatures and therefore not a crypto.Signature.
+	ProposerSigData []byte // signature of the proposer over the new block. Not a single cryptographic
+	// signature since the data represents cryptographic signatures serialized in some way (concatenation or other)
 }
 
 // Body returns the immutable part of the block header.
 func (h Header) Body() interface{} {
 	return struct {
-		ChainID        ChainID
-		ParentID       Identifier
-		Height         uint64
-		PayloadHash    Identifier
-		Timestamp      uint64
-		View           uint64
-		ParentVoterIDs []Identifier
-		ParentVoterSig crypto.Signature
-		ProposerID     Identifier
+		ChainID            ChainID
+		ParentID           Identifier
+		Height             uint64
+		PayloadHash        Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentVoterIDs     []Identifier
+		ParentVoterSigData []byte
+		ProposerID         Identifier
 	}{
-		ChainID:        h.ChainID,
-		ParentID:       h.ParentID,
-		Height:         h.Height,
-		PayloadHash:    h.PayloadHash,
-		Timestamp:      uint64(h.Timestamp.UnixNano()),
-		View:           h.View,
-		ParentVoterIDs: h.ParentVoterIDs,
-		ParentVoterSig: h.ParentVoterSig,
-		ProposerID:     h.ProposerID,
+		ChainID:            h.ChainID,
+		ParentID:           h.ParentID,
+		Height:             h.Height,
+		PayloadHash:        h.PayloadHash,
+		Timestamp:          uint64(h.Timestamp.UnixNano()),
+		View:               h.View,
+		ParentVoterIDs:     h.ParentVoterIDs,
+		ParentVoterSigData: h.ParentVoterSigData,
+		ProposerID:         h.ProposerID,
 	}
 }
 
