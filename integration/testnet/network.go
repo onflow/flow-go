@@ -14,33 +14,31 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go-sdk/crypto"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/utils/io"
-
 	"github.com/dapperlabs/testingdock"
 
 	"github.com/onflow/cadence"
 
+	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	dkgmod "github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -67,19 +65,14 @@ const (
 	AccessNodeAPIPort = "access-api-port"
 	// AccessNodeAPIProxyPort is the name used for the access node API HTTP proxy port.
 	AccessNodeAPIProxyPort = "access-api-http-proxy-port"
-	// UnstakedNetworkPort is the name used for the access node unstaked libp2p network port.
-	UnstakedNetworkPort = "access-unstaked-network-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
 
 	// ExeNodeMetricsPort
 	ExeNodeMetricsPort = "exe-metrics-port"
 
-	// default staked network port
-	DefaultStakedFlowPort = 2137
-
-	// default unstaked network port
-	DefaultUnstakedFlowPort = 7312
+	// default network port
+	DefaultFlowPort = 2137
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -312,17 +305,14 @@ func (n *NetworkConfig) Swap(i, j int) {
 // NodeConfig defines the input config for a particular node, specified prior
 // to network creation.
 type NodeConfig struct {
-	Role            flow.Role
-	Stake           uint64
-	Identifier      flow.Identifier
-	LogLevel        zerolog.Level
-	Ghost           bool
-	AdditionalFlags []string
-	Debug           bool
-	// Unstaked - only applicable to Access Node. Access nodes can be staked or unstaked.
-	// Unstaked nodes are not part of the identity table
-	Unstaked                      bool // only applicable to Access node
-	ParticipatesInUnstakedNetwork bool
+	Role                        flow.Role
+	Stake                       uint64
+	Identifier                  flow.Identifier
+	LogLevel                    zerolog.Level
+	Ghost                       bool
+	AdditionalFlags             []string
+	Debug                       bool
+	ParticipatesInPublicNetwork bool // only applicable to Access node
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -398,9 +388,9 @@ func AsGhost() func(config *NodeConfig) {
 	}
 }
 
-func AsUnstakedNetworkParticipant() func(config *NodeConfig) {
+func AsPublicNetworkParticipant() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		config.ParticipatesInUnstakedNetwork = true
+		config.ParticipatesInPublicNetwork = true
 	}
 }
 
@@ -499,11 +489,8 @@ func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, 
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	}
 
-	// TODO: eventually we will need upstream node's address
-	//
-	// upstreamANPort := net.ContainerByID(followerConf.upstreamNodeID).Ports[testnet.UnstakedNetworkPort]
-	// upstreamANAddress := fmt.Sprintf("127.0.0.1:%d", upstreamANPort)
-
+	// TODO: update consensus follower to just accept a networking key instead of a node ID
+	// it should be able to figure out the rest on its own.
 	follower := consensus_follower.NewConsensusFollower(
 		followerConf.nodeID,
 		followerConf.upstreamNodeID,
@@ -649,13 +636,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
-			if nodeConf.ParticipatesInUnstakedNetwork {
-				hostUnstakedPort := testingdock.RandomPort(t)
-				containerUnstakedPort := fmt.Sprintf("%d/tcp", DefaultUnstakedFlowPort)
-				nodeContainer.bindPort(hostUnstakedPort, containerUnstakedPort)
-				nodeContainer.addFlag("unstaked-bind-addr", fmt.Sprintf("%s:%d", nodeContainer.Name(), DefaultUnstakedFlowPort))
-				nodeContainer.Ports[UnstakedNetworkPort] = hostUnstakedPort
-				net.AccessPorts[UnstakedNetworkPort] = hostUnstakedPort
+			if nodeConf.ParticipatesInPublicNetwork {
+				// TODO: define this flag for Access node
+				nodeContainer.addFlag("public-network-participant", "true")
 			}
 
 		case flow.RoleConsensus:
@@ -678,18 +661,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 
-		if nodeConf.ParticipatesInUnstakedNetwork {
-			hostUnstakedPort := testingdock.RandomPort(t)
-			containerUnstakedPort := fmt.Sprintf("%d/tcp", DefaultUnstakedFlowPort)
-
-			// TODO: Currently, it is not possible to create a staked ghost AN which
-			// participates on the unstaked network, because the ghost node only joins
-			// a single network during startup. The ghost node needs to support the
-			// "unstaked-bind-addr" flag which can be used to specify a bind address
-			// for the unstaked network.
-
-			nodeContainer.bindPort(hostUnstakedPort, containerUnstakedPort)
-			nodeContainer.Ports[UnstakedNetworkPort] = hostUnstakedPort
+		if nodeConf.ParticipatesInPublicNetwork {
+			// TODO: Currently, it is not possible to create a ghost AN which participates
+			// in the public network, because connection gating is enabled by default and
+			// therefore the ghost node will deny incoming connections from all consensus
+			// followers. A flag for the ghost node will need to be created to enable
+			// overriding the default behavior.
 		}
 	}
 
@@ -761,29 +738,19 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	sort.Sort(&networkConf)
 
 	// generate staking and networking keys for each configured node
-	// NOTE: this includes unstaked access nodes, which need private keys written
-	// but should not be included in the identity table
-	allConfs, err := setupKeys(networkConf)
+	stakedConfs, err := setupKeys(networkConf)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
-
-	// only staked configs - this only includes identity table members
-	stakedConfs := filterContainerConfigs(allConfs, func(config ContainerConfig) bool {
-		return !config.Unstaked
-	})
 
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
 	}
 
-	allNodeInfos := toNodeInfos(allConfs)
-	allNodeInfos = append(allNodeInfos, followerInfos...)
+	allNodeInfos = append(toNodeInfos(stakedConfs), followerInfos...)
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
-	// IMPORTANT: these nodes infos must include exactly the identity table
-	//            members (no unstaked access nodes)
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
 
 	// run DKG for all consensus nodes
@@ -963,11 +930,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		// define the node's name <role>_<n> and address <name>:<port>
 		name := fmt.Sprintf("%s_%d", conf.Role.String(), roleCounter[conf.Role]+1)
 
-		flowPort := DefaultStakedFlowPort
-		if conf.Unstaked {
-			flowPort = DefaultUnstakedFlowPort
-		}
-		addr := fmt.Sprintf("%s:%d", name, flowPort)
+		addr := fmt.Sprintf("%s:%d", name, DefaultFlowPort)
 		roleCounter[conf.Role]++
 
 		info := bootstrap.NewPrivateNodeInfo(
@@ -980,14 +943,13 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		)
 
 		containerConf := ContainerConfig{
-			NodeInfo:                      info,
-			ContainerName:                 name,
-			LogLevel:                      conf.LogLevel,
-			Ghost:                         conf.Ghost,
-			AdditionalFlags:               conf.AdditionalFlags,
-			Debug:                         conf.Debug,
-			Unstaked:                      conf.Unstaked,
-			ParticipatesInUnstakedNetwork: conf.ParticipatesInUnstakedNetwork,
+			NodeInfo:                    info,
+			ContainerName:               name,
+			LogLevel:                    conf.LogLevel,
+			Ghost:                       conf.Ghost,
+			AdditionalFlags:             conf.AdditionalFlags,
+			Debug:                       conf.Debug,
+			ParticipatesInPublicNetwork: conf.ParticipatesInPublicNetwork,
 		}
 
 		confs = append(confs, containerConf)
