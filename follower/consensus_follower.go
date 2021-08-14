@@ -85,7 +85,7 @@ type ConsensusFollowerImpl struct {
 
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
-	networkPublicKey crypto.PublicKey,
+	networkPublicKey crypto.PublicKey, // TODO: make this optional. if not explicitly supplied, we can auto-generate one for them.
 	upstreamAccessNodeID flow.Identifier,
 	bindAddr string,
 	opts ...Option,

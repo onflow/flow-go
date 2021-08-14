@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	fcrypto "github.com/onflow/flow-go/crypto"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -216,13 +217,13 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 }
 
 type ConsensusFollowerConfig struct {
-	nodeID         flow.Identifier
+	networkKey     fcrypto.PrivateKey
 	upstreamNodeID flow.Identifier
 }
 
-func NewConsensusFollowerConfig(nodeID flow.Identifier, upstreamNodeID flow.Identifier) ConsensusFollowerConfig {
+func NewConsensusFollowerConfig(networkKey fcrypto.PrivateKey, upstreamNodeID flow.Identifier) ConsensusFollowerConfig {
 	return ConsensusFollowerConfig{
-		nodeID:         nodeID,
+		networkKey:     fcrypto.PrivateKey,
 		upstreamNodeID: upstreamNodeID,
 	}
 }
@@ -492,12 +493,13 @@ func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, 
 	// TODO: update consensus follower to just accept a networking key instead of a node ID
 	// it should be able to figure out the rest on its own.
 	follower := consensus_follower.NewConsensusFollower(
-		followerConf.nodeID,
+		followerConf.networkKey,
 		followerConf.upstreamNodeID,
 		bindAddr,
 		opts...,
 	)
 
+	// TODO: convert key to node ID? or just store with the network key as map key
 	net.ConsensusFollowers[followerConf.nodeID] = follower
 }
 
@@ -696,6 +698,7 @@ func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {
 	var nodeInfos []bootstrap.NodeInfo
 
+	// TODO: remove this, networking keys should be provided by the consensus follower config.
 	// get networking keys for all followers
 	networkKeys, err := unittest.NetworkingKeys(len(confs))
 	if err != nil {
@@ -710,6 +713,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 
 	for i, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
+			// TODO: Need to convert from network key here
 			conf.nodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
