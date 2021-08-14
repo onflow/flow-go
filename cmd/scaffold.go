@@ -191,8 +191,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Logger,
 			fnb.State,
 		)
-		node.SubscriptionManager = subscriptionManager
-
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
