@@ -181,7 +181,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		}
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-		node.SubscriptionManager = subscriptionManager
 		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
