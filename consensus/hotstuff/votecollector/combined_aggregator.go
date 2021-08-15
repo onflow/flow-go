@@ -17,6 +17,20 @@ type combinedAggregator struct {
 	weight         atomic.Uint64
 }
 
+func newCombinedAggregator(
+	message []byte,
+	requiredWeight uint64,
+	weightTable map[flow.Identifier]uint64,
+	weight atomic.Uint64,
+) *combinedAggregator {
+	return &combinedAggregator{
+		message:        message,
+		requiredWeight: requiredWeight,
+		weightTable:    weightTable,
+		weight:         weight,
+	}
+}
+
 // Verify a vote's signature
 func (c *combinedAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, SigType, error) {
 	panic("to be implemented")
