@@ -5,10 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/cadence/runtime/common"
-	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
+
 	"os"
 	"path"
 	"runtime"
@@ -17,7 +14,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/cadence/runtime/common"
+	"github.com/onflow/cadence/runtime/interpreter"
+
+	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // BalanceReporter iterates through registers getting the location and balance of all FlowVaults
@@ -33,17 +35,16 @@ func (r *BalanceReporter) filename() string {
 
 type balanceDataPoint struct {
 	// Path is the storage path of the composite the vault was found in
-	Path           string `json:"path"`
+	Path string `json:"path"`
 	// Address is the owner of the composite the vault was found in
-	Address        string `json:"address"`
+	Address string `json:"address"`
 	// LastComposite is the Composite directly containing the FlowVault
-	LastComposite  string `json:"last_composite"`
+	LastComposite string `json:"last_composite"`
 	// FirstComposite is the root composite at this path which directly or indirectly contains the vault
 	FirstComposite string `json:"first_composite"`
 	// Balance is the balance of the flow vault
-	Balance        uint64 `json:"balance"`
+	Balance uint64 `json:"balance"`
 }
-
 
 // Report creates a balance_report_*.json file that contains data on all FlowVaults in the state commitment.
 // I recommend using gojq to browse through the data, because of the large uint64 numbers which jq won't be able to handle.
@@ -80,8 +81,8 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 
 	results := make([]balanceDataPoint, 0)
 
+	resultsWG.Add(1)
 	go func() {
-		resultsWG.Add(1)
 		for point := range resultsChan {
 			results = append(results, point)
 		}
@@ -89,11 +90,12 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	}()
 
 	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
 		go r.balanceReporterWorker(jobs, wg, resultsChan)
 	}
 
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		for _, p := range payload {
 			jobs <- p
 		}
@@ -127,8 +129,6 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 }
 
 func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sync.WaitGroup, dataChan chan balanceDataPoint) {
-	wg.Add(1)
-
 	for payload := range jobs {
 		err := r.handlePayload(payload, dataChan)
 		if err != nil {
@@ -222,6 +222,9 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceD
 	}
 
 	inter, err := interpreter.NewInterpreter(nil, common.StringLocation("somewhere"))
+	if err != nil {
+		return err
+	}
 	interpreterValue.Accept(inter, balanceVisitor)
 
 	return nil
