@@ -420,7 +420,7 @@ func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.
 func (m *Middleware) UpdateAllowList() {
 	// update libp2pNode's approve lists if this middleware also does connection gating
 	if m.connectionGating {
-		m.libP2PNode.UpdateAllowList(m.peerIDs())
+		m.libP2PNode.UpdateAllowList(m.allPeers())
 	}
 
 	// update peer connections if this middleware also does peer management
