@@ -12,7 +12,7 @@ type SigType int
 // the other is the threshold sig used as staking sigature.
 const (
 	SigTypeStaking SigType = iota
-	SigTypeThreshold
+	SigTypeRandomBeacon
 	SigTypeInvalid
 )
 

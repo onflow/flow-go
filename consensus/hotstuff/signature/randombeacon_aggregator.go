@@ -1,5 +1,5 @@
 package signature
 
-// RandomBeaconAggregtaorImpl aggregates the random beacon signatures
-type RandomBeaconAggregtaorImpl struct {
+// RandomBeaconAggregatorImpl aggregates the random beacon signatures
+type RandomBeaconAggregatorImpl struct {
 }

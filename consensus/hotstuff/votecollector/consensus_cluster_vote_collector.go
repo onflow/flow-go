@@ -14,8 +14,9 @@ type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
 	dkg           hotstuff.DKG
+	validator     hotstuff.SigValidator
 	aggregator    CombinedAggregator
-	reconstructor RandomBeaconReconstructor
+	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
 	done          atomic.Bool
 }

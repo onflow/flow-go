@@ -2,6 +2,7 @@ package voteaggregator
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
@@ -23,7 +24,7 @@ type VoteAggregatorV2 struct {
 	voteValidator       hotstuff.Validator
 	signer              hotstuff.SignerVerifier
 	highestPrunedView   counters.StrictMonotonousCounter
-	collectors          VoteCollectors
+	collectors          hotstuff.VoteCollectors
 	queuedVotesNotifier engine.Notifier
 	queuedVotes         *fifoqueue.FifoQueue // keeps track of votes whose blocks can not be found
 }
