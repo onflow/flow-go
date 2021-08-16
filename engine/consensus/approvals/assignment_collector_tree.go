@@ -261,16 +261,18 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 		}, nil
 	}
 
-	// add AssignmentCollector as vertex to tree
-	err = t.forest.VerifyVertex(vertex)
-	if err != nil {
-		return nil, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
-	}
 	// leveled forest doesn't treat this case as error, we shouldn't create collectors
 	// for vertexes lower that forest.LowestLevel
 	if vertex.Level() < t.forest.LowestLevel {
 		return nil, fmt.Errorf("could not add collector with height lower than the lowest level")
 	}
+
+	// add AssignmentCollector as vertex to tree
+	err = t.forest.VerifyVertex(vertex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
+	}
+
 	t.forest.AddVertex(vertex)
 
 	// An assignment collector is processable if and only if:
