@@ -85,6 +85,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 	selector = filter.And(
 		selector,
 		filter.Not(filter.HasNodeID(me.NodeID())),
+		filter.Not(filter.Ejected),
 	)
 
 	// make sure we don't send requests to unstaked nodes
@@ -92,7 +93,7 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		selector = filter.And(
 			selector,
 			filter.HasStake(true),
-			filter.Not(filter.Ejected))
+		)
 	}
 
 	// initialize the propagation engine with its dependencies
