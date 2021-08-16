@@ -7,6 +7,9 @@
 /cmd/util/util
 /cmd/bootstrap/bootstrap
 
+# crypto relic folder
+crypto/relic/
+
 # Test binary, build with `go test -c`
 *.test
 
@@ -15,6 +18,12 @@
 
 # Output from logging to debug
 *.log
+
+# Output from binstat
+*.binstat.txt*
+
+# Output from pprof
+*.pprof.txt
 
 # Coverage artifacts
 coverage.zip

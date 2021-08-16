@@ -678,7 +678,8 @@ func (e *Engine) onBlockExecuted(executed *entity.ExecutableBlock, finalState fl
 			// go through each children, add them back to the queue, and check
 			// if the children is executable
 			for _, queue := range newQueues {
-				added := executionQueues.Add(queue)
+				queueID := queue.ID()
+				added := executionQueues.Add(queueID, queue)
 				if !added {
 					// blocks should be unique in execution queues, if we dismount all the children blocks, then
 					// add it back to the queues, then it should always be able to add.
@@ -845,8 +846,6 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 				// the collection id matches with the CollectionID from the collection guarantee
 				completeCollection.Transactions = collection.Transactions
 
-				fmt.Printf("handled collection\n")
-
 				// check if the block becomes executable
 				_ = e.executeBlockIfComplete(executableBlock)
 			}
@@ -864,7 +863,8 @@ func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Col
 
 func newQueue(blockify queue.Blockify, queues *stdmap.QueuesBackdata) (*queue.Queue, bool) {
 	q := queue.NewQueue(blockify)
-	return q, queues.Add(q)
+	qID := q.ID()
+	return q, queues.Add(qID, q)
 }
 
 // enqueue adds a block to the queues, return the queue that includes the block and booleans
@@ -978,7 +978,7 @@ func (e *Engine) matchOrRequestCollections(
 			ExecutableBlocks: map[flow.Identifier]*entity.ExecutableBlock{executableBlock.ID(): executableBlock},
 		}
 
-		added := collectionsBackdata.Add(blocksNeedingCollection)
+		added := collectionsBackdata.Add(blocksNeedingCollection.ID(), blocksNeedingCollection)
 		if !added {
 			// sanity check, should not happen, unless mempool implementation has a bug
 			return fmt.Errorf("collection already mapped to block")

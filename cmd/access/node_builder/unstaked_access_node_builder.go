@@ -1,23 +1,20 @@
-package main
+package node_builder
 
 import (
-	"strings"
-	"time"
+	"context"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/topology"
 )
 
 type UnstakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
+func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 	return &UnstakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -25,9 +22,16 @@ func UnstakedAccessNode(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
 
 func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	builder.Cancel = cancel
+
 	builder.validateParams()
 
-	builder.enqueueUnstakedNetworkInit()
+	builder.deriveBootstrapPeerIdentities()
+
+	builder.enqueueUnstakedNetworkInit(ctx)
+
+	builder.enqueueConnectWithStakedAN()
 
 	builder.EnqueueMetricsServerInit()
 
@@ -42,15 +46,22 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 func (builder *UnstakedAccessNodeBuilder) validateParams() {
 
-	// for an unstaked access node, the staked access node ID must be provided
-	if strings.TrimSpace(builder.stakedAccessNodeIDHex) == "" {
-		builder.Logger.Fatal().Msg("staked access node ID not specified")
-	}
-
-	// and also the unstaked bind address
+	// for an unstaked access node, the unstaked network bind address must be provided
 	if builder.unstakedNetworkBindAddr == cmd.NotSet {
 		builder.Logger.Fatal().Msg("unstaked bind address not set")
 	}
+
+	if len(builder.bootstrapNodeAddresses) != len(builder.bootstrapNodePublicKeys) {
+		builder.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
+	}
+}
+
+// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstreap peers from the parameters.
+// These are the identity of the staked and unstaked AN also acting as the DHT bootstrap server
+func (builder *UnstakedAccessNodeBuilder) deriveBootstrapPeerIdentities() {
+	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	builder.MustNot(err)
+	builder.bootstrapIdentites = ids
 }
 
 // initUnstakedLocal initializes the unstaked node ID, network key and network address
@@ -74,7 +85,7 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
-func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -88,29 +99,18 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
-		// network metrics
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
+		libP2PFactory, err := builder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
 		builder.MustNot(err)
 
-		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
+		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
 
-		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
-		peerUpdateInterval := time.Hour
-
-		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		participants := flow.IdentityList{}
 
-		upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
-		builder.MustNot(err)
-
-		// topology only consist of the upsteam staked AN
-		top := topology.NewFixedListTopology(upstreamANIdentifier)
-
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
+		// topology is nil since its automatically managed by libp2p
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, nil)
 		builder.MustNot(err)
 
 		builder.UnstakedNetwork = network
@@ -123,5 +123,17 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		builder.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
 
 		return builder.UnstakedNetwork, err
+	})
+}
+
+// enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the unstaked
+// AN with the staked AN.
+// Currently, there is an issue with LibP2P stopping advertisements of subscribed topics if no peers are connected
+// (https://github.com/libp2p/go-libp2p-pubsub/issues/442). This means that an unstaked AN could end up not being
+// discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
+// of an explicit connect to the staked AN before the node attempts to subscribe to topics.
+func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
+	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return newUpstreamConnector(builder.bootstrapIdentites, builder.UnstakedLibP2PNode, builder.Logger), nil
 	})
 }
