@@ -17,6 +17,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
@@ -54,23 +55,12 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 
 	connGater := NewConnGater(log)
 
-	// create PubSub options for libp2p to use
-	psOptions := []pubsub.Option{
-		// skip message signing
-		pubsub.WithMessageSigning(false),
-		// skip message signature
-		pubsub.WithStrictSignatureVerification(false),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
-		// no discovery
-	}
-
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(psOptions...).
+			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			Build(ctx)
@@ -81,7 +71,7 @@ type NodeBuilder interface {
 	SetRootBlockID(string) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
-	SetPubsubOptions(...pubsub.Option) NodeBuilder
+	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	Build(context.Context) (*Node, error)
@@ -96,7 +86,7 @@ type DefaultLibP2PNodeBuilder struct {
 	pingInfoProvider PingInfoProvider
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
-	pubSubOpts       []pubsub.Option
+	pubSubOpts       []PubsubOption
 }
 
 func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
@@ -126,7 +116,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...pubsub.Option) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...PubsubOption) NodeBuilder {
 	builder.pubSubOpts = opts
 	return builder
 }
@@ -174,6 +164,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.connMgr = builder.connMngr
 	}
 
+	if builder.rootBlockID == "" {
+		return nil, errors.New("root block ID must be provided")
+	}
+	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
 	}
@@ -190,7 +185,17 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.pingService = pingService
 	}
 
-	ps, err := builder.pubSubMaker(ctx, libp2pHost, builder.pubSubOpts...)
+	var libp2pPSOptions []pubsub.Option
+	// generate the libp2p Pubsub options from the given context and host
+	for _, optionGenerator := range builder.pubSubOpts {
+		option, err := optionGenerator(ctx, libp2pHost)
+		if err != nil {
+			return nil, err
+		}
+		libp2pPSOptions = append(libp2pPSOptions, option)
+	}
+
+	ps, err := builder.pubSubMaker(ctx, libp2pHost, libp2pPSOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -637,4 +642,34 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 		return nil, fmt.Errorf("could not create libp2p gossipsub: %w", err)
 	}
 	return pubSub, nil
+}
+
+// PubsubOption generates a libp2p pubsub.Option from the given context and host
+type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
+
+func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
+	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
+		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
+			return option, nil
+		}
+	}
+	return []PubsubOption{
+		// skip message signing
+		pubSubOptionFunc(pubsub.WithMessageSigning(false)),
+		// skip message signature
+		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(false)),
+		// set max message size limit for 1-k PubSub messaging
+		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
+		// no discovery
+	}
+}
+
+func WithDHTDiscovery(option ...dht.Option) PubsubOption {
+	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
+		dhtDiscovery, err := NewDHT(ctx, host, option...)
+		if err != nil {
+			return nil, err
+		}
+		return pubsub.WithDiscovery(dhtDiscovery), nil
+	}
 }
