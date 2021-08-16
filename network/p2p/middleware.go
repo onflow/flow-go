@@ -11,8 +11,8 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
-	"github.com/rs/zerolog"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -78,7 +78,7 @@ type Middleware struct {
 	unicastMessageTimeout time.Duration
 	connectionGating      bool
 	managePeerConnections bool
-	idTranslator IDTranslator
+	idTranslator          IDTranslator
 }
 
 // NewMiddleware creates a new middleware instance
@@ -129,7 +129,7 @@ func NewMiddleware(
 		unicastMessageTimeout: unicastMessageTimeout,
 		connectionGating:      connectionGating,
 		managePeerConnections: managePeerConnections,
-		idTranslator: idTranslator,
+		idTranslator:          idTranslator,
 	}
 }
 
@@ -140,11 +140,24 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-func (m *Middleware) peerIDs() []peer.ID {
-	identifiers := m.ov.Identifiers()
-	result := make([]peer.ID, len(identifiers))
+func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
+	identifiers, err := m.ov.Topology()
+	if err != nil {
+		// TODO: format error
+		return nil, err
+	}
 
-	for _, fid := range identifiers {
+	return m.peerIDs(identifiers), nil
+}
+
+func (m *Middleware) allPeers() peer.IDSlice {
+	return m.peerIDs(m.ov.Identifiers())
+}
+
+func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
+	result := make([]peer.ID, len(flowIDs))
+
+	for _, fid := range flowIDs {
 		pid, err := m.idTranslator.GetPeerID(fid)
 		if err != nil {
 			// TODO: log here
@@ -152,7 +165,7 @@ func (m *Middleware) peerIDs() []peer.ID {
 
 		result = append(result, pid)
 	}
-	
+
 	return result
 }
 
@@ -178,7 +191,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
 	if m.connectionGating {
-		m.libP2PNode.UpdateAllowList(m.peerIDs())
+		m.libP2PNode.UpdateAllowList(m.allPeers())
 	}
 
 	if m.managePeerConnections {
@@ -187,7 +200,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 			return fmt.Errorf("failed to create libp2pConnector: %w", err)
 		}
 
-		m.peerManager = NewPeerManager(m.log, m.ov.Topology, libp2pConnector, WithInterval(m.peerUpdateInterval))
+		m.peerManager = NewPeerManager(m.log, m.topologyPeers, libp2pConnector, WithInterval(m.peerUpdateInterval))
 		select {
 		case <-m.peerManager.Ready():
 			m.log.Debug().Msg("peer manager successfully started")
@@ -286,7 +299,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 
 	return nil
 }
-
 
 // handleIncomingStream handles an incoming stream from a remote peer
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object

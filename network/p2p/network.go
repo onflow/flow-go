@@ -79,15 +79,15 @@ func NewNetwork(
 
 	o := &Network{
 		IdentifierProvider: idProvider,
-		logger:           log,
-		codec:            codec,
-		me:               me,
-		mw:               mw,
-		rcache:           rcache,
-		top:              top,
-		metrics:          metrics,
-		subMngr:          sm,
-		lifecycleManager: lifecycle.NewLifecycleManager(),
+		logger:             log,
+		codec:              codec,
+		me:                 me,
+		mw:                 mw,
+		rcache:             rcache,
+		top:                top,
+		metrics:            metrics,
+		subMngr:            sm,
+		lifecycleManager:   lifecycle.NewLifecycleManager(),
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 
@@ -163,9 +163,9 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
-// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
+// Topology returns the identifiers of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
-func (n *Network) Topology() (flow.IdentityList, error) {
+func (n *Network) Topology() (flow.IdentifierList, error) {
 	n.Lock()
 	defer n.Unlock()
 

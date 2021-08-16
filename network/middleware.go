@@ -59,8 +59,8 @@ type Middleware interface {
 // overlay network layer.
 type Overlay interface {
 	id.IdentifierProvider
-	// Topology returns an identity list of nodes which this node should be directly connected to as peers
-	Topology() (flow.IdentityList, error)
+	// Topology returns an identifier list of nodes which this node should be directly connected to as peers
+	Topology() (flow.IdentifierList, error)
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 }
 
