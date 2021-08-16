@@ -49,7 +49,7 @@ func WithBootstrapDir(bootstrapDir string) Option {
 type BootstrapNodeInfo struct {
 	Host             string // ip or hostname
 	Port             uint
-	NetworkPublicKey crypto.PublicKey // the network public keys of the bootstrap peer
+	NetworkPublicKey crypto.PublicKey // the network public key of the bootstrap peer
 }
 
 func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
