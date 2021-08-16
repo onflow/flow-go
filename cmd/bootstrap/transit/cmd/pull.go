@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const timeout = 5 * time.Minute
+
 // pullCmd represents a command to pull keys and metadata from the Google bucket
 var pullCmd = &cobra.Command{
 	Use:   "pull",
@@ -38,7 +40,7 @@ func addPullCmdFlags() {
 func pull(cmd *cobra.Command, args []string) {
 	log.Info().Msg("running pull")
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	nodeID, err := readNodeID()
