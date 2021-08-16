@@ -352,16 +352,16 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	return flow.Header{
-		ChainID:        parent.ChainID,
-		ParentID:       parent.ID(),
-		Height:         height,
-		PayloadHash:    IdentifierFixture(),
-		Timestamp:      time.Now().UTC(),
-		View:           view,
-		ParentVoterIDs: IdentifierListFixture(4),
-		ParentVoterSig: CombinedSignatureFixture(2),
-		ProposerID:     IdentifierFixture(),
-		ProposerSig:    SignatureFixture(),
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		PayloadHash:        IdentifierFixture(),
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentVoterIDs:     IdentifierListFixture(4),
+		ParentVoterSigData: CombinedSignatureFixture(2),
+		ProposerID:         IdentifierFixture(),
+		ProposerSigData:    SignatureFixture(),
 	}
 }
 
