@@ -156,13 +156,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
-	// get the node identity map from the overlay
-	idsMap, err := m.ov.Identity()
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-
 	if m.connectionGating {
+
+		// get the node identity map from the overlay
+		idsMap, err := m.ov.Identity()
+		if err != nil {
+			return fmt.Errorf("could not get identities: %w", err)
+		}
+
 		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 		if err != nil {
 			return fmt.Errorf("could not update approved peer list: %w", err)
