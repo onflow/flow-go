@@ -59,7 +59,7 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() {
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstreap peers from the parameters.
 // These are the identity of the staked and unstaked AN also acting as the DHT bootstrap server
 func (builder *UnstakedAccessNodeBuilder) deriveBootstrapPeerIdentities() {
-	ids, err := BoostrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	builder.MustNot(err)
 	builder.bootstrapIdentites = ids
 }

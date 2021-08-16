@@ -666,7 +666,7 @@ func unstakedNetworkMsgValidators(selfID flow.Identifier) []network.MessageValid
 // BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
 // each Flow Identity is initialized with the passed address, the networking key
 // and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
-func BoostrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
 
 	if len(addresses) != len(keys) {
 		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")

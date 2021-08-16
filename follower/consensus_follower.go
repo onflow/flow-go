@@ -46,7 +46,7 @@ func WithBootstrapDir(bootstrapDir string) Option {
 
 func getAccessNodeOptions(config *Config) ([]access.Option, error) {
 
-	ids, err := access.BoostrapIdentities(config.bootstrapNodeAddresses, config.bootstrapNodePublicKeys)
+	ids, err := access.BootstrapIdentities(config.bootstrapNodeAddresses, config.bootstrapNodePublicKeys)
 	if err != nil {
 		return nil, err
 	}
