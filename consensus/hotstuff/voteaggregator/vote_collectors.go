@@ -26,6 +26,7 @@ func (v *voteCollectors) PruneUpToView(view uint64) error {
 	for blockID := range v.blockIDsByView[view] {
 		delete(v.collectors, blockID)
 	}
+	delete(v.blockIDsByView, view)
 	return nil
 }
 
