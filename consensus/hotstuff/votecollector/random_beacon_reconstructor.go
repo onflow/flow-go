@@ -1,3 +1,4 @@
+//nolint
 package votecollector
 
 import "github.com/onflow/flow-go/crypto"
