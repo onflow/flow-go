@@ -20,8 +20,7 @@ import (
 	"github.com/onflow/flow-go/ledger"
 )
 
-// iterates through registers keeping a map of register sizes
-// reports on storage metrics
+// BalanceReporter iterates through registers getting the location and balance of all FlowVaults
 type BalanceReporter struct {
 	Log         zerolog.Logger
 	OutputDir   string
@@ -29,17 +28,25 @@ type BalanceReporter struct {
 }
 
 func (r *BalanceReporter) filename() string {
-	return path.Join(r.OutputDir, fmt.Sprintf("balance_report_%d.csv", int32(time.Now().Unix())))
+	return path.Join(r.OutputDir, fmt.Sprintf("balance_report_%d.json", int32(time.Now().Unix())))
 }
 
 type balanceDataPoint struct {
-	Path           string
-	Address        string
-	LastComposite  string
-	FirstComposite string
-	Balance        uint64
+	// Path is the storage path of the composite the vault was found in
+	Path           string `json:"path"`
+	// Address is the owner of the composite the vault was found in
+	Address        string `json:"address"`
+	// LastComposite is the Composite directly containing the FlowVault
+	LastComposite  string `json:"last_composite"`
+	// FirstComposite is the root composite at this path which directly or indirectly contains the vault
+	FirstComposite string `json:"first_composite"`
+	// Balance is the balance of the flow vault
+	Balance        uint64 `json:"balance"`
 }
 
+
+// Report creates a balance_report_*.json file that contains data on all FlowVaults in the state commitment.
+// I recommend using gojq to browse through the data, because of the large uint64 numbers which jq won't be able to handle.
 func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	fn := r.filename()
 	r.Log.Info().Msgf("Running FLOW balance Reporter. Saving output to %s.", fn)
@@ -123,7 +130,7 @@ func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sy
 	wg.Add(1)
 
 	for payload := range jobs {
-		err := r.HandlePayload(payload, dataChan)
+		err := r.handlePayload(payload, dataChan)
 		if err != nil {
 			r.Log.Err(err).Msg("Error handling payload")
 		}
@@ -132,7 +139,7 @@ func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sy
 	wg.Done()
 }
 
-func (r *BalanceReporter) HandlePayload(p ledger.Payload, dataChan chan balanceDataPoint) error {
+func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceDataPoint) error {
 	id, err := keyToRegisterID(p.Key)
 	if err != nil {
 		return err
