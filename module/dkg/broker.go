@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/utils/retry"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -104,12 +105,14 @@ func (b *Broker) Broadcast(data []byte) {
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 	}
-	success := b.retry(
+
+	success := retry.BackoffExponential(
 		func() error {
 			return b.dkgContractClient.Broadcast(bcastMsg)
 		},
 		RETRY_MAX,
 		RETRY_MILLISECONDS,
+		b.log,
 	)
 	if !success {
 		b.log.Error().Msg("failed to broadcast message")
@@ -175,12 +178,13 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	success := b.retry(
+	success := retry.BackoffExponential(
 		func() error {
 			return b.dkgContractClient.SubmitResult(pubKey, groupKeys)
 		},
 		RETRY_MAX,
 		RETRY_MILLISECONDS,
+		b.log,
 	)
 	if !success {
 		return fmt.Errorf("failed to submit dkg result")
@@ -275,21 +279,4 @@ func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (
 		signData[:],
 		NewDKGMessageHasher(),
 	)
-}
-
-// retry makes maxRetry attempts to executed function f. After the nth attempt,
-// we wait retryMilliseconds*2^n ms before retrying. Returns an error after
-// maxRetry unsuccessful attempts.
-func (b *Broker) retry(f func() error, maxRetry int, retryMilliseconds int) bool {
-	for attempt := 1; attempt <= maxRetry; attempt++ {
-		err := f()
-		if err != nil {
-			b.log.Warn().Err(err).Msgf("attempt %d/%d failed", attempt, maxRetry)
-			wait := time.Duration(retryMilliseconds<<(attempt-1)) * time.Millisecond
-			time.Sleep(wait)
-			continue
-		}
-		return true
-	}
-	return false
 }

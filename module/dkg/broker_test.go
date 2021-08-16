@@ -264,6 +264,7 @@ func TestBroadcastMessage(t *testing.T) {
 	contractClient.AssertExpectations(t)
 }
 
+// TestRetry checks that the client is using the correct underlying retry mechanism
 func TestRetry(t *testing.T) {
 	committee, locals := initCommittee(2)
 
