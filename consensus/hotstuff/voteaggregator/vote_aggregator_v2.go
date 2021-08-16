@@ -95,7 +95,7 @@ func (va *VoteAggregatorV2) processQueuedVoteEvents() error {
 }
 
 func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
-	collector, err := va.collectors.GetOrCreateCollector(vote.View, vote.BlockID)
+	collector, _, err := va.collectors.GetOrCreateCollector(vote.View, vote.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not lazy init collector for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
