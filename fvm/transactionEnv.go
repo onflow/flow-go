@@ -449,6 +449,22 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 	return add, nil
 }
 
+func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountContractNames)
+		defer sp.Finish()
+	}
+
+	a := flow.BytesToAddress(address.Bytes())
+
+	freezeError := e.accounts.CheckAccountNotFrozen(a)
+	if freezeError != nil {
+		return nil, fmt.Errorf("get account contract names: %w", freezeError)
+	}
+
+	return e.accounts.GetContractNames(a)
+}
+
 func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Program, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetProgram)

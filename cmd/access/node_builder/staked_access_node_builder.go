@@ -1,13 +1,14 @@
-package main
+package node_builder
 
 import (
-	"time"
+	"context"
+	"fmt"
 
 	"github.com/onflow/flow-go/cmd"
+	pingeng "github.com/onflow/flow-go/engine/access/ping"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 )
 
@@ -17,7 +18,7 @@ type StakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
 }
 
-func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
+func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 	return &StakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
@@ -25,13 +26,16 @@ func StakedAccessNode(anb *FlowAccessNodeBuilder) *StakedAccessNodeBuilder {
 
 func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	builder.Cancel = cancel
+
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
-	builder.EnqueueNetworkInit()
+	builder.EnqueueNetworkInit(ctx)
 
 	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
 	if builder.ParticipatesInUnstakedNetwork() {
-		builder.enqueueUnstakedNetworkInit()
+		builder.enqueueUnstakedNetworkInit(ctx)
 	}
 
 	builder.EnqueueMetricsServerInit()
@@ -43,8 +47,29 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	return builder
 }
 
+func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
+	anb.FlowAccessNodeBuilder.
+		Build().
+		Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ping, err := pingeng.New(
+				node.Logger,
+				node.State,
+				node.Me,
+				anb.PingMetrics,
+				anb.pingEnabled,
+				node.Middleware,
+				anb.nodeInfoFile,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create ping engine: %w", err)
+			}
+			return ping, nil
+		})
+	return anb
+}
+
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
-func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
+func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -56,23 +81,17 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		// TODO: set a different networking key of the staked access node on the unstaked network
 		unstakedNetworkKey := builder.NetworkKey
 
+		libP2PFactory, err := builder.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
+		builder.MustNot(err)
+
+		msgValidators := unstakedNetworkMsgValidators(unstakedNodeID)
+
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 		// TODO: define new network metrics for the unstaked network
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		// intialize the LibP2P factory with an empty metrics NoopCollector for now till we have defined the new unstaked
-		// network metrics
-		libP2PFactory, err := builder.FlowAccessNodeBuilder.initLibP2PFactory(unstakedNodeID, unstakedNetworkMetrics, unstakedNetworkKey)
-		builder.MustNot(err)
-
-		// use the default validators for the staked access node unstaked networks
-		msgValidators := p2p.DefaultValidators(builder.Logger, unstakedNodeID)
-
-		// don't need any peer updates since this will be taken care by the DHT discovery mechanism
-		peerUpdateInterval := time.Hour
-
-		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, peerUpdateInterval, msgValidators...)
+		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
 
 		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
 		// TODO: this list should be the unstaked addresses of all the staked AN that participate in the unstaked network

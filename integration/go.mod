@@ -17,7 +17,7 @@ require (
 	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.18.1-0.20210715170431-cd7a7a483000
+	github.com/onflow/cadence v0.18.1-0.20210729032058-d9eb6683d6ed
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
@@ -26,7 +26,6 @@ require (
 	github.com/onflow/flow-go/crypto v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.0
 	github.com/plus3it/gorecurcopy v0.0.1
-	github.com/prometheus/client_golang v1.10.0 // indirect
 	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
@@ -38,7 +37,6 @@ require (
 	google.golang.org/genproto v0.0.0-20210405174219-a39eb2f71cb9 // indirect
 	google.golang.org/grpc v1.36.1
 	gopkg.in/yaml.v2 v2.4.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
 // temp fix for MacOS build. See comment https://github.com/ory/dockertest/issues/208#issuecomment-686820414
