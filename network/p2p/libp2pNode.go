@@ -17,6 +17,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
@@ -73,6 +74,7 @@ type NodeBuilder interface {
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
+	SetDHTOptions(...dht.Option) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
@@ -87,6 +89,7 @@ type DefaultLibP2PNodeBuilder struct {
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
+	dhtOpts          []dht.Option
 }
 
 func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
@@ -99,6 +102,11 @@ func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcr
 			return DefaultLibP2PHost(ctx, address, flowKey, opts...)
 		},
 	}
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeBuilder {
+	builder.dhtOpts = opts
+	return builder
 }
 
 func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
@@ -179,6 +187,15 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 	node.host = libp2pHost
 
+	if len(builder.dhtOpts) != 0 {
+		kdht, err := NewDHT(ctx, node.host, builder.dhtOpts...)
+		if err != nil {
+			return nil, err
+		}
+		node.dht = kdht
+		builder.pubSubOpts = append(builder.pubSubOpts, WithDHTDiscovery(kdht))
+	}
+
 	if builder.pingInfoProvider != nil {
 		pingLibP2PProtocolID := generatePingProtcolID(builder.rootBlockID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
@@ -227,6 +244,7 @@ type Node struct {
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	pingService          *PingService
 	connMgr              TagLessConnManager
+	dht                  *dht.IpfsDHT
 }
 
 // Stop stops the libp2p node.
@@ -339,7 +357,22 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		}
 
 		// remove the peer from the peer store if present
-		n.host.Peerstore().ClearAddrs(peerID)
+		// TODO: why were we doing this?
+		// n.host.Peerstore().ClearAddrs(peerID)
+
+		if len(n.host.Peerstore().Addrs(peerID)) == 0 {
+			if n.dht != nil {
+				// TODO: adjust timeout
+				timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+				// try to find the peer
+				_, err := n.dht.FindPeer(timedCtx, peerID)
+				cancel()
+				if err != nil {
+					return nil, fmt.Errorf("could not find address for peer %v: %w", peerID, err)
+				}
+			}
+			return nil, fmt.Errorf("no valid addresses exist for peer %v", peerID)
+		}
 
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
@@ -621,12 +654,9 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	}
 }
 
-func WithDHTDiscovery(option ...dht.Option) PubsubOption {
+func WithDHTDiscovery(kdht *dht.IpfsDHT) PubsubOption {
 	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
-		dhtDiscovery, err := NewDHT(ctx, host, option...)
-		if err != nil {
-			return nil, err
-		}
-		return pubsub.WithDiscovery(dhtDiscovery), nil
+		routingDiscovery := discovery.NewRoutingDiscovery(kdht)
+		return pubsub.WithDiscovery(routingDiscovery), nil
 	}
 }

@@ -597,7 +597,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			SetRootBlockID(builder.RootBlock.ID().String()).
 			// unlike the staked network where currently all the node addresses are known upfront,
 			// for the unstaked network the nodes need to discover each other using DHT Discovery.
-			SetPubsubOptions(p2p.WithDHTDiscovery(dhtOptions...)).
+			SetDHTOptions(dhtOptions...).
 			SetLogger(builder.Logger).
 			Build(ctx)
 		if err != nil {
