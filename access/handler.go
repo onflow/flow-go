@@ -464,7 +464,7 @@ func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResul
 	}
 
 	serviceEvents := make([]*entities.ServiceEvent, len(er.ServiceEvents))
-	var err error = nil
+	var err error
 	for i, serviceEvent := range er.ServiceEvents {
 		serviceEvents[i], err = serviceEventToMessage(serviceEvent)
 		if err != nil {

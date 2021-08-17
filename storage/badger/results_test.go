@@ -104,5 +104,6 @@ func TestResultStoreForceIndexOverridesMapping(t *testing.T) {
 		byBlockID, err := store.ByBlockID(blockID)
 
 		require.Equal(t, result2, byBlockID)
+		require.NoError(t, err)
 	})
 }

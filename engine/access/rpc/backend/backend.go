@@ -60,7 +60,6 @@ type Backend struct {
 	chainID           flow.ChainID
 	collections       storage.Collections
 	executionReceipts storage.ExecutionReceipts
-	executionResults  storage.ExecutionResults
 	connFactory       ConnectionFactory
 }
 
