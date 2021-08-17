@@ -6,10 +6,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/messages"
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
@@ -360,4 +363,48 @@ func TestLogHook(t *testing.T) {
 	sender.Disqualify(1, "testing")
 	sender.FlagMisbehavior(1, "test")
 	require.Equal(t, 2, hookCalls)
+}
+
+// TestRetry checks that the client is using the correct underlying retry mechanism
+func TestRetry(t *testing.T) {
+	committee, locals := initCommittee(2)
+
+	mockClient := &mock.DKGContractClient{}
+	sender := NewBroker(
+		zerolog.Nop(),
+		dkgInstanceID,
+		committee,
+		locals[orig],
+		orig,
+		mockClient,
+		NewBrokerTunnel(),
+	)
+
+	// configure the mock client to return an error, requiring a retry
+	expectedMsg, err := sender.prepareBroadcastMessage(msgb)
+	require.NoError(t, err)
+
+	const succeedAfterCalls = 2
+	calls := 0
+	mockClient.On("Broadcast", expectedMsg).Return(func(_ messages.BroadcastDKGMessage) error {
+		calls++
+		if calls <= succeedAfterCalls {
+			return fmt.Errorf("fake error")
+		}
+		return nil
+	}).Times(succeedAfterCalls + 1)
+
+	// Ensure first the aggregate time for the broadcast exceeds the sum of
+	// the expected between-retry wait periods. Since there are 2 failed calls
+	// then 1 successful calls, there are 2 wait periods with length m+m*2
+	before := time.Now()
+	sender.Broadcast(msgb)
+	after := time.Now()
+
+	actualDuration := after.Sub(before).Nanoseconds()
+	expectedMinimumDuration := ((RETRY_MILLISECONDS + RETRY_MILLISECONDS*2) * time.Millisecond).Nanoseconds()
+	assert.True(t, actualDuration >= expectedMinimumDuration)
+
+	// Ensure second that the expected number of calls to the underlying client are made
+	mockClient.AssertExpectations(t)
 }
