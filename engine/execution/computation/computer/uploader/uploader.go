@@ -61,6 +61,7 @@ func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) e
 func NewGCPBucketUploader(ctx context.Context, bucketName string, log zerolog.Logger) (*GCPBucketUploader, error) {
 
 	// no need to close the client according to documentation
+	// https://pkg.go.dev/cloud.google.com/go/storage#Client.Close
 	ctx = context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
