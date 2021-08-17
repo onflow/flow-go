@@ -365,13 +365,16 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 	// tests retrievable of chunk data packs
 	for _, cdp := range chunkDataPacks {
 		if _, err := s.chunkDataPacks.ByChunkID(cdp.ChunkID); err != nil {
-			log.Error().
+			lg := log.With().
 				Err(err).
 				Hex("chunk_id", logging.ID(cdp.ChunkID)).
 				Hex("start_state", cdp.StartState[:]).
-				Hex("proof", cdp.Proof[:]).
-				Interface("collection", cdp.Collection).
-				Msg("chunk data pack is not retrievable")
+				Hex("proof", cdp.Proof[:]).Logger()
+
+			if s.collections != nil {
+				lg.Fatal().Interface("transactions", len(cdp.Collection.Transactions)).Msg("chunk data pack is not retrievable")
+			}
+
 		}
 	}
 
