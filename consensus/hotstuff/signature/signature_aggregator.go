@@ -14,9 +14,9 @@ var _ hotstuff.SignatureAggregator = &SignatureAggregatorImpl{}
 
 // TrustedAdd adds an already verified signature, and look up the weight for the given signer,
 // and add it to the total weight, and returns the total weight that have been collected.
-// return (true, 1000, nil) means the signature has been added, and 1000 weight has been collected in total.
-// return (false, 1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-func (s *SignatureAggregatorImpl) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (added bool, totalWeight uint64, exception error) {
+// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
+// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
+func (s *SignatureAggregatorImpl) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error) {
 	panic("to be implemented")
 }
 

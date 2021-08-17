@@ -13,8 +13,11 @@ type RandomBeaconReconstructor interface {
 	// implementation, whether it still adds a signature or not, when the
 	// minimal number of required sig shares has already been reached,
 	// because the reconstructed group signature is the same.
-	// Returns: true if and only if enough signature shares were collected
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+	// It returns:
+	//  - (true, nil) if and only if enough signature shares were collected
+	//  - (false, nil) if not enough shares were collected
+	//  - (false, error) if there is exception adding the sig share)
+	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (hasSufficientShares bool, err error)
 
 	// HasSufficientShares returns true if and only if reconstructor
 	// has collected a sufficient number of signature shares.
@@ -44,9 +47,10 @@ const (
 type SignatureAggregator interface {
 	// TrustedAdd adds an already verified signature, and look up the weight for the given signer,
 	// and add it to the total weight, and returns the total weight that have been collected.
-	// return (true, 1000, nil) means the signature has been added, and 1000 weight has been collected in total.
-	// return (false, 1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (added bool, totalWeight uint64, exception error)
+	// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
+	//   (1000 is just an example)
+	// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
+	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected sig shares.
 	TotalWeight() uint64

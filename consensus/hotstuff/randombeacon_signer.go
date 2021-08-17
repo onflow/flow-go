@@ -16,11 +16,10 @@ type RandomBeaconSigner interface {
 	// The operation is sequential.
 	// It assumes the signature share has been verified and is valid.
 	// It returns:
-	// (true, false, nil) if the signature has been added
-	// (false, false, nil) if the signature is a duplication
-	// (true, true, nil) if the signature has been added, and enough shares have been collected.
-	// (false, false, error) if there is any exception
-	TrustedAdd(signerIndex int, share crypto.Signature) (added bool, enoughshares bool, exception error)
+	// (true, nil) if the signature has been added, and enough shares have been collected.
+	// (false, nil) if the signature has been added, but not enough shares were collected.
+	// (false, error) if there is any exception adding the sig share
+	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)
 
 	// VerifyAndAdd combines Verify and TrustedAdd into one call.
 	// If called concurrently, it is able to concurrently verifies the signature
