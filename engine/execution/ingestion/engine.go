@@ -1126,9 +1126,9 @@ func (e *Engine) saveExecutionResults(
 				Str("start_state", fmt.Sprintf("%x", cdp.StartState[:])).
 				Logger()
 
-			//if cdp.Proof != nil && len(cdp.Proof) > 0 {
-			//	lg = lg.With().Hex("proof", cdp.Proof[:]).Logger()
-			//}
+			if cdp.Proof != nil && len(cdp.Proof) > 0 {
+				lg = lg.With().Hex("proof", cdp.Proof[:]).Logger()
+			}
 
 			if cdp.Collection != nil {
 				lg = lg.With().Str("collection", fmt.Sprintf("%+v", cdp.Collection)).Logger()
