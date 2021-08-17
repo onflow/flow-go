@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/onflow/flow-go/engine/execution"
@@ -54,6 +55,7 @@ func Test_AsyncUploader(t *testing.T) {
 	<-async.Done()
 
 	require.Equal(t, int64(0), metrics.Counter.Load())
+	require.True(t, metrics.DurationTotal.Load() > 0, "duration should be nonzero")
 }
 
 func Test_GCPBucketUploader(t *testing.T) {
@@ -104,13 +106,15 @@ func (d *DummyUploader) Upload(_ *execution.ComputationResult) error {
 
 type DummyCollector struct {
 	metrics.NoopCollector
-	Counter atomic.Int64
+	Counter       atomic.Int64
+	DurationTotal atomic.Int64
 }
 
 func (d *DummyCollector) ExecutionBlockDataUploadStarted() {
 	d.Counter.Inc()
 }
 
-func (d *DummyCollector) ExecutionBlockDataUploadFinished() {
+func (d *DummyCollector) ExecutionBlockDataUploadFinished(dur time.Duration) {
 	d.Counter.Dec()
+	d.DurationTotal.Add(dur.Nanoseconds())
 }

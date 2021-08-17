@@ -347,7 +347,7 @@ type ExecutionMetrics interface {
 
 	ExecutionBlockDataUploadStarted()
 
-	ExecutionBlockDataUploadFinished()
+	ExecutionBlockDataUploadFinished(dur time.Duration)
 }
 
 type TransactionMetrics interface {
