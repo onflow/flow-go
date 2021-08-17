@@ -40,13 +40,13 @@ func ProposalToFlow(proposal *Proposal) *flow.Header {
 
 	block := proposal.Block
 	header := flow.Header{
-		ParentID:       block.QC.BlockID,
-		PayloadHash:    block.PayloadHash,
-		Timestamp:      block.Timestamp,
-		View:           block.View,
-		ParentVoterIDs: block.QC.SignerIDs,
+		ParentID:           block.QC.BlockID,
+		PayloadHash:        block.PayloadHash,
+		Timestamp:          block.Timestamp,
+		View:               block.View,
+		ParentVoterIDs:     block.QC.SignerIDs,
 		ParentVoterSigData: block.QC.SigData,
-		ProposerID:     block.ProposerID,
+		ProposerID:         block.ProposerID,
 		ProposerSigData:    proposal.SigData,
 	}
 
