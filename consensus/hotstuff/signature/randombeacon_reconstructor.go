@@ -11,3 +11,10 @@ type RandomBeaconReconstructorImpl struct {
 	identity2SignerIndex map[flow.Identifier]int     // lookup signer index by identity
 	randomBeaconSigner   hotstuff.RandomBeaconSigner // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
 }
+
+func NewRandomBeaconReconstructurImpl(identity2SignerIndex map[flow.Identifier]int, randomBeaconSigner hotstuff.RandomBeaconSigner) *RandomBeaconReconstructorImpl {
+	return &RandomBeaconReconstructorImpl{
+		identity2SignerIndex: identity2SignerIndex,
+		randomBeaconSigner:   randomBeaconSigner,
+	}
+}

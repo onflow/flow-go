@@ -1,3 +1,4 @@
+//nolint
 package votecollector
 
 import (
@@ -15,6 +16,20 @@ type combinedAggregator struct {
 	requiredWeight uint64                     // the required weight to be sufficient for aggregation
 	weightTable    map[flow.Identifier]uint64 // a map to lookup weight by node ID
 	weight         atomic.Uint64
+}
+
+func newCombinedAggregator(
+	message []byte,
+	requiredWeight uint64,
+	weightTable map[flow.Identifier]uint64,
+	weight atomic.Uint64,
+) *combinedAggregator {
+	return &combinedAggregator{
+		message:        message,
+		requiredWeight: requiredWeight,
+		weightTable:    weightTable,
+		weight:         weight,
+	}
 }
 
 // Verify a vote's signature

@@ -1,6 +1,8 @@
 package hotstuff
 
-import "github.com/onflow/flow-go/crypto"
+import (
+	"github.com/onflow/flow-go/crypto"
+)
 
 type RandomBeaconSigner interface {
 	// Verify verifies whether the signature is from the signer specified by the given signer index
@@ -52,4 +54,25 @@ type ThresholdSignerImpl struct {
 	haveEnoughShares   bool
 	signers            []int
 	thresholdSignature crypto.Signature
+}
+
+func NewThresholdSignerImpl(
+	msg []byte,
+	threshold int,
+	groupPublicKey crypto.PublicKey,
+	myIndex int,
+	myPrivateKey crypto.PrivateKey,
+	publicKeyShares []crypto.PublicKey) *ThresholdSignerImpl {
+	return &ThresholdSignerImpl{
+		msg:             msg,
+		threshold:       threshold,
+		groupPublicKey:  groupPublicKey,
+		myIndex:         myIndex,
+		myPrivateKey:    myPrivateKey,
+		publicKeyShares: publicKeyShares,
+
+		haveEnoughShares:   false,
+		signers:            nil,
+		thresholdSignature: nil,
+	}
 }

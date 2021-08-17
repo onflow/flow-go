@@ -16,7 +16,7 @@ type SigValidator interface {
 	//   - other error if there is an exception
 	ValidateVote(vote *model.Vote) error
 
-	// ValidateVote validates the cryptographic signature of a block.
+	// ValidateBlock validates the cryptographic signature of a block.
 	// It returns:
 	//   - nil if the blocks's signature is valid
 	//   - model.InvalidBlockError if the block's signature is invalid
@@ -25,7 +25,7 @@ type SigValidator interface {
 }
 
 type QCValidator interface {
-	// ValidateVote validates the cryptographic signature of a QC.
+	// ValidateQC validates the cryptographic signature of a QC.
 	// It returns:
 	//   - nil if the QC's signature is valid
 	//   - model.InvalidQCError if the block's signature is invalid

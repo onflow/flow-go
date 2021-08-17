@@ -14,6 +14,12 @@ type SingleSigValidator struct {
 	identity2SignerIndex map[flow.Identifier]int // lookup signer index by identity
 }
 
+func NewSingleSigValidator() *SingleSigValidator {
+	return &SingleSigValidator{
+		identity2SignerIndex: nil,
+	}
+}
+
 func (v *SingleSigValidator) ValidateVote(vote *model.Vote) error {
 	panic("TO IMPLEMENT")
 }
