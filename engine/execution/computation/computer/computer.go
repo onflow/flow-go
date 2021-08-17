@@ -88,7 +88,7 @@ func (e *blockComputer) ExecuteBlock(
 ) (*execution.ComputationResult, error) {
 
 	// call tracer
-	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
+	span := e.tracer.StartRootSpanForEntity(block.ID(), trace.EXEComputeBlock)
 	defer func() {
 		span.SetTag("block.collectioncount", len(block.CompleteCollections))
 		span.LogFields(

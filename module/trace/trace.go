@@ -116,6 +116,27 @@ func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName SpanName) (opent
 	return span, exists
 }
 
+func (t *OpenTracer) StartRootSpanForEntity(
+	entityID flow.Identifier,
+	operationName SpanName,
+) opentracing.Span {
+	// flow.Identifier to flow
+	traceID, err := jaeger.TraceIDFromString(entityID.String()[:32])
+	if err != nil {
+		// don't panic, gracefully move forward with background context
+		sp, _ := t.StartSpanFromContext(context.Background(), operationName)
+		return sp
+	}
+	ctx := jaeger.NewSpanContext(
+		traceID,
+		jaeger.SpanID(1),
+		jaeger.SpanID(0),
+		false,
+		nil,
+	)
+	return t.Tracer.StartSpan(string(operationName), jaeger.SelfRef(ctx))
+}
+
 func (t *OpenTracer) StartSpanFromContext(
 	ctx context.Context,
 	operationName SpanName,
