@@ -1119,6 +1119,15 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
+	for _, cdp := range chdps {
+		e.log.Info().
+			Hex("chunk_id", logging.ID(cdp.ChunkID)).
+			Hex("start_state", cdp.StartState[:]).
+			Hex("proof", cdp.Proof[:]).
+			Interface("collection", cdp.Collection).
+			Msg("chunk data pack stored")
+	}
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Hex("start_state", originalState[:]).
