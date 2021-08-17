@@ -8,7 +8,7 @@ import (
 // RandomBeaconReconstructor collects verified signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
-	// Add a beacon share without verifying it.
+	// TrustedAdd a beacon share without verifying it.
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 	HasSufficientShares() bool
 	// Reconstruct the beacon signature if there are enough shares. It errors if not enough shares were collected.
