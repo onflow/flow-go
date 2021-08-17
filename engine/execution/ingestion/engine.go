@@ -1120,12 +1120,17 @@ func (e *Engine) saveExecutionResults(
 	}
 
 	for _, cdp := range chdps {
-		e.log.Info().
-			Hex("chunk_id", logging.ID(cdp.ChunkID)).
+		lg := e.log.With().Hex("chunk_id", logging.ID(cdp.ChunkID)).
 			Hex("start_state", cdp.StartState[:]).
 			Hex("proof", cdp.Proof[:]).
 			Interface("collection", cdp.Collection).
-			Msg("chunk data pack stored")
+			Logger()
+
+		if cdp.Collection != nil {
+			lg = lg.With().Interface("collection", cdp.Collection).Logger()
+		}
+
+		lg.Info().Msg("chunk data pack stored")
 	}
 
 	e.log.Debug().
