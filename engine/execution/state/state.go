@@ -369,14 +369,14 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 		lg := log.With().
 			Hex("chunk_id", logging.ID(cdp.ChunkID)).
 			Hex("start_state", cdp.StartState[:]).
-			Hex("proof", cdp.Proof[:]).Logger()
+			Int("proof", len(cdp.Proof[:])).Logger()
 
 		if cdp.Collection != nil {
 			lg = lg.With().Hex("collection_id", logging.ID(cdp.Collection.ID())).Logger()
 		}
 
 		if err != nil {
-			lg.Error().Err(err).Msg("could not retrieve chunk data pack")
+			lg.Fatal().Err(err).Msg("could not retrieve chunk data pack")
 		} else {
 			lg.Info().Msg("chunk data pack retrieved successfully")
 		}
