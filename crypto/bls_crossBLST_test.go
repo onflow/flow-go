@@ -131,8 +131,9 @@ func testEncodeDecodePublicKeyCrossBLST(t *rapid.T) {
 func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381)
 	validSignatureFlow := rapid.Custom(validSignatureBytesFlow)
+	validSignatureBLST := rapid.Custom(validSignatureBytesBLST)
 	// sigBytes are bytes of either a valid or a random signature
-	sigBytes := rapid.OneOf(randomSlice, validSignatureFlow).Example().([]byte)
+	sigBytes := rapid.OneOf(randomSlice, validSignatureFlow, validSignatureBLST).Example().([]byte)
 
 	// check decoding results are consistent
 	var pointFlow pointG1
