@@ -421,28 +421,25 @@ func hashToG1(data []byte) *pointG1 {
 }
 
 // This is only a TEST function.
-// It wraps a call to optimized SwU algorithm since cgo can't be used
-// in go test files
-func OpSwUUnitTest(output []byte, input []byte) {
-	C.opswu_test((*C.uchar)(&output[0]),
-		(*C.uchar)(&input[0]),
-		(C.int)(len(input)))
-}
-
-// This is only a TEST function.
-// It wraps a call to signing using Relic to get a curve point, internally using XMD:SHA256
+// signWithXMDSHA256 signs a message using XMD_SHA256 as a hash to field.
 //
-// (since cgo can't be used in go test files)
-func (sk *PrKeyBLSBLS12381) signWithRelicMapTest(data []byte) Signature {
-	var point pointG1
-	mapToG1RelicTest(&point, data, []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_"))
+// The function is in this file because cgo can't be used in go test files.
+// TODO: implement a hasher for XMD SHA256 and use the `Sign` function.
+func (sk *PrKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
 
-	// set BLS context
-	blsInstance.reInit()
+	dst := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	// XMD using SHA256
+	C.xmd_sha256((*C.uchar)(&hash[0]),
+		(C.int)(opSwUInputLenBLSBLS12381),
+		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
 
+	// sign the hash
 	s := make([]byte, SignatureLenBLSBLS12381)
-	C.bls_sign_ep((*C.uchar)(&s[0]),
+	C.bls_sign((*C.uchar)(&s[0]),
 		(*C.bn_st)(&sk.scalar),
-		(*C.ep_st)(&point))
+		(*C.uchar)(&hash[0]),
+		(C.int)(len(hash)))
 	return s
 }
