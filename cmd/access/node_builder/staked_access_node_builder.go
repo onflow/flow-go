@@ -36,18 +36,20 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 
 		fnb.IdentityProvider = idCache
 		// translator
-		// networking provider
 		fnb.SyncEngineParticipantsProvider = id.NewFilteredIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				p2p.NetworkingSetFilter,
 			),
 			idCache,
 		)
+		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
 		// TODO: need special providers here
-		// for network, needs one that recognizes both protocl state and peerstore
-		// same for translator
+		// NetworkingIdentifierProvider should be the same as the one used in scaffold.go if this AN
+		// doesn't participate in unstaked network.
+		// If it does, then we can just use the default one (peerstoreProvider)
 
 		return nil
 	})
@@ -62,7 +64,8 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
-	builder.EnqueueNetworkInit(ctx)
+	// TODO: we should remove this call since we are no longer instantiating two networks
+	// builder.EnqueueNetworkInit(ctx)
 
 	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
 	if builder.ParticipatesInUnstakedNetwork() {
