@@ -1,0 +1,36 @@
+name: Snyk Security Scan
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron: '0 0 * * FRI' # Every Friday at 00:00am
+  
+jobs:
+  snyk-scan-nba-project:
+    name: Snyk Scan FLOW Project 
+    runs-on: 
+      - self-hosted
+      - Linux
+      - X64
+      - security
+    continue-on-error: true # set to true if you want this job to continue to the next stage even on failure
+    steps:
+      - uses: actions/checkout@master
+
+      - name: Snyk to check for vulnerabilities
+        uses: snyk/actions/golang@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          # command: monitor
+          args: --all-projects --severity-threshold=critical --sarif-file-output=snyk.sarif # https://support.snyk.io/hc/en-us/articles/360003812578-CLI-reference
+      
+      - name: Upload result to GitHub Code Scanning
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: snyk.sarif
+

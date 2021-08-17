@@ -1,3 +1,5 @@
+# Flow Go
+
 # Flow [![GoDoc](https://godoc.org/github.com/onflow/flow-go?status.svg)](https://godoc.org/github.com/onflow/flow-go)
 
 Flow is a fast, secure, and developer-friendly blockchain built to support the
@@ -154,3 +156,4 @@ Generate mocks used for unit tests:
 ```bash
 make generate-mocks
 ```
+
