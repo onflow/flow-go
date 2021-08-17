@@ -661,7 +661,7 @@ func executeBlockAndVerifyWithParameters(t *testing.T,
 	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
 
-	verifier := chunks.NewChunkVerifier(vm, fvmContext)
+	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
 	vcds := make([]*verification.VerifiableChunkData, er.Chunks.Len())
 
