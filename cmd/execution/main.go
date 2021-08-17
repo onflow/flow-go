@@ -306,10 +306,13 @@ func main() {
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 				requester.WithBatchInterval(requestInterval),
+				// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
+				// hence we not need to check origin
+				requester.WithValidateStaking(false),
 			)
 
 			preferredExeFilter := filter.Any
