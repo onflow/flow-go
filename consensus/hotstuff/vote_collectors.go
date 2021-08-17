@@ -13,11 +13,14 @@ type VoteCollectors interface {
 	// GetOrCreateCollector is used for getting hotstuff.VoteCollector.
 	// if there is no collector created or the given block ID, then it will create one.
 	// Collector is indexed by blockID for looking up by blockID, and also indexed by view for pruning.
+	// When creating a vote collector, the view will be used to get epoch by view, then create the random beacon
+	// signer object by epoch, because epoch determines DKG, which determines random beacon committee.
 	// It returns:
 	//  -  (collector, true, nil) if no collector can be found by the block ID, and a new collector was created.
 	//  -  (collector, false, nil) if the collector can be found by the block ID
 	//  -  (nil, false, error) if running into any exception creating the vote collector state machine
-	// TODO: do we need to verify the view? if an invalid vote has an invalid view, would we create a vote collector
+	// TODO: how to verify the view? if an invalid vote has an invalid view, then this method would be called with
+	// an invalid view. In that case, would we create a vote collector?
 	// indexed by a wrong view?
 	GetOrCreateCollector(view uint64, blockID flow.Identifier) (collector VoteCollector, created bool, err error)
 
