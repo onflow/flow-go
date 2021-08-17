@@ -431,7 +431,7 @@ func Test_ReplicaTimeoutAgain(t *testing.T) {
 		// measurement
 
 		start = time.Now()
-		nv, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
+		_, changed = pm.UpdateCurViewWithBlock(makeBlock(nv.View-1, nv.View), false)
 		break
 	}
 
