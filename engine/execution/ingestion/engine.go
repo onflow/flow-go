@@ -1119,22 +1119,24 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
 	}
 
-	for _, cdp := range chdps {
-		lg := e.log.With().
-			Hex("chunk_id", logging.ID(cdp.ChunkID)).
-			Str("start_state", fmt.Sprintf("%x", cdp.StartState[:])).
-			Logger()
+	e.unit.Launch(func() {
+		for _, cdp := range chdps {
+			lg := e.log.With().
+				Hex("chunk_id", logging.ID(cdp.ChunkID)).
+				Str("start_state", fmt.Sprintf("%x", cdp.StartState[:])).
+				Logger()
 
-		//if cdp.Proof != nil && len(cdp.Proof) > 0 {
-		//	lg = lg.With().Hex("proof", cdp.Proof[:]).Logger()
-		//}
+			//if cdp.Proof != nil && len(cdp.Proof) > 0 {
+			//	lg = lg.With().Hex("proof", cdp.Proof[:]).Logger()
+			//}
 
-		if cdp.Collection != nil {
-			lg = lg.With().Str("collection", fmt.Sprintf("%+v", cdp.Collection)).Logger()
+			if cdp.Collection != nil {
+				lg = lg.With().Str("collection", fmt.Sprintf("%+v", cdp.Collection)).Logger()
+			}
+
+			lg.Info().Msg("chunk data pack stored")
 		}
-
-		lg.Info().Msg("chunk data pack stored")
-	}
+	})
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
