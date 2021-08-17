@@ -20,9 +20,9 @@ type blockSummary struct {
 	BlockID        string   `json:"block_id"`
 	ParentBlockID  string   `json:"parent_block_id"`
 	ParentVoterIDs []string `json:"parent_voter_ids"`
-	// ParentVoterSig []string  `json:"parent_voter_sig"`
+	// ParentVoterSigData []string  `json:"parent_voter_sig"`
 	ProposerID string `json:"proposer_id"`
-	// ProposerSig    string  `json:"proposer_sig"`
+	// ProposerSigData    string  `json:"proposer_sig"`
 	Timestamp         time.Time `json:"timestamp"`
 	CollectionIDs     []string  `json:"collection_ids"`
 	SealedBlocks      []string  `json:"sealed_blocks"`

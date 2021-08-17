@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"time"
@@ -42,8 +43,8 @@ type NodeBuilder interface {
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
 
-	// EnqueueNetworkInit enqueues the default network component
-	EnqueueNetworkInit()
+	// EnqueueNetworkInit enqueues the default network component with the given context
+	EnqueueNetworkInit(ctx context.Context)
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()
@@ -98,12 +99,13 @@ type BaseConfig struct {
 	metricsPort           uint
 	BootstrapDir          string
 	peerUpdateInterval    time.Duration
-	unicastMessageTimeout time.Duration
+	UnicastMessageTimeout time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
+	metricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
 }
@@ -112,6 +114,7 @@ type BaseConfig struct {
 // structs such as DB, Network etc. The NodeConfig is composed of the BaseConfig and is updated in the
 // NodeBuilder functions as a node is bootstrapped.
 type NodeConfig struct {
+	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
 	Logger            zerolog.Logger
 	NodeID            flow.Identifier
@@ -149,12 +152,13 @@ func DefaultBaseConfig() *BaseConfig {
 		datadir:               datadir,
 		level:                 "info",
 		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
-		unicastMessageTimeout: p2p.DefaultUnicastTimeout,
+		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,
 		profilerEnabled:       false,
 		profilerDir:           "profiler",
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
+		metricsEnabled:        true,
 	}
 }
