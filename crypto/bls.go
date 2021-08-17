@@ -211,14 +211,8 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 }
 
 // decodePublicKey decodes a slice of bytes into a public key.
-// since we use the compressed representation by default, this delegates to decodePublicKeyCompressed
-func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
-	return a.decodePublicKeyCompressed(publicKeyBytes)
-}
-
-// decodePublicKeyCompressed decodes a slice of bytes into a public key.
 // This function includes a membership check in G2 and rejects the infinity point.
-func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (PublicKey, error) {
+func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
 		return nil, newInvalidInputsError(
 			"the input length has to be %d",
@@ -236,6 +230,15 @@ func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (Publ
 		return nil, newInvalidInputsError("the input is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 	return &pk, nil
+}
+
+// decodePublicKeyCompressed decodes a slice of bytes into a public key.
+// since we use the compressed representation by default, this checks the default and delegates to decodePublicKeyCompressed
+func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (PublicKey, error) {
+	if serializationG2 != compressed {
+		panic("library is not configured to use compressed public key serialization")
+	}
+	return a.decodePublicKey(publicKeyBytes)
 }
 
 // PrKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
@@ -346,15 +349,18 @@ func (pk *PubKeyBLSBLS12381) Size() int {
 // The encoding is a compressed encoding of the point
 // [zcash] https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
 func (a *PubKeyBLSBLS12381) EncodeCompressed() []byte {
-	dest := make([]byte, pubKeyLengthBLSBLS12381)
-	writePointG2(dest, &a.point)
-	return dest
+	if serializationG2 != compressed {
+		panic("library is not configured to use compressed public key serialization")
+	}
+	return a.Encode()
 }
 
 // Encode returns a byte encoding of the public key.
 // Since we use a compressed encoding by default, this delegates to EncodeCompressed
 func (a *PubKeyBLSBLS12381) Encode() []byte {
-	return a.EncodeCompressed()
+	dest := make([]byte, pubKeyLengthBLSBLS12381)
+	writePointG2(dest, &a.point)
+	return dest
 }
 
 // Equals checks is two public keys are equal
