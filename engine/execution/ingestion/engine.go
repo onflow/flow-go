@@ -1130,7 +1130,7 @@ func (e *Engine) saveExecutionResults(
 		//}
 
 		if cdp.Collection != nil {
-			lg = lg.With().Interface("collection", cdp.Collection).Logger()
+			lg = lg.With().Str("collection", fmt.Sprintf("%+v", cdp.Collection)).Logger()
 		}
 
 		lg.Info().Msg("chunk data pack stored")
