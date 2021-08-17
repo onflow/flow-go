@@ -38,7 +38,7 @@ func NewExecutionReceipts(collector module.CacheMetrics, db *badger.DB, results 
 		))
 
 		return func(tx *transaction.Tx) error {
-			err := storeResultOps(tx) // execute operations to store receipt
+			err := storeResultOps(tx) // execute operations to store results
 			if err != nil {
 				return fmt.Errorf("could not store result: %w", err)
 			}
