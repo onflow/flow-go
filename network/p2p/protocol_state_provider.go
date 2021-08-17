@@ -6,6 +6,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -66,7 +67,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	flowIDs := make(map[peer.ID]flow.Identifier, nIds)
 
 	for _, identity := range identities {
-		pid, err := ExtractPeerID(identity)
+		pid, err := ExtractPeerID(identity.NetworkPubKey)
 		if err != nil {
 			// maybe don't log fatal here. It's probably okay if we miss some ppl in our mapping
 		}
@@ -112,8 +113,8 @@ func (p *ProtocolStateIDCache) GetFlowID(peerID peer.ID) (fid flow.Identifier, e
 	return
 }
 
-func ExtractPeerID(id *flow.Identity) (pid peer.ID, err error) {
-	pk, err := PublicKey(id.NetworkPubKey)
+func ExtractPeerID(networkPubKey crypto.PublicKey) (pid peer.ID, err error) {
+	pk, err := PublicKey(networkPubKey)
 	if err != nil {
 		// TODO: format the error
 		return
