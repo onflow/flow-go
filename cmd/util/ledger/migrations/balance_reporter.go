@@ -176,13 +176,8 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceD
 		)
 	}
 
-	interpreterValue, ok := cValue.(interpreter.Value)
-	if !ok {
-		return nil
-	}
-
 	if id.Key == "contract\u001fFlowToken" {
-		tokenSupply := uint64(interpreterValue.(*interpreter.CompositeValue).GetField("totalSupply").(interpreter.UFix64Value))
+		tokenSupply := uint64(cValue.(*interpreter.CompositeValue).GetField("totalSupply").(interpreter.UFix64Value))
 		r.Log.Info().Uint64("tokenSupply", tokenSupply).Msg("total token supply")
 		r.totalSupply = tokenSupply
 	}
@@ -225,7 +220,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceD
 	if err != nil {
 		return err
 	}
-	interpreterValue.Accept(inter, balanceVisitor)
+	cValue.Accept(inter, balanceVisitor)
 
 	return nil
 }
