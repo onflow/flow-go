@@ -485,7 +485,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
 	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, 100)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, collectionsStorage, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
 	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
@@ -830,7 +830,7 @@ func VerificationNode(t testing.TB,
 			fvm.WithBlocks(blockFinder),
 		)
 
-		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
 		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
 

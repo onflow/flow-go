@@ -56,12 +56,13 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 
 	// initialize the default config
 	cfg := Config{
-		BatchThreshold: 32,
-		BatchInterval:  time.Second,
-		RetryInitial:   4 * time.Second,
-		RetryFunction:  RetryGeometric(2),
-		RetryMaximum:   2 * time.Minute,
-		RetryAttempts:  math.MaxUint32,
+		BatchThreshold:  32,
+		BatchInterval:   time.Second,
+		RetryInitial:    4 * time.Second,
+		RetryFunction:   RetryGeometric(2),
+		RetryMaximum:    2 * time.Minute,
+		RetryAttempts:   math.MaxUint32,
+		ValidateStaking: true,
 	}
 
 	// apply the custom option parameters
@@ -80,13 +81,20 @@ func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, m
 		return nil, fmt.Errorf("invalid retry maximum (must not be smaller than initial interval)")
 	}
 
-	// make sure we don't send requests from self or unstaked nodes
+	// make sure we don't send requests from self
 	selector = filter.And(
 		selector,
-		filter.HasStake(true),
-		filter.Not(filter.Ejected),
 		filter.Not(filter.HasNodeID(me.NodeID())),
+		filter.Not(filter.Ejected),
 	)
+
+	// make sure we don't send requests to unstaked nodes
+	if cfg.ValidateStaking {
+		selector = filter.And(
+			selector,
+			filter.HasStake(true),
+		)
+	}
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
@@ -396,16 +404,19 @@ func (e *Engine) process(originID flow.Identifier, message interface{}) error {
 
 func (e *Engine) onEntityResponse(originID flow.Identifier, res *messages.EntityResponse) error {
 
-	// check that the response comes from a valid provider
-	providers, err := e.state.Final().Identities(filter.And(
-		e.selector,
-		filter.HasNodeID(originID),
-	))
-	if err != nil {
-		return fmt.Errorf("could not get providers: %w", err)
-	}
-	if len(providers) == 0 {
-		return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
+	if e.cfg.ValidateStaking {
+
+		// check that the response comes from a valid provider
+		providers, err := e.state.Final().Identities(filter.And(
+			e.selector,
+			filter.HasNodeID(originID),
+		))
+		if err != nil {
+			return fmt.Errorf("could not get providers: %w", err)
+		}
+		if len(providers) == 0 {
+			return engine.NewInvalidInputErrorf("invalid provider origin (%x)", originID)
+		}
 	}
 
 	// build a list of needed entities; if not available, process anyway,

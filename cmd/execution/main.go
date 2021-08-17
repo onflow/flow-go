@@ -33,7 +33,7 @@ import (
 	"github.com/onflow/flow-go/fvm/extralog"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
-	wal "github.com/onflow/flow-go/ledger/complete/wal"
+	"github.com/onflow/flow-go/ledger/complete/wal"
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
@@ -256,7 +256,7 @@ func main() {
 			}
 			computationManager = manager
 
-			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, chdpCacheSize)
+			chunkDataPacks := storage.NewChunkDataPacks(node.Metrics.Cache, node.DB, node.Storage.Collections, chdpCacheSize)
 			stateCommitments := storage.NewCommits(node.Metrics.Cache, node.DB)
 
 			// Needed for gRPC server, make sure to assign to main scoped vars
@@ -308,10 +308,13 @@ func main() {
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 				requester.WithBatchInterval(requestInterval),
+				// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
+				// hence we not need to check origin
+				requester.WithValidateStaking(false),
 			)
 
 			preferredExeFilter := filter.Any

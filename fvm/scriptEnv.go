@@ -736,3 +736,8 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	}
 	return e.contracts.Commit()
 }
+
+// AllocateStorageIndex is not implemented in this enviornment
+func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (uint64, error) {
+	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
+}

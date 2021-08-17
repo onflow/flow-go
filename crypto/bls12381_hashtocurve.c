@@ -5,68 +5,7 @@
 
 extern prec_st* bls_prec;
 
-#if (hashToPoint == HASHCHECK)
-// Simple hashing to G1 as described in the original BLS paper 
-// https://www.iacr.org/archive/asiacrypt2001/22480516.pdf
-// taken and modified from Relic library
-static void map_to_G1_hashCheck(ep_t p, const uint8_t *msg, int len) {
-	bn_t k, pm1o2;
-	fp_t t;
-	uint8_t digest[RLC_MD_LEN];
-
-	bn_null(k);
-	bn_null(pm1o2);
-	fp_null(t);
-	ep_null(q);
-
-	RLC_TRY {
-		bn_new(k);
-		bn_new(pm1o2);
-		fp_new(t);
-		ep_new(q);
-
-		pm1o2->sign = RLC_POS;
-		pm1o2->used = RLC_FP_DIGS;
-		dv_copy(pm1o2->dp, fp_prime_get(), RLC_FP_DIGS);
-		bn_hlv(pm1o2, pm1o2);
-		md_map(digest, msg, len);
-		bn_read_bin(k, digest, RLC_MIN(RLC_FP_BYTES, RLC_MD_LEN));
-		fp_prime_conv(t, k);
-		fp_prime_back(k, t);
-
-        fp_prime_conv(p->x, k);
-        fp_zero(p->y);
-        fp_set_dig(p->z, 1);
-
-        while (1) {
-            ep_rhs(t, p);
-            if (fp_srt(p->y, t)) {
-                p->coord = BASIC;
-                break;
-            }
-            fp_add_dig(p->x, p->x, 1);
-        }
-
-        // Now, multiply by cofactor to get the correct group. 
-        ep_curve_get_cof(k);
-        if (bn_bits(k) < RLC_DIG) {
-            ep_mul_dig(p, p, k->dp[0]);
-        } else {
-            ep_mul_basic(p, p, k);
-        }
-	}
-	RLC_CATCH_ANY {
-		RLC_THROW(ERR_CAUGHT);
-	}
-	RLC_FINALLY {
-		bn_free(k);
-		bn_free(pm1o2);
-		fp_free(t);
-		ep_free(q);
-	}
-}
-
-#elif (hashToPoint==OPSWU)
+#if (hashToPoint==OPSWU)
 
 const uint64_t p_3div4_data[Fp_DIGITS] = {
     0xEE7FBFFFFFFFEAAA, 0x07AAFFFFAC54FFFF, 0xD9CC34A83DAC3D89,
@@ -448,38 +387,16 @@ static void map_to_G1_opswu(ep_t p, const uint8_t *msg, int len) {
 		RLC_THROW(ERR_CAUGHT);
 	}
 }
-
-// This is a testing funstion for the Optimized SwU core
-void opswu_test(uint8_t *out, const uint8_t *msg, int len){
-    fp_t t;
-    bn_t tmp;
-    bn_new(tmp);
-    bn_read_bin(tmp, msg, len);
-    fp_prime_conv(t, tmp);
-    bn_free(tmp);
-
-    ep_t p;
-    ep_new(p);
-    map_to_E1_swu(p, t); // map to E1
-    eval_iso11(p, p); // map to E
-    clear_cofactor(p, p); // map to G1
-    ep_write_bin_compact(out, p, SIGNATURE_LEN);
-}
 #endif
 
 // computes a hash of input data to G1
+// construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
 void map_to_G1(ep_t h, const byte* data, const int len) {
     #if hashToPoint==OPSWU
-    // construction 2 from section 5 in https://eprint.iacr.org/2019/403.pdf
+    // implementation using different mapping parameters than the IRTF draft
     map_to_G1_opswu(h, data, len);
-    #elif hashToPoint==SWU
-    // section 3 in https://eprint.iacr.org/2019/403.pdf`
-    map_to_G1_swu(h, data, len);
-    #elif hashToPoint==HASHCHECK 
-    // hash & check as described in the BLS paper
-    map_to_G1_hashCheck(h, data, len);
+    #elif hashToPoint==RELIC_OPSWU
+    // relic implementation compliant the IRTF draft
+    ep_map_from_field(h, data, len);
     #endif
 }
-
-
-

@@ -12,6 +12,16 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
+// TagLessConnManager is a companion interface to libp2p-core.connmgr.ConnManager which implements a (simplified) tagless variant of the Protect / Unprotect logic
+type TagLessConnManager interface {
+	connmgr.ConnManager
+	// ProtectPeer increments the stream setup count for the peer.ID
+	ProtectPeer(id peer.ID)
+	// UnprotectPeer decrements the stream setup count for the peer.ID.
+	// If the count reaches zero, the id is removed from the map
+	UnprotectPeer(id peer.ID)
+}
+
 // ConnManager provides an implementation of Libp2p's ConnManager interface (https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnManager)
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
 // This implementation updates networking metrics when a peer connection is added or removed
