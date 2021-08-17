@@ -336,8 +336,13 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
 func (n *Network) publish(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
+	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
 
-	err := n.sendOnChannel(channel, message, flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()))
+	if len(filteredIDs) == 0 {
+		return network.EmptyTargetList
+	}
+
+	err := n.sendOnChannel(channel, message, filteredIDs)
 
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel %s: %w", channel, err)
@@ -372,7 +377,7 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 	}
 }
 
-// sendOnChannel sends the message on channel to targets after applying the all the filters to targets.
+// sendOnChannel sends the message on channel to targets.
 func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
 	// generate network message (encoding) based on list of recipients
 	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
