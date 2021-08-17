@@ -10,13 +10,16 @@ import (
 // Implementations of this interface are responsible for state transitions of `VoteCollector`s and pruning of
 // stale and outdated collectors by view.
 type VoteCollectors interface {
-	// GetOrCreateCollector is used for getting hotstuff.VoteCollector, calling this function for first time
-	// will create a new collector.
-	// collector is indexed by blockID and view
-	// It returns the vote collector state machine, true and nil if found,
-	// It returns (collector, false, nil) if not found
-	// It returns (nil, false, error) if failed to create vote collector state machine
-	GetOrCreateCollector(view uint64, blockID flow.Identifier) (VoteCollector, bool, error)
+	// GetOrCreateCollector is used for getting hotstuff.VoteCollector.
+	// if there is no collector created or the given block ID, then it will create one.
+	// Collector is indexed by blockID for looking up by blockID, and also indexed by view for pruning.
+	// It returns:
+	//  -  (collector, true, nil) if no collector can be found by the block ID, and a new collector was created.
+	//  -  (collector, false, nil) if the collector can be found by the block ID
+	//  -  (nil, false, error) if running into any exception creating the vote collector state machine
+	// TODO: do we need to verify the view? if an invalid vote has an invalid view, would we create a vote collector
+	// indexed by a wrong view?
+	GetOrCreateCollector(view uint64, blockID flow.Identifier) (collector VoteCollector, created bool, err error)
 
 	// Prune the vote collectors whose view is below the given view
 	PruneUpToView(view uint64) error
