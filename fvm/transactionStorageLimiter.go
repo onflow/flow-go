@@ -3,6 +3,7 @@ package fvm
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/onflow/cadence/runtime/common"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -17,28 +18,35 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 
 func (d *TransactionStorageLimiter) CheckLimits(
 	env Enviornment,
-	addresses []flow.Address,
-) error {
+	addresses map[flow.Address]struct{},
+) (err error) {
 	if !env.Context().LimitAccountStorage {
 		return nil
 	}
 
-	for _, address := range addresses {
+	// iterating through a map in a non-deterministic order! Do not exit the loop early.
+	for address := range addresses {
 		commonAddress := common.BytesToAddress(address.Bytes())
 
-		capacity, err := env.GetStorageCapacity(commonAddress)
-		if err != nil {
-			return fmt.Errorf("storage limit check failed: %w", err)
+		capacity, aerr := env.GetStorageCapacity(commonAddress)
+		if aerr != nil {
+			aerr = fmt.Errorf("storage limit check failed: %w", aerr)
+			err = multierror.Append(err, aerr)
+			continue
 		}
 
-		usage, err := env.GetStorageUsed(commonAddress)
-		if err != nil {
-			return fmt.Errorf("storage limit check failed: %w", err)
+		usage, aerr := env.GetStorageUsed(commonAddress)
+		if aerr != nil {
+			aerr = fmt.Errorf("storage limit check failed: %w", aerr)
+			err = multierror.Append(err, aerr)
+			continue
 		}
 
 		if usage > capacity {
-			return errors.NewStorageCapacityExceededError(address, usage, capacity)
+			err = multierror.Append(err, errors.NewStorageCapacityExceededError(address, usage, capacity))
+			continue
 		}
 	}
-	return nil
+
+	return
 }

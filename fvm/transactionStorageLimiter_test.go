@@ -21,7 +21,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(99), nil)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckLimits(env, map[flow.Address]struct{}{owner: {}})
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("capacity = storage -> OK", func(t *testing.T) {
@@ -31,7 +31,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(100), nil)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckLimits(env, map[flow.Address]struct{}{owner: {}})
 		require.NoError(t, err, "Transaction with equal capacity than storage used should work")
 	})
 	t.Run("capacity < storage -> Not OK", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckLimits(env, map[flow.Address]struct{}{owner: {}})
 		require.Error(t, err, "Transaction with lower capacity than storage used should fail")
 	})
 	t.Run("if ctx LimitAccountStorage false-> OK", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(101), nil)
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckLimits(env, map[flow.Address]struct{}{owner: {}})
 		require.NoError(t, err, "Transaction with higher capacity than storage used should work")
 	})
 	t.Run("non existing accounts or any other errors on fetching storage used -> Not OK", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestTransactionStorageLimiter_Process(t *testing.T) {
 		env.On("GetStorageUsed", mock.Anything).Return(uint64(0), errors.NewAccountNotFoundError(owner))
 
 		d := &fvm.TransactionStorageLimiter{}
-		err := d.CheckLimits(env, []flow.Address{owner})
+		err := d.CheckLimits(env, map[flow.Address]struct{}{owner: {}})
 		require.Error(t, err, "check storage used on non existing account (not general registers) should fail")
 	})
 }
