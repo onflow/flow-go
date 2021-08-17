@@ -54,6 +54,7 @@ type SignatureAggregator interface {
 	// Aggregate assumes enough shares have been collected, it aggregates the signatures
 	// and return the aggregated signature.
 	// if called concurrently, only one thread will be running the aggregation.
+	// TODO: consider return (signerIDs and crypto.Signature)
 	Aggregate() ([]byte, error)
 }
 

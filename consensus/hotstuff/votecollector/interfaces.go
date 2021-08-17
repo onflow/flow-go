@@ -48,28 +48,6 @@ type CombinedAggregator interface {
 	AggregateSignature() (flow.AggregatedSignature, flow.AggregatedSignature, error)
 }
 
-type RandomBeaconReconstructor interface {
-	// Verify returns true if and only if the signature is valid.
-	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
-
-	// TrustedAdd adds the signature share to the reconstructors internal
-	// state. Validity of signature is not checked. It is up to the
-	// implementation, whether it still adds a signature or not, when the
-	// minimal number of required sig shares has already been reached,
-	// because the reconstructed group signature is the same.
-	// Returns: true if and only if enough signature shares were collected
-	TrustedAdd(signerIndex uint, sigShare crypto.Signature) (bool, error)
-
-	// HasSufficientShares returns true if and only if reconstructor
-	// has collected a sufficient number of signature shares.
-	HasSufficientShares() bool
-
-	// Reconstruct reconstructs the group signature from the provided
-	// signature shares. Errors if the the number of shares is insufficient
-	// or some of the added signatures shares were invalid.
-	Reconstruct() (crypto.Signature, error)
-}
-
 // QCBuilder is responsible for creating votes, proposals and QC's for a given block.
 // This interface should be used by consensus or collection vote collector to produce QC when signature
 // aggregation has been completed.

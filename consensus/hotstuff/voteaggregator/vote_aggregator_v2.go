@@ -138,13 +138,13 @@ func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 
 	err := va.collectors.ProcessBlock(block)
 	if err != nil {
-		return fmt.Errorf("could not process block %v: %w", block.BlockID, err)
+		return fmt.Errorf("could not process block %v: %w", block.Block.BlockID, err)
 	}
 
 	return nil
 }
 
-func (va *VoteAggregatorV2) InvalidBlock(block *model.Proposal) {
+func (va *VoteAggregatorV2) InvalidBlock(block *model.Proposal) error {
 	panic("implement me")
 }
 
