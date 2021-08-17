@@ -28,6 +28,8 @@ type StateMachine struct {
 	createVerifyingCollector NewVerifyingCollectorFactoryMethod
 }
 
+var _ hotstuff.VoteCollector = &StateMachine{}
+
 func (m *StateMachine) atomicLoadCollector() hotstuff.VoteCollectorState {
 	return m.collector.Load().(*atomicValueWrapper).collector
 }
