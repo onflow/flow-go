@@ -361,6 +361,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		// n.host.Peerstore().ClearAddrs(peerID)
 
 		if len(n.host.Peerstore().Addrs(peerID)) == 0 {
+			// TODO: add bunch of logging here
 			if n.dht != nil {
 				// TODO: adjust timeout
 				timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)

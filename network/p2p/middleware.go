@@ -12,11 +12,13 @@ import (
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -79,6 +81,7 @@ type Middleware struct {
 	connectionGating      bool
 	managePeerConnections bool
 	idTranslator          IDTranslator
+	idProvider            id.IdentityProvider
 }
 
 // NewMiddleware creates a new middleware instance
@@ -101,6 +104,7 @@ func NewMiddleware(
 	connectionGating bool,
 	managePeerConnections bool,
 	idTranslator IDTranslator,
+	idProvider id.IdentityProvider,
 	validators ...network.MessageValidator,
 ) *Middleware {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -125,6 +129,7 @@ func NewMiddleware(
 		connectionGating:      connectionGating,
 		managePeerConnections: managePeerConnections,
 		idTranslator:          idTranslator,
+		idProvider:            idProvider,
 	}
 
 	if len(validators) != 0 {
@@ -152,7 +157,7 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 }
 
 func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.GetIdentifierProvider().Identifiers())
+	return m.peerIDs(m.ov.Identifiers())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -180,6 +185,15 @@ func (m *Middleware) GetIPPort() (string, string, error) {
 	return m.libP2PNode.GetIPPort()
 }
 
+func (m *Middleware) UpdateNodeAddresses() {
+	ids := m.ov.Identities()
+	infos, _ := peerInfosFromIDs(ids)
+
+	for _, info := range infos {
+		m.libP2PNode.host.Peerstore().SetAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
+	}
+}
+
 // Start will start the middleware.
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
@@ -192,6 +206,8 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	}
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+
+	m.UpdateNodeAddresses()
 
 	if m.connectionGating {
 		m.libP2PNode.UpdateAllowList(m.allPeers())

@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/p2p"
 )
 
 type UnstakedAccessNodeBuilder struct {
@@ -23,6 +24,14 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
+
+		idCache, err := p2p.NewProtocolStateIDCache(node.State, fnb.ProtocolEvents)
+		if err != nil {
+			return err
+		}
+
+		fnb.IdentityProvider = idCache
+
 		return nil
 	})
 }

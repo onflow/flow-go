@@ -53,6 +53,8 @@ type Middleware interface {
 	// UpdateAllowList fetches the most recent identity of the nodes from overlay
 	// and updates the underlying libp2p node.
 	UpdateAllowList()
+
+	UpdateNodeAddresses()
 }
 
 // Overlay represents the interface that middleware uses to interact with the
@@ -62,7 +64,8 @@ type Overlay interface {
 	Topology() (flow.IdentifierList, error)
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 	SetDefaultIdentifierProvider(id.IdentifierProvider)
-	GetIdentifierProvider() id.IdentifierProvider
+	Identifiers() flow.IdentifierList
+	Identities() flow.IdentityList
 }
 
 // Connection represents an interface to read from & write to a connection.
