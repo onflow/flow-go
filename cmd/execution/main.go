@@ -54,13 +54,12 @@ import (
 func main() {
 
 	var (
-		followerState protocol.MutableState
-		ledgerStorage *ledger.Ledger
-		events        *storage.Events
-		serviceEvents *storage.ServiceEvents
-		txResults     *storage.TransactionResults
-		results       *storage.ExecutionResults
-		//receipts                    *storage.ExecutionReceipts
+		followerState               protocol.MutableState
+		ledgerStorage               *ledger.Ledger
+		events                      *storage.Events
+		serviceEvents               *storage.ServiceEvents
+		txResults                   *storage.TransactionResults
+		results                     *storage.ExecutionResults
 		myReceipts                  *storage.MyExecutionReceipts
 		providerEngine              *exeprovider.Engine
 		checkerEng                  *checker.Engine
