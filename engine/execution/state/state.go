@@ -7,6 +7,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
@@ -18,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -64,7 +66,8 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack,
+	PersistExecutionState(log zerolog.Logger, ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+		chunkDataPacks []*flow.ChunkDataPack,
 		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
 
@@ -326,7 +329,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
 
@@ -358,6 +361,19 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 		}
 	}
 	sp.Finish()
+
+	// tests retrievable of chunk data packs
+	for _, cdp := range chunkDataPacks {
+		if _, err := s.chunkDataPacks.ByChunkID(cdp.ChunkID); err != nil {
+			log.Error().
+				Err(err).
+				Hex("chunk_id", logging.ID(cdp.ChunkID)).
+				Hex("start_state", cdp.StartState[:]).
+				Hex("proof", cdp.Proof[:]).
+				Interface("collection", cdp.Collection).
+				Msg("chunk data pack is not retrievable")
+		}
+	}
 
 	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)

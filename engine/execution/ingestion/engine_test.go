@@ -231,6 +231,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 	mocked := ctx.executionState.
 		On("PersistExecutionState",
 			mock.Anything,
+			mock.Anything,
 			executableBlock.Block.Header,
 			newStateCommitment,
 			mock.MatchedBy(func(fs []*flow.ChunkDataPack) bool {
@@ -256,8 +257,8 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 			//lock.Lock()
 			//defer lock.Unlock()
 
-			blockID := args[1].(*flow.Header).ID()
-			commit := args[2].(flow.StateCommitment)
+			blockID := args[2].(*flow.Header).ID()
+			commit := args[3].(flow.StateCommitment)
 			commits[blockID] = commit
 			onPersisted(blockID, commit)
 		}
@@ -901,7 +902,15 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		Return(previousExecutionResultID, nil)
 
 	execState.
-		On("PersistExecutionState", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("PersistExecutionState",
+			mock.Anything,
+			mock.Anything,
+			executableBlock.Block.Header,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything,
+			mock.Anything, mock.Anything).
 		Return(nil)
 
 	e := Engine{

@@ -1114,17 +1114,10 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx, block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents, result.TransactionResults)
+	err = e.execState.PersistExecutionState(e.log, childCtx, block.Header, endState, chdps, executionReceipt, result.Events, result.ServiceEvents,
+		result.TransactionResults)
 	if err != nil {
 		return nil, fmt.Errorf("cannot persist execution state: %w", err)
-	}
-
-	for _, cdp := range chdps {
-		e.log.Debug().
-			Hex("chunk_id", logging.ID(cdp.ChunkID)).
-			Hex("start_state", cdp.StartState[:]).
-			Hex("proof", cdp.Proof[:]).
-			Str("collection", fmt.Sprintf("%+v", cdp.Collection)).Msg("chunk data pack stored")
 	}
 
 	e.log.Debug().
