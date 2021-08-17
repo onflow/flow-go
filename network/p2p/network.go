@@ -43,6 +43,7 @@ type Network struct {
 	sync.RWMutex
 	idProvider        id.IdentifierProvider
 	defaultIdProvider id.IdentifierProvider
+	identityProvider  id.IdentityProvider
 	logger            zerolog.Logger
 	codec             network.Codec
 	me                module.Local
@@ -78,6 +79,7 @@ func NewNetwork(
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
+	identityProvider id.IdentityProvider,
 	opts ...NetworkOption,
 ) (*Network, error) {
 
@@ -96,6 +98,7 @@ func NewNetwork(
 		metrics:          metrics,
 		subMngr:          sm,
 		lifecycleManager: lifecycle.NewLifecycleManager(),
+		identityProvider: identityProvider,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 
@@ -175,7 +178,7 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
-func (n *Network) GetIdentifierProvider() id.IdentifierProvider {
+func (n *Network) getIdentifierProvider() id.IdentifierProvider {
 	if n.idProvider != nil {
 		return n.idProvider
 	}
@@ -188,6 +191,14 @@ func (n *Network) GetIdentifierProvider() id.IdentifierProvider {
 	return n.defaultIdProvider
 }
 
+func (n *Network) Identifiers() flow.IdentifierList {
+	return n.getIdentifierProvider().Identifiers()
+}
+
+func (n *Network) Identities() flow.IdentityList {
+	return n.identityProvider.Identities(NetworkingSetFilter)
+}
+
 // Topology returns the identifiers of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentifierList, error) {
@@ -195,7 +206,7 @@ func (n *Network) Topology() (flow.IdentifierList, error) {
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
-	top, err := n.top.GenerateFanout(n.GetIdentifierProvider().Identifiers(), subscribedChannels)
+	top, err := n.top.GenerateFanout(n.Identifiers(), subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
