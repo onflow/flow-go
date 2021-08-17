@@ -1126,9 +1126,9 @@ func (e *Engine) saveExecutionResults(
 			Interface("collection", cdp.Collection).
 			Logger()
 
-		if cdp.Collection != nil {
-			lg = lg.With().Interface("collection", cdp.Collection).Logger()
-		}
+		//if cdp.Collection != nil {
+		//	lg = lg.With().Interface("collection", cdp.Collection).Logger()
+		//}
 
 		lg.Info().Msg("chunk data pack stored")
 	}
