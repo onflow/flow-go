@@ -16,8 +16,7 @@ type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
 	validator     *sigvalidator.ConsensusSigValidator
-	stakingAggr   hotstuff.SignatureAggregator
-	beaconAggr    hotstuff.SignatureAggregator
+	combinedAggr  hotstuff.CombinedSigAggregator
 	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
 	done          atomic.Bool
@@ -49,22 +48,16 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		return nil
 	}
 
+	_, err = c.combinedAggr.TrustedAdd(vote.SignerID, vote.SigData, sigType)
+	if err != nil {
+		return fmt.Errorf("could not aggregate staking sig share: %w", err)
+	}
+
 	if sigType == hotstuff.SigTypeRandomBeacon {
 		_, err = c.reconstructor.TrustedAdd(vote.SignerID, vote.SigData)
 		if err != nil {
 			return fmt.Errorf("could not add random beacon sig share: %w", err)
 		}
-		_, _, err = c.beaconAggr.TrustedAdd(vote.SignerID, vote.SigData)
-		if err != nil {
-			return fmt.Errorf("could not aggregate random beacon sig share: %w", err)
-		}
-	} else if sigType == hotstuff.SigTypeStaking {
-		_, _, err = c.stakingAggr.TrustedAdd(vote.SignerID, vote.SigData)
-		if err != nil {
-			return fmt.Errorf("could not aggregate staking sig share: %w", err)
-		}
-	} else {
-		return fmt.Errorf("unknown sigType: %v", sigType)
 	}
 
 	// we haven't collected sufficient weight or shares, we have nothing to do further
@@ -97,14 +90,9 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 
 	// at this point we can be sure that no one else is creating QC
 
-	_, err := c.stakingAggr.Aggregate()
+	_, err := c.combinedAggr.Aggregate()
 	if err != nil {
-		return nil, fmt.Errorf("could not construct aggregated staking signatures: %w", err)
-	}
-
-	_, err = c.beaconAggr.Aggregate()
-	if err != nil {
-		return nil, fmt.Errorf("could not construct aggregated random beacon signatures: %w", err)
+		return nil, fmt.Errorf("could not construct aggregated signatures: %w", err)
 	}
 
 	// reconstructor returns random beacon signature reconstructed from threshold signature shares
