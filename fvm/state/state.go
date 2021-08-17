@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -197,14 +198,19 @@ func (s *State) MergeState(other *State) error {
 	return s.checkMaxInteraction()
 }
 
-// UpdatedAddresses returns a map of addresses that were updated (at least 1 register update)
-func (s *State) UpdatedAddresses() map[flow.Address]struct{} {
-	updatedAddressesCopy := make(map[flow.Address]struct{}, len(s.updatedAddresses))
-	for k, v := range s.updatedAddresses {
-		updatedAddressesCopy[k] = v
+// UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
+func (s *State) UpdatedAddresses() []flow.Address {
+	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
+
+	// sort list wile constructing it
+	for k := range s.updatedAddresses {
+		i := sort.Search(len(addresses), func(i int) bool { return addresses[i].Hex() >= k.Hex() })
+		addresses = append(addresses, flow.EmptyAddress)
+		copy(addresses[i+1:], addresses[i:])
+		addresses[i] = k
 	}
 
-	return updatedAddressesCopy
+	return addresses
 }
 
 func (s *State) checkMaxInteraction() error {
