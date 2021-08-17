@@ -9,6 +9,12 @@ type ConsensusSigPackerImpl struct {
 	committees hotstuff.Committee
 }
 
+func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPackerImpl {
+	return &ConsensusSigPackerImpl{
+		committees: committees,
+	}
+}
+
 func (p *ConsensusSigPackerImpl) Pack(sig *hotstuff.AggregatedSignatureData) ([]flow.Identifier, []byte, error) {
 	panic("to be implemented")
 }

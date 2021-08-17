@@ -2,13 +2,14 @@ package voteaggregator
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
 )
 
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
@@ -95,6 +96,7 @@ func (va *VoteAggregatorV2) processQueuedVoteEvents() error {
 }
 
 func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
+	// TODO: log created
 	collector, _, err := va.collectors.GetOrCreateCollector(vote.View, vote.BlockID)
 	if err != nil {
 		return fmt.Errorf("could not lazy init collector for view %d, blockID %v: %w",

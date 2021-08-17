@@ -18,6 +18,14 @@ type CombinedSigValidator struct {
 	sigVerifier          hotstuff.RandomBeaconSigner // verifies the signature, but has no concept of vote
 }
 
+func NewCombinedSigValidator() *CombinedSigValidator {
+	// TODO: replace with real input
+	return &CombinedSigValidator{
+		identity2SignerIndex: nil,
+		sigVerifier:          nil,
+	}
+}
+
 func (v *CombinedSigValidator) ValidateVote(vote *model.Vote) error {
 	panic("TO IMPLEMENT")
 }

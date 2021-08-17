@@ -175,8 +175,8 @@ func (m *StateMachine) caching2Verifying() (*CachingVoteCollector, error) {
 // reIngestIncorporatedResultTask returns a functor for re-ingesting the specified
 // IncorporatedResults; functor handles all potential business logic errors.
 func (m *StateMachine) reIngestVoteTask(vote *model.Vote) func() {
-	panic("implement me")
 	task := func() {
+		panic("implement me")
 	}
 	return task
 }

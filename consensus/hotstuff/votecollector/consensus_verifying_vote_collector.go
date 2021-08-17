@@ -1,3 +1,4 @@
+//nolint
 package votecollector
 
 import (
@@ -11,6 +12,6 @@ type ConsensusVerifyingVoteCollector struct {
 	validator           hotstuff.SigValidator              // the signature validator
 	votedStakes         atomic.Value                       // the total stakes represented by all the voters.
 	stakingAgg          hotstuff.SignatureAggregator       // store staking sig shares and aggregates staking sig
-	thresholdAgg        hotstuff.SignatureAggregator       // store threshold sig shares and aggregates threshold sigs as staking sigs
+	beaconAgg           hotstuff.SignatureAggregator       // store random beacon sig shares and aggregates them as staking sigs
 	beaconReconstructor hotstuff.RandomBeaconReconstructor // store random beacon sig shares and reconstruct the random beacon sig.
 }
