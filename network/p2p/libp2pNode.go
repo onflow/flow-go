@@ -361,6 +361,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		// n.host.Peerstore().ClearAddrs(peerID)
 
 		if len(n.host.Peerstore().Addrs(peerID)) == 0 {
+			// TODO: add bunch of logging here
 			if n.dht != nil {
 				// TODO: adjust timeout
 				timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -654,12 +655,9 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	}
 }
 
-func WithDHTDiscovery(option ...dht.Option) PubsubOption {
-        return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
-               dhtDiscovery, err := NewDHT(ctx, host, option...)
-               if err != nil {
-                       return nil, err
-               }
-               return pubsub.WithDiscovery(dhtDiscovery), nil
-        }
- }
+func WithDHTDiscovery(kdht *dht.IpfsDHT) PubsubOption {
+	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
+		routingDiscovery := discovery.NewRoutingDiscovery(kdht)
+		return pubsub.WithDiscovery(routingDiscovery), nil
+	}
+}
