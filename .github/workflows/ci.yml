@@ -5,6 +5,8 @@ on:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - staging
+      - trying
   pull_request:
     branches:
       - master
@@ -48,7 +50,15 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
+      if: github.actor != 'bors[bot]'
       run: make ci
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 25
+        max_attempts: 2
+        command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1
       if: ${{ matrix.go-version == '1.15' }}
@@ -78,4 +88,12 @@ jobs:
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests
+      if: github.actor != 'bors[bot]'
       run: make ci-integration
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: make ci-integration
