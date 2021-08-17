@@ -238,6 +238,15 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 	return len(v) > 0, nil
 }
 
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return 0, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+	return v, nil
+}
+
 func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
@@ -438,6 +447,22 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 	}
 
 	return add, nil
+}
+
+func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountContractNames)
+		defer sp.Finish()
+	}
+
+	a := flow.BytesToAddress(address.Bytes())
+
+	freezeError := e.accounts.CheckAccountNotFrozen(a)
+	if freezeError != nil {
+		return nil, fmt.Errorf("get account contract names: %w", freezeError)
+	}
+
+	return e.accounts.GetContractNames(a)
 }
 
 func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Program, error) {

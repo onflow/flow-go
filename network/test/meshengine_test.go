@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -32,6 +34,7 @@ type MeshEngineTestSuite struct {
 	ConduitWrapper                   // used as a wrapper around conduit methods
 	nets           []*p2p.Network    // used to keep track of the networks
 	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
+	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -46,7 +49,21 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	const count = 10
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
+
+	// set up a channel to receive pubsub tags from connManagers of the nodes
+	var obs []observable.Observable
+	peerChannel := make(chan string)
+	ob := tagsObserver{
+		tags: peerChannel,
+		log:  logger,
+	}
+
+	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
+
+	for _, observableConnMgr := range obs {
+		observableConnMgr.Subscribe(&ob)
+	}
+	suite.obs = peerChannel
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -148,7 +165,14 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	// Each node broadcasting a message to all others
 	for i := range suite.nets {
@@ -220,7 +244,14 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(5 * time.Second)
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	// choose half of the nodes as target
 	allIds := suite.ids.NodeIDs()
@@ -273,8 +304,14 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
-
+	// each node will register ~D protect messages per mesh setup, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 	// others keeps the identifier of all nodes except node that is sender.
 	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
 
@@ -320,7 +357,14 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	// unregister a random engine from the test topic by calling close on it's conduit
 	unregisterIndex := rand.Intn(count)

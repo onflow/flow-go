@@ -179,6 +179,19 @@ func (a *blsBLS12381Algo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	return sk, nil
 }
 
+const invalidBLSSignatureHeader = byte(0xE0)
+
+// BLSInvalidSignature returns an invalid signature that fails when verified
+// with any message and public key.
+//
+// The signature bytes represent an invalid serialization of a point which
+// makes the verification fail early. The verification would return (false, nil).
+func BLSInvalidSignature() Signature {
+	signature := make([]byte, SignatureLenBLSBLS12381)
+	signature[0] = invalidBLSSignatureHeader // invalid header as per C.ep_read_bin_compact
+	return signature
+}
+
 // decodePrivateKey decodes a slice of bytes into a private key.
 // This function checks the scalar is less than the group order
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
@@ -408,10 +421,25 @@ func hashToG1(data []byte) *pointG1 {
 }
 
 // This is only a TEST function.
-// It wraps a call to optimized SwU algorithm since cgo can't be used
-// in go test files
-func OpSwUUnitTest(output []byte, input []byte) {
-	C.opswu_test((*C.uchar)(&output[0]),
-		(*C.uchar)(&input[0]),
-		(C.int)(len(input)))
+// signWithXMDSHA256 signs a message using XMD_SHA256 as a hash to field.
+//
+// The function is in this file because cgo can't be used in go test files.
+// TODO: implement a hasher for XMD SHA256 and use the `Sign` function.
+func (sk *PrKeyBLSBLS12381) signWithXMDSHA256(data []byte) Signature {
+
+	dst := []byte("BLS_SIG_BLS12381G1_XMD:SHA-256_SSWU_RO_NUL_")
+	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	// XMD using SHA256
+	C.xmd_sha256((*C.uchar)(&hash[0]),
+		(C.int)(opSwUInputLenBLSBLS12381),
+		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
+
+	// sign the hash
+	s := make([]byte, SignatureLenBLSBLS12381)
+	C.bls_sign((*C.uchar)(&s[0]),
+		(*C.bn_st)(&sk.scalar),
+		(*C.uchar)(&hash[0]),
+		(C.int)(len(hash)))
+	return s
 }

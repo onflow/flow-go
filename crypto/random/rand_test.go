@@ -43,11 +43,11 @@ func TestRandomPermutationSubset(t *testing.T) {
 	subsetSize := 20
 	seed := make([]byte, 16)
 	// test a zero seed
-	rng, err := NewRand(seed)
+	_, err := NewRand(seed)
 	require.NoError(t, err)
 	// fix thee seed
 	seed[0] = 45
-	rng, err = NewRand(seed)
+	rng, err := NewRand(seed)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
