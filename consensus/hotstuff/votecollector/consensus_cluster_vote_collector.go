@@ -1,3 +1,4 @@
+// nolint
 package votecollector
 
 import (
@@ -7,15 +8,16 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/sigvalidator"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
-	dkg           hotstuff.DKG
-	aggregator    CombinedAggregator
-	reconstructor RandomBeaconReconstructor
+	validator     *sigvalidator.ConsensusSigValidator
+	combinedAggr  hotstuff.CombinedSigAggregator
+	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
 	done          atomic.Bool
 }
@@ -36,13 +38,9 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		return nil
 	}
 
-	verified, sigType, err := c.aggregator.Verify(vote.SignerID, vote.SigData)
+	sigType, err := c.validator.ValidateVote(vote)
+	// handle InvalidVoteError
 	if err != nil {
-		return fmt.Errorf("could not verify vote signature: %w", err)
-	}
-
-	// TODO: handle if verified == false
-	if !verified {
 		return fmt.Errorf("could not verify vote signature: %w", err)
 	}
 
@@ -50,24 +48,24 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		return nil
 	}
 
-	_, err = c.aggregator.TrustedAdd(vote.SignerID, vote.SigData, sigType)
+	_, err = c.combinedAggr.TrustedAdd(vote.SignerID, vote.SigData, sigType)
 	if err != nil {
-		return fmt.Errorf("could not aggregate vote signature: %w", err)
+		return fmt.Errorf("could not aggregate staking sig share: %w", err)
 	}
 
-	if sigType == SigTypeThreshold {
-		index, err := c.dkg.Index(vote.SignerID)
-		if err != nil {
-			return fmt.Errorf("could not retrieve dkg index for signer (%v): %w", vote.SignerID, err)
-		}
-		_, err = c.reconstructor.TrustedAdd(index, vote.SigData)
+	if sigType == hotstuff.SigTypeRandomBeacon {
+		_, err = c.reconstructor.TrustedAdd(vote.SignerID, vote.SigData)
 		if err != nil {
 			return fmt.Errorf("could not add random beacon sig share: %w", err)
 		}
 	}
 
 	// we haven't collected sufficient weight or shares, we have nothing to do further
-	if !c.aggregator.HasSufficientWeight() || !c.reconstructor.HasSufficientShares() {
+	if !c.hasSufficientStake() {
+		return nil
+	}
+
+	if !c.reconstructor.HasSufficientShares() {
 		return nil
 	}
 
@@ -92,9 +90,7 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 
 	// at this point we can be sure that no one else is creating QC
 
-	// aggregator returns two signatures, one is aggregated staking signature
-	// another one is aggregated threshold signature
-	_, _, err := c.aggregator.AggregateSignature()
+	_, err := c.combinedAggr.Aggregate()
 	if err != nil {
 		return nil, fmt.Errorf("could not construct aggregated signatures: %w", err)
 	}
@@ -107,6 +103,10 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 
 	// TODO: use signatures to build qc
 
+	panic("not implemented")
+}
+
+func (c *ConsensusClusterVoteCollector) hasSufficientStake() bool {
 	panic("not implemented")
 }
 

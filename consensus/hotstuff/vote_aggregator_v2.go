@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// BlockSigner abstracts the implementation of how a signature of a block or a voteis produced
+// BlockSigner abstracts the implementation of how a signature of a block or a vote is produced
 // and stored in a stateful crypto object for aggregation.
 // The VoteAggregator implements both the VoteAggregator interface and the BlockSigner interface so that
 // The EventHandler could use the VoteAggregator interface to send Block, and Voter/BlockProducer can use
@@ -15,8 +15,9 @@ import (
 // implementation details are abstracted to Voter/BlockProducer.
 type BlockSigner interface {
 	// CreateVote returns a vote for the given block.
-	// return (vote, nil) if vote is created
-	// return (nil , module.InvalidBlockError) if the block is invalid.
+	// It returns:
+	//  - (vote, nil) if vote is created
+	//  - (nil , module.InvalidBlockError) if the block is invalid.
 	CreateVote(*model.Block) (*model.Vote, error)
 }
 
@@ -30,19 +31,25 @@ type VoteAggregatorV2 interface {
 	// The voting block could either be known or unknown.
 	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.
 	// This method can be called concurrently, votes will be queued and processed asynchronously.
-	// ToDo: document sentinel errors expected during normal operation
+	// It returns:
+	//  - nil if the vote has been added to the queue for async processing
+	//  - error if there is exception adding the vote to the queue
+
 	AddVote(vote *model.Vote) error
 
 	// AddBlock notifies the VoteAggregator about a known block so that it can start processing
 	// pending votes whose block was unknown.
 	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
-	// ToDo: document sentinel errors expected during normal operation
-	AddBlock(block *model.Proposal) (bool, error)
+	// It returns:
+	// 	- nil if the block is valid
+	//  - model.InvalidBlockError if the block is invalid
+	//  - error if there is exception
+	AddBlock(block *model.Proposal) error
 
 	// InvalidBlock notifies the VoteAggregator about an invalid block, so that it can process votes for the invalid
 	// block and slash the voters.
 	InvalidBlock(block *model.Proposal) error
 
-	// PruneByView will remove any data held for the provided view.
-	PruneByView(view uint64)
+	// PruneUpToView will remove any data held for the provided view.
+	PruneUpToView(view uint64)
 }

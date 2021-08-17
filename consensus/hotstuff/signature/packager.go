@@ -9,6 +9,8 @@ type ConsensusSigPackerImpl struct {
 	committees hotstuff.Committee
 }
 
+var _ hotstuff.Packer = &ConsensusSigPackerImpl{}
+
 func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPackerImpl {
 	return &ConsensusSigPackerImpl{
 		committees: committees,

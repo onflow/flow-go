@@ -24,10 +24,14 @@ type VoteAggregatorV2 struct {
 	voteValidator       hotstuff.Validator
 	signer              hotstuff.SignerVerifier
 	highestPrunedView   counters.StrictMonotonousCounter
-	collectors          VoteCollectors
+	collectors          hotstuff.VoteCollectors
 	queuedVotesNotifier engine.Notifier
 	queuedVotes         *fifoqueue.FifoQueue // keeps track of votes whose blocks can not be found
 }
+
+// TODO: Move to tests
+var _ hotstuff.BlockSigner = &VoteAggregatorV2{}
+var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
 func NewVoteAggregatorV2(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.SignerVerifier) *VoteAggregatorV2 {
@@ -126,21 +130,21 @@ func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 	return nil
 }
 
-func (va *VoteAggregatorV2) AddBlock(block *model.Block) error {
+func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
-	if va.isBlockStale(block) {
+	if va.isBlockStale(block.Block) {
 		return nil
 	}
 
 	err := va.collectors.ProcessBlock(block)
 	if err != nil {
-		return fmt.Errorf("could not process block %v: %w", block.BlockID, err)
+		return fmt.Errorf("could not process block %v: %w", block.Block.BlockID, err)
 	}
 
 	return nil
 }
 
-func (va *VoteAggregatorV2) InvalidBlock(block *model.Block) {
+func (va *VoteAggregatorV2) InvalidBlock(block *model.Proposal) error {
 	panic("implement me")
 }
 
@@ -154,6 +158,14 @@ func (va *VoteAggregatorV2) PruneUpToView(view uint64) {
 			va.log.Fatal().Err(err).Msgf("fatal error when pruning vote collectors by view %d", view)
 		}
 	}
+}
+
+// CreateVote will create a vote for the given block, and return the vote.
+// The created vote will be stored in the vote collector for the block.
+// It get the vote collector for the block or create it if not exists, and let it vote collector
+// to create and store the created vote.
+func (va *VoteAggregatorV2) CreateVote(block *model.Block) (*model.Vote, error) {
+	panic("to be implemented")
 }
 
 func (va *VoteAggregatorV2) isVoteStale(vote *model.Vote) bool {
