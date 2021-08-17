@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -60,11 +59,9 @@ type Middleware interface {
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
-	// Topology returns an identifier list of nodes which this node should be directly connected to as peers
-	Topology() (flow.IdentifierList, error)
+	// Topology returns an identity list of nodes which this node should be directly connected to as peers
+	Topology() (flow.IdentityList, error)
 	Receive(nodeID flow.Identifier, msg *message.Message) error
-	SetDefaultIdentifierProvider(id.IdentifierProvider)
-	Identifiers() flow.IdentifierList
 	Identities() flow.IdentityList
 }
 
