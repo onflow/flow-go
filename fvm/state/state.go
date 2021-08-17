@@ -197,13 +197,14 @@ func (s *State) MergeState(other *State) error {
 	return s.checkMaxInteraction()
 }
 
-// UpdatedAddresses returns a list of addresses that were updated (at least 1 register update)
-func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
-	for k := range s.updatedAddresses {
-		addresses = append(addresses, k)
+// UpdatedAddresses returns a map of addresses that were updated (at least 1 register update)
+func (s *State) UpdatedAddresses() map[flow.Address]struct{} {
+	updatedAddressesCopy := make(map[flow.Address]struct{}, len(s.updatedAddresses))
+	for k, v := range s.updatedAddresses {
+		updatedAddressesCopy[k] = v
 	}
-	return addresses
+
+	return updatedAddressesCopy
 }
 
 func (s *State) checkMaxInteraction() error {
