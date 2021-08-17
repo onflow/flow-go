@@ -133,4 +133,4 @@ func (nc *NoopCollector) ChunkDataPackRequested()                               
 func (nc *NoopCollector) ExecutionSync(syncing bool)                                             {}
 func (nc *NoopCollector) DiskSize(uint64)                                                        {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                       {}
-func (nc *NoopCollector) ExecutionBlockDataUploadFinished()                                      {}
+func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                     {}

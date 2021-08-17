@@ -66,6 +66,7 @@ type ExecutionCollector struct {
 	stateSyncActive                  prometheus.Gauge
 	executionStateDiskUsage          prometheus.Gauge
 	blockDataUploadsInProgress       prometheus.Gauge
+	blockDataUploadsDuration         prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -327,6 +328,14 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Help:      "number of concurrently running Block Data upload operations",
 	})
 
+	blockDataUploadsDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemBlockDataUploader,
+		Name:      "block_data_upload_duration_ms",
+		Help:      "the duration of update upload operation",
+		Buckets:   []float64{1, 100, 500, 1000, 2000},
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
 	registerer.MustRegister(latestTrieRegCount)
@@ -362,6 +371,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(scriptComputationUsed)
 	registerer.MustRegister(totalChunkDataPackRequests)
 	registerer.MustRegister(blockDataUploadsInProgress)
+	registerer.MustRegister(blockDataUploadsDuration)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
@@ -401,6 +411,7 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		scriptComputationUsed:       scriptComputationUsed,
 		totalChunkDataPackRequests:  totalChunkDataPackRequests,
 		blockDataUploadsInProgress:  blockDataUploadsInProgress,
+		blockDataUploadsDuration:    blockDataUploadsDuration,
 
 		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -650,8 +661,9 @@ func (ec *ExecutionCollector) ExecutionBlockDataUploadStarted() {
 	ec.blockDataUploadsInProgress.Inc()
 }
 
-func (ec *ExecutionCollector) ExecutionBlockDataUploadFinished() {
+func (ec *ExecutionCollector) ExecutionBlockDataUploadFinished(dur time.Duration) {
 	ec.blockDataUploadsInProgress.Dec()
+	ec.blockDataUploadsDuration.Observe(float64(dur.Milliseconds()))
 }
 
 // TransactionParsed reports the time spent parsing a single transaction

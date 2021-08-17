@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/onflow/flow-go/engine"
@@ -45,12 +46,14 @@ func (a *AsyncUploader) Done() <-chan struct{} {
 func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) error {
 	a.unit.Launch(func() {
 		a.metrics.ExecutionBlockDataUploadStarted()
-		defer a.metrics.ExecutionBlockDataUploadFinished()
+		start := time.Now()
 
 		err := a.uploader.Upload(computationResult)
 		if err != nil {
 			a.log.Error().Err(err).Msg("error while uploading block data")
 		}
+
+		a.metrics.ExecutionBlockDataUploadFinished(time.Since(start))
 	})
 	return nil
 }
