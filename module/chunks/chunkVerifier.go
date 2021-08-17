@@ -55,7 +55,7 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 	}
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
-	for i, txBody := range vc.Collection.Transactions {
+	for i, txBody := range vc.ChunkDataPack.Collection.Transactions {
 		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
@@ -206,7 +206,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		computedServiceEvents := make(flow.ServiceEventList, len(result.ServiceEvents))
 
 		for i, serviceEvent := range serviceEvents {
-			realServiceEvent, err := convert.ServiceEvent(serviceEvent)
+			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
 			if err != nil {
 				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
 			}

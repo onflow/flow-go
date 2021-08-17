@@ -46,10 +46,12 @@ var eventsList = flow.EventsList{
 	},
 }
 
-var epochSetupEvent, _ = convert.EpochSetupFixture()
-var epochCommitEvent, _ = convert.EpochCommitFixture()
+// the chain we use for this test suite
+var testChain = flow.Emulator
+var epochSetupEvent, _ = convert.EpochSetupFixture(testChain)
+var epochCommitEvent, _ = convert.EpochCommitFixture(testChain)
 
-var epochSetupServiceEvent, _ = convert.ServiceEvent(epochSetupEvent)
+var epochSetupServiceEvent, _ = convert.ServiceEvent(testChain, epochSetupEvent)
 
 var serviceEventsList = []flow.ServiceEvent{
 	*epochSetupServiceEvent,
@@ -71,7 +73,7 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 	vm := new(vmMock)
 	systemOkVm := new(vmSystemOkMock)
 	systemBadVm := new(vmSystemBadMock)
-	vmCtx := fvm.NewContext(zerolog.Nop())
+	vmCtx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(testChain.Chain()))
 
 	// system chunk runs predefined system transaction, hence we can't distinguish
 	// based on its content and we need separate VMs
@@ -210,7 +212,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	col := unittest.CollectionFixture(0)
-	vch.Collection = &col
+	vch.ChunkDataPack.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
 	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
@@ -338,6 +340,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		ChunkID:    chunk.ID(),
 		StartState: flow.StateCommitment(startState),
 		Proof:      proof,
+		Collection: &coll,
 	}
 
 	// ExecutionResult setup
@@ -352,7 +355,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		Chunk:         &chunk,
 		Header:        &header,
 		Result:        &result,
-		Collection:    &coll,
 		ChunkDataPack: &chunkDataPack,
 		EndState:      flow.StateCommitment(endState),
 	}

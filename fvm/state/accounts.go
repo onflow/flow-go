@@ -22,6 +22,7 @@ const (
 	KeyPublicKeyCount     = "public_key_count"
 	KeyStorageUsed        = "storage_used"
 	KeyAccountFrozen      = "frozen"
+	KeyStorageIndex       = "storage_index"
 	uint64StorageSize     = 8
 	AccountFrozenValue    = 1
 	AccountNotFrozenValue = 0
@@ -39,6 +40,34 @@ func NewAccounts(stateHolder *StateHolder) *Accounts {
 	return &Accounts{
 		stateHolder: stateHolder,
 	}
+}
+
+func (a *Accounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
+	var index uint64
+	indexBytes, err := a.getValue(address, false, KeyStorageIndex)
+	if err != nil {
+		return 0, err
+	}
+
+	if len(indexBytes) == 0 {
+		// if not exist for the first time set it to 1 and return
+		// note that zero is reserved for other puporses. (e.g. empty storageIndex checks)
+		index = 1
+	} else if len(indexBytes) != uint64StorageSize {
+		// this should be fatal
+		return 0, fmt.Errorf("invalid storage index byte size (%d != 8)", len(indexBytes))
+	} else {
+		index = binary.BigEndian.Uint64(indexBytes)
+	}
+
+	newIndexBytes := make([]byte, uint64StorageSize)
+	binary.BigEndian.PutUint64(newIndexBytes, uint64(index+1))
+
+	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes)
+	if err != nil {
+		return 0, fmt.Errorf("failed to store the key storage index: %w", err)
+	}
+	return index, nil
 }
 
 func (a *Accounts) Get(address flow.Address) (*flow.Account, error) {

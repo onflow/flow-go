@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {
@@ -55,6 +57,17 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 	}
 
 	return keys, nil
+}
+
+func DKGParticipantPriv() *dkg.DKGParticipantPriv {
+	privKey, _ := StakingKey()
+	randBeaconKey := encodable.RandomBeaconPrivKey{
+		PrivateKey: privKey,
+	}
+	return &dkg.DKGParticipantPriv{
+		NodeID:              IdentifierFixture(),
+		RandomBeaconPrivKey: randBeaconKey,
+	}
 }
 
 func MustDecodePublicKeyHex(algo crypto.SigningAlgorithm, keyHex string) crypto.PublicKey {

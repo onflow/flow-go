@@ -1,4 +1,0 @@
-[submodule "crypto/relic"]
-	path = crypto/relic
-	url = https://github.com/relic-toolkit/relic
-	ignore = dirty

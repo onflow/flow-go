@@ -89,7 +89,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 		View:      head.View,
 		BlockID:   s.blockID,
 		SignerIDs: child.ParentVoterIDs,
-		SigData:   child.ParentVoterSig,
+		SigData:   child.ParentVoterSigData,
 	}
 
 	return qc, nil
@@ -409,7 +409,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 		return nil, fmt.Errorf("could not get child: %w", err)
 	}
 
-	seed, err := seed.FromParentSignature(indices, child.ParentVoterSig)
+	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not create seed from header's signature: %w", err)
 	}

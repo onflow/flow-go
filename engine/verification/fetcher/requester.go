@@ -11,7 +11,6 @@ type ChunkDataPackRequester interface {
 	module.ReadyDoneAware
 	// Request makes the request of chunk data pack for the specified chunk ID with the specified targets.
 	Request(request *verification.ChunkDataPackRequest)
-
 	// WithChunkDataPackHandler registers the handler component of requester engine. The handler implements the logic of handling
 	// a requested chunk data pack upon its arrival.
 	WithChunkDataPackHandler(handler ChunkDataPackHandler)
@@ -21,7 +20,7 @@ type ChunkDataPackRequester interface {
 type ChunkDataPackHandler interface {
 	// HandleChunkDataPack is called by the ChunkDataPackRequester anytime a new requested chunk arrives.
 	// It contains the logic of handling the chunk data pack.
-	HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection)
+	HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack)
 
 	// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the chunk ID has been sealed and
 	// hence the requester will no longer request it.

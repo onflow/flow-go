@@ -155,7 +155,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           [][]byte{h.Header.ParentVoterSig},
+		Signatures:           [][]byte{h.Header.ParentVoterSigData},
 	}
 
 	return &bh, nil

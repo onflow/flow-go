@@ -106,17 +106,13 @@ func (checker *ClusterStateChecker) Assert(t *testing.T) {
 		assert.Equal(t, checker.count, count, "unexpected total number of transactions")
 	}
 
-	if checker.contains != nil {
-		for _, txID := range checker.contains {
-			_, exists := transactions[txID]
-			assert.True(t, exists, "missing expected transaction: %x", txID)
-		}
+	for _, txID := range checker.contains {
+		_, exists := transactions[txID]
+		assert.True(t, exists, "missing expected transaction: %x", txID)
 	}
 
-	if checker.omits != nil {
-		for _, txID := range checker.omits {
-			_, exists := transactions[txID]
-			assert.False(t, exists, "found unexpected transaction: %x", txID)
-		}
+	for _, txID := range checker.omits {
+		_, exists := transactions[txID]
+		assert.False(t, exists, "found unexpected transaction: %x", txID)
 	}
 }
