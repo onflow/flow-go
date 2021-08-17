@@ -150,6 +150,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
+	UnstakedLibP2PNode             *p2p.Node
 	UnstakedNetwork                *p2p.Network
 	unstakedMiddleware             *p2p.Middleware
 	FollowerState                  protocol.MutableState
@@ -614,7 +615,8 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) *p2p.Middleware {
-	builder.unstakedMiddleware = p2p.NewMiddleware(builder.Logger,
+	builder.unstakedMiddleware = p2p.NewMiddleware(
+		builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
@@ -624,7 +626,9 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		false, // no connection gating for the unstaked network
 		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 		builder.IDTranslator,
-		validators...)
+		p2p.WithMessageValidators(validators...),
+		// use default identifier provider
+	)
 	return builder.unstakedMiddleware
 }
 
@@ -650,7 +654,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		topology,
 		subscriptionManager,
 		networkMetrics,
-		p2p.WithIdentifierProvider(builder.NetworkingIdentifierProvider),
+		builder.IdentityProvider,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
