@@ -212,6 +212,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 
 		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateAllowList)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
+		// TODO: add a consumer which implements setting the permanent peer addresses,
+		// and expiring the old permanent ones
 
 		return net, err
 	})
