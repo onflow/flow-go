@@ -101,13 +101,8 @@ func NewMiddleware(
 	connectionGating bool,
 	managePeerConnections bool,
 	idTranslator IDTranslator,
-	validators ...network.MessageValidator) *Middleware {
-
-	if len(validators) == 0 {
-		// add default validators to filter out unwanted messages received by this node
-		validators = DefaultValidators(log, flowID)
-	}
-
+	validators ...network.MessageValidator,
+) *Middleware {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	if unicastMessageTimeout <= 0 {
@@ -115,7 +110,7 @@ func NewMiddleware(
 	}
 
 	// create the node entity and inject dependencies & config
-	return &Middleware{
+	mw := &Middleware{
 		ctx:                   ctx,
 		cancel:                cancel,
 		log:                   log,
@@ -124,13 +119,19 @@ func NewMiddleware(
 		libP2PNodeFactory:     libP2PNodeFactory,
 		metrics:               metrics,
 		rootBlockID:           rootBlockID,
-		validators:            validators,
+		validators:            DefaultValidators(log, flowID),
 		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
 		connectionGating:      connectionGating,
 		managePeerConnections: managePeerConnections,
 		idTranslator:          idTranslator,
 	}
+
+	if len(validators) != 0 {
+		mw.validators = validators
+	}
+
+	return mw
 }
 
 func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
@@ -151,7 +152,7 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 }
 
 func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Identifiers())
+	return m.peerIDs(m.ov.GetIdentifierProvider().Identifiers())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -183,6 +184,8 @@ func (m *Middleware) GetIPPort() (string, string, error) {
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
+
+	ov.SetDefaultIdentifierProvider(NewPeerstoreIdentifierProvider(libP2PNode.host, m.idTranslator))
 
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
@@ -415,7 +418,7 @@ func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.
 	return m.libP2PNode.Ping(m.ctx, peerID)
 }
 
-// UpdateAllowList fetches the most recent identity of the nodes from overlay
+// UpdateAllowList fetches the most recent identifiers of the nodes from overlay
 // and updates the underlying libp2p node.
 func (m *Middleware) UpdateAllowList() {
 	// update libp2pNode's approve lists if this middleware also does connection gating

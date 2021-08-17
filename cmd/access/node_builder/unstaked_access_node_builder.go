@@ -24,12 +24,21 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 	}
 }
 
+func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
+	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
+		return nil
+	})
+}
+
 func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	builder.Cancel = cancel
 
 	builder.validateParams()
+
+	builder.InitIDProviders()
 
 	builder.enqueueUnstakedNetworkInit(ctx)
 
@@ -77,6 +86,16 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 	}
 }
 
+func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
+	anb.
+		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			anb.SyncEngineParticipantsProvider = node.Network.GetIdentifierProvider()
+			return nil
+		})
+	anb.FlowAccessNodeBuilder.Build()
+	return anb
+}
+
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
 func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
 
@@ -109,16 +128,18 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 			false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 			msgValidators...)
 
-		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
-		participants := flow.IdentityList{}
-
 		upstreamANIdentifier, err := flow.HexStringToIdentifier(builder.stakedAccessNodeIDHex)
 		builder.MustNot(err)
 
 		// topology only consist of the upsteam staked AN
 		top := topology.NewFixedListTopology(upstreamANIdentifier)
 
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, top)
+		network, err := builder.initNetwork(
+			builder.Me,
+			unstakedNetworkMetrics,
+			middleware,
+			top,
+		)
 		builder.MustNot(err)
 
 		builder.UnstakedNetwork = network

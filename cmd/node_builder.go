@@ -44,6 +44,9 @@ type NodeBuilder interface {
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
 
+	// InitIDProviders initializes the IdentityProvider and IDTranslator
+	InitIDProviders()
+
 	// EnqueueNetworkInit enqueues the default network component with the given context
 	EnqueueNetworkInit(ctx context.Context)
 
@@ -115,23 +118,27 @@ type BaseConfig struct {
 type NodeConfig struct {
 	Cancel context.CancelFunc // cancel function for the context that is passed to the networking layer
 	BaseConfig
-	Logger             zerolog.Logger
-	NodeID             flow.Identifier
-	Me                 *local.Local
-	Tracer             module.Tracer
-	MetricsRegisterer  prometheus.Registerer
-	Metrics            Metrics
-	DB                 *badger.DB
-	Storage            Storage
-	ProtocolEvents     *events.Distributor
-	State              protocol.State
-	Middleware         *p2p.Middleware
-	Network            *p2p.Network
-	MsgValidators      []network.MessageValidator
-	FvmOptions         []fvm.Option
-	StakingKey         crypto.PrivateKey
-	NetworkKey         crypto.PrivateKey
-	IdentifierProvider id.IdentityProvider // TODO: initialize these in scaffold and unstaked node
+	Logger            zerolog.Logger
+	NodeID            flow.Identifier
+	Me                *local.Local
+	Tracer            module.Tracer
+	MetricsRegisterer prometheus.Registerer
+	Metrics           Metrics
+	DB                *badger.DB
+	Storage           Storage
+	ProtocolEvents    *events.Distributor
+	State             protocol.State
+	Middleware        *p2p.Middleware
+	Network           *p2p.Network
+	MsgValidators     []network.MessageValidator
+	FvmOptions        []fvm.Option
+	StakingKey        crypto.PrivateKey
+	NetworkKey        crypto.PrivateKey
+
+	// TODO: initialize these in scaffold and unstaked node
+	IdentityProvider             id.IdentityProvider
+	IDTranslator                 p2p.IDTranslator
+	NetworkingIdentifierProvider id.IdentifierProvider
 
 	// root state information
 	RootBlock   *flow.Block

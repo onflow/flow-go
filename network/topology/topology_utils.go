@@ -51,7 +51,7 @@ func byteSeedFromID(id flow.Identifier) ([]byte, error) {
 }
 
 // clusterPeers returns the list of other nodes within the same cluster as specified identifier.
-func clusterPeers(id flow.Identifier, state protocol.State) (flow.IdentityList, error) {
+func clusterPeers(id flow.Identifier, state protocol.State) (flow.IdentifierList, error) {
 	currentEpoch := state.Final().Epochs().Current()
 	clusterList, err := currentEpoch.Clustering()
 	if err != nil {
@@ -63,5 +63,5 @@ func clusterPeers(id flow.Identifier, state protocol.State) (flow.IdentityList, 
 		return nil, fmt.Errorf("failed to find the cluster for node ID %s", id.String())
 	}
 
-	return myCluster, nil
+	return myCluster.NodeIDs(), nil
 }

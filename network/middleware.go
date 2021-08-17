@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/message"
 )
 
 // Topic is the internal type of Libp2p which corresponds to the Channel in the network level.
@@ -52,16 +52,17 @@ type Middleware interface {
 
 	// UpdateAllowList fetches the most recent identity of the nodes from overlay
 	// and updates the underlying libp2p node.
-	UpdateAllowList() 
+	UpdateAllowList()
 }
 
 // Overlay represents the interface that middleware uses to interact with the
 // overlay network layer.
 type Overlay interface {
-	id.IdentifierProvider
 	// Topology returns an identifier list of nodes which this node should be directly connected to as peers
 	Topology() (flow.IdentifierList, error)
 	Receive(nodeID flow.Identifier, msg *message.Message) error
+	SetDefaultIdentifierProvider(id.IdentifierProvider)
+	GetIdentifierProvider() id.IdentifierProvider
 }
 
 // Connection represents an interface to read from & write to a connection.

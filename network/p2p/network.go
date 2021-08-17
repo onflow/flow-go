@@ -41,19 +41,28 @@ type ReadyDoneAwareNetwork interface {
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	id.IdentifierProvider
-	logger           zerolog.Logger
-	codec            network.Codec
-	me               module.Local
-	mw               network.Middleware
-	top              network.Topology // used to determine fanout connections
-	metrics          module.NetworkMetrics
-	rcache           *RcvCache // used to deduplicate incoming messages
-	queue            network.MessageQueue
-	ctx              context.Context
-	cancel           context.CancelFunc
-	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
-	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
+	idProvider        id.IdentifierProvider
+	defaultIdProvider id.IdentifierProvider
+	logger            zerolog.Logger
+	codec             network.Codec
+	me                module.Local
+	mw                network.Middleware
+	top               network.Topology // used to determine fanout connections
+	metrics           module.NetworkMetrics
+	rcache            *RcvCache // used to deduplicate incoming messages
+	queue             network.MessageQueue
+	ctx               context.Context
+	cancel            context.CancelFunc
+	subMngr           network.SubscriptionManager // used to keep track of subscribed channels
+	lifecycleManager  *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
+}
+
+type NetworkOption func(*Network)
+
+func WithIdentifierProvider(provider id.IdentifierProvider) NetworkOption {
+	return func(net *Network) {
+		net.idProvider = provider
+	}
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -63,13 +72,13 @@ type Network struct {
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
-	idProvider id.IdentifierProvider,
 	me module.Local,
 	mw network.Middleware,
 	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
+	opts ...NetworkOption,
 ) (*Network, error) {
 
 	rcache, err := newRcvCache(csize)
@@ -78,16 +87,15 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		IdentifierProvider: idProvider,
-		logger:             log,
-		codec:              codec,
-		me:                 me,
-		mw:                 mw,
-		rcache:             rcache,
-		top:                top,
-		metrics:            metrics,
-		subMngr:            sm,
-		lifecycleManager:   lifecycle.NewLifecycleManager(),
+		logger:           log,
+		codec:            codec,
+		me:               me,
+		mw:               mw,
+		rcache:           rcache,
+		top:              top,
+		metrics:          metrics,
+		subMngr:          sm,
+		lifecycleManager: lifecycle.NewLifecycleManager(),
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 
@@ -97,6 +105,10 @@ func NewNetwork(
 
 	// create workers to read from the queue and call queueSubmitFunc
 	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+
+	for _, opt := range opts {
+		opt(o)
+	}
 
 	return o, nil
 }
@@ -163,6 +175,19 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
+func (n *Network) GetIdentifierProvider() id.IdentifierProvider {
+	if n.idProvider != nil {
+		return n.idProvider
+	}
+	n.RLock()
+	defer n.RUnlock()
+	if n.defaultIdProvider == nil {
+		n.logger.Fatal().Msg("TODO")
+		// TODO
+	}
+	return n.defaultIdProvider
+}
+
 // Topology returns the identifiers of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentifierList, error) {
@@ -170,7 +195,7 @@ func (n *Network) Topology() (flow.IdentifierList, error) {
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
-	top, err := n.top.GenerateFanout(n.Identifiers(), subscribedChannels)
+	top, err := n.top.GenerateFanout(n.GetIdentifierProvider().Identifiers(), subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
@@ -277,6 +302,12 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	return msg, nil
 }
 
+func (n *Network) SetDefaultIdentifierProvider(provider id.IdentifierProvider) {
+	n.Lock()
+	n.defaultIdProvider = provider
+	n.Unlock()
+}
+
 // unicast sends the message in a reliable way to the given recipient.
 // It uses 1-1 direct messaging over the underlying network to deliver the message.
 // It returns an error if unicasting fails.
@@ -318,7 +349,6 @@ func (n *Network) publish(channel network.Channel, message interface{}, targetID
 // multicast unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
 // selected from the specified targetIDs.
 func (n *Network) multicast(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
-
 	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
 
 	if len(selectedIDs) == 0 {

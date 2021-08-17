@@ -1,20 +1,20 @@
 package p2p
 
 import (
+	crypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multihash"
-	"github.com/libp2p/go-libp2p-core/crypto/pb"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type UnstakedNetworkPeerIDProvider struct{}
+type UnstakedNetworkIDTranslator struct{}
 
-func NewUnstakedNetworkPeerIDProvider() *UnstakedNetworkPeerIDProvider {
-	return &UnstakedNetworkPeerIDProvider{}
+func NewUnstakedNetworkIDTranslator() *UnstakedNetworkIDTranslator {
+	return &UnstakedNetworkIDTranslator{}
 }
 
-func GetPeerID(flowID flow.Identifier) (peer.ID, error) {
+func (t *UnstakedNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
 	data := append([]byte{0x02}, flowID[:]...)
 	mh, err := multihash.Sum(data, multihash.IDENTITY, -1)
 	if err != nil {
@@ -24,7 +24,7 @@ func GetPeerID(flowID flow.Identifier) (peer.ID, error) {
 	return peer.ID(mh), nil
 }
 
-func GetFlowID(peerID peer.ID) (flow.Identifier, error) {
+func (t *UnstakedNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
 	pk, err := peerID.ExtractPublicKey()
 	if err != nil {
 		// return error

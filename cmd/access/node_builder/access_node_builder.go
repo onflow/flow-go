@@ -35,6 +35,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -144,24 +145,25 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	UnstakedNetwork            *p2p.Network
-	unstakedMiddleware         *p2p.Middleware
-	FollowerState              protocol.MutableState
-	SyncCore                   *synchronization.Core
-	RpcEng                     *rpc.Engine
-	FinalizationDistributor    *pubsub.FinalizationDistributor
-	FinalizedHeader            *synceng.FinalizedHeaderCache
-	CollectionRPC              access.AccessAPIClient
-	TransactionTimings         *stdmap.TransactionTimings
-	CollectionsToMarkFinalized *stdmap.Times
-	CollectionsToMarkExecuted  *stdmap.Times
-	BlocksToMarkExecuted       *stdmap.Times
-	TransactionMetrics         module.TransactionMetrics
-	PingMetrics                module.PingMetrics
-	Committee                  hotstuff.Committee
-	Finalized                  *flow.Header
-	Pending                    []*flow.Header
-	FollowerCore               module.HotStuffFollower
+	UnstakedNetwork                *p2p.Network
+	unstakedMiddleware             *p2p.Middleware
+	FollowerState                  protocol.MutableState
+	SyncCore                       *synchronization.Core
+	RpcEng                         *rpc.Engine
+	FinalizationDistributor        *pubsub.FinalizationDistributor
+	FinalizedHeader                *synceng.FinalizedHeaderCache
+	CollectionRPC                  access.AccessAPIClient
+	TransactionTimings             *stdmap.TransactionTimings
+	CollectionsToMarkFinalized     *stdmap.Times
+	CollectionsToMarkExecuted      *stdmap.Times
+	BlocksToMarkExecuted           *stdmap.Times
+	TransactionMetrics             module.TransactionMetrics
+	PingMetrics                    module.PingMetrics
+	Committee                      hotstuff.Committee
+	Finalized                      *flow.Header
+	Pending                        []*flow.Header
+	FollowerCore                   module.HotStuffFollower
+	SyncEngineParticipantsProvider id.IdentifierProvider
 
 	// engines
 	IngestEng   *ingestion.Engine
@@ -314,7 +316,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.FinalizedHeader,
-			node.State,
+			builder.SyncEngineParticipantsProvider,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -628,6 +630,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		unicastMessageTimeout,
 		connectionGating,
 		managerPeerConnections,
+		builder.IDTranslator,
 		validators...)
 	return builder.unstakedMiddleware
 }
@@ -638,7 +641,6 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware *p2p.Middleware,
-	participants flow.IdentityList,
 	topology network.Topology) (*p2p.Network, error) {
 
 	codec := jsoncodec.NewCodec()
@@ -646,15 +648,17 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	subscriptionManager := p2p.NewChannelSubscriptionManager(middleware)
 
 	// creates network instance
-	net, err := p2p.NewNetwork(builder.Logger,
+	net, err := p2p.NewNetwork(
+		builder.Logger,
 		codec,
-		participants,
 		nodeID,
 		builder.unstakedMiddleware,
 		p2p.DefaultCacheSize,
 		topology,
 		subscriptionManager,
-		networkMetrics)
+		networkMetrics,
+		p2p.WithIdentifierProvider(builder.NetworkingIdentifierProvider),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize network: %w", err)
 	}

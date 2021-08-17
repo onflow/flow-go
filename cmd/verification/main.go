@@ -24,10 +24,12 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -352,7 +354,13 @@ func main() {
 				followerEng,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				id.NewFilteredIdentifierProvider(
+					filter.And(
+						filter.HasRole(flow.RoleConsensus),
+						filter.Not(filter.HasNodeID(node.Me.NodeID())),
+					),
+					node.IdentityProvider,
+				),
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
