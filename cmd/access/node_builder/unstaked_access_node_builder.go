@@ -105,7 +105,8 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 	anb.
 		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			anb.SyncEngineParticipantsProvider = node.Network.GetIdentifierProvider()
+			// use the default identifier provider
+			anb.SyncEngineParticipantsProvider = node.Middleware.IdentifierProvider()
 			return nil
 		})
 	anb.FlowAccessNodeBuilder.Build()

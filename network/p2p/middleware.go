@@ -460,6 +460,10 @@ func (m *Middleware) UpdateAllowList() {
 	m.peerManagerUpdate()
 }
 
+func (m *Middleware) IdentifierProvider() id.IdentifierProvider {
+	return m.idProvider
+}
+
 // IsConnected returns true if this node is connected to the node with id nodeID.
 func (m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
 	peerID, err := m.idTranslator.GetPeerID(nodeID)
