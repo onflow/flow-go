@@ -18,14 +18,14 @@ func NewTransactionStorageLimiter() *TransactionStorageLimiter {
 
 func (d *TransactionStorageLimiter) CheckLimits(
 	env Enviornment,
-	addresses map[flow.Address]struct{},
+	addresses []flow.Address,
 ) (err error) {
 	if !env.Context().LimitAccountStorage {
 		return nil
 	}
 
 	// iterating through a map in a non-deterministic order! Do not exit the loop early.
-	for address := range addresses {
+	for _, address := range addresses {
 		commonAddress := common.BytesToAddress(address.Bytes())
 
 		capacity, aerr := env.GetStorageCapacity(commonAddress)
