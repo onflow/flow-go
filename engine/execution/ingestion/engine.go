@@ -1120,7 +1120,7 @@ func (e *Engine) saveExecutionResults(
 	}
 
 	for _, cdp := range chdps {
-		e.log.Info().
+		e.log.Debug().
 			Hex("chunk_id", logging.ID(cdp.ChunkID)).
 			Hex("start_state", cdp.StartState[:]).
 			Hex("proof", cdp.Proof[:]).
