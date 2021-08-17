@@ -120,9 +120,10 @@ func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.
 }
 
 // ProcessBlock performs validation of block signature and processes block with respected collector.
-func (m *StateMachine) ProcessBlock(block *model.Block) error {
+func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
 	// TODO: implement logic for validating block proposal, converting it to vote and further processing
 
+	block := proposal.Block
 	currentStatus := m.Status()
 	err := m.ChangeProcessingStatus(currentStatus, hotstuff.VoteCollectorStatusVerifying)
 	if err != nil {

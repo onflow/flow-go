@@ -26,5 +26,5 @@ type VoteCollectors interface {
 	// It returns nil if the block is valid.
 	// It returns model.InvalidBlockError if block is invalid.
 	// It returns other error if there is exception processing the block.
-	ProcessBlock(block *model.Block) error
+	ProcessBlock(block *model.Proposal) error
 }
