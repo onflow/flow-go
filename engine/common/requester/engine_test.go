@@ -394,6 +394,7 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 	// make sure we process item without checking integrity
 	assert.Equal(t, 1, called)
 }
+
 // Verify that the origin should not be checked when ValidateStaking config is set to false
 func TestOriginValidation(t *testing.T) {
 	identities := unittest.IdentityListFixture(16)
