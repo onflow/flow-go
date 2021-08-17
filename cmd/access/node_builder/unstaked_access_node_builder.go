@@ -105,7 +105,8 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 	anb.
 		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			anb.SyncEngineParticipantsProvider = node.Network.GetIdentifierProvider()
+			// use the default identifier provider
+			anb.SyncEngineParticipantsProvider = node.Middleware.IdentifierProvider()
 			return nil
 		})
 	anb.FlowAccessNodeBuilder.Build()
@@ -134,11 +135,8 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
 
-		// empty list of unstaked network participants since they will be discovered dynamically and are not known upfront
-		participants := flow.IdentityList{}
-
 		// topology is nil since its automatically managed by libp2p
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, participants, nil)
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, nil)
 		builder.MustNot(err)
 
 		builder.UnstakedNetwork = network
