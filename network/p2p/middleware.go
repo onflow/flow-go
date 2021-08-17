@@ -81,7 +81,21 @@ type Middleware struct {
 	connectionGating      bool
 	managePeerConnections bool
 	idTranslator          IDTranslator
-	idProvider            id.IdentityProvider
+	idProvider            id.IdentifierProvider
+}
+
+type MiddlewareOption func(*Middleware)
+
+func WithIdentifierProvider(provider id.IdentifierProvider) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.idProvider = provider
+	}
+}
+
+func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.validators = validators
+	}
 }
 
 // NewMiddleware creates a new middleware instance
@@ -104,8 +118,7 @@ func NewMiddleware(
 	connectionGating bool,
 	managePeerConnections bool,
 	idTranslator IDTranslator,
-	idProvider id.IdentityProvider,
-	validators ...network.MessageValidator,
+	opts ...MiddlewareOption,
 ) *Middleware {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -129,11 +142,10 @@ func NewMiddleware(
 		connectionGating:      connectionGating,
 		managePeerConnections: managePeerConnections,
 		idTranslator:          idTranslator,
-		idProvider:            idProvider,
 	}
 
-	if len(validators) != 0 {
-		mw.validators = validators
+	for _, opt := range opts {
+		opt(mw)
 	}
 
 	return mw
@@ -147,17 +159,17 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 }
 
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
-	identifiers, err := m.ov.Topology()
+	identities, err := m.ov.Topology()
 	if err != nil {
 		// TODO: format error
 		return nil, err
 	}
 
-	return m.peerIDs(identifiers), nil
+	return m.peerIDs(identities.NodeIDs()), nil
 }
 
 func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Identifiers())
+	return m.peerIDs(m.idProvider.Identifiers())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -199,7 +211,9 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
 
-	ov.SetDefaultIdentifierProvider(NewPeerstoreIdentifierProvider(libP2PNode.host, m.idTranslator))
+	if m.idProvider == nil {
+		m.idProvider = NewPeerstoreIdentifierProvider(libP2PNode.host, m.idTranslator)
+	}
 
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
@@ -444,6 +458,10 @@ func (m *Middleware) UpdateAllowList() {
 
 	// update peer connections if this middleware also does peer management
 	m.peerManagerUpdate()
+}
+
+func (m *Middleware) IdentifierProvider() id.IdentifierProvider {
+	return m.idProvider
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.
