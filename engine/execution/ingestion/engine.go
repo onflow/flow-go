@@ -1121,8 +1121,8 @@ func (e *Engine) saveExecutionResults(
 
 	for _, cdp := range chdps {
 		lg := e.log.With().Hex("chunk_id", logging.ID(cdp.ChunkID)).
-			Hex("start_state", cdp.StartState[:]).
-			Hex("proof", cdp.Proof[:]).
+			//Hex("start_state", cdp.StartState[:]).
+			//Hex("proof", cdp.Proof[:]).
 			Logger()
 
 		//if cdp.Collection != nil {
