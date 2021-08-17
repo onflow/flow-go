@@ -383,23 +383,24 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
-		block, err := b.blocks.ByID(header.ID())
+		blockID := header.ID()
+		index, err := b.index.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve block %x: %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve index for block %x: %w", blockID, err)
 		}
 
 		// enforce condition (1): only consider seals for results that are incorporated in the fork
-		for _, result := range block.Payload.Results {
+		for _, resultID := range index.ResultIDs {
+
+			result, err := b.resultsDB.ByID(resultID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve execution result %x: %w", resultID, err)
+			}
+
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			// ATTENTION:
-			// Here, IncorporatedBlockID (the first argument) should be set to
-			// ancestorID, because that is the block that contains the
-			// ExecutionResult. However, in phase 2 of the sealing roadmap, we
-			// are still using a temporary sealing logic where the
-			// IncorporatedBlockID is expected to be the result's block ID.
 			incorporatedResult := flow.NewIncorporatedResult(
-				result.BlockID,
+				blockID,
 				result,
 			)
 
@@ -625,11 +626,11 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		// the following fields should be set by the custom function as needed
 		// NOTE: we could abstract all of this away into an interface{} field,
 		// but that would be over the top as we will probably always use hotstuff
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
+		View:               0,
+		ParentVoterIDs:     nil,
+		ParentVoterSigData: nil,
+		ProposerID:         flow.ZeroID,
+		ProposerSigData:    nil,
 	}
 
 	// apply the custom fields setter of the consensus algorithm

@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 type communicationMode int
@@ -129,8 +130,8 @@ func NewMiddleware(log zerolog.Logger,
 
 func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
-		validator.NewSenderValidator(flowID),      // validator to filter out messages sent by this node itself
-		validator.NewTargetValidator(log, flowID), // validator to filter out messages not intended for this node
+		validator.ValidateNotSender(flowID),   // validator to filter out messages sent by this node itself
+		validator.ValidateTarget(log, flowID), // validator to filter out messages not intended for this node
 	}
 }
 
@@ -155,13 +156,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
-	// get the node identity map from the overlay
-	idsMap, err := m.ov.Identity()
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-
 	if m.connectionGating {
+
+		// get the node identity map from the overlay
+		idsMap, err := m.ov.Identity()
+		if err != nil {
+			return fmt.Errorf("could not get identities: %w", err)
+		}
+
 		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 		if err != nil {
 			return fmt.Errorf("could not update approved peer list: %w", err)
@@ -382,7 +384,9 @@ func (m *Middleware) processMessage(msg *message.Message) {
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
 
 	// convert the message to bytes to be put on the wire.
+	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
 	data, err := msg.Marshal()
+	//binstat.LeaveVal(bs, int64(len(data)))
 	if err != nil {
 		return fmt.Errorf("failed to marshal the message: %w", err)
 	}
