@@ -90,7 +90,7 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 
 	// at this point we can be sure that no one else is creating QC
 
-	_, err := c.combinedAggr.Aggregate()
+	_, _, err := c.combinedAggr.Aggregate()
 	if err != nil {
 		return nil, fmt.Errorf("could not construct aggregated signatures: %w", err)
 	}
