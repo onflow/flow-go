@@ -20,6 +20,9 @@ type ExecutionResults interface {
 	// Index indexes an execution result by block ID.
 	Index(blockID flow.Identifier, resultID flow.Identifier) error
 
+	// ForceIndex indexes an execution result by block ID overwriting existing database entry
+	ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error
+
 	// BatchIndex indexes an execution result by block ID in a given batch
 	BatchIndex(blockID flow.Identifier, resultID flow.Identifier, batch BatchStorage) error
 

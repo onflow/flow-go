@@ -352,16 +352,16 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	return flow.Header{
-		ChainID:        parent.ChainID,
-		ParentID:       parent.ID(),
-		Height:         height,
-		PayloadHash:    IdentifierFixture(),
-		Timestamp:      time.Now().UTC(),
-		View:           view,
-		ParentVoterIDs: IdentifierListFixture(4),
-		ParentVoterSig: CombinedSignatureFixture(2),
-		ProposerID:     IdentifierFixture(),
-		ProposerSig:    SignatureFixture(),
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		PayloadHash:        IdentifierFixture(),
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentVoterIDs:     IdentifierListFixture(4),
+		ParentVoterSigData: CombinedSignatureFixture(2),
+		ProposerID:         IdentifierFixture(),
+		ProposerSigData:    SignatureFixture(),
 	}
 }
 
@@ -651,6 +651,27 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 			chunk.BlockID = blockID
 		}
 	}
+}
+
+func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.ServiceEvents = ServiceEventsFixture(n)
+	}
+}
+
+func ServiceEventsFixture(n int) flow.ServiceEventList {
+	sel := make(flow.ServiceEventList, n)
+
+	for ; n > 0; n-- {
+		switch rand.Intn(2) {
+		case 0:
+			sel[n-1] = EpochCommitFixture().ServiceEvent()
+		case 1:
+			sel[n-1] = EpochSetupFixture().ServiceEvent()
+		}
+	}
+
+	return sel
 }
 
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {

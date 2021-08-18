@@ -45,14 +45,17 @@ typedef uint8_t byte;
 
 
 // constants used in the optimized SWU hash to curve
-#define ELLP_Nx_LEN 12
-#define ELLP_Dx_LEN 10
-#define ELLP_Ny_LEN 16
-#define ELLP_Dy_LEN 15
+#if (hashToPoint == OPSWU)
+    #define ELLP_Nx_LEN 12
+    #define ELLP_Dx_LEN 10
+    #define ELLP_Ny_LEN 16
+    #define ELLP_Dy_LEN 15
+#endif
 
 
 // Structure of precomputed data
 typedef struct prec_ {
+    #if (hashToPoint == OPSWU)
     bn_st p_3div4;
     fp_st fp_p_1div2; 
     // coefficients of E1(Fp)
@@ -63,12 +66,19 @@ typedef struct prec_ {
     fp_st iso_Dx[ELLP_Dx_LEN];
     fp_st iso_Ny[ELLP_Ny_LEN];
     fp_st iso_Dy[ELLP_Dy_LEN];
+    #endif
     #if  (MEMBERSHIP_CHECK_G1 == BOWE)
     bn_st beta;
     bn_st z2_1_by3;
     #endif
     bn_st p_1div2;
 } prec_st;
+
+// BLS based SPoCK
+int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
+
+// hash to curve functions (functions in bls12381_hashtocurve.c)
+void     map_to_G1(ep_t, const byte*, const int);
 
 // Utility functions
 int      get_valid();
@@ -111,6 +121,8 @@ int bowe_subgroup_check_G1(const ep_t);
 int subgroup_check_G1_test(int, int);
 int subgroup_check_G1_bench();
 
+// utility testing function
+void xmd_sha256(uint8_t *, int, uint8_t *, int, uint8_t *, int);
 
 // Debugging related functions
 void     bytes_print_(char*, byte*, int);
@@ -118,8 +130,5 @@ void     fp_print_(char*, fp_t);
 void     bn_print_(char*, bn_st*);
 void     ep_print_(char*, ep_st*);
 void     ep2_print_(char*, ep2_st*);
-
-// BLS based SPoCK
-int bls_spock_verify(const ep2_t, const byte*, const ep2_t, const byte*);
 
 #endif

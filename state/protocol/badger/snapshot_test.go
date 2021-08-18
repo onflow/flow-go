@@ -469,7 +469,7 @@ func TestQuorumCertificate(t *testing.T) {
 			assert.Nil(t, err)
 			// should have signatures from valid child (block 2)
 			assert.Equal(t, block2.Header.ParentVoterIDs, qc.SignerIDs)
-			assert.Equal(t, block2.Header.ParentVoterSig.Bytes(), qc.SigData)
+			assert.Equal(t, block2.Header.ParentVoterSigData, qc.SigData)
 			// should have view matching block1 view
 			assert.Equal(t, block1.Header.View, qc.View)
 

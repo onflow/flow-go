@@ -400,34 +400,30 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		}
 	}
 
-	origin := 0
-	target := m.size - 1
-
-	originID := m.ids[origin].NodeID
 	message1 := createMessage(firstNode, lastNode, "hello1")
 
-	m.ov[target].On("Receive", originID, mockery.Anything).Return(nil).Once()
+	m.ov[last].On("Receive", firstNode, mockery.Anything).Return(nil).Once()
 
 	// first test that when both nodes are subscribed to the channel, the target node receives the message
-	err := m.mws[origin].Publish(message1, testChannel)
+	err := m.mws[first].Publish(message1, testChannel)
 	assert.NoError(m.T(), err)
 
 	assert.Eventually(m.T(), func() bool {
-		return m.ov[target].AssertCalled(m.T(), "Receive", originID, mockery.Anything)
+		return m.ov[last].AssertCalled(m.T(), "Receive", firstNode, mockery.Anything)
 	}, 2*time.Second, time.Millisecond)
 
 	// now unsubscribe the target node from the channel
-	err = m.mws[target].Unsubscribe(testChannel)
+	err = m.mws[last].Unsubscribe(testChannel)
 	assert.NoError(m.T(), err)
 
 	// create and send a new message on the channel from the origin node
 	message2 := createMessage(firstNode, lastNode, "hello2")
-	err = m.mws[origin].Publish(message2, testChannel)
+	err = m.mws[first].Publish(message2, testChannel)
 	assert.NoError(m.T(), err)
 
 	// assert that the new message is not received by the target node
 	assert.Never(m.T(), func() bool {
-		return !m.ov[target].AssertNumberOfCalls(m.T(), "Receive", 1)
+		return !m.ov[last].AssertNumberOfCalls(m.T(), "Receive", 1)
 	}, 2*time.Second, time.Millisecond)
 }
 
