@@ -42,6 +42,10 @@ const (
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
+
+	// timeout for FindPeer queries to the DHT
+	// TODO: is this a sensible value?
+	findPeerQueryTimeout = 15 * time.Second
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -356,21 +360,22 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		default:
 		}
 
+		// TODO: why were we doing this? Is it okay to remove?
 		// remove the peer from the peer store if present
-		// TODO: why were we doing this?
 		// n.host.Peerstore().ClearAddrs(peerID)
 
 		if len(n.host.Peerstore().Addrs(peerID)) == 0 {
-			// TODO: add bunch of logging here
+			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore")
 			if n.dht != nil {
-				// TODO: adjust timeout
-				timedCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-				// try to find the peer
+				n.logger.Info().Str("peerID", peerID.Pretty()).Msg("searching for peer in dht")
+				timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
+				// try to find the peer using the dht
 				_, err := n.dht.FindPeer(timedCtx, peerID)
 				cancel()
 				if err != nil {
 					return nil, fmt.Errorf("could not find address for peer %v: %w", peerID, err)
 				}
+				n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address found")
 			}
 			return nil, fmt.Errorf("no valid addresses exist for peer %v", peerID)
 		}

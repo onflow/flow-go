@@ -46,8 +46,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 		)
 		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
-		// TODO: need special providers here
-		// NetworkingIdentifierProvider should be the same as the one used in scaffold.go if this AN
+		// TODO: NetworkingIdentifierProvider should be the same as the one used in scaffold.go if this AN
 		// doesn't participate in unstaked network.
 		// If it does, then we can just use the default one (peerstoreProvider)
 

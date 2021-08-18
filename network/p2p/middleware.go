@@ -161,7 +161,6 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
-		// TODO: format error
 		return nil, err
 	}
 
@@ -178,7 +177,10 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	for _, fid := range flowIDs {
 		pid, err := m.idTranslator.GetPeerID(fid)
 		if err != nil {
-			// TODO: log here
+			// We probably don't need to fail the entire function here, since the other
+			// translations may still succeed
+			m.log.Err(err).Str("flowID", fid.String()).Msg("failed to translate to peer ID")
+			continue
 		}
 
 		result = append(result, pid)
@@ -212,7 +214,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	libP2PNode, err := m.libP2PNodeFactory()
 
 	if m.idProvider == nil {
-		m.idProvider = NewPeerstoreIdentifierProvider(libP2PNode.host, m.idTranslator)
+		m.idProvider = NewPeerstoreIdentifierProvider(m.log, libP2PNode.host, m.idTranslator)
 	}
 
 	if err != nil {
