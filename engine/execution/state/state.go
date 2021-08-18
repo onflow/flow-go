@@ -362,22 +362,6 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 	}
 	sp.Finish()
 
-	// tests retrievable of chunk data packs
-	for _, cdp := range chunkDataPacks {
-
-		lg := log.With().
-			Hex("chunk_id", logging.ID(cdp.ChunkID)).
-			Hex("start_state", cdp.StartState[:]).
-			Int("proof_length", len(cdp.Proof[:])).Logger()
-
-		if cdp.Collection != nil {
-			lg = lg.With().Hex("collection_id", logging.ID(cdp.Collection.ID())).Logger()
-		}
-
-		lg.Info().Msg("chunk data pack stored successfully")
-
-	}
-
 	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)
 	if err != nil {
@@ -425,6 +409,30 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
+	}
+
+	// tests retrievable of chunk data packs
+	for _, cdp := range chunkDataPacks {
+		_, err := s.chunkDataPacks.ByChunkID(cdp.ChunkID)
+
+		lg := log.With().
+			Hex("chunk_id", logging.ID(cdp.ChunkID)).
+			Hex("start_state", cdp.StartState[:]).
+			Int("proof_length", len(cdp.Proof[:])).Logger()
+
+		if cdp.Collection != nil {
+			lg = lg.With().Hex("collection_id", logging.ID(cdp.Collection.ID())).Logger()
+		}
+
+		if err != nil {
+			log.Error().
+				Err(err).
+				Hex("proof", cdp.Proof[:]).
+				Msg("could not retrieve chunk data pack for test")
+		}
+
+		lg.Info().Msg("chunk data pack successfully retrieved for test")
+
 	}
 
 	//outside batch because it requires read access
