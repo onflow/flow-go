@@ -122,7 +122,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 			f := func(ctx context.Context) error {
 				err := e.conduit.Unicast(&msg.DKGMessage, msg.DestID)
 				if err != nil {
-					return fmt.Errorf("error sending dkg message: %v", err)
+					return fmt.Errorf("error sending dkg message: %w", err)
 				}
 
 				return nil
