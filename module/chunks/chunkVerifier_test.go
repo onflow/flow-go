@@ -77,9 +77,9 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 
 	// system chunk runs predefined system transaction, hence we can't distinguish
 	// based on its content and we need separate VMs
-	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
-	s.systemOkVerifier = chunks.NewChunkVerifier(systemOkVm, vmCtx)
-	s.systemBadVerifier = chunks.NewChunkVerifier(systemBadVm, vmCtx)
+	s.verifier = chunks.NewChunkVerifier(vm, vmCtx, zerolog.Nop())
+	s.systemOkVerifier = chunks.NewChunkVerifier(systemOkVm, vmCtx, zerolog.Nop())
+	s.systemBadVerifier = chunks.NewChunkVerifier(systemBadVm, vmCtx, zerolog.Nop())
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -212,7 +212,7 @@ func (s *ChunkVerifierTestSuite) TestEmptyCollection() {
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
 	col := unittest.CollectionFixture(0)
-	vch.Collection = &col
+	vch.ChunkDataPack.Collection = &col
 	vch.EndState = vch.ChunkDataPack.StartState
 	emptyListHash, err := flow.EventsListHash(flow.EventsList{})
 	assert.NoError(s.T(), err)
@@ -340,6 +340,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		ChunkID:    chunk.ID(),
 		StartState: flow.StateCommitment(startState),
 		Proof:      proof,
+		Collection: &coll,
 	}
 
 	// ExecutionResult setup
@@ -354,7 +355,6 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 		Chunk:         &chunk,
 		Header:        &header,
 		Result:        &result,
-		Collection:    &coll,
 		ChunkDataPack: &chunkDataPack,
 		EndState:      flow.StateCommitment(endState),
 	}

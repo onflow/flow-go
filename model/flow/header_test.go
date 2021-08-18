@@ -34,28 +34,28 @@ func TestHeaderFingerprint(t *testing.T) {
 	headerID := header.ID()
 	data := header.Fingerprint()
 	var decoded struct {
-		ChainID        flow.ChainID
-		ParentID       flow.Identifier
-		Height         uint64
-		PayloadHash    flow.Identifier
-		Timestamp      uint64
-		View           uint64
-		ParentVoterIDs []flow.Identifier
-		ParentVoterSig crypto.Signature
-		ProposerID     flow.Identifier
+		ChainID            flow.ChainID
+		ParentID           flow.Identifier
+		Height             uint64
+		PayloadHash        flow.Identifier
+		Timestamp          uint64
+		View               uint64
+		ParentVoterIDs     []flow.Identifier
+		ParentVoterSigData crypto.Signature
+		ProposerID         flow.Identifier
 	}
 	rlp.NewEncoder().MustDecode(data, &decoded)
 	decHeader := flow.Header{
-		ChainID:        decoded.ChainID,
-		ParentID:       decoded.ParentID,
-		Height:         decoded.Height,
-		PayloadHash:    decoded.PayloadHash,
-		Timestamp:      time.Unix(0, int64(decoded.Timestamp)).UTC(),
-		View:           decoded.View,
-		ParentVoterIDs: decoded.ParentVoterIDs,
-		ParentVoterSig: decoded.ParentVoterSig,
-		ProposerID:     decoded.ProposerID,
-		ProposerSig:    header.ProposerSig, // since this field is not encoded/decoded, just set it to the original
+		ChainID:            decoded.ChainID,
+		ParentID:           decoded.ParentID,
+		Height:             decoded.Height,
+		PayloadHash:        decoded.PayloadHash,
+		Timestamp:          time.Unix(0, int64(decoded.Timestamp)).UTC(),
+		View:               decoded.View,
+		ParentVoterIDs:     decoded.ParentVoterIDs,
+		ParentVoterSigData: decoded.ParentVoterSigData,
+		ProposerID:         decoded.ProposerID,
+		ProposerSigData:    header.ProposerSigData, // since this field is not encoded/decoded, just set it to the original
 		// value to pass test
 	}
 	decodedID := decHeader.ID()

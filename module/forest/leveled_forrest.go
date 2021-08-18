@@ -16,6 +16,7 @@ import (
 type LevelledForest struct {
 	vertices        VertexSet
 	verticesAtLevel map[uint64]VertexList
+	size            uint64
 	LowestLevel     uint64
 }
 
@@ -57,6 +58,8 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		return nil
 	}
 
+	elementsPruned := 0
+
 	// to optimize the pruning large level-ranges, we compare:
 	//  * the number of levels for which we have stored vertex containers: len(f.verticesAtLevel)
 	//  * the number of levels that need to be pruned: level-f.LowestLevel
@@ -65,6 +68,9 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		for l, vertices := range f.verticesAtLevel {
 			if l < level {
 				for _, v := range vertices {
+					if !f.isEmptyContainer(v) {
+						elementsPruned++
+					}
 					delete(f.vertices, v.id)
 				}
 				delete(f.verticesAtLevel, l)
@@ -72,7 +78,11 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		}
 	} else {
 		for l := f.LowestLevel; l < level; l++ {
-			for _, v := range f.verticesAtLevel[l] { // nil map behaves like empty map when iterating over it
+			verticesAtLevel := f.verticesAtLevel[l]
+			for _, v := range verticesAtLevel { // nil map behaves like empty map when iterating over it
+				if !f.isEmptyContainer(v) {
+					elementsPruned++
+				}
 				delete(f.vertices, v.id)
 			}
 			delete(f.verticesAtLevel, l)
@@ -80,6 +90,7 @@ func (f *LevelledForest) PruneUpToLevel(level uint64) error {
 		}
 	}
 	f.LowestLevel = level
+	f.size -= uint64(elementsPruned)
 	return nil
 }
 
@@ -104,6 +115,12 @@ func (f *LevelledForest) GetVertex(id flow.Identifier) (Vertex, bool) {
 	return container.vertex, true
 }
 
+// GetSize returns the total number of vertices above the pruned lowest level.
+// Note this call is not concurrent-safe, caller is responsible to ensure concurrency safety.
+func (f *LevelledForest) GetSize() uint64 {
+	return f.size
+}
+
 // GetChildren returns a VertexIterator to iterate over the children
 // An empty VertexIterator is returned, if no vertices are known whose parent is `id` , `level`
 func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
@@ -112,7 +129,7 @@ func (f *LevelledForest) GetChildren(id flow.Identifier) VertexIterator {
 	return newVertexIterator(container.children) // VertexIterator gracefully handles nil slices
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
+// GetNumberOfChildren returns number of children of given vertex
 func (f *LevelledForest) GetNumberOfChildren(id flow.Identifier) int {
 	container := f.vertices[id] // if vertex does not exists, container is the default zero value for vertexContainer, which contains a nil-slice for its children
 	num := 0
@@ -130,7 +147,7 @@ func (f *LevelledForest) GetVerticesAtLevel(level uint64) VertexIterator {
 	return newVertexIterator(f.verticesAtLevel[level]) // go returns the zero value for a missing level. Here, a nil slice
 }
 
-// GetVerticesAtLevel returns a VertexIterator to iterate over the Vertices at the specified height
+// GetNumberOfVerticesAtLevel returns number of vertices at given level
 func (f *LevelledForest) GetNumberOfVerticesAtLevel(level uint64) int {
 	num := 0
 	for _, container := range f.verticesAtLevel[level] {
@@ -157,6 +174,7 @@ func (f *LevelledForest) AddVertex(vertex Vertex) {
 	// container is empty, i.e. full vertex is new and should be stored in container
 	container.vertex = vertex // add vertex to container
 	f.registerWithParent(container)
+	f.size += 1
 }
 
 func (f *LevelledForest) registerWithParent(vertexContainer *vertexContainer) {

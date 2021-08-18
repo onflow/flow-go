@@ -288,16 +288,12 @@ func executeBlockAndVerify(t *testing.T,
 	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
 
-	verifier := chunks.NewChunkVerifier(vm, fvmContext)
+	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
 	vcds := make([]*verification.VerifiableChunkData, er.Chunks.Len())
 
 	for i, chunk := range er.Chunks {
 		isSystemChunk := i == er.Chunks.Len()-1
-		var collection flow.Collection
-		if !isSystemChunk {
-			collection = executableBlock.CompleteCollections[chdps[i].CollectionID].Collection()
-		}
 		offsetForChunk, err := fetcher.TransactionOffsetForChunk(er.Chunks, chunk.Index)
 		require.NoError(t, err)
 
@@ -306,7 +302,6 @@ func executeBlockAndVerify(t *testing.T,
 			Chunk:             chunk,
 			Header:            executableBlock.Block.Header,
 			Result:            er,
-			Collection:        &collection,
 			ChunkDataPack:     chdps[i],
 			EndState:          chunk.EndState,
 			TransactionOffset: offsetForChunk,
