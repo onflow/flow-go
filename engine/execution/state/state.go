@@ -376,7 +376,7 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 		}
 
 		if err != nil {
-			lg.Fatal().Err(err).Msg("could not retrieve chunk data pack")
+			lg.Error().Err(err).Msg("could not retrieve chunk data pack")
 		} else {
 			lg.Info().Msg("chunk data pack retrieved successfully")
 		}
