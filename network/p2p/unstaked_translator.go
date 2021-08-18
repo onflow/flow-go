@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"fmt"
+
 	crypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multihash"
@@ -27,16 +29,16 @@ func (t *UnstakedNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID
 func (t *UnstakedNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
 	pk, err := peerID.ExtractPublicKey()
 	if err != nil {
-		// return error
+		return flow.ZeroID, fmt.Errorf("Cannot generate an unstaked FlowID for peerID %v: corresponding libp2p key is not extractible from PeerID", peerID)
 	}
 
-	if pk.Type() != crypto_pb.KeyType_ECDSA {
-		// fail
+	if pk.Type() != crypto_pb.KeyType_Secp256k1 {
+		return flow.ZeroID, fmt.Errorf("Cannot generate an unstaked FlowID for peerID %v: corresponding libp2p key is not a %v key", peerID, crypto_pb.KeyType_name[(int32)(crypto_pb.KeyType_Secp256k1)])
 	}
 
 	data, err := pk.Raw()
-	if err != nil || data[0] != 0x02 { // TODO: check if this is the right byte to check
-		// fail
+	if err != nil || data[0] != 0x02 {
+		return flow.ZeroID, fmt.Errorf("Cannot generate an unstaked FlowID for peerID %v: corresponding libp2p key is invalid or negative", peerID)
 	}
 
 	return flow.HashToID(data[1:]), nil
