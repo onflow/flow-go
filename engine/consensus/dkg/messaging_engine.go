@@ -19,7 +19,7 @@ import (
 // a message
 const RETRY_MAX = 5
 
-// RETRY_MILLISECONDS is the number of milliseconds to wait between retries
+// RETRY_MILLISECONDS is the number of milliseconds to wait between the two first tries
 const RETRY_MILLISECONDS = 1000
 
 // MessagingEngine is a network engine that enables DKG nodes to exchange
