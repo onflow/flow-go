@@ -105,9 +105,13 @@ func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer f
 		return
 	default:
 	}
+
 	peerID, err := p2p.ExtractPeerID(bootstrapPeer.NetworkPubKey)
 	if err != nil {
-		// TODO: return formatted error
+		resultChan <- result{
+			id:  flow.Identity{},
+			err: err,
+		}
 	}
 
 	// try and connect to the bootstrap server
