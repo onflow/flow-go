@@ -140,22 +140,13 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
-		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, *identity))
+		peerInfo, err := PeerAddressInfo(*identity)
+		require.NoError(suite.T(), err)
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, peerInfo))
 	}
 
 	// Checks if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].host.Peerstore().Peers(), count)
-
-	// Checks whether the first node is connected to the rest
-	for _, peer := range nodes[0].host.Peerstore().Peers() {
-		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].host.ID().String() == peer.String() {
-			continue
-		}
-		assert.Eventuallyf(suite.T(), func() bool {
-			return network.Connected == nodes[0].host.Network().Connectedness(peer)
-		}, 2*time.Second, tickForAssertEventually, fmt.Sprintf(" first node is not connected to %s", peer.String()))
-	}
+	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count)
 }
 
 // TestAddPeers checks if nodes can be added as peers to a given node
@@ -165,39 +156,27 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 
 	// create nodes
 	nodes, identities := suite.NodesFixture(count, nil, false)
+	peerInfos, errs := peerInfosFromIDs(identities)
+	assert.Len(suite.T(), errs, 0)
 	defer StopNodes(suite.T(), nodes)
 
 	// add nodes two and three to the first node as its peers
-	for _, identity := range identities[1:] {
-		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, *identity))
+	for _, pInfo := range peerInfos[1:] {
+		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, pInfo))
 	}
 
 	// check if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].host.Peerstore().Peers(), count)
-
-	// check whether the first node is connected to the rest
-	for _, peer := range nodes[0].host.Peerstore().Peers() {
-		// A node is also a peer to itself but not marked as connected, hence skip checking that.
-		if nodes[0].host.ID().String() == peer.String() {
-			continue
-		}
-		assert.Eventually(suite.T(), func() bool {
-			return network.Connected == nodes[0].host.Network().Connectedness(peer)
-		}, 2*time.Second, tickForAssertEventually)
-	}
+	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count)
 
 	// disconnect from each peer and assert that the connection no longer exists
-	for _, identity := range identities[1:] {
-		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, *identity))
-		pInfo, err := PeerAddressInfo(*identity)
-		assert.NoError(suite.T(), err)
+	for _, pInfo := range peerInfos[1:] {
+		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, pInfo.ID))
 		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
 }
 
 // TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
 func (suite *LibP2PNodeTestSuite) TestCreateStream() {
-
 	count := 2
 
 	// Creates nodes
@@ -213,7 +192,10 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	var streams []network.Stream
 	for i := 0; i < 100; i++ {
-		anotherStream, err := nodes[0].CreateStream(context.Background(), *id2)
+		pInfo, err := PeerAddressInfo(*id2)
+		require.NoError(suite.T(), err)
+		require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), pInfo))
+		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
 		// Assert that a stream was returned without error
 		require.NoError(suite.T(), err)
 		require.NotNil(suite.T(), anotherStream)
@@ -264,9 +246,14 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 
 	id1 := *identities[0]
 	id2 := *identities[1]
+	pInfo1, err := PeerAddressInfo(id1)
+	require.NoError(suite.T(), err)
+	pInfo2, err := PeerAddressInfo(id2)
+	require.NoError(suite.T(), err)
 
 	// Create stream from node 1 to node 2
-	s1, err := nodes[0].CreateStream(context.Background(), id2)
+	require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), pInfo2))
+	s1, err := nodes[0].CreateStream(context.Background(), pInfo2.ID)
 	assert.NoError(suite.T(), err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
@@ -287,7 +274,8 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Create stream from node 2 to node 1
-	s2, err := nodes[1].CreateStream(context.Background(), id1)
+	require.NoError(suite.T(), nodes[1].AddPeer(context.Background(), pInfo1))
+	s2, err := nodes[1].CreateStream(context.Background(), pInfo1.ID)
 	assert.NoError(suite.T(), err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
@@ -322,16 +310,19 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 		require.NoError(suite.T(), listener.Close())
 	}()
 
+	silentNodeInfo, err := PeerAddressInfo(silentNodeId)
+	require.NoError(suite.T(), err)
+
 	// setup the context to expire after the default timeout
 	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
 	grace := 1 * time.Second
-	var err error
 	unittest.AssertReturnsBefore(suite.T(),
 		func() {
-			_, err = nodes[0].CreateStream(ctx, silentNodeId)
+			require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), silentNodeInfo))
+			_, err = nodes[0].CreateStream(ctx, silentNodeInfo.ID)
 		},
 		DefaultUnicastTimeout+grace)
 	assert.Error(suite.T(), err)

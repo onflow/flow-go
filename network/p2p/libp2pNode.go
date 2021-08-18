@@ -312,8 +312,8 @@ func (n *Node) Stop() (chan struct{}, error) {
 }
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
-func (n *Node) AddPeer(ctx context.Context, peerID peer.ID) error {
-	err := n.host.Connect(ctx, peer.AddrInfo{ID: peerID})
+func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
+	err := n.host.Connect(ctx, peerInfo)
 	if err != nil {
 		return err
 	}
@@ -332,6 +332,21 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+	if len(n.host.Peerstore().Addrs(peerID)) == 0 {
+		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore")
+		if n.dht != nil {
+			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("searching for peer in dht")
+			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
+			// try to find the peer using the dht
+			_, err := n.dht.FindPeer(timedCtx, peerID)
+			cancel()
+			if err != nil {
+				return nil, fmt.Errorf("could not find address for peer %v: %w", peerID, err)
+			}
+			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address found")
+		}
+		return nil, fmt.Errorf("no valid addresses exist for peer %v", peerID)
+	}
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
@@ -364,22 +379,6 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		// remove the peer from the peer store if present
 		// n.host.Peerstore().ClearAddrs(peerID)
 
-		if len(n.host.Peerstore().Addrs(peerID)) == 0 {
-			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore")
-			if n.dht != nil {
-				n.logger.Info().Str("peerID", peerID.Pretty()).Msg("searching for peer in dht")
-				timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
-				// try to find the peer using the dht
-				_, err := n.dht.FindPeer(timedCtx, peerID)
-				cancel()
-				if err != nil {
-					return nil, fmt.Errorf("could not find address for peer %v: %w", peerID, err)
-				}
-				n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address found")
-			}
-			return nil, fmt.Errorf("no valid addresses exist for peer %v", peerID)
-		}
-
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
@@ -393,7 +392,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		err := n.AddPeer(ctx, peerID)
+		err := n.AddPeer(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
@@ -541,7 +540,7 @@ func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, 
 }
 
 // UpdateAllowList allows the peer allow list to be updated.
-func (n *Node) UpdateAllowList(peers []peer.ID) {
+func (n *Node) UpdateAllowList(peers peer.IDSlice) {
 	if n.connGater == nil {
 		n.logger.Debug().Hex("node_id", logging.ID(n.id)).Msg("skipping update allow list, connection gating is not enabled")
 		return

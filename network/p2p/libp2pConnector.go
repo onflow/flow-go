@@ -94,7 +94,7 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 // trimAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
 // A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
-func (l *libp2pConnector) trimAllConnectionsExcept(peerIDs []peer.ID) {
+func (l *libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 	// convert the peerInfos to a peer.ID -> bool map
 	peersToKeep := make(map[peer.ID]bool, len(peerIDs))
