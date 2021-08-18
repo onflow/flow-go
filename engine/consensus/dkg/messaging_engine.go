@@ -128,7 +128,6 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 			}
 
 			retry.BackoffExponential(f, RETRY_MAX, RETRY_MILLISECONDS, e.log)
-
 		case <-e.unit.Quit():
 			return
 		}
