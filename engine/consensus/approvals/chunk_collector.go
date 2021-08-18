@@ -10,7 +10,7 @@ import (
 // well as accumulating signatures of already checked approvals.
 type ChunkApprovalCollector struct {
 	assignment                           map[flow.Identifier]struct{} // set of verifiers that were assigned to current chunk
-	chunkApprovals                       SignatureCollector           // accumulator of signatures for current collector
+	chunkApprovals                       flow.SignatureCollector      // accumulator of signatures for current collector
 	lock                                 sync.Mutex                   // lock to protect `chunkApprovals`
 	requiredApprovalsForSealConstruction uint                         // number of approvals that are required for each chunk to be sealed
 }
@@ -18,7 +18,7 @@ type ChunkApprovalCollector struct {
 func NewChunkApprovalCollector(assignment map[flow.Identifier]struct{}, requiredApprovalsForSealConstruction uint) *ChunkApprovalCollector {
 	return &ChunkApprovalCollector{
 		assignment:                           assignment,
-		chunkApprovals:                       NewSignatureCollector(),
+		chunkApprovals:                       flow.NewSignatureCollector(),
 		lock:                                 sync.Mutex{},
 		requiredApprovalsForSealConstruction: requiredApprovalsForSealConstruction,
 	}
