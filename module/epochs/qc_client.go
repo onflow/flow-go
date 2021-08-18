@@ -24,10 +24,6 @@ const (
 
 	// TransactionSubmissionTimeout is the time after which we return an error.
 	TransactionSubmissionTimeout = 5 * time.Minute
-
-	// TransactionStatusRetryTimeout is the time after which the status of a
-	// transaction is checked again
-	TransactionStatusRetryTimeout = 1 * time.Second
 )
 
 // QCContractClient is a client to the Quorum Certificate contract. Allows the client to

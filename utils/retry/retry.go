@@ -1,6 +1,7 @@
 package retry
 
 import (
+	"context"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -8,20 +9,52 @@ import (
 
 // BackoffExponential makes maxRetry attempts to executed function f. After the nth attempt,
 // we wait retryMilliseconds*2^n ms before retrying. Returns an error after
-// maxRetry unsuccessful attempts.
-func BackoffExponential(f func() error, maxRetry int, retryMilliseconds int, logger zerolog.Logger) bool {
+// maxRetry unsuccessful attempts. It will short circuit if ctx is Done.
+func BackoffExponential(ctx context.Context, retryFuncName string, f func(context.Context) error, maxRetry int, retryMilliseconds int, logger zerolog.Logger) bool {
 	wait := time.Duration(retryMilliseconds) * time.Millisecond
 	for attempt := 1; attempt <= maxRetry; attempt++ {
-		err := f()
+		err := f(ctx)
 		if err != nil {
-			logger.Warn().Err(err).Msgf("attempt %d/%d failed", attempt, maxRetry)
-			time.Sleep(wait)
-			wait <<= 1
+			logger.Warn().Err(err).Str("retrying_func", retryFuncName).Msgf("attempt %d/%d failed", attempt, maxRetry)
 
-			logger.Info().Msgf("%v", wait)
-			continue
+			select {
+			case <-time.After(wait):
+				wait <<= 1
+				continue
+			case <-ctx.Done():
+				return false
+			}
 		}
 		return true
 	}
 	return false
 }
+
+// WithTimeout attempts to execute function f with a retryMilliseconds sleep in between attempts
+// until the function f either succeeds, context is done or timeout has been reached.
+func WithTimeout(ctx context.Context, retryFuncName string, f func(context.Context) error, timeoutDuration time.Duration, retryMilliseconds int, logger zerolog.Logger) bool {
+	ticker := time.Tick(time.Duration(retryMilliseconds) * time.Millisecond)
+	attempt := 0
+
+	ctxWithTimeOut, cancel := context.WithTimeout(ctx, timeoutDuration)
+
+	defer cancel()
+
+	var err error
+	for {
+		select {
+		case <-ticker:
+			err = f(ctx)
+			attempt++
+			if err != nil {
+				logger.Warn().Err(err).Str("retrying_func", retryFuncName).Msgf("attempt %d failed", attempt)
+				continue
+			}
+
+			return true
+		case <-ctxWithTimeOut.Done():
+			return false
+		}
+	}
+}
+

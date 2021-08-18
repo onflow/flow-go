@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sync"
 
@@ -18,7 +19,7 @@ import (
 
 // RETRY_MAX is the maximum number of times the broker will attempt to broadcast
 // a message or publish a result
-const RETRY_MAX = 5
+const RETRY_MAX = 8
 
 // RETRY_MILLISECONDS is the number of milliseconds to wait between retries
 const RETRY_MILLISECONDS = 1000
@@ -105,8 +106,11 @@ func (b *Broker) Broadcast(data []byte) {
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 	}
+
 	success := retry.BackoffExponential(
-		func() error {
+		"Broker.Broadcast",
+		context.TODO(),
+		func(ctx context.Context) error {
 			return b.dkgContractClient.Broadcast(bcastMsg)
 		},
 		RETRY_MAX,
@@ -178,7 +182,9 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
 	success := retry.BackoffExponential(
-		func() error {
+		"Broker.SubmitResult",
+		context.TODO(),
+		func(ctx context.Context) error {
 			return b.dkgContractClient.SubmitResult(pubKey, groupKeys)
 		},
 		RETRY_MAX,

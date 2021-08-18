@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/utils/retry"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,6 +12,11 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/module"
+)
+
+const (
+	waitForSealedTimeout = 5 * time.Minute
+	waitForSealedRetry = 1000
 )
 
 // BaseClient represents the core fields and methods needed to create
@@ -78,44 +84,35 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 
 // WaitForSealed waits for a transaction to be sealed
 func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
+	var (
+		result *sdk.TransactionResult
+		err error
+	)
 
-	attempts := 1
-	for {
-		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
-
-		// check for a cancelled/expired context
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
+	f := func(context.Context) error {
+		result, err = c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
-			log.Error().Err(err).Msg("could not get transaction result")
-			continue
-		}
-		if result.Error != nil {
-			return fmt.Errorf("error executing transaction: %w", result.Error)
-		}
-		log.Info().Str("status", result.Status.String()).Msg("got transaction result")
-
-		// if the transaction has expired we skip waiting for seal
-		if result.Status == sdk.TransactionStatusExpired {
-			return fmt.Errorf("transaction has expired")
+			return err
 		}
 
-		if result.Status == sdk.TransactionStatusSealed {
-			return nil
-		}
-
-		attempts++
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(TransactionStatusRetryTimeout):
-			// re-enter the top of the for loop
-		}
+		return nil
 	}
+
+	retry.WithTimeout(ctx, "BaseClient.WaitForSealed", f, waitForSealedTimeout, waitForSealedRetry, c.Log)
+
+	if result.Error != nil {
+		return fmt.Errorf("error executing transaction: %w", result.Error)
+	}
+	c.Log.Info().Str("status", result.Status.String()).Msg("got transaction result")
+
+	// if the transaction has expired we skip waiting for seal
+	if result.Status == sdk.TransactionStatusExpired {
+		return fmt.Errorf("transaction has expired")
+	}
+
+	if result.Status == sdk.TransactionStatusSealed {
+		return nil
+	}
+
+	return fmt.Errorf("unexpected transaction status %s", result.Status.String())
 }

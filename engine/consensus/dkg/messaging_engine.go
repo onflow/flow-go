@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/onflow/flow-go/utils/retry"
@@ -118,7 +119,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 	for {
 		select {
 		case msg := <-e.tunnel.MsgChOut:
-			f := func() error {
+			f := func(ctx context.Context) error {
 				err := e.conduit.Unicast(&msg.DKGMessage, msg.DestID)
 				if err != nil {
 					return fmt.Errorf("error sending dkg message: %v", err)
@@ -127,7 +128,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 				return nil
 			}
 
-			retry.BackoffExponential(f, RETRY_MAX, RETRY_MILLISECONDS, e.log)
+			retry.BackoffExponential(context.TODO(),"MessagingEngine.forwardOutgoingMessages", f, RETRY_MAX, RETRY_MILLISECONDS, e.log)
 		case <-e.unit.Quit():
 			return
 		}
