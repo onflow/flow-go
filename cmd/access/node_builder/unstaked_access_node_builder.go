@@ -25,7 +25,7 @@ func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
 
-		idCache, err := p2p.NewProtocolStateIDCache(node.State, fnb.ProtocolEvents)
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, fnb.ProtocolEvents)
 		if err != nil {
 			return err
 		}

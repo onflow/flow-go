@@ -137,7 +137,7 @@ type NodeConfig struct {
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
 
-	// TODO: initialize these in scaffold and unstaked node
+	// ID providers
 	IdentityProvider             id.IdentityProvider
 	IDTranslator                 p2p.IDTranslator
 	NetworkingIdentifierProvider id.IdentifierProvider
