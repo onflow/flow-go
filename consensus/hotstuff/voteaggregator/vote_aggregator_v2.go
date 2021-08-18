@@ -26,7 +26,7 @@ type VoteAggregatorV2 struct {
 	highestPrunedView   counters.StrictMonotonousCounter
 	collectors          hotstuff.VoteCollectors
 	queuedVotesNotifier engine.Notifier
-	queuedVotes         *fifoqueue.FifoQueue // keeps track of votes whose blocks can not be found
+	queuedVotes         *fifoqueue.FifoQueue
 }
 
 // TODO: Move to tests

@@ -34,14 +34,13 @@ type VoteAggregatorV2 interface {
 	// It returns:
 	//  - nil if the vote has been added to the queue for async processing
 	//  - error if there is exception adding the vote to the queue
-
 	AddVote(vote *model.Vote) error
 
 	// AddBlock notifies the VoteAggregator about a known block so that it can start processing
 	// pending votes whose block was unknown.
 	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
 	// It returns:
-	// 	- nil if the block is valid
+	// - nil if the block is valid
 	//  - model.InvalidBlockError if the block is invalid
 	//  - error if there is exception
 	AddBlock(block *model.Proposal) error
