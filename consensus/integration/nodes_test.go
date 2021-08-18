@@ -32,7 +32,6 @@ import (
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -232,8 +231,12 @@ func createNode(
 	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
 	require.NoError(t, err)
 
-	idCache, err := p2p.NewProtocolStateIDCache(log, state, consumer)
+	identities, err := state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(me.NodeID())),
+	))
 	require.NoError(t, err)
+	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
 
 	// initialize the synchronization engine
 	sync, err := synceng.New(
@@ -245,13 +248,7 @@ func createNode(
 		comp,
 		syncCore,
 		finalizedHeader,
-		id.NewFilteredIdentifierProvider(
-			filter.And(
-				filter.HasRole(flow.RoleConsensus),
-				filter.Not(filter.HasNodeID(me.NodeID())),
-			),
-			idCache,
-		),
+		idProvider,
 	)
 	require.NoError(t, err)
 

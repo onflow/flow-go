@@ -75,6 +75,8 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	flowIDs := make(map[peer.ID]flow.Identifier, nIds)
 
 	for _, identity := range identities {
+		p.logger.Debug().Interface("identity", identity).Msg("extracting peer ID from network key")
+
 		pid, err := ExtractPeerID(identity.NetworkPubKey)
 		if err != nil {
 			p.logger.Err(err).Interface("identity", identity).Msg("failed to extract peer ID from network key")
