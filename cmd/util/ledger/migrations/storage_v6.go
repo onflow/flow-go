@@ -3,6 +3,8 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/onflow/atree"
+
 	newInter "github.com/onflow/cadence-latest/runtime/interpreter"
 	oldInter "github.com/onflow/cadence-v0180/runtime/interpreter"
 )
@@ -44,7 +46,7 @@ func (c *ValueConverter) VisitTypeValue(_ *oldInter.Interpreter, value oldInter.
 }
 
 func (c *ValueConverter) VisitVoidValue(_ *oldInter.Interpreter, value oldInter.VoidValue) {
-	panic("implement me")
+	c.result = newInter.VoidValue{}
 }
 
 func (c *ValueConverter) VisitBoolValue(_ *oldInter.Interpreter, value oldInter.BoolValue) {
@@ -66,7 +68,7 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 
 	c.result = newInter.NewArrayValue(arrayStaticType, c.newInter.Storage, newElements...)
 
-	// Do not decent. We already visited children here.
+	// Do not descent. We already visited children here.
 	return false
 }
 
@@ -99,71 +101,115 @@ func (c *ValueConverter) VisitInt256Value(_ *oldInter.Interpreter, value oldInte
 }
 
 func (c *ValueConverter) VisitUIntValue(_ *oldInter.Interpreter, value oldInter.UIntValue) {
-	panic("implement me")
+	c.result = newInter.NewUIntValueFromBigInt(value.BigInt)
 }
 
 func (c *ValueConverter) VisitUInt8Value(_ *oldInter.Interpreter, value oldInter.UInt8Value) {
-	panic("implement me")
+	c.result = newInter.UInt8Value(value)
 }
 
 func (c *ValueConverter) VisitUInt16Value(_ *oldInter.Interpreter, value oldInter.UInt16Value) {
-	panic("implement me")
+	c.result = newInter.UInt16Value(value)
 }
 
 func (c *ValueConverter) VisitUInt32Value(_ *oldInter.Interpreter, value oldInter.UInt32Value) {
-	panic("implement me")
+	c.result = newInter.UInt32Value(value)
 }
 
 func (c *ValueConverter) VisitUInt64Value(_ *oldInter.Interpreter, value oldInter.UInt64Value) {
-	panic("implement me")
+	c.result = newInter.UInt64Value(value)
 }
 
 func (c *ValueConverter) VisitUInt128Value(_ *oldInter.Interpreter, value oldInter.UInt128Value) {
-	panic("implement me")
+	c.result = newInter.NewUInt128ValueFromBigInt(value.BigInt)
 }
 
 func (c *ValueConverter) VisitUInt256Value(_ *oldInter.Interpreter, value oldInter.UInt256Value) {
-	panic("implement me")
+	c.result = newInter.NewUInt256ValueFromBigInt(value.BigInt)
 }
 
 func (c *ValueConverter) VisitWord8Value(_ *oldInter.Interpreter, value oldInter.Word8Value) {
-	panic("implement me")
+	c.result = newInter.Word8Value(value)
 }
 
 func (c *ValueConverter) VisitWord16Value(_ *oldInter.Interpreter, value oldInter.Word16Value) {
-	panic("implement me")
+	c.result = newInter.Word16Value(value)
 }
 
 func (c *ValueConverter) VisitWord32Value(_ *oldInter.Interpreter, value oldInter.Word32Value) {
-	panic("implement me")
+	c.result = newInter.Word32Value(value)
 }
 
 func (c *ValueConverter) VisitWord64Value(_ *oldInter.Interpreter, value oldInter.Word64Value) {
-	panic("implement me")
+	c.result = newInter.Word64Value(value)
 }
 
 func (c *ValueConverter) VisitFix64Value(_ *oldInter.Interpreter, value oldInter.Fix64Value) {
-	panic("implement me")
+	c.result = newInter.NewFix64ValueWithInteger(int64(value.ToInt()))
 }
 
 func (c *ValueConverter) VisitUFix64Value(_ *oldInter.Interpreter, value oldInter.UFix64Value) {
-	panic("implement me")
+	c.result = newInter.NewUFix64ValueWithInteger(uint64(value.ToInt()))
 }
 
 func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
-	panic("implement me")
+	fields := newInter.NewStringValueOrderedMap()
+
+	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
+		fields.Set(key, c.Convert(fieldVal))
+	})
+
+	c.result = &newInter.CompositeValue{
+		// TODO: Convert location and kind to new package?
+		Location:            value.Location(),
+		QualifiedIdentifier: value.QualifiedIdentifier(),
+		Kind:                value.Kind(),
+		Fields:              fields,
+
+		// TODO
+		StorageID: atree.StorageID{},
+	}
+
+	// Do not descent
+	return false
 }
 
 func (c *ValueConverter) VisitDictionaryValue(_ *oldInter.Interpreter, value *oldInter.DictionaryValue) bool {
-	panic("implement me")
+	staticType := ConvertStaticType(value.StaticType()).(newInter.DictionaryStaticType)
+
+	keysAndValues := make([]newInter.Value, value.Count()*2)
+
+	for index, key := range value.Keys().Elements() {
+		keysAndValues[index*2] = c.Convert(key)
+	}
+
+	index := 0
+	value.Entries().Foreach(func(_ string, value oldInter.Value) {
+		keysAndValues[index*2+1] = c.Convert(value)
+		index++
+	})
+
+	// TODO: pass address as a parameter?
+	c.result = newInter.NewDictionaryValue(
+		staticType,
+		c.newInter.Storage,
+		keysAndValues...,
+	)
+
+	// Do not descent
+	return false
 }
 
 func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, value oldInter.NilValue) {
-	panic("implement me")
+	c.result = newInter.NilValue{}
 }
 
 func (c *ValueConverter) VisitSomeValue(_ *oldInter.Interpreter, value *oldInter.SomeValue) bool {
-	panic("implement me")
+	innerValue := c.Convert(value.Value)
+	c.result = newInter.NewSomeValueNonCopying(innerValue)
+
+	// Do not descent
+	return false
 }
 
 func (c *ValueConverter) VisitStorageReferenceValue(_ *oldInter.Interpreter, value *oldInter.StorageReferenceValue) {
