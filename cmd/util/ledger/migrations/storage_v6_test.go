@@ -6,11 +6,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	oldInter "github.com/onflow/cadence0170/runtime/interpreter"
-	newInter "github.com/onflow/cadence0180/runtime/interpreter"
+	newInter "github.com/onflow/cadence-latest/runtime/interpreter"
+	oldInter "github.com/onflow/cadence-v0180/runtime/interpreter"
 )
 
-func TestName(t *testing.T) {
+func TestValueConversion(t *testing.T) {
 	oldArray := oldInter.NewArrayValue(
 		[]oldInter.Value{
 			oldInter.NewStringValue("foo"),
@@ -19,8 +19,8 @@ func TestName(t *testing.T) {
 		},
 	)
 
-	converter := &ValueConverter{}
-	newArray := converter.Convert(nil, oldArray)
+	converter := NewValueConverter(nil, nil)
+	newArray := converter.Convert(oldArray)
 
 	fmt.Println(newArray)
 	assert.IsType(t, &newInter.ArrayValue{}, newArray)
