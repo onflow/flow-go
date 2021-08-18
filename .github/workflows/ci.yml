@@ -97,8 +97,8 @@ jobs:
         max_attempts: 2
         command: make ci-integration
 
-  blst-test:
-    name: crypto cross BLST Tests
+  cross-blst-test:
+    name: cross-testing internal BLS implementation with BLST
     strategy:
       fail-fast: false
       matrix:
