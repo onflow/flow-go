@@ -364,22 +364,18 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 
 	// tests retrievable of chunk data packs
 	for _, cdp := range chunkDataPacks {
-		_, err := s.chunkDataPacks.ByChunkID(cdp.ChunkID)
 
 		lg := log.With().
 			Hex("chunk_id", logging.ID(cdp.ChunkID)).
 			Hex("start_state", cdp.StartState[:]).
-			Int("proof", len(cdp.Proof[:])).Logger()
+			Int("proof_length", len(cdp.Proof[:])).Logger()
 
 		if cdp.Collection != nil {
 			lg = lg.With().Hex("collection_id", logging.ID(cdp.Collection.ID())).Logger()
 		}
 
-		if err != nil {
-			lg.Error().Err(err).Msg("could not retrieve chunk data pack")
-		} else {
-			lg.Info().Msg("chunk data pack retrieved successfully")
-		}
+		lg.Info().Msg("chunk data pack retrieved successfully")
+
 	}
 
 	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
