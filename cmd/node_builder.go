@@ -106,6 +106,8 @@ type BaseConfig struct {
 	profilerDuration      time.Duration
 	tracerEnabled         bool
 	metricsEnabled        bool
+	guaranteesCacheSize   uint
+	receiptsCacheSize     uint
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
