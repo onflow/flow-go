@@ -37,6 +37,10 @@ COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
 FROM build-env as build-production
 WORKDIR /app
 
+COPY ./.netrc /root/.netrc
+RUN chmod 600 /root/.netrc
+
+
 # Keep Go's build cache between builds.
 # https://github.com/golang/go/issues/27719#issuecomment-514747274
 RUN --mount=type=cache,target=/go/pkg/mod \
