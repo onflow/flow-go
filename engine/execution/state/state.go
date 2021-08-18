@@ -374,7 +374,7 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 			lg = lg.With().Hex("collection_id", logging.ID(cdp.Collection.ID())).Logger()
 		}
 
-		lg.Info().Msg("chunk data pack retrieved successfully")
+		lg.Info().Msg("chunk data pack stored successfully")
 
 	}
 
