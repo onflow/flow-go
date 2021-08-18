@@ -951,7 +951,9 @@ github.com/olekukonko/tablewriter v0.0.1/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXW
 github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1:vsDQFd/mU46D+Z4whnwzcISnGGzXWMclvtLoiIKAKIo=
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
+github.com/onflow/cadence v0.17.0 h1:TFpwYVIs2b/bd6TlYxa3zMZN2S9CByMvW7Uk01KFP9Y=
 github.com/onflow/cadence v0.17.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
+github.com/onflow/cadence v0.18.0 h1:Ntvb4UMAllt57qrfEPbyu+A/ktQhZvNmyoE5i09Gqx8=
 github.com/onflow/cadence v0.18.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
 github.com/onflow/cadence v0.18.1-0.20210729032058-d9eb6683d6ed h1:2A34U71OmDDC5qAXLEmViZUP2Qs0IPJfQJfYmGnJZ4U=
 github.com/onflow/cadence v0.18.1-0.20210729032058-d9eb6683d6ed/go.mod h1:ZXcJOh7LZkgqoArtvKx8UYcYQ0cC71zNffP6R1HGGB8=

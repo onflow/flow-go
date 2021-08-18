@@ -40,6 +40,8 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/onflow/cadence v0.18.1-0.20210729032058-d9eb6683d6ed
+	github.com/onflow/cadence0170 v0.0.0-00010101000000-000000000000
+	github.com/onflow/cadence0180 v0.0.0-00010101000000-000000000000
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
@@ -73,3 +75,7 @@ require (
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
+
+replace github.com/onflow/cadence0170 => github.com/onflow/cadence v0.17.0
+
+replace github.com/onflow/cadence0180 => github.com/onflow/cadence v0.18.0
