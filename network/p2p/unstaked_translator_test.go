@@ -11,6 +11,9 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 )
 
+// For these test, refer to https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md for libp2p
+// PeerID specifications and how they relate to keys.
+
 // This test shows we can't use ECDSA P-256 keys for libp2p and expect PeerID <=> PublicKey bijections
 func TestIDTranslationP256(t *testing.T) {
 	loops := 50
@@ -42,21 +45,25 @@ func TestIDTranslationSecp256k1(t *testing.T) {
 }
 
 func TestUnstakedTranslationRoundTrip(t *testing.T) {
-	loops := 50
+	max_iterations := 50
 	unstakedTranslator := NewUnstakedNetworkIDTranslator()
-	for i := 0; i < loops; i++ {
+
+	tested_vectors := 0
+
+	for ok := true; ok; ok = tested_vectors < max_iterations {
 		pID := createPeerIDFromAlgo(t, fcrypto.ECDSASecp256k1)
 
 		pk, err := pID.ExtractPublicKey()
 		require.NoError(t, err)
 
-		// for a secp256k1 key, this is compressed representation preceded by 00 bits
-		// indicating the multihash.IDENTITY
+		// for a secp256k1 key, this is just the compressed representation
 		pkBytes, err := pk.Raw()
 		require.NoError(t, err)
 
 		// key is positive, roundtrip should be possible
 		if pkBytes[0] == 0x02 {
+			tested_vectors++
+
 			flowID, err := unstakedTranslator.GetFlowID(pID)
 			require.NoError(t, err)
 			retrievedPeerID, err := unstakedTranslator.GetPeerID(flowID)
