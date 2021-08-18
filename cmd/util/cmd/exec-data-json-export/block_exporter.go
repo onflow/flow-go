@@ -40,10 +40,10 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
 	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db)
+	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize)
 	seals := badger.NewSeals(cacheMetrics, db)
 	results := badger.NewExecutionResults(cacheMetrics, db)
-	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results)
+	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
 	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := badger.NewBlocks(db, headers, payloads)
 	commits := badger.NewCommits(&metrics.NoopCollector{}, db)
