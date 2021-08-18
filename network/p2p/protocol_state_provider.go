@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -18,21 +19,24 @@ type ProtocolStateIDCache struct {
 	identities flow.IdentityList
 	state      protocol.State
 	mu         sync.RWMutex
-	peerIDs    map[flow.Identifier]peer.ID // TODO: need to initialize these in constructor!!!
+	peerIDs    map[flow.Identifier]peer.ID
 	flowIDs    map[peer.ID]flow.Identifier
+	logger     zerolog.Logger
 }
 
 func NewProtocolStateIDCache(
+	logger zerolog.Logger,
 	state protocol.State,
 	eventDistributer *events.Distributor,
 ) (*ProtocolStateIDCache, error) {
 	provider := &ProtocolStateIDCache{
-		state: state,
+		state:  state,
+		logger: logger.With().Str("component", "protocol-state-id-cache").Logger(),
 	}
 
 	head, err := state.Final().Head()
 	if err != nil {
-		return nil, err // TODO: format the error
+		return nil, fmt.Errorf("failed to get latest state header: %w", err)
 	}
 
 	provider.update(head.ID())
@@ -41,24 +45,28 @@ func NewProtocolStateIDCache(
 	return provider, nil
 }
 
-func (p *ProtocolStateIDCache) EpochTransition(_ uint64, header *flow.Header) {
-	// TODO: maybe we actually want to log the epoch information from the arguments here (epoch phase, etc)
+func (p *ProtocolStateIDCache) EpochTransition(newEpochCounter uint64, header *flow.Header) {
+	p.logger.Info().Uint64("newEpochCounter", newEpochCounter).Msg("epoch transition")
 	p.update(header.ID())
 }
 
-func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(_ uint64, header *flow.Header) {
+func (p *ProtocolStateIDCache) EpochSetupPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
+	p.logger.Info().Uint64("currentEpochCounter", currentEpochCounter).Msg("epoch setup phase started")
 	p.update(header.ID())
 }
 
-func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(_ uint64, header *flow.Header) {
+func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter uint64, header *flow.Header) {
+	p.logger.Info().Uint64("currentEpochCounter", currentEpochCounter).Msg("epoch committed phase started")
 	p.update(header.ID())
 }
 
 func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
-	// TODO: log status here
+	p.logger.Info().Str("blockID", blockID.String()).Msg("updating cached identities")
+
 	identities, err := p.state.AtBlockID(blockID).Identities(filter.Any)
 	if err != nil {
-		// TODO: log fatal. Reasoning here is, we don't want to continue with an expired list.
+		// We don't want to continue with an expired identity list.
+		p.logger.Fatal().Err(err).Msg("failed to fetch new identities")
 	}
 
 	nIds := identities.Count()
@@ -67,9 +75,12 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	flowIDs := make(map[peer.ID]flow.Identifier, nIds)
 
 	for _, identity := range identities {
+		p.logger.Debug().Interface("identity", identity).Msg("extracting peer ID from network key")
+
 		pid, err := ExtractPeerID(identity.NetworkPubKey)
 		if err != nil {
-			// maybe don't log fatal here. It's probably okay if we miss some ppl in our mapping
+			p.logger.Err(err).Interface("identity", identity).Msg("failed to extract peer ID from network key")
+			continue
 		}
 
 		flowIDs[pid] = identity.NodeID
@@ -116,13 +127,13 @@ func (p *ProtocolStateIDCache) GetFlowID(peerID peer.ID) (fid flow.Identifier, e
 func ExtractPeerID(networkPubKey crypto.PublicKey) (pid peer.ID, err error) {
 	pk, err := PublicKey(networkPubKey)
 	if err != nil {
-		// TODO: format the error
+		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
 		return
 	}
 
 	pid, err = peer.IDFromPublicKey(pk)
 	if err != nil {
-		// TODO: format the error
+		err = fmt.Errorf("failed to convert LibP2P key to peer ID: %w", err)
 		return
 	}
 

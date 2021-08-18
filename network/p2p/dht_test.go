@@ -180,7 +180,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
 			SetRootBlockID(rootBlockID).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(WithDHTDiscovery(AsServer(dhtServer))).
+			SetDHTOptions(AsServer(dhtServer)).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(logger).
 			Build(suite.ctx)
