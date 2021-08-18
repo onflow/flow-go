@@ -94,8 +94,8 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		Proof:      schdp.Proof,
 	}
 
-	if schdp.CollectionID != nil {
-		collection, err := ch.collections.ByID(*schdp.CollectionID)
+	if !schdp.SystemChunk {
+		collection, err := ch.collections.ByID(schdp.CollectionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrive collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
 		}
@@ -118,15 +118,17 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 
 func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPack {
 	sc := &badgermodel.StoredChunkDataPack{
-		ChunkID:    c.ChunkID,
-		StartState: c.StartState,
-		Proof:      c.Proof,
+		ChunkID:     c.ChunkID,
+		StartState:  c.StartState,
+		Proof:       c.Proof,
+		SystemChunk: false,
 	}
 
 	if c.Collection != nil {
-		// non-system chunks have a non-nil collection
-		collectionID := c.Collection.ID()
-		sc.CollectionID = &collectionID
+		// system chunk
+		sc.CollectionID = c.Collection.ID()
+	} else {
+		sc.SystemChunk = true
 	}
 
 	return sc
