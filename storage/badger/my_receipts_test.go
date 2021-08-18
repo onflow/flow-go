@@ -16,7 +16,7 @@ func TestMyExecutionReceiptsStorage(t *testing.T) {
 		unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 			metrics := metrics.NewNoopCollector()
 			results := bstorage.NewExecutionResults(metrics, db)
-			receipts := bstorage.NewExecutionReceipts(metrics, db, results)
+			receipts := bstorage.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
 			store := bstorage.NewMyExecutionReceipts(metrics, db, receipts)
 
 			f(store)

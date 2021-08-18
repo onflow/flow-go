@@ -5,10 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
+
+	module "github.com/onflow/flow-go/module/mock"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -390,4 +393,92 @@ func TestOnEntityIntegrityCheck(t *testing.T) {
 
 	// make sure we process item without checking integrity
 	assert.Equal(t, 1, called)
+}
+
+// Verify that the origin should not be checked when ValidateStaking config is set to false
+func TestOriginValidation(t *testing.T) {
+	identities := unittest.IdentityListFixture(16)
+	targetID := identities[0].NodeID
+	wrongID := identities[1].NodeID
+	meID := identities[3].NodeID
+
+	final := &protocol.Snapshot{}
+	final.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return identities.Filter(selector)
+		},
+		nil,
+	)
+
+	state := &protocol.State{}
+	state.On("Final").Return(final)
+
+	me := &module.Local{}
+
+	me.On("NodeID").Return(meID)
+
+	nonce := rand.Uint64()
+
+	wanted := unittest.CollectionFixture(1)
+
+	now := time.Now()
+
+	iwanted := &Item{
+		EntityID:       wanted.ID(),
+		LastRequested:  now,
+		ExtraSelector:  filter.HasNodeID(targetID),
+		checkIntegrity: true,
+	}
+
+	// prepare payload
+	bwanted, _ := msgpack.Marshal(wanted)
+
+	res := &messages.EntityResponse{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+		Blobs:     [][]byte{bwanted},
+	}
+
+	req := &messages.EntityRequest{
+		Nonce:     nonce,
+		EntityIDs: []flow.Identifier{wanted.ID()},
+	}
+
+	network := &module.Network{}
+	network.On("Register", mock.Anything, mock.Anything).Return(nil, nil)
+
+	e, err := New(
+		zerolog.Nop(),
+		metrics.NewNoopCollector(),
+		network,
+		me,
+		state,
+		"",
+		filter.HasNodeID(targetID),
+		func() flow.Entity { return &flow.Collection{} },
+	)
+	assert.NoError(t, err)
+
+	called := false
+
+	e.WithHandle(func(origin flow.Identifier, _ flow.Entity) {
+		// we expect wrong origin to propagate here with validation disabled
+		assert.Equal(t, wrongID, origin)
+		called = true
+	})
+
+	e.items[iwanted.EntityID] = iwanted
+	e.requests[req.Nonce] = req
+
+	err = e.onEntityResponse(wrongID, res)
+	assert.Error(t, err)
+	assert.IsType(t, engine.InvalidInputError{}, err)
+
+	e.cfg.ValidateStaking = false
+
+	err = e.onEntityResponse(wrongID, res)
+	assert.NoError(t, err)
+
+	// handler are called async, but this should be extremely quick
+	require.Eventually(t, func() bool { return called }, 100*time.Millisecond, 10*time.Millisecond)
 }

@@ -36,7 +36,7 @@ func TestCertificateGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	// convert the test key to a libp2p key for easy comparision
-	libp2pKey, err := p2p.PrivKey(key)
+	libp2pKey, err := p2p.LibP2PPrivKeyFromFlow(key)
 	expectedKey := libp2pKey.GetPublic()
 	require.NoError(t, err)
 
