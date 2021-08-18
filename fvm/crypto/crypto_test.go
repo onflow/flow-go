@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/cadence/runtime"
@@ -302,4 +303,32 @@ func TestValidatePublicKey(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestHashingAlgorithmConversion(t *testing.T) {
+	hashingAlgoMapping := map[runtime.HashAlgorithm]hash.HashingAlgorithm{
+		runtime.HashAlgorithmSHA2_256:              hash.SHA2_256,
+		runtime.HashAlgorithmSHA3_256:              hash.SHA3_256,
+		runtime.HashAlgorithmSHA2_384:              hash.SHA2_384,
+		runtime.HashAlgorithmSHA3_384:              hash.SHA3_384,
+		runtime.HashAlgorithmKMAC128_BLS_BLS12_381: hash.KMAC128,
+	}
+
+	for runtimeAlgo, cryptoAlgo := range hashingAlgoMapping {
+		assert.Equal(t, cryptoAlgo, crypto.RuntimeToCryptoHashingAlgorithm(runtimeAlgo))
+		assert.Equal(t, runtimeAlgo, crypto.CryptoToRuntimeHashingAlgorithm(cryptoAlgo))
+	}
+}
+
+func TestSigningAlgorithmConversion(t *testing.T) {
+	signingAlgoMapping := map[runtime.SignatureAlgorithm]gocrypto.SigningAlgorithm{
+		runtime.SignatureAlgorithmECDSA_P256:      gocrypto.ECDSAP256,
+		runtime.SignatureAlgorithmECDSA_secp256k1: gocrypto.ECDSASecp256k1,
+		runtime.SignatureAlgorithmBLS_BLS12_381:   gocrypto.BLSBLS12381,
+	}
+
+	for runtimeAlgo, cryptoAlgo := range signingAlgoMapping {
+		assert.Equal(t, cryptoAlgo, crypto.RuntimeToCryptoSigningAlgorithm(runtimeAlgo))
+		assert.Equal(t, runtimeAlgo, crypto.CryptoToRuntimeSigningAlgorithm(cryptoAlgo))
+	}
 }
