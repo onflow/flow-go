@@ -122,15 +122,11 @@ func (_m *Middleware) Unsubscribe(channel network.Channel) error {
 }
 
 // UpdateAllowList provides a mock function with given fields:
-func (_m *Middleware) UpdateAllowList() error {
-	ret := _m.Called()
+func (_m *Middleware) UpdateAllowList() {
+	_m.Called()
+}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+// UpdateNodeAddresses provides a mock function with given fields:
+func (_m *Middleware) UpdateNodeAddresses() {
+	_m.Called()
 }
