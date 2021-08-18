@@ -202,7 +202,7 @@ type sortedAddresses []flow.Address
 
 func (a sortedAddresses) Len() int           { return len(a) }
 func (a sortedAddresses) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a sortedAddresses) Less(i, j int) bool { return bytes.Compare(a[i].Bytes(), a[j].Bytes()) >= 0 }
+func (a sortedAddresses) Less(i, j int) bool { return bytes.Compare(a[i][:], a[j][:]) >= 0 }
 
 // UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
