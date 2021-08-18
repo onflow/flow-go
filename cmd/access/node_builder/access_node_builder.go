@@ -442,6 +442,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 				node.Storage.Collections,
 				node.Storage.Transactions,
 				node.Storage.Receipts,
+				node.Storage.Results,
 				node.RootChainID,
 				anb.TransactionMetrics,
 				anb.collectionGRPCPort,
@@ -470,7 +471,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.TransactionMetrics,
+			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, anb.TransactionMetrics,
 				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
 			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
 			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)

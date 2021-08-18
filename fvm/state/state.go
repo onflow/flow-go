@@ -198,17 +198,23 @@ func (s *State) MergeState(other *State) error {
 	return s.checkMaxInteraction()
 }
 
+type sortedAddresses []flow.Address
+
+func (a sortedAddresses) Len() int           { return len(a) }
+func (a sortedAddresses) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a sortedAddresses) Less(i, j int) bool { return bytes.Compare(a[i][:], a[j][:]) >= 0 }
+
 // UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
+	addresses := make(sortedAddresses, len(s.updatedAddresses))
 
-	// sort list wile constructing it
+	i := 0
 	for k := range s.updatedAddresses {
-		i := sort.Search(len(addresses), func(i int) bool { return addresses[i].Hex() >= k.Hex() })
-		addresses = append(addresses, flow.EmptyAddress)
-		copy(addresses[i+1:], addresses[i:])
 		addresses[i] = k
+		i++
 	}
+
+	sort.Sort(addresses)
 
 	return addresses
 }
