@@ -1066,7 +1066,9 @@ github.com/olekukonko/tablewriter v0.0.2-0.20190409134802-7e037d187b0c/go.mod h1
 github.com/onflow/atree v0.0.0-20210922123047-5e9b56cf01dd h1:Z6c+LAg+Ge4NdN229n5oGLhoVNdjVjpn0ahtDDL9xpQ=
 github.com/onflow/atree v0.0.0-20210922123047-5e9b56cf01dd/go.mod h1:f2dlPtqA1itnpjm/JA3ztAxUiXadIO/4CjyXwbQbT8M=
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
+github.com/onflow/cadence v0.17.0 h1:TFpwYVIs2b/bd6TlYxa3zMZN2S9CByMvW7Uk01KFP9Y=
 github.com/onflow/cadence v0.17.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
+github.com/onflow/cadence v0.18.0 h1:Ntvb4UMAllt57qrfEPbyu+A/ktQhZvNmyoE5i09Gqx8=
 github.com/onflow/cadence v0.18.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
 github.com/onflow/cadence v0.20.0-beta1 h1:5K3G+l7/AOLRuNphn1xdQcZe7QKlk+QzuncrU6/1EEE=
 github.com/onflow/cadence v0.20.0-beta1/go.mod h1:ZunqK8Bjv0EGKmHqzfUgWtHHNchp2YIjGVWAxzfqDCE=
