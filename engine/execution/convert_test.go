@@ -28,11 +28,11 @@ func Test_BuildChunkDataPack(t *testing.T) {
 
 		require.Len(t, result.Chunks, 4) // +1 for system chunk
 
-		assert.Equal(t, uint16(1), result.Chunks[0].NumberOfTransactions)
-		assert.Equal(t, uint16(1), result.Chunks[1].NumberOfTransactions)
-		assert.Equal(t, uint16(1), result.Chunks[2].NumberOfTransactions)
+		assert.Equal(t, uint64(1), result.Chunks[0].NumberOfTransactions)
+		assert.Equal(t, uint64(1), result.Chunks[1].NumberOfTransactions)
+		assert.Equal(t, uint64(1), result.Chunks[2].NumberOfTransactions)
 
 		// system chunk is special case, but currently also 1 tx
-		assert.Equal(t, uint16(1), result.Chunks[3].NumberOfTransactions)
+		assert.Equal(t, uint64(1), result.Chunks[3].NumberOfTransactions)
 	})
 }
