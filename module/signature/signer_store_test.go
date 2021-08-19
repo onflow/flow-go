@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -27,9 +28,8 @@ func TestGetThresholdSignerWithNilPrivateKey(t *testing.T) {
 	epochLookup := new(modmocks.EpochLookup)
 	epochLookup.On("EpochForView", mock.Anything).Return(epoch, nil)
 
-
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		
+
 		dkgKeys := storage.NewDKGKeys(metrics.NewNoopCollector(), db)
 		signerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeys)
 
