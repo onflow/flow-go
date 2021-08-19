@@ -1,6 +1,7 @@
 package uploader
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/fxamacker/cbor/v2"
@@ -44,7 +45,11 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 func WriteComputationResultsTo(computationResult *execution.ComputationResult, writer io.Writer) error {
 	blockData := ComputationResultToBlockData(computationResult)
 
-	encoder := cbor.NewEncoder(writer)
+	mode, err := cbor.CoreDetEncOptions().EncMode()
+	if err != nil {
+		return fmt.Errorf("cannot create deterministic cbor encoding mode: %w", err)
+	}
+	encoder := mode.NewEncoder(writer)
 
 	return encoder.Encode(blockData)
 }
