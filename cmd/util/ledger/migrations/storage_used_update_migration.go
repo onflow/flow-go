@@ -68,13 +68,14 @@ func (m *StorageUsedUpdateMigration) Migrate(payload []ledger.Payload) ([]ledger
 		}
 	}()
 
+	workerCount := runtime.NumCPU()
+
 	storageUsed := make(map[string]uint64)
-	storageUsedChan := make(chan accountPayloadSize, 1)
+	storageUsedChan := make(chan accountPayloadSize, workerCount)
 	payloadChan := make(chan indexedPayload)
-	storageUsedPayloadChan := make(chan accountStorageUsedPayload, 1)
+	storageUsedPayloadChan := make(chan accountStorageUsedPayload, workerCount)
 	storageUsedPayload := make(map[string]int)
 
-	workerCount := runtime.NumCPU()
 	inputWG := &sync.WaitGroup{}
 	outputWG := &sync.WaitGroup{}
 
