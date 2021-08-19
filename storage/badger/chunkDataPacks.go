@@ -80,12 +80,9 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	tx := ch.db.NewTransaction(false)
-	defer tx.Discard()
-
-	schdp, err := ch.retrieveCHDP(chunkID)(tx)
+	schdp, err := ch.byChunkID(chunkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
+		return nil, err
 	}
 
 	chdp := &flow.ChunkDataPack{
@@ -104,6 +101,18 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	}
 
 	return chdp, nil
+}
+
+func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*badgermodel.StoredChunkDataPack, error) {
+	tx := ch.db.NewTransaction(false)
+	defer tx.Discard()
+
+	schdp, err := ch.retrieveCHDP(chunkID)(tx)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
+	}
+
+	return schdp, nil
 }
 
 func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
