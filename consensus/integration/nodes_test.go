@@ -117,11 +117,11 @@ func createNode(
 	tracer := trace.NewNoopTracer()
 
 	headersDB := storage.NewHeaders(metrics, db)
-	guaranteesDB := storage.NewGuarantees(metrics, db)
+	guaranteesDB := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
 	resultsDB := storage.NewExecutionResults(metrics, db)
-	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB)
+	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB, storage.DefaultCacheSize)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
@@ -227,8 +227,11 @@ func createNode(
 	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
 	require.NoError(t, err)
 
+	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
+	require.NoError(t, err)
+
 	// initialize the synchronization engine
-	sync, err := synceng.New(log, metrics, net, me, state, blocksDB, comp, syncCore)
+	sync, err := synceng.New(log, metrics, net, me, blocksDB, comp, syncCore, finalizedHeader, state)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}

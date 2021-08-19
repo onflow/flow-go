@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -21,10 +22,11 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -40,8 +42,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const NotSet = "not set"
-
 type Metrics struct {
 	Network    module.NetworkMetrics
 	Engine     module.EngineMetrics
@@ -55,7 +55,7 @@ type Storage struct {
 	Index        storage.Index
 	Identities   storage.Identities
 	Guarantees   storage.Guarantees
-	Receipts     storage.ExecutionReceipts
+	Receipts     *bstorage.ExecutionReceipts
 	Results      storage.ExecutionResults
 	Seals        storage.Seals
 	Payloads     storage.Payloads
@@ -101,35 +101,39 @@ type FlowNodeBuilder struct {
 	sig         chan os.Signal
 	preInitFns  []func(NodeBuilder, *NodeConfig)
 	postInitFns []func(NodeBuilder, *NodeConfig)
+	lm          *lifecycle.LifecycleManager
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
-	homedir, _ := os.UserHomeDir()
-	datadir := filepath.Join(homedir, ".flow", "database")
+	defaultConfig := DefaultBaseConfig()
+
 	// bind configuration parameters
-	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", NotSet, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", NotSet, "address to bind on")
-	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", "bootstrap", "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", 1*time.Minute, "how long to try connecting to the network")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", datadir, "directory to store the protocol state")
-	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", "info", "level for logging output")
-	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", p2p.DefaultPeerUpdateInterval, "how often to refresh the peer connections for the node")
-	fnb.flags.DurationVar(&fnb.BaseConfig.unicastMessageTimeout, "unicast-timeout", p2p.DefaultUnicastTimeout, "how long a unicast transmission can take to complete")
-	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", 8080, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", false, "whether to enable the auto-profiler")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", "profiler", "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", 15*time.Minute,
+	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultConfig.bindAddr, "address to bind on")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
+	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
+	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
 		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", 10*time.Second,
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
 		"the duration to run the auto-profile for")
-	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", false,
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
+
+	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
+	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
-		codec := jsoncodec.NewCodec()
+		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.bindAddr != NotSet {
@@ -150,7 +154,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			},
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(fnb.Logger.Level(zerolog.ErrorLevel),
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
+			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
@@ -168,7 +173,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Metrics.Network,
 			fnb.RootBlock.ID().String(),
 			fnb.BaseConfig.peerUpdateInterval,
-			fnb.BaseConfig.unicastMessageTimeout,
+			fnb.BaseConfig.UnicastMessageTimeout,
+			true,
+			true,
 			fnb.MsgValidators...)
 
 		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
@@ -292,22 +299,32 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
 	}
-	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
-
-	mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNetworkCollector(),
-		Engine:     metrics.NewEngineCollector(),
-		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
-		Mempool:    mempools,
+		Network:    metrics.NewNoopCollector(),
+		Engine:     metrics.NewNoopCollector(),
+		Compliance: metrics.NewNoopCollector(),
+		Cache:      metrics.NewNoopCollector(),
+		Mempool:    metrics.NewNoopCollector(),
 	}
+	if fnb.BaseConfig.metricsEnabled {
+		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 
-	// registers mempools as a Component so that its Ready method is invoked upon startup
-	fnb.Component("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
-		return mempools, nil
-	})
+		mempools := metrics.NewMempoolCollector(5 * time.Second)
+
+		fnb.Metrics = Metrics{
+			Network:    metrics.NewNetworkCollector(),
+			Engine:     metrics.NewEngineCollector(),
+			Compliance: metrics.NewComplianceCollector(),
+			Cache:      metrics.NewCacheCollector(fnb.RootChainID),
+			Mempool:    mempools,
+		}
+
+		// registers mempools as a Component so that its Ready method is invoked upon startup
+		fnb.Component("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+			return mempools, nil
+		})
+	}
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
@@ -367,10 +384,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
@@ -568,11 +585,9 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 	select {
 	case <-readyAware.Ready():
 		log.Info().Msg("component startup complete")
-	case <-time.After(fnb.BaseConfig.timeout):
-		log.Fatal().Msg("component startup timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component startup aborted")
-		os.Exit(1)
+		return
 	}
 
 	fnb.doneObject = append(fnb.doneObject, namedDoneObject{
@@ -587,11 +602,9 @@ func (fnb *FlowNodeBuilder) handleDoneObject(v namedDoneObject) {
 	select {
 	case <-v.ob.Done():
 		log.Info().Msg("component shutdown complete")
-	case <-time.After(fnb.BaseConfig.timeout):
-		log.Fatal().Msg("component shutdown timed out")
 	case <-fnb.sig:
 		log.Warn().Msg("component shutdown aborted")
-		os.Exit(1)
+		return
 	}
 }
 
@@ -646,22 +659,55 @@ func (fnb *FlowNodeBuilder) PostInit(f func(builder NodeBuilder, node *NodeConfi
 	return fnb
 }
 
+type Option func(*BaseConfig)
+
+func WithBootstrapDir(bootstrapDir string) Option {
+	return func(config *BaseConfig) {
+		config.BootstrapDir = bootstrapDir
+	}
+}
+
+func WithNodeID(nodeID flow.Identifier) Option {
+	return func(config *BaseConfig) {
+		config.nodeIDHex = nodeID.String()
+	}
+}
+
+func WithDataDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		config.datadir = dataDir
+	}
+}
+
+func WithMetricsEnabled(enabled bool) Option {
+	return func(config *BaseConfig) {
+		config.metricsEnabled = enabled
+	}
+}
+
 // FlowNode creates a new Flow node builder with the given name.
-func FlowNode(role string) *FlowNodeBuilder {
+func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
+	config := DefaultBaseConfig()
+	config.NodeRole = role
+	for _, opt := range opts {
+		opt(config)
+	}
 
 	builder := &FlowNodeBuilder{
 		NodeConfig: &NodeConfig{
-			BaseConfig: BaseConfig{
-				NodeRole: role,
-			},
-			Logger: zerolog.New(os.Stderr),
+			BaseConfig: *config,
+			Logger:     zerolog.New(os.Stderr),
 		},
 		flags: pflag.CommandLine,
+		lm:    lifecycle.NewLifecycleManager(),
 	}
 	return builder
 }
 
 func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	fnb.Cancel = cancel
 
 	fnb.PrintBuildVersionDetails()
 
@@ -669,80 +715,115 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
-	fnb.EnqueueNetworkInit()
+	fnb.EnqueueNetworkInit(ctx)
 
-	fnb.EnqueueMetricsServerInit()
-
-	fnb.RegisterBadgerMetrics()
+	if fnb.metricsEnabled {
+		fnb.EnqueueMetricsServerInit()
+		fnb.RegisterBadgerMetrics()
+	}
 
 	fnb.EnqueueTracer()
 
 	return fnb
 }
 
-// Run initiates all common components (logger, database, protocol state etc.)
-// then starts each component. It also sets up a channel to gracefully shut
-// down each component if a SIGINT is received.
+// Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
+// down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
+// Since, Run is a blocking call it should only be used when running a node as it's own independent process.
 func (fnb *FlowNodeBuilder) Run() {
 
 	// initialize signal catcher
 	fnb.sig = make(chan os.Signal, 1)
 	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
 
-	// seed random generator
-	rand.Seed(time.Now().UnixNano())
-
-	fnb.initNodeInfo()
-
-	fnb.initLogger()
-
-	fnb.initProfiler()
-
-	fnb.initDB()
-
-	fnb.initMetrics()
-
-	fnb.initStorage()
-
-	for _, f := range fnb.preInitFns {
-		fnb.handlePreInit(f)
+	select {
+	case <-fnb.Ready():
+		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
+	case <-time.After(fnb.BaseConfig.timeout):
+		fnb.Logger.Fatal().Msg("node startup timed out")
+	case <-fnb.sig:
+		fnb.Logger.Warn().Msg("node startup aborted")
+		os.Exit(1)
 	}
 
-	fnb.initState()
-
-	fnb.initFvmOptions()
-
-	for _, f := range fnb.postInitFns {
-		fnb.handlePostInit(f)
-	}
-
-	// set up all modules
-	for _, f := range fnb.modules {
-		fnb.handleModule(f)
-	}
-
-	// initialize all components
-	for _, f := range fnb.components {
-		fnb.handleComponent(f)
-	}
-
-	fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
-
+	// block till a SIGINT is received
 	<-fnb.sig
 
 	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.NodeRole)
 
-	for i := len(fnb.doneObject) - 1; i >= 0; i-- {
-		doneObject := fnb.doneObject[i]
-
-		fnb.handleDoneObject(doneObject)
+	select {
+	case <-fnb.Done():
+		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
+	case <-time.After(fnb.BaseConfig.timeout):
+		fnb.Logger.Fatal().Msg("node shutdown timed out")
+	case <-fnb.sig:
+		fnb.Logger.Warn().Msg("node shutdown aborted")
+		os.Exit(1)
 	}
 
-	fnb.closeDatabase()
-
-	fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
-
 	os.Exit(0)
+}
+
+// Ready returns a channel that closes after initiating all common components (logger, database, protocol state etc.)
+// and then starting all modules and components.
+func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
+	fnb.lm.OnStart(func() {
+		// seed random generator
+		rand.Seed(time.Now().UnixNano())
+
+		fnb.initNodeInfo()
+
+		fnb.initLogger()
+
+		fnb.initProfiler()
+
+		fnb.initDB()
+
+		fnb.initMetrics()
+
+		fnb.initStorage()
+
+		for _, f := range fnb.preInitFns {
+			fnb.handlePreInit(f)
+		}
+
+		fnb.initState()
+
+		fnb.initFvmOptions()
+
+		for _, f := range fnb.postInitFns {
+			fnb.handlePostInit(f)
+		}
+
+		// set up all modules
+		for _, f := range fnb.modules {
+			fnb.handleModule(f)
+		}
+
+		// initialize all components
+		for _, f := range fnb.components {
+			fnb.handleComponent(f)
+		}
+	})
+	return fnb.lm.Started()
+}
+
+// Done returns a channel that closes after all registered components are stopped
+func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
+	fnb.lm.OnStop(func() {
+		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
+			doneObject := fnb.doneObject[i]
+
+			fnb.handleDoneObject(doneObject)
+		}
+
+		fnb.closeDatabase()
+	})
+	// cancel the context used by the networking layer
+	if fnb.Cancel != nil {
+		fnb.Cancel()
+	}
+	return fnb.lm.Stopped()
 }
 
 func (fnb *FlowNodeBuilder) handlePreInit(f func(builder NodeBuilder, node *NodeConfig)) {

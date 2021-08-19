@@ -64,9 +64,9 @@ func init() {
 	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
 	flag.IntVar(&unstakedAccessCount, "unstaked-access", DefaultUnstakedAccessCount, "number of un-staked access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
-	flag.Uint64Var(&numViewsEpoch, "epoch-length", 0, "number of views in epoch")
-	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 0, "number of views in epoch staking phase")
-	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 0, "number of views in epoch dkg phase")
+	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
+	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
+	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -312,6 +312,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
 			"JAEGER_AGENT_PORT=6831",
+			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
+			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+			"BINSTAT_ENABLE",
+			"BINSTAT_LEN_WHAT",
+			"BINSTAT_DMP_NAME",
+			"BINSTAT_DMP_PATH",
 		},
 	}
 

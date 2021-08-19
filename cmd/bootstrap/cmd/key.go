@@ -54,10 +54,10 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	role := validateRole(flagRole)
 	validateAddressFormat(flagAddress)
 
-	// generate all three keys
-	networkKey, stakingKey, machineKey, err := generateKeys()
+	// generate staking and network keys
+	networkKey, stakingKey, err := generateKeys()
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not generate keys")
+		log.Fatal().Err(err).Msg("could not generate staking or network keys")
 	}
 
 	log.Debug().Str("address", flagAddress).Msg("assembling node information")
@@ -73,25 +73,33 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not access private keys")
 	}
 
-	log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
-	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
-
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
-	writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
+	if role == flow.RoleCollection || role == flow.RoleConsensus {
+
+		// generate machine account priv key
+		machineKey, err := generateMachineAccountKey()
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not generate machine account key")
+		}
+
+		log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
+		machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
+		writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
+	}
 }
 
-func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, error) {
+func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, error) {
 
 	log.Debug().Msg("will generate networking key")
 	networkSeed := validateSeed(flagNetworkSeed)
 	networkKey, err := utils.GenerateNetworkingKey(networkSeed)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
+		return nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 	log.Info().Msg("generated networking key")
 
@@ -99,19 +107,24 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, crypto.PrivateKey, er
 	stakingSeed := validateSeed(flagStakingSeed)
 	stakingKey, err := utils.GenerateStakingKey(stakingSeed)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
+		return nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
 	log.Info().Msg("generated staking key")
+
+	return networkKey, stakingKey, nil
+}
+
+func generateMachineAccountKey() (crypto.PrivateKey, error) {
 
 	log.Debug().Msg("will generate machine account key")
 	machineSeed := validateSeed(flagMachineSeed)
 	machineKey, err := utils.GenerateMachineAccountKey(machineSeed)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not generate machine key: %w", err)
+		return nil, fmt.Errorf("could not generate machine key: %w", err)
 	}
 	log.Info().Msg("generated machine account key")
 
-	return networkKey, stakingKey, machineKey, nil
+	return machineKey, nil
 }
 
 func validateRole(role string) flow.Role {

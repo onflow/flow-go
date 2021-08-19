@@ -5,6 +5,8 @@ on:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - staging
+      - trying
   pull_request:
     branches:
       - master
@@ -23,7 +25,7 @@ jobs:
       uses: golangci/golangci-lint-action@v2.3.0
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
-        version: v1.29
+        version: v1.41
         args: -v --build-tags relic
     - name: Run ShellCheck
       uses: ludeeus/action-shellcheck@master
@@ -47,7 +49,15 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v2
     - name: Run tests
+      if: github.actor != 'bors[bot]'
       run: make ci
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 25
+        max_attempts: 2
+        command: make ci
     - name: Upload coverage report
       uses: codecov/codecov-action@v1
       if: ${{ matrix.go-version == '1.15' }}
@@ -55,6 +65,7 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
+    
   integration-test:
     name: Integration Tests
     strategy:
@@ -76,4 +87,37 @@ jobs:
     - name: Docker build
       run: make docker-build-flow
     - name: Run tests
+      if: github.actor != 'bors[bot]'
       run: make ci-integration
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 15
+        max_attempts: 2
+        command: make ci-integration
+
+  cross-blst-test:
+    name: cross-testing internal BLS implementation with BLST
+    strategy:
+      fail-fast: false
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Build relic
+      run: make crypto/relic/build
+    - name: Run tests
+      if: github.actor != 'bors[bot]'
+      run: make -C crypto cross-blst-test
+    - name: Run tests (Bors)
+      if: github.actor == 'bors[bot]'
+      uses: nick-invision/retry@v2
+      with:
+        timeout_minutes: 25
+        max_attempts: 2
+        command: make -C crypto cross-blst-test

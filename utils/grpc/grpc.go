@@ -24,7 +24,7 @@ const DefaultMaxMsgSize = 1024 * 1024 * 16
 func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 	// convert the Flow crypto private key to a Libp2p private crypto key
-	libP2PKey, err := p2p.PrivKey(privKey)
+	libP2PKey, err := p2p.LibP2PPrivKeyFromFlow(privKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert Flow key to libp2p key: %w", err)
 	}
@@ -82,9 +82,11 @@ func IsServerAuthError(err error) bool {
 // The TLSConfig verifies that the server certifcate is valid and has the correct signature
 func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 
+	// #nosec G402
 	config := &tls.Config{
-		MinVersion:         tls.VersionTLS13,
-		InsecureSkipVerify: true, // This is not insecure here. We will verify the cert chain ourselves.
+		MinVersion: tls.VersionTLS13,
+		// This is not insecure here. We will verify the cert chain ourselves.
+		InsecureSkipVerify: true,
 		ClientAuth:         tls.RequireAnyClientCert,
 	}
 
@@ -100,7 +102,7 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 
 	// convert the Flow.crypto key to LibP2P key for easy comparision using LibP2P TLS utils
-	expectedLibP2PKey, err := p2p.PublicKey(expectedPublicKey)
+	expectedLibP2PKey, err := p2p.LibP2PPublicKeyFromFlow(expectedPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate a libp2p key from a Flow key: %w", err)
 	}
