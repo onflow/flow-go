@@ -3,8 +3,9 @@ package epochs
 import (
 	"context"
 	"fmt"
-	"github.com/sethvargo/go-retry"
 	"time"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
@@ -16,7 +17,7 @@ import (
 
 const (
 	waitForSealedRetryInterval = 3 * time.Second
-	waitForSealedMaxDuration = 5 * time.Minute
+	waitForSealedMaxDuration   = 5 * time.Minute
 )
 
 // BaseClient represents the core fields and methods needed to create
@@ -116,7 +117,6 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 		if result.Status == sdk.TransactionStatusSealed {
 			return nil
 		}
-
 
 		return retry.RetryableError(fmt.Errorf("waiting for transaction to be sealed retrying"))
 	})

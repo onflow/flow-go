@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/sethvargo/go-retry"
 	"sync"
 	"time"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
@@ -184,7 +185,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
 	expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
 	if err != nil {
-		b.log.Fatal().Err(err).Msg("create retry mechanism")
+		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
 	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
 
