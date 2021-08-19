@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	newInter "github.com/onflow/cadence-latest/runtime/interpreter"
-	oldInter "github.com/onflow/cadence-v0180/runtime/interpreter"
+	newInter "github.com/onflow/cadence/runtime/interpreter"
+	oldInter "github.com/onflow/cadence/v18/runtime/interpreter"
 )
 
 func TestValueConversion(t *testing.T) {
@@ -19,7 +19,11 @@ func TestValueConversion(t *testing.T) {
 		},
 	)
 
-	converter := NewValueConverter(nil, nil)
+	inter := newInter.Interpreter{
+		Storage: newInter.NewInMemoryStorage(),
+	}
+
+	converter := NewValueConverter(nil, &inter)
 	newArray := converter.Convert(oldArray)
 
 	fmt.Println(newArray)

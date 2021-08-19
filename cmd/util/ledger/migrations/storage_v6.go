@@ -5,8 +5,8 @@ import (
 
 	"github.com/onflow/atree"
 
-	newInter "github.com/onflow/cadence-latest/runtime/interpreter"
-	oldInter "github.com/onflow/cadence-v0180/runtime/interpreter"
+	newInter "github.com/onflow/cadence/runtime/interpreter"
+	oldInter "github.com/onflow/cadence/v18/runtime/interpreter"
 )
 
 var _ oldInter.Visitor = &ValueConverter{}
@@ -37,7 +37,7 @@ func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
 	return c.result
 }
 
-func (c *ValueConverter) VisitValue(_ *oldInter.Interpreter, value oldInter.Value) {
+func (c *ValueConverter) VisitValue(_ *oldInter.Interpreter, _ oldInter.Value) {
 	panic("implement me")
 }
 
@@ -45,7 +45,7 @@ func (c *ValueConverter) VisitTypeValue(_ *oldInter.Interpreter, value oldInter.
 	panic("implement me")
 }
 
-func (c *ValueConverter) VisitVoidValue(_ *oldInter.Interpreter, value oldInter.VoidValue) {
+func (c *ValueConverter) VisitVoidValue(_ *oldInter.Interpreter, _ oldInter.VoidValue) {
 	c.result = newInter.VoidValue{}
 }
 
@@ -200,7 +200,7 @@ func (c *ValueConverter) VisitDictionaryValue(_ *oldInter.Interpreter, value *ol
 	return false
 }
 
-func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, value oldInter.NilValue) {
+func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilValue) {
 	c.result = newInter.NilValue{}
 }
 
@@ -212,24 +212,35 @@ func (c *ValueConverter) VisitSomeValue(_ *oldInter.Interpreter, value *oldInter
 	return false
 }
 
-func (c *ValueConverter) VisitStorageReferenceValue(_ *oldInter.Interpreter, value *oldInter.StorageReferenceValue) {
-	panic("implement me")
+func (c *ValueConverter) VisitStorageReferenceValue(_ *oldInter.Interpreter, _ *oldInter.StorageReferenceValue) {
+	panic("value not storable")
 }
 
-func (c *ValueConverter) VisitEphemeralReferenceValue(_ *oldInter.Interpreter, value *oldInter.EphemeralReferenceValue) {
-	panic("implement me")
+func (c *ValueConverter) VisitEphemeralReferenceValue(_ *oldInter.Interpreter, _ *oldInter.EphemeralReferenceValue) {
+	panic("value not storable")
 }
 
 func (c *ValueConverter) VisitAddressValue(_ *oldInter.Interpreter, value oldInter.AddressValue) {
-	panic("implement me")
+	c.result = newInter.AddressValue(value)
 }
 
 func (c *ValueConverter) VisitPathValue(_ *oldInter.Interpreter, value oldInter.PathValue) {
-	panic("implement me")
+	c.result = newInter.PathValue{
+		Domain:     value.Domain,
+		Identifier: value.Identifier,
+	}
 }
 
 func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value oldInter.CapabilityValue) {
-	panic("implement me")
+	address := c.Convert(value).(newInter.AddressValue)
+	path := c.Convert(value).(newInter.PathValue)
+	burrowType := ConvertStaticType(value.BorrowType)
+
+	c.result = &newInter.CapabilityValue{
+		Address:    address,
+		Path:       path,
+		BorrowType: burrowType,
+	}
 }
 
 func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.LinkValue) {
