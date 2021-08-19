@@ -2,11 +2,13 @@ package follower
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,11 +24,11 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	nodeID               flow.Identifier // the node ID of this node
-	upstreamAccessNodeID flow.Identifier // the node ID of the upstream access node
-	bindAddr             string          // address to bind on
-	dataDir              string          // directory to store the protocol state
-	bootstrapDir         string          // path to the bootstrap directory
+	nodeID         flow.Identifier     // the node ID of this node
+	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
+	bindAddr       string              // address to bind on
+	dataDir        string              // directory to store the protocol state
+	bootstrapDir   string              // path to the bootstrap directory
 }
 
 type Option func(c *Config)
@@ -43,9 +45,30 @@ func WithBootstrapDir(bootstrapDir string) Option {
 	}
 }
 
+// BootstrapNodeInfo contains the details about the upstream bootstrap peer the consensus follower uses
+type BootstrapNodeInfo struct {
+	Host             string // ip or hostname
+	Port             uint
+	NetworkPublicKey crypto.PublicKey // the network public key of the bootstrap peer
+}
+
+func bootstrapIdentities(bootstrapNodes []BootstrapNodeInfo) flow.IdentityList {
+	ids := make(flow.IdentityList, len(bootstrapNodes))
+	for i, b := range bootstrapNodes {
+		ids[i] = &flow.Identity{
+			Role:          flow.RoleAccess,
+			NetworkPubKey: b.NetworkPublicKey,
+			Address:       fmt.Sprintf("%s:%d", b.Host, b.Port),
+			StakingPubKey: nil,
+		}
+	}
+	return ids
+}
+
 func getAccessNodeOptions(config *Config) []access.Option {
+	ids := bootstrapIdentities(config.bootstrapNodes)
 	return []access.Option{
-		access.WithUpstreamAccessNodeID(config.upstreamAccessNodeID),
+		access.WithBootStrapPeers(ids...),
 		access.WithUnstakedNetworkBindAddr(config.bindAddr),
 		access.WithBaseOptions(getBaseOptions(config)),
 	}
@@ -85,14 +108,14 @@ type ConsensusFollowerImpl struct {
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
 	nodeID flow.Identifier,
-	upstreamAccessNodeID flow.Identifier,
+	bootstapIdentities []BootstrapNodeInfo,
 	bindAddr string,
 	opts ...Option,
-) *ConsensusFollowerImpl {
+) (*ConsensusFollowerImpl, error) {
 	config := &Config{
-		nodeID:               nodeID,
-		upstreamAccessNodeID: upstreamAccessNodeID,
-		bindAddr:             bindAddr,
+		nodeID:         nodeID,
+		bootstrapNodes: bootstapIdentities,
+		bindAddr:       bindAddr,
 	}
 
 	for _, opt := range opts {
@@ -100,13 +123,13 @@ func NewConsensusFollower(
 	}
 
 	accessNodeOptions := getAccessNodeOptions(config)
-	anb := buildAccessNode(accessNodeOptions)
 
+	anb := buildAccessNode(accessNodeOptions)
 	consensusFollower := &ConsensusFollowerImpl{nodeBuilder: anb}
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
-	return consensusFollower
+	return consensusFollower, nil
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.
