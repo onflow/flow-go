@@ -190,7 +190,7 @@ func main() {
 					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
 				}
 
-				asyncUploader := uploader.NewAsyncUploader(
+				blockDataUploader := uploader.NewAsyncUploader(
 					gcpBucketUploader,
 					blockdataUploaderRetryTimeout,
 					blockDataUploaderMaxRetry,
@@ -198,9 +198,7 @@ func main() {
 					collector,
 				)
 
-				blockDataUploader = asyncUploader
-
-				return asyncUploader, nil
+				return blockDataUploader, nil
 			}
 
 			// Since we don't have conditional component creation, we just use Noop one.

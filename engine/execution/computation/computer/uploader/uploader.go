@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/utils/logging"
 	"github.com/rs/zerolog"
 
 	"github.com/sethvargo/go-retry"
@@ -70,7 +71,9 @@ func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) e
 		})
 
 		if err != nil {
-			a.log.Error().Err(err).Msg("failed to upload block data")
+			a.log.Error().Err(err).
+				Hex("block_id", logging.Entity(computationResult.ExecutableBlock)).
+				Msg("failed to upload block data")
 		}
 
 		a.metrics.ExecutionBlockDataUploadFinished(time.Since(start))
