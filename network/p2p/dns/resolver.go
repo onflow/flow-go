@@ -25,14 +25,14 @@ type Resolver struct {
 type optFunc func(resolver *Resolver)
 
 // WithBasicResolver is an option function for setting the basic resolver of this Resolver.
-func WithBasicResolver(basic madns.BasicResolver) func(resolver *Resolver) {
+func WithBasicResolver(basic madns.BasicResolver) optFunc {
 	return func(resolver *Resolver) {
 		resolver.res = basic
 	}
 }
 
 // WithTTL is an option function for setting the time to live for cache entries.
-func WithTTL(ttl time.Duration) func(resolver *Resolver) {
+func WithTTL(ttl time.Duration) optFunc {
 	return func(resolver *Resolver) {
 		resolver.c.ttl = ttl
 	}
