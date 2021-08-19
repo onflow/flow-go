@@ -1,11 +1,5 @@
 # Context Propagation and Network Layer Refactor (Core Protocol)
 
-| Status        | Proposed                                       |
-:-------------- |:---------------------------------------------- |
-| **FLIP #**    | [xxx](https://github.com/onflow/flow/pull/xxx) |
-| **Author(s)** | Simon Zhu (simon.zhu@dapperlabs.com)           |
-| **Sponsor**   | Simon Zhu (simon.zhu@dapperlabs.com)           |
-| **Updated**   | 2021-xx-xx                                     |
 
 
 ## Objective
