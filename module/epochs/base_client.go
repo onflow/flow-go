@@ -3,8 +3,9 @@ package epochs
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/utils/retry"
 	"time"
+
+	"github.com/onflow/flow-go/utils/retry"
 
 	"github.com/rs/zerolog"
 
@@ -16,7 +17,7 @@ import (
 
 const (
 	waitForSealedTimeout = 5 * time.Minute
-	waitForSealedRetry = 1000
+	waitForSealedRetry   = 1000
 )
 
 // BaseClient represents the core fields and methods needed to create
@@ -86,7 +87,7 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
 	var (
 		result *sdk.TransactionResult
-		err error
+		err    error
 	)
 
 	f := func(context.Context) error {
