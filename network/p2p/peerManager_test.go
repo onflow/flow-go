@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -41,8 +43,14 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	currentIDs := unittest.IdentityListFixture(10)
 
 	// setup a ID provider callback to return currentIDs
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	idProvider := func() (peer.IDSlice, error) {
+		pids := peer.IDSlice{}
+		for _, id := range currentIDs {
+			pid, err := ExtractPeerID(id.NetworkPubKey)
+			require.NoError(suite.T(), err)
+			pids = append(pids, pid)
+		}
+		return pids, nil
 	}
 
 	// track IDs that should be disconnected
@@ -105,8 +113,14 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 // TestPeriodicPeerUpdate tests that the peer manager runs periodically
 func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 	currentIDs := unittest.IdentityListFixture(10)
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	idProvider := func() (peer.IDSlice, error) {
+		pids := peer.IDSlice{}
+		for _, id := range currentIDs {
+			pid, err := ExtractPeerID(id.NetworkPubKey)
+			require.NoError(suite.T(), err)
+			pids = append(pids, pid)
+		}
+		return pids, nil
 	}
 
 	connector := new(mocknetwork.Connector)
@@ -137,8 +151,14 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 // TestOnDemandPeerUpdate tests that the a peer update can be requested on demand and in between the periodic runs
 func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 	currentIDs := unittest.IdentityListFixture(10)
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	idProvider := func() (peer.IDSlice, error) {
+		pids := peer.IDSlice{}
+		for _, id := range currentIDs {
+			pid, err := ExtractPeerID(id.NetworkPubKey)
+			require.NoError(suite.T(), err)
+			pids = append(pids, pid)
+		}
+		return pids, nil
 	}
 
 	// chooses peer interval rate deliberately long to capture on demand peer update
@@ -180,8 +200,14 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 // TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
 func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	currentIDs := unittest.IdentityListFixture(10)
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	idProvider := func() (peer.IDSlice, error) {
+		pids := peer.IDSlice{}
+		for _, id := range currentIDs {
+			pid, err := ExtractPeerID(id.NetworkPubKey)
+			require.NoError(suite.T(), err)
+			pids = append(pids, pid)
+		}
+		return pids, nil
 	}
 
 	connector := new(mocknetwork.Connector)
