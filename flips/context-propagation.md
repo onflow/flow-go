@@ -178,6 +178,8 @@ Notes:
 
     f.ChildRoutines = append(f.ChildRoutines, f.childRoutine, f.childRoutineWithFooParameter(foo))
     f.SubComponents = append(f.SubComponents, NewBarComponent(bar))
+
+    return f
   }
 
   func (f *FooComponent) childRoutine(ctx context.Context) {
