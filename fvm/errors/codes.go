@@ -27,8 +27,8 @@ const (
 const (
 	// tx validation errors 1000 - 1049
 	// ErrCodeTxValidationError         ErrorCode = 1000 - reserved
-	ErrCodeInvalidTxByteSizeError        ErrorCode = 1001
-	ErrCodeInvalidReferenceBlockError    ErrorCode = 1002
+	ErrCodeInvalidTxByteSizeError     ErrorCode = 1001
+	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
 	// ErrCodeExpiredTransactionError       ErrorCode = 1003
 	ErrCodeInvalidScriptError            ErrorCode = 1004
 	ErrCodeInvalidGasLimitError          ErrorCode = 1005
@@ -38,20 +38,20 @@ const (
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
-	ErrCodeFVMInternalError            ErrorCode = 1050
-	ErrCodeValueError                  ErrorCode = 1051
-	ErrCodeInvalidArgumentError        ErrorCode = 1052
-	ErrCodeInvalidAddressError         ErrorCode = 1053
-	ErrCodeInvalidLocationError        ErrorCode = 1054
-	ErrCodeAccountAuthorizationError   ErrorCode = 1055
+	ErrCodeFVMInternalError          ErrorCode = 1050
+	ErrCodeValueError                ErrorCode = 1051
+	ErrCodeInvalidArgumentError      ErrorCode = 1052
+	ErrCodeInvalidAddressError       ErrorCode = 1053
+	ErrCodeInvalidLocationError      ErrorCode = 1054
+	ErrCodeAccountAuthorizationError ErrorCode = 1055
 	// ErrCodeOperationAuthorizationError ErrorCode = 1056
-	ErrCodeOperationNotSupportedError  ErrorCode = 1057
+	ErrCodeOperationNotSupportedError ErrorCode = 1057
 
 	// execution errors 1100 - 1200
 	// ErrCodeExecutionError                 ErrorCode = 1100 - reserved
-	ErrCodeCadenceRunTimeError                ErrorCode = 1101
-	ErrCodeEncodingUnsupportedValue           ErrorCode = 1102
-	ErrCodeStorageCapacityExceeded            ErrorCode = 1103
+	ErrCodeCadenceRunTimeError      ErrorCode = 1101
+	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
+	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
 	// ErrCodeGasLimitExceededError              ErrorCode = 1104
 	ErrCodeEventLimitExceededError            ErrorCode = 1105
 	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
