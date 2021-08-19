@@ -33,7 +33,7 @@ type RandomBeaconReconstructor interface {
 type SigType int
 
 // There are two signatures are aggregable, one is the normal staking signature,
-// the other is the threshold sig used as staking sigature.
+// the other is the threshold sig used as staking signature.
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
@@ -50,7 +50,7 @@ type SignatureAggregator interface {
 	// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
 	//   (1000 is just an example)
 	// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
+	TrustedAdd(signerID flow.Identifier, weight uint64, sig crypto.Signature) (added bool, totalWeight uint64)
 
 	// TotalWeight returns the total weight presented by the collected sig shares.
 	TotalWeight() uint64
@@ -58,13 +58,12 @@ type SignatureAggregator interface {
 	// Aggregate assumes enough shares have been collected, it aggregates the signatures
 	// and return the aggregated signature.
 	// if called concurrently, only one thread will be running the aggregation.
-	// TODO: consider return (signerIDs and crypto.Signature)
-	Aggregate() ([]byte, error)
+	Aggregate() flow.AggregatedSignature
 }
 
 // CombinedSigAggregator aggregates the staking signatures and random beacon signatures,
 // and keep track of the total weights represented by each signature share. And report whether
-// sufficient weights for representing majority of stakes have been collected. If yes, then aggregate
+// sufficient weights for representing the majority of stakes have been collected. If yes, then aggregate
 // the signatures.
 type CombinedSigAggregator interface {
 	// TrustedAdd adds the signature to staking signatures store or random beacon signature store
