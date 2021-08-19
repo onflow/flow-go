@@ -30,7 +30,7 @@ This introduces issues of concurrency safety, as most implementations do not pro
 
 [Clearer documentation](https://github.com/onflow/flow-go/pull/1032) and a new [`LifecycleManager`](https://github.com/onflow/flow-go/pull/1031) component were introduced as a step towards fixing this by providing concurrency-safety for components implementing `ReadyDoneAware`, but this still does not provide a clear separation between the ability to start / stop a component and the ability to check its state. A component usually only needs to be started once, whereas multiple other components may wish to check its state.
 
-#### Tight coupling of network layer to Flow concepts
+#### Tight coupling of network layer to Flow-specific data types
 The current network layer API was designed with the assumption that all messages sent and received either target or originate from staked Flow nodes. This is why an engine's [`Process`](https://github.com/onflow/flow-go/blob/master/network/engine.go#L28) method accepts a Flow ID identifying the message sender, and outgoing messages [must specify Flow ID(s)](https://github.com/onflow/flow-go/blob/master/network/conduit.go#L62) as targets.
 
 This assumption is no longer true today. The access node, for example, may communicate with multiple (unstaked) consensus followers. It's perceivable that in the future there will be even more cases where communication with unstaked parties may happen (for example, execution nodes talking to DPS).
