@@ -3,7 +3,7 @@ module github.com/onflow/flow-go
 go 1.15
 
 require (
-	cloud.google.com/go/storage v1.10.0
+	cloud.google.com/go/storage v1.16.0
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/davecgh/go-spew v1.1.1
@@ -15,7 +15,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.5.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.1.2
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
@@ -50,6 +50,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/rs/zerolog v1.19.0
+	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
@@ -62,8 +63,8 @@ require (
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.31.0
-	google.golang.org/grpc v1.36.1
+	google.golang.org/api v0.49.0
+	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.26.0
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7
@@ -73,4 +74,4 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.18.0-patch.6
+//replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.18.0-patch.6

@@ -14,7 +14,6 @@ require (
 	github.com/ethereum/go-ethereum v1.10.1 // indirect
 	github.com/go-openapi/strfmt v0.20.1 // indirect
 	github.com/go-test/deep v1.0.7 // indirect
-	github.com/golang/snappy v0.0.3 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/onflow/cadence v0.18.1-0.20210715170431-cd7a7a483000
@@ -34,9 +33,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
-	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto v0.0.0-20210405174219-a39eb2f71cb9 // indirect
-	google.golang.org/grpc v1.36.1
+	google.golang.org/grpc v1.38.0
 	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
@@ -48,4 +45,4 @@ replace github.com/onflow/flow-go => ../
 
 replace github.com/onflow/flow-go/crypto => ../crypto
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.18.0-patch.6
+//replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.18.0-patch.6

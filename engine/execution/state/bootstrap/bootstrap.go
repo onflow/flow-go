@@ -52,7 +52,7 @@ func (b *Bootstrapper) BootstrapLedger(
 		return flow.DummyStateCommitment, err
 	}
 
-	newStateCommitment, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
+	newStateCommitment, _, err := state.CommitDelta(ledger, view.Delta(), flow.StateCommitment(ledger.InitialState()))
 	if err != nil {
 		return flow.DummyStateCommitment, err
 	}
