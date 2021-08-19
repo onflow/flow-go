@@ -362,6 +362,9 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its PublicKey) and eventually passes it to the overlay
+// In particular, it checks the claim of protocol authorship situated in the message against `originKey`
+// The assumption is that the message has been authenticated at the network level (libp2p) to origin at the network public key `originKey`
+// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, originKey crypto.PublicKey) {
 	identities, err := m.ov.Identity()
 	if err != nil {
