@@ -125,7 +125,7 @@ func (p *ProtocolStateIDCache) GetFlowID(peerID peer.ID) (fid flow.Identifier, e
 }
 
 func ExtractPeerID(networkPubKey crypto.PublicKey) (pid peer.ID, err error) {
-	pk, err := PublicKey(networkPubKey)
+	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
 		return
