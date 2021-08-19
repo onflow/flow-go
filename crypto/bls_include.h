@@ -24,10 +24,9 @@
 #define MEMBERSHIP_CHECK 1
 
 // algorithm choice for the hashing to G1 
-#define HASHCHECK 1
-#define OPSWU 2
-#define hashToPoint OPSWU
-
+#define RELIC_OPSWU 1  // relic library implementation (compliant with the BLS IRTF draft)
+#define OPSWU 2        // local flow implementation using different parameters than the IRTF draft 
+#define hashToPoint RELIC_OPSWU
 
 // bls core (functions in bls_core.c)
 int      get_signature_len();
@@ -48,7 +47,4 @@ int      check_membership_Zr(const bn_t);
 int      check_membership_G1(const ep_t p);
 int      check_membership_G2(const ep2_t);
 
-// hash to curve functions (functions in bls12381_hashtocurve.c)
-void     map_to_G1(ep_t, const byte*, const int);
-void     opswu_test(uint8_t *, const uint8_t *, int);
 #endif

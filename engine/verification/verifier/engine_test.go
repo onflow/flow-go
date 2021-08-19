@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	testifymock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -18,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil/mocklocal"
 	"github.com/onflow/flow-go/engine/verification/utils"
-	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	chmodel "github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
@@ -114,20 +112,6 @@ func (suite *VerifierEngineTestSuite) TestNewEngine() *verifier.Engine {
 	suite.net.AssertExpectations(suite.T())
 	return e
 
-}
-
-func (suite *VerifierEngineTestSuite) TestInvalidSender() {
-	eng := suite.TestNewEngine()
-
-	myID := unittest.IdentifierFixture()
-
-	// mocks NodeID method of the local
-	suite.me.MockNodeID(myID)
-
-	completeRA := vertestutils.LightExecutionResultFixture(1)
-
-	err := eng.ProcessLocal(&completeRA)
-	assert.Error(suite.T(), err)
 }
 
 func (suite *VerifierEngineTestSuite) TestIncorrectResult() {

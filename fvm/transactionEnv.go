@@ -238,6 +238,15 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 	return len(v) > 0, nil
 }
 
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return 0, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+	return v, nil
+}
+
 func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
