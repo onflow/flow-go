@@ -88,6 +88,20 @@ func (_m *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResul
 	return r0, r1
 }
 
+// ForceIndex provides a mock function with given fields: blockID, resultID
+func (_m *ExecutionResults) ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error {
+	ret := _m.Called(blockID, resultID)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, flow.Identifier) error); ok {
+		r0 = rf(blockID, resultID)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // Index provides a mock function with given fields: blockID, resultID
 func (_m *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
 	ret := _m.Called(blockID, resultID)
