@@ -42,7 +42,7 @@ func (b *BlocksFinder) ByHeightFrom(height uint64, header *flow.Header) (*flow.H
 	}
 
 	if height > header.Height {
-		// TODO figure out min hight and enforce it to be bigger than min hight
+		// TODO figure out min height and enforce it to be bigger than min height
 		minHeight := 0
 		msg := fmt.Sprintf("requested height (%d) is not in the range(%d, %d)", height, minHeight, header.Height)
 		err := errors.NewValueErrorf(fmt.Sprint(height), msg)

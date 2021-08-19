@@ -20,7 +20,7 @@ type AccountKeyHandler struct {
 	accounts *state.Accounts
 }
 
-//  NewAccountPublicKey construct an account public key given a runtime public key.
+// NewAccountPublicKey construct an account public key given a runtime public key.
 func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	hashAlgo sema.HashAlgorithm,
 	keyIndex int,

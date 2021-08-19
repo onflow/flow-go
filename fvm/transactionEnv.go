@@ -154,15 +154,15 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		runtime.Context{Interface: e},
 	)
 	if err != nil {
-		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	addresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
 	if !ok {
-		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	return adresses
+	return addresses
 }
 
 func (e *TransactionEnv) isAuthorizerServiceAccount() bool {

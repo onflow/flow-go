@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestErrorHandeling(t *testing.T) {
+func TestErrorHandling(t *testing.T) {
 
 	t.Run("test nonfatal error detection", func(t *testing.T) {
 		e1 := &OperationNotSupportedError{"some operations"}
