@@ -4,7 +4,7 @@ package signature
 
 import "github.com/onflow/flow-go/crypto"
 
-// This implementation of `ThresholdProvider` always produces invalid signatures
+// This implementation of `InvalidThresholdProvider` always produces invalid signatures
 // (that are inexpensively detectable as invalid) as we cannot produce valid signatures
 // due to some failure in generating random beacon key during the last DKG.
 // This will be replaced by consensus voting v2, which will allow a random beacon node that failed DKG
