@@ -41,7 +41,7 @@ Moving forward, we should split the `ReadyDoneAware` interface into two separate
 - A `Runnable` interface which can be used to start and stop a component:
   ```golang
   type Runnable interface {
-    // Run will start the component
+    // Run will start the component and returns immediately.
     Run(context.Context)
   }
   ```
