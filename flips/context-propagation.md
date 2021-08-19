@@ -33,7 +33,7 @@ Furthermore, many engines actually don't need to know the `OriginID` of a messag
 
 Finally, as of today the network layer does not actually verify the [`OriginID`](https://github.com/onflow/flow-go/blob/2641774451dcc1e147843a74265afb58466b50ab/network/message/message.pb.go#L29) field of messages received from the network. This opens the door to impersonation attacks, as a node can send a message pretending to be any other node simply by putting the other node's `OriginID` field inside the message they send.
 
-## Design Proposal
+## Proposal
 
 ### Separate lifecycle management from state observation
 
