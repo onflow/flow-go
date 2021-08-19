@@ -19,7 +19,7 @@ func TestChunkDataPack(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := badgerstorage.NewCollections(db, transactions)
-		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 100)
+		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
 
 		// attempt to get an invalid
 		_, err := store.ByChunkID(unittest.IdentifierFixture())
@@ -34,7 +34,17 @@ func TestChunkDataPack(t *testing.T) {
 		err = collections.Store(collection)
 		require.NoError(t, err)
 
-		err = store.Store(expected)
+		batch := badgerstorage.NewBatch(db)
+		err = store.BatchStore(expected, batch)
+		require.NoError(t, err)
+
+		for i := 0; i < 10; i++ {
+			cdp := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
+			err = store.BatchStore(cdp, batch)
+			require.NoError(t, err)
+		}
+
+		err = batch.Flush()
 		require.NoError(t, err)
 
 		// retrieve the transaction by ID

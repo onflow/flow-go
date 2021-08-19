@@ -30,9 +30,9 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		chunkID := key.(flow.Identifier)
 
-		var c *badgermodel.StoredChunkDataPack
+		var c badgermodel.StoredChunkDataPack
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveChunkDataPack(chunkID, c)(tx)
+			err := operation.RetrieveChunkDataPack(chunkID, &c)(tx)
 			return &c, err
 		}
 	}
