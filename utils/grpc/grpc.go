@@ -23,7 +23,7 @@ const DefaultMaxMsgSize = 1024 * 1024 * 16
 func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 	// convert the Flow crypto private key to a Libp2p private crypto key
-	libP2PKey, err := p2p.PrivKey(privKey)
+	libP2PKey, err := p2p.LibP2PPrivKeyFromFlow(privKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert Flow key to libp2p key: %w", err)
 	}

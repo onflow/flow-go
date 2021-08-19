@@ -61,7 +61,6 @@ func main() {
 		serviceEvents               *storage.ServiceEvents
 		txResults                   *storage.TransactionResults
 		results                     *storage.ExecutionResults
-		receipts                    *storage.ExecutionReceipts
 		myReceipts                  *storage.MyExecutionReceipts
 		providerEngine              *exeprovider.Engine
 		checkerEng                  *checker.Engine
@@ -114,7 +113,7 @@ func main() {
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
 			flags.UintVar(&stateDeltasLimit, "state-deltas-limit", 100, "maximum number of state deltas in the memory pool")
 			flags.UintVar(&cadenceExecutionCache, "cadence-execution-cache", computation.DefaultProgramsCacheSize, "cache size for Cadence execution")
-			flags.UintVar(&chdpCacheSize, "chdp-cache", 100, "cache size for Chunk Data Packs")
+			flags.UintVar(&chdpCacheSize, "chdp-cache", storage.DefaultCacheSize, "cache size for Chunk Data Packs")
 			flags.DurationVar(&requestInterval, "request-interval", 60*time.Second, "the interval between requests for the requester engine")
 			flags.DurationVar(&scriptLogThreshold, "script-log-threshold", computation.DefaultScriptLogThreshold, "threshold for logging script execution")
 			flags.StringVar(&preferredExeNodeIDStr, "preferred-exe-node-id", "", "node ID for preferred execution node used for state sync")
@@ -155,8 +154,7 @@ func main() {
 		}).
 		Module("execution receipts storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-			receipts = storage.NewExecutionReceipts(node.Metrics.Cache, node.DB, results)
-			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, receipts)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts)
 			return nil
 		}).
 		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -273,7 +271,7 @@ func main() {
 				node.Storage.Collections,
 				chunkDataPacks,
 				results,
-				receipts,
+				node.Storage.Receipts,
 				myReceipts,
 				events,
 				serviceEvents,
@@ -309,10 +307,13 @@ func main() {
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
-				filter.HasRole(flow.RoleCollection),
+				filter.Any,
 				func() flow.Entity { return &flow.Collection{} },
 				// we are manually triggering batches in execution, but lets still send off a batch once a minute, as a safety net for the sake of retries
 				requester.WithBatchInterval(requestInterval),
+				// consistency of collection can be checked by checking hash, and hash comes from trusted source (blocks from consensus follower)
+				// hence we not need to check origin
+				requester.WithValidateStaking(false),
 			)
 
 			preferredExeFilter := filter.Any
