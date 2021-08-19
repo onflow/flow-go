@@ -12,10 +12,13 @@ import (
 // maxRetry unsuccessful attempts. It will short circuit if ctx is Done.
 func BackoffExponential(ctx context.Context, retryFuncName string, f func(context.Context) error, maxRetry int, retryMilliseconds time.Duration, logger zerolog.Logger) bool {
 	wait := retryMilliseconds * time.Millisecond
+	started := time.Now()
 	for attempt := 1; attempt <= maxRetry; attempt++ {
+		log := logger.With().Int("attempt", attempt).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
+
 		err := f(ctx)
 		if err != nil {
-			logger.Warn().Err(err).Str("retrying_func", retryFuncName).Msgf("attempt %d/%d failed", attempt, maxRetry)
+			log.Warn().Err(err).Str("retrying_func", retryFuncName).Msgf("attempt %d/%d failed", attempt, maxRetry)
 
 			select {
 			case <-time.After(wait):
@@ -47,7 +50,7 @@ func WithTimeout(ctx context.Context, retryFuncName string, f func(context.Conte
 			err = f(ctxWithTimeOut)
 			attempt++
 			if err != nil {
-				logger.Warn().Err(err).Str("retrying_func", retryFuncName).Msgf("attempt %d failed", attempt)
+				logger.Warn().Err(err).Int("attempt", attempt).Str("retrying_func", retryFuncName).Msgf("attempt %d failed", attempt)
 				continue
 			}
 

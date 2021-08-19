@@ -100,7 +100,9 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 	}
 
 	for {
-		retry.WithTimeout(ctx, "BaseClient.WaitForSealed", f, waitForSealedTimeout, waitForSealedRetry, c.Log)
+		log := c.Log.With().Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
+
+		retry.WithTimeout(ctx, "BaseClient.WaitForSealed", f, waitForSealedTimeout, waitForSealedRetry, log)
 
 		if result.Error != nil {
 			return fmt.Errorf("error executing transaction: %w", result.Error)
