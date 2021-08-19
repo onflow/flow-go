@@ -2,7 +2,9 @@ package dkg
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"github.com/sethvargo/go-retry"
 	"sync"
 	"time"
 
@@ -20,7 +22,7 @@ import (
 const RETRY_MAX = 5
 
 // RETRY_MILLISECONDS is the number of milliseconds to wait between retries
-const RETRY_MILLISECONDS = 1000
+const RETRY_MILLISECONDS = 1000 * time.Millisecond
 
 // Broker is an implementation of the DKGBroker interface which is intended to
 // be used in conjuction with the DKG MessagingEngine for private messages, and
@@ -104,17 +106,22 @@ func (b *Broker) Broadcast(data []byte) {
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 	}
-	success := b.retry(
-		func() error {
-			return b.dkgContractClient.Broadcast(bcastMsg)
-		},
-		RETRY_MAX,
-		RETRY_MILLISECONDS,
-	)
-	if !success {
-		b.log.Error().Msg("failed to broadcast message")
+
+	expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("create retry mechanism")
+	}
+	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
+
+	err = retry.Do(context.TODO(), maxedExpRetry, func(ctx context.Context) error {
+		return retry.RetryableError(b.dkgContractClient.Broadcast(bcastMsg))
+	})
+
+	if err != nil {
+		b.log.Error().Err(err).Msg("failed to broadcast message")
 		return
 	}
+
 	b.log.Debug().Msg("dkg message broadcast")
 	b.broadcasts++
 }
@@ -175,16 +182,21 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	success := b.retry(
-		func() error {
-			return b.dkgContractClient.SubmitResult(pubKey, groupKeys)
-		},
-		RETRY_MAX,
-		RETRY_MILLISECONDS,
-	)
-	if !success {
-		return fmt.Errorf("failed to submit dkg result")
+	expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("create retry mechanism")
 	}
+	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
+
+	err = retry.Do(context.TODO(), maxedExpRetry, func(ctx context.Context) error {
+		return retry.RetryableError(b.dkgContractClient.SubmitResult(pubKey, groupKeys))
+	})
+
+	if err != nil {
+		b.log.Error().Err(err).Msg("failed to submit dkg result")
+		return err
+	}
+
 	b.log.Debug().Msg("dkg result submitted")
 	return nil
 }
@@ -275,21 +287,4 @@ func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (
 		signData[:],
 		NewDKGMessageHasher(),
 	)
-}
-
-// retry makes maxRetry attempts to executed function f, with retryMilliseconds
-// between each attempt. It returns an error if all attemps failed.
-func (b *Broker) retry(f func() error, maxRetry int, retryMilliseconds int) bool {
-	success := false
-	for attempt := 1; attempt <= maxRetry; attempt++ {
-		err := f()
-		if err != nil {
-			b.log.Warn().Err(err).Msgf("attempt %d/%d failed", attempt, maxRetry)
-			time.Sleep(RETRY_MILLISECONDS * time.Millisecond)
-			continue
-		}
-		success = true
-		break
-	}
-	return success
 }

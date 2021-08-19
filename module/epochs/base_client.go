@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"fmt"
+	"github.com/sethvargo/go-retry"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -11,6 +12,11 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/module"
+)
+
+const (
+	waitForSealedRetryInterval = 3 * time.Second
+	waitForSealedMaxDuration = 5 * time.Minute
 )
 
 // BaseClient represents the core fields and methods needed to create
@@ -79,25 +85,27 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 // WaitForSealed waits for a transaction to be sealed
 func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
 
-	attempts := 1
-	for {
-		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
+	constRetry, err := retry.NewConstant(waitForSealedRetryInterval)
+	if err != nil {
+		return fmt.Errorf("cannot create retry mechanism: %w", err)
+	}
+	maxedConstRetry := retry.WithMaxDuration(waitForSealedMaxDuration, constRetry)
 
-		// check for a cancelled/expired context
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
+	attempts := 0
+	err = retry.Do(ctx, maxedConstRetry, func(ctx context.Context) error {
+		attempts++
+		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
-			log.Error().Err(err).Msg("could not get transaction result")
-			continue
+			log.Error().Err(err).Msg("could not get transaction result retrying")
+			return retry.RetryableError(fmt.Errorf("oops"))
 		}
+
 		if result.Error != nil {
 			return fmt.Errorf("error executing transaction: %w", result.Error)
 		}
+
 		log.Info().Str("status", result.Status.String()).Msg("got transaction result")
 
 		// if the transaction has expired we skip waiting for seal
@@ -109,13 +117,12 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 			return nil
 		}
 
-		attempts++
 
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(TransactionStatusRetryTimeout):
-			// re-enter the top of the for loop
-		}
+		return retry.RetryableError(fmt.Errorf("waiting for transaction to be sealed retrying"))
+	})
+	if err != nil {
+		return err
 	}
+
+	return nil
 }
