@@ -44,6 +44,10 @@ func (e Event) ID() Identifier {
 	return MakeID(wrapEventID(e))
 }
 
+func (e Event) Checksum() Identifier {
+	return MakeID(e)
+}
+
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
 	w := wrapEventID(e)

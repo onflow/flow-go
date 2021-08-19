@@ -10,7 +10,7 @@ import (
 
 // Voter produces votes for the given block
 type Voter struct {
-	signer        hotstuff.BlockSigner // to create vote
+	signer        hotstuff.SignerVerifier
 	forks         hotstuff.ForksReader
 	persist       hotstuff.Persister
 	committee     hotstuff.Committee // only produce votes when we are valid committee members
@@ -19,7 +19,7 @@ type Voter struct {
 
 // New creates a new Voter instance
 func New(
-	signer hotstuff.BlockSigner,
+	signer hotstuff.SignerVerifier,
 	forks hotstuff.ForksReader,
 	persist hotstuff.Persister,
 	committee hotstuff.Committee,
