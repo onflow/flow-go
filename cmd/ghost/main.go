@@ -23,7 +23,7 @@ func main() {
 		Module("message validators", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			validators := []network.MessageValidator{
 				// filter out messages sent by this node itself
-				validator.NewSenderValidator(node.Me.NodeID()),
+				validator.ValidateNotSender(node.Me.NodeID()),
 				// but retain all the 1-k messages even if they are not intended for this node
 			}
 			node.MsgValidators = validators

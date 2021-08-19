@@ -215,10 +215,14 @@ func (et *ExecutionTree) PruneUpToHeight(limit uint64) error {
 
 // Size returns the number of receipts stored in the mempool
 func (et *ExecutionTree) Size() uint {
+	et.RLock()
+	defer et.RUnlock()
 	return et.size
 }
 
 // LowestHeight returns the lowest height, where results are still stored in the mempool.
 func (et *ExecutionTree) LowestHeight() uint64 {
+	et.RLock()
+	defer et.RUnlock()
 	return et.forest.LowestLevel
 }

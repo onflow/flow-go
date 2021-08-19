@@ -1,6 +1,6 @@
 # Flow Cryptography
 
-This Go package provides the cryptography tools needed by Flow blockchain.
+This Go package provides the cryptography tools needed by the Flow blockchain.
 Most of the primitives and protocols can be used in other projects and are not specific to Flow.
 
 Flow is an ongoing project, which means that new features will still be added and modifications will still be made to improve security and performance of the cryptography package.
@@ -15,23 +15,37 @@ Cloning Flow repository and following the [installation steps](https://github.co
 
 If you wish to only import the Flow cryptography package to your Go project, please follow the following steps:
 
-- Get Flow cryptography package.
+- Get Flow cryptography package 
 ```
 go get github.com/onflow/flow-go/crypto
 ```
-- Install [CMake](https://cmake.org/install/), which is used for building the package.
-- From the package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. For instance:
-```
-cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.12.0/
-go generate
+or simply import the package to your Go project
+ ```
+import "github.com/onflow/flow-go/crypto"
 ```
 
-Skipping the above step will result in compilation errors related to missing "relic" files. For instance:
+This is enough to run the package code for many functionalities. However, this isn't enough if BLS signature related functionalities are used. The BLS features rely on an extrnal C library ([Relic](https://github.com/relic-toolkit/relic)) for lower level mathematical operations. Building your project at this stage including BLS functionalities would result in build errors related to missing "relic" files. For instance:
 ```
 fatal error: 'relic.h' file not found
 #include "relic.h"
          ^~~~~~~~~
 ```
+
+ An extra step is required to compile the external dependency (Relic) locally. 
+
+- Install [CMake](https://cmake.org/install/), which is used for building the package. The build also requires [Git](http://git-scm.com/) and bash scripting.  
+- From the Go package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. `version-tag` is the imported package version. 
+For instance:
+```
+cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.18.0/
+go generate
+```
+
+When building your project and including any BLS functionality, adding a build tag to include the BLS files in the build is necessary. 
+```
+go test -tags=relic
+```
+
 
 ## Algorithms
 
