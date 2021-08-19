@@ -15,6 +15,7 @@ import (
 	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -378,6 +379,8 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 	nodes, identities := suite.NodesFixture(2, nil, false)
 	defer StopNodes(suite.T(), nodes)
 	require.Len(suite.T(), identities, 2)
+	nodeInfo1, err := PeerAddressInfo(*identities[1])
+	require.NoError(suite.T(), err)
 
 	wg := sync.WaitGroup{}
 
@@ -386,7 +389,8 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 	createStream := func() {
 		<-gate
-		_, err := nodes[0].CreateStream(suite.ctx, *identities[1])
+		require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), nodeInfo1))
+		_, err := nodes[0].CreateStream(suite.ctx, nodeInfo1.ID)
 		assert.NoError(suite.T(), err) // assert that stream was successfully created
 		wg.Done()
 	}
@@ -446,10 +450,13 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 	// Creates nodes
 	nodes, identities := suite.NodesFixture(2, handler, false)
 	defer StopNodes(suite.T(), nodes)
+	nodeInfo1, err := PeerAddressInfo(*identities[1])
+	require.NoError(suite.T(), err)
 
 	for i := 0; i < count; i++ {
 		// Create stream from node 1 to node 2 (reuse if one already exists)
-		s, err := nodes[0].CreateStream(context.Background(), *identities[1])
+		require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), nodeInfo1))
+		s, err := nodes[0].CreateStream(context.Background(), nodeInfo1.ID)
 		assert.NoError(suite.T(), err)
 		w := bufio.NewWriter(s)
 
@@ -506,7 +513,9 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64) {
 	pctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	resp, rtt, err := source.Ping(pctx, target)
+	pid, err := ExtractPeerID(target.NetworkPubKey)
+	assert.NoError(t, err)
+	resp, rtt, err := source.Ping(pctx, pid)
 	assert.NoError(t, err)
 	assert.NotZero(t, rtt)
 	assert.Equal(t, expectedVersion, resp.Version)
@@ -522,10 +531,14 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 	node1 := nodes[0]
 	node1Id := *identities[0]
 	defer StopNode(suite.T(), node1)
+	node1Info, err := PeerAddressInfo(node1Id)
+	assert.NoError(suite.T(), err)
 
 	node2 := nodes[1]
 	node2Id := *identities[1]
 	defer StopNode(suite.T(), node2)
+	node2Info, err := PeerAddressInfo(node2Id)
+	assert.NoError(suite.T(), err)
 
 	requireError := func(err error) {
 		require.Error(suite.T(), err)
@@ -534,38 +547,40 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	suite.Run("outbound connection to a not-allowed node is rejected", func() {
 		// node1 and node2 both have no allowListed peers
-		_, err := node1.CreateStream(suite.ctx, node2Id)
+		requireError(node1.AddPeer(context.Background(), node2Info))
+		_, err := node1.CreateStream(suite.ctx, node2Info.ID)
 		requireError(err)
-		_, err = node2.CreateStream(suite.ctx, node1Id)
+		requireError(node2.AddPeer(context.Background(), node1Info))
+		_, err = node2.CreateStream(suite.ctx, node1Info.ID)
 		requireError(err)
 	})
 
 	suite.Run("inbound connection from an allowed node is rejected", func() {
 
 		// node1 allowlists node2 but node2 does not allowlists node1
-		err := node1.UpdateAllowList(flow.IdentityList{&node2Id})
-		require.NoError(suite.T(), err)
+		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
-		_, err = node1.CreateStream(suite.ctx, node2Id)
+		require.NoError(suite.T(), node1.AddPeer(context.Background(), node2Info))
+		_, err = node1.CreateStream(suite.ctx, node2Info.ID)
 		require.Error(suite.T(), err)
 	})
 
 	suite.Run("outbound connection to an approved node is allowed", func() {
 
 		// node1 allowlists node2
-		err := node1.UpdateAllowList(flow.IdentityList{&node2Id})
-		require.NoError(suite.T(), err)
+		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
 		// node2 allowlists node1
-		err = node2.UpdateAllowList(flow.IdentityList{&node1Id})
-		require.NoError(suite.T(), err)
+		node2.UpdateAllowList(peer.IDSlice{node1Info.ID})
 
 		// node1 should be allowed to connect to node2
-		_, err = node1.CreateStream(suite.ctx, node2Id)
+		require.NoError(suite.T(), node1.AddPeer(context.Background(), node2Info))
+		_, err = node1.CreateStream(suite.ctx, node2Info.ID)
 		require.NoError(suite.T(), err)
 		// node2 should be allowed to connect to node1
-		_, err = node2.CreateStream(suite.ctx, node1Id)
+		require.NoError(suite.T(), node2.AddPeer(context.Background(), node1Info))
+		_, err = node2.CreateStream(suite.ctx, node1Info.ID)
 		require.NoError(suite.T(), err)
 	})
 }
@@ -576,12 +591,12 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
 	node1 := node[0]
 	node1Id := identity[0]
 	defer StopNode(suite.T(), node1)
+	node1Info, err := PeerAddressInfo(*node1Id)
+	assert.NoError(suite.T(), err)
 
 	suite.Run("updating allowlist of node w/o ConnGater does not crash", func() {
-
 		// node1 allowlists node1
-		err := node1.UpdateAllowList(flow.IdentityList{node1Id})
-		require.Error(suite.T(), err)
+		node1.UpdateAllowList(peer.IDSlice{node1Info.ID})
 	})
 }
 
