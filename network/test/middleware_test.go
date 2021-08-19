@@ -321,6 +321,44 @@ func (m *MiddlewareTestSuite) TestSpoofedPubSubHello() {
 
 }
 
+// TestSpoofedDirect sends a message from the first middleware of the test suit to the last one
+// we check a pubsub message with a spoofed OriginID does not get delivered
+func (m *MiddlewareTestSuite) TestSpoofedDirect() {
+
+	// extracts sender id based on the mock option
+	var err error
+	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
+	firstNode := 0
+	lastNode := m.size - 1
+
+	spoofedID := unittest.IdentifierFixture()
+
+	spoofedMsg := createMessage(spoofedID, m.ids[lastNode].NodeID, "hello")
+
+	// sends a direct spoofed message from first node to the last node
+	err = m.mws[firstNode].SendDirect(spoofedMsg, m.ids[lastNode].NodeID)
+	require.NoError(m.Suite.T(), err)
+
+	// assert that the spoofed message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[lastNode].AssertNumberOfCalls(m.T(), "Receive", 0)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	invalidID := m.ids[lastNode].NodeID
+
+	invalidMsg := createMessage(invalidID, m.ids[lastNode].NodeID, "hello")
+
+	// sends a direct spoofed message from first node to the last node
+	err = m.mws[firstNode].SendDirect(invalidMsg, m.ids[lastNode].NodeID)
+	require.NoError(m.Suite.T(), err)
+
+	// assert that the spoofed message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[lastNode].AssertNumberOfCalls(m.T(), "Receive", 0)
+	}, 2*time.Second, 100*time.Millisecond)
+
+}
+
 // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
 // size beyond the permissible unicast message size returns an error.
 func (m *MiddlewareTestSuite) TestMaxMessageSize_SendDirect() {
