@@ -14,7 +14,6 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
@@ -699,19 +698,6 @@ func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	key, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSASecp256k1, seed)
 	require.NoError(t, err)
 	return key
-}
-
-// generateNetworkingAndLibP2PKeys is a test helper that generates a ECDSA flow key pairs, and translate it to
-// libp2p key pairs. It returns both generated pairs of keys.
-func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
-	// generates flow key
-	key := generateNetworkingKey(t)
-
-	// translates flow key into libp2p key
-	libP2Pkey, err := PrivKey(key)
-	require.NoError(t, err)
-
-	return libP2Pkey, key
 }
 
 // silentNodeFixture returns a TCP listener and a node which never replies

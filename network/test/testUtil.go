@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -19,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	message2 "github.com/onflow/flow-go/model/libp2p/message"
+	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
@@ -246,16 +245,6 @@ func generateLibP2PNode(t *testing.T,
 
 	noopMetrics := metrics.NewNoopCollector()
 
-	// create PubSub options for libp2p to use
-	psOptions := []pubsub.Option{
-		// skip message signing
-		pubsub.WithMessageSigning(false),
-		// skip message signature
-		pubsub.WithStrictSignatureVerification(false),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
-	}
-
 	pingInfoProvider := new(mocknetwork.PingInfoProvider)
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
@@ -273,7 +262,7 @@ func generateLibP2PNode(t *testing.T,
 		SetRootBlockID(rootBlockID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
-		SetPubsubOptions(psOptions...).
+		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetLogger(logger).
@@ -345,7 +334,7 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	// reserves 1000 bytes for the message headers, encoding overhead, and libp2p message overhead.
 	overhead := 1000
 	require.Greater(t, int(size), overhead, "could not generate message below size threshold")
-	emptyEvent := &message2.TestMessage{
+	emptyEvent := &message.TestMessage{
 		Text: "",
 	}
 
