@@ -128,7 +128,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 				return nil
 			}
 
-			retry.BackoffExponential(context.TODO(),"MessagingEngine.forwardOutgoingMessages", f, RETRY_MAX, RETRY_MILLISECONDS, e.log)
+			retry.BackoffExponential(e.unit.Ctx(),"MessagingEngine.forwardOutgoingMessages", f, RETRY_MAX, RETRY_MILLISECONDS, e.log)
 		case <-e.unit.Quit():
 			return
 		}

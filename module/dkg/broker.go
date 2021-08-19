@@ -108,8 +108,8 @@ func (b *Broker) Broadcast(data []byte) {
 	}
 
 	success := retry.BackoffExponential(
-		"Broker.Broadcast",
 		context.TODO(),
+		"Broker.Broadcast",
 		func(ctx context.Context) error {
 			return b.dkgContractClient.Broadcast(bcastMsg)
 		},
@@ -182,8 +182,8 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
 	success := retry.BackoffExponential(
-		"Broker.SubmitResult",
 		context.TODO(),
+		"Broker.SubmitResult",
 		func(ctx context.Context) error {
 			return b.dkgContractClient.SubmitResult(pubKey, groupKeys)
 		},

@@ -98,21 +98,21 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 		return nil
 	}
 
-	retry.WithTimeout(ctx, "BaseClient.WaitForSealed", f, waitForSealedTimeout, waitForSealedRetry, c.Log)
+	for {
+		retry.WithTimeout(ctx, "BaseClient.WaitForSealed", f, waitForSealedTimeout, waitForSealedRetry, c.Log)
 
-	if result.Error != nil {
-		return fmt.Errorf("error executing transaction: %w", result.Error)
+		if result.Error != nil {
+			return fmt.Errorf("error executing transaction: %w", result.Error)
+		}
+		c.Log.Info().Str("status", result.Status.String()).Msg("got transaction result")
+
+		// if the transaction has expired we skip waiting for seal
+		if result.Status == sdk.TransactionStatusExpired {
+			return fmt.Errorf("transaction has expired")
+		}
+
+		if result.Status == sdk.TransactionStatusSealed {
+			return nil
+		}
 	}
-	c.Log.Info().Str("status", result.Status.String()).Msg("got transaction result")
-
-	// if the transaction has expired we skip waiting for seal
-	if result.Status == sdk.TransactionStatusExpired {
-		return fmt.Errorf("transaction has expired")
-	}
-
-	if result.Status == sdk.TransactionStatusSealed {
-		return nil
-	}
-
-	return fmt.Errorf("unexpected transaction status %s", result.Status.String())
 }
