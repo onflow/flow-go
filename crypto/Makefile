@@ -6,7 +6,10 @@ IMAGE_TAG := v0.0.7
 .PHONY: test
 test:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic -v ./...
+cross-blst-test:
+	# test all packages with Relic library enabled
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic,blst -run BLST -v ./...
 
 .PHONY: docker-build
 docker-build:
