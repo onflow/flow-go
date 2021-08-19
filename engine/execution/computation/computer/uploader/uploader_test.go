@@ -3,6 +3,7 @@ package uploader
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"sync"
@@ -19,43 +20,105 @@ import (
 
 func Test_AsyncUploader(t *testing.T) {
 
-	wgCalled := sync.WaitGroup{}
-	wgCalled.Add(3)
+	t.Run("uploads are run in parallel and emit metrics", func(t *testing.T) {
+		wgCalled := sync.WaitGroup{}
+		wgCalled.Add(3)
 
-	wgAllDone := sync.WaitGroup{}
-	wgAllDone.Add(1)
+		wgAllDone := sync.WaitGroup{}
+		wgAllDone.Add(1)
 
-	uploader := &DummyUploader{
-		f: func() {
-			// this should be called 3 times
-			wgCalled.Done()
+		uploader := &DummyUploader{
+			f: func() error {
+				// this should be called 3 times
+				wgCalled.Done()
 
-			wgAllDone.Wait()
-		},
-	}
+				wgAllDone.Wait()
 
-	metrics := &DummyCollector{}
-	async := NewAsyncUploader(uploader, zerolog.Nop(), metrics)
+				return nil
+			},
+		}
 
-	err := async.Upload(nil)
-	require.NoError(t, err)
+		metrics := &DummyCollector{}
+		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 1, zerolog.Nop(), metrics)
 
-	err = async.Upload(nil)
-	require.NoError(t, err)
+		err := async.Upload(nil)
+		require.NoError(t, err)
 
-	err = async.Upload(nil)
-	require.NoError(t, err)
+		err = async.Upload(nil)
+		require.NoError(t, err)
 
-	wgCalled.Wait() // all three are in progress, check metrics
+		err = async.Upload(nil)
+		require.NoError(t, err)
 
-	require.Equal(t, int64(3), metrics.Counter.Load())
+		wgCalled.Wait() // all three are in progress, check metrics
 
-	wgAllDone.Done() //release all
+		require.Equal(t, int64(3), metrics.Counter.Load())
 
-	<-async.Done()
+		wgAllDone.Done() //release all
 
-	require.Equal(t, int64(0), metrics.Counter.Load())
-	require.True(t, metrics.DurationTotal.Load() > 0, "duration should be nonzero")
+		<-async.Done()
+
+		require.Equal(t, int64(0), metrics.Counter.Load())
+		require.True(t, metrics.DurationTotal.Load() > 0, "duration should be nonzero")
+	})
+
+	t.Run("failed uploads are retried", func(t *testing.T) {
+
+		callCount := 0
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		uploader := &DummyUploader{
+			f: func() error {
+				if callCount < 3 {
+					callCount++
+					return fmt.Errorf("artificial upload error")
+				}
+				wg.Done()
+				return nil
+			},
+		}
+
+		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
+
+		err := async.Upload(nil) // doesn't matter what we upload
+		require.NoError(t, err)
+
+		wg.Wait()
+
+		require.Equal(t, 3, callCount)
+	})
+
+	t.Run("stopping component stops retrying", func(t *testing.T) {
+
+		callCount := 0
+
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+
+		uploader := &DummyUploader{
+			f: func() error {
+				defer func() {
+					callCount++
+				}()
+				wg.Wait()
+				return fmt.Errorf("this should return only once")
+			},
+		}
+
+		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
+
+		err := async.Upload(nil) // doesn't matter what we upload
+		require.NoError(t, err)
+
+		c := async.Done()
+		wg.Done()
+		<-c
+
+		require.Equal(t, 1, callCount)
+	})
+
 }
 
 func Test_GCPBucketUploader(t *testing.T) {
@@ -96,11 +159,27 @@ func Test_GCPBucketUploader(t *testing.T) {
 }
 
 type DummyUploader struct {
-	f func()
+	f func() error
 }
 
 func (d *DummyUploader) Upload(_ *execution.ComputationResult) error {
-	d.f()
+	return d.f()
+}
+
+type FailingUploader struct {
+	failTimes int
+	callCount int
+}
+
+func (d *FailingUploader) Upload(_ *execution.ComputationResult) error {
+	defer func() {
+		d.callCount++
+	}()
+
+	if d.callCount <= d.failTimes {
+		return fmt.Errorf("an artificial error")
+	}
+
 	return nil
 }
 

@@ -13,26 +13,32 @@ import (
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module"
 	"github.com/rs/zerolog"
+
+	"github.com/sethvargo/go-retry"
 )
 
 type Uploader interface {
 	Upload(computationResult *execution.ComputationResult) error
 }
 
-func NewAsyncUploader(uploader Uploader, log zerolog.Logger, metrics module.ExecutionMetrics) *AsyncUploader {
+func NewAsyncUploader(uploader Uploader, retryInitialTimeout time.Duration, maxRetryNumber uint64, log zerolog.Logger, metrics module.ExecutionMetrics) *AsyncUploader {
 	return &AsyncUploader{
-		unit:     engine.NewUnit(),
-		uploader: uploader,
-		log:      log.With().Str("component", "block_data_uploader").Logger(),
-		metrics:  metrics,
+		unit:                engine.NewUnit(),
+		uploader:            uploader,
+		log:                 log.With().Str("component", "block_data_uploader").Logger(),
+		metrics:             metrics,
+		retryInitialTimeout: retryInitialTimeout,
+		maxRetryNumber:      maxRetryNumber,
 	}
 }
 
 type AsyncUploader struct {
-	unit     *engine.Unit
-	uploader Uploader
-	log      zerolog.Logger
-	metrics  module.ExecutionMetrics
+	unit                *engine.Unit
+	uploader            Uploader
+	log                 zerolog.Logger
+	metrics             module.ExecutionMetrics
+	retryInitialTimeout time.Duration
+	maxRetryNumber      uint64
 }
 
 func (a *AsyncUploader) Ready() <-chan struct{} {
@@ -44,13 +50,27 @@ func (a *AsyncUploader) Done() <-chan struct{} {
 }
 
 func (a *AsyncUploader) Upload(computationResult *execution.ComputationResult) error {
+
+	fibRetry, err := retry.NewFibonacci(a.retryInitialTimeout)
+	if err != nil {
+		return fmt.Errorf("cannot create retry mechanism: %w", err)
+	}
+	cappedFibRetry := retry.WithMaxRetries(a.maxRetryNumber, fibRetry)
+
 	a.unit.Launch(func() {
 		a.metrics.ExecutionBlockDataUploadStarted()
 		start := time.Now()
 
-		err := a.uploader.Upload(computationResult)
+		err := retry.Do(a.unit.Ctx(), cappedFibRetry, func(ctx context.Context) error {
+			err := a.uploader.Upload(computationResult)
+			if err != nil {
+				a.log.Warn().Err(err).Msg("error while uploading block data, retrying")
+			}
+			return retry.RetryableError(err)
+		})
+
 		if err != nil {
-			a.log.Error().Err(err).Msg("error while uploading block data")
+			a.log.Error().Err(err).Msg("failed to upload block data")
 		}
 
 		a.metrics.ExecutionBlockDataUploadFinished(time.Since(start))
@@ -62,7 +82,6 @@ func NewGCPBucketUploader(ctx context.Context, bucketName string, log zerolog.Lo
 
 	// no need to close the client according to documentation
 	// https://pkg.go.dev/cloud.google.com/go/storage#Client.Close
-	ctx = context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create GCP Bucket client: %w", err)
