@@ -96,6 +96,7 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 	return addr, err
 }
 
+// lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
 	if addr, ok := r.c.resolveTXTCache(txt); ok {
 		// resolving address from cache
