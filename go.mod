@@ -46,10 +46,10 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.0-beta1.0.20211026173452-734a61c6a1c7
-	github.com/onflow/cadence-latest v0.0.0-00010101000000-000000000000
-	github.com/onflow/cadence-v0180 v0.0.0-00010101000000-000000000000
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
+	github.com/onflow/cadence v0.18.0
+	github.com/onflow/cadence/v18 v18.0.0-00010101000000-000000000000
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3
@@ -91,8 +91,8 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
 
-replace github.com/onflow/cadence-v0180 => github.com/onflow/cadence v0.18.0
+replace github.com/onflow/cadence => ../cadence
 
-replace github.com/onflow/cadence-latest => ../cadence
+replace github.com/onflow/cadence/v18 => github.com/onflow/cadence v0.18.0
 
 replace github.com/onflow/atree => ../atree
