@@ -16,6 +16,7 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -146,11 +147,11 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, peerInfo))
 	}
 
-	// Checks if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count)
+	// Checks if both of the other nodes have been added as peers to the first node
+	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count-1)
 }
 
-// TestAddPeers checks if nodes can be added as peers to a given node
+// TestRemovePeers checks if nodes can be removed as peers from a given node
 func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 
 	count := 3
@@ -166,8 +167,8 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, pInfo))
 	}
 
-	// check if all 3 nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count)
+	// check if all other nodes have been added as peers to the first node
+	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count-1)
 
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, pInfo := range peerInfos[1:] {
@@ -195,7 +196,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 	for i := 0; i < 100; i++ {
 		pInfo, err := PeerAddressInfo(*id2)
 		require.NoError(suite.T(), err)
-		require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), pInfo))
+		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
 		// Assert that a stream was returned without error
 		require.NoError(suite.T(), err)
@@ -253,7 +254,7 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	require.NoError(suite.T(), err)
 
 	// Create stream from node 1 to node 2
-	require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), pInfo2))
+	nodes[0].host.Peerstore().AddAddrs(pInfo2.ID, pInfo2.Addrs, peerstore.AddressTTL)
 	s1, err := nodes[0].CreateStream(context.Background(), pInfo2.ID)
 	assert.NoError(suite.T(), err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
@@ -275,7 +276,7 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Create stream from node 2 to node 1
-	require.NoError(suite.T(), nodes[1].AddPeer(context.Background(), pInfo1))
+	nodes[1].host.Peerstore().AddAddrs(pInfo1.ID, pInfo1.Addrs, peerstore.AddressTTL)
 	s2, err := nodes[1].CreateStream(context.Background(), pInfo1.ID)
 	assert.NoError(suite.T(), err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
@@ -322,7 +323,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	grace := 1 * time.Second
 	unittest.AssertReturnsBefore(suite.T(),
 		func() {
-			require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), silentNodeInfo))
+			nodes[0].host.Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
 			_, err = nodes[0].CreateStream(ctx, silentNodeInfo.ID)
 		},
 		DefaultUnicastTimeout+grace)
@@ -350,7 +351,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// creates a stream to unresponsive node and makes sure that the stream creation is blocked
 	blockedCallCh := unittest.RequireNeverReturnBefore(suite.T(),
 		func() {
-			require.NoError(suite.T(), goodNodes[0].AddPeer(context.Background(), silentNodeInfo))
+			goodNodes[0].host.Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
 			_, _ = goodNodes[0].CreateStream(suite.ctx, silentNodeInfo.ID) // this call will block
 		},
 		1*time.Second,
@@ -359,7 +360,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// requires same peer can still connect to the other regular peer without being blocked
 	unittest.RequireReturnsBefore(suite.T(),
 		func() {
-			require.NoError(suite.T(), goodNodes[0].AddPeer(context.Background(), goodNodeInfo1))
+			goodNodes[0].host.Peerstore().AddAddrs(goodNodeInfo1.ID, goodNodeInfo1.Addrs, peerstore.AddressTTL)
 			_, err := goodNodes[0].CreateStream(suite.ctx, goodNodeInfo1.ID)
 			require.NoError(suite.T(), err)
 		},
@@ -389,7 +390,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 	createStream := func() {
 		<-gate
-		require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), nodeInfo1))
+		nodes[0].host.Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
 		_, err := nodes[0].CreateStream(suite.ctx, nodeInfo1.ID)
 		assert.NoError(suite.T(), err) // assert that stream was successfully created
 		wg.Done()
@@ -455,7 +456,7 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 
 	for i := 0; i < count; i++ {
 		// Create stream from node 1 to node 2 (reuse if one already exists)
-		require.NoError(suite.T(), nodes[0].AddPeer(context.Background(), nodeInfo1))
+		nodes[0].host.Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
 		s, err := nodes[0].CreateStream(context.Background(), nodeInfo1.ID)
 		assert.NoError(suite.T(), err)
 		w := bufio.NewWriter(s)
