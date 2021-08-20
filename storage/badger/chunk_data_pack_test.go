@@ -18,7 +18,7 @@ import (
 
 // TestChunkDataPack_Store evaluates correct storage and retrieval of chunk data packs in the storage.
 func TestChunkDataPack_Store(t *testing.T) {
-	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks) {
+	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, _ *badger.DB) {
 		wg := sync.WaitGroup{}
 		wg.Add(len(chunkDataPacks))
 		for _, chunkDataPack := range chunkDataPacks {
@@ -34,7 +34,30 @@ func TestChunkDataPack_Store(t *testing.T) {
 	})
 }
 
-func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *badgerstorage.ChunkDataPacks)) {
+// TestChunkDataPack_BatchStore evaluates correct batch storage and retrieval of chunk data packs in the storage.
+func TestChunkDataPack_BatchStore(t *testing.T) {
+	WithChunkDataPacks(t, 100, func(t *testing.T, chunkDataPacks []*flow.ChunkDataPack, chunkDataPackStore *badgerstorage.ChunkDataPacks, db *badger.DB) {
+		batch := badgerstorage.NewBatch(db)
+
+		wg := sync.WaitGroup{}
+		wg.Add(len(chunkDataPacks))
+		for _, chunkDataPack := range chunkDataPacks {
+			go func(cdp flow.ChunkDataPack) {
+				err := chunkDataPackStore.BatchStore(&cdp, batch)
+				require.NoError(t, err)
+
+				wg.Done()
+			}(*chunkDataPack)
+		}
+
+		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not store chunk data packs on time")
+
+		err := batch.Flush()
+		require.NoError(t, err)
+	})
+}
+
+func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *badgerstorage.ChunkDataPacks, *badger.DB)) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
 		collections := badgerstorage.NewCollections(db, transactions)
@@ -52,7 +75,7 @@ func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*
 		}
 
 		// stores chunk data packs in the memory using provided store function.
-		storeFunc(t, chunkDataPacks, store)
+		storeFunc(t, chunkDataPacks, store, db)
 		//batch := badgerstorage.NewBatch(db)
 		//err = store.BatchStore(expected, batch)
 		//require.NoError(t, err)
