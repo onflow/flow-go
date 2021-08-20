@@ -514,9 +514,10 @@ func (suite *LibP2PNodeTestSuite) TestPing() {
 func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64) {
 	pctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	pid, err := ExtractPeerID(target.NetworkPubKey)
+	pInfo, err := PeerAddressInfo(target)
 	assert.NoError(t, err)
-	resp, rtt, err := source.Ping(pctx, pid)
+	source.host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+	resp, rtt, err := source.Ping(pctx, pInfo.ID)
 	assert.NoError(t, err)
 	assert.NotZero(t, rtt)
 	assert.Equal(t, expectedVersion, resp.Version)
@@ -548,10 +549,10 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	suite.Run("outbound connection to a not-allowed node is rejected", func() {
 		// node1 and node2 both have no allowListed peers
-		requireError(node1.AddPeer(context.Background(), node2Info))
+		node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
 		_, err := node1.CreateStream(suite.ctx, node2Info.ID)
 		requireError(err)
-		requireError(node2.AddPeer(context.Background(), node1Info))
+		node2.host.Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.AddressTTL)
 		_, err = node2.CreateStream(suite.ctx, node1Info.ID)
 		requireError(err)
 	})
@@ -563,7 +564,7 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
-		require.NoError(suite.T(), node1.AddPeer(context.Background(), node2Info))
+		node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
 		_, err = node1.CreateStream(suite.ctx, node2Info.ID)
 		require.Error(suite.T(), err)
 	})
@@ -576,11 +577,11 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 		node2.UpdateAllowList(peer.IDSlice{node1Info.ID})
 
 		// node1 should be allowed to connect to node2
-		require.NoError(suite.T(), node1.AddPeer(context.Background(), node2Info))
+		node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
 		_, err = node1.CreateStream(suite.ctx, node2Info.ID)
 		require.NoError(suite.T(), err)
 		// node2 should be allowed to connect to node1
-		require.NoError(suite.T(), node2.AddPeer(context.Background(), node1Info))
+		node2.host.Peerstore().AddAddrs(node1Info.ID, node1Info.Addrs, peerstore.AddressTTL)
 		_, err = node2.CreateStream(suite.ctx, node1Info.ID)
 		require.NoError(suite.T(), err)
 	})
