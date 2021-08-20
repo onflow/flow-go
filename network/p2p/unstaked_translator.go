@@ -3,9 +3,9 @@ package p2p
 import (
 	"fmt"
 
+	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	crypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/multiformats/go-multihash"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -18,12 +18,19 @@ func NewUnstakedNetworkIDTranslator() *UnstakedNetworkIDTranslator {
 
 func (t *UnstakedNetworkIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
 	data := append([]byte{0x02}, flowID[:]...)
-	mh, err := multihash.Sum(data, multihash.IDENTITY, -1)
+
+	um := lcrypto.PubKeyUnmarshallers[crypto_pb.KeyType_Secp256k1]
+	key, err := um(data)
 	if err != nil {
-		return "", fmt.Errorf("failed to compute multihash: %w", err)
+		return "", fmt.Errorf("failed to convert flow ID to libp2p public key: %w", err)
 	}
 
-	return peer.ID(mh), nil
+	pid, err := peer.IDFromPublicKey(key)
+	if err != nil {
+		return "", fmt.Errorf("failed to get peer ID from libp2p public key: %w", err)
+	}
+
+	return pid, nil
 }
 
 func (t *UnstakedNetworkIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
