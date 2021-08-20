@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -232,7 +233,17 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := p2p.NewNetwork(log, cbor.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
+		net, err := p2p.NewNetwork(
+			log,
+			cbor.NewCodec(),
+			me,
+			mws[i],
+			csize,
+			tops[i],
+			sms[i],
+			metrics,
+			id.NewFixedIdentityProvider(ids),
+		)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
