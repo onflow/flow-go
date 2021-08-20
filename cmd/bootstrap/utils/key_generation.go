@@ -1,7 +1,12 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"fmt"
+	gohash "hash"
+	"io"
+
+	"golang.org/x/crypto/hkdf"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -39,7 +44,7 @@ func drawUnstakedKey(seed []byte) (crypto.PrivateKey, error) {
 	if err != nil {
 		// this should not happen
 		return nil, err
-	} else if key.PublicKey().EncodeCompressed()[0] == X962_INVERSION {
+	} else if key.PublicKey().EncodeCompressed()[0] == 0x03 {
 		// negative key -> unsuitable
 		return nil, fmt.Errorf("Unsuitable negative key")
 	}
