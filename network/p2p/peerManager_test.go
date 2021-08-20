@@ -35,21 +35,32 @@ func (suite *PeerManagerTestSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 }
 
+func (suite *PeerManagerTestSuite) generateIdentities(n int) (flow.IdentityList, peer.IDSlice) {
+	// create some test ids
+	currentIDs := unittest.IdentityListFixture(n)
+
+	// setup a ID provider callback to return currentIDs
+	pids := peer.IDSlice{}
+	for _, id := range currentIDs {
+		key, err := generateFlowNetworkingKey(id.NodeID)
+		require.NoError(suite.T(), err)
+		id.NetworkPubKey = key.PublicKey()
+		pid, err := ExtractPeerID(key.PublicKey())
+		require.NoError(suite.T(), err)
+		pids = append(pids, pid)
+	}
+
+	return currentIDs, pids
+}
+
 // TestUpdatePeers tests that updatePeers calls the connector with the expected list of ids to connect and disconnect
 // from. The tests are cumulative and ordered.
 func (suite *PeerManagerTestSuite) TestUpdatePeers() {
-
 	// create some test ids
-	currentIDs := unittest.IdentityListFixture(10)
+	currentIDs, pids := suite.generateIdentities(10)
 
-	// setup a ID provider callback to return currentIDs
+	// setup a ID provider callback to return peer IDs
 	idProvider := func() (peer.IDSlice, error) {
-		pids := peer.IDSlice{}
-		for _, id := range currentIDs {
-			pid, err := ExtractPeerID(id.NetworkPubKey)
-			require.NoError(suite.T(), err)
-			pids = append(pids, pid)
-		}
 		return pids, nil
 	}
 
@@ -112,14 +123,11 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 
 // TestPeriodicPeerUpdate tests that the peer manager runs periodically
 func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
-	currentIDs := unittest.IdentityListFixture(10)
+	// create some test ids
+	_, pids := suite.generateIdentities(10)
+
+	// setup a ID provider callback to return peer IDs
 	idProvider := func() (peer.IDSlice, error) {
-		pids := peer.IDSlice{}
-		for _, id := range currentIDs {
-			pid, err := ExtractPeerID(id.NetworkPubKey)
-			require.NoError(suite.T(), err)
-			pids = append(pids, pid)
-		}
 		return pids, nil
 	}
 
@@ -150,14 +158,11 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 
 // TestOnDemandPeerUpdate tests that the a peer update can be requested on demand and in between the periodic runs
 func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
-	currentIDs := unittest.IdentityListFixture(10)
+	// create some test ids
+	_, pids := suite.generateIdentities(10)
+
+	// setup a ID provider callback to return peer IDs
 	idProvider := func() (peer.IDSlice, error) {
-		pids := peer.IDSlice{}
-		for _, id := range currentIDs {
-			pid, err := ExtractPeerID(id.NetworkPubKey)
-			require.NoError(suite.T(), err)
-			pids = append(pids, pid)
-		}
 		return pids, nil
 	}
 
@@ -199,14 +204,11 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 
 // TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
 func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
-	currentIDs := unittest.IdentityListFixture(10)
+	// create some test ids
+	_, pids := suite.generateIdentities(10)
+
+	// setup a ID provider callback to return peer IDs
 	idProvider := func() (peer.IDSlice, error) {
-		pids := peer.IDSlice{}
-		for _, id := range currentIDs {
-			pid, err := ExtractPeerID(id.NetworkPubKey)
-			require.NoError(suite.T(), err)
-			pids = append(pids, pid)
-		}
 		return pids, nil
 	}
 
