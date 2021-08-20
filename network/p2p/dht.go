@@ -39,7 +39,7 @@ func AsServer(enable bool) dht.Option {
 	if enable {
 		return dht.Mode(dht.ModeServer)
 	}
-	return dht.Mode(dht.ModeAuto)
+	return dht.Mode(dht.ModeClient)
 }
 
 func WithBootstrapPeers(bootstrapNodes flow.IdentityList) (dht.Option, error) {
