@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -111,21 +110,18 @@ func (t *FixedTableIdentityTranslator) GetPeerID(n flow.Identifier) (peer.ID, er
 	return peerID, nil
 }
 
-func NewFixedTableIdentityTranslator(identities flow.IdentityList) *FixedTableIdentityTranslator {
+func NewFixedTableIdentityTranslator(t *testing.T, identities flow.IdentityList) *FixedTableIdentityTranslator {
 	flow2p2p := make(map[flow.Identifier]peer.ID)
 	p2p2flow := make(map[peer.ID]flow.Identifier)
 
 	for _, identity := range identities {
-		nodeID := identity.ID()
+		nodeID := identity.NodeID
 		networkKey := identity.NetworkPubKey
 		peerPK, err := p2p.LibP2PPublicKeyFromFlow(networkKey)
-		if err != nil {
-			panic("could not interpret a network public key from Flow, test identities setup problem")
-		}
+		require.NoError(t, err)
+
 		peerID, err := peer.IDFromPublicKey(peerPK)
-		if err != nil {
-			panic("could not generate a PeerID from public Key, test identities setup problem")
-		}
+		require.NoError(t, err)
 
 		flow2p2p[nodeID] = peerID
 		p2p2flow[peerID] = nodeID
@@ -178,7 +174,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		}
 
 		// create a fixed id translator for the identities
-		tableTranslator := NewFixedTableIdentityTranslator(identities)
+		tableTranslator := NewFixedTableIdentityTranslator(t, identities)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
