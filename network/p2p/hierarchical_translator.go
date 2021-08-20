@@ -3,6 +3,7 @@ package p2p
 import (
 	"fmt"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -17,13 +18,15 @@ func NewHierarchicalIDTranslator(translators ...IDTranslator) *HierarchicalIDTra
 }
 
 func (t *HierarchicalIDTranslator) GetPeerID(flowID flow.Identifier) (peer.ID, error) {
+	var errs *multierror.Error
 	for _, translator := range t.translators {
 		pid, err := translator.GetPeerID(flowID)
 		if err == nil {
 			return pid, nil
 		}
+		errs = multierror.Append(errs, err)
 	}
-	return "", fmt.Errorf("could not find corresponding peer ID for flow ID %v", flowID)
+	return "", fmt.Errorf("could not find corresponding peer ID for flow ID %v: %w", flowID, errs)
 }
 
 func (t *HierarchicalIDTranslator) GetFlowID(peerID peer.ID) (flow.Identifier, error) {
