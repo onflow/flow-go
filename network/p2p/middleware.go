@@ -250,7 +250,6 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
-
 	mgr, found := m.peerMgr()
 	if found {
 		// stops peer manager
