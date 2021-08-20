@@ -7,7 +7,6 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
@@ -19,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	badgerstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // ReadOnlyExecutionState allows to read the execution state
@@ -66,7 +64,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(log zerolog.Logger, ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 		chunkDataPacks []*flow.ChunkDataPack,
 		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
@@ -329,7 +327,7 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
 
@@ -409,30 +407,6 @@ func (s *state) PersistExecutionState(log zerolog.Logger, ctx context.Context, h
 	err = batch.Flush()
 	if err != nil {
 		return fmt.Errorf("batch flush error: %w", err)
-	}
-
-	// tests retrievable of chunk data packs
-	for _, cdp := range chunkDataPacks {
-		_, err := s.chunkDataPacks.ByChunkID(cdp.ChunkID)
-
-		lg := log.With().
-			Hex("chunk_id", logging.ID(cdp.ChunkID)).
-			Hex("start_state", cdp.StartState[:]).
-			Int("proof_length", len(cdp.Proof[:])).Logger()
-
-		if cdp.Collection != nil {
-			lg = lg.With().Hex("collection_id", logging.ID(cdp.Collection.ID())).Logger()
-		}
-
-		if err != nil {
-			log.Error().
-				Err(err).
-				Hex("proof", cdp.Proof[:]).
-				Msg("could not retrieve chunk data pack for test")
-		}
-
-		lg.Info().Msg("chunk data pack successfully retrieved for test")
-
 	}
 
 	//outside batch because it requires read access
