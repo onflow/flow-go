@@ -736,6 +736,7 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
+	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
 	fnb.EnqueueNetworkInit(ctx)
