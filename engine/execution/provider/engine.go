@@ -185,7 +185,7 @@ func (e *Engine) onChunkDataRequest(
 
 	_, err = e.ensureStaked(chunkDataPack.ChunkID, originID)
 	if err != nil {
-		log.Error().
+		lg.Error().
 			Err(err).
 			Msg("could not verify staked identity of chunk data pack request, dropping it")
 		return
