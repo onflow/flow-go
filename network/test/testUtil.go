@@ -89,49 +89,6 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.NetworkMetrics
 	}
 }
 
-type FixedTableIdentityTranslator struct {
-	flow2p2p map[flow.Identifier]peer.ID
-	p2p2flow map[peer.ID]flow.Identifier
-}
-
-func (t *FixedTableIdentityTranslator) GetFlowID(p peer.ID) (flow.Identifier, error) {
-	nodeID, ok := t.p2p2flow[p]
-	if !ok {
-		return flow.ZeroID, fmt.Errorf("could not find a flow NodeID for peer %v", p)
-	}
-	return nodeID, nil
-}
-
-func (t *FixedTableIdentityTranslator) GetPeerID(n flow.Identifier) (peer.ID, error) {
-	peerID, ok := t.flow2p2p[n]
-	if !ok {
-		return *new(peer.ID), fmt.Errorf("could not find a libp2p PeerID for flow NodeID %v", n)
-	}
-	return peerID, nil
-}
-
-func NewFixedTableIdentityTranslator(identities flow.IdentityList) *FixedTableIdentityTranslator {
-	flow2p2p := make(map[flow.Identifier]peer.ID)
-	p2p2flow := make(map[peer.ID]flow.Identifier)
-
-	for identity := range identities {
-		nodeID := identity.ID()
-		networkKey := identity.NetworkPublicKey
-		peerPK, err := LibP2PPublicKeyFromFlow(networkKey)
-		if err != nil {
-			panic("could not interpret a network public key from Flow, test identities setup problem")
-		}
-		peerID, err := peer.IDFromPublicKey(peerPK)
-		if err != nil {
-			panic("could not generate a PeerID from public Key, test identities setup problem")
-		}
-
-		flow2p2p[nodeID] = peerID
-		p2p2flow[peerID] = nodeID
-	}
-	return &FixedTableIdentityTranslator{flow2p2p, p2p2flow}
-}
-
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
@@ -176,9 +133,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			return node, nil
 		}
 
-		// create a fixed id translator for the identities
-		tableTranslator := NewFixedTableIdentityTranslator(identities)
-
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
 			factory,
@@ -188,9 +142,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultPeerUpdateInterval,
 			p2p.DefaultUnicastTimeout,
 			true,
-			true,
-			tableTranslator,
-		)
+			true)
 	}
 	return mws
 }
