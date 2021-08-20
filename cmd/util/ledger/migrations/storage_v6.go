@@ -42,7 +42,9 @@ func (c *ValueConverter) VisitValue(_ *oldInter.Interpreter, _ oldInter.Value) {
 }
 
 func (c *ValueConverter) VisitTypeValue(_ *oldInter.Interpreter, value oldInter.TypeValue) {
-	panic("implement me")
+	c.result = newInter.TypeValue{
+		Type: ConvertStaticType(value.Type),
+	}
 }
 
 func (c *ValueConverter) VisitVoidValue(_ *oldInter.Interpreter, _ oldInter.VoidValue) {
@@ -244,23 +246,27 @@ func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value old
 }
 
 func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.LinkValue) {
-	panic("implement me")
+	targetPath := c.Convert(value.TargetPath).(newInter.PathValue)
+	c.result = newInter.LinkValue{
+		TargetPath: targetPath,
+		Type:       ConvertStaticType(value.Type),
+	}
 }
 
-func (c *ValueConverter) VisitInterpretedFunctionValue(_ *oldInter.Interpreter, value oldInter.InterpretedFunctionValue) {
-	panic("implement me")
+func (c *ValueConverter) VisitInterpretedFunctionValue(_ *oldInter.Interpreter, _ oldInter.InterpretedFunctionValue) {
+	panic("value not storable")
 }
 
-func (c *ValueConverter) VisitHostFunctionValue(_ *oldInter.Interpreter, value oldInter.HostFunctionValue) {
-	panic("implement me")
+func (c *ValueConverter) VisitHostFunctionValue(_ *oldInter.Interpreter, _ oldInter.HostFunctionValue) {
+	panic("value not storable")
 }
 
-func (c *ValueConverter) VisitBoundFunctionValue(_ *oldInter.Interpreter, value oldInter.BoundFunctionValue) {
-	panic("implement me")
+func (c *ValueConverter) VisitBoundFunctionValue(_ *oldInter.Interpreter, _ oldInter.BoundFunctionValue) {
+	panic("value not storable")
 }
 
-func (c *ValueConverter) VisitDeployedContractValue(_ *oldInter.Interpreter, value oldInter.DeployedContractValue) {
-	panic("implement me")
+func (c *ValueConverter) VisitDeployedContractValue(_ *oldInter.Interpreter, _ oldInter.DeployedContractValue) {
+	panic("value not storable")
 }
 
 func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
