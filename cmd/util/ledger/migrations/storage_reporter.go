@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -161,7 +162,8 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	storedData, version := interpreter.StripMagic(vaultResource)
 
 	commonAddress := common.BytesToAddress([]byte(vaultId.Owner))
-	storedValue, err := interpreter.DecodeValue(storedData, &commonAddress, []string{vaultId.Key}, version, nil)
+
+	storedValue, err := decode(storedData, version, commonAddress)
 	if err != nil {
 		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
 	}
@@ -169,7 +171,7 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	if !ok {
 		return 0, false, fmt.Errorf("could not decode composite at %s: %w", address, err)
 	}
-	balanceField, ok := composite.Fields().Get("balance")
+	balanceField, ok := composite.Fields.Get("balance")
 	if !ok {
 		return 0, false, fmt.Errorf("could get balance field at %s: %w", address, err)
 	}
@@ -190,4 +192,23 @@ func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterI
 		Controller: "",
 		Key:        key,
 	}
+}
+
+func decode(storedData []byte, _ uint16, commonAddress common.Address) (interpreter.Value, error) {
+	// TODO: validate version
+
+	storage := interpreter.NewInMemoryStorage()
+	storageID, err := storage.GenerateStorageID(atree.Address(commonAddress))
+	if err != nil {
+		return nil, err
+	}
+
+	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(storedData)
+
+	decoded, err := interpreter.DecodeStorable(decoder, storageID)
+	if err != nil {
+		return nil, err
+	}
+
+	return interpreter.StoredValue(decoded, storage)
 }
