@@ -7,6 +7,7 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -177,8 +178,8 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 }
 
 func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, peerInfo peer.AddrInfo) {
-	require.NoError(t, sourceNode.AddPeer(context.Background(), peerInfo))
 	// create stream from node 1 to node 2
+	sourceNode.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	s, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
 	// assert that stream creation succeeded
 	require.NoError(t, err)
@@ -186,8 +187,8 @@ func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, peerInfo peer
 }
 
 func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, peerInfo peer.AddrInfo) {
-	require.NoError(t, sourceNode.AddPeer(context.Background(), peerInfo))
 	// create stream from source node to destination address
+	sourceNode.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
 	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
 	// assert that stream creation failed
 	assert.Error(t, err)

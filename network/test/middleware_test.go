@@ -110,8 +110,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	}
 	for i, mw := range m.mws {
 		assert.NoError(m.T(), mw.Start(m.ov[i]))
-		err := mw.UpdateAllowList()
-		require.NoError(m.T(), err)
+		mw.UpdateAllowList()
 	}
 }
 
