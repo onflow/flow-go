@@ -88,7 +88,7 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 
 	constRetry, err := retry.NewConstant(waitForSealedRetryInterval)
 	if err != nil {
-		return fmt.Errorf("cannot create retry mechanism: %w", err)
+		c.Log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
 	maxedConstRetry := retry.WithMaxDuration(waitForSealedMaxDuration, constRetry)
 

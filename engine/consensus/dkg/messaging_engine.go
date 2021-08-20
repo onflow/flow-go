@@ -3,6 +3,7 @@ package dkg
 import (
 	"context"
 	"fmt"
+
 	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
@@ -122,6 +123,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 			if err != nil {
 				e.log.Err(err).Msg("failed to create retry mechanism")
 			}
+
 			maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
 			err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
 				err := e.conduit.Unicast(&msg.DKGMessage, msg.DestID)
@@ -130,6 +132,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 				}
 				return retry.RetryableError(err)
 			})
+			e.log.Err(err).Msg("error sending dkg message")
 		case <-e.unit.Quit():
 			return
 		}

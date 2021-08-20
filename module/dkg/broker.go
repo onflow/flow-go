@@ -114,7 +114,7 @@ func (b *Broker) Broadcast(data []byte) {
 	}
 	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
 
-	err = retry.Do(context.TODO(), maxedExpRetry, func(ctx context.Context) error {
+	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 		err := b.dkgContractClient.Broadcast(bcastMsg)
 		if err != nil {
 			b.log.Error().Err(err).Msg("error broadcasting DKG result retrying")
@@ -123,8 +123,7 @@ func (b *Broker) Broadcast(data []byte) {
 	})
 
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to broadcast message")
-		return
+		b.log.Fatal().Err(err).Msg("failed to broadcast message")
 	}
 
 	b.log.Debug().Msg("dkg message broadcast")
@@ -193,7 +192,7 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	}
 	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
 
-	err = retry.Do(context.TODO(), maxedExpRetry, func(ctx context.Context) error {
+	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 		err := b.dkgContractClient.SubmitResult(pubKey, groupKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msg("error submitting DKG result retrying")
@@ -202,8 +201,7 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	})
 
 	if err != nil {
-		b.log.Error().Err(err).Msg("failed to submit dkg result")
-		return err
+		b.log.Fatal().Err(err).Msg("failed to submit dkg result")
 	}
 
 	b.log.Debug().Msg("dkg result submitted")
