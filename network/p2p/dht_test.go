@@ -43,6 +43,52 @@ func (suite *DHTTestSuite) TearDownTest() {
 	suite.cancel()
 }
 
+func (suite *DHTTestSuite) TestFindPeerWithDHT() {
+	count := 10
+	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
+
+	dhtServerNodes := suite.CreateNodes(2, true)
+	require.Len(suite.T(), dhtServerNodes, 2)
+
+	dhtClientNodes := suite.CreateNodes(count-2, false)
+
+	nodes := append(dhtServerNodes, dhtClientNodes...)
+	defer suite.StopNodes(nodes)
+
+	getDhtServerAddr := func(i uint) peer.AddrInfo {
+		return peer.AddrInfo{ID: dhtServerNodes[i].host.ID(), Addrs: dhtServerNodes[i].host.Addrs()}
+	}
+
+	for i, clientNode := range dhtClientNodes {
+		err := clientNode.host.Connect(suite.ctx, getDhtServerAddr(uint(i%2)))
+		require.NoError(suite.T(), err)
+	}
+
+	require.Eventually(suite.T(), func() bool {
+		for i, clientNode := range dhtClientNodes {
+			if clientNode.dht.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
+				return false
+			}
+		}
+		return true
+	}, time.Second*5, tickForAssertEventually, "nodes failed to connect")
+
+	err := dhtServerNodes[0].host.Connect(suite.ctx, getDhtServerAddr(1))
+	require.NoError(suite.T(), err)
+
+	require.Eventually(suite.T(), func() bool {
+		return dhtServerNodes[0].dht.RoutingTable().Find(getDhtServerAddr(1).ID) != ""
+	}, time.Second*5, tickForAssertEventually, "dht servers failed to connect")
+
+	for i := 0; i < len(dhtClientNodes); i += 2 {
+		for j := 1; j < len(dhtClientNodes); j += 2 {
+			dhtClientNodes[i].host.Peerstore().ClearAddrs(dhtClientNodes[j].host.ID())
+			_, err = dhtClientNodes[i].CreateStream(suite.ctx, dhtClientNodes[j].host.ID())
+			require.NoError(suite.T(), err)
+		}
+	}
+}
+
 // TestPubSub checks if nodes can subscribe to a topic and send and receive a message on that topic. The DHT discovery
 // mechanism is used for nodes to find each other.
 func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
