@@ -37,10 +37,24 @@ func TestExecutionFlow(t *testing.T) {
 
 	chainID := flow.Testnet
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	keys, errs := unittest.NetworkingKeys(4)
+	assert.NoError(t, errs)
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithNetworkingKey(keys[0].PublicKey()),
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithNetworkingKey(keys[1].PublicKey()),
+	)
+	exeID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithNetworkingKey(keys[2].PublicKey()),
+	)
+	verID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithNetworkingKey(keys[3].PublicKey()),
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID)
 
@@ -286,12 +300,23 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	// exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	keys, errs := unittest.NetworkingKeys(4)
+	assert.NoError(t, errs)
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithNetworkingKey(keys[0].PublicKey()),
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithNetworkingKey(keys[1].PublicKey()),
+	)
+	exe1ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithNetworkingKey(keys[2].PublicKey()),
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID)
+	identities[3].NetworkPubKey = keys[3].PublicKey()
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -424,11 +449,28 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	keys, errs := unittest.NetworkingKeys(5)
+	assert.NoError(t, errs)
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithNetworkingKey(keys[0].PublicKey()),
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithNetworkingKey(keys[1].PublicKey()),
+	)
+	exeID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithNetworkingKey(keys[2].PublicKey()),
+	)
+	ver1ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithNetworkingKey(keys[3].PublicKey()),
+	)
+	ver2ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithNetworkingKey(keys[4].PublicKey()),
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, ver1ID, ver2ID)
 
