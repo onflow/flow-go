@@ -90,46 +90,6 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.NetworkMetrics
 	}
 }
 
-type FixedTableIdentityTranslator struct {
-	flow2p2p map[flow.Identifier]peer.ID
-	p2p2flow map[peer.ID]flow.Identifier
-}
-
-func (t *FixedTableIdentityTranslator) GetFlowID(p peer.ID) (flow.Identifier, error) {
-	nodeID, ok := t.p2p2flow[p]
-	if !ok {
-		return flow.ZeroID, fmt.Errorf("could not find a flow NodeID for peer %v", p)
-	}
-	return nodeID, nil
-}
-
-func (t *FixedTableIdentityTranslator) GetPeerID(n flow.Identifier) (peer.ID, error) {
-	peerID, ok := t.flow2p2p[n]
-	if !ok {
-		return *new(peer.ID), fmt.Errorf("could not find a libp2p PeerID for flow NodeID %v", n)
-	}
-	return peerID, nil
-}
-
-func NewFixedTableIdentityTranslator(t *testing.T, identities flow.IdentityList) *FixedTableIdentityTranslator {
-	flow2p2p := make(map[flow.Identifier]peer.ID)
-	p2p2flow := make(map[peer.ID]flow.Identifier)
-
-	for _, identity := range identities {
-		nodeID := identity.NodeID
-		networkKey := identity.NetworkPubKey
-		peerPK, err := p2p.LibP2PPublicKeyFromFlow(networkKey)
-		require.NoError(t, err)
-
-		peerID, err := peer.IDFromPublicKey(peerPK)
-		require.NoError(t, err)
-
-		flow2p2p[nodeID] = peerID
-		p2p2flow[peerID] = nodeID
-	}
-	return &FixedTableIdentityTranslator{flow2p2p, p2p2flow}
-}
-
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
@@ -175,7 +135,8 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		}
 
 		// create a fixed id translator for the identities
-		tableTranslator := NewFixedTableIdentityTranslator(t, identities)
+		tableTranslator, err := p2p.NewFixedTableIdentityTranslator(identities)
+		require.NoError(t, err)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
