@@ -219,7 +219,7 @@ func (e *Engine) onChunkDataRequest(
 		}
 
 		if err != nil {
-			lg.Info().
+			lg.Warn().
 				Err(err).
 				Msg("could not send requested chunk data pack to origin ID")
 			return
