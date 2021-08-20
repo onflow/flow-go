@@ -253,8 +253,6 @@ func GenerateNetworks(t *testing.T,
 	if !dryRunMode {
 		for _, net := range nets {
 			<-net.Ready()
-			err := net.SetIDs(ids)
-			require.NoError(t, err)
 		}
 	}
 	return nets
