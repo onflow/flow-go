@@ -65,7 +65,7 @@ type MiddlewareTestSuite struct {
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
-func TestMiddlewareTestSuit(t *testing.T) {
+func TestMiddlewareTestSuite(t *testing.T) {
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
@@ -101,11 +101,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		overlay := &mocknetwork.Overlay{}
 		m.ov = append(m.ov, overlay)
 
-		identifierToID := make(map[flow.Identifier]flow.Identity)
-		for _, id := range m.ids {
-			identifierToID[id.NodeID] = *id
-		}
-		overlay.On("Identity").Maybe().Return(identifierToID, nil)
+		overlay.On("Identities").Maybe().Return(flow.IdentityList(m.ids), nil)
 		overlay.On("Topology").Maybe().Return(flow.IdentityList(m.ids), nil)
 	}
 	for i, mw := range m.mws {
