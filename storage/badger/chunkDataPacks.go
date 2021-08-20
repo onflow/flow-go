@@ -134,7 +134,7 @@ func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPa
 	}
 
 	if c.Collection != nil {
-		// system chunk
+		// non system chunk
 		sc.CollectionID = c.Collection.ID()
 	} else {
 		sc.SystemChunk = true
