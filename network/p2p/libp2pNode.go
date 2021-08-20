@@ -45,7 +45,7 @@ const (
 
 	// timeout for FindPeer queries to the DHT
 	// TODO: is this a sensible value?
-	findPeerQueryTimeout = 15 * time.Second
+	findPeerQueryTimeout = 10 * time.Second
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.

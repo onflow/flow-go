@@ -297,8 +297,8 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 }
 
-// TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the default
-// unicast timeout interval
+// TestCreateStreamTimeoutWithUnresponsiveNode tests that the CreateStream call does not block longer than the
+// timeout interval
 func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
 
 	// creates a regular node
@@ -315,18 +315,20 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 	silentNodeInfo, err := PeerAddressInfo(silentNodeId)
 	require.NoError(suite.T(), err)
 
+	timeout := 1 * time.Second
+
 	// setup the context to expire after the default timeout
-	ctx, cancel := context.WithTimeout(context.Background(), DefaultUnicastTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
-	grace := 1 * time.Second
+	grace := 100 * time.Millisecond
 	unittest.AssertReturnsBefore(suite.T(),
 		func() {
 			nodes[0].host.Peerstore().AddAddrs(silentNodeInfo.ID, silentNodeInfo.Addrs, peerstore.AddressTTL)
 			_, err = nodes[0].CreateStream(ctx, silentNodeInfo.ID)
 		},
-		DefaultUnicastTimeout+grace)
+		timeout+grace)
 	assert.Error(suite.T(), err)
 }
 
