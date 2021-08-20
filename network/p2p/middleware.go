@@ -249,7 +249,6 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 // Stop will end the execution of the middleware and wait for it to end.
 func (m *Middleware) Stop() {
-
 	mgr, found := m.peerMgr()
 	if found {
 		// stops peer manager
@@ -387,6 +386,31 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	m.peerManagerUpdate()
 
 	return nil
+}
+
+// processAuthenticatedMessage processes a message and a source (indicated by its PublicKey) and eventually passes it to the overlay
+// In particular, it checks the claim of protocol authorship situated in the message against `originKey`
+// The assumption is that the message has been authenticated at the network level (libp2p) to origin at the network public key `originKey`
+// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, originKey crypto.PublicKey) {
+	identities := m.ov.Identities()
+
+	// check the origin of the message corresponds to the one claimed in the OriginID
+	originID := flow.HashToID(msg.OriginID)
+
+	originIdentity, found := identities.ByNodeID(originID)
+	if !found {
+		m.log.Warn().Msgf("received message with claimed originID %x, which is not known by this node, and was dropped", originID)
+		return
+	} else if originIdentity.NetworkPubKey == nil {
+		m.log.Warn().Msgf("received message with claimed originID %x, wich has no network identifiers at this node, and was dropped", originID)
+		return
+	} else if !originIdentity.NetworkPubKey.Equals(originKey) {
+		m.log.Warn().Msgf("received message claiming to be from nodeID %v with key %x was actually signed by %x and dropped", originID, originIdentity.NetworkPubKey, originKey)
+		return
+	}
+
+	m.processMessage(msg)
 }
 
 // processMessage processes a message and eventually passes it to the overlay
