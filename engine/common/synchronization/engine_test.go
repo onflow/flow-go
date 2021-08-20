@@ -426,7 +426,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("BatchRequested", batches[0])
 
 	// exclude my node ID
-	ss.e.sendRequests(ss.participants[1:], ranges, batches)
+	ss.e.sendRequests(ss.participants[1:].NodeIDs(), ranges, batches)
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -483,6 +483,6 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	err := ss.e.finalizedHeader.updateHeader()
 	require.NoError(ss.T(), err)
 	actualHeader := ss.e.finalizedHeader.Get()
-	require.ElementsMatch(ss.T(), ss.e.getParticipants(actualHeader.ID()), ss.participants[1:])
+	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
 	require.Equal(ss.T(), actualHeader, &finalizedBlock)
 }
