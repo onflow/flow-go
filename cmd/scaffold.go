@@ -744,6 +744,7 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.extraFlagsValidation()
 
+	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
 	fnb.EnqueueNetworkInit(ctx)
