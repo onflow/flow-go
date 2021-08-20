@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sync"
-	"time"
-
 	"github.com/sethvargo/go-retry"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -23,7 +21,7 @@ import (
 const RETRY_MAX = 8
 
 // RETRY_MILLISECONDS is the number of milliseconds to wait between retries
-const RETRY_MILLISECONDS = 1000 * time.Millisecond
+const RETRY_MILLISECONDS = 1000
 
 // Broker is an implementation of the DKGBroker interface which is intended to
 // be used in conjuction with the DKG MessagingEngine for private messages, and
