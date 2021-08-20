@@ -203,7 +203,7 @@ func (e *Engine) onChunkDataRequest(
 		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
 
-	lg.Info().Msg("chunk data pack response lunched to dispatch")
+	lg.Debug().Msg("chunk data pack response lunched to dispatch")
 
 	// sends requested chunk data pack to the requester
 	e.unit.Launch(func() {
