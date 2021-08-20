@@ -491,17 +491,20 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		}
 	}
 
+	msgRcvd := make(chan struct{}, 2)
+	msgRcvdFun := func() {
+		<-msgRcvd
+	}
 	message1 := createMessage(firstNode, lastNode, "hello1")
-
-	m.ov[last].On("Receive", firstNode, mockery.Anything).Return(nil).Once()
+	m.ov[last].On("Receive", firstNode, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
+		msgRcvd <- struct{}{}
+	})
 
 	// first test that when both nodes are subscribed to the channel, the target node receives the message
 	err := m.mws[first].Publish(message1, testChannel)
 	assert.NoError(m.T(), err)
 
-	assert.Eventually(m.T(), func() bool {
-		return m.ov[last].AssertCalled(m.T(), "Receive", firstNode, mockery.Anything)
-	}, 2*time.Second, time.Millisecond)
+	unittest.RequireReturnsBefore(m.T(), msgRcvdFun, 2*time.Second, "message not received")
 
 	// now unsubscribe the target node from the channel
 	err = m.mws[last].Unsubscribe(testChannel)
@@ -513,9 +516,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	assert.NoError(m.T(), err)
 
 	// assert that the new message is not received by the target node
-	assert.Never(m.T(), func() bool {
-		return !m.ov[last].AssertNumberOfCalls(m.T(), "Receive", 1)
-	}, 2*time.Second, 100*time.Millisecond)
+	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
 }
 
 func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) *message.Message {
