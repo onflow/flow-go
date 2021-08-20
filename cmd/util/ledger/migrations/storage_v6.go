@@ -269,40 +269,63 @@ func (c *ValueConverter) VisitDeployedContractValue(_ *oldInter.Interpreter, _ o
 	panic("value not storable")
 }
 
+// Type conversions
+
 func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 	switch typ := staticType.(type) {
 	case oldInter.CompositeStaticType:
-
+		return newInter.CompositeStaticType{
+			Location:            typ.Location,
+			QualifiedIdentifier: typ.QualifiedIdentifier,
+		}
 	case oldInter.InterfaceStaticType:
-
+		return newInter.InterfaceStaticType{
+			Location:            typ.Location,
+			QualifiedIdentifier: typ.QualifiedIdentifier,
+		}
 	case oldInter.VariableSizedStaticType:
 		return newInter.VariableSizedStaticType{
 			Type: ConvertStaticType(typ.Type),
 		}
-
 	case oldInter.ConstantSizedStaticType:
 		return newInter.ConstantSizedStaticType{
 			Type: ConvertStaticType(typ.Type),
 			Size: typ.Size,
 		}
-
 	case oldInter.DictionaryStaticType:
-
+		return newInter.DictionaryStaticType{
+			KeyType:   ConvertStaticType(typ.KeyType),
+			ValueType: ConvertStaticType(typ.ValueType),
+		}
 	case oldInter.OptionalStaticType:
-
+		return newInter.OptionalStaticType{
+			Type: ConvertStaticType(typ.Type),
+		}
 	case *oldInter.RestrictedStaticType:
+		restrictions := make([]newInter.InterfaceStaticType, 0, len(typ.Restrictions))
+		for _, oldInterfaceType := range typ.Restrictions {
+			newInterfaceType := ConvertStaticType(oldInterfaceType).(newInter.InterfaceStaticType)
+			restrictions = append(restrictions, newInterfaceType)
+		}
 
+		return &newInter.RestrictedStaticType{
+			Type:         ConvertStaticType(typ.Type),
+			Restrictions: restrictions,
+		}
 	case oldInter.ReferenceStaticType:
-
+		return newInter.ReferenceStaticType{
+			Authorized: typ.Authorized,
+			Type:       ConvertStaticType(typ.Type),
+		}
 	case oldInter.CapabilityStaticType:
-
+		return newInter.CapabilityStaticType{
+			BorrowType: ConvertStaticType(typ.BorrowType),
+		}
 	case oldInter.PrimitiveStaticType:
 		return ConvertPrimitiveStaticType(typ)
 	default:
 		panic(fmt.Errorf("cannot covert static type: %s", staticType))
 	}
-
-	panic("not implemented yet")
 }
 
 func ConvertPrimitiveStaticType(staticType oldInter.PrimitiveStaticType) newInter.PrimitiveStaticType {
