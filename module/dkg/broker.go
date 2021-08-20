@@ -20,7 +20,7 @@ import (
 
 // RETRY_MAX is the maximum number of times the broker will attempt to broadcast
 // a message or publish a result
-const RETRY_MAX = 5
+const RETRY_MAX = 8
 
 // RETRY_MILLISECONDS is the number of milliseconds to wait between retries
 const RETRY_MILLISECONDS = 1000 * time.Millisecond
@@ -115,7 +115,11 @@ func (b *Broker) Broadcast(data []byte) {
 	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
 
 	err = retry.Do(context.TODO(), maxedExpRetry, func(ctx context.Context) error {
-		return retry.RetryableError(b.dkgContractClient.Broadcast(bcastMsg))
+		err := b.dkgContractClient.Broadcast(bcastMsg)
+		if err != nil {
+			b.log.Error().Err(err).Msg("error broadcasting DKG result retrying")
+		}
+		return retry.RetryableError(err)
 	})
 
 	if err != nil {
@@ -190,7 +194,11 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
 
 	err = retry.Do(context.TODO(), maxedExpRetry, func(ctx context.Context) error {
-		return retry.RetryableError(b.dkgContractClient.SubmitResult(pubKey, groupKeys))
+		err := b.dkgContractClient.SubmitResult(pubKey, groupKeys)
+		if err != nil {
+			b.log.Error().Err(err).Msg("error submitting DKG result retrying")
+		}
+		return retry.RetryableError(err)
 	})
 
 	if err != nil {
