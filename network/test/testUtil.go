@@ -114,10 +114,10 @@ func NewFixedTableIdentityTranslator(identities flow.IdentityList) *FixedTableId
 	flow2p2p := make(map[flow.Identifier]peer.ID)
 	p2p2flow := make(map[peer.ID]flow.Identifier)
 
-	for identity := range identities {
+	for _, identity := range identities {
 		nodeID := identity.ID()
-		networkKey := identity.NetworkPublicKey
-		peerPK, err := LibP2PPublicKeyFromFlow(networkKey)
+		networkKey := identity.NetworkPubKey
+		peerPK, err := p2p.LibP2PPublicKeyFromFlow(networkKey)
 		if err != nil {
 			panic("could not interpret a network public key from Flow, test identities setup problem")
 		}
