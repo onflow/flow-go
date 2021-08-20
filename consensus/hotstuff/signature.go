@@ -75,7 +75,7 @@ type CombinedSigAggregator interface {
 	//  - (true, nil) if the sig share is added, and sufficient stake weight has been collected to represent
 	//    the majority.
 	//  - (false, exception) if there is any exception adding the signature.
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (hasSufficientWeight bool, exception error)
+	TrustedAdd(signer *flow.Identity, sig crypto.Signature, sigType SigType) (hasSufficientWeight bool, exception error)
 
 	// HasSufficientWeight returns whether enough signatures have been collected to represent
 	// stake majority.
