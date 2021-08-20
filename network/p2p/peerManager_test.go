@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"math/rand"
 	"os"
 	"sync"
 	"testing"
@@ -15,8 +16,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -57,22 +56,19 @@ func (suite *PeerManagerTestSuite) generateIdentities(n int) (flow.IdentityList,
 // from. The tests are cumulative and ordered.
 func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// create some test ids
-	currentIDs, pids := suite.generateIdentities(10)
+	_, pids := suite.generateIdentities(10)
 
 	// setup a ID provider callback to return peer IDs
 	idProvider := func() (peer.IDSlice, error) {
 		return pids, nil
 	}
 
-	// track IDs that should be disconnected
-	var extraIDs flow.IdentityList
-
 	// create the connector mock to check ids requested for connect and disconnect
 	connector := new(mocknetwork.Connector)
-	connector.On("UpdatePeers", mock.Anything, mock.AnythingOfType("flow.IdentityList")).
+	connector.On("UpdatePeers", mock.Anything, mock.AnythingOfType("peer.IDSlice")).
 		Run(func(args mock.Arguments) {
-			idArg := args[1].(flow.IdentityList)
-			assertListsEqual(suite.T(), currentIDs, idArg)
+			idArg := args[1].(peer.IDSlice)
+			assertListsEqual(suite.T(), pids, idArg)
 		}).
 		Return(nil)
 
@@ -88,8 +84,8 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// a subsequent call to updatePeers should request a connector.UpdatePeers to existing ids and new ids
 	suite.Run("updatePeers connects to old and new peers", func() {
 		// create a new id
-		newIDs := unittest.IdentityListFixture(1)
-		currentIDs = append(currentIDs, newIDs...)
+		_, newPIDs := suite.generateIdentities(1)
+		pids = append(pids, newPIDs...)
 
 		pm.updatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
@@ -98,8 +94,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// when ids are only excluded, connector.UpdatePeers should be called
 	suite.Run("updatePeers disconnects from extra peers", func() {
 		// delete an id
-		extraIDs = currentIDs.Sample(1)
-		currentIDs = currentIDs.Filter(filter.Not(filter.In(extraIDs)))
+		pids = removeRandomElement(pids)
 
 		pm.updatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 3)
@@ -108,17 +103,23 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// addition and deletion of ids should result in a call to connector.UpdatePeers
 	suite.Run("updatePeers connects to new peers and disconnects from extra peers", func() {
 		// remove a couple of ids
-		extraIDs = currentIDs.Sample(2)
-		currentIDs = currentIDs.Filter(filter.Not(filter.In(extraIDs)))
+		pids = removeRandomElement(pids)
+		pids = removeRandomElement(pids)
 
 		// add a couple of new ids
-		newIDs := unittest.IdentityListFixture(2)
-		currentIDs = append(currentIDs, newIDs...)
+		_, newPIDs := suite.generateIdentities(2)
+		pids = append(pids, newPIDs...)
 
 		pm.updatePeers()
 
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 4)
 	})
+}
+
+func removeRandomElement(pids peer.IDSlice) peer.IDSlice {
+	i := rand.Intn(len(pids))
+	pids[i] = pids[len(pids)-1]
+	return pids[:len(pids)-1]
 }
 
 // TestPeriodicPeerUpdate tests that the peer manager runs periodically
@@ -246,9 +247,32 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	}, 10*time.Second, 100*time.Millisecond)
 }
 
-// assertListsEqual asserts that two identity list are equal ignoring the order
-func assertListsEqual(t *testing.T, list1, list2 flow.IdentityList) {
-	list1 = list1.Sort(order.ByNodeIDAsc)
-	list2 = list2.Sort(order.ByNodeIDAsc)
-	assert.Equal(t, list1, list2)
+// assertListsEqual asserts that two peer ID slices are equal ignoring the order
+func assertListsEqual(t *testing.T, list1, list2 peer.IDSlice) {
+	listsEqual := func() bool {
+		if len(list1) != len(list2) {
+			return false
+		}
+
+		map1 := make(map[peer.ID]int)
+		map2 := make(map[peer.ID]int)
+
+		for _, e1 := range list1 {
+			map1[e1]++
+		}
+		for _, e2 := range list2 {
+			map2[e2]++
+		}
+
+		for key, val := range map1 {
+			if map2[key] != val {
+				return false
+			}
+		}
+		return true
+	}
+
+	if !listsEqual() {
+		assert.Failf(t, "peer ID slices not equal", "list1: %v, list2: %v", list1, list2)
+	}
 }

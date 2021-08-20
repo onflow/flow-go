@@ -395,16 +395,12 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 // The assumption is that the message has been authenticated at the network level (libp2p) to origin at the network public key `originKey`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, originKey crypto.PublicKey) {
-	identities, err := m.ov.Identity()
-	if err != nil {
-		m.log.Error().Err(err).Msg("failed to retrieve identities list while delivering a message")
-		return
-	}
+	identities := m.ov.Identities()
 
 	// check the origin of the message corresponds to the one claimed in the OriginID
 	originID := flow.HashToID(msg.OriginID)
 
-	originIdentity, found := identities[originID]
+	originIdentity, found := identities.ByNodeID(originID)
 	if !found {
 		m.log.Warn().Msgf("received message with claimed originID %x, which is not known by this node, and was dropped", originID)
 		return
