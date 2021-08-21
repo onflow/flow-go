@@ -11,10 +11,11 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/engine/execution/state/unittest"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module/metrics"
