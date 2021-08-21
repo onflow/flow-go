@@ -21,6 +21,7 @@ import (
 	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	idModule "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -122,9 +123,10 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) []*p2p.Middleware {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) ([]*p2p.Middleware, []*id.UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
+	idProviders := make([]*id.UpdatableIDProvider, len(identities))
 
 	for i, id := range identities {
 		// casts libP2PNode instance to a local variable to avoid closure
@@ -135,9 +137,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			return node, nil
 		}
 
-		// create a fixed id translator for the identities
-		tableTranslator, err := p2p.NewFixedTableIdentityTranslator(identities)
-		require.NoError(t, err)
+		idProviders[i] = idModule.NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
@@ -149,10 +149,13 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			true,
 			true,
-			tableTranslator,
+			p2p.NewIdentityProviderIdentityTranslator(idProviders[i]),
+			p2p.WithIdentifierProvider(
+				idProviders[i],
+			),
 		)
 	}
-	return mws
+	return mws, idProviders
 }
 
 // GenerateNetworks generates the network for the given middlewares
@@ -201,7 +204,7 @@ func GenerateNetworks(t *testing.T,
 			tops[i],
 			sms[i],
 			metrics,
-			id.NewFixedIdentityProvider(ids),
+			idModule.NewFixedIdentityProvider(ids),
 		)
 		require.NoError(t, err)
 
@@ -221,11 +224,11 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable) {
+	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*id.UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, opts...)
-	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
-	return ids, mws, protectObservables
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes)
+	return ids, mws, protectObservables, providers
 }
 
 func GenerateIDsMiddlewaresNetworks(t *testing.T,
@@ -235,7 +238,7 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	tops []network.Topology,
 	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable) {
 
-	ids, mws, observables := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
 	return ids, mws, networks, observables

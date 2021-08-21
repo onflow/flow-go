@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
@@ -17,6 +19,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network/codec/cbor"
@@ -56,12 +59,14 @@ func (co *tagsObserver) OnComplete() {
 
 type MiddlewareTestSuite struct {
 	suite.Suite
-	size    int               // used to determine number of middlewares under test
-	mws     []*p2p.Middleware // used to keep track of middlewares under test
-	ov      []*mocknetwork.Overlay
-	obs     chan string // used to keep track of Protect events tagged by pubsub messages
-	ids     []*flow.Identity
-	metrics *metrics.NoopCollector // no-op performance monitoring simulation
+	size      int               // used to determine number of middlewares under test
+	mws       []*p2p.Middleware // used to keep track of middlewares under test
+	ov        []*mocknetwork.Overlay
+	obs       chan string // used to keep track of Protect events tagged by pubsub messages
+	ids       []*flow.Identity
+	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
+	logger    zerolog.Logger
+	providers []*id.UpdatableIDProvider
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -73,6 +78,7 @@ func TestMiddlewareTestSuite(t *testing.T) {
 func (m *MiddlewareTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
+	m.logger = logger
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
@@ -85,7 +91,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -98,16 +104,24 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create the mock overlays
 	for i := 0; i < m.size; i++ {
-		overlay := &mocknetwork.Overlay{}
-		m.ov = append(m.ov, overlay)
-
-		overlay.On("Identities").Maybe().Return(flow.IdentityList(m.ids), nil)
-		overlay.On("Topology").Maybe().Return(flow.IdentityList(m.ids), nil)
+		m.ov = append(m.ov, m.createOverlay())
 	}
 	for i, mw := range m.mws {
 		assert.NoError(m.T(), mw.Start(m.ov[i]))
 		mw.UpdateAllowList()
 	}
+}
+
+func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
+	overlay := &mocknetwork.Overlay{}
+
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return flow.IdentityList(m.ids)
+	}, nil)
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return flow.IdentityList(m.ids)
+	}, nil)
+	return overlay
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
@@ -460,6 +474,41 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// sends a direct message from first node to the last node
 	err = m.mws[first].Publish(msg, testChannel)
 	require.Error(m.Suite.T(), err)
+}
+
+func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
+	ids, mws, _, providers := GenerateIDsAndMiddlewares(m.T(), 1, false, m.logger)
+	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
+	require.Len(m.T(), mws, 1)
+	newId := ids[0]
+	newMw := mws[0]
+	newProvider := providers[0]
+
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	newProvider.SetIdentities(idList)
+	overlay := m.createOverlay()
+	overlay.On("Receive",
+		m.ids[0].NodeID,
+		mock.AnythingOfType("*message.Message"),
+	).Return(nil)
+	assert.NoError(m.T(), newMw.Start(overlay))
+
+	// needed to enable ID translation
+	m.providers[0].SetIdentities(idList)
+	m.mws[0].UpdateAllowList()
+
+	msg := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+	err := m.mws[0].SendDirect(msg, newId.NodeID)
+	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
+
+	m.ids = idList
+	m.mws[0].UpdateNodeAddresses()
+
+	err = m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
 }
 
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
