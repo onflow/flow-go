@@ -29,8 +29,6 @@ type DHTTestSuite struct {
 	cancel context.CancelFunc // used to cancel the context
 }
 
-// TODO: test that dht findPeer times out
-
 // TestDHTTestSuite test the libp2p pubsub with DHT for discovery
 func TestDHTTestSuite(t *testing.T) {
 	suite.Run(t, new(DHTTestSuite))

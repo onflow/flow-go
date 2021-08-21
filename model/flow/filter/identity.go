@@ -3,6 +3,7 @@
 package filter
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -58,6 +59,17 @@ func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
 	return func(identity *flow.Identity) bool {
 		_, ok := lookup[identity.NodeID]
 		return ok
+	}
+}
+
+func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
+	return func(identity *flow.Identity) bool {
+		for _, key := range keys {
+			if key.Equals(identity.NetworkPubKey) {
+				return true
+			}
+		}
+		return false
 	}
 }
 
