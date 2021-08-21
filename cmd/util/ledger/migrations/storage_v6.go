@@ -12,15 +12,13 @@ import (
 var _ oldInter.Visitor = &ValueConverter{}
 
 type ValueConverter struct {
-	result   newInter.Value
-	newInter *newInter.Interpreter
-	oldInter *oldInter.Interpreter
+	result  newInter.Value
+	storage newInter.Storage
 }
 
-func NewValueConverter(oldInter *oldInter.Interpreter, newInter *newInter.Interpreter) *ValueConverter {
+func NewValueConverter(storage newInter.Storage) *ValueConverter {
 	return &ValueConverter{
-		oldInter: oldInter,
-		newInter: newInter,
+		storage: storage,
 	}
 }
 
@@ -32,7 +30,8 @@ func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
 		c.result = prevResult
 	}()
 
-	value.Accept(c.oldInter, c)
+	// Interpreter is never used. So safe to pass nil here.
+	value.Accept(nil, c)
 
 	return c.result
 }
@@ -68,7 +67,7 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
 
-	c.result = newInter.NewArrayValue(arrayStaticType, c.newInter.Storage, newElements...)
+	c.result = newInter.NewArrayValue(arrayStaticType, c.storage, newElements...)
 
 	// Do not descent. We already visited children here.
 	return false
@@ -194,7 +193,7 @@ func (c *ValueConverter) VisitDictionaryValue(_ *oldInter.Interpreter, value *ol
 	// TODO: pass address as a parameter?
 	c.result = newInter.NewDictionaryValue(
 		staticType,
-		c.newInter.Storage,
+		c.storage,
 		keysAndValues...,
 	)
 
