@@ -63,13 +63,13 @@ func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
 }
 
 func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
-	lookup := make(map[crypto.PublicKey]struct{})
-	for _, key := range keys {
-		lookup[key] = struct{}{}
-	}
 	return func(identity *flow.Identity) bool {
-		_, ok := lookup[identity.NetworkPubKey]
-		return ok
+		for _, key := range keys {
+			if key.Equals(identity.NetworkPubKey) {
+				return true
+			}
+		}
+		return false
 	}
 }
 
