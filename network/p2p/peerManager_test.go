@@ -61,7 +61,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	connector.On("UpdatePeers", mock.Anything, mock.AnythingOfType("peer.IDSlice")).
 		Run(func(args mock.Arguments) {
 			idArg := args[1].(peer.IDSlice)
-			assertListsEqual(suite.T(), pids, idArg)
+			assert.ElementsMatch(suite.T(), pids, idArg)
 		}).
 		Return(nil)
 
@@ -238,10 +238,4 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	assert.Eventually(suite.T(), func() bool {
 		return connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
 	}, 10*time.Second, 100*time.Millisecond)
-}
-
-// assertListsEqual asserts that two peer ID slices are equal ignoring the order
-func assertListsEqual(t *testing.T, list1, list2 peer.IDSlice) {
-	assert.Subset(t, list1, list2)
-	assert.Subset(t, list2, list1)
 }
