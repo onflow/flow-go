@@ -171,6 +171,7 @@ func (ss *SyncSuite) SetupTest() {
 	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
 
 	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
+	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
 		id.NewFilteredIdentifierProvider(
 			filter.And(

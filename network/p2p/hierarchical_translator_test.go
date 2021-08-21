@@ -36,6 +36,7 @@ func (suite *HierarchicalTranslatorTestSuite) TestFirstTranslatorSuccess() {
 	pid, err := suite.translator.GetPeerID(suite.ids[0].NodeID)
 	require.NoError(suite.T(), err)
 	fid, err := suite.translator.GetFlowID(pid)
+	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), fid, suite.ids[0].NodeID)
 }
 
@@ -43,6 +44,7 @@ func (suite *HierarchicalTranslatorTestSuite) TestSecondTranslatorSuccess() {
 	pid, err := suite.translator.GetPeerID(suite.ids[1].NodeID)
 	require.NoError(suite.T(), err)
 	fid, err := suite.translator.GetFlowID(pid)
+	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), fid, suite.ids[1].NodeID)
 }
 
@@ -54,6 +56,7 @@ func (suite *HierarchicalTranslatorTestSuite) TestTranslationFailure() {
 	key, err := LibP2PPrivKeyFromFlow(generateNetworkingKey(suite.T()))
 	require.NoError(suite.T(), err)
 	pid, err := peer.IDFromPrivateKey(key)
+	require.NoError(suite.T(), err)
 	_, err = suite.translator.GetFlowID(pid)
 	require.Error(suite.T(), err)
 }
