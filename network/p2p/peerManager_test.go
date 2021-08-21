@@ -242,30 +242,6 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 
 // assertListsEqual asserts that two peer ID slices are equal ignoring the order
 func assertListsEqual(t *testing.T, list1, list2 peer.IDSlice) {
-	listsEqual := func() bool {
-		if len(list1) != len(list2) {
-			return false
-		}
-
-		map1 := make(map[peer.ID]int)
-		map2 := make(map[peer.ID]int)
-
-		for _, e1 := range list1 {
-			map1[e1]++
-		}
-		for _, e2 := range list2 {
-			map2[e2]++
-		}
-
-		for key, val := range map1 {
-			if map2[key] != val {
-				return false
-			}
-		}
-		return true
-	}
-
-	if !listsEqual() {
-		assert.Failf(t, "peer ID slices not equal", "list1: %v, list2: %v", list1, list2)
-	}
+	assert.Subset(t, list1, list2)
+	assert.Subset(t, list2, list1)
 }
