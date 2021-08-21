@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"

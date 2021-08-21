@@ -8,14 +8,15 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/engine/execution"
 	state2 "github.com/onflow/flow-go/engine/execution/state"
 	unittest2 "github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -132,6 +133,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 	noopCollector := &metrics.NoopCollector{}
 
 	ledger, err := complete.NewLedger(&fixtures.NoopWAL{}, 10, noopCollector, zerolog.Nop(), complete.DefaultPathFinderVersion)
+	require.NoError(t, err)
 
 	me := new(module.Local)
 	me.On("NodeID").Return(flow.ZeroID)

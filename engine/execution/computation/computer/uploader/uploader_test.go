@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
-	"github.com/onflow/flow-go/engine/execution"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
+
+	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/module/metrics"
 )
 
 func Test_AsyncUploader(t *testing.T) {

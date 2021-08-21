@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 
 	"github.com/sethvargo/go-retry"
 )

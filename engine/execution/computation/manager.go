@@ -8,8 +8,9 @@ import (
 	"time"
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"

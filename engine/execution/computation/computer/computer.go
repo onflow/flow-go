@@ -6,11 +6,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
+
+	"github.com/onflow/flow-go/ledger"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"

@@ -6,11 +6,12 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/golang/mock/gomock"
-	ledger2 "github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	ledger2 "github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/ledger/common/pathfinder"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	ledger "github.com/onflow/flow-go/ledger/complete"
