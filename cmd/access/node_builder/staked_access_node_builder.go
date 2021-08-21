@@ -63,8 +63,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
 	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
-	// TODO: we should remove this call since we are no longer instantiating two networks
-	// builder.EnqueueNetworkInit(ctx)
+	builder.EnqueueNetworkInit(ctx)
 
 	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
 	if builder.ParticipatesInUnstakedNetwork() {
