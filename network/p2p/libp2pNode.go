@@ -381,10 +381,6 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		default:
 		}
 
-		// TODO: why were we doing this? Is it okay to remove?
-		// remove the peer from the peer store if present
-		// n.host.Peerstore().ClearAddrs(peerID)
-
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
