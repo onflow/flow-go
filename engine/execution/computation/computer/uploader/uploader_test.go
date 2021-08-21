@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"cloud.google.com/go/storage"
+	"github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
@@ -20,6 +21,8 @@ import (
 )
 
 func Test_AsyncUploader(t *testing.T) {
+
+	computationResult := unittest.ComputationResultFixture(nil)
 
 	t.Run("uploads are run in parallel and emit metrics", func(t *testing.T) {
 		wgCalled := sync.WaitGroup{}
@@ -42,13 +45,13 @@ func Test_AsyncUploader(t *testing.T) {
 		metrics := &DummyCollector{}
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 1, zerolog.Nop(), metrics)
 
-		err := async.Upload(nil)
+		err := async.Upload(computationResult)
 		require.NoError(t, err)
 
-		err = async.Upload(nil)
+		err = async.Upload(computationResult)
 		require.NoError(t, err)
 
-		err = async.Upload(nil)
+		err = async.Upload(computationResult)
 		require.NoError(t, err)
 
 		wgCalled.Wait() // all three are in progress, check metrics
@@ -83,7 +86,7 @@ func Test_AsyncUploader(t *testing.T) {
 
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
 
-		err := async.Upload(nil) // doesn't matter what we upload
+		err := async.Upload(computationResult)
 		require.NoError(t, err)
 
 		wg.Wait()
@@ -110,7 +113,7 @@ func Test_AsyncUploader(t *testing.T) {
 
 		async := NewAsyncUploader(uploader, 1*time.Nanosecond, 5, zerolog.Nop(), &metrics.NoopCollector{})
 
-		err := async.Upload(nil) // doesn't matter what we upload
+		err := async.Upload(computationResult) // doesn't matter what we upload
 		require.NoError(t, err)
 
 		c := async.Done()
