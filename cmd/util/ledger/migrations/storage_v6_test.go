@@ -19,11 +19,9 @@ func TestValueConversion(t *testing.T) {
 		},
 	)
 
-	inter := newInter.Interpreter{
-		Storage: newInter.NewInMemoryStorage(),
-	}
+	storage := newInter.NewInMemoryStorage()
+	converter := NewValueConverter(storage)
 
-	converter := NewValueConverter(nil, &inter)
 	newArray := converter.Convert(oldArray)
 
 	fmt.Println(newArray)
