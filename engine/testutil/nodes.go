@@ -629,6 +629,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.NoError(t, err)
 
 	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
+	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
