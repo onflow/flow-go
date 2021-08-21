@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"gotest.tools/assert"
+
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type HierarchicalTranslatorTestSuite struct {
