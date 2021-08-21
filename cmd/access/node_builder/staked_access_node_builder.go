@@ -40,7 +40,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
-				p2p.NetworkingSetFilter,
+				p2p.NotEjectedFilter,
 			),
 			idCache,
 		)
