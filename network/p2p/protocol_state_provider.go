@@ -7,7 +7,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
@@ -119,22 +118,6 @@ func (p *ProtocolStateIDCache) GetFlowID(peerID peer.ID) (fid flow.Identifier, e
 	fid, found := p.flowIDs[peerID]
 	if !found {
 		err = fmt.Errorf("peer ID %v was not found in cached identity list", peerID)
-	}
-
-	return
-}
-
-func ExtractPeerID(networkPubKey crypto.PublicKey) (pid peer.ID, err error) {
-	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
-	if err != nil {
-		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
-		return
-	}
-
-	pid, err = peer.IDFromPublicKey(pk)
-	if err != nil {
-		err = fmt.Errorf("failed to convert LibP2P key to peer ID: %w", err)
-		return
 	}
 
 	return
