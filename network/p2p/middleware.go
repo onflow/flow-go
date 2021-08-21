@@ -65,24 +65,25 @@ const (
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
-	ctx                   context.Context
-	cancel                context.CancelFunc
-	log                   zerolog.Logger
-	ov                    network.Overlay
-	wg                    *sync.WaitGroup
-	libP2PNode            *Node
-	libP2PNodeFactory     LibP2PFactoryFunc
-	me                    flow.Identifier
-	metrics               module.NetworkMetrics
-	rootBlockID           string
-	validators            []network.MessageValidator
-	peerManager           *PeerManager
-	peerUpdateInterval    time.Duration
-	unicastMessageTimeout time.Duration
-	connectionGating      bool
-	managePeerConnections bool
-	idTranslator          IDTranslator
-	idProvider            id.IdentifierProvider
+	ctx                        context.Context
+	cancel                     context.CancelFunc
+	log                        zerolog.Logger
+	ov                         network.Overlay
+	wg                         *sync.WaitGroup
+	libP2PNode                 *Node
+	libP2PNodeFactory          LibP2PFactoryFunc
+	me                         flow.Identifier
+	metrics                    module.NetworkMetrics
+	rootBlockID                string
+	validators                 []network.MessageValidator
+	peerManager                *PeerManager
+	peerUpdateInterval         time.Duration
+	unicastMessageTimeout      time.Duration
+	connectionGating           bool
+	managePeerConnections      bool
+	idTranslator               IDTranslator
+	idProvider                 id.IdentifierProvider
+	previousProtocolStatePeers []peer.AddrInfo
 }
 
 type MiddlewareOption func(*Middleware)
@@ -201,12 +202,28 @@ func (m *Middleware) GetIPPort() (string, string, error) {
 }
 
 func (m *Middleware) UpdateNodeAddresses() {
-	ids := m.ov.Identities()
-	infos, _ := peerInfosFromIDs(ids)
+	m.log.Info().Msg("Updating protocol state node addresses")
 
-	for _, info := range infos {
+	ids := m.ov.Identities()
+	newInfos, invalid := peerInfosFromIDs(ids)
+
+	for id, err := range invalid {
+		m.log.Err(err).Str("node_id", id.String()).Msg("failed to extract peer info from identity")
+	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	// set old addresses to expire
+	for _, oldInfo := range m.previousProtocolStatePeers {
+		m.libP2PNode.host.Peerstore().SetAddrs(oldInfo.ID, oldInfo.Addrs, peerstore.TempAddrTTL)
+	}
+
+	for _, info := range newInfos {
 		m.libP2PNode.host.Peerstore().SetAddrs(info.ID, info.Addrs, peerstore.PermanentAddrTTL)
 	}
+
+	m.previousProtocolStatePeers = newInfos
 }
 
 // Start will start the middleware.
