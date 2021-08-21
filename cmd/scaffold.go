@@ -432,7 +432,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		fnb.IdentityProvider = idCache
 		fnb.IDTranslator = idCache
-		fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NetworkingSetFilter, idCache)
+		fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
 		return nil
 	})
 }

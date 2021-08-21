@@ -24,13 +24,13 @@ import (
 
 const DefaultCacheSize = 10e6
 
-// NetworkingSetFilter is an identity filter that, when applied to the identity
+// NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
 // over the networking layer.
 //
 // NOTE: The protocol state includes nodes from the previous/next epoch that should
 // be included in network communication. We omit any nodes that have been ejected.
-var NetworkingSetFilter = filter.Not(filter.Ejected)
+var NotEjectedFilter = filter.Not(filter.Ejected)
 
 type ReadyDoneAwareNetwork interface {
 	module.Network
@@ -164,7 +164,7 @@ func (n *Network) unregister(channel network.Channel) error {
 }
 
 func (n *Network) Identities() flow.IdentityList {
-	return n.identityProvider.Identities(NetworkingSetFilter)
+	return n.identityProvider.Identities(NotEjectedFilter)
 }
 
 // Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
