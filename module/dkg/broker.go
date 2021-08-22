@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/sethvargo/go-retry"
 	"sync"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
