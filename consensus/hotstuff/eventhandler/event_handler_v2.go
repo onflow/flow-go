@@ -113,16 +113,11 @@ func (e *EventHandlerV2) OnReceiveProposal(proposal *model.Proposal) error {
 		}
 	}
 
-	// add block and validate the signature
+	// notify vote aggregator about a new block, so that it can start verifiying
+	// votes for it.
 	err := e.voteAggregator.AddBlock(proposal)
-	if model.IsInvalidBlockError(err) {
-		log.Warn().Err(err).Msg("invalid block proposal with invalid sig")
-		// TODO: e.voteAggregator.InvalidBlock()
-		return nil
-	}
-
 	if err != nil {
-		return fmt.Errorf("could not validate proposal sig's sig: %w", err)
+		return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
 	}
 
 	// store the block. the block will also be validated there
