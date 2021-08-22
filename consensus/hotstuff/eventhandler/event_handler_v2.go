@@ -334,14 +334,23 @@ func (e *EventHandlerV2) processBlockForCurrentViewWithNextLeader(block *model.B
 		shouldVote = false
 	}
 
-	// send my vote if I should vote and I'm not the leader
+	// send my vote if I should vote if I'm not the leader for the current view
 	if shouldVote {
 		e.notifier.OnVoting(ownVote)
 		log.Debug().Msg("forwarding vote to compliance engine")
 
-		err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
-		if err != nil {
-			log.Warn().Err(err).Msg("could not forward vote")
+		// if I'm the next leader, just forward the vote to the vote aggregator of ourselves
+		// if I'm not the next leader, then send the vote to the next leader.
+		if isSelfNextLeader {
+			// TODO: consider add own vote along with the proposal atomically to VoteAggregator
+			// in order to ensure the own vote will always be included.
+			err := e.voteAggregator.AddVote(ownVote)
+			log.Warn().Err(err).Msg("could not forward vote to the vote aggregator of ourselves")
+		} else {
+			err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
+			if err != nil {
+				log.Warn().Err(err).Msg("could not forward vote")
+			}
 		}
 	}
 
