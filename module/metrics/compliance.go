@@ -67,7 +67,7 @@ func NewComplianceCollector() *ComplianceCollector {
 			Help:      "the final view of phase 1 of the current epochs DKG with the greatest counter",
 		}),
 		currentDKGPhase2FinalView: promauto.NewGauge(prometheus.GaugeOpts{
-			Name:      "current_dkg_phase1_final_view",
+			Name:      "current_dkg_phase2_final_view",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the final view of phase 2 of current epochs DKG with the greatest counter",

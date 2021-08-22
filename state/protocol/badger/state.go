@@ -514,13 +514,12 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 		return fmt.Errorf("could not update committed epoch final view")
 	}
 
-	//@TODO add metrics for Final view of current epoch
 	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
 	if err != nil {
 		return fmt.Errorf("could not update current epoch final view")
 	}
 	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
-	
+
 	// update dkg phase 1 final view
 	dkgPhase1FinalView, err := snap.Epochs().Current().DKGPhase1FinalView()
 	if err != nil {

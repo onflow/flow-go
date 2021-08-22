@@ -470,6 +470,20 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
 		metrics.On("CommittedEpochFinalView", finalView).Once()
 
+		metrics.On("CurrentEpochFinalView", finalView).Once()
+
+		currentDKGPhase1FinalView, err := initialCurrentEpoch.DKGPhase1FinalView()
+		require.NoError(t, err)
+		metrics.On("CurrentDKGPhase1FinalView", currentDKGPhase1FinalView).Once()
+
+		currentDKGPhase2FinalView, err := initialCurrentEpoch.DKGPhase2FinalView()
+		require.NoError(t, err)
+		metrics.On("CurrentDKGPhase2FinalView", currentDKGPhase2FinalView).Once()
+
+		currentDKGPhase3FinalView, err := initialCurrentEpoch.DKGPhase3FinalView()
+		require.NoError(t, err)
+		metrics.On("CurrentDKGPhase3FinalView", currentDKGPhase3FinalView).Once()
+
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
