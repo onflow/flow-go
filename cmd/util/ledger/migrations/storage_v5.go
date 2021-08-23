@@ -1851,6 +1851,10 @@ func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool
 	panic("unexpected ValidatePublicKey call")
 }
 
+func (m migrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([]string, error) {
+	panic("unexpected GetAccountContractNames call")
+}
+
 // Errors
 
 type EmptyContainerTypeInferringError struct {
