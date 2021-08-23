@@ -36,7 +36,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
@@ -150,26 +149,25 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	UnstakedLibP2PNode             *p2p.Node
-	UnstakedNetwork                *p2p.Network
-	unstakedMiddleware             *p2p.Middleware
-	FollowerState                  protocol.MutableState
-	SyncCore                       *synchronization.Core
-	RpcEng                         *rpc.Engine
-	FinalizationDistributor        *pubsub.FinalizationDistributor
-	FinalizedHeader                *synceng.FinalizedHeaderCache
-	CollectionRPC                  access.AccessAPIClient
-	TransactionTimings             *stdmap.TransactionTimings
-	CollectionsToMarkFinalized     *stdmap.Times
-	CollectionsToMarkExecuted      *stdmap.Times
-	BlocksToMarkExecuted           *stdmap.Times
-	TransactionMetrics             module.TransactionMetrics
-	PingMetrics                    module.PingMetrics
-	Committee                      hotstuff.Committee
-	Finalized                      *flow.Header
-	Pending                        []*flow.Header
-	FollowerCore                   module.HotStuffFollower
-	SyncEngineParticipantsProvider id.IdentifierProvider
+	UnstakedLibP2PNode         *p2p.Node
+	UnstakedNetwork            *p2p.Network
+	unstakedMiddleware         *p2p.Middleware
+	FollowerState              protocol.MutableState
+	SyncCore                   *synchronization.Core
+	RpcEng                     *rpc.Engine
+	FinalizationDistributor    *pubsub.FinalizationDistributor
+	FinalizedHeader            *synceng.FinalizedHeaderCache
+	CollectionRPC              access.AccessAPIClient
+	TransactionTimings         *stdmap.TransactionTimings
+	CollectionsToMarkFinalized *stdmap.Times
+	CollectionsToMarkExecuted  *stdmap.Times
+	BlocksToMarkExecuted       *stdmap.Times
+	TransactionMetrics         module.TransactionMetrics
+	PingMetrics                module.PingMetrics
+	Committee                  hotstuff.Committee
+	Finalized                  *flow.Header
+	Pending                    []*flow.Header
+	FollowerCore               module.HotStuffFollower
 
 	// engines
 	IngestEng   *ingestion.Engine
@@ -322,7 +320,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.FinalizedHeader,
-			builder.SyncEngineParticipantsProvider,
+			node.SyncEngineIdentifierProvider,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)
