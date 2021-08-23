@@ -99,9 +99,10 @@ func (e *Engine) process(channel network.Channel, originID flow.Identifier, even
 	conduit, ok := e.conduits[channel]
 
 	if !ok {
-		e.log.Trace().Interface("event", event).Str("channel", channel.String()).Str("originID", originID.String()).Msg("unknown channel")
 		return fmt.Errorf("received message on unknown channel %s", channel)
 	}
+
+	e.log.Trace().Interface("event", event).Str("channel", channel.String()).Str("originID", originID.String()).Msg("relaying message")
 
 	// We use a dummy target ID here so that events are broadcast to the entire network
 	if err := conduit.Publish(event, flow.ZeroID); err != nil {

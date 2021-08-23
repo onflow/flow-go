@@ -9,6 +9,8 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/relay"
+	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -101,6 +103,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 			}
 			return ping, nil
 		})
+
 	return anb
 }
 

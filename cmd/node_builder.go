@@ -130,8 +130,8 @@ type NodeConfig struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
-	Middleware        *p2p.Middleware
-	Network           *p2p.Network
+	Middleware        network.Middleware
+	Network           p2p.ReadyDoneAwareNetwork
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey

@@ -75,7 +75,7 @@ func getAccessNodeOptions(config *Config) []access.Option {
 
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
-		cmd.WithNodeID(config.nodeID),
+		cmd.WithNetworkPublicKey(config.networkPubKey),
 		cmd.WithMetricsEnabled(false),
 	}
 	if config.bootstrapDir != "" {

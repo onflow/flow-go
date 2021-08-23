@@ -66,7 +66,7 @@ func (suite *AccessSuite) SetupTest() {
 	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID))
 	nodeConfigs = append(nodeConfigs, collConfig)
 
-	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
+	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs, nil)
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
 	// start the network
