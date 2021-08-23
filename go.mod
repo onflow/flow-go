@@ -93,6 +93,6 @@ replace github.com/onflow/flow-go/crypto => ./crypto
 
 replace github.com/onflow/cadence => ../cadence
 
-replace github.com/onflow/cadence/v18 => github.com/onflow/cadence v0.18.0
+replace github.com/onflow/cadence/v18 => ../cadence-2
 
 replace github.com/onflow/atree => ../atree
