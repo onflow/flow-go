@@ -40,12 +40,12 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/onflow/cadence v0.18.1-0.20210823180844-0a7100cf2ca9
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.6
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.6
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.18.0
-	github.com/onflow/flow/protobuf/go/flow v0.2.0
+	github.com/onflow/flow/protobuf/go/flow v0.2.2
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pkg/errors v0.9.1
@@ -65,7 +65,7 @@ require (
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.31.0
 	google.golang.org/grpc v1.36.1
-	google.golang.org/protobuf v1.26.0
+	google.golang.org/protobuf v1.27.1
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7
 )

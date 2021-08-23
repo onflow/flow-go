@@ -232,6 +232,15 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 	return &pk, nil
 }
 
+// decodePublicKeyCompressed decodes a slice of bytes into a public key.
+// since we use the compressed representation by default, this checks the default and delegates to decodePublicKeyCompressed
+func (a *blsBLS12381Algo) decodePublicKeyCompressed(publicKeyBytes []byte) (PublicKey, error) {
+	if serializationG2 != compressed {
+		panic("library is not configured to use compressed public key serialization")
+	}
+	return a.decodePublicKey(publicKeyBytes)
+}
+
 // PrKeyBLSBLS12381 is the private key of BLS using BLS12_381, it implements PrivateKey
 type PrKeyBLSBLS12381 struct {
 	// public key
@@ -339,6 +348,15 @@ func (pk *PubKeyBLSBLS12381) Size() int {
 // Encode returns a byte encoding of the public key.
 // The encoding is a compressed encoding of the point
 // [zcash] https://github.com/zkcrypto/pairing/blob/master/src/bls12_381/README.md#serialization
+func (a *PubKeyBLSBLS12381) EncodeCompressed() []byte {
+	if serializationG2 != compressed {
+		panic("library is not configured to use compressed public key serialization")
+	}
+	return a.Encode()
+}
+
+// Encode returns a byte encoding of the public key.
+// Since we use a compressed encoding by default, this delegates to EncodeCompressed
 func (a *PubKeyBLSBLS12381) Encode() []byte {
 	dest := make([]byte, pubKeyLengthBLSBLS12381)
 	writePointG2(dest, &a.point)
