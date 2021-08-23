@@ -73,9 +73,9 @@ type AccessNodeBuilder interface {
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
 
-	// ParticipatesInUnstakedNetwork returns True if this an Access Node which participates in the unstaked network,
-	// False otherwise
-	ParticipatesInUnstakedNetwork() bool
+	// SupportsUnstakedNetwork returns True if this is a staked Access node which also supports
+	// unstaked access nodes/unstaked consensus follower engines, False otherwise.
+	SupportsUnstakedNetwork() bool
 
 	// Build defines all of the Access node's components and modules.
 	Build() AccessNodeBuilder
@@ -89,7 +89,7 @@ type AccessNodeConfig struct {
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	bootstrapIdentites           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	unstakedNetworkBindAddr      string
+	supportsUnstakedFollower     bool
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -137,7 +137,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		staked:                       true,
 		bootstrapNodeAddresses:       []string{},
 		bootstrapNodePublicKeys:      []string{},
-		unstakedNetworkBindAddr:      cmd.NotSet,
+		supportsUnstakedFollower:     false,
 	}
 }
 
@@ -149,9 +149,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	UnstakedLibP2PNode         *p2p.Node
-	UnstakedNetwork            p2p.ReadyDoneAwareNetwork
-	unstakedMiddleware         network.Middleware
+	LibP2PNode                     *p2p.Node
 	FollowerState              protocol.MutableState
 	SyncCore                   *synchronization.Core
 	RpcEng                     *rpc.Engine
@@ -496,9 +494,9 @@ func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	}
 }
 
-func WithUnstakedNetworkBindAddr(bindAddr string) Option {
+func SupportsUnstakedFollower(enable bool) Option {
 	return func(config *AccessNodeConfig) {
-		config.unstakedNetworkBindAddr = bindAddr
+		config.supportsUnstakedFollower = enable
 	}
 }
 
@@ -524,8 +522,14 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) ParticipatesInUnstakedNetwork() bool {
-	return builder.unstakedNetworkBindAddr != cmd.NotSet
+func (builder *FlowAccessNodeBuilder) SupportsUnstakedNetwork() bool {
+	// unstaked access nodes can't be upstream of other unstaked access nodes for now
+	if !builder.IsStaked() {
+		return false
+	}
+
+	// a staked access node may or may not support unstaked follower
+	return builder.supportsUnstakedFollower
 }
 
 func (builder *FlowAccessNodeBuilder) ParseFlags() {
@@ -566,7 +570,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.StringVar(&builder.unstakedNetworkBindAddr, "unstaked-bind-addr", defaultConfig.unstakedNetworkBindAddr, "address to bind on for the unstaked network")
+		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-follower", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked follower (not applicable for unstaked nodes)")
 	})
 }
 
@@ -586,19 +590,24 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 		dhtOptions = append(dhtOptions, bootstrapPeersOpt)
 	}
 
+	myAddr := builder.NodeConfig.Me.Address()
+	if builder.BaseConfig.BindAddr != cmd.NotSet {
+		myAddr = builder.BaseConfig.BindAddr
+	}
+
 	return func() (*p2p.Node, error) {
-		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.unstakedNetworkBindAddr, networkKey).
+		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID().String()).
-			// unlike the staked network where currently all the node addresses are known upfront,
-			// for the unstaked network the nodes need to discover each other using DHT Discovery.
+			// unlike the staked side of the network where currently all the node addresses are known upfront,
+			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
 			SetDHTOptions(dhtOptions...).
 			SetLogger(builder.Logger).
 			Build(ctx)
 		if err != nil {
 			return nil, err
 		}
-		builder.UnstakedLibP2PNode = libp2pNode
-		return builder.UnstakedLibP2PNode, nil
+		builder.LibP2PNode = libp2pNode
+		return builder.LibP2PNode, nil
 	}, nil
 }
 
@@ -607,9 +616,8 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
-
 	validators ...network.MessageValidator) *network.Middleware {
-	builder.unstakedMiddleware = p2p.NewMiddleware(
+	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
 		nodeID,
@@ -623,7 +631,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		p2p.WithMessageValidators(validators...),
 		// use default identifier provider
 	)
-	return builder.unstakedMiddleware
+	return builder.Middleware
 }
 
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
@@ -643,7 +651,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		builder.Logger,
 		codec,
 		nodeID,
-		builder.unstakedMiddleware,
+		builder.Middleware,
 		p2p.DefaultCacheSize,
 		topology,
 		subscriptionManager,
