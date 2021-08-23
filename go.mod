@@ -37,7 +37,6 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.4.6
 	github.com/libp2p/go-tcp-transport v0.2.7
 	github.com/m4ksio/wal v1.0.0
-	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/onflow/cadence v0.18.1-0.20210730161646-b891a21c51fd
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
@@ -65,8 +64,8 @@ require (
 	golang.org/x/sys v0.0.0-20210809222454-d867a43fc93e // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.31.0
-	google.golang.org/grpc v1.36.1
+	google.golang.org/api v0.44.0
+	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.27.1
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7
