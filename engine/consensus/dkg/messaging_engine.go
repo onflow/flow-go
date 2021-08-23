@@ -121,7 +121,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 		case msg := <-e.tunnel.MsgChOut:
 			expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
 			if err != nil {
-				e.log.Err(err).Msg("failed to create retry mechanism")
+				e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 			}
 
 			maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
