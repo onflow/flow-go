@@ -13,6 +13,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -156,13 +157,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
-	// get the node identity map from the overlay
-	idsMap, err := m.ov.Identity()
-	if err != nil {
-		return fmt.Errorf("could not get identities: %w", err)
-	}
-
 	if m.connectionGating {
+
+		// get the node identity map from the overlay
+		idsMap, err := m.ov.Identity()
+		if err != nil {
+			return fmt.Errorf("could not get identities: %w", err)
+		}
+
 		err = m.libP2PNode.UpdateAllowList(identityList(idsMap))
 		if err != nil {
 			return fmt.Errorf("could not update approved peer list: %w", err)
@@ -315,7 +317,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	log.Info().Msg("incoming stream received")
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
+	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
 
 	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)
@@ -333,7 +335,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
+	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
@@ -357,6 +359,35 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	m.peerManagerUpdate()
 
 	return nil
+}
+
+// processAuthenticatedMessage processes a message and a source (indicated by its PublicKey) and eventually passes it to the overlay
+// In particular, it checks the claim of protocol authorship situated in the message against `originKey`
+// The assumption is that the message has been authenticated at the network level (libp2p) to origin at the network public key `originKey`
+// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
+func (m *Middleware) processAuthenticatedMessage(msg *message.Message, originKey crypto.PublicKey) {
+	identities, err := m.ov.Identity()
+	if err != nil {
+		m.log.Error().Err(err).Msg("failed to retrieve identities list while delivering a message")
+		return
+	}
+
+	// check the origin of the message corresponds to the one claimed in the OriginID
+	originID := flow.HashToID(msg.OriginID)
+
+	originIdentity, found := identities[originID]
+	if !found {
+		m.log.Warn().Msgf("received message with claimed originID %x, which is not known by this node, and was dropped", originID)
+		return
+	} else if originIdentity.NetworkPubKey == nil {
+		m.log.Warn().Msgf("received message with claimed originID %x, wich has no network identifiers at this node, and was dropped", originID)
+		return
+	} else if !originIdentity.NetworkPubKey.Equals(originKey) {
+		m.log.Warn().Msgf("received message claiming to be from nodeID %v with key %x was actually signed by %x and dropped", originID, originIdentity.NetworkPubKey, originKey)
+		return
+	}
+
+	m.processMessage(msg)
 }
 
 // processMessage processes a message and eventually passes it to the overlay

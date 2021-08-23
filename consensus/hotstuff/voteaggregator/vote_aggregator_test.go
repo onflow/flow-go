@@ -167,10 +167,11 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeInsufficientVotes() {
 	testView := uint64(5)
 	bp := newMockBlock(as, testView, as.participants[len(as.participants)-1].NodeID)
 	_ = as.aggregator.StoreProposerVote(bp.ProposerVote())
-	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
+	_, _, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
+	require.NoError(as.T(), err)
 	for i := 0; i < 3; i++ {
 		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
-		qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
+		qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		require.False(as.T(), built)
 		require.Nil(as.T(), qc)
 		require.NoError(as.T(), err)
@@ -190,11 +191,12 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeSufficientVotes() {
 	proposerVote := bp.ProposerVote()
 	expectedVoters.AddVote(proposerVote)
 	_ = as.aggregator.StoreProposerVote(proposerVote)
-	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block) // includes proposer's vote
-	for i := 0; i < 3; i++ {                                         // adding
+	_, _, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block) // includes proposer's vote
+	require.NoError(as.T(), err)
+	for i := 0; i < 3; i++ { // adding
 		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		expectedVoters.AddVote(vote)
-		qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
+		qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		require.False(as.T(), built)
 		require.Nil(as.T(), qc)
 		require.NoError(as.T(), err)
@@ -203,7 +205,7 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeSufficientVotes() {
 	vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[3].NodeID)
 	expectedVoters.AddVote(vote)
 	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
-	qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
+	qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	require.NoError(as.T(), err)
 	require.True(as.T(), built)
 	require.NotNil(as.T(), qc)
@@ -302,7 +304,6 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 
 	proposerVote := bp.ProposerVote()
 	expectedVoters.AddVote(proposerVote)
-	_, _, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	for i := 0; i < 6; i++ {
 		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		if i < 4 { // only the first 4 votes from nodes _other_ than proposer should be included in QC
@@ -656,14 +657,13 @@ func (as *AggregatorSuite) TestVoteOrderAfterBlock() {
 func (as *AggregatorSuite) TestPartialPruneBeforeBlock() {
 	pruneView := uint64(4)
 	var voteList []*model.Vote
-	var blockList []*model.Block
 	for i := 2; i <= 5; i++ {
 		view := uint64(i)
 		bp := newMockBlock(as, view, unittest.IdentifierFixture())
 		vote := as.newMockVote(view, bp.Block.BlockID, as.participants[i].NodeID)
-		as.aggregator.StorePendingVote(vote)
+		_, err := as.aggregator.StorePendingVote(vote)
+		require.NoError(as.T(), err)
 		voteList = append(voteList, vote)
-		blockList = append(blockList, bp.Block)
 	}
 	// before pruning
 	_, viewToBlockLen, viewToVoteLen, pendingVoteLen, _ := getStateLength(as.aggregator)
@@ -694,7 +694,6 @@ func (as *AggregatorSuite) TestPartialPruneBeforeBlock() {
 func (as *AggregatorSuite) TestPartialPruneAfterBlock() {
 	pruneView := uint64(4)
 	var voteList []*model.Vote
-	var blockList []*model.Block
 	for i := 2; i <= 5; i++ {
 		view := uint64(i)
 		bp := newMockBlock(as, view, as.participants[i].NodeID)
@@ -703,7 +702,6 @@ func (as *AggregatorSuite) TestPartialPruneAfterBlock() {
 		vote := as.newMockVote(view, bp.Block.BlockID, as.participants[i].NodeID)
 		_, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 		voteList = append(voteList, vote)
-		blockList = append(blockList, bp.Block)
 	}
 	// before pruning
 	_, viewToBlockLen, viewToVoteLen, _, votingStatusLen := getStateLength(as.aggregator)

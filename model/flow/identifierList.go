@@ -69,3 +69,22 @@ func (il IdentifierList) Contains(target Identifier) bool {
 	}
 	return false
 }
+
+// Sample returns random sample of length 'size' of the ids
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+func (il IdentifierList) Sample(size uint) IdentifierList {
+	return Sample(size, il...)
+}
+
+// Filter will apply a filter to the identifier list.
+func (il IdentifierList) Filter(filter IdentifierFilter) IdentifierList {
+	var dup IdentifierList
+IDLoop:
+	for _, identifier := range il {
+		if !filter(identifier) {
+			continue IDLoop
+		}
+		dup = append(dup, identifier)
+	}
+	return dup
+}
