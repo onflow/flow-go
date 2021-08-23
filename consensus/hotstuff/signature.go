@@ -8,6 +8,10 @@ import (
 // RandomBeaconReconstructor collects verified signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
+	// Verify returns true if and only if the signature is valid.
+	// It expects that correct type of signature is passed. Only SigTypeRandomBeacon is supported
+	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+
 	// TrustedAdd adds the signature share to the reconstructors internal
 	// state. Validity of signature is not checked. It is up to the
 	// implementation, whether it still adds a signature or not, when the
@@ -24,7 +28,7 @@ type RandomBeaconReconstructor interface {
 	HasSufficientShares() bool
 
 	// Reconstruct reconstructs the group signature from the provided
-	// signature shares. Errors if the the number of shares is insufficient
+	// signature shares. Errors if the number of shares is insufficient
 	// or some of the added signatures shares were invalid.
 	Reconstruct() (crypto.Signature, error)
 }
@@ -33,7 +37,7 @@ type RandomBeaconReconstructor interface {
 type SigType int
 
 // There are two signatures are aggregable, one is the normal staking signature,
-// the other is the threshold sig used as staking sigature.
+// the other is the threshold sig used as staking signature.
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
@@ -45,12 +49,16 @@ const (
 // but not a mix of staking signature and random beacon signature.
 // Implementation of SignatureAggregator must be concurrent safe
 type SignatureAggregator interface {
-	// TrustedAdd adds an already verified signature, and look up the weight for the given signer,
+	// Verify returns true if and only if the signature is valid.
+	// It expects that correct type of signature is passed. Only SigTypeStaking is supported
+	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+
+	// TrustedAdd adds an already verified signature, with weight for the given signer,
 	// and add it to the total weight, and returns the total weight that have been collected.
 	// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
 	//   (1000 is just an example)
 	// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
+	TrustedAdd(signerID flow.Identifier, weight uint64, sig crypto.Signature) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected sig shares.
 	TotalWeight() uint64
@@ -64,9 +72,14 @@ type SignatureAggregator interface {
 
 // CombinedSigAggregator aggregates the staking signatures and random beacon signatures,
 // and keep track of the total weights represented by each signature share. And report whether
-// sufficient weights for representing majority of stakes have been collected. If yes, then aggregate
+// sufficient weights for representing the majority of stakes have been collected. If yes, then aggregate
 // the signatures.
 type CombinedSigAggregator interface {
+	// Verify returns true if and only if the signature is valid.
+	// It expects that correct type of signature is passed. Only SigTypeStaking is supported.
+	// SigTypeRandomBeacon are expected to be checked by RandomBeaconReconstructor.
+	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+
 	// TrustedAdd adds the signature to staking signatures store or random beacon signature store
 	// based on the given sig type.
 	// It returns:

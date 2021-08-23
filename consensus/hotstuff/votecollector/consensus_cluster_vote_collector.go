@@ -8,14 +8,12 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/sigvalidator"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
-	validator     *sigvalidator.ConsensusSigValidator
 	combinedAggr  hotstuff.CombinedSigAggregator
 	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
@@ -33,15 +31,43 @@ func (c *ConsensusClusterVoteCollector) CreateVote(block *model.Block) (*model.V
 	panic("implement me")
 }
 
+// parseSigType returns type of signature contained in model.Vote.
+func (c *ConsensusClusterVoteCollector) parseSigType(vote *model.Vote) (hotstuff.SigType, error) {
+	panic("implement me")
+}
+
+func (c *ConsensusClusterVoteCollector) validateSignature(sigType hotstuff.SigType, vote *model.Vote) (bool, error) {
+	signerID := vote.SignerID
+	sig := vote.SigData
+	switch sigType {
+	case hotstuff.SigTypeStaking:
+		return c.combinedAggr.Verify(signerID, sig)
+	case hotstuff.SigTypeRandomBeacon:
+		return c.reconstructor.Verify(signerID, sig)
+	}
+
+	return false, fmt.Errorf("invalid sig type: %d", sigType)
+}
+
 func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	if c.done.Load() {
 		return nil
 	}
 
-	sigType, err := c.validator.ValidateVote(vote)
+	sigType, err := c.parseSigType(vote)
 	// handle InvalidVoteError
 	if err != nil {
+		return fmt.Errorf("could parse vote signature type: %w", err)
+	}
+
+	valid, err := c.validateSignature(sigType, vote)
+	if err != nil {
 		return fmt.Errorf("could not verify vote signature: %w", err)
+	}
+
+	// TODO: handle invalid error with sentinel error or callback
+	if !valid {
+		return fmt.Errorf("invalid signature")
 	}
 
 	if c.done.Load() {
