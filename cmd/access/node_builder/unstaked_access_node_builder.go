@@ -21,6 +21,12 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 	}
 }
 
+func (fnb *UnstakedAccessNodeBuilder) InitNodeInfo() {
+	fnb.NodeID = flow.ZeroID                   // TODO: extract node id from networking key
+	fnb.NodeConfig.NetworkKey = fnb.NetworkKey // use the networking that has been passed in
+	fnb.NodeConfig.StakingKey = nil            // no staking key for the unstaked node
+}
+
 func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
@@ -55,7 +61,7 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.RegisterBadgerMetrics()
 
-	builder.EnqueueTracer()
+	builder.EnqxueueTracer()
 
 	builder.PreInit(builder.initUnstakedLocal())
 

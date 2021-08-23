@@ -258,7 +258,7 @@ func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
 }
 
-func (fnb *FlowNodeBuilder) initNodeInfo() {
+func (fnb *FlowNodeBuilder) InitNodeInfo() {
 	if fnb.BaseConfig.nodeIDHex == NotSet {
 		fnb.Logger.Fatal().Msg("cannot start without node ID")
 	}
@@ -698,12 +698,6 @@ func WithBootstrapDir(bootstrapDir string) Option {
 	}
 }
 
-func WithNodeID(nodeID flow.Identifier) Option {
-	return func(config *BaseConfig) {
-		config.nodeIDHex = nodeID.String()
-	}
-}
-
 func WithBindAddress(bindAddress string) Option {
 	return func(config *BaseConfig) {
 		config.BindAddr = bindAddress
@@ -811,7 +805,7 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 		// seed random generator
 		rand.Seed(time.Now().UnixNano())
 
-		fnb.initNodeInfo()
+		fnb.InitNodeInfo()
 
 		fnb.initLogger()
 

@@ -73,9 +73,9 @@ type AccessNodeBuilder interface {
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
 
-	// SupportsUnstakedNetwork returns True if this is a staked Access node which also supports
+	// SupportsUnstakedNode returns True if this is a staked Access node which also supports
 	// unstaked access nodes/unstaked consensus follower engines, False otherwise.
-	SupportsUnstakedNetwork() bool
+	SupportsUnstakedNode() bool
 
 	// Build defines all of the Access node's components and modules.
 	Build() AccessNodeBuilder
@@ -89,6 +89,7 @@ type AccessNodeConfig struct {
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	bootstrapIdentites           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	NetworkKey                   crypto.PrivateKey
 	supportsUnstakedFollower     bool
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
@@ -494,9 +495,15 @@ func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	}
 }
 
-func SupportsUnstakedFollower(enable bool) Option {
+func SupportsUnstakedNode(enable bool) Option {
 	return func(config *AccessNodeConfig) {
 		config.supportsUnstakedFollower = enable
+	}
+}
+
+func WithNetworkKey(key crypto.PrivateKey) Option {
+	return func(config *AccessNodeConfig) {
+		config.NetworkKey = key
 	}
 }
 
@@ -522,7 +529,7 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) SupportsUnstakedNetwork() bool {
+func (builder *FlowAccessNodeBuilder) SupportsUnstakedNode() bool {
 	// unstaked access nodes can't be upstream of other unstaked access nodes for now
 	if !builder.IsStaked() {
 		return false
@@ -570,7 +577,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
 		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
-		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-follower", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked follower (not applicable for unstaked nodes)")
+		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 	})
 }
 
@@ -616,7 +623,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
-	validators ...network.MessageValidator) *network.Middleware {
+	validators ...network.MessageValidator) network.Middleware {
 	builder.Middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
