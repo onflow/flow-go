@@ -943,7 +943,8 @@ func (e *TransactionEnv) RecordTrace(operation string, location common.Location,
 				Fields: []traceLog.Field{traceLog.String("location", location.String())},
 			})
 		}
-		spanName := trace.SpanName(fmt.Sprintf("%s.%s", trace.FVMCadenceTrace, operation))
+
+		spanName := trace.FVMCadenceTrace.Child(operation)
 		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
 	}
 }
