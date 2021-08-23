@@ -50,7 +50,6 @@ import (
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -618,13 +617,7 @@ func main() {
 				comp,
 				syncCore,
 				finalizedHeader,
-				id.NewFilteredIdentifierProvider(
-					filter.And(
-						filter.HasRole(flow.RoleConsensus),
-						filter.Not(filter.HasNodeID(node.Me.NodeID())),
-					),
-					node.IdentityProvider,
-				),
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

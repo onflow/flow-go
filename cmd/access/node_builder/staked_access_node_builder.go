@@ -35,8 +35,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 		}
 
 		fnb.IdentityProvider = idCache
-		// translator
-		fnb.SyncEngineParticipantsProvider = id.NewFilteredIdentifierProvider(
+		fnb.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
