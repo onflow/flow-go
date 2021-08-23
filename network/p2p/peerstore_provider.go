@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// PeerstoreIdentifierProvider implements an IdentifierProvider which provides the identifiers
+// of the peers present in the given LibP2P host's peerstore.
 type PeerstoreIdentifierProvider struct {
 	host         host.Host
 	idTranslator IDTranslator
@@ -24,7 +26,9 @@ func NewPeerstoreIdentifierProvider(logger zerolog.Logger, host host.Host, idTra
 func (p *PeerstoreIdentifierProvider) Identifiers() flow.IdentifierList {
 	var result flow.IdentifierList
 
+	// get all peers with addresses from the peerstore
 	pids := p.host.Peerstore().PeersWithAddrs()
+
 	for _, pid := range pids {
 		flowID, err := p.idTranslator.GetFlowID(pid)
 		if err != nil {
