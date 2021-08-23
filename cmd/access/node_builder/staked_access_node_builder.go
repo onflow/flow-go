@@ -66,14 +66,11 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.InitIDProviders()
 
-	// for the staked access node, initialize the network used to communicate with the other staked flow nodes
-	// by calling the EnqueueNetworkInit on the base FlowBuilder like any other staked node
-	builder.EnqueueNetworkInit(ctx)
-
-	// if this is upstream staked AN for unstaked ANs, initialize the network to communicate on the unstaked network
+	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.SupportsUnstakedNetwork() {
 		builder.enqueueUnstakedNetworkInit(ctx)
 	} else {
+		// otherwise, enqueue the regular network
 		builder.EnqueueNetworkInit(ctx)
 	}
 
