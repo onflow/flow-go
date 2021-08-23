@@ -62,6 +62,8 @@ func HasNodeID(nodeIDs ...flow.Identifier) flow.IdentityFilter {
 	}
 }
 
+// HasNetworkingKey returns a filter that returns true for any identity with a
+// networking public key matching any of the inputs.
 func HasNetworkingKey(keys ...crypto.PublicKey) flow.IdentityFilter {
 	return func(identity *flow.Identity) bool {
 		for _, key := range keys {

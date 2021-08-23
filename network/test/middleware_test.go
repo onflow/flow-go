@@ -476,7 +476,10 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	require.Error(m.Suite.T(), err)
 }
 
+// TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
+// the addresses of the staked network participants.
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
+	// create a new staked identity
 	ids, mws, _, providers := GenerateIDsAndMiddlewares(m.T(), 1, false, m.logger)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
@@ -501,12 +504,16 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 
 	msg := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
 
+	// message should fail to send because no address is known yet
+	// for the new identity
 	err := m.mws[0].SendDirect(msg, newId.NodeID)
 	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
 
+	// update the addresses
 	m.ids = idList
 	m.mws[0].UpdateNodeAddresses()
 
+	// now the message should send successfully
 	err = m.mws[0].SendDirect(msg, newId.NodeID)
 	require.NoError(m.T(), err)
 }
