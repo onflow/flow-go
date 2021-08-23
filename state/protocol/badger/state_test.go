@@ -119,6 +119,22 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 
+		currentEpochFinalView, err := committedPhaseSnapshot.Epochs().Current().FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+
+		currentDKGPhase1FinalView, err := committedPhaseSnapshot.Epochs().Current().DKGPhase1FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", currentDKGPhase1FinalView).Once()
+
+		currentDKGPhase2FinalView, err := committedPhaseSnapshot.Epochs().Current().DKGPhase2FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase2FinalView", currentDKGPhase2FinalView).Once()
+
+		currentDKGPhase3FinalView, err := committedPhaseSnapshot.Epochs().Current().DKGPhase3FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase3FinalView", currentDKGPhase3FinalView).Once()
+
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
 		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
