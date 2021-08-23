@@ -47,6 +47,19 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+
+		currentDKGPhase1FinalView, err := epoch.DKGPhase1FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", currentDKGPhase1FinalView).Once()
+
+		currentDKGPhase2FinalView, err := epoch.DKGPhase2FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase2FinalView", currentDKGPhase2FinalView).Once()
+
+		currentDKGPhase3FinalView, err := epoch.DKGPhase3FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase3FinalView", currentDKGPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
