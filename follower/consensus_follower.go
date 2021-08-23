@@ -24,7 +24,7 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	nodeID         flow.Identifier     // the node ID of this node
+	networkPrivKey crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr       string              // address to bind on
 	dataDir        string              // directory to store the protocol state
@@ -70,12 +70,12 @@ func getAccessNodeOptions(config *Config) []access.Option {
 	return []access.Option{
 		access.WithBootStrapPeers(ids...),
 		access.WithBaseOptions(getBaseOptions(config)),
+		access.WithNetworkKey(config.networkPrivKey),
 	}
 }
 
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
-		cmd.WithNetworkPublicKey(config.networkPubKey),
 		cmd.WithMetricsEnabled(false),
 	}
 	if config.bootstrapDir != "" {
@@ -109,13 +109,13 @@ type ConsensusFollowerImpl struct {
 
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
-	nodeID flow.Identifier,
-	bootstapIdentities []BootstrapNodeInfo,
+	networkPrivKey crypto.PrivateKey,
 	bindAddr string,
+	bootstapIdentities []BootstrapNodeInfo,
 	opts ...Option,
 ) (*ConsensusFollowerImpl, error) {
 	config := &Config{
-		nodeID:         nodeID,
+		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 	}

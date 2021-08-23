@@ -9,8 +9,6 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
-	"github.com/onflow/flow-go/engine/access/relay"
-	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -69,7 +67,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	builder.InitIDProviders()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
-	if builder.SupportsUnstakedNetwork() {
+	if builder.SupportsUnstakedNode() {
 		builder.enqueueUnstakedNetworkInit(ctx)
 	} else {
 		// otherwise, enqueue the regular network

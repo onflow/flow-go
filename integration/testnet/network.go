@@ -218,13 +218,13 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 
 type ConsensusFollowerConfig struct {
 	networkKey     fcrypto.PrivateKey
-	upstreamNodeID flow.Identifier
+	bootstrapNodes []consensus_follower.BootstrapNodeInfo
 }
 
-func NewConsensusFollowerConfig(networkKey fcrypto.PrivateKey, upstreamNodeID flow.Identifier) ConsensusFollowerConfig {
+func NewConsensusFollowerConfig(networkKey fcrypto.PrivateKey, bootstrapNodes []consensus_follower.BootstrapNodeInfo) ConsensusFollowerConfig {
 	return ConsensusFollowerConfig{
-		networkKey:     fcrypto.PrivateKey,
-		upstreamNodeID: upstreamNodeID,
+		networkKey:     networkKey,
+		bootstrapNodes: bootstrapNodes,
 	}
 }
 
@@ -306,14 +306,14 @@ func (n *NetworkConfig) Swap(i, j int) {
 // NodeConfig defines the input config for a particular node, specified prior
 // to network creation.
 type NodeConfig struct {
-	Role                        flow.Role
-	Stake                       uint64
-	Identifier                  flow.Identifier
-	LogLevel                    zerolog.Level
-	Ghost                       bool
-	AdditionalFlags             []string
-	Debug                       bool
-	ParticipatesInPublicNetwork bool // only applicable to Access node
+	Role                  flow.Role
+	Stake                 uint64
+	Identifier            flow.Identifier
+	LogLevel              zerolog.Level
+	Ghost                 bool
+	AdditionalFlags       []string
+	Debug                 bool
+	SupportsUnstakedNodes bool // only applicable to Access node
 }
 
 func NewNodeConfig(role flow.Role, opts ...func(*NodeConfig)) NodeConfig {
@@ -389,9 +389,9 @@ func AsGhost() func(config *NodeConfig) {
 	}
 }
 
-func AsPublicNetworkParticipant() func(config *NodeConfig) {
+func SupportsUnstakedNodes() func(config *NodeConfig) {
 	return func(config *NodeConfig) {
-		config.ParticipatesInPublicNetwork = true
+		config.SupportsUnstakedNodes = true
 	}
 }
 
@@ -492,12 +492,7 @@ func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, 
 
 	// TODO: update consensus follower to just accept a networking key instead of a node ID
 	// it should be able to figure out the rest on its own.
-	follower := consensus_follower.NewConsensusFollower(
-		followerConf.networkKey,
-		followerConf.upstreamNodeID,
-		bindAddr,
-		opts...,
-	)
+	follower, err := consensus_follower.NewConsensusFollower(followerConf.networkKey, bindAddr, followerConf.bootstrapNodes, opts...)
 
 	// TODO: convert key to node ID? or just store with the network key as map key
 	net.ConsensusFollowers[followerConf.nodeID] = follower
@@ -752,7 +747,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
 	}
 
-	allNodeInfos = append(toNodeInfos(stakedConfs), followerInfos...)
+	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)
@@ -953,7 +948,7 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 			Ghost:                       conf.Ghost,
 			AdditionalFlags:             conf.AdditionalFlags,
 			Debug:                       conf.Debug,
-			ParticipatesInPublicNetwork: conf.ParticipatesInPublicNetwork,
+			ParticipatesInPublicNetwork: conf.SupportsUnstakedNodes,
 		}
 
 		confs = append(confs, containerConf)
