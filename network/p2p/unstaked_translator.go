@@ -10,6 +10,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// UnstakedNetworkIDTranslator implements an IDTranslator which translates IDs for peers
+// on the unstaked network.
+// On the unstaked network, a Flow ID is derived from a peer ID by extracting the public
+// key from the peer ID, dropping the first byte (parity byte), and using the remaining
+// 32 bytes as the Flow ID.
+// Network keys for unstaked nodes must be generated using the Secp256k1 curve, and must
+// be positive. It is assumed that these requirements are enforced during key generation,
+// and any peer ID's which don't follow these conventions are considered invalid.
 type UnstakedNetworkIDTranslator struct{}
 
 func NewUnstakedNetworkIDTranslator() *UnstakedNetworkIDTranslator {

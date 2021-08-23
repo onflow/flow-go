@@ -4,6 +4,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// FilteredIdentifierProvider implements an IdentifierProvider which provides the identifiers
+// resulting from applying a filter to an IdentityProvider.
 type FilteredIdentifierProvider struct {
 	filter           flow.IdentityFilter
 	identityProvider IdentityProvider
