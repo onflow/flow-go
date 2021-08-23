@@ -11,5 +11,6 @@ type StoredChunkDataPack struct {
 	ChunkID      flow.Identifier
 	StartState   flow.StateCommitment
 	Proof        flow.StorageProof
-	CollectionID *flow.Identifier
+	CollectionID flow.Identifier
+	SystemChunk  bool
 }
