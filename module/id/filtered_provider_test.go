@@ -3,9 +3,10 @@ package id
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/utils/unittest"
 )
