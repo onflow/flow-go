@@ -1,20 +1,368 @@
 package migrations
 
 import (
+	"bytes"
 	"fmt"
+	"math"
+	"os"
+	"path"
+	"strings"
+	"time"
+
+	"encoding/hex"
+
+	"github.com/fxamacker/cbor/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
 
+	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
 	oldInter "github.com/onflow/cadence/v18/runtime/interpreter"
 )
 
-var _ oldInter.Visitor = &ValueConverter{}
+const cborTagStorageReference = 202
 
+var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
+
+var storageMigrationV5DecMode = func() cbor.DecMode {
+	decMode, err := cbor.DecOptions{
+		IntDec:           cbor.IntDecConvertNone,
+		MaxArrayElements: math.MaxInt32,
+		MaxMapPairs:      math.MaxInt32,
+		MaxNestedLevels:  256,
+	}.DecMode()
+	if err != nil {
+		panic(err)
+	}
+	return decMode
+}()
+
+var CBOREncMode = func() cbor.EncMode {
+	options := cbor.CanonicalEncOptions()
+	options.BigIntConvert = cbor.BigIntConvertNone
+	encMode, err := options.EncMode()
+	if err != nil {
+		panic(err)
+	}
+	return encMode
+}()
+
+type storageFormatV5MigrationResult struct {
+	key     ledger.Key
+	payload *ledger.Payload
+	err     error
+}
+
+type brokenTypeCause int
+
+type StorageFormatV6Migration struct {
+	Log           zerolog.Logger
+	OutputDir     string
+	accounts      *state.Accounts
+	programs      *programs.Programs
+	brokenTypeIDs map[common.TypeID]brokenTypeCause
+	reportFile    *os.File
+	storage       newInter.Storage
+}
+
+func (m StorageFormatV6Migration) filename() string {
+	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
+}
+
+func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
+
+	filename := m.filename()
+	m.Log.Info().Msgf("Running storage format V5 migration. Saving report to %s.", filename)
+
+	reportFile, err := os.Create(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = reportFile.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	m.reportFile = reportFile
+
+	m.Log.Info().Msg("Loading account contracts ...")
+
+	m.accounts = m.getContractsOnlyAccounts(payloads)
+
+	m.Log.Info().Msg("Loaded account contracts")
+
+	m.programs = programs.NewEmptyPrograms()
+	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
+
+	m.storage = newInter.NewInMemoryStorage()
+
+	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
+
+	for _, payload := range payloads {
+
+		keyParts := payload.Key.KeyParts
+
+		rawOwner := keyParts[0].Value
+		rawKey := keyParts[2].Value
+
+		result := m.migrate(payload)
+
+		if result.err != nil {
+
+			return nil, fmt.Errorf(
+				"failed to migrate key: %q (owner: %x): %w",
+				rawKey,
+				rawOwner,
+				result.err,
+			)
+		} else if result.payload != nil {
+			migratedPayloads = append(migratedPayloads, *result.payload)
+		} else {
+			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
+			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+		}
+	}
+
+	return migratedPayloads, nil
+}
+
+func (m StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+	var filteredPayloads []ledger.Payload
+
+	for _, payload := range payloads {
+		rawKey := string(payload.Key.KeyParts[2].Value)
+		if strings.HasPrefix(rawKey, "contract_names") ||
+			strings.HasPrefix(rawKey, "code.") ||
+			rawKey == "exists" {
+
+			filteredPayloads = append(filteredPayloads, payload)
+		}
+	}
+
+	l := newView(filteredPayloads)
+	st := state.NewState(l)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+	return accounts
+}
+
+func (m StorageFormatV6Migration) migrate(
+	payload ledger.Payload,
+) storageFormatV5MigrationResult {
+	migratedPayload, err := m.reencodePayload(payload)
+	result := storageFormatV5MigrationResult{
+		key: payload.Key,
+	}
+	if err != nil {
+		result.err = err
+	} else if migratedPayload != nil {
+		if err := m.checkStorageFormat(*migratedPayload); err != nil {
+			panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
+		}
+		result.payload = migratedPayload
+	}
+	return result
+}
+
+func (m StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
+
+	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
+		return nil
+	}
+
+	_, version := newInter.StripMagic(payload.Value)
+	if version != newInter.CurrentEncodingVersion {
+		return fmt.Errorf("invalid version for key %s: %d", payload.Key.String(), version)
+	}
+
+	return nil
+}
+
+func (m StorageFormatV6Migration) reencodePayload(
+	payload ledger.Payload,
+) (*ledger.Payload, error) {
+
+	keyParts := payload.Key.KeyParts
+
+	rawOwner := keyParts[0].Value
+	rawController := keyParts[1].Value
+	rawKey := keyParts[2].Value
+
+	// Ignore known payload keys that are not Cadence values
+
+	if state.IsFVMStateKey(
+		string(rawOwner),
+		string(rawController),
+		string(rawKey),
+	) {
+		return &payload, nil
+	}
+
+	value, version := oldInter.StripMagic(payload.Value)
+
+	if version != oldInter.CurrentEncodingVersion-1 {
+		return nil,
+			fmt.Errorf(
+				"invalid storage format version for key: %s: %d",
+				rawKey,
+				version,
+			)
+	}
+
+	err := storageMigrationV5DecMode.Valid(value)
+	if err != nil {
+		return &payload, nil
+	}
+
+	// Delete known dead or orphaned contract value child keys
+
+	//if m.isOrphanContactValueChildKey(
+	//	rawKey,
+	//	flow.BytesToAddress(rawOwner),
+	//) {
+	//	m.Log.Warn().Msgf(
+	//		"DELETING orphaned contract value child key: %s (owner: %x)",
+	//		string(rawKey), rawOwner,
+	//	)
+	//
+	//	return nil, nil
+	//}
+
+	// Extract the owner from the key
+
+	newValue, keep, err := m.reencodeValue(
+		value,
+		common.BytesToAddress(rawOwner),
+		string(rawKey),
+		version,
+	)
+
+	if err != nil {
+		return nil,
+			fmt.Errorf(
+				"failed to re-encode key: %s: %w\n\nvalue:\n%s\n\n%s",
+				rawKey, err,
+				hex.Dump(value),
+				cborMeLink(value),
+			)
+	}
+
+	if !keep {
+		return nil, nil
+	}
+
+	payload.Value = newInter.PrependMagic(
+		newValue,
+		newInter.CurrentEncodingVersion,
+	)
+
+	return &payload, nil
+}
+
+// Re-encodes the value to the new storage format, using following steps:
+//   - Decode to old value
+//   - Covert value from old to new
+//   - Encode the new value.
+func (m StorageFormatV6Migration) reencodeValue(
+	data []byte,
+	owner common.Address,
+	key string,
+	version uint16,
+) (
+	newData []byte,
+	keep bool,
+	err error,
+) {
+
+	// Decode the value
+
+	storagePath := []string{key}
+
+	rootValue, err := oldInter.DecodeValue(data, &owner, storagePath, version, nil)
+	if err != nil {
+		if tagErr, ok := err.(oldInter.UnsupportedTagDecodingError); ok &&
+			tagErr.Tag == cborTagStorageReference &&
+			bytes.Compare(data[:2], storageReferenceEncodingStart) == 0 {
+
+			m.Log.Warn().
+				Str("key", key).
+				Str("owner", owner.String()).
+				Msgf("DELETING unsupported storage reference")
+
+			return nil, false, nil
+
+		} else {
+			return nil, false, fmt.Errorf(
+				"failed to decode value: %w\n\nvalue:\n%s\n",
+				err, hex.Dump(data),
+			)
+		}
+	}
+
+	// Force decoding of all inner values
+
+	oldInter.InspectValue(
+		rootValue,
+		func(inspectedValue oldInter.Value) bool {
+			switch inspectedValue := inspectedValue.(type) {
+			case *oldInter.CompositeValue:
+				_ = inspectedValue.Fields()
+			case *oldInter.ArrayValue:
+				_ = inspectedValue.Elements()
+			case *oldInter.DictionaryValue:
+				_ = inspectedValue.Entries()
+			}
+			return true
+		},
+	)
+
+	// Convert old value to new value
+
+	converter := NewValueConverter(m.storage)
+	newValue := converter.Convert(rootValue)
+
+	// Encode the new value
+
+	storable, ok := newValue.(atree.Storable)
+	if !ok {
+		return nil, false,
+			fmt.Errorf("non-storable value at key: %s", key)
+	}
+
+	var buf bytes.Buffer
+	enc := atree.NewEncoder(&buf, CBOREncMode)
+
+	err = storable.Encode(enc)
+	if err != nil {
+		return nil, false, err
+	}
+
+	err = enc.CBOR.Flush()
+	if err != nil {
+		return nil, false, err
+	}
+
+	return buf.Bytes(), true, nil
+}
+
+func cborMeLink(value []byte) string {
+	return fmt.Sprintf("http://cbor.me/?bytes=%x", value)
+}
+
+// Value Converter
+//
 type ValueConverter struct {
 	result  newInter.Value
 	storage newInter.Storage
 }
+
+var _ oldInter.Visitor = &ValueConverter{}
 
 func NewValueConverter(storage newInter.Storage) *ValueConverter {
 	return &ValueConverter{
@@ -234,12 +582,12 @@ func (c *ValueConverter) VisitPathValue(_ *oldInter.Interpreter, value oldInter.
 
 func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value oldInter.CapabilityValue) {
 	address := c.Convert(value).(newInter.AddressValue)
-	path := c.Convert(value).(newInter.PathValue)
+	pathValue := c.Convert(value).(newInter.PathValue)
 	burrowType := ConvertStaticType(value.BorrowType)
 
 	c.result = &newInter.CapabilityValue{
 		Address:    address,
-		Path:       path,
+		Path:       pathValue,
 		BorrowType: burrowType,
 	}
 }

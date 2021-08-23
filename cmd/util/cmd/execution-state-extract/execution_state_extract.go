@@ -56,8 +56,12 @@ func extractExecutionState(dir string,
 	migrations := []ledger.Migration{}
 	reporters := []ledger.Reporter{}
 	if migrate {
+		storageFormatV5Migration := mgr.StorageFormatV6Migration{
+			Log:       log,
+			OutputDir: outputDir,
+		}
 		migrations = []ledger.Migration{
-			mgr.PruneMigration,
+			storageFormatV5Migration.Migrate,
 		}
 	}
 	if report {

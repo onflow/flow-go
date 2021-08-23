@@ -11,12 +11,13 @@ import (
 )
 
 func TestValueConversion(t *testing.T) {
-	oldArray := oldInter.NewArrayValue(
-		[]oldInter.Value{
-			oldInter.NewStringValue("foo"),
-			oldInter.NewStringValue("bar"),
-			oldInter.BoolValue(true),
+	oldArray := oldInter.NewArrayValueUnownedNonCopying(
+		oldInter.VariableSizedStaticType{
+			Type: oldInter.PrimitiveStaticTypeAnyStruct,
 		},
+		oldInter.NewStringValue("foo"),
+		oldInter.NewStringValue("bar"),
+		oldInter.BoolValue(true),
 	)
 
 	storage := newInter.NewInMemoryStorage()
