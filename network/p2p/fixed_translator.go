@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// FixedTableIdentityTranslator implements an IDTranslator which translates ID's for a
+// fixed list of identities.
 type FixedTableIdentityTranslator struct {
 	flow2p2p map[flow.Identifier]peer.ID
 	p2p2flow map[peer.ID]flow.Identifier
