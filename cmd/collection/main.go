@@ -36,7 +36,6 @@ import (
 	builder "github.com/onflow/flow-go/module/builder/collection"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/ingress"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
@@ -271,13 +270,7 @@ func main() {
 				followerEng,
 				mainChainSyncCore,
 				finalizedHeader,
-				id.NewFilteredIdentifierProvider(
-					filter.And(
-						filter.HasRole(flow.RoleConsensus),
-						filter.Not(filter.HasNodeID(node.Me.NodeID())),
-					),
-					node.IdentityProvider,
-				),
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
