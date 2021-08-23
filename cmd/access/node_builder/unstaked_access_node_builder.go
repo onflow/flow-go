@@ -96,6 +96,8 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 	}
 }
 
+// Build enqueues the sync engine and the follower engine for the unstaked access node.
+// Currently, the unstaked AN only runs the follower engine.
 func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 	anb.
 		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -103,7 +105,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 			node.SyncEngineIdentifierProvider = node.Middleware.IdentifierProvider()
 			return nil
 		})
-	anb.FlowAccessNodeBuilder.Build()
+	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
 	return anb
 }
 
