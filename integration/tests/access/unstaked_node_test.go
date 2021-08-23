@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	consensus_follower "github.com/onflow/flow-go/follower"
@@ -49,7 +50,7 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	stakedConfig := testnet.NewNodeConfig(
 		flow.RoleAccess,
 		testnet.WithID(suite.stakedID),
-		testnet.AsUnstakedNetworkParticipant(),
+		testnet.SupportsUnstakedNodes(),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	)
 	nodeConfigs = append(nodeConfigs, stakedConfig)
@@ -89,9 +90,14 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	// consensus follower
+	unstakedKey, err := unittest.NetworkingKey()
+	require.NoError(suite.T(), err)
+	// TODO: derive node id from the key
 	suite.unstakedID = unittest.IdentifierFixture()
+
+
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(suite.unstakedID, suite.stakedID),
+		testnet.NewConsensusFollowerConfig(unstakedKey, suite.stakedID, suite.unstakedID),
 	}
 
 	conf := testnet.NewNetworkConfig("unstaked_node_test", nodeConfigs, followerConfigs)

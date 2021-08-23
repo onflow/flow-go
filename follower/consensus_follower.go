@@ -24,7 +24,7 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	networkPubKey  crypto.PublicKey    // the network public key of this node
+	networkPrivKey crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr       string              // address to bind on
 	dataDir        string              // directory to store the protocol state
@@ -69,14 +69,13 @@ func getAccessNodeOptions(config *Config) []access.Option {
 	ids := bootstrapIdentities(config.bootstrapNodes)
 	return []access.Option{
 		access.WithBootStrapPeers(ids...),
-		access.WithBindAddr(config.bindAddr),
 		access.WithBaseOptions(getBaseOptions(config)),
+		access.WithNetworkKey(config.networkPrivKey),
 	}
 }
 
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
-		cmd.WithNetworkPublicKey(config.networkPubKey),
 		cmd.WithMetricsEnabled(false),
 	}
 	if config.bootstrapDir != "" {
@@ -84,6 +83,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	}
 	if config.dataDir != "" {
 		options = append(options, cmd.WithDataDir(config.dataDir))
+	}
+	if config.bindAddr != "" {
+		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
 
 	return options
@@ -107,13 +109,13 @@ type ConsensusFollowerImpl struct {
 
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
-	networkPublicKey crypto.PublicKey, // TODO: make this optional. if not explicitly supplied, we can auto-generate one for them.
-	bootstapIdentities []BootstrapNodeInfo,
+	networkPrivKey crypto.PrivateKey,
 	bindAddr string,
+	bootstapIdentities []BootstrapNodeInfo,
 	opts ...Option,
 ) (*ConsensusFollowerImpl, error) {
 	config := &Config{
-		networkPublicKey:     networkPublicKey,
+		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 	}
