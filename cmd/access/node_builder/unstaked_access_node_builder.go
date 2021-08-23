@@ -106,7 +106,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 	anb.
 		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// use the default identifier provider
-			anb.SyncEngineParticipantsProvider = node.Middleware.IdentifierProvider()
+			node.SyncEngineIdentifierProvider = node.Middleware.IdentifierProvider()
 			return nil
 		})
 	anb.FlowAccessNodeBuilder.Build()
