@@ -69,7 +69,6 @@ func getAccessNodeOptions(config *Config) []access.Option {
 	ids := bootstrapIdentities(config.bootstrapNodes)
 	return []access.Option{
 		access.WithBootStrapPeers(ids...),
-		access.WithUnstakedNetworkBindAddr(config.bindAddr),
 		access.WithBaseOptions(getBaseOptions(config)),
 	}
 }
@@ -84,6 +83,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	}
 	if config.dataDir != "" {
 		options = append(options, cmd.WithDataDir(config.dataDir))
+	}
+	if config.bindAddr != "" {
+		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
 
 	return options

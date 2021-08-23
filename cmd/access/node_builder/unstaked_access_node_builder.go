@@ -63,12 +63,6 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 }
 
 func (builder *UnstakedAccessNodeBuilder) validateParams() {
-
-	// for an unstaked access node, the unstaked network bind address must be provided
-	if builder.unstakedNetworkBindAddr == cmd.NotSet {
-		builder.Logger.Fatal().Msg("unstaked bind address not set")
-	}
-
 	if len(builder.bootstrapNodeAddresses) != len(builder.bootstrapNodePublicKeys) {
 		builder.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
 	}
@@ -93,7 +87,7 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 			NetworkPubKey: node.NetworkKey.PublicKey(),
 			StakingPubKey: nil,             // no staking key needed for the unstaked node
 			Role:          flow.RoleAccess, // unstaked node can only run as an access node
-			Address:       builder.unstakedNetworkBindAddr,
+			Address:       builder.BindAddr,
 		}
 
 		me, err := local.New(self, nil)
@@ -139,16 +133,16 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, nil)
 		builder.MustNot(err)
 
-		builder.UnstakedNetwork = network
-		builder.unstakedMiddleware = middleware
+		builder.Network = network
+		builder.Middleware = middleware
 
 		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
 		builder.Network = network
 		builder.Middleware = middleware
 
-		builder.Logger.Info().Msgf("unstaked network will run on address: %s", builder.unstakedNetworkBindAddr)
+		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 
-		return builder.UnstakedNetwork, err
+		return builder.Network, err
 	})
 }
 
@@ -160,6 +154,6 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return newUpstreamConnector(builder.bootstrapIdentites, builder.UnstakedLibP2PNode, builder.Logger), nil
+		return newUpstreamConnector(builder.bootstrapIdentites, builder.LibP2PNode, builder.Logger), nil
 	})
 }

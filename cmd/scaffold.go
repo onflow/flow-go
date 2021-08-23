@@ -110,7 +110,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultConfig.bindAddr, "address to bind on")
+	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
@@ -137,8 +137,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.bindAddr != NotSet {
-			myAddr = fnb.BaseConfig.bindAddr
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
 		}
 
 		// setup the Ping provider to return the software version and the sealed block height
@@ -691,6 +691,12 @@ func WithBootstrapDir(bootstrapDir string) Option {
 func WithNodeID(nodeID flow.Identifier) Option {
 	return func(config *BaseConfig) {
 		config.nodeIDHex = nodeID.String()
+	}
+}
+
+func WithBindAddress(bindAddress string) Option {
+	return func(config *BaseConfig) {
+		config.BindAddr = bindAddress
 	}
 }
 

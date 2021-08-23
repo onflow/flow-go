@@ -95,7 +95,7 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
-	bindAddr              string
+	BindAddr              string
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
@@ -155,7 +155,7 @@ func DefaultBaseConfig() *BaseConfig {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
-		bindAddr:              NotSet,
+		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
