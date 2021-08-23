@@ -4,6 +4,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// FixedIdentifierProvider implements an IdentifierProvider which provides a fixed list
+// of identifiers.
 type FixedIdentifierProvider struct {
 	identifiers flow.IdentifierList
 }
@@ -16,6 +18,8 @@ func (p *FixedIdentifierProvider) Identifiers() flow.IdentifierList {
 	return p.identifiers
 }
 
+// FixedIdentityProvider implements an IdentityProvider which provides a fixed list
+// of identities.
 type FixedIdentityProvider struct {
 	identities flow.IdentityList
 }

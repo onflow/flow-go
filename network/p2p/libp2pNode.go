@@ -354,25 +354,24 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
-	if len(n.host.Peerstore().Addrs(peerID)) == 0 {
-		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore")
+	// If we do not currently have any addresses for the given peer, stream creation will almost
+	// certainly fail. If this Node was configure with a DHT, we can try to lookup the address of
+	// the peer in the DHT as a last resort.
+	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
+		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore, searching for peer in dht")
 
-		if n.dht != nil {
-			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("searching for peer in dht")
+		var err error
+		func() {
+			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
+			defer cancel()
+			// try to find the peer using the dht
+			_, err = n.dht.FindPeer(timedCtx, peerID)
+		}()
 
-			var err error
-			func() {
-				timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
-				defer cancel()
-				// try to find the peer using the dht
-				_, err = n.dht.FindPeer(timedCtx, peerID)
-			}()
-
-			if err != nil {
-				n.logger.Err(err).Str("peerID", peerID.Pretty()).Msg("could not find addresses")
-			} else {
-				n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address found")
-			}
+		if err != nil {
+			n.logger.Warn().Err(err).Str("peerID", peerID.Pretty()).Msg("could not find addresses")
+		} else {
+			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("addresses found")
 		}
 	}
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)

@@ -3,6 +3,7 @@ package id
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -30,6 +31,9 @@ func TestFilteredIdentitiesProvider(t *testing.T) {
 
 	ip := NewFixedIdentityProvider(identities)
 	fp := NewFilteredIdentifierProvider(filter.In(oddIdentities), ip)
+
+	assert.ElementsMatch(t, fp.Identifiers(),
+		(flow.IdentityList)(oddIdentities).NodeIDs())
 
 	in := 0
 	out := 0
