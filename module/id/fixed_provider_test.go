@@ -7,8 +7,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFixedIdentifierProvider(t *testing.T) {
