@@ -57,12 +57,6 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.enqueueConnectWithStakedAN()
 
-	builder.EnqueueMetricsServerInit()
-
-	builder.RegisterBadgerMetrics()
-
-	builder.EnqxueueTracer()
-
 	builder.PreInit(builder.initUnstakedLocal())
 
 	return builder
@@ -105,13 +99,13 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 // Build enqueues the sync engine and the follower engine for the unstaked access node.
 // Currently, the unstaked AN only runs the follower engine.
 func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	anb.
-		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// use the default identifier provider
-			node.SyncEngineIdentifierProvider = node.Middleware.IdentifierProvider()
-			return nil
-		})
-	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
+	//anb.
+	//	Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+	//		// use the default identifier provider
+	//		node.SyncEngineIdentifierProvider = node.Middleware.IdentifierProvider()
+	//		return nil
+	//	})
+	//anb.FlowAccessNodeBuilder.BuildConsensusFollower()
 	return anb
 }
 

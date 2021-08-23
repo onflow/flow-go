@@ -25,9 +25,9 @@ import (
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	fcrypto "github.com/onflow/flow-go/crypto"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -217,14 +217,16 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 }
 
 type ConsensusFollowerConfig struct {
-	networkKey     fcrypto.PrivateKey
-	bootstrapNodes []consensus_follower.BootstrapNodeInfo
+	nodeID flow.Identifier
+	networkingPrivKey crypto.PrivateKey
+	stakedNodeID flow.Identifier
 }
 
-func NewConsensusFollowerConfig(networkKey fcrypto.PrivateKey, bootstrapNodes []consensus_follower.BootstrapNodeInfo) ConsensusFollowerConfig {
+func NewConsensusFollowerConfig(networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, nodeID flow.Identifier) ConsensusFollowerConfig {
 	return ConsensusFollowerConfig{
-		networkKey:     networkKey,
-		bootstrapNodes: bootstrapNodes,
+		networkingPrivKey: networkingPrivKey,
+		stakedNodeID: stakedNodeID,
+		nodeID: nodeID, // TODO: remove this and derive it from the key instead
 	}
 }
 
@@ -458,13 +460,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
-		flowNetwork.AddConsensusFollower(t, bootstrapDir, followerConf)
+		flowNetwork.addConsensusFollower(t, bootstrapDir, followerConf, confs)
 	}
 
 	return flowNetwork
 }
 
-func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, followerConf ConsensusFollowerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
 
@@ -490,9 +492,35 @@ func (net *FlowNetwork) AddConsensusFollower(t *testing.T, bootstrapDir string, 
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
 	}
 
+	var stakedANContainer *ContainerConfig
+	// find the upstream Access node container for this follower engine
+	for _, cont := range containers {
+		if cont.NodeID == followerConf.stakedNodeID {
+			stakedANContainer = &cont
+			break
+		}
+	}
+	require.NotNil(t, stakedANContainer, "unable to find staked AN for the follower engine %s", followerConf.nodeID.String())
+
+	hostPort := strings.Split(stakedANContainer.Address, ":")
+	require.Len(t, hostPort, 2, "invalid address for staked AN %s", stakedANContainer.Address)
+
+	host := hostPort[0]
+	portStr := hostPort[1]
+	portU64, err := strconv.ParseUint(portStr, 10, 32)
+	require.NoError(t, err)
+	port := uint(portU64)
+
+	bootstrapNodeInfo := consensus_follower.BootstrapNodeInfo{
+		Host: host,
+		Port: port,
+		NetworkPublicKey: stakedANContainer.NetworkPubKey(),
+	}
+
 	// TODO: update consensus follower to just accept a networking key instead of a node ID
 	// it should be able to figure out the rest on its own.
-	follower, err := consensus_follower.NewConsensusFollower(followerConf.networkKey, bindAddr, followerConf.bootstrapNodes, opts...)
+	follower, err := consensus_follower.NewConsensusFollower(followerConf.networkingPrivKey, bindAddr,
+		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
 
 	// TODO: convert key to node ID? or just store with the network key as map key
 	net.ConsensusFollowers[followerConf.nodeID] = follower
@@ -633,9 +661,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
-			if nodeConf.ParticipatesInPublicNetwork {
+			if nodeConf.SupportsUnstakedNodes {
 				// TODO: define this flag for Access node
-				nodeContainer.addFlag("public-network-participant", "true")
+				nodeContainer.addFlag("supports-unstaked-node", "true")
 			}
 
 		case flow.RoleConsensus:
@@ -658,7 +686,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 
-		if nodeConf.ParticipatesInPublicNetwork {
+		if nodeConf.SupportsUnstakedNodes {
 			// TODO: Currently, it is not possible to create a ghost AN which participates
 			// in the public network, because connection gating is enabled by default and
 			// therefore the ghost node will deny incoming connections from all consensus
@@ -693,28 +721,22 @@ func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
 func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, error) {
 	var nodeInfos []bootstrap.NodeInfo
 
-	// TODO: remove this, networking keys should be provided by the consensus follower config.
-	// get networking keys for all followers
-	networkKeys, err := unittest.NetworkingKeys(len(confs))
+	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
+	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
+	dummyStakingKey, err := unittest.StakingKey()
 	if err != nil {
 		return nil, err
 	}
 
-	// get staking keys for all followers
-	stakingKeys, err := unittest.StakingKeys(len(confs))
-	if err != nil {
-		return nil, err
-	}
-
-	for i, conf := range confs {
+	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
 			// TODO: Need to convert from network key here
 			conf.nodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
 			0,               // no stake
-			networkKeys[i],
-			stakingKeys[i],
+			conf.networkingPrivKey,
+			dummyStakingKey,
 		)
 
 		nodeInfos = append(nodeInfos, info)
@@ -742,6 +764,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
+	// generate the follower node keys (follow nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
@@ -897,7 +920,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, err
 	}
 
-	return root, result, seal, allConfs, nil
+	return root, result, seal, stakedConfs, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
@@ -942,13 +965,13 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 		)
 
 		containerConf := ContainerConfig{
-			NodeInfo:                    info,
-			ContainerName:               name,
-			LogLevel:                    conf.LogLevel,
-			Ghost:                       conf.Ghost,
-			AdditionalFlags:             conf.AdditionalFlags,
-			Debug:                       conf.Debug,
-			ParticipatesInPublicNetwork: conf.SupportsUnstakedNodes,
+			NodeInfo:              info,
+			ContainerName:         name,
+			LogLevel:              conf.LogLevel,
+			Ghost:                 conf.Ghost,
+			AdditionalFlags:       conf.AdditionalFlags,
+			Debug:                 conf.Debug,
+			SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
 		}
 
 		confs = append(confs, containerConf)
