@@ -60,8 +60,6 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.InitIDProviders()
 
-	builder.deriveBootstrapPeerIdentities()
-
 	builder.enqueueUnstakedNetworkInit(ctx)
 
 	builder.enqueueConnectWithStakedAN()
@@ -81,14 +79,6 @@ func (builder *UnstakedAccessNodeBuilder) validateParams() {
 	if len(builder.bootstrapNodeAddresses) != len(builder.bootstrapNodePublicKeys) {
 		builder.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
 	}
-}
-
-// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstreap peers from the parameters.
-// These are the identity of the staked and unstaked AN also acting as the DHT bootstrap server
-func (builder *UnstakedAccessNodeBuilder) deriveBootstrapPeerIdentities() {
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	builder.MustNot(err)
-	builder.bootstrapIdentites = ids
 }
 
 // initUnstakedLocal initializes the unstaked node ID, network key and network address
@@ -170,7 +160,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("upstream connector", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(builder.bootstrapIdentites, builder.LibP2PNode, builder.Logger), nil
 	})
 }
