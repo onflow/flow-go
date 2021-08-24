@@ -15,6 +15,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// these constants are defined in X9.62 section 4.2 and 4.3
+// see https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.202.2977&rep=rep1&type=pdf
+// they indicate if the conversion to/from a public key (point) in compressed form must involve an inversion of the ordinate coordinate
+const X962_NO_INVERSION = uint8(0x02)
+const X962_INVERSION = uint8(0x03)
+
 func GenerateMachineAccountKey(seed []byte) (crypto.PrivateKey, error) {
 	keys, err := GenerateKeys(crypto.ECDSAP256, 1, [][]byte{seed})
 	if err != nil {
@@ -38,7 +44,7 @@ func drawUnstakedKey(seed []byte) (crypto.PrivateKey, error) {
 	if err != nil {
 		// this should not happen
 		return nil, err
-	} else if key.PublicKey().EncodeCompressed()[0] == 0x03 {
+	} else if key.PublicKey().EncodeCompressed()[0] == X962_INVERSION {
 		// negative key -> unsuitable
 		return nil, fmt.Errorf("Unsuitable negative key")
 	}
