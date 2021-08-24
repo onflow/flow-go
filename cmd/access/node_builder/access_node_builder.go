@@ -152,24 +152,24 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                     *p2p.Node
-	FollowerState                  protocol.MutableState
-	SyncCore                       *synchronization.Core
-	RpcEng                         *rpc.Engine
-	FinalizationDistributor        *pubsub.FinalizationDistributor
-	FinalizedHeader                *synceng.FinalizedHeaderCache
-	CollectionRPC                  access.AccessAPIClient
-	TransactionTimings             *stdmap.TransactionTimings
-	CollectionsToMarkFinalized     *stdmap.Times
-	CollectionsToMarkExecuted      *stdmap.Times
-	BlocksToMarkExecuted           *stdmap.Times
-	TransactionMetrics             module.TransactionMetrics
-	PingMetrics                    module.PingMetrics
-	Committee                      hotstuff.Committee
-	Finalized                      *flow.Header
-	Pending                        []*flow.Header
-	FollowerCore                   module.HotStuffFollower
-	SyncEngineParticipantsProvider id.IdentifierProvider
+	LibP2PNode                            *p2p.Node
+	FollowerState                         protocol.MutableState
+	SyncCore                              *synchronization.Core
+	RpcEng                                *rpc.Engine
+	FinalizationDistributor               *pubsub.FinalizationDistributor
+	FinalizedHeader                       *synceng.FinalizedHeaderCache
+	CollectionRPC                         access.AccessAPIClient
+	TransactionTimings                    *stdmap.TransactionTimings
+	CollectionsToMarkFinalized            *stdmap.Times
+	CollectionsToMarkExecuted             *stdmap.Times
+	BlocksToMarkExecuted                  *stdmap.Times
+	TransactionMetrics                    module.TransactionMetrics
+	PingMetrics                           module.PingMetrics
+	Committee                             hotstuff.Committee
+	Finalized                             *flow.Header
+	Pending                               []*flow.Header
+	FollowerCore                          module.HotStuffFollower
+	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
 	IngestEng   *ingestion.Engine
@@ -322,7 +322,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 			builder.FollowerEng,
 			builder.SyncCore,
 			builder.FinalizedHeader,
-			builder.SyncEngineParticipantsProvider,
+			builder.SyncEngineParticipantsProviderFactory(),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create synchronization engine: %w", err)

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
@@ -141,7 +142,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 				return errors.New("middleware was of unexpected type")
 			}
 			// use the default identifier provider
-			anb.SyncEngineParticipantsProvider = middleware.IdentifierProvider()
+			anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider { return middleware.IdentifierProvider() }
 			return nil
 		})
 	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
