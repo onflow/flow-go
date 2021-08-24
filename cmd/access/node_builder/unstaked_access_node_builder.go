@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/channel_reassigner"
+	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
@@ -148,11 +148,13 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 
 		middleware := builder.initMiddleware(unstakedNodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
 
+		subscriptionManager := converter.NewSubscriptionManager(p2p.NewChannelSubscriptionManager(middleware), engine.SyncCommittee, engine.UnstakedSyncCommittee)
+
 		// topology is nil since its automatically managed by libp2p
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, nil)
+		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, nil, subscriptionManager)
 		builder.MustNot(err)
 
-		builder.Network = channel_reassigner.NewChannelReassignerNetwork(network, engine.SyncCommittee, engine.UnstakedSyncCommittee)
+		builder.Network = network
 		builder.Middleware = middleware
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
