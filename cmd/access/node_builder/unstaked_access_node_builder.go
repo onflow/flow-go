@@ -66,6 +66,12 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.enqueueConnectWithStakedAN()
 
+	//builder.EnqueueMetricsServerInit()
+	//
+	//builder.RegisterBadgerMetrics()
+	//
+	//builder.EnqueueTracer()
+
 	builder.PreInit(builder.initUnstakedLocal())
 
 	return builder
