@@ -29,15 +29,13 @@ func (fnb *UnstakedAccessNodeBuilder) initNodeInfo() {
 	fnb.MustNot(err)
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	fnb.MustNot(err)
-	fnb.NodeID, err = fnb.IDTranslator.GetFlowID(peerID)
+	fnb.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(peerID)
 	fnb.MustNot(err)
 	fnb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
 	fnb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
 }
 
 func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
-	fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
-
 	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, fnb.ProtocolEvents)
 		if err != nil {
@@ -45,6 +43,8 @@ func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
 		}
 
 		fnb.IdentityProvider = idCache
+
+		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
 		return nil
 	})
@@ -57,12 +57,12 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.validateParams()
 
-	builder.InitIDProviders()
-
 	// if a network key has been passed in the init node info here
 	if builder.AccessNodeConfig.NetworkKey != nil {
 		builder.initNodeInfo()
 	}
+
+	builder.InitIDProviders()
 
 	builder.enqueueUnstakedNetworkInit(ctx)
 
