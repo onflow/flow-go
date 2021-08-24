@@ -33,7 +33,9 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
-	google.golang.org/grpc v1.38.0
+	google.golang.org/appengine v1.6.7 // indirect
+	google.golang.org/genproto v0.0.0-20210405174219-a39eb2f71cb9 // indirect
+	google.golang.org/grpc v1.36.1
 	gopkg.in/yaml.v2 v2.4.0
 )
 
