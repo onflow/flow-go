@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 const NotSet = "not set"
@@ -170,5 +171,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
 		metricsEnabled:        true,
+		receiptsCacheSize:     bstorage.DefaultCacheSize,
+		guaranteesCacheSize:   bstorage.DefaultCacheSize,
 	}
 }
