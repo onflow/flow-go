@@ -88,7 +88,7 @@ type AccessNodeConfig struct {
 	staked                       bool
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
-	bootstrapIdentites           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
+	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
 	supportsUnstakedFollower     bool
 	collectionGRPCPort           uint
@@ -491,7 +491,7 @@ type Option func(*AccessNodeConfig)
 
 func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	return func(config *AccessNodeConfig) {
-		config.bootstrapIdentites = bootstrapNodes
+		config.bootstrapIdentities = bootstrapNodes
 	}
 }
 
@@ -588,7 +588,7 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	builder.MustNot(err)
-	builder.bootstrapIdentites = ids
+	builder.bootstrapIdentities = ids
 }
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
@@ -602,7 +602,7 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	// if this is an unstaked access node, then seed the DHT with the boostrap identities
 	if !builder.IsStaked() {
-		bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentites)
+		bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentities)
 		builder.MustNot(err)
 		dhtOptions = append(dhtOptions, bootstrapPeersOpt)
 	}
