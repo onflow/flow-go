@@ -546,6 +546,8 @@ func (builder *FlowAccessNodeBuilder) ParseFlags() {
 	builder.extraFlags()
 
 	builder.ParseAndPrintFlags()
+
+	builder.deriveBootstrapPeerIdentities()
 }
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
@@ -579,6 +581,14 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 	})
+}
+
+// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
+// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
+func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
+	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	builder.MustNot(err)
+	builder.bootstrapIdentites = ids
 }
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
