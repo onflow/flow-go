@@ -44,9 +44,6 @@ type NodeBuilder interface {
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
 
-	// InitNodeInfo initializes the node id, staking key and networking key
-	InitNodeInfo()
-
 	// InitIDProviders initializes the IdentityProvider and IDTranslator
 	InitIDProviders()
 

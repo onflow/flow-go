@@ -256,7 +256,7 @@ func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
 }
 
-func (fnb *FlowNodeBuilder) InitNodeInfo() {
+func (fnb *FlowNodeBuilder) initNodeInfo() {
 	if fnb.BaseConfig.nodeIDHex == NotSet {
 		fnb.Logger.Fatal().Msg("cannot start without node ID")
 	}
@@ -795,7 +795,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 		// seed random generator
 		rand.Seed(time.Now().UnixNano())
 
-		fnb.InitNodeInfo()
+		// init nodeinfo by reading the private bootstrap file if not already set
+		if fnb.NodeID == flow.ZeroID {
+			fnb.initNodeInfo()
+		}
 
 		fnb.initLogger()
 
