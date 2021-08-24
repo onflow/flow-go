@@ -8,11 +8,15 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/common/splitter"
+	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
@@ -84,23 +88,58 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 }
 
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	anb.FlowAccessNodeBuilder.
-		Build().
-		Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			ping, err := pingeng.New(
-				node.Logger,
-				node.State,
-				node.Me,
-				anb.PingMetrics,
-				anb.pingEnabled,
-				node.Middleware,
-				anb.nodeInfoFile,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not create ping engine: %w", err)
-			}
-			return ping, nil
-		})
+	anb.FlowAccessNodeBuilder.Build()
+
+	if anb.SupportsUnstakedNode() {
+		var unstakedNetworkConduit network.Conduit
+		var proxyEngine *splitter.Engine
+
+		anb.
+			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				proxyEngine := splitter.New(node.Logger, engine.SyncCommittee)
+
+				// register the proxy engine with the unstaked network
+				var err error
+				unstakedNetworkConduit, err = node.Network.Register(engine.SyncCommittee, proxyEngine)
+				if err != nil {
+					return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
+				}
+
+				return proxyEngine, nil
+			}).
+			Component("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				syncRequestHandler := synceng.NewRequestHandlerEngine(
+					node.Logger,         // TODO: use different logger for unstaked network?
+					node.Metrics.Engine, // TODO: use different metrics for unstaked network?
+					unstakedNetworkConduit,
+					node.Me, // TODO: does staked node use same Node ID on unstaked network?
+					node.Storage.Blocks,
+					anb.SyncCore,
+					anb.FinalizedHeader,
+				)
+
+				// register the sync request handler with the proxy engine
+				proxyEngine.RegisterEngine(syncRequestHandler)
+
+				return syncRequestHandler, nil
+			})
+	}
+
+	anb.Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		ping, err := pingeng.New(
+			node.Logger,
+			node.State,
+			node.Me,
+			anb.PingMetrics,
+			anb.pingEnabled,
+			node.Middleware,
+			anb.nodeInfoFile,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("could not create ping engine: %w", err)
+		}
+		return ping, nil
+	})
 
 	return anb
 }
