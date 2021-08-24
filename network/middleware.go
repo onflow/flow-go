@@ -68,7 +68,6 @@ type Overlay interface {
 	Identities() flow.IdentityList
 
 	Receive(nodeID flow.Identifier, msg *message.Message) error
-	Identities() flow.IdentityList
 }
 
 // Connection represents an interface to read from & write to a connection.
