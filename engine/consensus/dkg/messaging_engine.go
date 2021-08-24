@@ -132,7 +132,7 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 				}
 				return retry.RetryableError(err)
 			})
-			e.log.Err(err).Msg("error sending dkg message")
+			e.log.Error().Err(err).Msg("error sending dkg message")
 		case <-e.unit.Quit():
 			return
 		}
