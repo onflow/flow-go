@@ -31,7 +31,7 @@ func roundTripHeaderViaCodec(t *testing.T, codec network.Codec) {
 	decodedInterface, err := codec.Decode(encoded)
 	assert.NoError(t, err)
 	decoded := decodedInterface.(*messages.BlockProposal)
-	assert.Equal(t, message.Header.ProposerSig, decoded.Header.ProposerSig)
+	assert.Equal(t, message.Header.ProposerSigData, decoded.Header.ProposerSigData)
 	messageHeader := fmt.Sprintf("- .Header=%+v\n", message.Header)
 	decodedHeader := fmt.Sprintf("- .Header=%+v\n", decoded.Header)
 	assert.Equal(t, messageHeader, decodedHeader)
