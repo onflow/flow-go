@@ -352,16 +352,16 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 	height := parent.Height + 1
 	view := parent.View + 1 + uint64(rand.Intn(10)) // Intn returns [0, n)
 	return flow.Header{
-		ChainID:        parent.ChainID,
-		ParentID:       parent.ID(),
-		Height:         height,
-		PayloadHash:    IdentifierFixture(),
-		Timestamp:      time.Now().UTC(),
-		View:           view,
-		ParentVoterIDs: IdentifierListFixture(4),
-		ParentVoterSig: CombinedSignatureFixture(2),
-		ProposerID:     IdentifierFixture(),
-		ProposerSig:    SignatureFixture(),
+		ChainID:            parent.ChainID,
+		ParentID:           parent.ID(),
+		Height:             height,
+		PayloadHash:        IdentifierFixture(),
+		Timestamp:          time.Now().UTC(),
+		View:               view,
+		ParentVoterIDs:     IdentifierListFixture(4),
+		ParentVoterSigData: CombinedSignatureFixture(2),
+		ProposerID:         IdentifierFixture(),
+		ProposerSigData:    SignatureFixture(),
 	}
 }
 
@@ -651,6 +651,27 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 			chunk.BlockID = blockID
 		}
 	}
+}
+
+func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.ServiceEvents = ServiceEventsFixture(n)
+	}
+}
+
+func ServiceEventsFixture(n int) flow.ServiceEventList {
+	sel := make(flow.ServiceEventList, n)
+
+	for ; n > 0; n-- {
+		switch rand.Intn(2) {
+		case 0:
+			sel[n-1] = EpochCommitFixture().ServiceEvent()
+		case 1:
+			sel[n-1] = EpochSetupFixture().ServiceEvent()
+		}
+	}
+
+	return sel
 }
 
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
@@ -1156,7 +1177,6 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 		Chunk:         &chunk,
 		Header:        block.Header,
 		Result:        &result,
-		Collection:    &col,
 		ChunkDataPack: ChunkDataPackFixture(result.ID()),
 		EndState:      endState,
 	}
@@ -1167,15 +1187,12 @@ func VerifiableChunkDataFixture(chunkIndex uint64) *verification.VerifiableChunk
 func ChunkDataResponseFixture(chunkID flow.Identifier, opts ...func(*messages.ChunkDataResponse)) *messages.ChunkDataResponse {
 	cdp := &messages.ChunkDataResponse{
 		ChunkDataPack: *ChunkDataPackFixture(chunkID),
-		Collection:    CollectionFixture(1),
 		Nonce:         rand.Uint64(),
 	}
 
 	for _, opt := range opts {
 		opt(cdp)
 	}
-
-	cdp.ChunkDataPack.CollectionID = cdp.Collection.ID()
 
 	return cdp
 }
@@ -1253,9 +1270,9 @@ func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verifica
 	return req
 }
 
-func WithCollectionID(collectionID flow.Identifier) func(*flow.ChunkDataPack) {
+func WithChunkDataPackCollection(collection *flow.Collection) func(*flow.ChunkDataPack) {
 	return func(cdp *flow.ChunkDataPack) {
-		cdp.CollectionID = collectionID
+		cdp.Collection = collection
 	}
 }
 
@@ -1266,14 +1283,12 @@ func WithStartState(startState flow.StateCommitment) func(*flow.ChunkDataPack) {
 }
 
 func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataPack)) *flow.ChunkDataPack {
-	//ids := utils.GetRandomRegisterIDs(1)
-	//values := utils.GetRandomValues(1, 1, 32)
+	coll := CollectionFixture(1)
 	cdp := &flow.ChunkDataPack{
 		ChunkID:    chunkID,
 		StartState: StateCommitmentFixture(),
-		//RegisterTouches: []flow.RegisterTouch{{RegisterID: ids[0], Value: values[0], Proof: []byte{'p'}}},
-		Proof:        []byte{'p'},
-		CollectionID: IdentifierFixture(),
+		Proof:      []byte{'p'},
+		Collection: &coll,
 	}
 
 	for _, opt := range opts {
@@ -1281,6 +1296,15 @@ func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataP
 	}
 
 	return cdp
+}
+
+func ChunkDataPacksFixture(count int, opts ...func(*flow.ChunkDataPack)) []*flow.ChunkDataPack {
+	chunkDataPacks := make([]*flow.ChunkDataPack, count)
+	for i := 0; i < count; i++ {
+		chunkDataPacks[i] = ChunkDataPackFixture(IdentifierFixture())
+	}
+
+	return chunkDataPacks
 }
 
 // SeedFixture returns a random []byte with length n

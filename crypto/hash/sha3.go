@@ -167,7 +167,6 @@ func (d *Sha3State) write(p []byte) {
 			}
 		}
 	}
-	return
 }
 
 // pads appends the domain separation bits in dsbyte, applies

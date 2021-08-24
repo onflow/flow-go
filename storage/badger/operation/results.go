@@ -26,6 +26,11 @@ func IndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) fun
 	return insert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
 }
 
+// ReindexExecutionResult updates mapping of an execution result ID keyed by block ID
+func ReindexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(*badger.Txn) error {
+	return update(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)
+}
+
 // BatchIndexExecutionResult inserts an execution result ID keyed by block ID into a batch
 func BatchIndexExecutionResult(blockID flow.Identifier, resultID flow.Identifier) func(batch *badger.WriteBatch) error {
 	return batchInsert(makePrefix(codeIndexExecutionResultByBlock, blockID), resultID)

@@ -7,16 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
+	storagemodel "github.com/onflow/flow-go/storage/badger/model"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestChunkDataPack(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		expected := unittest.ChunkDataPackFixture(unittest.IdentifierFixture())
+		collectionID := unittest.IdentifierFixture()
+		expected := &storagemodel.StoredChunkDataPack{
+			ChunkID:      unittest.IdentifierFixture(),
+			StartState:   unittest.StateCommitmentFixture(),
+			Proof:        []byte{'p'},
+			CollectionID: collectionID,
+		}
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {
-			var actual flow.ChunkDataPack
+			var actual storagemodel.StoredChunkDataPack
 			err := db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.Error(t, err)
 		})
@@ -25,7 +31,7 @@ func TestChunkDataPack(t *testing.T) {
 			err := db.Update(InsertChunkDataPack(expected))
 			require.NoError(t, err)
 
-			var actual flow.ChunkDataPack
+			var actual storagemodel.StoredChunkDataPack
 			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.NoError(t, err)
 
@@ -36,7 +42,7 @@ func TestChunkDataPack(t *testing.T) {
 			err := db.Update(RemoveChunkDataPack(expected.ChunkID))
 			require.NoError(t, err)
 
-			var actual flow.ChunkDataPack
+			var actual storagemodel.StoredChunkDataPack
 			err = db.View(RetrieveChunkDataPack(expected.ChunkID, &actual))
 			assert.Error(t, err)
 		})

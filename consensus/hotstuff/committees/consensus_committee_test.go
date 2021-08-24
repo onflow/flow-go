@@ -222,6 +222,7 @@ func TestRemoveOldEpochs(t *testing.T) {
 
 		// query a view from the new epoch
 		_, err = committee.LeaderForView(firstView)
+		require.NoError(t, err)
 		// transition to the next epoch
 		epochQuery.Transition()
 

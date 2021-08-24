@@ -80,7 +80,7 @@ type stakingKeysAggregator struct {
 func newStakingKeysAggregator() *stakingKeysAggregator {
 	aggregator := &stakingKeysAggregator{
 		lastStakingSigners: map[flow.Identifier]*flow.Identity{},
-		lastStakingKey:     crypto.NeutralBLSPublicKey(),
+		lastStakingKey:     NeutralBLSPublicKey(),
 		RWMutex:            sync.RWMutex{},
 	}
 	return aggregator
@@ -107,12 +107,12 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 	newSignerKeys, missingSignerKeys, updatedSignerSet := identitiesDeltaKeys(signers, lastSet)
 	// add the new keys
 	var err error
-	updatedKey, err := crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
+	updatedKey, err := AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
 	if err != nil {
 		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
 	}
 	// remove the missing keys
-	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
+	updatedKey, err = RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
 	if err != nil {
 		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
 	}

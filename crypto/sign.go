@@ -16,12 +16,14 @@ import (
 
 // Signer interface
 type signer interface {
-	// generatePrKey generates a private key
+	// generatePrivateKey generates a private key
 	generatePrivateKey([]byte) (PrivateKey, error)
-	// decodePrKey loads a private key from a byte array
+	// decodePrivateKey loads a private key from a byte array
 	decodePrivateKey([]byte) (PrivateKey, error)
-	// decodePubKey loads a public key from a byte array
+	// decodePublicKey loads a public key from a byte array
 	decodePublicKey([]byte) (PublicKey, error)
+	// decodePublicKeyCompressed loads a public key from a byte array representing a point in compressed form
+	decodePublicKeyCompressed([]byte) (PublicKey, error)
 }
 
 // newNonRelicSigner returns a signer that does not depend on Relic library.
@@ -107,6 +109,15 @@ func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	return signer.decodePublicKey(data)
 }
 
+// DecodePublicKeyCompressed decodes an array of bytes given in a compressed representation into a public key of the given algorithm
+func DecodePublicKeyCompressed(algo SigningAlgorithm, data []byte) (PublicKey, error) {
+	signer, err := newSigner(algo)
+	if err != nil {
+		return nil, newInvalidInputsError("decode public key failed: %s", err)
+	}
+	return signer.decodePublicKeyCompressed(data)
+}
+
 // Signature type tools
 
 // Bytes returns a byte array of the signature data
@@ -153,6 +164,10 @@ type PublicKey interface {
 	Verify(Signature, []byte, hash.Hasher) (bool, error)
 	// Encode returns a bytes representation of the public key.
 	Encode() []byte
+	// Encode returns a compressed byte representation of the public key.
+	// The compressed serialization concept is generic to elliptic curves,
+	// but we refer to individual curve parameters for details of the compressed format
+	EncodeCompressed() []byte
 	// Equals returns true if the given PublicKeys are equal. Keys are considered unequal if their algorithms are
 	// unequal or if their encoded representations are unequal. If the encoding of either key fails, they are considered
 	// unequal as well.

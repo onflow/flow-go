@@ -335,6 +335,22 @@ func (e *ScriptEnv) ResolveLocation(
 	return resolvedLocations, nil
 }
 
+func (e *ScriptEnv) GetAccountContractNames(address runtime.Address) ([]string, error) {
+	if e.isTraceable() {
+		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountContractNames)
+		defer sp.Finish()
+	}
+
+	a := flow.BytesToAddress(address.Bytes())
+
+	freezeError := e.accounts.CheckAccountNotFrozen(a)
+	if freezeError != nil {
+		return nil, fmt.Errorf("get account contract names: %w", freezeError)
+	}
+
+	return e.accounts.GetContractNames(a)
+}
+
 func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCode)
@@ -719,4 +735,9 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 		return nil, err
 	}
 	return e.contracts.Commit()
+}
+
+// AllocateStorageIndex is not implemented in this enviornment
+func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (uint64, error) {
+	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
 }
