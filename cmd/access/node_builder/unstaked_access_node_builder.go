@@ -24,11 +24,11 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 func (fnb *UnstakedAccessNodeBuilder) initNodeInfo() {
 	// use the networking key that has been passed in the config
 	networkingKey := fnb.AccessNodeConfig.NetworkKey
-	nodeID, err := flow.PublicKeyToID(networkingKey.PublicKey())   // TODO: verify this
+	nodeID, err := flow.PublicKeyToID(networkingKey.PublicKey()) // TODO: verify this
 	fnb.MustNot(err)
 	fnb.NodeID = nodeID
-	fnb.NodeConfig.NetworkKey = networkingKey  // copy the key to NodeConfig
-	fnb.NodeConfig.StakingKey = nil            // no staking key for the unstaked node
+	fnb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
+	fnb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
 }
 
 func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
