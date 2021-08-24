@@ -66,6 +66,8 @@ const (
 	AccessNodeAPIPort = "access-api-port"
 	// AccessNodeAPIProxyPort is the name used for the access node API HTTP proxy port.
 	AccessNodeAPIProxyPort = "access-api-http-proxy-port"
+	// AccessNodeExternalNetworkPort is the name used for the access node network port accessible from outside any docker container
+	AccessNodeExternalNetworkPort = "access-external-network-port"
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
 
@@ -507,17 +509,13 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	}
 	require.NotNil(t, stakedANContainer, "unable to find staked AN for the follower engine %s", followerConf.nodeID.String())
 
-	hostPort := strings.Split(stakedANContainer.Address, ":")
-	require.Len(t, hostPort, 2, "invalid address for staked AN %s", stakedANContainer.Address)
-
-	host := hostPort[0]
-	portStr := hostPort[1]
+	portStr := net.AccessPorts[AccessNodeExternalNetworkPort]
 	portU64, err := strconv.ParseUint(portStr, 10, 32)
 	require.NoError(t, err)
 	port := uint(portU64)
 
 	bootstrapNodeInfo := consensus_follower.BootstrapNodeInfo{
-		Host: host,
+		Host: "localhost",
 		Port: port,
 		NetworkPublicKey: stakedANContainer.NetworkPubKey(),
 	}
@@ -667,7 +665,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 			if nodeConf.SupportsUnstakedNodes {
-				// TODO: define this flag for Access node
+				hostExternalNetworkPort := testingdock.RandomPort(t)
+				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
+				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.addFlag("supports-unstaked-node", "true")
 			}
 
@@ -697,6 +697,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// therefore the ghost node will deny incoming connections from all consensus
 			// followers. A flag for the ghost node will need to be created to enable
 			// overriding the default behavior.
+			return fmt.Errorf("currently ghost node for an access node which supports unstaked node is not implemented")
 		}
 	}
 
