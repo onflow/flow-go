@@ -472,17 +472,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		metrics.On("CurrentEpochFinalView", finalView).Once()
 
-		currentDKGPhase1FinalView, err := initialCurrentEpoch.DKGPhase1FinalView()
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := realprotocol.DKGPhaseViews(initialCurrentEpoch)
 		require.NoError(t, err)
-		metrics.On("CurrentDKGPhase1FinalView", currentDKGPhase1FinalView).Once()
-
-		currentDKGPhase2FinalView, err := initialCurrentEpoch.DKGPhase2FinalView()
-		require.NoError(t, err)
-		metrics.On("CurrentDKGPhase2FinalView", currentDKGPhase2FinalView).Once()
-
-		currentDKGPhase3FinalView, err := initialCurrentEpoch.DKGPhase3FinalView()
-		require.NoError(t, err)
-		metrics.On("CurrentDKGPhase3FinalView", currentDKGPhase3FinalView).Once()
+		metrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		metrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
@@ -709,6 +703,13 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter)
+
+		metrics.On("CurrentEpochFinalView", epoch1Setup.FinalView)
+		metrics.On("CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView)
+		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
+		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
+
+
 		err = state.Finalize(block8.ID())
 		require.NoError(t, err)
 		err = state.Finalize(block9.ID())

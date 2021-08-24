@@ -49,17 +49,11 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
 		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
 
-		currentDKGPhase1FinalView, err := epoch.DKGPhase1FinalView()
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
 		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase1FinalView", currentDKGPhase1FinalView).Once()
-
-		currentDKGPhase2FinalView, err := epoch.DKGPhase2FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase2FinalView", currentDKGPhase2FinalView).Once()
-
-		currentDKGPhase3FinalView, err := epoch.DKGPhase3FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase3FinalView", currentDKGPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -123,17 +117,11 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
 
-		currentDKGPhase1FinalView, err := committedPhaseSnapshot.Epochs().Current().DKGPhase1FinalView()
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(committedPhaseSnapshot.Epochs().Current())
 		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase1FinalView", currentDKGPhase1FinalView).Once()
-
-		currentDKGPhase2FinalView, err := committedPhaseSnapshot.Epochs().Current().DKGPhase2FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase2FinalView", currentDKGPhase2FinalView).Once()
-
-		currentDKGPhase3FinalView, err := committedPhaseSnapshot.Epochs().Current().DKGPhase3FinalView()
-		require.NoError(t, err)
-		complianceMetrics.On("CurrentDKGPhase3FinalView", currentDKGPhase3FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
