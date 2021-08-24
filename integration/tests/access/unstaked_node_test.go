@@ -108,6 +108,8 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey, suite.stakedID),
 	}
 
+	suite.unstakedID = followerConfigs[0].NodeID
+
 	// consensus follower
 	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
