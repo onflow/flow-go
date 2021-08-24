@@ -741,7 +741,6 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 
 	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
-			// TODO: Need to convert from network key here
 			conf.nodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
