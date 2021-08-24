@@ -52,7 +52,7 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 }
 
 func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
-	//go suite.follower.Run(suite.ctx)
+	go suite.follower.Run(suite.ctx)
 	// TODO: to be implemented later
 	time.Sleep(time.Second * 30)
 }
