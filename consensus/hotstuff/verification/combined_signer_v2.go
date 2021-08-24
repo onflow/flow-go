@@ -5,6 +5,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -109,7 +110,8 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 		}
-		return beaconShare, nil
+
+		return signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconShare), nil
 	}
 
 	// if the node didn't complete DKG, then using the staking key to sign the block as a
@@ -120,5 +122,5 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
 	}
 
-	return stakingSig
+	return signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig)
 }
