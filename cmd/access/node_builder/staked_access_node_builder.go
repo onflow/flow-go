@@ -100,7 +100,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 
 				// register the proxy engine with the unstaked network
 				var err error
-				unstakedNetworkConduit, err = node.Network.Register(engine.SyncCommittee, proxyEngine)
+				unstakedNetworkConduit, err = node.Network.Register(engine.UnstakedSyncCommittee, proxyEngine)
 				if err != nil {
 					return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
 				}

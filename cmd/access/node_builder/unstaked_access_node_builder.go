@@ -6,10 +6,12 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/channel_reassigner"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
@@ -150,11 +152,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, nil)
 		builder.MustNot(err)
 
-		builder.Network = network
-		builder.Middleware = middleware
-
-		// for an unstaked node, the staked network and middleware is set to the same as the unstaked network and middlware
-		builder.Network = network
+		builder.Network = channel_reassigner.NewChannelReassignerNetwork(network, engine.SyncCommittee, engine.UnstakedSyncCommittee)
 		builder.Middleware = middleware
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
