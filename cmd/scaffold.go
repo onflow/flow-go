@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
