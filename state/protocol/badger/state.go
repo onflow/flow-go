@@ -516,7 +516,7 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 
 	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
 	if err != nil {
-		return fmt.Errorf("could not update current epoch final view")
+		return fmt.Errorf("could not update current epoch final view: %w", err)
 	}
 	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
 
