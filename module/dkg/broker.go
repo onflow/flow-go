@@ -194,7 +194,7 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 		err := b.dkgContractClient.SubmitResult(pubKey, groupKeys)
 		if err != nil {
-			b.log.Error().Err(err).Msg("error submitting DKG result retrying")
+			b.log.Error().Err(err).Msg("error submitting DKG result, retrying")
 		}
 		return retry.RetryableError(err)
 	})
