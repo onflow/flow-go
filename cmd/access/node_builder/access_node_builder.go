@@ -9,6 +9,7 @@ import (
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -682,10 +683,16 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	return net, nil
 }
 
-func unstakedNetworkMsgValidators(selfID flow.Identifier) []network.MessageValidator {
+func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProvider, selfID flow.Identifier) []network.MessageValidator {
 	return []network.MessageValidator{
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
+		validator.NewAnyValidator(
+			validator.NewOriginValidator(
+				id.NewFilteredIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
+			),
+			validator.ValidateTarget(log, selfID),
+		),
 	}
 }
 
