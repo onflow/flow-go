@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
 
 // StakedAccessNodeBuilder builds a staked access node. The staked access node can optionally participate in the
@@ -131,6 +132,9 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 
 		builder.Network = network
 		builder.Middleware = middleware
+
+		idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+		builder.ProtocolEvents.AddConsumer(idEvents)
 
 		node.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
 		return builder.Network, err
