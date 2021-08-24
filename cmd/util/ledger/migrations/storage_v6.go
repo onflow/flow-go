@@ -516,16 +516,15 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 		fields.Set(key, c.Convert(fieldVal))
 	})
 
-	c.result = &newInter.CompositeValue{
-		// TODO: Convert location and kind to new package?
-		Location:            value.Location(),
-		QualifiedIdentifier: value.QualifiedIdentifier(),
-		Kind:                value.Kind(),
-		Fields:              fields,
-
-		// TODO
-		StorageID: atree.StorageID{},
-	}
+	// TODO: Convert location and kind to new package?
+	c.result = newInter.NewCompositeValue(
+		c.storage,
+		value.Location(),
+		value.QualifiedIdentifier(),
+		value.Kind(),
+		fields,
+		*value.Owner,
+	)
 
 	// Do not descent
 	return false
