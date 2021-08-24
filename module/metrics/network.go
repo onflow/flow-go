@@ -16,17 +16,18 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize      *prometheus.HistogramVec
-	inboundMessageSize       *prometheus.HistogramVec
-	duplicateMessagesDropped *prometheus.CounterVec
-	queueSize                *prometheus.GaugeVec
-	queueDuration            *prometheus.HistogramVec
-	inboundProcessTime       *prometheus.CounterVec
-	outboundConnectionCount  prometheus.Gauge
-	inboundConnectionCount   prometheus.Gauge
-	dnsLookupDuration        prometheus.Histogram
-	dnsCacheMissCount        prometheus.Counter
-	dnsCacheHitCount         prometheus.Counter
+	outboundMessageSize       *prometheus.HistogramVec
+	inboundMessageSize        *prometheus.HistogramVec
+	duplicateMessagesDropped  *prometheus.CounterVec
+	queueSize                 *prometheus.GaugeVec
+	queueDuration             *prometheus.HistogramVec
+	inboundProcessTime        *prometheus.CounterVec
+	outboundConnectionCount   prometheus.Gauge
+	inboundConnectionCount    prometheus.Gauge
+	dnsLookupDuration         prometheus.Histogram
+	dnsCacheMissCount         prometheus.Counter
+	dnsCacheHitCount          prometheus.Counter
+	dnsCacheInvalidationCount prometheus.Counter
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -69,6 +70,13 @@ func NewNetworkCollector() *NetworkCollector {
 			Subsystem: subsystemGossip,
 			Name:      "dns_cache_miss_total",
 			Help:      "the number of dns lookups that miss the cache and made through network",
+		}),
+
+		dnsCacheInvalidationCount: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_cache_invalidation_total",
+			Help:      "the number of times dns cache is invalidated for an entry",
 		}),
 
 		dnsCacheHitCount: promauto.NewCounter(prometheus.CounterOpts{
@@ -170,6 +178,11 @@ func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
 // OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
 func (nc *NetworkCollector) OnDNSCacheMiss() {
 	nc.dnsCacheMissCount.Inc()
+}
+
+// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
+func (nc *NetworkCollector) OnDNSCacheInvalidated() {
+	nc.dnsCacheInvalidationCount.Inc()
 }
 
 // OnDNSCacheHit tracks the total number of dns requests resolved through the cache without

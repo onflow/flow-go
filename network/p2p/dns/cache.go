@@ -7,7 +7,11 @@ import (
 )
 
 // defaultTimeToLive is the default duration a dns result is cached.
-const defaultTimeToLive = 5 * time.Minute
+const (
+	defaultTimeToLive     = 5 * time.Minute
+	cacheEntryExists      = true
+	cacheEntryInvalidated = true
+)
 
 // cache is a ttl-based cache for dns entries
 type cache struct {
@@ -26,43 +30,43 @@ func newCache() *cache {
 }
 
 // resolveIPCache resolves the domain through the cache if it is available.
-func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool) {
+func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 	c.Lock()
 	defer c.Unlock()
 
 	entry, ok := c.ipCache[domain]
 
 	if !ok {
-		return nil, false
+		return nil, !cacheEntryExists, !cacheEntryInvalidated
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// invalidates cache entry
 		delete(c.ipCache, domain)
-		return nil, false
+		return nil, !cacheEntryExists, cacheEntryInvalidated
 	}
 
-	return entry.addresses, true
+	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
-func (c *cache) resolveTXTCache(txt string) ([]string, bool) {
+func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 	c.Lock()
 	defer c.Unlock()
 
 	entry, ok := c.txtCache[txt]
 
 	if !ok {
-		return nil, false
+		return nil, !cacheEntryExists, !cacheEntryInvalidated
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// invalidates cache entry
 		delete(c.txtCache, txt)
-		return nil, false
+		return nil, !cacheEntryExists, cacheEntryInvalidated
 	}
 
-	return entry.addresses, true
+	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
 }
 
 // updateIPCache updates the cache entry for the domain.
