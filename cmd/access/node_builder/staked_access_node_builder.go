@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 )
@@ -109,17 +108,12 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-		libP2PFactory, err := builder.initLibP2PFactory(ctx, builder.NodeID, builder.NetworkKey)
+		libP2PFactory, err := builder.initLibP2PFactory(ctx, builder.NodeID, builder.NodeConfig.NetworkKey)
 		builder.MustNot(err)
 
 		msgValidators := unstakedNetworkMsgValidators(builder.NodeID)
 
-		// Network Metrics
-		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
-		// TODO: define new network metrics for the unstaked network
-		unstakedNetworkMetrics := metrics.NewNoopCollector()
-
-		middleware := builder.initMiddleware(builder.NodeID, unstakedNetworkMetrics, libP2PFactory, msgValidators...)
+		middleware := builder.initMiddleware(builder.NodeID, node.Metrics.Network, libP2PFactory, msgValidators...)
 
 		// topology returns empty list since peers are not known upfront
 		top, err := topology.NewTopicBasedTopology(
@@ -132,7 +126,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 		}
 		topologyCache := topology.NewCache(builder.Logger, top)
 
-		network, err := builder.initNetwork(builder.Me, unstakedNetworkMetrics, middleware, topologyCache)
+		network, err := builder.initNetwork(builder.Me, node.Metrics.Network, middleware, topologyCache)
 		builder.MustNot(err)
 
 		builder.Network = network

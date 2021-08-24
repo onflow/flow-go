@@ -21,9 +21,13 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 	}
 }
 
-func (fnb *UnstakedAccessNodeBuilder) InitNodeInfo() {
-	fnb.NodeID = flow.ZeroID                   // TODO: extract node id from networking key
-	fnb.NodeConfig.NetworkKey = fnb.NetworkKey // use the networking that has been passed in
+func (fnb *UnstakedAccessNodeBuilder) initNodeInfo() {
+	// use the networking key that has been passed in the config
+	networkingKey := fnb.AccessNodeConfig.NetworkKey
+	nodeID, err := flow.PublicKeyToID(networkingKey.PublicKey())   // TODO: verify this
+	fnb.MustNot(err)
+	fnb.NodeID = nodeID
+	fnb.NodeConfig.NetworkKey = networkingKey  // copy the key to NodeConfig
 	fnb.NodeConfig.StakingKey = nil            // no staking key for the unstaked node
 }
 
@@ -48,6 +52,11 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	builder.Cancel = cancel
 
 	builder.validateParams()
+
+	// if a network key has been passed in the init node info here
+	if builder.AccessNodeConfig.NetworkKey != nil {
+		builder.initNodeInfo()
+	}
 
 	builder.InitIDProviders()
 
@@ -105,7 +114,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 	//		node.SyncEngineIdentifierProvider = node.Middleware.IdentifierProvider()
 	//		return nil
 	//	})
-	//anb.FlowAccessNodeBuilder.BuildConsensusFollower()
+	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
 	return anb
 }
 

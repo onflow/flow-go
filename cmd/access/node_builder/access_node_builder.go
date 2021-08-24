@@ -41,7 +41,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
@@ -89,7 +89,7 @@ type AccessNodeConfig struct {
 	bootstrapNodeAddresses       []string
 	bootstrapNodePublicKeys      []string
 	bootstrapIdentites           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
-	NetworkKey                   crypto.PrivateKey
+	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
 	supportsUnstakedFollower     bool
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
@@ -649,7 +649,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	middleware network.Middleware,
 	topology network.Topology) (*p2p.Network, error) {
 
-	codec := jsoncodec.NewCodec()
+	codec := cborcodec.NewCodec()
 
 	subscriptionManager := p2p.NewChannelSubscriptionManager(middleware)
 
