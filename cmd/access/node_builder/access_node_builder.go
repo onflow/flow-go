@@ -168,6 +168,9 @@ type FlowAccessNodeBuilder struct {
 	Finalized                             *flow.Header
 	Pending                               []*flow.Header
 	FollowerCore                          module.HotStuffFollower
+	// for the untsaked access node, the sync engine participants provider is the libp2p peer store which is not
+	// available until after the network has started. Hence, a factory function that needs to be called just before
+	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
