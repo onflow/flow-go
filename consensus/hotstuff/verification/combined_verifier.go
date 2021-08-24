@@ -132,7 +132,7 @@ func (c *CombinedVerifier) VerifyConsensusQC(signers flow.IdentityList, sigData 
 		return fmt.Errorf("could not get dkg: %w", err)
 	}
 
-	aggregatedSigData, err := c.packer.Unpack(signers, sigData)
+	aggregatedSigData, err := c.packer.Unpack(block.BlockID, signers, sigData)
 	if err != nil {
 		// TODO: Use sentinal error
 		return fmt.Error("could not unpack sig data for block (%v): %w", block.BlockID, sigData)
