@@ -21,6 +21,7 @@ type CombinedVerifier struct {
 	keysAggregator *stakingKeysAggregator
 	beacon         module.ThresholdVerifier
 	merger         module.Merger
+	packer         hotstuff.Packer
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
@@ -121,4 +122,67 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
 	return stakingValid, nil
+}
+
+// VerifyConsensusQC verifies the validity of a combined signature on a quorum certificate.
+func (c *CombinedVerifier) VerifyConsensusQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
+
+	dkg, err := c.committee.DKG(block.BlockID)
+	if err != nil {
+		return fmt.Errorf("could not get dkg: %w", err)
+	}
+
+	aggregatedSigData, err := c.packer.Unpack(signers, sigData)
+	if err != nil {
+		// TODO: Use sentinal error
+		return fmt.Error("could not unpack sig data for block (%v): %w", block.BlockID, sigData)
+	}
+
+	msg := MakeVoteMessage(block.View, block.BlockID)
+	// TODO: verify if batch verification is faster
+
+	// verify the beacon signature first
+	beaconValid, err := c.beacon.VerifyThreshold(msg, aggregatedSigData.ReconstructedRandomBeaconSig, dkg.GroupKey())
+	if err != nil {
+		return fmt.Errorf("internal error while verifying beacon signature: %w", err)
+	}
+	if !beaconValid {
+		// TODO: Use sential error
+		return fmt.Error("invalid beacon error: %w", err)
+	}
+	// verify the aggregated staking signature next (more costly)
+	// TODO: eventually VerifyMany will be a method of a stateful struct. The struct would
+	// hold the message, all the participants keys, the latest verification aggregated public key,
+	// as well as the latest list of signers (preferably a bit vector, using indices).
+	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
+	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
+
+	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(aggregatedSigData.StakingSigners)
+	if err != nil {
+		return fmt.Errorf("could not compute aggregated key: %w", err)
+	}
+	aggregatedStakingValid, err := c.staking.Verify(msg, aggregatedSigData.AggregatedStakingSig, aggregatedKey)
+	if err != nil {
+		return fmt.Errorf("internal error while verifying aggregated staking signature: %w", err)
+	}
+
+	if aggregatedStakingValid == false {
+		// TODO: use sentinal error
+		return fmt.Errorf("invalid aggregated staking sig error: %w", err)
+	}
+
+	aggregatedBeaconKey, err := c.keysAggregator.aggregatedStakingKey(aggregatedSigData.RandomBeaconSigners)
+	if err != nil {
+		return fmt.Errorf("could not compute aggregated key: %w", err)
+	}
+	aggregatedBeaconValid, err := c.staking.Verify(msg, aggregatedSigData.AggregatedRandomBeaconSig, aggregatedBeaconKey)
+	if err != nil {
+		return fmt.Errorf("internal error while verifying aggregated random beacon signature: %w", err)
+	}
+	if aggregatedBeaconValid == false {
+		// TODO: use sentinal error
+		return fmt.Errorf("invalid aggregated random beacon sig error: %w", err)
+	}
+
+	return nil
 }
