@@ -105,11 +105,9 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 
 	unstakedKey, err := UnstakedNetworkingKey()
 	require.NoError(suite.T(), err)
-	// TODO: derive node id from the key
-	suite.unstakedID = unittest.IdentifierFixture()
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(unstakedKey, suite.stakedID, suite.unstakedID),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey, suite.stakedID),
 	}
 
 	// consensus follower
