@@ -188,29 +188,6 @@ func readPointG1(a *pointG1, src []byte) error {
 // This is only a TEST function.
 // It wraps calls to subgroup checks since cgo can't be used
 // in go test files.
-//
-// This wraps a subgroup check in G1
-func checkInG1Test(pt *pointG1) bool {
-	return C.check_membership_G1((*C.ep_st)(pt)) == valid
-}
-
-// This is only a TEST function.
-// It wraps calls to the relic hash-to-G1 map since cgo can't be used
-// in go test files.
-//
-// This map uses, by default, XMD:SH256 for hash-to-field, and can be
-// configured to use several XMD:(SHA|BS) variants, see:
-// https://github.com/relic-toolkit/relic/blob/43f2cd4695ff29a35dfab5bbf368439d4ff20d14/include/relic_md.h
-//
-// TODO (fga): since XMD:SHA* is of little relevance ot us (tests aside), replace by calls to
-// ep_map_from_field if/when  https://github.com/relic-toolkit/relic/pull/205 is merged.
-func mapToG1RelicTest(dest *pointG1, msg, dst []byte) {
-	C.ep_map_dst((*C.ep_st)(dest), (*C.uchar)(&msg[0]), (C.int)(len(msg)), (*C.uchar)(&dst[0]), (C.int)(len(dst)))
-}
-
-// This is only a TEST function.
-// It wraps calls to subgroup checks since cgo can't be used
-// in go test files.
 // if inG1 is true, the function tests the membership of a point in G1,
 // otherwise, a point in E1\G1 membership is tested.
 // method is the index of the membership check method as defined in bls12381_utils.h
@@ -219,8 +196,36 @@ func checkG1Test(inG1 int, method int) bool {
 }
 
 // This is only a TEST function.
+// It wraps a call to a subgroup check in G1 since cgo can't be used
+// in go test files.
+func checkInG1Test(pt *pointG1) bool {
+	return C.check_membership_G1((*C.ep_st)(pt)) == valid
+}
+
+// This is only a TEST function.
 // It wraps calls to subgroup checks since cgo can't be used
 // in go test files.
 func benchG1Test() {
 	_ = C.subgroup_check_G1_bench()
+}
+
+// This is only a TEST function.
+// It hashes `data` to a G1 point using the tag `dst` and returns the G1 point serialization.
+// The function uses xmd with SHA256 in the hash-to-field.
+func hashToG1Bytes(data, dst []byte) []byte {
+	hash := make([]byte, opSwUInputLenBLSBLS12381)
+	// XMD using SHA256
+	C.xmd_sha256((*C.uchar)(&hash[0]),
+		(C.int)(opSwUInputLenBLSBLS12381),
+		(*C.uchar)(&data[0]), (C.int)(len(data)),
+		(*C.uchar)(&dst[0]), (C.int)(len(dst)))
+
+	// map the hash to G1
+	var point pointG1
+	C.map_to_G1((*C.ep_st)(&point), (*C.uchar)(&hash[0]), (C.int)(len(hash)))
+
+	// serialize the point
+	pointBytes := make([]byte, signatureLengthBLSBLS12381)
+	writePointG1(pointBytes, &point)
+	return pointBytes
 }

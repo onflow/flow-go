@@ -218,13 +218,13 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 				Uint32("event_index", event.EventIndex).
 				Bytes("event_payload", event.Payload).
 				Str("block_id", chunk.BlockID.String()).
-				Str("collection_id", chunkDataPack.CollectionID.String()).
+				Str("collection_id", chunkDataPack.Collection.ID().String()).
 				Str("result_id", result.ID().String()).
 				Uint64("chunk_index", chunk.Index).
 				Msg("not matching events debug")
 		}
 
-		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
+		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events), nil
 	}
 
 	if systemChunk {

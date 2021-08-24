@@ -56,6 +56,7 @@ type Engine struct {
 	collections       storage.Collections
 	transactions      storage.Transactions
 	executionReceipts storage.ExecutionReceipts
+	executionResults  storage.ExecutionResults
 
 	// metrics
 	transactionMetrics         module.TransactionMetrics
@@ -77,6 +78,7 @@ func New(
 	headers storage.Headers,
 	collections storage.Collections,
 	transactions storage.Transactions,
+	executionResults storage.ExecutionResults,
 	executionReceipts storage.ExecutionReceipts,
 	transactionMetrics module.TransactionMetrics,
 	collectionsToMarkFinalized *stdmap.Times,
@@ -96,6 +98,7 @@ func New(
 		headers:                    headers,
 		collections:                collections,
 		transactions:               transactions,
+		executionResults:           executionResults,
 		executionReceipts:          executionReceipts,
 		transactionMetrics:         transactionMetrics,
 		collectionsToMarkFinalized: collectionsToMarkFinalized,
@@ -266,6 +269,14 @@ func (e *Engine) handleExecutionReceipt(originID flow.Identifier, r *flow.Execut
 	err := e.executionReceipts.Store(r)
 	if err != nil {
 		return fmt.Errorf("failed to store execution receipt: %w", err)
+	}
+
+	// TODO - handle possibly conflicting execution results in a proper way
+	// for example, for unsealed blocks any ER is valid, but for sealed blocks
+	// there should match the seal data.
+	err = e.executionResults.ForceIndex(r.ExecutionResult.BlockID, r.ExecutionResult.ID())
+	if err != nil {
+		return fmt.Errorf("failed to index execution result: %w", err)
 	}
 
 	e.trackExecutedMetricForReceipt(r)

@@ -99,12 +99,15 @@ type BaseConfig struct {
 	metricsPort           uint
 	BootstrapDir          string
 	peerUpdateInterval    time.Duration
-	unicastMessageTimeout time.Duration
+	UnicastMessageTimeout time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
+	metricsEnabled        bool
+	guaranteesCacheSize   uint
+	receiptsCacheSize     uint
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -149,12 +152,13 @@ func DefaultBaseConfig() *BaseConfig {
 		datadir:               datadir,
 		level:                 "info",
 		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
-		unicastMessageTimeout: p2p.DefaultUnicastTimeout,
+		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,
 		profilerEnabled:       false,
 		profilerDir:           "profiler",
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
+		metricsEnabled:        true,
 	}
 }

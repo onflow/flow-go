@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -55,7 +55,7 @@ type Storage struct {
 	Index        storage.Index
 	Identities   storage.Identities
 	Guarantees   storage.Guarantees
-	Receipts     storage.ExecutionReceipts
+	Receipts     *bstorage.ExecutionReceipts
 	Results      storage.ExecutionResults
 	Seals        storage.Seals
 	Payloads     storage.Payloads
@@ -105,31 +105,35 @@ type FlowNodeBuilder struct {
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
-	defaultBaseConfig := DefaultBaseConfig()
+	defaultConfig := DefaultBaseConfig()
+
 	// bind configuration parameters
-	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultBaseConfig.nodeIDHex, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultBaseConfig.bindAddr, "address to bind on")
-	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultBaseConfig.BootstrapDir, "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultBaseConfig.timeout, "node startup / shutdown timeout")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultBaseConfig.datadir, "directory to store the protocol state")
-	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultBaseConfig.level, "level for logging output")
-	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultBaseConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
-	fnb.flags.DurationVar(&fnb.BaseConfig.unicastMessageTimeout, "unicast-timeout", defaultBaseConfig.unicastMessageTimeout, "how long a unicast transmission can take to complete")
-	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultBaseConfig.metricsPort, "port for /metrics endpoint")
-	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultBaseConfig.profilerEnabled, "whether to enable the auto-profiler")
-	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultBaseConfig.profilerDir, "directory to create auto-profiler profiles")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultBaseConfig.profilerInterval,
+	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
+	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultConfig.bindAddr, "address to bind on")
+	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
+	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
+	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
+	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
+	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
+	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
+	fnb.flags.StringVar(&fnb.BaseConfig.profilerDir, "profiler-dir", defaultConfig.profilerDir, "directory to create auto-profiler profiles")
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerInterval, "profiler-interval", defaultConfig.profilerInterval,
 		"the interval between auto-profiler runs")
-	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultBaseConfig.profilerDuration,
+	fnb.flags.DurationVar(&fnb.BaseConfig.profilerDuration, "profiler-duration", defaultConfig.profilerDuration,
 		"the duration to run the auto-profile for")
-	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultBaseConfig.tracerEnabled,
+	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
+
+	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
+	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
-		codec := jsoncodec.NewCodec()
+		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.bindAddr != NotSet {
@@ -169,7 +173,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Metrics.Network,
 			fnb.RootBlock.ID().String(),
 			fnb.BaseConfig.peerUpdateInterval,
-			fnb.BaseConfig.unicastMessageTimeout,
+			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
 			true,
 			fnb.MsgValidators...)
@@ -295,22 +299,32 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
 	}
-	fnb.MetricsRegisterer = prometheus.DefaultRegisterer
-
-	mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNetworkCollector(),
-		Engine:     metrics.NewEngineCollector(),
-		Compliance: metrics.NewComplianceCollector(),
-		Cache:      metrics.NewCacheCollector(fnb.RootChainID),
-		Mempool:    mempools,
+		Network:    metrics.NewNoopCollector(),
+		Engine:     metrics.NewNoopCollector(),
+		Compliance: metrics.NewNoopCollector(),
+		Cache:      metrics.NewNoopCollector(),
+		Mempool:    metrics.NewNoopCollector(),
 	}
+	if fnb.BaseConfig.metricsEnabled {
+		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 
-	// registers mempools as a Component so that its Ready method is invoked upon startup
-	fnb.Component("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
-		return mempools, nil
-	})
+		mempools := metrics.NewMempoolCollector(5 * time.Second)
+
+		fnb.Metrics = Metrics{
+			Network:    metrics.NewNetworkCollector(),
+			Engine:     metrics.NewEngineCollector(),
+			Compliance: metrics.NewComplianceCollector(),
+			Cache:      metrics.NewCacheCollector(fnb.RootChainID),
+			Mempool:    mempools,
+		}
+
+		// registers mempools as a Component so that its Ready method is invoked upon startup
+		fnb.Component("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+			return mempools, nil
+		})
+	}
 }
 
 func (fnb *FlowNodeBuilder) initProfiler() {
@@ -370,10 +384,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
@@ -645,15 +659,44 @@ func (fnb *FlowNodeBuilder) PostInit(f func(builder NodeBuilder, node *NodeConfi
 	return fnb
 }
 
+type Option func(*BaseConfig)
+
+func WithBootstrapDir(bootstrapDir string) Option {
+	return func(config *BaseConfig) {
+		config.BootstrapDir = bootstrapDir
+	}
+}
+
+func WithNodeID(nodeID flow.Identifier) Option {
+	return func(config *BaseConfig) {
+		config.nodeIDHex = nodeID.String()
+	}
+}
+
+func WithDataDir(dataDir string) Option {
+	return func(config *BaseConfig) {
+		config.datadir = dataDir
+	}
+}
+
+func WithMetricsEnabled(enabled bool) Option {
+	return func(config *BaseConfig) {
+		config.metricsEnabled = enabled
+	}
+}
+
 // FlowNode creates a new Flow node builder with the given name.
-func FlowNode(role string) *FlowNodeBuilder {
+func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
+	config := DefaultBaseConfig()
+	config.NodeRole = role
+	for _, opt := range opts {
+		opt(config)
+	}
 
 	builder := &FlowNodeBuilder{
 		NodeConfig: &NodeConfig{
-			BaseConfig: BaseConfig{
-				NodeRole: role,
-			},
-			Logger: zerolog.New(os.Stderr),
+			BaseConfig: *config,
+			Logger:     zerolog.New(os.Stderr),
 		},
 		flags: pflag.CommandLine,
 		lm:    lifecycle.NewLifecycleManager(),
@@ -674,9 +717,10 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.EnqueueNetworkInit(ctx)
 
-	fnb.EnqueueMetricsServerInit()
-
-	fnb.RegisterBadgerMetrics()
+	if fnb.metricsEnabled {
+		fnb.EnqueueMetricsServerInit()
+		fnb.RegisterBadgerMetrics()
+	}
 
 	fnb.EnqueueTracer()
 
