@@ -520,25 +520,13 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	}
 	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
 
-	// update dkg phase 1 final view
-	dkgPhase1FinalView, err := snap.Epochs().Current().DKGPhase1FinalView()
+	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(currEpoch)
 	if err != nil {
-		return fmt.Errorf("could not update current dkg phase 1 final view")
+		return fmt.Errorf("could not get dkg phase final view: %w", err)
 	}
+
 	state.metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
-
-	// update dkg phase 2 final view
-	dkgPhase2FinalView, err := snap.Epochs().Current().DKGPhase2FinalView()
-	if err != nil {
-		return fmt.Errorf("could not update current dkg phase 2 final view")
-	}
 	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
-
-	// update dkg phase 3 final view
-	dkgPhase3FinalView, err := snap.Epochs().Current().DKGPhase3FinalView()
-	if err != nil {
-		return fmt.Errorf("could not update current dkg phase 3 final view")
-	}
 	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
 
 	return nil
