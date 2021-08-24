@@ -59,6 +59,7 @@ func (suite *ProtocolStateProviderTestSuite) SetupTest() {
 	suite.provider = provider
 }
 
+// triggerUpdate simulates an epoch transition
 func (suite *ProtocolStateProviderTestSuite) triggerUpdate() {
 	suite.participants = unittest.IdentityListFixture(5, unittest.WithAllRoles(), unittest.WithKeys)
 
@@ -97,6 +98,8 @@ func TestProtocolStateProvider(t *testing.T) {
 	suite.Run(t, new(ProtocolStateProviderTestSuite))
 }
 
+// checkStateTransition triggers an epoch transition and checks that the updated
+// state is reflected by the provider being tested.
 func (suite *ProtocolStateProviderTestSuite) checkStateTransition() {
 	oldParticipants := suite.participants
 

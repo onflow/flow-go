@@ -53,6 +53,8 @@ type Middleware interface {
 	// and updates the underlying libp2p node.
 	UpdateAllowList()
 
+	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
+	// in the Flow protocol.
 	UpdateNodeAddresses()
 }
 
@@ -61,6 +63,10 @@ type Middleware interface {
 type Overlay interface {
 	// Topology returns an identity list of nodes which this node should be directly connected to as peers
 	Topology() (flow.IdentityList, error)
+
+	// Identities returns a list of all Flow identities on the network
+	Identities() flow.IdentityList
+
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 	Identities() flow.IdentityList
 }

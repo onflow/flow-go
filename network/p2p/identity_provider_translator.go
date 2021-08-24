@@ -10,11 +10,13 @@ import (
 	"github.com/onflow/flow-go/module/id"
 )
 
-type IdentityProviderIdentityTranslator struct {
+// IdentityProviderIDTranslator implements an IDTranslator which provides ID
+// translation capabilities for an IdentityProvider.
+type IdentityProviderIDTranslator struct {
 	idProvider id.IdentityProvider
 }
 
-func (t *IdentityProviderIdentityTranslator) GetFlowID(p peer.ID) (flow.Identifier, error) {
+func (t *IdentityProviderIDTranslator) GetFlowID(p peer.ID) (flow.Identifier, error) {
 	key, err := p.ExtractPublicKey()
 	if err != nil {
 		return flow.ZeroID, err
@@ -30,7 +32,7 @@ func (t *IdentityProviderIdentityTranslator) GetFlowID(p peer.ID) (flow.Identifi
 	return ids[0].NodeID, nil
 }
 
-func (t *IdentityProviderIdentityTranslator) GetPeerID(n flow.Identifier) (peer.ID, error) {
+func (t *IdentityProviderIDTranslator) GetPeerID(n flow.Identifier) (peer.ID, error) {
 	ids := t.idProvider.Identities(filter.HasNodeID(n))
 	if len(ids) == 0 {
 		return "", fmt.Errorf("could not find identity with id %v", n.String())
@@ -46,6 +48,6 @@ func (t *IdentityProviderIdentityTranslator) GetPeerID(n flow.Identifier) (peer.
 	return pid, nil
 }
 
-func NewIdentityProviderIdentityTranslator(provider id.IdentityProvider) *IdentityProviderIdentityTranslator {
-	return &IdentityProviderIdentityTranslator{provider}
+func NewIdentityProviderIDTranslator(provider id.IdentityProvider) *IdentityProviderIDTranslator {
+	return &IdentityProviderIDTranslator{provider}
 }
