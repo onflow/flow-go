@@ -99,7 +99,7 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
-			msg := "could not get transaction result retrying"
+			msg := "could not get transaction result, retrying"
 			log.Error().Err(err).Msg(msg)
 			return retry.RetryableError(fmt.Errorf(msg))
 		}
