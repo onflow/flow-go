@@ -40,7 +40,7 @@ func (connector *upstreamConnector) Ready() <-chan struct{} {
 		defer close(resultChan)
 
 		// a shorter context for the connection worker
-		workerCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		workerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 		defer cancel()
 
 		// spawn a connect worker for each bootstrap node
