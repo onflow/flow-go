@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
 	consensus_follower "github.com/onflow/flow-go/follower"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -69,22 +72,20 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		flow.RoleAccess,
 		testnet.WithID(suite.stakedID),
 		testnet.SupportsUnstakedNodes(),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.TraceLevel),
 	)
 
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.WarnLevel),
-		// TODO replace these with actual values
-		testnet.WithAdditionalFlag("--access-address=null"),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 0)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 0)),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
@@ -100,19 +101,29 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		stakedConfig,
 	}
 
-	// consensus follower
-	unstakedKey, err := unittest.NetworkingKey()
+	unstakedKey, err := UnstakedNetworkingKey()
 	require.NoError(suite.T(), err)
-	// TODO: derive node id from the key
-	suite.unstakedID = unittest.IdentifierFixture()
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(unstakedKey, suite.stakedID, suite.unstakedID),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey, suite.stakedID),
 	}
 
+	suite.unstakedID = followerConfigs[0].NodeID
+
+	// consensus follower
 	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
 	suite.follower = suite.net.ConsensusFollowerByID(suite.unstakedID)
 	suite.follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
+}
+
+// TODO: Move this to unittest and resolve the circular dependency issue
+func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSASecp256k1)
+	n, err := rand.Read(seed)
+	if err != nil || n != crypto.KeyGenSeedMinLenECDSASecp256k1 {
+		return nil, err
+	}
+	return utils.GenerateUnstakedNetworkingKey(unittest.SeedFixture(n))
 }

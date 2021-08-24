@@ -96,7 +96,7 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
 	nodeBuilder.Initialize()
-	nodeBuilder.BuildConsensusFollower()
+	nodeBuilder.Build()
 
 	return nodeBuilder
 }

@@ -37,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/network/p2p"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -219,16 +220,20 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 }
 
 type ConsensusFollowerConfig struct {
-	nodeID flow.Identifier
-	networkingPrivKey crypto.PrivateKey
-	stakedNodeID flow.Identifier
+	NodeID            flow.Identifier
+	NetworkingPrivKey crypto.PrivateKey
+	StakedNodeID      flow.Identifier
 }
 
-func NewConsensusFollowerConfig(networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, nodeID flow.Identifier) ConsensusFollowerConfig {
+func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier) ConsensusFollowerConfig {
+	pid, err := p2p.ExtractPeerID(networkingPrivKey.PublicKey())
+	assert.NoError(t, err)
+	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
+	assert.NoError(t, err)
 	return ConsensusFollowerConfig{
-		networkingPrivKey: networkingPrivKey,
-		stakedNodeID: stakedNodeID,
-		nodeID: nodeID, // TODO: remove this and derive it from the key instead
+		NetworkingPrivKey: networkingPrivKey,
+		StakedNodeID:      stakedNodeID,
+		NodeID:            nodeID,
 	}
 }
 
@@ -502,12 +507,12 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	var stakedANContainer *ContainerConfig
 	// find the upstream Access node container for this follower engine
 	for _, cont := range containers {
-		if cont.NodeID == followerConf.stakedNodeID {
+		if cont.NodeID == followerConf.StakedNodeID {
 			stakedANContainer = &cont
 			break
 		}
 	}
-	require.NotNil(t, stakedANContainer, "unable to find staked AN for the follower engine %s", followerConf.nodeID.String())
+	require.NotNil(t, stakedANContainer, "unable to find staked AN for the follower engine %s", followerConf.NodeID.String())
 
 	portStr := net.AccessPorts[AccessNodeExternalNetworkPort]
 	portU64, err := strconv.ParseUint(portStr, 10, 32)
@@ -515,18 +520,18 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	port := uint(portU64)
 
 	bootstrapNodeInfo := consensus_follower.BootstrapNodeInfo{
-		Host: "localhost",
-		Port: port,
+		Host:             "localhost",
+		Port:             port,
 		NetworkPublicKey: stakedANContainer.NetworkPubKey(),
 	}
 
 	// TODO: update consensus follower to just accept a networking key instead of a node ID
 	// it should be able to figure out the rest on its own.
-	follower, err := consensus_follower.NewConsensusFollower(followerConf.networkingPrivKey, bindAddr,
+	follower, err := consensus_follower.NewConsensusFollower(followerConf.NetworkingPrivKey, bindAddr,
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
 
 	// TODO: convert key to node ID? or just store with the network key as map key
-	net.ConsensusFollowers[followerConf.nodeID] = follower
+	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
 
 // AddNode creates a node container with the given config and adds it to the
@@ -736,12 +741,11 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 
 	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
-			// TODO: Need to convert from network key here
-			conf.nodeID,
+			conf.NodeID,
 			flow.RoleAccess, // use Access role
 			"",              // no address
 			0,               // no stake
-			conf.networkingPrivKey,
+			conf.NetworkingPrivKey,
 			dummyStakingKey,
 		)
 
