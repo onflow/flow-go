@@ -32,11 +32,6 @@ const DefaultCacheSize = 10e6
 // be included in network communication. We omit any nodes that have been ejected.
 var NotEjectedFilter = filter.Not(filter.Ejected)
 
-type ReadyDoneAwareNetwork interface {
-	module.Network
-	module.ReadyDoneAware
-}
-
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
