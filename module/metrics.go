@@ -20,6 +20,9 @@ type ResolverMetrics interface {
 	// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
 	// looking up the network.
 	OnDNSCacheHit()
+
+	// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
+	OnDNSCacheInvalidated()
 }
 
 type NetworkMetrics interface {

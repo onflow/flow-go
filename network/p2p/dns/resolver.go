@@ -66,10 +66,12 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 
 // lookupIPAddr encapsulates the logic of resolving an ip address through cache.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	if addr, ok := r.c.resolveIPCache(domain); ok {
+	if addr, exits, invalidated := r.c.resolveIPCache(domain); exits {
 		// resolving address from cache
 		r.collector.OnDNSCacheHit()
 		return addr, nil
+	} else if invalidated {
+		r.collector.OnDNSCacheInvalidated()
 	}
 
 	// resolves domain through underlying resolver
@@ -98,10 +100,12 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
-	if addr, ok := r.c.resolveTXTCache(txt); ok {
+	if addr, exists, invalidated := r.c.resolveTXTCache(txt); exists {
 		// resolving address from cache
 		r.collector.OnDNSCacheHit()
 		return addr, nil
+	} else if invalidated {
+		r.collector.OnDNSCacheInvalidated()
 	}
 
 	// resolves txt through underlying resolver

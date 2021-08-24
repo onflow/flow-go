@@ -29,6 +29,7 @@ func (nc *NoopCollector) OutboundConnections(_ uint)                            
 func (nc *NoopCollector) InboundConnections(_ uint)                                              {}
 func (nc *NoopCollector) DNSLookupDuration(duration time.Duration)                               {}
 func (nc *NoopCollector) OnDNSCacheMiss()                                                        {}
+func (nc *NoopCollector) OnDNSCacheInvalidated()                                                 {}
 func (nc *NoopCollector) OnDNSCacheHit()                                                         {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                                          {}
