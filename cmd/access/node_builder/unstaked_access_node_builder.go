@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
 
 type UnstakedAccessNodeBuilder struct {
@@ -152,6 +153,9 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 		builder.Middleware = middleware
 
 		builder.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
+
+		idEvents := gadgets.NewIdentityDeltas(builder.Middleware.UpdateNodeAddresses)
+		builder.ProtocolEvents.AddConsumer(idEvents)
 
 		return builder.Network, err
 	})
