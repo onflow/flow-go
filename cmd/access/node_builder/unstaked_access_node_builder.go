@@ -3,6 +3,7 @@ package node_builder
 import (
 	"context"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -20,6 +21,34 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 	}
 }
 
+func (fnb *UnstakedAccessNodeBuilder) initNodeInfo() {
+	// use the networking key that has been passed in the config
+	networkingKey := fnb.AccessNodeConfig.NetworkKey
+	pubKey, err := p2p.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
+	fnb.MustNot(err)
+	peerID, err := peer.IDFromPublicKey(pubKey)
+	fnb.MustNot(err)
+	fnb.NodeID, err = fnb.IDTranslator.GetFlowID(peerID)
+	fnb.MustNot(err)
+	fnb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
+	fnb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
+}
+
+func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
+	fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
+
+	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, fnb.ProtocolEvents)
+		if err != nil {
+			return err
+		}
+
+		fnb.IdentityProvider = idCache
+
+		return nil
+	})
+}
+
 func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -27,7 +56,12 @@ func (builder *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.validateParams()
 
-	builder.deriveBootstrapPeerIdentities()
+	builder.InitIDProviders()
+
+	// if a network key has been passed in the init node info here
+	if builder.AccessNodeConfig.NetworkKey != nil {
+		builder.initNodeInfo()
+	}
 
 	builder.enqueueUnstakedNetworkInit(ctx)
 
@@ -133,7 +167,7 @@ func (builder *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (builder *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	builder.Component("unstaked network", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		return newUpstreamConnector(builder.bootstrapIdentites, builder.UnstakedLibP2PNode, builder.Logger), nil
+	builder.Component("upstream connector", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		return newUpstreamConnector(builder.bootstrapIdentities, builder.LibP2PNode, builder.Logger), nil
 	})
 }
