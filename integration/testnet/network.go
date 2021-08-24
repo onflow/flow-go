@@ -243,10 +243,9 @@ type NetworkConfig struct {
 
 type NetworkConfigOpt func(*NetworkConfig)
 
-func NewNetworkConfig(name string, nodes []NodeConfig, followers []ConsensusFollowerConfig, opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:                 nodes,
-		ConsensusFollowers:    followers,
 		Name:                  name,
 		NClusters:             1, // default to 1 cluster
 		ViewsInStakingAuction: DefaultViewsInStakingAuction,
@@ -282,6 +281,12 @@ func WithViewsInDKGPhase(views uint64) func(*NetworkConfig) {
 func WithClusters(n uint) func(*NetworkConfig) {
 	return func(conf *NetworkConfig) {
 		conf.NClusters = n
+	}
+}
+
+func WithConsensusFollowers(followers ...ConsensusFollowerConfig) func(*NetworkConfig) {
+	return func(conf *NetworkConfig) {
+		conf.ConsensusFollowers = followers
 	}
 }
 
