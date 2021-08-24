@@ -663,11 +663,11 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
-	topology network.Topology) (*p2p.Network, error) {
+	topology network.Topology,
+	subMngr network.SubscriptionManager,
+) (*p2p.Network, error) {
 
 	codec := cborcodec.NewCodec()
-
-	subscriptionManager := p2p.NewChannelSubscriptionManager(middleware)
 
 	// creates network instance
 	net, err := p2p.NewNetwork(
@@ -677,7 +677,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		builder.Middleware,
 		p2p.DefaultCacheSize,
 		topology,
-		subscriptionManager,
+		subMngr,
 		networkMetrics,
 		builder.IdentityProvider,
 	)
