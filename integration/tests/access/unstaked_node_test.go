@@ -2,7 +2,9 @@ package access
 
 import (
 	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -43,7 +45,23 @@ func (suite *UnstakedAccessSuite) TearDownTest() {
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
-	nodeConfigs := []testnet.NodeConfig{}
+	suite.buildNetworkConfig()
+	// start the network
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
+	suite.net.Start(suite.ctx)
+}
+
+func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
+	//go suite.follower.Run(suite.ctx)
+	// TODO: to be implemented later
+	time.Sleep(time.Second * 30)
+}
+
+func (suite *UnstakedAccessSuite) OnBlockFinalizedConsumer(finalizedBlockID flow.Identifier) {
+	fmt.Println(finalizedBlockID.String())
+}
+
+func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 
 	// staked access node
 	suite.stakedID = unittest.IdentifierFixture()
@@ -53,41 +71,34 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 		testnet.SupportsUnstakedNodes(),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	)
-	nodeConfigs = append(nodeConfigs, stakedConfig)
 
-	// consensus node (ghost)
-	suite.conID = unittest.IdentifierFixture()
-	conConfig := testnet.NewNodeConfig(
-		flow.RoleConsensus,
-		testnet.WithID(suite.conID),
-		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-	)
-	nodeConfigs = append(nodeConfigs, conConfig)
+	collectionConfigs := []func(*testnet.NodeConfig){
+		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		// TODO replace these with actual values
+		testnet.WithAdditionalFlag("--access-address=null"),
+	}
 
-	// execution node (unused)
-	exeConfig := testnet.NewNodeConfig(
-		flow.RoleExecution,
-		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-	)
-	nodeConfigs = append(nodeConfigs, exeConfig)
+	consensusConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
+		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
+		testnet.WithLogLevel(zerolog.WarnLevel),
+	}
 
-	// verification node (unused)
-	verConfig := testnet.NewNodeConfig(
-		flow.RoleVerification,
-		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-	)
-	nodeConfigs = append(nodeConfigs, verConfig)
-
-	// collection node (unused)
-	collConfig := testnet.NewNodeConfig(
-		flow.RoleCollection,
-		testnet.AsGhost(),
-		testnet.WithLogLevel(zerolog.FatalLevel),
-	)
-	nodeConfigs = append(nodeConfigs, collConfig)
+	net := []testnet.NodeConfig{
+		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithDebugImage(false)),
+		stakedConfig,
+	}
 
 	// consensus follower
 	unstakedKey, err := unittest.NetworkingKey()
@@ -95,22 +106,13 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 	// TODO: derive node id from the key
 	suite.unstakedID = unittest.IdentifierFixture()
 
-
 	followerConfigs := []testnet.ConsensusFollowerConfig{
 		testnet.NewConsensusFollowerConfig(unstakedKey, suite.stakedID, suite.unstakedID),
 	}
 
-	conf := testnet.NewNetworkConfig("unstaked_node_test", nodeConfigs, testnet.WithConsensusFollowers(followerConfigs...))
+	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
 	suite.follower = suite.net.ConsensusFollowerByID(suite.unstakedID)
-
-	// start the network
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-	suite.net.Start(suite.ctx)
-}
-
-func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
-	go suite.follower.Run(suite.ctx)
-	// TODO: to be implemented later
+	suite.follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
 }
