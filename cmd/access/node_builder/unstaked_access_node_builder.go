@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/cmd"
@@ -109,12 +110,17 @@ func (builder *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.N
 // Build enqueues the sync engine and the follower engine for the unstaked access node.
 // Currently, the unstaked AN only runs the follower engine.
 func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	//anb.
-	//	Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-	//		// use the default identifier provider
-	//		node.SyncEngineIdentifierProvider = node.Middleware.IdentifierProvider()
-	//		return nil
-	//	})
+	anb.
+		Module("sync engine participants provider", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			middleware, ok := node.Middleware.(*p2p.Middleware)
+			if !ok {
+				return errors.New("middleware was of unexpected type")
+			}
+			// use the default identifier provider
+			anb.SyncEngineParticipantsProvider = middleware.IdentifierProvider()
+			return nil
+		})
+
 	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
 	return anb
 }
