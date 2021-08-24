@@ -709,7 +709,6 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
 		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
 
-
 		err = state.Finalize(block8.ID())
 		require.NoError(t, err)
 		err = state.Finalize(block9.ID())
