@@ -133,6 +133,9 @@ const (
 	ProvideChunks            = RequestChunks
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
+
+	// Unstaked network channels
+	UnstakedSyncCommittee = network.Channel("unstaked-sync-committee")
 )
 
 // initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
