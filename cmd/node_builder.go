@@ -136,7 +136,7 @@ type NodeConfig struct {
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Middleware        network.Middleware
-	Network           p2p.ReadyDoneAwareNetwork
+	Network           module.ReadyDoneAwareNetwork
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
