@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/sethvargo/go-retry"
 
@@ -17,12 +18,12 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// RETRY_MAX is the maximum number of times the broker will attempt to broadcast
+// retryMax is the maximum number of times the broker will attempt to broadcast
 // a message or publish a result
 const retryMax = 8
 
-// RETRY_MILLISECONDS is the number of milliseconds to wait between retries
-const RETRY_MILLISECONDS = 1000
+// retryMilliseconds is the number of milliseconds to wait between retries
+const retryMilliseconds = 1000 * time.Millisecond
 
 // Broker is an implementation of the DKGBroker interface which is intended to
 // be used in conjuction with the DKG MessagingEngine for private messages, and
@@ -107,11 +108,11 @@ func (b *Broker) Broadcast(data []byte) {
 		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 	}
 
-	expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
+	expRetry, err := retry.NewExponential(retryMilliseconds)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("create retry mechanism")
 	}
-	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
+	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
 
 	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 		err := b.dkgContractClient.Broadcast(bcastMsg)
@@ -185,11 +186,11 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
+	expRetry, err := retry.NewExponential(retryMilliseconds)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
-	maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
+	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
 
 	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 		err := b.dkgContractClient.SubmitResult(pubKey, groupKeys)

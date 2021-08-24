@@ -3,6 +3,7 @@ package dkg
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/sethvargo/go-retry"
 
@@ -16,12 +17,12 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// RETRY_MAX is the maximum number of times the engine will attempt to forward
+// retryMax is the maximum number of times the engine will attempt to forward
 // a message
-const RETRY_MAX = 5
+const retryMax = 5
 
-// RETRY_MILLISECONDS is the number of milliseconds to wait between the two first tries
-const RETRY_MILLISECONDS = 1000
+// retryMilliseconds is the number of milliseconds to wait between the two first tries
+const retryMilliseconds = 1000 * time.Millisecond
 
 // MessagingEngine is a network engine that enables DKG nodes to exchange
 // private messages over the network.
@@ -119,12 +120,12 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 	for {
 		select {
 		case msg := <-e.tunnel.MsgChOut:
-			expRetry, err := retry.NewExponential(RETRY_MILLISECONDS)
+			expRetry, err := retry.NewExponential(retryMilliseconds)
 			if err != nil {
 				e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 			}
 
-			maxedExpRetry := retry.WithMaxRetries(RETRY_MAX, expRetry)
+			maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
 			err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
 				err := e.conduit.Unicast(&msg.DKGMessage, msg.DestID)
 				if err != nil {
@@ -132,7 +133,9 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 				}
 				return retry.RetryableError(err)
 			})
-			e.log.Error().Err(err).Msg("error sending dkg message")
+			if err != nil {
+				e.log.Error().Err(err).Msg("error sending dkg message")
+			}
 		case <-e.unit.Quit():
 			return
 		}
