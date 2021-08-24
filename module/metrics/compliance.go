@@ -57,7 +57,7 @@ func NewComplianceCollector() *ComplianceCollector {
 			Name:      "current_epoch_final_view",
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
-			Help:      "the final view of the current epoch with the greatest counter",
+			Help:      "the final view of the current epoch",
 		}),
 
 		currentDKGPhase1FinalView: promauto.NewGauge(prometheus.GaugeOpts{
