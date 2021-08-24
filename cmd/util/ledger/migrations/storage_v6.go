@@ -51,7 +51,7 @@ var CBOREncMode = func() cbor.EncMode {
 	return encMode
 }()
 
-type storageFormatV5MigrationResult struct {
+type storageFormatV6MigrationResult struct {
 	key     ledger.Key
 	payload *ledger.Payload
 	err     error
@@ -152,13 +152,15 @@ func (m StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pay
 	return accounts
 }
 
-func (m StorageFormatV6Migration) migrate(
-	payload ledger.Payload,
-) storageFormatV5MigrationResult {
+func (m StorageFormatV6Migration) migrate(payload ledger.Payload) storageFormatV6MigrationResult {
+	// TODO: skip inner values, if they are already encoded
+
 	migratedPayload, err := m.reencodePayload(payload)
-	result := storageFormatV5MigrationResult{
+
+	result := storageFormatV6MigrationResult{
 		key: payload.Key,
 	}
+
 	if err != nil {
 		result.err = err
 	} else if migratedPayload != nil {
@@ -167,6 +169,7 @@ func (m StorageFormatV6Migration) migrate(
 		}
 		result.payload = migratedPayload
 	}
+
 	return result
 }
 
@@ -184,9 +187,7 @@ func (m StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) err
 	return nil
 }
 
-func (m StorageFormatV6Migration) reencodePayload(
-	payload ledger.Payload,
-) (*ledger.Payload, error) {
+func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
 
@@ -206,7 +207,7 @@ func (m StorageFormatV6Migration) reencodePayload(
 
 	value, version := oldInter.StripMagic(payload.Value)
 
-	if version != oldInter.CurrentEncodingVersion-1 {
+	if version != oldInter.CurrentEncodingVersion {
 		return nil,
 			fmt.Errorf(
 				"invalid storage format version for key: %s: %d",
@@ -329,10 +330,17 @@ func (m StorageFormatV6Migration) reencodeValue(
 
 	// Encode the new value
 
-	storable, ok := newValue.(atree.Storable)
+	storable, ok := interface{}(newValue).(atree.Storable)
 	if !ok {
-		return nil, false,
-			fmt.Errorf("non-storable value at key: %s", key)
+		// TODO: encode
+		// Return the original value as is for now.
+		return data, true, nil
+
+		//return nil, false,
+		//	fmt.Errorf("non-storable value at key: %s\nvalue type: %s\n",
+		//		key,
+		//		reflect.TypeOf(newValue),
+		//	)
 	}
 
 	var buf bytes.Buffer
