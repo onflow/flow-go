@@ -158,8 +158,10 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Con
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
+		subscriptionManager := p2p.NewChannelSubscriptionManager(anb.Middleware)
+
 		// topology is nil since its automatically managed by libp2p
-		network, err := anb.initNetwork(anb.Me, unstakedNetworkMetrics, anb.Middleware, nil)
+		network, err := anb.initNetwork(anb.Me, unstakedNetworkMetrics, anb.Middleware, nil, subscriptionManager)
 		anb.MustNot(err)
 
 		anb.Network = network
