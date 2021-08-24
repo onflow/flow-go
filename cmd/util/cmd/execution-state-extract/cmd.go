@@ -93,6 +93,23 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
+	} else {
+		// read state commitment from root checkpoint
+
+		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid root checkpoint")
+		}
+		const crcLength = 4
+		_, err = f.Seek(-(hash.HashLen + crcLength), 2 /* relative from end */)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid root checkpoint")
+		}
+
+		n, err := f.Read(stateCommitment[:])
+		if err != nil || n != hash.HashLen {
+			log.Fatal().Err(err).Msg("failed to read state commitment from root checkpoint")
+		}
 	}
 
 	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
@@ -123,8 +140,8 @@ func run(*cobra.Command, []string) {
 		log.Logger,
 		!flagNoMigration,
 		!flagNoReport,
-		false,
 	)
+
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

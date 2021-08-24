@@ -27,7 +27,6 @@ func extractExecutionState(
 	log zerolog.Logger,
 	migrate bool,
 	report bool,
-	cleanupStorage bool,
 ) error {
 
 	diskWal, err := wal.NewDiskWAL(
