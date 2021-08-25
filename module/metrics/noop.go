@@ -51,6 +51,10 @@ func (nc *NoopCollector) BlockProposalDuration(duration time.Duration)          
 func (nc *NoopCollector) CommittedEpochFinalView(view uint64)                                    {}
 func (nc *NoopCollector) CurrentEpochCounter(counter uint64)                                     {}
 func (nc *NoopCollector) CurrentEpochPhase(phase flow.EpochPhase)                                {}
+func (nc *NoopCollector) CurrentEpochFinalView(view uint64)                                      {}
+func (nc *NoopCollector) CurrentDKGPhase1FinalView(view uint64)                                  {}
+func (nc *NoopCollector) CurrentDKGPhase2FinalView(view uint64)                                  {}
+func (nc *NoopCollector) CurrentDKGPhase3FinalView(view uint64)                                  {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                             {}
 func (nc *NoopCollector) CacheHit(resource string)                                               {}
 func (nc *NoopCollector) CacheNotFound(resource string)                                          {}
