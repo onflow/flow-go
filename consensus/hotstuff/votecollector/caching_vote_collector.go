@@ -20,10 +20,14 @@ func NewCachingVoteCollector(base CollectionBase) *CachingVoteCollector {
 }
 
 func (c *CachingVoteCollector) AddVote(vote *model.Vote) error {
-	if vote.BlockID != c.blockID {
-		return fmt.Errorf("this CachingVoteCollector processes votes for blockID (%x), "+
-			"but got a vote for (%x)", c.blockID, vote.BlockID)
+	if vote.View != c.view {
+		return fmt.Errorf("this CachingVoteCollector processes votes for view %d, "+
+			"but got a vote for %d", c.view, vote.View)
 	}
+
+	// TODO: add handling of double votes here. If we don't know anything about block
+	// proposal we might delay our decision, but still double votes has to be tracked.
+	// Use c.doubleVoteDetector for this purpose.
 
 	_ = c.pendingVotes.AddVote(vote)
 

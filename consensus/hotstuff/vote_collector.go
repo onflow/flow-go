@@ -73,9 +73,9 @@ type VoteCollectorState interface {
 	// passed to EventLoop through a callback.
 	AddVote(vote *model.Vote) error
 
-	// BlockID returns the block ID that this instance is collecting votes for.
+	// View returns the view that this instance is collecting votes for.
 	// This method is useful when adding the newly created vote collector to vote collectors map.
-	BlockID() flow.Identifier
+	View() uint64
 
 	// Status returns the status of the vote collector
 	Status() VoteCollectorStatus

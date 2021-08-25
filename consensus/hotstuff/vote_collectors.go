@@ -2,7 +2,6 @@ package hotstuff
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // VoteCollectors is an interface which allows VoteAggregator to interact with collectors structured by
@@ -11,8 +10,8 @@ import (
 // stale and outdated collectors by view.
 type VoteCollectors interface {
 	// GetOrCreateCollector is used for getting hotstuff.VoteCollector.
-	// if there is no collector created or the given block ID, then it will create one.
-	// Collector is indexed by blockID for looking up by blockID, and also indexed by view for pruning.
+	// if there is no collector created or the given view, then it will create one.
+	// Collector is indexed by view.
 	// When creating a vote collector, the view will be used to get epoch by view, then create the random beacon
 	// signer object by epoch, because epoch determines DKG, which determines random beacon committee.
 	// It returns:
@@ -22,9 +21,9 @@ type VoteCollectors interface {
 	// TODO: how to verify the view? if an invalid vote has an invalid view, then this method would be called with
 	// an invalid view. In that case, would we create a vote collector?
 	// indexed by a wrong view?
-	GetOrCreateCollector(view uint64, blockID flow.Identifier) (collector VoteCollector, created bool, err error)
+	GetOrCreateCollector(view uint64) (collector VoteCollector, created bool, err error)
 
-	// Prune the vote collectors whose view is below the given view
+	// PruneUpToView prunes the vote collectors whose view is below the given view
 	PruneUpToView(view uint64) error
 
 	// ProcessBlock performs validation of block signature and processes block with respected collector.

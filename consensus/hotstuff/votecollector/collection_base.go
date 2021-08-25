@@ -4,23 +4,23 @@ package votecollector
 import (
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
-
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type CollectionBase struct {
-	log        zerolog.Logger
-	workerPool *workerpool.WorkerPool
+	log                zerolog.Logger
+	workerPool         *workerpool.WorkerPool
+	doubleVoteDetector *DoubleVoteDetector
 
-	blockID flow.Identifier
+	view uint64
 }
 
-func NewCollectionBase(blockID flow.Identifier) CollectionBase {
+func NewCollectionBase(view uint64) CollectionBase {
 	return CollectionBase{
-		blockID: blockID,
+		view:               view,
+		doubleVoteDetector: NewDoubleVoteDetector(view),
 	}
 }
 
-func (c *CollectionBase) BlockID() flow.Identifier {
-	return c.blockID
+func (c *CollectionBase) View() uint64 {
+	return c.view
 }

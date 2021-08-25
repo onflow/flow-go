@@ -48,6 +48,13 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		return nil
 	}
 
+	// after we have checked vote signature, let's track this vote to detect double voting
+	err = c.doubleVoteDetector.AddVote(vote)
+	// either way if it's exception or a sentinel error we need to return with error
+	if err != nil {
+		return err
+	}
+
 	_, err = c.combinedAggr.TrustedAdd(vote.SignerID, vote.SigData, sigType)
 	if err != nil {
 		return fmt.Errorf("could not aggregate staking sig share: %w", err)
