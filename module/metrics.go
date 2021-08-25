@@ -72,6 +72,10 @@ type ComplianceMetrics interface {
 	BlockProposalDuration(duration time.Duration)
 	CurrentEpochCounter(counter uint64)
 	CurrentEpochPhase(phase flow.EpochPhase)
+	CurrentEpochFinalView(view uint64)
+	CurrentDKGPhase1FinalView(view uint64)
+	CurrentDKGPhase2FinalView(view uint64)
+	CurrentDKGPhase3FinalView(view uint64)
 }
 
 type CleanerMetrics interface {
