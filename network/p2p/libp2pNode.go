@@ -58,7 +58,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 	connGater := NewConnGater(log)
 
 	// TODO: uncomment following lines to activate dns caching
-	resolver, err := dns.NewResolver(metrics, dns.WithTTL(1*time.Hour))
+	resolver, err := dns.NewResolver(metrics, dns.WithTTL(24*time.Hour))
 	if err != nil {
 		return nil, fmt.Errorf("could not create dns resolver: %w", err)
 	}
