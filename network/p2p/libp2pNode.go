@@ -30,6 +30,7 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/utils/logging"
@@ -54,9 +55,9 @@ type LibP2PFactoryFunc func() (*Node, error)
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
-	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider) (LibP2PFactoryFunc, error) {
+	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider, idProvider id.IdentityProvider) (LibP2PFactoryFunc, error) {
 
-	connManager := NewConnManager(log, metrics)
+	connManager := NewConnManager(log, idProvider, metrics)
 
 	connGater := NewConnGater(log)
 

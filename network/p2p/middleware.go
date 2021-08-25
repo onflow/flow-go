@@ -345,8 +345,12 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 		return fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
 	}
 
+	channel := metrics.ChannelOneToOne
+	if _, isStaked := m.ov.Identities().ByNodeID(targetID); !isStaked {
+		channel = metrics.ChannelOneToOneUnstaked
+	}
 	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+	m.metrics.NetworkMessageSent(msg.Size(), channel, msg.Type)
 
 	return nil
 }
@@ -360,8 +364,14 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 
 	log.Info().Msg("incoming stream received")
 
+	nodeID, err := m.idTranslator.GetFlowID(s.Conn().RemotePeer())
+	if err != nil {
+		log.Err(err).Str("peer_id", s.Conn().RemotePeer().Pretty()).Msg("could not translate peer ID of incoming stream")
+	}
+	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
+
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize)
+	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
 
 	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)

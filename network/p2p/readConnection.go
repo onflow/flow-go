@@ -26,6 +26,7 @@ type readConnection struct {
 	metrics    module.NetworkMetrics
 	maxMsgSize int
 	callback   func(msg *message.Message, peerID peer.ID)
+	isStaked   bool
 }
 
 // newReadConnection creates a new readConnection
@@ -34,7 +35,9 @@ func newReadConnection(ctx context.Context,
 	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics,
-	maxMsgSize int) *readConnection {
+	maxMsgSize int,
+	isStaked bool,
+) *readConnection {
 
 	if maxMsgSize <= 0 {
 		maxMsgSize = DefaultMaxUnicastMsgSize
@@ -48,6 +51,7 @@ func newReadConnection(ctx context.Context,
 		log:        log,
 		metrics:    metrics,
 		maxMsgSize: maxMsgSize,
+		isStaked:   isStaked,
 	}
 	return &c
 }
@@ -101,8 +105,12 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
+		channel := metrics.ChannelOneToOne
+		if !rc.isStaked {
+			channel = metrics.ChannelOneToOneUnstaked
+		}
 		// log metrics with the channel name as OneToOne
-		rc.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+		rc.metrics.NetworkMessageReceived(msg.Size(), channel, msg.Type)
 
 		// call the callback
 		rc.callback(&msg, rc.remoteID)

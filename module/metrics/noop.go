@@ -27,6 +27,8 @@ func (nc *NoopCollector) MessageReceived(engine string, message string)         
 func (nc *NoopCollector) MessageHandled(engine string, message string)                           {}
 func (nc *NoopCollector) OutboundConnections(_ uint)                                             {}
 func (nc *NoopCollector) InboundConnections(_ uint)                                              {}
+func (nc *NoopCollector) UnstakedOutboundConnections(_ uint)                                     {}
+func (nc *NoopCollector) UnstakedInboundConnections(_ uint)                                      {}
 func (nc *NoopCollector) RanGC(duration time.Duration)                                           {}
 func (nc *NoopCollector) BadgerLSMSize(sizeBytes int64)                                          {}
 func (nc *NoopCollector) BadgerVLogSize(sizeBytes int64)                                         {}
