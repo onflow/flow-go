@@ -346,7 +346,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	}
 
 	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+	m.metrics.NetworkMessageSent(msg.Size(), metrics.ChannelOneToOne, msg.Type, targetID.String())
 
 	return nil
 }
