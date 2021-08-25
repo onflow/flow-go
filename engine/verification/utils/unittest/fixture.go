@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/epochs"
 
@@ -208,6 +209,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 	var payload flow.Payload
 	var referenceBlock flow.Block
+	var serviceEvents flow.ServiceEventList
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -287,6 +289,12 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		}
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
+		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
+		for _, event := range computationResult.ServiceEvents {
+			converted, err := convert.ServiceEvent(referenceBlock.Header.ChainID, event)
+			require.NoError(t, err)
+			serviceEvents = append(serviceEvents, *converted)
+		}
 
 		startState := startStateCommitment
 
@@ -331,8 +339,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	}
 
 	result := &flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  chunks,
+		BlockID:       blockID,
+		Chunks:        chunks,
+		ServiceEvents: serviceEvents,
 	}
 
 	return result, &ExecutionReceiptData{
