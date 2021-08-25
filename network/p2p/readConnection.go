@@ -7,8 +7,10 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/message"
@@ -19,16 +21,17 @@ import (
 type readConnection struct {
 	ctx        context.Context
 	stream     libp2pnetwork.Stream
+	remoteKey  crypto.PublicKey
 	log        zerolog.Logger
 	metrics    module.NetworkMetrics
 	maxMsgSize int
-	callback   func(msg *message.Message)
+	callback   func(msg *message.Message, pk crypto.PublicKey)
 }
 
 // newReadConnection creates a new readConnection
 func newReadConnection(ctx context.Context,
 	stream libp2pnetwork.Stream,
-	callback func(msg *message.Message),
+	callback func(msg *message.Message, pubKey crypto.PublicKey),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics,
 	maxMsgSize int) *readConnection {
@@ -37,9 +40,18 @@ func newReadConnection(ctx context.Context,
 		maxMsgSize = DefaultMaxUnicastMsgSize
 	}
 
+	remoteKey := stream.Conn().RemotePublicKey()
+	flowKey, err := FlowPublicKeyFromLibP2P(remoteKey)
+	// this should not happen if the stream was setup properly
+	if err != nil {
+		log.Err(err).Msg("failed to extract flow public key of stream libp2p key")
+		return nil
+	}
+
 	c := readConnection{
 		ctx:        ctx,
 		stream:     stream,
+		remoteKey:  flowKey,
 		callback:   callback,
 		log:        log,
 		metrics:    metrics,
@@ -101,7 +113,7 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 		rc.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 
 		// call the callback
-		rc.callback(&msg)
+		rc.callback(&msg, rc.remoteKey)
 	}
 }
 
