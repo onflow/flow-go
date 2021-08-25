@@ -17,21 +17,21 @@ func NewEngineCollector() *EngineCollector {
 
 		sent: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_sent_total",
-			Namespace: namespaceNetwork,
+			Namespace: NamespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages sent by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
 		received: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_received_total",
-			Namespace: namespaceNetwork,
+			Namespace: NamespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages received by engines",
 		}, []string{EngineLabel, LabelMessage}),
 
 		handled: promauto.NewCounterVec(prometheus.CounterOpts{
 			Name:      "messages_handled_total",
-			Namespace: namespaceNetwork,
+			Namespace: NamespaceNetwork,
 			Subsystem: subsystemEngine,
 			Help:      "the number of messages handled by engines",
 		}, []string{EngineLabel, LabelMessage}),
