@@ -16,14 +16,16 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize      *prometheus.HistogramVec
-	inboundMessageSize       *prometheus.HistogramVec
-	duplicateMessagesDropped *prometheus.CounterVec
-	queueSize                *prometheus.GaugeVec
-	queueDuration            *prometheus.HistogramVec
-	inboundProcessTime       *prometheus.CounterVec
-	outboundConnectionCount  prometheus.Gauge
-	inboundConnectionCount   prometheus.Gauge
+	outboundMessageSize             *prometheus.HistogramVec
+	inboundMessageSize              *prometheus.HistogramVec
+	duplicateMessagesDropped        *prometheus.CounterVec
+	queueSize                       *prometheus.GaugeVec
+	queueDuration                   *prometheus.HistogramVec
+	inboundProcessTime              *prometheus.CounterVec
+	outboundConnectionCount         prometheus.Gauge
+	inboundConnectionCount          prometheus.Gauge
+	unstakedOutboundConnectionCount prometheus.Gauge
+	unstakedInboundConnectionCount  prometheus.Gauge
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -36,7 +38,7 @@ func NewNetworkCollector() *NetworkCollector {
 			Name:      "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelMessage, LabelNodeID}),
 
 		inboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
 			Namespace: NamespaceNetwork,
@@ -44,14 +46,14 @@ func NewNetworkCollector() *NetworkCollector {
 			Name:      "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelMessage, LabelNodeID}),
 
 		duplicateMessagesDropped: promauto.NewCounterVec(prometheus.CounterOpts{
 			Namespace: NamespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelMessage, LabelNodeID}),
 
 		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: NamespaceNetwork,
@@ -88,6 +90,20 @@ func NewNetworkCollector() *NetworkCollector {
 			Name:      "inbound_connection_count",
 			Help:      "the number of inbound connections of this node",
 		}),
+
+		unstakedOutboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
+			Name:      "unstaked_outbound_connection_count",
+			Help:      "the number of outbound connections to unstaked nodes",
+		}),
+
+		unstakedInboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
+			Name:      "unstaked_inbound_connection_count",
+			Help:      "the number of inbound connections from unstaked nodes",
+		}),
 	}
 
 	return nc
@@ -95,19 +111,19 @@ func NewNetworkCollector() *NetworkCollector {
 
 // NetworkMessageSent tracks the message size of the last message sent out on the wire
 // in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string) {
-	nc.outboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+func (nc *NetworkCollector) NetworkMessageSent(sizeBytes int, topic string, messageType string, targetID string) {
+	nc.outboundMessageSize.WithLabelValues(topic, messageType, targetID).Observe(float64(sizeBytes))
 }
 
 // NetworkMessageReceived tracks the message size of the last message received on the wire
 // in bytes for the given topic
-func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string) {
-	nc.inboundMessageSize.WithLabelValues(topic, messageType).Observe(float64(sizeBytes))
+func (nc *NetworkCollector) NetworkMessageReceived(sizeBytes int, topic string, messageType string, originID string) {
+	nc.inboundMessageSize.WithLabelValues(topic, messageType, originID).Observe(float64(sizeBytes))
 }
 
 // NetworkDuplicateMessagesDropped tracks the number of messages dropped by the network layer due to duplication
-func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string) {
-	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType).Add(1)
+func (nc *NetworkCollector) NetworkDuplicateMessagesDropped(topic, messageType string, originID string) {
+	nc.duplicateMessagesDropped.WithLabelValues(topic, messageType, originID).Add(1)
 }
 
 func (nc *NetworkCollector) MessageAdded(priority int) {
@@ -133,4 +149,12 @@ func (nc *NetworkCollector) OutboundConnections(connectionCount uint) {
 
 func (nc *NetworkCollector) InboundConnections(connectionCount uint) {
 	nc.inboundConnectionCount.Set(float64(connectionCount))
+}
+
+func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
+	nc.unstakedOutboundConnectionCount.Set(float64(connectionCount))
+}
+
+func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
+	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
 }

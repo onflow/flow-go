@@ -1,25 +1,25 @@
 package unstaked
 
 import (
-	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module"
 )
 
 type EngineCollector struct {
-	collector metrics.EngineCollector
+	metrics module.EngineMetrics
 }
 
-func NewUnstakedEngineCollector(collector metrics.EngineCollector) *EngineCollector {
-	return &EngineCollector{collector}
+func NewUnstakedEngineCollector(metrics module.EngineMetrics) *EngineCollector {
+	return &EngineCollector{metrics}
 }
 
 func (ec *EngineCollector) MessageSent(engine string, message string) {
-	ec.collector.MessageSent("unstaked_"+engine, message)
+	ec.metrics.MessageSent("unstaked_"+engine, message)
 }
 
 func (ec *EngineCollector) MessageReceived(engine string, message string) {
-	ec.collector.MessageReceived("unstaked_"+engine, message)
+	ec.metrics.MessageReceived("unstaked_"+engine, message)
 }
 
 func (ec *EngineCollector) MessageHandled(engine string, message string) {
-	ec.collector.MessageHandled("unstaked_"+engine, message)
+	ec.metrics.MessageHandled("unstaked_"+engine, message)
 }
