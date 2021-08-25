@@ -438,6 +438,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				p2p.NotEjectedFilter,
 			),
 			idCache,
 		)
