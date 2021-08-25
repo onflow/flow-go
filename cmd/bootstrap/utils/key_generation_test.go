@@ -14,6 +14,22 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+func TestGenerateUnstakedNetworkingKey(t *testing.T) {
+
+	key, err := GenerateUnstakedNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLenECDSASecp256k1))
+	require.NoError(t, err)
+	assert.Equal(t, crypto.ECDSASecp256k1, key.Algorithm())
+	assert.Equal(t, X962_NO_INVERSION, key.PublicKey().EncodeCompressed()[0])
+
+	keys, err := GenerateUnstakedNetworkingKeys(20, unittest.SeedFixtures(20, crypto.KeyGenSeedMinLenECDSASecp256k1))
+	require.NoError(t, err)
+	for _, key := range keys {
+		assert.Equal(t, crypto.ECDSASecp256k1, key.Algorithm())
+		assert.Equal(t, X962_NO_INVERSION, key.PublicKey().EncodeCompressed()[0])
+	}
+
+}
+
 func TestGenerateKeys(t *testing.T) {
 	_, err := GenerateKeys(crypto.BLSBLS12381, 0, unittest.SeedFixtures(2, crypto.KeyGenSeedMinLenBLSBLS12381))
 	require.EqualError(t, err, "n needs to match the number of seeds (0 != 2)")
