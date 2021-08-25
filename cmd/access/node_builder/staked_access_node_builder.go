@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
@@ -111,10 +112,10 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 			}).
 			Component("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				syncRequestHandler := synceng.NewRequestHandlerEngine(
-					node.Logger,         // TODO: use different logger for unstaked network?
-					node.Metrics.Engine, // TODO: use different metrics for unstaked network?
+					node.Logger.With().Bool("unstaked", true).Logger(),
+					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
 					unstakedNetworkConduit,
-					node.Me, // TODO: does staked node use same Node ID on unstaked network?
+					node.Me,
 					node.Storage.Blocks,
 					anb.SyncCore,
 					anb.FinalizedHeader,
@@ -195,7 +196,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 		myAddr = builder.BaseConfig.BindAddr
 	}
 
-	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network)
+	connManager := p2p.NewConnManager(builder.Logger, builder.IdentityProvider, builder.Metrics.Network)
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).

@@ -101,6 +101,12 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
+		// TODO
+		channel := metrics.ChannelOneToOne
+		_, found := m.ov.Identities().ByNodeID(targetID)
+		if !found {
+			channel = "unstaked_" + channel
+		}
 		// log metrics with the channel name as OneToOne
 		rc.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
 
