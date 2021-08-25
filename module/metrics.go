@@ -29,13 +29,13 @@ type NetworkMetrics interface {
 	ResolverMetrics
 
 	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string, messageType string)
+	NetworkMessageSent(sizeBytes int, topic string, messageType string, targetID string)
 
 	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
+	NetworkMessageReceived(sizeBytes int, topic string, messageType string, originID string)
 
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string, messageType string)
+	NetworkDuplicateMessagesDropped(topic string, messageType string, originID string)
 
 	// Message receive queue metrics
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
@@ -55,6 +55,12 @@ type NetworkMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+
+	// UnstakedOutboundConnections updates the metric tracking the number of outbound connections to unstaked nodes
+	UnstakedOutboundConnections(connectionCount uint)
+
+	// UnstakedInboundConnections updates the metric tracking the number of inbound connections from unstaked nodes
+	UnstakedInboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
