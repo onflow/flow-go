@@ -25,7 +25,7 @@ type RandomBeaconReconstructor interface {
 
 	// Reconstruct reconstructs the group signature.
 	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
-	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures. 
+	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures.
 	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
 	Reconstruct() (crypto.Signature, error)
 }
