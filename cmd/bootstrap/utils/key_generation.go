@@ -44,7 +44,7 @@ func drawUnstakedKey(seed []byte) (crypto.PrivateKey, error) {
 	if err != nil {
 		// this should not happen
 		return nil, err
-	} else if key.PublicKey().EncodeCompressed()[0] == 0x03 {
+	} else if key.PublicKey().EncodeCompressed()[0] == X962_INVERSION {
 		// negative key -> unsuitable
 		return nil, fmt.Errorf("Unsuitable negative key")
 	}

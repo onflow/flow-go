@@ -425,14 +425,14 @@ func (fnb *FlowNodeBuilder) initStorage() {
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, fnb.ProtocolEvents)
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
 
-		fnb.IdentityProvider = idCache
-		fnb.IDTranslator = idCache
-		fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
+		node.IdentityProvider = idCache
+		node.IDTranslator = idCache
+		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
 		return nil
 	})
 }

@@ -13,6 +13,8 @@ import (
 	"github.com/onflow/flow-go/state/protocol/events"
 )
 
+// ProtocolStateIDCache implements an IdentityProvider and IDTranslator for the set of staked
+// Flow network participants as according to the given `protocol.State`.
 type ProtocolStateIDCache struct {
 	events.Noop
 	identities flow.IdentityList
@@ -59,6 +61,9 @@ func (p *ProtocolStateIDCache) EpochCommittedPhaseStarted(currentEpochCounter ui
 	p.update(header.ID())
 }
 
+// update updates the cached identities stored in this provider.
+// This is called whenever an epoch event occurs, signaling a possible change in
+// protocol state identities.
 func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	p.logger.Info().Str("blockID", blockID.String()).Msg("updating cached identities")
 

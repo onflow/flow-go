@@ -152,23 +152,26 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
-	LibP2PNode                            *p2p.Node
-	FollowerState                         protocol.MutableState
-	SyncCore                              *synchronization.Core
-	RpcEng                                *rpc.Engine
-	FinalizationDistributor               *pubsub.FinalizationDistributor
-	FinalizedHeader                       *synceng.FinalizedHeaderCache
-	CollectionRPC                         access.AccessAPIClient
-	TransactionTimings                    *stdmap.TransactionTimings
-	CollectionsToMarkFinalized            *stdmap.Times
-	CollectionsToMarkExecuted             *stdmap.Times
-	BlocksToMarkExecuted                  *stdmap.Times
-	TransactionMetrics                    module.TransactionMetrics
-	PingMetrics                           module.PingMetrics
-	Committee                             hotstuff.Committee
-	Finalized                             *flow.Header
-	Pending                               []*flow.Header
-	FollowerCore                          module.HotStuffFollower
+	LibP2PNode                 *p2p.Node
+	FollowerState              protocol.MutableState
+	SyncCore                   *synchronization.Core
+	RpcEng                     *rpc.Engine
+	FinalizationDistributor    *pubsub.FinalizationDistributor
+	FinalizedHeader            *synceng.FinalizedHeaderCache
+	CollectionRPC              access.AccessAPIClient
+	TransactionTimings         *stdmap.TransactionTimings
+	CollectionsToMarkFinalized *stdmap.Times
+	CollectionsToMarkExecuted  *stdmap.Times
+	BlocksToMarkExecuted       *stdmap.Times
+	TransactionMetrics         module.TransactionMetrics
+	PingMetrics                module.PingMetrics
+	Committee                  hotstuff.Committee
+	Finalized                  *flow.Header
+	Pending                    []*flow.Header
+	FollowerCore               module.HotStuffFollower
+	// for the untsaked access node, the sync engine participants provider is the libp2p peer store which is not
+	// available until after the network has started. Hence, a factory function that needs to be called just before
+	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
 
 	// engines
@@ -661,7 +664,6 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	networkMetrics module.NetworkMetrics,
 	middleware network.Middleware,
 	topology network.Topology,
-	subMngr network.SubscriptionManager,
 ) (*p2p.Network, error) {
 
 	codec := cborcodec.NewCodec()
@@ -674,7 +676,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		builder.Middleware,
 		p2p.DefaultCacheSize,
 		topology,
-		subMngr,
+		p2p.NewChannelSubscriptionManager(middleware),
 		networkMetrics,
 		builder.IdentityProvider,
 	)

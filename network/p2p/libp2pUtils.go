@@ -233,6 +233,7 @@ func flowStream(conn network.Conn) network.Stream {
 	return nil
 }
 
+// ExtractPeerID extracts the LibP2P peer ID associated with the given Flow public key.
 func ExtractPeerID(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
 	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
 	if err != nil {
