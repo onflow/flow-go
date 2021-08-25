@@ -86,7 +86,7 @@ func (suite *PeerStoreProviderTestSuite) TestTranslationPeers() {
 		peerIDs[i] = pID
 	}
 	// check we can find the libp2p peers
-	assert.Subset(suite.T(), peerIDs, suite.libp2pPeersIDs, "peer IDs should include those in the peer Store")
+	assert.ElementsMatch(suite.T(), peerIDs, append(suite.libp2pPeersIDs, suite.nodes[testNodeIndex].Host().ID()), "peer IDs should include those in the peer Store")
 
 }
 
