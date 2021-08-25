@@ -2,7 +2,7 @@ package metrics
 
 // Prometheus metric namespaces
 const (
-	namespaceNetwork      = "network"
+	NamespaceNetwork      = "network"
 	namespaceStorage      = "storage"
 	namespaceAccess       = "access"
 	namespaceCollection   = "collection"
@@ -17,7 +17,7 @@ const (
 	// subsystemLibp2p = "libp2p"
 	subsystemGossip = "gossip"
 	subsystemEngine = "engine"
-	subsystemQueue  = "queue"
+	SubsystemQueue  = "queue"
 )
 
 // Storage subsystems represent the various components of the storage layer.
