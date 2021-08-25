@@ -94,8 +94,7 @@ func (a AccountPublicKey) CompactEncode(version uint8) ([]byte, error) {
 func (a *AccountPublicKey) CompactDecode(data []byte) error {
 	// read version and redirect
 	// first 5 bits are encoding version
-	b := uint8(data[0]) & byte(248)  // first 5 bits are encoding version
-	encodingVersion := uint8(b) >> 3 // (mask of 11111000 and left shift 3)
+	encodingVersion := data[0] >> 3 // extract the 5 most significant bits
 
 	switch encodingVersion {
 	case 0:
@@ -120,7 +119,7 @@ func (a *AccountPublicKey) compactDecodeV0(data []byte) error {
 	a.Revoked = (data[0] & byte(4)) > 0 // (mask of 00000100 and equality check (might optimize in the future))
 
 	// the last 2 remaining bits of first byte are the most significant bits of key weight
-	a.Weight = int(uint16(data[0]&byte(3))<<8 + uint16(data[1]))
+	a.Weight = int(uint16(data[0]&byte(3))<<8 | uint16(data[1]))
 
 	// right now is omitted for speed reasons and since user has no control over these values
 
@@ -157,7 +156,7 @@ func (a AccountPublicKey) compactEncodeV0() ([]byte, error) {
 	// first 5 bits	are encoding version
 	// you might set it initial int according to the version
 	// e.g. uint8(8) for version 1, uint8(16) for v2, uint8(24) for v3, ...
-	firstByte := uint8(0)
+	var firstByte uint8
 	// next bit is set flag for revoked key
 	if a.Revoked {
 		firstByte = firstByte | uint8(4)
