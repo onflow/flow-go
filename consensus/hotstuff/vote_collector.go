@@ -87,6 +87,6 @@ type VoteCollectorState interface {
 // map and produce the vote.
 // Note CachingVoteCollector can't create vote, only VerifyingVoteCollector can
 type VerifyingVoteCollector interface {
-	VoteCollector
+	VoteCollectorState
 	BlockSigner
 }
