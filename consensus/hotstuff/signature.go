@@ -23,9 +23,10 @@ type RandomBeaconReconstructor interface {
 	// has collected a sufficient number of signature shares.
 	HasSufficientShares() bool
 
-	// Reconstruct reconstructs the group signature from the provided
-	// signature shares. Errors if the the number of shares is insufficient
-	// or some of the added signatures shares were invalid.
+	// Reconstruct reconstructs the group signature.
+	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
+	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures. 
+	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
 	Reconstruct() (crypto.Signature, error)
 }
 

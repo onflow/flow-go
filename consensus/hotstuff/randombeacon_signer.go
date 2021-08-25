@@ -4,37 +4,37 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+// RandomBeaconSigner encapsulates all methods needed by a Hotstuff leader to validate the beacon votes and reconstruct a beacon signature. The random beacon methods are based on a threshold signature scheme. 
 type RandomBeaconSigner interface {
-	// Verify verifies whether the signature is from the signer specified by the given signer index
-	// it allows concurrent verification of the given signature
-	// return nil if signature is valid
-	// return crypto.InvalidInputsError if the signature is invalid
-	// return other error if there is exception
+	// Verify verifies the signature share under the signer's public key and the message agreed upon.
+	// It allows concurrent verification of the given signature.
+	// It returns nil if signature is valid, 
+	// crypto.InvalidInputsError if the signature is invalid,
+	// and other error if there is an exception.
 	Verify(signerIndex int, share crypto.Signature) error
 
-	// TrustedAdd adds a verified share to the internal signature shares store
+	// TrustedAdd adds a share to the internal signature shares store.
 	// The operation is sequential.
-	// It assumes the signature share has been verified and is valid.
+	// The function does not verify the signature is valid. It is the caller's responsibility
+	// to make sure the signature was previously verified.
 	// It returns:
 	// (true, nil) if the signature has been added, and enough shares have been collected.
 	// (false, nil) if the signature has been added, but not enough shares were collected.
-	// (false, error) if there is any exception adding the sig share
+	// (false, error) if there is any exception adding the signature share.
 	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)
 
-	// VerifyAndAdd combines Verify and TrustedAdd into one call.
-	// If called concurrently, it is able to concurrently verifies the signature
-	// but sequentially adding the signature shares to it's internal store.
-	VerifyAndAdd(signerIndex int, share crypto.Signature) (bool, bool, error)
 
 	// EnoughShares returns whether it has accumulated enough shares to reconstruct
 	// a group signature
 	EnoughShares() bool
 
-	// SignShare produces a signature share with its own private key.
+	// SignShare produces a signature share with the internal participant's private key.
 	SignShare() (crypto.Signature, error)
 
 	// Reconstruct reconstructs the group signature.
-	// It assumes the threshold enough shares have been collected.
+	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
+	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures. 
+	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
 	Reconstruct() (crypto.Signature, error)
 }
 
