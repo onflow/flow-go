@@ -7,11 +7,13 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
@@ -158,13 +160,11 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Con
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 		unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-		subscriptionManager := p2p.NewChannelSubscriptionManager(anb.Middleware)
-
 		// topology is nil since its automatically managed by libp2p
-		network, err := anb.initNetwork(anb.Me, unstakedNetworkMetrics, anb.Middleware, nil, subscriptionManager)
+		network, err := anb.initNetwork(anb.Me, unstakedNetworkMetrics, anb.Middleware, nil)
 		anb.MustNot(err)
 
-		anb.Network = network
+		anb.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.UnstakedSyncCommittee)
 
 		anb.Logger.Info().Msgf("network will run on address: %s", anb.BindAddr)
 
