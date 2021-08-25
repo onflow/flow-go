@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"testing"
-	"time"
 
 	"github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -70,8 +69,6 @@ func (suite *PeerStoreProviderTestSuite) SetupTest() {
 	assert.Len(suite.T(), suite.libp2pPeersIDs, peerCount)
 	assert.Len(suite.T(), suite.ids, nodeCount)
 
-	// give the Node the time to establish those connections
-	time.Sleep(2 * time.Second)
 }
 
 func (suite *PeerStoreProviderTestSuite) TestTranslationPeers() {
