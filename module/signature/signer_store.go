@@ -10,12 +10,12 @@ import (
 )
 
 // EpochAwareSignerStore implements the SignerStore interface. It is epoch
-// aware, and provides the appropriate threshold signers on a per-view basis,
+// aware, and provides the appropriate dkg signers on a per-view basis,
 // using the database to retrieve the relevant DKG keys.
 type EpochAwareSignerStore struct {
-	epochLookup module.EpochLookup                // used to fetch epoch counter by view
-	keys        storage.DKGKeys                   // used to fetch DKG private key by epoch
-	signers     map[uint64]module.ThresholdSigner // cache of signers by epoch
+	epochLookup module.EpochLookup       // used to fetch epoch counter by view
+	keys        storage.DKGKeys          // used to fetch DKG private key by epoch
+	signers     map[uint64]module.Signer // cache of signers by epoch
 }
 
 // NewEpochAwareSignerStore instantiates a new EpochAwareSignerStore
@@ -23,14 +23,14 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKe
 	return &EpochAwareSignerStore{
 		epochLookup: epochLookup,
 		keys:        keys,
-		signers:     make(map[uint64]module.ThresholdSigner),
+		signers:     make(map[uint64]module.Signer),
 	}
 }
 
-// GetThresholdSigner returns the threshold-signer for signing objects at a
+// GetSigner returns the threshold-signer for signing objects at a
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
-func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, bool, error) {
+func (s *EpochAwareSignerStore) GetSigner(view uint64) (module.Signer, bool, error) {
 	epoch, err := s.epochLookup.EpochForView(view)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not get epoch by view: %v, %w", view, err)
@@ -67,17 +67,17 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 // keeps one signer and is not epoch-aware. It is used only for the
 // bootstrapping process.
 type SingleSignerStore struct {
-	signer module.ThresholdSigner
+	signer module.Signer
 }
 
 // NewSingleSignerStore instantiates a new SingleSignerStore.
-func NewSingleSignerStore(signer module.ThresholdSigner) *SingleSignerStore {
+func NewSingleSignerStore(signer module.Signer) *SingleSignerStore {
 	return &SingleSignerStore{
 		signer: signer,
 	}
 }
 
 // GetThresholdSigner returns the signer.
-func (s *SingleSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
+func (s *SingleSignerStore) GetSigner(view uint64) (module.Signer, error) {
 	return s.signer, nil
 }

@@ -18,10 +18,10 @@ import (
 // be used to reconstruct a threshold signature.
 type CombinedSignerV2 struct {
 	*CombinedVerifier
-	staking              module.AggregatingSigner
-	merger               module.Merger
-	thresholdSignerStore module.ThresholdSignerStoreV2
-	signerID             flow.Identifier
+	staking        module.AggregatingSigner
+	merger         module.Merger
+	dkgSignerStore module.DKGSignerStore
+	signerID       flow.Identifier
 }
 
 // NewCombinedSignerV2 creates a new combined signer with the given dependencies:
@@ -29,22 +29,22 @@ type CombinedSignerV2 struct {
 // - the staking signer is used to create and verify aggregatable signatures for the first signature part;
 // - the thresholdVerifier is used to verify threshold signatures
 // - the merger is used to join and split the two signature parts on our models;
-// - the thresholdSignerStore is used to get threshold-signers by epoch/view;
+// - the dkgSignerStore is used to get threshold-signers by epoch/view;
 // - the signer ID is used as the identity when creating signatures;
 func NewCombinedSignerV2(
 	committee hotstuff.Committee,
 	staking module.AggregatingSigner,
 	thresholdVerifier module.ThresholdVerifier,
 	merger module.Merger,
-	thresholdSignerStore module.ThresholdSignerStore,
+	dkgSignerStore module.DKGSignerStore,
 	signerID flow.Identifier) *CombinedSignerV2 {
 
 	sc := &CombinedSignerV2{
-		CombinedVerifier:     NewCombinedVerifier(committee, staking, thresholdVerifier, merger),
-		staking:              staking,
-		merger:               merger,
-		thresholdSignerStore: thresholdSignerStore,
-		signerID:             signerID,
+		CombinedVerifier: NewCombinedVerifier(committee, staking, thresholdVerifier, merger),
+		staking:          staking,
+		merger:           merger,
+		dkgSignerStore:   dkgSignerStore,
+		signerID:         signerID,
 	}
 	return sc
 }
@@ -98,7 +98,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beacon, hasBeaconSigner, err := c.thresholdSignerStore.GetThresholdSigner(block.View)
+	beacon, hasBeaconSigner, err := c.dkgSignerStore.GetSigner(block.View)
 	if err != nil {
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
 	}
