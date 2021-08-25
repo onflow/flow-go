@@ -158,7 +158,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 	})
 
 	suite.Run("wrong cluster - with dupes", func() {
-		suite.T().Log("ROUND 4")
+		suite.T().Log("ROUND 4 - CHANGE FOR COMMIT")
 
 		// keep track of which cluster is responsible for which transaction ID
 		txIDsByCluster := [3][]flow.Identifier{{}, {}, {}}
