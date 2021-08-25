@@ -24,8 +24,8 @@ type RandomBeaconSigner interface {
 	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)
 
 
-	// EnoughShares returns whether it has accumulated enough shares to reconstruct
-	// a group signature
+	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
+	// a group signature.
 	EnoughShares() bool
 
 	// SignShare produces a signature share with the internal participant's private key.

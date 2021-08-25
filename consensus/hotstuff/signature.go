@@ -33,8 +33,7 @@ type RandomBeaconReconstructor interface {
 // SigType is the aggregable signature type.
 type SigType int
 
-// There are two signatures are aggregable, one is the normal staking signature,
-// the other is the threshold sig used as staking sigature.
+// SigType specifies the role of the signature in the protocol. SigTypeRandomBeacon type is for random beacon signatures. SigTypeStaking is for Hotstuff sigantures. Both types are aggregatable cryptographic signatures.
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
