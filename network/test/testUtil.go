@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	idModule "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
@@ -122,10 +121,10 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) ([]*p2p.Middleware, []*id.UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) ([]*p2p.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
-	idProviders := make([]*id.UpdatableIDProvider, len(identities))
+	idProviders := make([]*UpdatableIDProvider, len(identities))
 
 	for i, id := range identities {
 		// casts libP2PNode instance to a local variable to avoid closure
@@ -136,7 +135,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			return node, nil
 		}
 
-		idProviders[i] = idModule.NewUpdatableIDProvider(identities)
+		idProviders[i] = NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
@@ -223,7 +222,7 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*id.UpdatableIDProvider) {
+	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, opts...)
 	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes)
