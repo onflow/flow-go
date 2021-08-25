@@ -19,7 +19,6 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network/codec/cbor"
@@ -66,7 +65,7 @@ type MiddlewareTestSuite struct {
 	ids       []*flow.Identity
 	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
 	logger    zerolog.Logger
-	providers []*id.UpdatableIDProvider
+	providers []*UpdatableIDProvider
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
