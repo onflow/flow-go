@@ -29,13 +29,13 @@ type NetworkMetrics interface {
 	ResolverMetrics
 
 	// NetworkMessageSent size in bytes and count of the network message sent
-	NetworkMessageSent(sizeBytes int, topic string, messageType string, targetID string)
+	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
 	// NetworkMessageReceived size in bytes and count of the network message received
-	NetworkMessageReceived(sizeBytes int, topic string, messageType string, originID string)
+	NetworkMessageReceived(sizeBytes int, topic string, messageType string)
 
 	// NetworkDuplicateMessagesDropped counts number of messages dropped due to duplicate detection
-	NetworkDuplicateMessagesDropped(topic string, messageType string, originID string)
+	NetworkDuplicateMessagesDropped(topic string, messageType string)
 
 	// Message receive queue metrics
 	// MessageAdded increments the metric tracking the number of messages in the queue with the given priority
