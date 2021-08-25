@@ -245,6 +245,9 @@ func (e *blockComputer) executeSystemCollection(
 	if err != nil {
 		return txIndex, err
 	}
+
+	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
+
 	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
 	if systemChunkTxResult.ErrorMessage != "" {
 		// This log is used as the data source for an alert on grafana.
@@ -259,8 +262,6 @@ func (e *blockComputer) executeSystemCollection(
 
 		return txIndex, err
 	}
-
-	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
 	return txIndex, err
 }
