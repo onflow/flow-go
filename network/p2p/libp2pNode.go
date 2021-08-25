@@ -41,6 +41,9 @@ const (
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
+
+	// maximum number of milliseconds to wait between attempts for a 1-1 direct connection
+	maxConnectAttemptSleepDuration = 5
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -359,10 +362,11 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 		default:
 		}
 
-		// remove the peer from the peer store if present
-		n.host.Peerstore().ClearAddrs(peerID)
-
-		// cancel the dial back off (if any), since we want to connect immediately
+		// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
+		// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
+		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
+		// immediately without backing off and fail-fast.
+		// Hence, explicitly cancel the dial back off (if any) and try connecting again
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
@@ -371,7 +375,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
 			// choose a random interval between 0 to 5
-			r := rand.Intn(5)
+			// (to ensure that this node and the target node don't attempt to reconnect at the same time)
+			r := rand.Intn(maxConnectAttemptSleepDuration)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
