@@ -18,13 +18,13 @@ func NewPingCollector() *PingCollector {
 	pc := &PingCollector{
 		reachable: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "node_reachable",
-			Namespace: NamespaceNetwork,
+			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "report whether a node is reachable",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
 		sealedHeight: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Name:      "sealed_height",
-			Namespace: NamespaceNetwork,
+			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "the last sealed height of a node",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo, LabelNodeVersion}),
