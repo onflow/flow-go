@@ -112,7 +112,11 @@ type AggregatedSignatureData struct {
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
-	Pack(sig *AggregatedSignatureData) ([]flow.Identifier, []byte, error)
+	// blockID is the block that the aggregated sig is signed for
+	// sig is the aggregated signature data
+	Pack(blockID flow.Identifier, sig *AggregatedSignatureData) ([]flow.Identifier, []byte, error)
 
-	Unpack(signerIDs []flow.Identifier, sigData []byte) (*AggregatedSignatureData, error)
+	// blockID is the block that the aggregated sig is signed for
+	// sig is the aggregated signature data
+	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*AggregatedSignatureData, error)
 }
