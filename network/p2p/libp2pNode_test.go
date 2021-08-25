@@ -250,7 +250,7 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	node1 := nodes[0]
 	node2 := nodes[1]
 
-	// stop node 1 immediately
+	// stop node 2 immediately
 	StopNode(suite.T(), node2)
 	defer StopNode(suite.T(), node1)
 
