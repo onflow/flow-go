@@ -43,6 +43,8 @@ func (suite *DHTTestSuite) TearDownTest() {
 	suite.cancel()
 }
 
+// TestFindPeerWithDHT checks that if a node is configured to participate in the DHT, it is
+// able to create new streams with peers even without knowing their address info beforehand.
 func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 	count := 10
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
@@ -59,11 +61,13 @@ func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 		return peer.AddrInfo{ID: dhtServerNodes[i].host.ID(), Addrs: dhtServerNodes[i].host.Addrs()}
 	}
 
+	// connect even numbered clients to the first DHT server, and odd number clients to the second
 	for i, clientNode := range dhtClientNodes {
 		err := clientNode.host.Connect(suite.ctx, getDhtServerAddr(uint(i%2)))
 		require.NoError(suite.T(), err)
 	}
 
+	// wait for clients to connect to DHT servers and update their routing tables
 	require.Eventually(suite.T(), func() bool {
 		for i, clientNode := range dhtClientNodes {
 			if clientNode.dht.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
@@ -73,16 +77,24 @@ func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 		return true
 	}, time.Second*5, tickForAssertEventually, "nodes failed to connect")
 
+	// connect the two DHT servers to each other
 	err := dhtServerNodes[0].host.Connect(suite.ctx, getDhtServerAddr(1))
 	require.NoError(suite.T(), err)
 
+	// wait for the first server to connect to the second and update its routing table
 	require.Eventually(suite.T(), func() bool {
 		return dhtServerNodes[0].dht.RoutingTable().Find(getDhtServerAddr(1).ID) != ""
 	}, time.Second*5, tickForAssertEventually, "dht servers failed to connect")
 
+	// check that all even numbered clients can create streams with all odd numbered clients
 	for i := 0; i < len(dhtClientNodes); i += 2 {
 		for j := 1; j < len(dhtClientNodes); j += 2 {
+			// client i should not yet know the address of client j, but we clear any addresses
+			// here just in case.
 			dhtClientNodes[i].host.Peerstore().ClearAddrs(dhtClientNodes[j].host.ID())
+
+			// Try to create a stream from client i to client j. This should resort to a DHT
+			// lookup since client i does not know client j's address.
 			_, err = dhtClientNodes[i].CreateStream(suite.ctx, dhtClientNodes[j].host.ID())
 			require.NoError(suite.T(), err)
 		}

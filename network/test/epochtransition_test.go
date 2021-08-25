@@ -120,6 +120,7 @@ func TestEpochTransitionTestSuite(t *testing.T) {
 	t.Skip(fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
 }
 
+// signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
 func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
 	for _, n := range suite.testNodes.nodes {
 		n.mw.UpdateNodeAddresses()
