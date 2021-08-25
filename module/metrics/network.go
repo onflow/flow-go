@@ -35,7 +35,7 @@ func NewNetworkCollector() *NetworkCollector {
 	nc := &NetworkCollector{
 
 		outboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
+			Namespace: NamespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
@@ -43,7 +43,7 @@ func NewNetworkCollector() *NetworkCollector {
 		}, []string{LabelChannel, LabelMessage}),
 
 		inboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
+			Namespace: NamespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
@@ -51,7 +51,7 @@ func NewNetworkCollector() *NetworkCollector {
 		}, []string{LabelChannel, LabelMessage}),
 
 		duplicateMessagesDropped: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
+			Namespace: NamespaceNetwork,
 			Subsystem: subsystemGossip,
 			Name:      "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
@@ -87,37 +87,37 @@ func NewNetworkCollector() *NetworkCollector {
 		}),
 
 		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
 			Name:      "message_queue_size",
 			Help:      "the number of elements in the message receive queue",
 		}, []string{LabelPriority}),
 
 		queueDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
 			Name:      "message_queue_duration_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
 		}, []string{LabelPriority}),
 
 		inboundProcessTime: promauto.NewCounterVec(prometheus.CounterOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
 			Name:      "engine_message_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
 		}, []string{LabelChannel}),
 
 		outboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
 			Name:      "outbound_connection_count",
 			Help:      "the number of outbound connections of this node",
 		}),
 
 		inboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
+			Namespace: NamespaceNetwork,
+			Subsystem: SubsystemQueue,
 			Name:      "inbound_connection_count",
 			Help:      "the number of inbound connections of this node",
 		}),
