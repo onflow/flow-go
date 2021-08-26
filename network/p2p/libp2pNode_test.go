@@ -241,6 +241,33 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 	}
 }
 
+// TestNoBackoffWhenCreateStream checks that backoff is not enabled between attempts to connect to a remote peer
+// for one-to-one direct communication.
+func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
+
+	count := 2
+	// Creates nodes
+	nodes, identities := suite.NodesFixture(count, nil, false)
+	node1 := nodes[0]
+	node2 := nodes[1]
+
+	// stop node 2 immediately
+	StopNode(suite.T(), node2)
+	defer StopNode(suite.T(), node1)
+
+	id2 := identities[1]
+
+	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
+
+	var err error
+	unittest.RequireReturnsBefore(suite.T(), func() {
+		_, err = node1.CreateStream(context.Background(), *id2)
+	}, maxTimeToWait, fmt.Sprintf("create stream did not error within %d ms", maxTimeToWait))
+
+	require.Error(suite.T(), err)
+	require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+}
+
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 
