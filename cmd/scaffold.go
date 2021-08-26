@@ -165,6 +165,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Metrics.Network,
 			pingProvider,
 			node.IdentityProvider,
+			node.IDTranslator,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)

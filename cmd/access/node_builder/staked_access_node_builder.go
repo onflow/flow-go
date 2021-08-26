@@ -44,7 +44,6 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 		}
 
 		fnb.IdentityProvider = idCache
-		// translator
 		fnb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewFilteredIdentifierProvider(
 				filter.And(
@@ -200,7 +199,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			SetConnectionManager(connManager).
 			// act as a DHT server
 			SetDHTOptions(dhtOptions...).
-			SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
+			SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize, builder.IdentityProvider, builder.IDTranslator)...).
 			SetLogger(builder.Logger).
 			Build(ctx)
 		if err != nil {

@@ -17,6 +17,14 @@ type Filter struct {
 	myPeerID     peer.ID
 }
 
+func NewSubscriptionFilter(pid peer.ID, idProvider id.IdentityProvider, idTranslator IDTranslator) *Filter {
+	return &Filter{
+		idProvider,
+		idTranslator,
+		pid,
+	}
+}
+
 func (f *Filter) getIdentity(pid peer.ID) *flow.Identity {
 	fid, err := f.idTranslator.GetFlowID(pid)
 	if err != nil {

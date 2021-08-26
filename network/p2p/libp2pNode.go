@@ -55,7 +55,7 @@ type LibP2PFactoryFunc func() (*Node, error)
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
-	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider, idProvider id.IdentityProvider) (LibP2PFactoryFunc, error) {
+	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider, idProvider id.IdentityProvider, idTranslator IDTranslator) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, idProvider, metrics)
 
@@ -66,7 +66,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
+			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize, idProvider, idTranslator)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			Build(ctx)
@@ -644,7 +644,7 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 // PubsubOption generates a libp2p pubsub.Option from the given context and host
 type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
 
-func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
+func DefaultPubsubOptions(maxPubSubMsgSize int, idProvider id.IdentityProvider, idTranslator IDTranslator) []PubsubOption {
 	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
 		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
 			return option, nil
@@ -658,6 +658,11 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 		// set max message size limit for 1-k PubSub messaging
 		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
+
+		// subscription filter
+		func(_ context.Context, h host.Host) (pubsub.Option, error) {
+			return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), idProvider, idTranslator)), nil
+		},
 	}
 }
 
