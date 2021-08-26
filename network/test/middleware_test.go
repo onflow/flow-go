@@ -58,6 +58,7 @@ func (co *tagsObserver) OnComplete() {
 
 type MiddlewareTestSuite struct {
 	suite.Suite
+	sync.RWMutex
 	size      int               // used to determine number of middlewares under test
 	mws       []*p2p.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
@@ -70,6 +71,7 @@ type MiddlewareTestSuite struct {
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
 func TestMiddlewareTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
@@ -111,16 +113,64 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	}
 }
 
+// TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
+// the addresses of the staked network participants.
+func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
+	// create a new staked identity
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false)
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, false)
+	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
+	require.Len(m.T(), mws, 1)
+	newId := ids[0]
+	newMw := mws[0]
+	// newProvider := providers[0]
+	defer newMw.Stop()
+
+	overlay := m.createOverlay()
+	overlay.On("Receive",
+		m.ids[0].NodeID,
+		mock.AnythingOfType("*message.Message"),
+	).Return(nil)
+	assert.NoError(m.T(), newMw.Start(overlay))
+
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	// needed to enable ID translation
+	m.providers[0].SetIdentities(idList)
+	m.mws[0].UpdateAllowList()
+
+	msg := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+	// message should fail to send because no address is known yet
+	// for the new identity
+	err := m.mws[0].SendDirect(msg, newId.NodeID)
+	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
+
+	// update the addresses
+	m.Lock()
+	m.ids = idList
+	m.Unlock()
+	// newProvider.SetIdentities(idList)
+	// newMw.UpdateAllowList()
+	m.mws[0].UpdateNodeAddresses()
+
+	// now the message should send successfully
+	err = m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
+}
+
 func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
-
-	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
-		return flow.IdentityList(m.ids)
-	}, nil)
-	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
-		return flow.IdentityList(m.ids)
-	}, nil)
+	overlay.On("Identities").Maybe().Return(m.getIds, nil)
+	overlay.On("Topology").Maybe().Return(m.getIds, nil)
 	return overlay
+}
+
+func (m *MiddlewareTestSuite) getIds() flow.IdentityList {
+	m.RLock()
+	defer m.RUnlock()
+	return flow.IdentityList(m.ids)
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
@@ -174,7 +224,6 @@ func (m *MiddlewareTestSuite) TestMultiPing() {
 // expectID and expectPayload are what we expect the receiver side to evaluate the
 // incoming ping against, it can be mocked or typed data
 func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
-
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error
@@ -473,48 +522,6 @@ func (m *MiddlewareTestSuite) TestMaxMessageSize_Publish() {
 	// sends a direct message from first node to the last node
 	err = m.mws[first].Publish(msg, testChannel)
 	require.Error(m.Suite.T(), err)
-}
-
-// TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
-// the addresses of the staked network participants.
-func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
-	// create a new staked identity
-	ids, mws, _, providers := GenerateIDsAndMiddlewares(m.T(), 1, false, m.logger)
-	require.Len(m.T(), ids, 1)
-	require.Len(m.T(), providers, 1)
-	require.Len(m.T(), mws, 1)
-	newId := ids[0]
-	newMw := mws[0]
-	newProvider := providers[0]
-
-	idList := flow.IdentityList(append(m.ids, newId))
-
-	newProvider.SetIdentities(idList)
-	overlay := m.createOverlay()
-	overlay.On("Receive",
-		m.ids[0].NodeID,
-		mock.AnythingOfType("*message.Message"),
-	).Return(nil)
-	assert.NoError(m.T(), newMw.Start(overlay))
-
-	// needed to enable ID translation
-	m.providers[0].SetIdentities(idList)
-	m.mws[0].UpdateAllowList()
-
-	msg := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
-
-	// message should fail to send because no address is known yet
-	// for the new identity
-	err := m.mws[0].SendDirect(msg, newId.NodeID)
-	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
-
-	// update the addresses
-	m.ids = idList
-	m.mws[0].UpdateNodeAddresses()
-
-	// now the message should send successfully
-	err = m.mws[0].SendDirect(msg, newId.NodeID)
-	require.NoError(m.T(), err)
 }
 
 // TestUnsubscribe tests that an engine can unsubscribe from a topic it was earlier subscribed to and stop receiving
