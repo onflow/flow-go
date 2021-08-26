@@ -246,8 +246,6 @@ func (e *blockComputer) executeSystemCollection(
 		return txIndex, err
 	}
 
-	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
-
 	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
 	if systemChunkTxResult.ErrorMessage != "" {
 		// This log is used as the data source for an alert on grafana.
@@ -259,9 +257,9 @@ func (e *blockComputer) executeSystemCollection(
 			Bool("system_chunk_error", true).
 			Bool("critical_error", true).
 			Msg("error executing system chunk transaction")
-
-		return txIndex, err
 	}
+
+	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
 	return txIndex, err
 }
