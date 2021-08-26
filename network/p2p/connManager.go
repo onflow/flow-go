@@ -42,19 +42,31 @@ type ConnManager struct {
 	idProvider id.IdentityProvider
 }
 
-func NewConnManager(log zerolog.Logger, idProvider id.IdentityProvider, metrics module.NetworkMetrics) *ConnManager {
+type ConnManagerOption func(*ConnManager)
+
+func TrackUnstakedConnections(idProvider id.IdentityProvider) ConnManagerOption {
+	return func(cm *ConnManager) {
+		cm.idProvider = idProvider
+	}
+}
+
+func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics, opts ...ConnManagerOption) *ConnManager {
 	cn := &ConnManager{
 		log:                      log,
 		NullConnMgr:              connmgr.NullConnMgr{},
 		metrics:                  metrics,
 		streamSetupInProgressCnt: make(map[peer.ID]int),
-		idProvider:               idProvider,
 	}
 	n := &network.NotifyBundle{ListenCloseF: cn.ListenCloseNotifee,
 		ListenF:       cn.ListenNotifee,
 		ConnectedF:    cn.Connected,
 		DisconnectedF: cn.Disconnected}
 	cn.n = n
+
+	for _, opt := range opts {
+		opt(cn)
+	}
+
 	return cn
 }
 
@@ -93,12 +105,14 @@ func (c *ConnManager) updateConnectionMetric(n network.Network) {
 	var totalOutbound uint = 0
 
 	stakedPeers := make(map[peer.ID]struct{})
-	for _, id := range c.idProvider.Identities(NotEjectedFilter) {
-		pid, err := ExtractPeerID(id.NetworkPubKey)
-		if err != nil {
-			c.log.Fatal().Err(err).Msg("failed to convert network public key of staked node to peer ID")
+	if c.idProvider != nil {
+		for _, id := range c.idProvider.Identities(NotEjectedFilter) {
+			pid, err := ExtractPeerID(id.NetworkPubKey)
+			if err != nil {
+				c.log.Fatal().Err(err).Msg("failed to convert network public key of staked node to peer ID")
+			}
+			stakedPeers[pid] = struct{}{}
 		}
-		stakedPeers[pid] = struct{}{}
 	}
 	for _, conn := range n.Conns() {
 		_, isStaked := stakedPeers[conn.RemotePeer()]
@@ -116,10 +130,12 @@ func (c *ConnManager) updateConnectionMetric(n network.Network) {
 		}
 	}
 
-	c.metrics.InboundConnections(stakedInbound)
-	c.metrics.OutboundConnections(stakedOutbound)
-	c.metrics.UnstakedInboundConnections(totalInbound - stakedInbound)
-	c.metrics.UnstakedOutboundConnections(totalOutbound - stakedOutbound)
+	c.metrics.InboundConnections(totalInbound)
+	c.metrics.OutboundConnections(totalOutbound)
+	if c.idProvider != nil {
+		c.metrics.UnstakedInboundConnections(totalInbound - stakedInbound)
+		c.metrics.UnstakedOutboundConnections(totalOutbound - stakedOutbound)
+	}
 }
 
 func (c *ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
