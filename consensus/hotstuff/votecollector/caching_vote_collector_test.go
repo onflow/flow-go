@@ -14,62 +14,70 @@ import (
 // rejects duplicated votes.
 func TestCachingVoteCollector_AddVote(t *testing.T) {
 	t.Parallel()
-	blockID := unittest.IdentifierFixture()
+	block := unittest.BlockHeaderFixture()
+	blockID := block.ID()
 	t.Run("add-invalid-vote", func(t *testing.T) {
-		collector := NewCachingVoteCollector(NewCollectionBase(blockID))
+		collector := NewCachingVoteCollector(NewCollectionBase(block.View))
 		vote := unittest.VoteFixture()
 		err := collector.AddVote(vote)
 		require.Error(t, err)
-		require.Empty(t, collector.GetVotes())
+		require.Empty(t, collector.GetVotesByBlockID(blockID))
 	})
 	t.Run("add-valid-vote", func(t *testing.T) {
-		collector := NewCachingVoteCollector(NewCollectionBase(blockID))
-		vote := unittest.VoteFixture()
-		vote.BlockID = blockID
+		collector := NewCachingVoteCollector(NewCollectionBase(block.View))
+		vote := unittest.VoteFixture(func(vote *model.Vote) {
+			vote.BlockID = blockID
+			vote.View = block.View
+		})
 		err := collector.AddVote(vote)
 		require.NoError(t, err)
-		require.Equal(t, []*model.Vote{vote}, collector.GetVotes())
+		require.Equal(t, []*model.Vote{vote}, collector.GetVotesByBlockID(blockID))
 	})
 	t.Run("add-duplicated-vote", func(t *testing.T) {
-		collector := NewCachingVoteCollector(NewCollectionBase(blockID))
-		vote := unittest.VoteFixture()
-		vote.BlockID = blockID
+		collector := NewCachingVoteCollector(NewCollectionBase(block.View))
+		vote := unittest.VoteFixture(func(vote *model.Vote) {
+			vote.BlockID = blockID
+			vote.View = block.View
+		})
 		err := collector.AddVote(vote)
 		require.NoError(t, err)
 
 		err = collector.AddVote(vote)
 		require.NoError(t, err)
-		require.Equal(t, []*model.Vote{vote}, collector.GetVotes())
+		require.Equal(t, []*model.Vote{vote}, collector.GetVotesByBlockID(blockID))
 	})
 }
 
 // TestCachingVoteCollector_ProcessingStatus tests that processing status is expected
 func TestCachingVoteCollector_ProcessingStatus(t *testing.T) {
 	t.Parallel()
-	collector := NewCachingVoteCollector(NewCollectionBase(unittest.IdentifierFixture()))
+	collector := NewCachingVoteCollector(NewCollectionBase(100))
 	require.Equal(t, hotstuff.VoteCollectorStatus(hotstuff.VoteCollectorStatusCaching), collector.Status())
 }
 
 // TestCachingVoteCollector_BlockID tests that blockID is expected
 func TestCachingVoteCollector_BlockID(t *testing.T) {
 	t.Parallel()
-	blockID := unittest.IdentifierFixture()
-	collector := NewCachingVoteCollector(NewCollectionBase(blockID))
-	require.Equal(t, blockID, collector.BlockID())
+	block := unittest.BlockHeaderFixture()
+	collector := NewCachingVoteCollector(NewCollectionBase(block.View))
+	require.Equal(t, block.View, collector.View())
 }
 
 // TestCachingVoteCollector_GetVotes tests that GetVotes returns all previously cached votes
 func TestCachingVoteCollector_GetVotes(t *testing.T) {
 	t.Parallel()
-	blockID := unittest.IdentifierFixture()
-	collector := NewCachingVoteCollector(NewCollectionBase(blockID))
+	block := unittest.BlockHeaderFixture()
+	blockID := block.ID()
+	collector := NewCachingVoteCollector(NewCollectionBase(block.View))
 	expectedVotes := make([]*model.Vote, 5)
 	for i := range expectedVotes {
-		vote := unittest.VoteFixture()
-		vote.BlockID = blockID
+		vote := unittest.VoteFixture(func(vote *model.Vote) {
+			vote.BlockID = blockID
+			vote.View = block.View
+		})
 		expectedVotes[i] = vote
 		err := collector.AddVote(vote)
 		require.NoError(t, err)
 	}
-	require.ElementsMatch(t, expectedVotes, collector.GetVotes())
+	require.ElementsMatch(t, expectedVotes, collector.GetVotesByBlockID(blockID))
 }
