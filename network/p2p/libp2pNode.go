@@ -25,6 +25,7 @@ import (
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -44,6 +45,9 @@ const (
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
 
+	// maximum number of milliseconds to wait between attempts for a 1-1 direct connection
+	maxConnectAttemptSleepDuration = 5
+
 	// timeout for FindPeer queries to the DHT
 	// TODO: is this a sensible value?
 	findPeerQueryTimeout = 10 * time.Second
@@ -61,6 +65,12 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 
 	connGater := NewConnGater(log)
 
+	// TODO: uncomment following lines to activate dns caching
+	//resolver, err := dns.NewResolver(metrics)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	//}
+
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
@@ -69,6 +79,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
+			// SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
@@ -81,6 +92,7 @@ type NodeBuilder interface {
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetDHTOptions(...dht.Option) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
+	SetResolver(resolver *madns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -91,6 +103,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
+	resolver         *madns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -144,6 +157,11 @@ func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBu
 	return builder
 }
 
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) NodeBuilder {
+	builder.resolver = resolver
+	return builder
+}
+
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
 		id:     builder.id,
@@ -184,6 +202,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
+	}
+
+	if builder.resolver != nil { // sets DNS resolver
+		opts = append(opts, libp2p.MultiaddrResolver(builder.resolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -381,7 +403,11 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		default:
 		}
 
-		// cancel the dial back off (if any), since we want to connect immediately
+		// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
+		// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
+		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
+		// immediately without backing off and fail-fast.
+		// Hence, explicitly cancel the dial back off (if any) and try connecting again
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
@@ -390,7 +416,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
 			// choose a random interval between 0 to 5
-			r := rand.Intn(5)
+			// (to ensure that this node and the target node don't attempt to reconnect at the same time)
+			r := rand.Intn(maxConnectAttemptSleepDuration)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
@@ -575,7 +602,8 @@ func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
+func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
+	error) {
 	defaultOptions, err := DefaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err

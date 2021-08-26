@@ -19,6 +19,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const blockCount = 5 // number of finalized blocks to wait for
+
 type UnstakedAccessSuite struct {
 	suite.Suite
 
@@ -26,11 +28,12 @@ type UnstakedAccessSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	net        *testnet.FlowNetwork
-	stakedID   flow.Identifier
-	unstakedID flow.Identifier
-	conID      flow.Identifier
-	follower   consensus_follower.ConsensusFollower
+	net                   *testnet.FlowNetwork
+	stakedID              flow.Identifier
+	unstakedID            flow.Identifier
+	conID                 flow.Identifier
+	follower              consensus_follower.ConsensusFollower
+	finalizedBlockIDsChan chan flow.Identifier
 }
 
 func TestUnstakedAccessSuite(t *testing.T) {
@@ -48,20 +51,66 @@ func (suite *UnstakedAccessSuite) TearDownTest() {
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
+	suite.finalizedBlockIDsChan = make(chan flow.Identifier, blockCount)
 	suite.buildNetworkConfig()
 	// start the network
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.net.Start(suite.ctx)
 }
 
+// TestReceiveBlocks tests that consensus follower follows the chain and persists blocks in storage
 func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
-	go suite.follower.Run(suite.ctx)
-	// TODO: to be implemented later
-	time.Sleep(time.Second * 30)
+	ctx, cancel := context.WithCancel(suite.ctx)
+	defer cancel()
+	// kick off the follower
+	go suite.follower.Run(ctx)
+
+	followerImpl, ok := suite.follower.(*consensus_follower.ConsensusFollowerImpl)
+	if !ok {
+		suite.Fail("unexpected consensus follower implementation")
+		return
+	}
+
+	// get the underlying node builder
+	node := followerImpl.NodeBuilder
+	// wait for the follower to have completely started
+	unittest.RequireCloseBefore(suite.T(), node.Ready(), 10*time.Second,
+		"timed out while waiting for consensus follower to start")
+
+	// get the underlying storage that the follower is using
+	storage := node.Storage
+	require.NotNil(suite.T(), storage)
+	blocks := storage.Blocks
+	require.NotNil(suite.T(), blocks)
+
+	rcvdBlockCnt := 0
+	var err error
+	receiveBlocks := func() {
+		for ; rcvdBlockCnt < blockCount; rcvdBlockCnt++ {
+			select {
+			case blockID := <-suite.finalizedBlockIDsChan:
+				_, err = blocks.ByID(blockID)
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+
+	// wait for finalized blocks
+	unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 1*time.Minute) // waiting 1 minute for 5 blocks
+
+	// all blocks were found in the storage
+	require.NoError(suite.T(), err, "finalized block not found in storage")
+
+	// assert that blockCount number of blocks were received
+	require.Equal(suite.T(), blockCount, rcvdBlockCnt)
+
 }
 
 func (suite *UnstakedAccessSuite) OnBlockFinalizedConsumer(finalizedBlockID flow.Identifier) {
-	fmt.Println(finalizedBlockID.String())
+	// push the finalized block ID to the finalizedBlockIDsChan channel
+	suite.finalizedBlockIDsChan <- finalizedBlockID
 }
 
 func (suite *UnstakedAccessSuite) buildNetworkConfig() {

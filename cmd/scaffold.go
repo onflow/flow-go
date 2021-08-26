@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
@@ -435,6 +436,14 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
 		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
+		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+			filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				p2p.NotEjectedFilter,
+			),
+			idCache,
+		)
 		return nil
 	})
 }
@@ -576,7 +585,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
 			fvm.WithTransactionFeesEnabled(true),

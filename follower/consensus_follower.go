@@ -102,7 +102,7 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 }
 
 type ConsensusFollowerImpl struct {
-	nodeBuilder *access.UnstakedAccessNodeBuilder
+	NodeBuilder *access.UnstakedAccessNodeBuilder
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
 }
@@ -127,7 +127,7 @@ func NewConsensusFollower(
 	accessNodeOptions := getAccessNodeOptions(config)
 
 	anb := buildAccessNode(accessNodeOptions)
-	consensusFollower := &ConsensusFollowerImpl{nodeBuilder: anb}
+	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
@@ -154,7 +154,7 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 
 // Run starts the consensus follower.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	runAccessNode(ctx, cf.nodeBuilder)
+	runAccessNode(ctx, cf.NodeBuilder)
 }
 
 func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
