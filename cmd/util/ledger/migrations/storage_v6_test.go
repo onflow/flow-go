@@ -85,21 +85,21 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		newValue, err := slab.StoredValue(migration.storage)
+		newValue, err := newInter.StoredValue(slab, migration.storage)
 		require.NoError(t, err)
 
-		assert.IsType(t, &atree.Array{}, newValue)
-		array := newValue.(*atree.Array)
+		assert.IsType(t, &newInter.ArrayValue{}, newValue)
+		array := newValue.(*newInter.ArrayValue)
 
-		value, err := array.Get(0)
+		value := array.GetIndex(nil, 0)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.NewStringValue("foo"), value)
 
-		value, err = array.Get(1)
+		value = array.GetIndex(nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.NewStringValue("bar"), value)
 
-		value, err = array.Get(2)
+		value = array.GetIndex(nil, 2)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
