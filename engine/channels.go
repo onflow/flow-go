@@ -90,6 +90,13 @@ func Channels() network.ChannelList {
 	return channels
 }
 
+func UnstakedChannels() network.ChannelList {
+	return network.ChannelList{
+		UnstakedSyncCommittee,
+		ReceiveBlocks,
+	}
+}
+
 // channels
 const (
 
