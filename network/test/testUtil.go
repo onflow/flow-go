@@ -83,7 +83,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 }
 
 func NewTagWatchingConnManager(log zerolog.Logger, idProvider idModule.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
-	cm := p2p.NewConnManager(log, idProvider, metrics)
+	cm := p2p.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
 		observers:   make(map[observable.Observer]struct{}),
