@@ -6,7 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 type voteCollectors struct {
@@ -17,7 +16,7 @@ type voteCollectors struct {
 var _ hotstuff.VoteCollectors = &voteCollectors{}
 
 // GetOrCreateCollector performs lazy initialization of collectors based on their view
-func (v *voteCollectors) GetOrCreateCollector(view uint64, blockID flow.Identifier) (hotstuff.VoteCollector, bool, error) {
+func (v *voteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	panic("implement me")
 }
 
