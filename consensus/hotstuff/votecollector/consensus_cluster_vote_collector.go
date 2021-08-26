@@ -54,7 +54,7 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
 	// handle InvalidVoteError
 	if err != nil {
-		return fmt.Errorf("could parse vote signature type: %w", err)
+		return fmt.Errorf("could not parse vote signature type: %w", err)
 	}
 
 	valid, err := c.validateSignature(vote.SignerID, sigType, sig)
