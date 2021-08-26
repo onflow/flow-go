@@ -13,3 +13,10 @@ type BasicResolver interface {
 	LookupIPAddr(context.Context, string) ([]net.IPAddr, error)
 	LookupTXT(context.Context, string) ([]string, error)
 }
+
+type ResolverRequester interface {
+	RequestIPAddr(context.Context, string) bool
+	RequestTXT(context.Context, string) bool
+	WithIPHandler(func([]net.IPAddr, error))
+	WithTXTHandler(func([]string, error))
+}
