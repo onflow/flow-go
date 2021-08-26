@@ -191,7 +191,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 		myAddr = builder.BaseConfig.BindAddr
 	}
 
-	connManager := p2p.NewConnManager(builder.Logger, builder.IdentityProvider, builder.Metrics.Network)
+	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
