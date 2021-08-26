@@ -8,14 +8,14 @@ import (
 
 // defaultTimeToLive is the default duration a dns result is cached.
 const (
-	defaultTimeToLive     = 5 * time.Minute
-	cacheEntryExists      = true
-	cacheEntryInvalidated = true
+	defaultTimeToLive = 5 * time.Minute
+	cacheEntryExists  = true
+	cacheEntryExpired = true
 )
 
 // cache is a ttl-based cache for dns entries
 type cache struct {
-	sync.Mutex
+	sync.RWMutex
 	ttl      time.Duration // time-to-live for cache entry
 	ipCache  map[string]*ipCacheEntry
 	txtCache map[string]*txtCacheEntry
@@ -31,42 +31,44 @@ func newCache() *cache {
 
 // resolveIPCache resolves the domain through the cache if it is available.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
 
 	entry, ok := c.ipCache[domain]
 
 	if !ok {
-		return nil, !cacheEntryExists, !cacheEntryInvalidated
+		// does not exist
+		return nil, !cacheEntryExists, !cacheEntryExpired
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
-		// invalidates cache entry
-		delete(c.ipCache, domain)
-		return nil, !cacheEntryExists, cacheEntryInvalidated
+		// exists but expired
+		return entry.addresses, !cacheEntryExists, cacheEntryExpired
 	}
 
-	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
+	// exists and fresh
+	return entry.addresses, cacheEntryExists, !cacheEntryExpired
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
+	defer c.RUnlock()
 
 	entry, ok := c.txtCache[txt]
 
 	if !ok {
-		return nil, !cacheEntryExists, !cacheEntryInvalidated
+		// does not exist
+		return nil, !cacheEntryExists, !cacheEntryExpired
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
-		// invalidates cache entry
-		delete(c.txtCache, txt)
-		return nil, !cacheEntryExists, cacheEntryInvalidated
+		// exists but expired
+		return entry.addresses, !cacheEntryExists, cacheEntryExpired
 	}
 
-	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
+	// exists and fresh
+	return entry.addresses, cacheEntryExists, !cacheEntryExpired
 }
 
 // updateIPCache updates the cache entry for the domain.
