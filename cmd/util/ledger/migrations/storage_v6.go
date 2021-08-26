@@ -28,7 +28,7 @@ const cborTagStorageReference = 202
 
 var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
 
-var storageMigrationV5DecMode = func() cbor.DecMode {
+var storageMigrationV6DecMode = func() cbor.DecMode {
 	decMode, err := cbor.DecOptions{
 		IntDec:           cbor.IntDecConvertNone,
 		MaxArrayElements: math.MaxInt32,
@@ -57,6 +57,48 @@ type storageFormatV6MigrationResult struct {
 	err     error
 }
 
+var _ atree.BaseStorage = &EncodingStorage{}
+
+type EncodingStorage struct {
+	*atree.InMemBaseStorage
+	Payloads []ledger.Payload
+}
+
+func NewEncodingStorage() *EncodingStorage {
+	return &EncodingStorage{
+		InMemBaseStorage: atree.NewInMemBaseStorage(),
+		Payloads:         make([]ledger.Payload, 0),
+	}
+}
+
+func (e *EncodingStorage) Store(id atree.StorageID, value []byte) error {
+	err := e.InMemBaseStorage.Store(id, value)
+	if err != nil {
+		return err
+	}
+
+	// Add the encoded content to the payloads
+
+	payload := ledger.Payload{
+
+		//TODO: Properly convert storageID to ledger.Key
+		Key: ledger.NewKey([]ledger.KeyPart{
+			ledger.NewKeyPart(0, id.Address[:]),
+			ledger.NewKeyPart(1, id.Index[:]),
+		}),
+
+		// TODO: Still need to prepend magic number?
+		Value: newInter.PrependMagic(
+			value,
+			newInter.CurrentEncodingVersion,
+		),
+	}
+
+	e.Payloads = append(e.Payloads, payload)
+
+	return nil
+}
+
 type brokenTypeCause int
 
 type StorageFormatV6Migration struct {
@@ -66,7 +108,8 @@ type StorageFormatV6Migration struct {
 	programs      *programs.Programs
 	brokenTypeIDs map[common.TypeID]brokenTypeCause
 	reportFile    *os.File
-	storage       newInter.Storage
+	storage       *atree.PersistentSlabStorage
+	baseStorage   *EncodingStorage
 }
 
 func (m StorageFormatV6Migration) filename() string {
@@ -100,9 +143,9 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.programs = programs.NewEmptyPrograms()
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
 
-	m.storage = newInter.NewInMemoryStorage()
-
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
+
+	m.initStorage()
 
 	for _, payload := range payloads {
 
@@ -122,14 +165,45 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 				result.err,
 			)
 		} else if result.payload != nil {
-			migratedPayloads = append(migratedPayloads, *result.payload)
+			// NO-OP. Add all encoded values later.
+
+			// migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
 			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 		}
 	}
 
+	err = m.storage.Commit()
+	if err != nil {
+		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
+	}
+
+	for _, payload := range m.baseStorage.Payloads {
+		migratedPayloads = append(migratedPayloads, payload)
+	}
+
 	return migratedPayloads, nil
+}
+
+func (m *StorageFormatV6Migration) initStorage() {
+	encMode, err := cbor.EncOptions{}.EncMode()
+	if err != nil {
+		panic(err)
+	}
+
+	decMode, err := cbor.DecOptions{}.DecMode()
+	if err != nil {
+		panic(err)
+	}
+
+	m.baseStorage = NewEncodingStorage()
+
+	m.storage = atree.NewPersistentSlabStorage(
+		m.baseStorage,
+		encMode,
+		decMode,
+	)
 }
 
 func (m StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
@@ -216,28 +290,14 @@ func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledg
 			)
 	}
 
-	err := storageMigrationV5DecMode.Valid(value)
+	err := storageMigrationV6DecMode.Valid(value)
 	if err != nil {
 		return &payload, nil
 	}
 
-	// Delete known dead or orphaned contract value child keys
-
-	//if m.isOrphanContactValueChildKey(
-	//	rawKey,
-	//	flow.BytesToAddress(rawOwner),
-	//) {
-	//	m.Log.Warn().Msgf(
-	//		"DELETING orphaned contract value child key: %s (owner: %x)",
-	//		string(rawKey), rawOwner,
-	//	)
-	//
-	//	return nil, nil
-	//}
-
 	// Extract the owner from the key
 
-	newValue, keep, err := m.reencodeValue(
+	err = m.reencodeValue(
 		value,
 		common.BytesToAddress(rawOwner),
 		string(rawKey),
@@ -254,30 +314,18 @@ func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledg
 			)
 	}
 
-	if !keep {
-		return nil, nil
-	}
-
-	payload.Value = newInter.PrependMagic(
-		newValue,
-		newInter.CurrentEncodingVersion,
-	)
-
 	return &payload, nil
 }
 
 // Re-encodes the value to the new storage format, using following steps:
 //   - Decode to old value
 //   - Covert value from old to new
-//   - Encode the new value.
 func (m StorageFormatV6Migration) reencodeValue(
 	data []byte,
 	owner common.Address,
 	key string,
 	version uint16,
 ) (
-	newData []byte,
-	keep bool,
 	err error,
 ) {
 
@@ -296,10 +344,10 @@ func (m StorageFormatV6Migration) reencodeValue(
 				Str("owner", owner.String()).
 				Msgf("DELETING unsupported storage reference")
 
-			return nil, false, nil
+			return nil
 
 		} else {
-			return nil, false, fmt.Errorf(
+			return fmt.Errorf(
 				"failed to decode value: %w\n\nvalue:\n%s\n",
 				err, hex.Dump(data),
 			)
@@ -326,37 +374,9 @@ func (m StorageFormatV6Migration) reencodeValue(
 	// Convert old value to new value
 
 	converter := NewValueConverter(m.storage)
-	newValue := converter.Convert(rootValue)
+	_ = converter.Convert(rootValue)
 
-	// Encode the new value
-
-	storable, ok := interface{}(newValue).(atree.Storable)
-	if !ok {
-		// TODO: encode
-		// Return the original value as is for now.
-		return data, true, nil
-
-		//return nil, false,
-		//	fmt.Errorf("non-storable value at key: %s\nvalue type: %s\n",
-		//		key,
-		//		reflect.TypeOf(newValue),
-		//	)
-	}
-
-	var buf bytes.Buffer
-	enc := atree.NewEncoder(&buf, CBOREncMode)
-
-	err = storable.Encode(enc)
-	if err != nil {
-		return nil, false, err
-	}
-
-	err = enc.CBOR.Flush()
-	if err != nil {
-		return nil, false, err
-	}
-
-	return buf.Bytes(), true, nil
+	return nil
 }
 
 func cborMeLink(value []byte) string {
@@ -367,12 +387,12 @@ func cborMeLink(value []byte) string {
 //
 type ValueConverter struct {
 	result  newInter.Value
-	storage newInter.Storage
+	storage atree.SlabStorage
 }
 
 var _ oldInter.Visitor = &ValueConverter{}
 
-func NewValueConverter(storage newInter.Storage) *ValueConverter {
+func NewValueConverter(storage atree.SlabStorage) *ValueConverter {
 	return &ValueConverter{
 		storage: storage,
 	}
@@ -423,7 +443,12 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
 
-	c.result = newInter.NewArrayValue(arrayStaticType, c.storage, newElements...)
+	c.result = newInter.NewArrayValueWithAddress(
+		arrayStaticType,
+		c.storage,
+		*value.Owner,
+		newElements...,
+	)
 
 	// Do not descent. We already visited children here.
 	return false
