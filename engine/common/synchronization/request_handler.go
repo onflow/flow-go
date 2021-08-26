@@ -45,6 +45,8 @@ type RequestHandlerEngine struct {
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
 	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
+
+	queueMissingHeights bool // true if missing heights should be added to download queue
 }
 
 func NewRequestHandlerEngine(
@@ -55,17 +57,19 @@ func NewRequestHandlerEngine(
 	blocks storage.Blocks,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
+	queueMissingHeights bool,
 ) *RequestHandlerEngine {
 	r := &RequestHandlerEngine{
-		unit:            engine.NewUnit(),
-		lm:              lifecycle.NewLifecycleManager(),
-		me:              me,
-		log:             log.With().Str("engine", "synchronization").Logger(),
-		metrics:         metrics,
-		blocks:          blocks,
-		core:            core,
-		finalizedHeader: finalizedHeader,
-		con:             con,
+		unit:                engine.NewUnit(),
+		lm:                  lifecycle.NewLifecycleManager(),
+		me:                  me,
+		log:                 log.With().Str("engine", "synchronization").Logger(),
+		metrics:             metrics,
+		blocks:              blocks,
+		core:                core,
+		finalizedHeader:     finalizedHeader,
+		con:                 con,
+		queueMissingHeights: queueMissingHeights,
 	}
 
 	r.setupRequestMessageHandler()
@@ -175,8 +179,10 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
 	final := r.finalizedHeader.Get()
 
-	// queue any missing heights as needed
-	r.core.HandleHeight(final, req.Height)
+	if r.queueMissingHeights {
+		// queue any missing heights as needed
+		r.core.HandleHeight(final, req.Height)
+	}
 
 	// don't bother sending a response if we're within tolerance or if we're
 	// behind the requester

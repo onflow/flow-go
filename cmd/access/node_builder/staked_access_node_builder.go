@@ -119,6 +119,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 					node.Storage.Blocks,
 					anb.SyncCore,
 					anb.FinalizedHeader,
+					false,
 				)
 
 				// register the sync request handler with the proxy engine
