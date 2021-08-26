@@ -17,7 +17,7 @@ var (
 )
 
 // NewVerifyingCollectorFactoryMethod is a factory method to generate a hotstuff.VoteCollectorState
-type NewVerifyingCollectorFactoryMethod = func(base CollectionBase) (hotstuff.VoteCollectorState, error)
+type NewVerifyingCollectorFactoryMethod = func(base CollectionBase, block *model.Block) (hotstuff.VerifyingVoteCollector, error)
 
 // StateMachine implements a state machine for transition between different states of vote collector
 type StateMachine struct {
@@ -92,20 +92,26 @@ func (m *StateMachine) Status() hotstuff.VoteCollectorStatus {
 //         CachingVotes   -> VerifyingVotes
 //         CachingVotes   -> Invalid
 //         VerifyingVotes -> Invalid
-func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.VoteCollectorStatus) error {
+func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.VoteCollectorStatus, payload interface{}) error {
 	// don't transition between same states
 	if currentStatus == newStatus {
 		return nil
 	}
 
 	if (currentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
-		cachingCollector, err := m.caching2Verifying()
+		block, ok := payload.(*model.Block)
+		if !ok {
+			return fmt.Errorf("invalid payload %v, expected *model.Block", payload)
+		}
+
+		cachingCollector, err := m.caching2Verifying(block)
 		if err != nil {
 			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", currentStatus.String(), newStatus.String(), err)
 		}
 
+		blockID := block.BlockID
 		m.workerPool.Submit(func() {
-			for _, vote := range cachingCollector.GetVotes() {
+			for _, vote := range cachingCollector.GetVotesByBlockID(blockID) {
 				task := m.reIngestVoteTask(vote)
 				m.workerPool.Submit(task)
 			}
@@ -124,8 +130,7 @@ func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
 	// TODO: implement logic for validating block proposal, converting it to vote and further processing
 
 	block := proposal.Block
-	currentStatus := m.Status()
-	err := m.ChangeProcessingStatus(currentStatus, hotstuff.VoteCollectorStatusVerifying)
+	err := m.ChangeProcessingStatus(m.Status(), hotstuff.VoteCollectorStatusVerifying, proposal.Block)
 	if err != nil {
 		return fmt.Errorf("could not change processing status for block %x: %w", block.BlockID, err)
 	}
@@ -154,7 +159,7 @@ func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
 // * CachingVoteCollector as of before the update
 // * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-func (m *StateMachine) caching2Verifying() (*CachingVoteCollector, error) {
+func (m *StateMachine) caching2Verifying(block *model.Block) (*CachingVoteCollector, error) {
 	m.Lock()
 	defer m.Unlock()
 	clr := m.atomicLoadCollector()
@@ -163,7 +168,7 @@ func (m *StateMachine) caching2Verifying() (*CachingVoteCollector, error) {
 		return nil, fmt.Errorf("collector's current state is %s: %w", clr.Status().String(), ErrDifferentCollectorState)
 	}
 
-	verifyingCollector, err := m.createVerifyingCollector(m.CollectionBase)
+	verifyingCollector, err := m.createVerifyingCollector(m.CollectionBase, block)
 	if err != nil {
 		return nil, fmt.Errorf("could not create verifying vote collector")
 	}

@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -38,6 +39,6 @@ func (c *CachingVoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusCaching
 }
 
-func (c *CachingVoteCollector) GetVotes() []*model.Vote {
-	return c.pendingVotes.All()
+func (c *CachingVoteCollector) GetVotesByBlockID(blockID flow.Identifier) []*model.Vote {
+	return c.pendingVotes.ByBlockID(blockID)
 }

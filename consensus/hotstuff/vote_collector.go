@@ -41,21 +41,6 @@ func (ps VoteCollectorStatus) String() string {
 
 type VoteCollector interface {
 	VoteCollectorState
-	// ChangeProcessingStatus changes the VoteCollector's internal processing
-	// status. The operation is implemented as an atomic compare-and-swap, i.e. the
-	// state transition is only executed if VoteCollector's internal state is
-	// equal to `expectedValue`. The return indicates whether the state was updated.
-	// The implementation only allows the transitions
-	//         CachingVotes   -> VerifyingVotes
-	//         CachingVotes   -> Invalid
-	//         VerifyingVotes -> Invalid
-	// Error returns:
-	// * nil if the state transition was successfully executed
-	// * ErrDifferentCollectorState if the VoteCollector's state is different than expectedCurrentStatus
-	// * ErrInvalidCollectorStateTransition if the given state transition is impossible
-	// * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-	ChangeProcessingStatus(expectedValue, newValue VoteCollectorStatus) error
-
 	// ProcessBlock performs validation of block signature and processes block with respected collector.
 	// Calling this function will mark conflicting collector as stale and change state of valid collectors
 	// It returns nil if the block is valid.
@@ -87,6 +72,10 @@ type VoteCollectorState interface {
 // map and produce the vote.
 // Note CachingVoteCollector can't create vote, only VerifyingVoteCollector can
 type VerifyingVoteCollector interface {
-	VoteCollector
+	VoteCollectorState
 	BlockSigner
+
+	// Block returns block that will be used to collector votes for. Transition to VerifyingVoteCollector can occur only
+	// when we have received block proposal so this information has to be available.
+	Block() *model.Block
 }

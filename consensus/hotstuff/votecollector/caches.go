@@ -38,6 +38,17 @@ func (ps *PendingVotes) All() []*model.Vote {
 	return votes
 }
 
+func (ps *PendingVotes) ByBlockID(blockID flow.Identifier) []*model.Vote {
+	orderedVotes := ps.All()
+	votes := make([]*model.Vote, 0)
+	for _, vote := range orderedVotes {
+		if vote.BlockID == blockID {
+			votes = append(votes, vote)
+		}
+	}
+	return votes
+}
+
 // NewPendingVotes creates a PendingVotes instance
 func NewPendingVotes() *PendingVotes {
 	return &PendingVotes{voteMap: make(map[flow.Identifier]struct{})}

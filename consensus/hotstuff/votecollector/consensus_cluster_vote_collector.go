@@ -15,6 +15,7 @@ import (
 type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
+	block         *model.Block
 	validator     *sigvalidator.ConsensusSigValidator
 	combinedAggr  hotstuff.CombinedSigAggregator
 	reconstructor hotstuff.RandomBeaconReconstructor
@@ -22,10 +23,16 @@ type ConsensusClusterVoteCollector struct {
 	done          atomic.Bool
 }
 
-func NewConsensusClusterVoteCollector(base CollectionBase) *ConsensusClusterVoteCollector {
+var _ hotstuff.VerifyingVoteCollector = &ConsensusClusterVoteCollector{}
+
+func NewConsensusClusterVoteCollector(base CollectionBase, block *model.Block) *ConsensusClusterVoteCollector {
 	return &ConsensusClusterVoteCollector{
 		CollectionBase: base,
 	}
+}
+
+func (c *ConsensusClusterVoteCollector) Block() *model.Block {
+	return c.block
 }
 
 // CreateVote implements BlockSigner interface for creating votes from block proposals
@@ -49,7 +56,7 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	}
 
 	// after we have checked vote signature, let's track this vote to detect double voting
-	err = c.doubleVoteDetector.AddVote(vote)
+	err = c.doubleVoteDetector.TrustedAdd(vote)
 	// either way if it's exception or a sentinel error we need to return with error
 	if err != nil {
 		return err
