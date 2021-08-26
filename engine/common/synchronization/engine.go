@@ -106,7 +106,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
