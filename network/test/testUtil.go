@@ -94,7 +94,7 @@ func NewTagWatchingConnManager(log zerolog.Logger, metrics module.NetworkMetrics
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
-func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode, connGating bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
@@ -108,7 +108,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key)
+			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, connGating)
 
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
@@ -122,7 +122,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node) ([]*p2p.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, enablePeerManagementAndConnectionGating bool) ([]*p2p.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
@@ -146,8 +146,8 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			rootBlockID,
 			p2p.DefaultPeerUpdateInterval,
 			p2p.DefaultUnicastTimeout,
-			true,
-			true,
+			enablePeerManagementAndConnectionGating,
+			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			p2p.WithIdentifierProvider(
 				idProviders[i],
@@ -225,8 +225,8 @@ func GenerateIDsAndMiddlewares(t *testing.T,
 	dryRunMode bool,
 	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
-	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, opts...)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes)
+	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, true, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, true)
 	return ids, mws, protectObservables, providers
 }
 
@@ -258,7 +258,9 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
-	key crypto.PrivateKey) (*p2p.Node, observable.Observable) {
+	key crypto.PrivateKey,
+	connGating bool,
+) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
@@ -267,7 +269,10 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
 	ctx := context.Background()
-	connGater := p2p.NewConnGater(logger)
+	var connGater *p2p.ConnGater = nil
+	if connGating {
+		connGater = p2p.NewConnGater(logger)
+	}
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, noopMetrics)
 
