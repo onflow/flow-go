@@ -73,7 +73,7 @@ type Middleware struct {
 	libP2PNodeFactory          LibP2PFactoryFunc
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
-	rootBlockID                string
+	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
 	peerManager                *PeerManager
 	peerUpdateInterval         time.Duration
@@ -113,7 +113,7 @@ func NewMiddleware(
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
-	rootBlockID string,
+	rootBlockID flow.Identifier,
 	peerUpdateInterval time.Duration,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,

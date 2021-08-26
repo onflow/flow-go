@@ -15,13 +15,15 @@ type Filter struct {
 	idProvider   id.IdentityProvider
 	idTranslator IDTranslator
 	myPeerID     peer.ID
+	rootBlockID  flow.Identifier
 }
 
-func NewSubscriptionFilter(pid peer.ID, idProvider id.IdentityProvider, idTranslator IDTranslator) *Filter {
+func NewSubscriptionFilter(pid peer.ID, rootBlockID flow.Identifier, idProvider id.IdentityProvider, idTranslator IDTranslator) *Filter {
 	return &Filter{
 		idProvider,
 		idTranslator,
 		pid,
+		rootBlockID,
 	}
 }
 
@@ -40,31 +42,45 @@ func (f *Filter) getIdentity(pid peer.ID) *flow.Identity {
 	return identities[0]
 }
 
-func (f *Filter) allowedChannels(pid peer.ID) network.ChannelList {
+func (f *Filter) allowedTopics(pid peer.ID) []network.Topic {
 	id := f.getIdentity(pid)
 
+	var channels network.ChannelList
+
 	if id == nil {
-		return engine.UnstakedChannels()
+		channels = engine.UnstakedChannels()
+	} else {
+		channels = engine.ChannelsByRole(id.Role)
 	}
 
-	return engine.ChannelsByRole(id.Role)
+	var topics []network.Topic
+
+	for _, ch := range channels {
+		topics = append(topics, engine.TopicFromChannel(ch, f.rootBlockID))
+	}
+
+	return topics
 }
 
 func (f *Filter) CanSubscribe(topic string) bool {
-	// TODO: check if this is correct
-	channel := network.Channel(topic)
+	for _, allowedTopic := range f.allowedTopics(f.myPeerID) {
+		if topic == allowedTopic.String() {
+			return true
+		}
+	}
 
-	return f.allowedChannels(f.myPeerID).Contains(channel)
+	return false
 }
 
 func (f *Filter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
-	allowedChannels := f.allowedChannels(from)
+	allowedTopics := f.allowedTopics(from)
 	var filtered []*pb.RPC_SubOpts
 
 	for _, opt := range opts {
-		channel := network.Channel(*opt.Topicid)
-		if allowedChannels.Contains(channel) {
-			filtered = append(filtered, opt)
+		for _, allowedTopic := range allowedTopics {
+			if *opt.Topicid == allowedTopic.String() {
+				filtered = append(filtered, opt)
+			}
 		}
 	}
 

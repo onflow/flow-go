@@ -54,7 +54,7 @@ type LibP2PFactoryFunc func() (*Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
+func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID flow.Identifier,
 	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider, idProvider id.IdentityProvider, idTranslator IDTranslator) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, idProvider, metrics)
@@ -66,7 +66,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize, idProvider, idTranslator)...).
+			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize, idProvider, idTranslator, rootBlockID)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			Build(ctx)
@@ -74,7 +74,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(string) NodeBuilder
+	SetRootBlockID(flow.Identifier) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
@@ -86,7 +86,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      string
+	rootBlockID      flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
@@ -114,7 +114,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeB
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
 	builder.rootBlockID = rootBlockId
 	return builder
 }
@@ -160,7 +160,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == "" {
+	if builder.rootBlockID == flow.ZeroID {
 		return nil, errors.New("root block ID must be provided")
 	}
 	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
@@ -176,11 +176,6 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		opts = append(opts, libp2p.ConnectionManager(builder.connMngr))
 		node.connMgr = builder.connMngr
 	}
-
-	if builder.rootBlockID == "" {
-		return nil, errors.New("root block ID must be provided")
-	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
@@ -644,7 +639,7 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 // PubsubOption generates a libp2p pubsub.Option from the given context and host
 type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
 
-func DefaultPubsubOptions(maxPubSubMsgSize int, idProvider id.IdentityProvider, idTranslator IDTranslator) []PubsubOption {
+func DefaultPubsubOptions(maxPubSubMsgSize int, idProvider id.IdentityProvider, idTranslator IDTranslator, rootBlockID flow.Identifier) []PubsubOption {
 	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
 		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
 			return option, nil
@@ -661,7 +656,7 @@ func DefaultPubsubOptions(maxPubSubMsgSize int, idProvider id.IdentityProvider, 
 
 		// subscription filter
 		func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), idProvider, idTranslator)), nil
+			return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), rootBlockID, idProvider, idTranslator)), nil
 		},
 	}
 }
