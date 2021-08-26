@@ -26,6 +26,18 @@ func TestEncodeDecodeRandomBeaconSig(t *testing.T) {
 	require.Equal(t, sig, decodedSig)
 }
 
+// encode with invalid sig type, then decode will fail
+func TestEncodeDecodeInvalidSig(t *testing.T) {
+	sig := unittest.SignatureFixture()
+
+	for i := int(hotstuff.SigTypeRandomBeacon) + 1; i < int(hotstuff.SigTypeRandomBeacon)+5; i++ {
+		sigType := hotstuff.SigType(i)
+		encoded := EncodeSingleSig(sigType, sig)
+		_, _, err := DecodeSingleSig(encoded)
+		require.Error(t, err)
+	}
+}
+
 func TestDecodeEmptySig(t *testing.T) {
 	_, _, err := DecodeSingleSig([]byte{})
 	require.Error(t, err)

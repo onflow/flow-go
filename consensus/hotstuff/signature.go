@@ -37,8 +37,13 @@ type SigType int
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
-	SigTypeInvalid
 )
+
+// Valid returns true if the signature is either SigTypeStaking or SigTypeRandomBeacon
+// else return false
+func (t SigType) Valid() bool {
+	return t == SigTypeStaking || t == SigTypeRandomBeacon
+}
 
 // SignatureAggregator aggregates the verified signatures.
 // It can either be used to aggregate staking signatures or aggregate random beacon signatures,
