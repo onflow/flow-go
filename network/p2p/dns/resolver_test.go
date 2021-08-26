@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -25,8 +24,7 @@ const happyPath = true
 // instead of going through the underlying basic resolver, and hence through the network.
 func TestResolver_HappyPath(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
-	require.NoError(t, err)
+	resolver := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 
 	size := 10 // 10 text and 10 ip domains.
 	times := 5 // each domain is queried 5 times.
@@ -44,12 +42,10 @@ func TestResolver_HappyPath(t *testing.T) {
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired after their time-to-live is passed.
 func TestResolver_CacheExpiry(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	resolver, err := dns.NewResolver(
+	resolver := dns.NewResolver(
 		metrics.NewNoopCollector(),
 		dns.WithBasicResolver(&basicResolver),
 		dns.WithTTL(1*time.Second)) // cache timeout set to 1 seconds for this test
-
-	require.NoError(t, err)
 
 	size := 2  // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
@@ -71,8 +67,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 // TestResolver_Error evaluates that when the underlying resolver returns an error, the resolver itself does not cache the result.
 func TestResolver_Error(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
-	resolver, err := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
-	require.NoError(t, err)
+	resolver := dns.NewResolver(metrics.NewNoopCollector(), dns.WithBasicResolver(&basicResolver))
 
 	// one test case for txt and one for ip
 	times := 5 // each test case tried 5 times
@@ -103,7 +98,7 @@ type txtLookupTestCase struct {
 // all queries have been resolved.
 func queryResolver(t *testing.T,
 	times int,
-	resolver *madns.Resolver,
+	resolver *dns.Resolver,
 	txtTestCases map[string]*txtLookupTestCase,
 	ipTestCases map[string]*ipLookupTestCase,
 	happyPath bool) *sync.WaitGroup {

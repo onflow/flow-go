@@ -17,6 +17,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -633,17 +634,20 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
 	// dns resolver
-	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
-	require.NoError(t, err)
+	resolver := dns.NewResolver(metrics.NewNoopCollector())
+	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start resolver")
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(log, noopMetrics)
+
+	libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
+	require.NoError(t, err)
 
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
 		SetRootBlockID(rootID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
-		SetResolver(resolver).
+		SetResolver(libp2pResolver).
 		SetLogger(log)
 
 	if allowList {

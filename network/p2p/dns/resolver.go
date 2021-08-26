@@ -54,7 +54,7 @@ func WithTTL(ttl time.Duration) optFunc {
 }
 
 // NewResolver is the factory function for creating an instance of this resolver.
-func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Resolver, error) {
+func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	resolver := &Resolver{
 		res:            madns.DefaultResolver,
 		c:              newCache(),
@@ -68,7 +68,7 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) (*madns.Reso
 		opt(resolver)
 	}
 
-	return madns.NewResolver(madns.WithDefaultResolver(resolver))
+	return resolver
 }
 
 // Ready initializes the resolver and returns a channel that is closed when the initialization is done.
@@ -211,4 +211,8 @@ func (r *Resolver) shouldResolveTXT(txt string) bool {
 	}
 
 	return false
+}
+
+func (r *Resolver) BasicResolver() madns.BasicResolver {
+	return r.res
 }
