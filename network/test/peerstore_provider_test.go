@@ -50,7 +50,7 @@ func (suite *PeerStoreProviderTestSuite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	u := p2p.NewUnstakedNetworkIDTranslator()
-	suite.translator = p2p.NewHierarchicalIDTranslator(u, t)
+	suite.translator = p2p.NewHierarchicalIDTranslator(t, u)
 
 	// emulate the middleware behavior in populating the testnode's peer store
 	libp2pPeers := make([]peer.ID, peerCount)
