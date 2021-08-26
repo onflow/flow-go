@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -110,7 +111,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode, connGat
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, connGating, idProvider)
+			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, idProvider, connGating)
 
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
@@ -127,7 +128,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode, connGat
 func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, enablePeerManagementAndConnectionGating bool) ([]*p2p.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]*p2p.Middleware, len(identities))
-	idProviders := make([]*id.UpdatableIDProvider, len(identities))
+	idProviders := make([]*UpdatableIDProvider, len(identities))
 
 	for i, id := range identities {
 		// casts libP2PNode instance to a local variable to avoid closure
@@ -138,7 +139,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			return node, nil
 		}
 
-		idProviders[i] = idModule.NewUpdatableIDProvider(identities)
+		idProviders[i] = NewUpdatableIDProvider(identities)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
@@ -225,7 +226,7 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*id.UpdatableIDProvider) {
+	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
 	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, true, opts...)
 	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, true)
@@ -261,8 +262,8 @@ func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
 	key crypto.PrivateKey,
-	connGating bool,
 	idProvider idModule.IdentityProvider,
+	connGating bool,
 ) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
@@ -279,12 +280,17 @@ func generateLibP2PNode(t *testing.T,
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
+	// dns resolver
+	resolver, err := dns.NewResolver(noopMetrics)
+	require.NoError(t, err)
+
 	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
 		SetRootBlockID(rootBlockID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
 		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
 		SetPingInfoProvider(pingInfoProvider).
+		SetResolver(resolver).
 		SetLogger(logger).
 		Build(ctx)
 	require.NoError(t, err)

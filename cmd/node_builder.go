@@ -45,7 +45,7 @@ type NodeBuilder interface {
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
 
-	// InitIDProviders initializes the IdentityProvider and IDTranslator
+	// InitIDProviders initializes the ID providers needed by various components
 	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
@@ -142,6 +142,7 @@ type NodeConfig struct {
 	IdentityProvider             id.IdentityProvider
 	IDTranslator                 p2p.IDTranslator
 	NetworkingIdentifierProvider id.IdentifierProvider
+	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
 	RootBlock   *flow.Block
