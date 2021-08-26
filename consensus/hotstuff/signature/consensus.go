@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-// EncodeSingleSig takes the given signature type and a signature, encode it into raw bytes
+// EncodeSingleSig encodes a single signature into signature data as required by the consensus design.
 func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 	t := byte(sigType)
 	encoded := make([]byte, 0, len(sig)+1)
@@ -16,7 +16,8 @@ func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 	return encoded
 }
 
-// DecodeSingleSig takes an encoded raw bytes as signature data, and decode it.
+// DecodeSingleSig decodes signature data into a cryptographic signature and a type as required by
+// the consensus design.
 // It returns:
 //  - 0, nil, error("empty sig data") if the sig data is empty
 //  - 0, nil, error("invalid sig type:") if the sig type is invalid
