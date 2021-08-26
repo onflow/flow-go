@@ -28,17 +28,15 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	require.NoError(t, host1.Connect(ctx, *host.InfoFromHost(host2)))
 	require.NoError(t, host1.Connect(ctx, *host.InfoFromHost(host3)))
 
-
 	topicname1 := "testtopic1"
 	topicname2 := "testtopic2"
 
 	filter := &Filter{
 		allowedIDs: make(map[peer.ID]struct{}),
-		topic: topicname2,
+		topic:      topicname2,
 	}
 	filter.allowedIDs[host1.ID()] = struct{}{}
 	filter.allowedIDs[host2.ID()] = struct{}{}
-
 
 	ps1, err := pubsub.NewGossipSub(ctx, host1, pubsub.WithSubscriptionFilter(filter))
 	require.NoError(t, err)
@@ -60,7 +58,7 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	require.NoError(t, err)
 	_, err = topic2.Subscribe()
 	require.NoError(t, err)
-	topic2, err = ps2.Join(topicname2)
+	topic2Host2, err := ps2.Join(topicname2)
 	require.NoError(t, err)
 	subscriberHost2Topic2, err := topic2.Subscribe()
 	require.NoError(t, err)
@@ -97,7 +95,7 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	fmt.Printf("\t For %s", topicname2)
 	fmt.Println(ps3.ListPeers(topicname2))
 
-	err = wrongTopic.Publish(ctx, []byte("hello"))
+	err = topic2Host2.Publish(ctx, []byte("hello"))
 	require.NoError(t, err)
 
 	time.Sleep(2 * time.Second)
@@ -105,7 +103,7 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	msg, err := subscriberHost2Topic2.Next(ctx)
 	require.NoError(t, err)
 	fmt.Printf(" message recvd on topic %s from peer %s\n", *msg.Topic, msg.ReceivedFrom.String())
-	fmt.Println(msg)
+	fmt.Println(msg.Data)
 
 	msg, err = subscriberHost1Topic2.Next(ctx)
 	require.NoError(t, err)
@@ -117,13 +115,14 @@ func TestBasicSubscriptionFilter(t *testing.T) {
 	fmt.Println(ps2.ListPeers(topicname1))
 	fmt.Printf("\t For %s", topicname2)
 	fmt.Println(ps2.ListPeers(topicname2))
+	t.Fail()
 }
 
-
 var _ pubsub.SubscriptionFilter = (*Filter)(nil)
+
 type Filter struct {
 	allowedIDs map[peer.ID]struct{}
-	topic string
+	topic      string
 }
 
 func (filter *Filter) CanSubscribe(topic string) bool {
