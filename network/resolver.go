@@ -3,6 +3,8 @@ package network
 import (
 	"context"
 	"net"
+
+	"github.com/onflow/flow-go/module"
 )
 
 // BasicResolver is a low level interface for DNS resolution
@@ -14,9 +16,13 @@ type BasicResolver interface {
 	LookupTXT(context.Context, string) ([]string, error)
 }
 
+type DNSIPHandlerFunc func([]net.IPAddr, error)
+type DNSTXTHandlerFunc func(func([]string, error))
+
 type ResolverRequester interface {
+	module.ReadyDoneAware
 	RequestIPAddr(context.Context, string) bool
 	RequestTXT(context.Context, string) bool
-	WithIPHandler(func([]net.IPAddr, error))
-	WithTXTHandler(func([]string, error))
+	WithIPHandler(DNSIPHandlerFunc)
+	WithTXTHandler(DNSTXTHandlerFunc)
 }
