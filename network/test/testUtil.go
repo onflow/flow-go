@@ -82,8 +82,8 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *TagWatchingConnManager {
-	cm := p2p.NewConnManager(log, metrics)
+func NewTagWatchingConnManager(log zerolog.Logger, idProvider idModule.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+	cm := p2p.NewConnManager(log, idProvider, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
 		observers:   make(map[observable.Observer]struct{}),
@@ -100,6 +100,8 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 
 	identities := unittest.IdentityListFixture(n, opts...)
 
+	idProvider := id.NewFixedIdentityProvider(identities)
+
 	// generates keys and address for the node
 	for i, id := range identities {
 		// generate key
@@ -108,7 +110,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key)
+			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, idProvider)
 
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
@@ -258,7 +260,9 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
-	key crypto.PrivateKey) (*p2p.Node, observable.Observable) {
+	key crypto.PrivateKey,
+	idProvider idModule.IdentityProvider,
+) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
 
@@ -269,7 +273,7 @@ func generateLibP2PNode(t *testing.T,
 	ctx := context.Background()
 	connGater := p2p.NewConnGater(logger)
 	// Inject some logic to be able to observe connections of this node
-	connManager := NewTagWatchingConnManager(logger, noopMetrics)
+	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
 	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
 		SetRootBlockID(rootBlockID).
