@@ -166,7 +166,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
-			node.IdentityProvider,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
