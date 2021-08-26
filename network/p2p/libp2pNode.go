@@ -24,6 +24,7 @@ import (
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -55,6 +56,12 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 
 	connGater := NewConnGater(log)
 
+	// TODO: uncomment following lines to activate dns caching
+	//resolver, err := dns.NewResolver(metrics)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	//}
+
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
@@ -63,6 +70,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
+			// SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
@@ -74,6 +82,7 @@ type NodeBuilder interface {
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
+	SetResolver(resolver *madns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -84,6 +93,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
+	resolver         *madns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -131,6 +141,11 @@ func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBu
 	return builder
 }
 
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) NodeBuilder {
+	builder.resolver = resolver
+	return builder
+}
+
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
 		id:     builder.id,
@@ -171,6 +186,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
+	}
+
+	if builder.resolver != nil { // sets DNS resolver
+		opts = append(opts, libp2p.MultiaddrResolver(builder.resolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -578,7 +597,8 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
+func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
+	error) {
 	defaultOptions, err := DefaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err

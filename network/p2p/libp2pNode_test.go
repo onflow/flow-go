@@ -27,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -631,6 +632,10 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
+	// dns resolver
+	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
+	require.NoError(t, err)
+
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(log, noopMetrics)
 
@@ -638,6 +643,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetRootBlockID(rootID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
+		SetResolver(resolver).
 		SetLogger(log)
 
 	if allowList {
