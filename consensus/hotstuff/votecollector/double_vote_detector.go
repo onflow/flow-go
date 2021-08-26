@@ -24,8 +24,9 @@ func NewDoubleVoteDetector(view uint64) *DoubleVoteDetector {
 	}
 }
 
-// AddVote adds vote to internal index and returns model.DoubleVoteError sentinel error if it's not the first vote.
-func (d *DoubleVoteDetector) AddVote(vote *model.Vote) error {
+// TrustedAdd adds vote to internal index and returns model.DoubleVoteError sentinel error if it's not the first vote.
+// Votes should be validated before adding.
+func (d *DoubleVoteDetector) TrustedAdd(vote *model.Vote) error {
 	if vote.View != d.view {
 		return fmt.Errorf("this DoubleVoteDetector tracks double voting for view %d but got vote for %d",
 			d.view, vote.View)
