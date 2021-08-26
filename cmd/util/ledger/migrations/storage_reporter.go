@@ -198,9 +198,12 @@ func decode(storedData []byte, _ uint16, commonAddress common.Address) (interpre
 	// TODO: validate version
 
 	storage := interpreter.NewInMemoryStorage()
-	storageID, err := storage.GenerateStorageID(atree.Address(commonAddress))
-	if err != nil {
-		return nil, err
+
+	storageID := atree.StorageID{
+		Address: atree.Address(commonAddress),
+
+		// TODO:
+		Index: atree.StorageIndex{},
 	}
 
 	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(storedData)
