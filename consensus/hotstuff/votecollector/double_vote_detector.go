@@ -12,15 +12,15 @@ import (
 // For each view new DoubleVoteDetector needs to be created.
 // Tracks double voting for one view.
 type DoubleVoteDetector struct {
-	lock             sync.Mutex
-	view             uint64
-	signersByBlockID map[flow.Identifier]*model.Vote // signerID -> vote, track votes by signerID
+	lock            sync.Mutex
+	view            uint64
+	votesBySignerID map[flow.Identifier]*model.Vote // signerID -> vote, track votes by signerID
 }
 
 func NewDoubleVoteDetector(view uint64) *DoubleVoteDetector {
 	return &DoubleVoteDetector{
-		view:             view,
-		signersByBlockID: make(map[flow.Identifier]*model.Vote),
+		view:            view,
+		votesBySignerID: make(map[flow.Identifier]*model.Vote),
 	}
 }
 
@@ -35,12 +35,12 @@ func (d *DoubleVoteDetector) TrustedAdd(vote *model.Vote) error {
 	d.lock.Lock()
 	defer d.lock.Unlock()
 
-	if firstVote, ok := d.signersByBlockID[vote.SignerID]; ok && vote.ID() != firstVote.ID() {
+	if firstVote, ok := d.votesBySignerID[vote.SignerID]; ok && vote.ID() != firstVote.ID() {
 		return model.NewDoubleVoteErrorf(firstVote, vote, "double vote at view: %d", d.view)
 	}
 
 	// record vote as first one
-	d.signersByBlockID[vote.SignerID] = vote
+	d.votesBySignerID[vote.SignerID] = vote
 
 	return nil
 }
