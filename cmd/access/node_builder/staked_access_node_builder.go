@@ -194,7 +194,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID().String()).
+			SetRootBlockID(builder.RootBlock.ID()).
 			// no connection gater
 			SetConnectionManager(connManager).
 			// act as a DHT server

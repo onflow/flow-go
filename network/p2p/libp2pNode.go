@@ -66,17 +66,22 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 	connGater := NewConnGater(log)
 
 	// TODO: uncomment following lines to activate dns caching
-	//resolver, err := dns.NewResolver(metrics)
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	//}
+	// resolver, err := dns.NewResolver(metrics)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	// }
+
+	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+	psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
+		return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), rootBlockID, idProvider, idTranslator)), nil
+	})
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize, idProvider, idTranslator, rootBlockID)...).
+			SetPubsubOptions(psOpts...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			// SetResolver(resolver).
@@ -667,7 +672,7 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 // PubsubOption generates a libp2p pubsub.Option from the given context and host
 type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
 
-func DefaultPubsubOptions(maxPubSubMsgSize int, idProvider id.IdentityProvider, idTranslator IDTranslator, rootBlockID flow.Identifier) []PubsubOption {
+func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
 		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
 			return option, nil
@@ -681,11 +686,6 @@ func DefaultPubsubOptions(maxPubSubMsgSize int, idProvider id.IdentityProvider, 
 		// set max message size limit for 1-k PubSub messaging
 		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
-
-		// subscription filter
-		func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), rootBlockID, idProvider, idTranslator)), nil
-		},
 	}
 }
 

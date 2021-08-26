@@ -620,10 +620,11 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID().String()).
+			SetRootBlockID(builder.RootBlock.ID()).
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
 			SetDHTOptions(dhtOptions...).
+			// TODO: set pubsub options with subscription filter
 			SetLogger(builder.Logger).
 			Build(ctx)
 		if err != nil {
@@ -645,7 +646,7 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		builder.RootBlock.ID().String(),
+		builder.RootBlock.ID(),
 		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating for the unstaked network
