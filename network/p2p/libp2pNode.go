@@ -61,7 +61,7 @@ type LibP2PFactoryFunc func() (*Node, error)
 func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID flow.Identifier,
 	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider, idProvider id.IdentityProvider, idTranslator IDTranslator) (LibP2PFactoryFunc, error) {
 
-	connManager := NewConnManager(log, idProvider, metrics)
+	connManager := NewConnManager(log, metrics)
 
 	connGater := NewConnGater(log)
 

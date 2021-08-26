@@ -18,7 +18,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -229,15 +228,11 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 	// creating nodes
 	for i := 1; i <= count; i++ {
 		key := generateNetworkingKey(suite.T())
-		noopMetrics := metrics.NewNoopCollector()
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 
-		connManager := NewConnManager(logger, noopMetrics)
-
 		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
 			SetRootBlockID(rootBlockID).
-			SetConnectionManager(connManager).
 			SetDHTOptions(AsServer(dhtServer)).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(logger).

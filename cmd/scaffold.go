@@ -165,7 +165,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
-			node.IdentityProvider,
 			node.IDTranslator,
 		)
 		if err != nil {
@@ -177,7 +176,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			fnb.RootBlock.ID().String(),
+			fnb.RootBlock.ID(),
 			fnb.BaseConfig.peerUpdateInterval,
 			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
