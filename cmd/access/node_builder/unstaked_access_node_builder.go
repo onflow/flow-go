@@ -59,7 +59,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 			if !ok {
 				anb.Logger.Fatal().Msg("middleware was of unexpected type")
 			}
-		return middleware.IdentifierProvider()
+			return middleware.IdentifierProvider()
 		}
 
 		return nil
@@ -75,10 +75,7 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	anb.validateParams()
 
-	// if a network key has been passed in, then initialize the node ID and networking key from it
-	if anb.AccessNodeConfig.NetworkKey != nil {
-		anb.initNodeInfo()
-	}
+	anb.initNodeInfo()
 
 	anb.InitIDProviders()
 
@@ -109,6 +106,9 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 func (anb *UnstakedAccessNodeBuilder) validateParams() {
 	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
 		anb.Logger.Fatal().Msg("bind address not specified")
+	}
+	if anb.NetworkKey == nil {
+		anb.Logger.Fatal().Msg("networking key not provided")
 	}
 	if len(anb.bootstrapIdentities) > 0 {
 		return
