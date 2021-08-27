@@ -194,7 +194,7 @@ func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterI
 	}
 }
 
-func decode(storedData []byte, _ uint16, commonAddress common.Address) (interpreter.Value, error) {
+func decode(storedData []byte, version uint16, commonAddress common.Address) (interpreter.Value, error) {
 	// TODO: validate version
 
 	storage := interpreter.NewInMemoryStorage()
