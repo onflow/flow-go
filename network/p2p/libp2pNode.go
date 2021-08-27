@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -82,7 +83,7 @@ type NodeBuilder interface {
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
-	SetResolver(resolver flownet.BasicResolver) NodeBuilder
+	SetResolver(*dns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -93,7 +94,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
-	resolver         flownet.BasicResolver
+	resolver         *dns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -141,7 +142,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver flownet.BasicResolver) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) NodeBuilder {
 	builder.resolver = resolver
 	return builder
 }
@@ -249,7 +250,7 @@ type Node struct {
 	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
-	resolver             flownet.BasicResolver                  // dns resolver for libp2p (is nil if default)
+	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	pingService          *PingService
 	connMgr              TagLessConnManager
 }
