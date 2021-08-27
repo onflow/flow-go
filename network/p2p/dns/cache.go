@@ -92,3 +92,29 @@ func (c *cache) updateTXTCache(txt string, addr []string) {
 		timestamp: runtimeNano(),
 	}
 }
+
+// invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
+// is successful.
+func (c *cache) invalidateIPCacheEntry(domain string) bool {
+	c.Lock()
+	defer c.Unlock()
+
+	_, exists := c.ipCache[domain]
+
+	delete(c.ipCache, domain)
+
+	return exists
+}
+
+// invalidateTXTCacheEntry atomically invalidates txt cache entry. Boolean variable determines whether invalidation
+// is successful.
+func (c *cache) invalidateTXTCacheEntry(txt string) bool {
+	c.Lock()
+	defer c.Unlock()
+
+	_, exists := c.txtCache[txt]
+
+	delete(c.txtCache, txt)
+
+	return exists
+}

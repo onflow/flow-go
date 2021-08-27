@@ -105,7 +105,11 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 		r.unit.Launch(func() {
 			_, err := r.lookupResolverForIPAddr(ctx, domain)
 			if err != nil {
-				r.collector.OnDNSCacheInvalidated()
+				// invalidates cached entry when hits error on resolving.
+				invalidated := r.c.invalidateIPCacheEntry(domain)
+				if invalidated {
+					r.collector.OnDNSCacheInvalidated()
+				}
 			}
 			r.doneResolvingIP(domain)
 		})
@@ -152,7 +156,11 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 		r.unit.Launch(func() {
 			_, err := r.lookupResolverForTXTAddr(ctx, txt)
 			if err != nil {
-				r.collector.OnDNSCacheInvalidated()
+				// invalidates cached entry when hits error on resolving.
+				invalidated := r.c.invalidateTXTCacheEntry(txt)
+				if invalidated {
+					r.collector.OnDNSCacheInvalidated()
+				}
 			}
 			r.doneResolvingTXT(txt)
 		})
