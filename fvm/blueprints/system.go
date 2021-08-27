@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const SystemChunkTransactionGasLimit = 1_000_000_000
+const SystemChunkTransactionGasLimit = 100_000_000
 
 // TODO (Ramtin) after changes to this method are merged into master move them here.
 
