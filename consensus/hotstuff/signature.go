@@ -43,8 +43,8 @@ const (
 	SigTypeInvalid
 )
 
-// WeighedSignatureAggregator aggregates signatures of the same signature scheme from different signers. 
-// The module is aware of weights assigned to each signer. 
+// WeighedSignatureAggregator aggregates signatures of the same signature scheme from different signers.
+// The module is aware of weights assigned to each signer.
 // It can either be used to aggregate staking signatures or aggregate random beacon signatures,
 // but not a mix of both.
 // Implementation of SignatureAggregator must be concurrent safe.
@@ -67,7 +67,7 @@ type SignatureAggregator interface {
 	// if called concurrently, only one thread will be running the aggregation.
 	// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
 	// It errors if not enough weights have been collected.
-	// The function performs a final verification and errors if the aggregated signature is not valid. This is 
+	// The function performs a final verification and errors if the aggregated signature is not valid. This is
 	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
 	// If called concurrently, only one thread will be running the aggregation.
 	// TODO: consider return (signerIDs and crypto.Signature)
