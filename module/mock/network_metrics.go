@@ -13,19 +13,9 @@ type NetworkMetrics struct {
 	mock.Mock
 }
 
-// DNSCacheResolution provides a mock function with given fields:
-func (_m *NetworkMetrics) OnDNSCacheHit() {
-	_m.Called()
-}
-
 // DNSLookupDuration provides a mock function with given fields: duration
 func (_m *NetworkMetrics) DNSLookupDuration(duration time.Duration) {
 	_m.Called(duration)
-}
-
-// DNSLookupResolution provides a mock function with given fields:
-func (_m *NetworkMetrics) OnDNSCacheMiss() {
-	_m.Called()
 }
 
 // InboundConnections provides a mock function with given fields: connectionCount
@@ -63,6 +53,21 @@ func (_m *NetworkMetrics) NetworkMessageSent(sizeBytes int, topic string, messag
 	_m.Called(sizeBytes, topic, messageType)
 }
 
+// OnDNSCacheHit provides a mock function with given fields:
+func (_m *NetworkMetrics) OnDNSCacheHit() {
+	_m.Called()
+}
+
+// OnDNSCacheInvalidated provides a mock function with given fields:
+func (_m *NetworkMetrics) OnDNSCacheInvalidated() {
+	_m.Called()
+}
+
+// OnDNSCacheMiss provides a mock function with given fields:
+func (_m *NetworkMetrics) OnDNSCacheMiss() {
+	_m.Called()
+}
+
 // OutboundConnections provides a mock function with given fields: connectionCount
 func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 	_m.Called(connectionCount)
@@ -71,4 +76,14 @@ func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 // QueueDuration provides a mock function with given fields: duration, priority
 func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority int) {
 	_m.Called(duration, priority)
+}
+
+// UnstakedInboundConnections provides a mock function with given fields: connectionCount
+func (_m *NetworkMetrics) UnstakedInboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
+}
+
+// UnstakedOutboundConnections provides a mock function with given fields: connectionCount
+func (_m *NetworkMetrics) UnstakedOutboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
 }
