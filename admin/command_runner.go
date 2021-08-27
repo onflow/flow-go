@@ -53,9 +53,10 @@ func (r *CommandRunner) getHandler(command string) CommandHandler {
 }
 
 func (r *CommandRunner) Start(ctx context.Context) {
-	// TODO: We need to actually start the grpc server here
 	// TODO: define num workers
+	// use errGroup?
 	go r.processLoop(ctx)
+	go r.runAdminServer(ctx)
 }
 
 func (r *CommandRunner) runAdminServer(ctx context.Context) {
@@ -65,10 +66,14 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) {
 		// log.Fatalf("failed to listen: %v", err)
 	}
 
+	// TODO: check context before running these next 3 lines
 	grpcServer := grpc.NewServer()
 	pb.RegisterAdminServer(grpcServer, NewAdminServer(r.commandQ))
-	grpcServer.Serve(lis)
-	// grpcServer.GracefulStop()
+	go grpcServer.Serve(lis)
+
+	<-ctx.Done()
+
+	grpcServer.GracefulStop()
 }
 
 func (r *CommandRunner) processLoop(ctx context.Context) {
