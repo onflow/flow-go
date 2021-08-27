@@ -39,7 +39,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 		}
 
 		fnb.IdentityProvider = idCache
-		// translator
+
 		fnb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewFilteredIdentifierProvider(
 				filter.And(
@@ -53,7 +53,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 
 		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
-		if !fnb.SupportsUnstakedNode() {
+		if !fnb.supportsUnstakedFollower {
 			fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
 		}
 
@@ -69,7 +69,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	builder.InitIDProviders()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
-	if builder.SupportsUnstakedNode() {
+	if builder.supportsUnstakedFollower {
 		builder.enqueueUnstakedNetworkInit(ctx)
 	} else {
 		// otherwise, enqueue the regular network
@@ -138,12 +138,18 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+// The LibP2P host is created with the following options:
+// 		DHT as server
+// 		The address from the node config or the specified bind address as the listen address
+// 		The passed in private key as the libp2p key
+//		No connection gater
+// 		Default Flow libp2p pubsub options
 func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	nodeID flow.Identifier,
 	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
 	// The staked nodes act as the DHT servers
-	dhtOptions := []dht.Option{p2p.AsServer(builder.IsStaked())}
+	dhtOptions := []dht.Option{p2p.AsServer(true)}
 
 	myAddr := builder.NodeConfig.Me.Address()
 	if builder.BaseConfig.BindAddr != cmd.NotSet {
