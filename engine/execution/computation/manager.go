@@ -223,7 +223,7 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 
 	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account at block (%s): %w", blockHeader.ID(), err)
+		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}
 
 	return account, nil
