@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// SignatureAggregatorImpl aggregates the signatures
+// SignatureAggregator implements hotstuff.SignatureAggregator. It aggregates signatures of one specific type (staking or random beacon signatures) but not a mix.
 type SignatureAggregatorImpl struct {
 }
 

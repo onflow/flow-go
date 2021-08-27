@@ -97,7 +97,9 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	if !c.reconstructor.HasSufficientShares() {
 		return nil
 	}
-
+	if !c.done.CAS(false, true) {
+		return nil
+	}
 	qc, err := c.buildQC()
 	if err != nil {
 		return fmt.Errorf("could not build QC: %w", err)
@@ -135,7 +137,7 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 	panic("not implemented")
 }
 
-func (c *ConsensusClusterVoteCollector) hasSufficientStake() bool {
+func (c *ConsensusClusterVoteCollector) hasSufficientWeight() bool {
 	panic("not implemented")
 }
 
