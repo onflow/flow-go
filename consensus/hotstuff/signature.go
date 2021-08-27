@@ -43,12 +43,12 @@ const (
 	SigTypeInvalid
 )
 
-// WeighedSignatureAggregator aggregates signatures of the same signature scheme from different signers.
+// WeightedSignatureAggregator aggregates signatures of the same signature scheme from different signers.
 // The module is aware of weights assigned to each signer.
 // It can either be used to aggregate staking signatures or aggregate random beacon signatures,
 // but not a mix of both.
 // Implementation of SignatureAggregator must be concurrent safe.
-type SignatureAggregator interface {
+type WeightedSignatureAggregator interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message.
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 
@@ -70,8 +70,7 @@ type SignatureAggregator interface {
 	// The function performs a final verification and errors if the aggregated signature is not valid. This is
 	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
 	// If called concurrently, only one thread will be running the aggregation.
-	// TODO: consider return (signerIDs and crypto.Signature)
-	Aggregate() ([]byte, error)
+	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
 // CombinedSigAggregator aggregates the staking signatures and random beacon signatures,
@@ -108,8 +107,8 @@ type CombinedSigAggregator interface {
 type AggregatedSignatureData struct {
 	StakingSigners               []flow.Identifier
 	RandomBeaconSigners          []flow.Identifier
-	AggregatedStakingSig         crypto.Signature
-	AggregatedRandomBeaconSig    crypto.Signature
+	AggregatedStakingSig         []byte
+	AggregatedRandomBeaconSig    []byte
 	ReconstructedRandomBeaconSig crypto.Signature
 }
 
