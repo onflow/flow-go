@@ -24,7 +24,7 @@ type ConsensusFollower interface {
 
 // Config contains the configurable fields for a `ConsensusFollower`.
 type Config struct {
-	nodeID         flow.Identifier     // the node ID of this node
+	networkPrivKey crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr       string              // address to bind on
 	dataDir        string              // directory to store the protocol state
@@ -69,14 +69,13 @@ func getAccessNodeOptions(config *Config) []access.Option {
 	ids := bootstrapIdentities(config.bootstrapNodes)
 	return []access.Option{
 		access.WithBootStrapPeers(ids...),
-		access.WithUnstakedNetworkBindAddr(config.bindAddr),
 		access.WithBaseOptions(getBaseOptions(config)),
+		access.WithNetworkKey(config.networkPrivKey),
 	}
 }
 
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
-		cmd.WithNodeID(config.nodeID),
 		cmd.WithMetricsEnabled(false),
 	}
 	if config.bootstrapDir != "" {
@@ -84,6 +83,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	}
 	if config.dataDir != "" {
 		options = append(options, cmd.WithDataDir(config.dataDir))
+	}
+	if config.bindAddr != "" {
+		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
 
 	return options
@@ -94,26 +96,26 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
 	nodeBuilder.Initialize()
-	nodeBuilder.BuildConsensusFollower()
+	nodeBuilder.Build()
 
 	return nodeBuilder
 }
 
 type ConsensusFollowerImpl struct {
-	nodeBuilder *access.UnstakedAccessNodeBuilder
+	NodeBuilder *access.UnstakedAccessNodeBuilder
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
 }
 
 // NewConsensusFollower creates a new consensus follower.
 func NewConsensusFollower(
-	nodeID flow.Identifier,
-	bootstapIdentities []BootstrapNodeInfo,
+	networkPrivKey crypto.PrivateKey,
 	bindAddr string,
+	bootstapIdentities []BootstrapNodeInfo,
 	opts ...Option,
 ) (*ConsensusFollowerImpl, error) {
 	config := &Config{
-		nodeID:         nodeID,
+		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
 	}
@@ -125,7 +127,7 @@ func NewConsensusFollower(
 	accessNodeOptions := getAccessNodeOptions(config)
 
 	anb := buildAccessNode(accessNodeOptions)
-	consensusFollower := &ConsensusFollowerImpl{nodeBuilder: anb}
+	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
@@ -152,7 +154,7 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 
 // Run starts the consensus follower.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	runAccessNode(ctx, cf.nodeBuilder)
+	runAccessNode(ctx, cf.NodeBuilder)
 }
 
 func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
