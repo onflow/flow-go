@@ -525,12 +525,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 		NetworkPublicKey: stakedANContainer.NetworkPubKey(),
 	}
 
-	// TODO: update consensus follower to just accept a networking key instead of a node ID
 	// it should be able to figure out the rest on its own.
 	follower, err := consensus_follower.NewConsensusFollower(followerConf.NetworkingPrivKey, bindAddr,
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
 
-	// TODO: convert key to node ID? or just store with the network key as map key
 	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
 
@@ -701,7 +699,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// in the public network, because connection gating is enabled by default and
 			// therefore the ghost node will deny incoming connections from all consensus
 			// followers. A flag for the ghost node will need to be created to enable
-			// overriding the default behavior.
+			// overriding the default behavior (see: https://github.com/dapperlabs/flow-go/issues/5696).
 			return fmt.Errorf("currently ghost node for an access node which supports unstaked node is not implemented")
 		}
 	}
@@ -734,6 +732,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
+	// (see issue: https://github.com/onflow/flow-go/issues/1214)
 	dummyStakingKey, err := unittest.StakingKey()
 	if err != nil {
 		return nil, err
