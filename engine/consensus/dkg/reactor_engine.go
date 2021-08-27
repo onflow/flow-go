@@ -94,44 +94,43 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 // views.
 func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	firstID := first.ID()
-	nextEpochCounter := currentEpochCounter + 1
 
-	log := e.log.With().
+	lg := e.log.With().
 		Uint64("current_epoch", currentEpochCounter).
 		Uint64("view", first.View).
 		Hex("block", firstID[:]).
 		Logger()
-	log.Info().Msg("EpochSetup received")
 
 	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not retrieve epoch info")
+		lg.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
 	committee := curDKGInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
 
-	e.log.Info().
+	lg.Info().
 		Uint64("phase1", curDKGInfo.phase1FinalView).
 		Uint64("phase2", curDKGInfo.phase2FinalView).
 		Uint64("phase3", curDKGInfo.phase3FinalView).
 		Interface("members", committee.NodeIDs()).
 		Msg("epoch info")
 
+	nextEpochCounter := currentEpochCounter + 1
 	controller, err := e.controllerFactory.Create(
 		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
 		committee,
 		curDKGInfo.seed,
 	)
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("could not create DKG controller")
+		lg.Fatal().Err(err).Msg("could not create DKG controller")
 	}
 	e.controller = controller
 
 	e.unit.Launch(func() {
-		e.log.Info().Msg("DKG Run")
+		lg.Info().Msg("DKG Run")
 		err := e.controller.Run()
 		if err != nil {
-			e.log.Fatal().Err(err).Msg("DKG Run error")
+			lg.Fatal().Err(err).Msg("DKG Run error")
 		}
 	})
 
@@ -177,6 +176,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)

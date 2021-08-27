@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"fmt"
+	"sort"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -197,12 +198,24 @@ func (s *State) MergeState(other *State) error {
 	return s.checkMaxInteraction()
 }
 
-// UpdatedAddresses returns a list of addresses that were updated (at least 1 register update)
+type sortedAddresses []flow.Address
+
+func (a sortedAddresses) Len() int           { return len(a) }
+func (a sortedAddresses) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a sortedAddresses) Less(i, j int) bool { return bytes.Compare(a[i][:], a[j][:]) >= 0 }
+
+// UpdatedAddresses returns a sorted list of addresses that were updated (at least 1 register update)
 func (s *State) UpdatedAddresses() []flow.Address {
-	addresses := make([]flow.Address, 0, len(s.updatedAddresses))
+	addresses := make(sortedAddresses, len(s.updatedAddresses))
+
+	i := 0
 	for k := range s.updatedAddresses {
-		addresses = append(addresses, k)
+		addresses[i] = k
+		i++
 	}
+
+	sort.Sort(addresses)
+
 	return addresses
 }
 

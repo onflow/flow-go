@@ -10,18 +10,22 @@ import (
 )
 
 type ComplianceCollector struct {
-	finalizedHeight          prometheus.Gauge
-	sealedHeight             prometheus.Gauge
-	finalizedBlocks          *prometheus.CounterVec
-	sealedBlocks             prometheus.Counter
-	blockProposalDuration    prometheus.Counter
-	finalizedPayload         *prometheus.CounterVec
-	sealedPayload            *prometheus.CounterVec
-	lastBlockFinalizedAt     time.Time
-	finalizedBlocksPerSecond prometheus.Summary
-	committedEpochFinalView  prometheus.Gauge
-	currentEpochCounter      prometheus.Gauge
-	currentEpochPhase        prometheus.Gauge
+	finalizedHeight           prometheus.Gauge
+	sealedHeight              prometheus.Gauge
+	finalizedBlocks           *prometheus.CounterVec
+	sealedBlocks              prometheus.Counter
+	blockProposalDuration     prometheus.Counter
+	finalizedPayload          *prometheus.CounterVec
+	sealedPayload             *prometheus.CounterVec
+	lastBlockFinalizedAt      time.Time
+	finalizedBlocksPerSecond  prometheus.Summary
+	committedEpochFinalView   prometheus.Gauge
+	currentEpochCounter       prometheus.Gauge
+	currentEpochPhase         prometheus.Gauge
+	currentEpochFinalView     prometheus.Gauge
+	currentDKGPhase1FinalView prometheus.Gauge
+	currentDKGPhase2FinalView prometheus.Gauge
+	currentDKGPhase3FinalView prometheus.Gauge
 }
 
 func NewComplianceCollector() *ComplianceCollector {
@@ -47,6 +51,33 @@ func NewComplianceCollector() *ComplianceCollector {
 			Namespace: namespaceConsensus,
 			Subsystem: subsystemCompliance,
 			Help:      "the final view of the committed epoch with the greatest counter",
+		}),
+
+		currentEpochFinalView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_epoch_final_view",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the final view of the current epoch",
+		}),
+
+		currentDKGPhase1FinalView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_dkg_phase1_final_view",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the final view of phase 1 of the current epochs DKG",
+		}),
+		currentDKGPhase2FinalView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_dkg_phase2_final_view",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the final view of phase 2 of current epochs DKG",
+		}),
+
+		currentDKGPhase3FinalView: promauto.NewGauge(prometheus.GaugeOpts{
+			Name:      "current_dkg_phase3_final_view",
+			Namespace: namespaceConsensus,
+			Subsystem: subsystemCompliance,
+			Help:      "the final view of phase 3 of the current epochs DKG (a successful DKG will end shortly after this view)",
 		}),
 
 		finalizedHeight: promauto.NewGauge(prometheus.GaugeOpts{
@@ -162,5 +193,21 @@ func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {
 }
 
 func (cc *ComplianceCollector) CurrentEpochPhase(phase flow.EpochPhase) {
-	cc.currentEpochCounter.Set(float64(phase))
+	cc.currentEpochPhase.Set(float64(phase))
+}
+
+func (cc *ComplianceCollector) CurrentEpochFinalView(view uint64) {
+	cc.currentEpochFinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) CurrentDKGPhase1FinalView(view uint64) {
+	cc.currentDKGPhase1FinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) CurrentDKGPhase2FinalView(view uint64) {
+	cc.currentDKGPhase2FinalView.Set(float64(view))
+}
+
+func (cc *ComplianceCollector) CurrentDKGPhase3FinalView(view uint64) {
+	cc.currentDKGPhase3FinalView.Set(float64(view))
 }
