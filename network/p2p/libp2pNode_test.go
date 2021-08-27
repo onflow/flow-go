@@ -680,8 +680,12 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
 	require.NoError(t, err)
 
+	noopMetrics := metrics.NewNoopCollector()
+	connManager := NewConnManager(log, noopMetrics)
+
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
 		SetRootBlockID(rootID).
+		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetLogger(log)
