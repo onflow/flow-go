@@ -150,12 +150,18 @@ func (m *Middleware) GetIPPort() (string, string, error) {
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
-
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
+
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+	select {
+	case <-m.libP2PNode.Start():
+		m.log.Debug().Msg("libp2p node starts successfully")
+	case <-time.After(30 * time.Second):
+		return fmt.Errorf("could not start libp2p node")
+	}
 
 	if m.connectionGating {
 
