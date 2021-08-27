@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"path/filepath"
 	"time"
 
-	"github.com/spf13/pflag"
-	"google.golang.org/grpc"
-
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
+	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -89,7 +88,11 @@ func main() {
 		requiredApprovalsForSealVerification   uint
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
-		accessAddress                          string
+
+		// DKG contract client
+		accessAddress       string
+		accessApiNodePubKey string
+		insecureAccessAPI   bool
 
 		err                     error
 		mutableState            protocol.MutableState
@@ -136,6 +139,8 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
+			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -650,7 +655,6 @@ func main() {
 			return messagingEngine, nil
 		}).
 		Component("DKG reactor engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
 			// the viewsObserver is used by the reactor engine to subscribe to
 			// new views being finalized
 			viewsObserver := gadgets.NewViews()
@@ -661,7 +665,7 @@ func main() {
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
 			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, accessAddress)
+			dkgContractClient, err := createDKGContractClient(node, accessAddress, accessApiNodePubKey, insecureAccessAPI)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
@@ -705,11 +709,8 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 	return &priv, nil
 }
 
-// TEMPORARY: The functionality to allow starting up a node without a properly
-// configured machine account is very much intended to be temporary.
-// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
-// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
-func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module.DKGContractClient, error) {
+// createDKGContractClient creates a DKG contract client
+func createDKGContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodePubKey string, insecureAccessAPI bool) (module.DKGContractClient, error) {
 
 	var dkgClient module.DKGContractClient
 
@@ -721,7 +722,7 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module
 
 	// if not valid return a mock dkg contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return dkgmodule.NewMockClient(node.Logger), nil
+		return nil, fmt.Errorf("could not validate node machine account config")
 	}
 
 	// attempt to read NodeMachineAccountInfo
@@ -737,8 +738,13 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module
 	}
 	txSigner := crypto.NewInMemorySigner(sk, info.HashAlgorithm)
 
+	grpcDialOpts, err := common.GetGRPCDialOption(accessAddress, accessApiNodePubKey, insecureAccessAPI)
+	if err != nil {
+		return nil, fmt.Errorf("could not get GRPC conn for flow client %w", err)
+	}
+
 	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	flowClient, err := client.New(accessAddress, grpcDialOpts)
 	if err != nil {
 		return nil, err
 	}

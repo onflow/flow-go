@@ -2,13 +2,12 @@ package main
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"time"
-
-	"github.com/spf13/pflag"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -83,7 +82,9 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		accessAddress string
+		accessAddress       string
+		accessApiNodePubKey string
+		insecureAccessAPI   bool
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -138,6 +139,8 @@ func main() {
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
+			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -317,7 +320,6 @@ func main() {
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
@@ -397,7 +399,7 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// construct QC contract client
-			qcContractClient, err := createQCContractClient(node, accessAddress)
+			qcContractClient, err := createQCContractClient(node, accessAddress, accessApiNodePubKey, insecureAccessAPI)
 			if err != nil {
 				return nil, fmt.Errorf("could not create qc contract client %w", err)
 			}
@@ -444,11 +446,8 @@ func main() {
 		Run()
 }
 
-// TEMPORARY: The functionality to allow starting up a node without a properly configured
-// machine account is very much intended to be temporary.
-// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
-// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
-func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.QCContractClient, error) {
+// createQCContractClient creates QC contract client
+func createQCContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodePubKey string, insecureAccessAPI bool) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -460,7 +459,7 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.
 
 	// if not valid return a mock qc contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return epochs.NewMockQCContractClient(node.Logger), nil
+		return nil, fmt.Errorf("could not validate node machine account config")
 	}
 
 	// attempt to read NodeMachineAccountInfo
@@ -476,8 +475,13 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.
 	}
 	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
 
+	grpcDialOpts, err := common.GetGRPCDialOption(accessAddress, accessApiNodePubKey, insecureAccessAPI)
+	if err != nil {
+		return nil, fmt.Errorf("could not get GRPC conn for flow client %w", err)
+	}
+
 	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
+	flowClient, err := client.New(accessAddress, grpcDialOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -487,3 +491,4 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.
 
 	return qcContractClient, nil
 }
+

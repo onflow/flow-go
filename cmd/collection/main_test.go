@@ -38,89 +38,45 @@ func TestCreateQCContractClient(t *testing.T) {
 
 	machineAccountFileName := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, local.NodeID())
 
-	t.Run("should return mock contract client with no NodeMachineAccountInfo file and invalid --access-address flag", func(t *testing.T) {
+	t.Run("should return valid QC contract client", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {
 
-			// empty access address as input
-			accessAddress := ""
-
-			// set BootstrapDir to temporary dir
-			cmd.BaseConfig.BootstrapDir = bootDir
-
-			// make sure NodeMachineAccount file does not exist (sanity-check)
-			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
-
-			client, err := createQCContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `MockQCContractClient`
-			assert.IsType(t, &epochs.MockQCContractClient{}, client)
-		})
-	})
-
-	t.Run("should return mock contract client with no NodeMachineAccountInfo file and valid --access-address flag", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// valid access address format
 			accessAddress := "17.123.255.123:2353"
+			accessApiNodeID := "02880abb813f1646952edb0a919d60444ebb34b92ce53e00868d526b80cf3621"
+			insecureAccessAPI := false
+			// set BootstrapDir to temporary dir
+			cmd.BaseConfig.BootstrapDir = bootDir
 
+			// write machine account info
+			infoPath := filepath.Join(bootDir, machineAccountFileName)
+			writeNodeMachineAccountInfo(t, infoPath)
+			require.FileExists(t, infoPath)
+
+			client, err := createQCContractClient(cmd, accessAddress, accessApiNodeID, insecureAccessAPI)
+			require.NoError(t, err)
+
+			assert.IsType(t, &epochs.QCContractClient{}, client)
+
+		})
+	})
+
+	t.Run("should return err if node machine account info is missing", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(bootDir string) {
+
+			accessAddress := "17.123.255.123:2353"
+			accessApiNodeID := "02880abb813f1646952edb0a919d60444ebb34b92ce53e00868d526b80cf3621"
+			insecureAccessAPI := false
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
 
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
 
-			client, err := createQCContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `MockQCContractClient`
-			assert.IsType(t, &epochs.MockQCContractClient{}, client)
+			_, err := createQCContractClient(cmd, accessAddress, accessApiNodeID, insecureAccessAPI)
+			require.Error(t, err)
 		})
 	})
 
-	t.Run("should return mock contract client with valid NodeMachineAccountInfo file and invalid --access-address flag", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// valid access address format
-			accessAddress := ""
-
-			// set BootstrapDir to temporary dir
-			cmd.BaseConfig.BootstrapDir = bootDir
-
-			// write machine account info
-			infoPath := filepath.Join(bootDir, machineAccountFileName)
-			writeNodeMachineAccountInfo(t, infoPath)
-			require.FileExists(t, infoPath)
-
-			client, err := createQCContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `MockQCContractClient`
-			assert.IsType(t, &epochs.MockQCContractClient{}, client)
-		})
-	})
-
-	t.Run("should return full contract client with valid NodeMachineAccountInfo file and valid --access-address flag", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// valid access address format
-			accessAddress := "13.113.215.113:2353"
-
-			// set BootstrapDir to temporary dir
-			cmd.BaseConfig.BootstrapDir = bootDir
-
-			// write machine account info
-			infoPath := filepath.Join(bootDir, machineAccountFileName)
-			writeNodeMachineAccountInfo(t, infoPath)
-			require.FileExists(t, infoPath)
-
-			client, err := createQCContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `QCContractClient`
-			assert.IsType(t, &epochs.QCContractClient{}, client)
-		})
-	})
 }
 
 func writeNodeMachineAccountInfo(t *testing.T, path string) {
