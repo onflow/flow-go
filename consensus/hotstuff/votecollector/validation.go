@@ -4,9 +4,10 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 )
 
-// ValidateVote performs general checks against cached block proposal
+// VoteComplianceCheck performs general checks against cached block proposal
 // Returns nil on success and sentinel model.InvalidVoteError in case vote is invalid
-func ValidateVote(vote *model.Vote, block *model.Block) error {
+// TODO: this function can be reused vote vote validator by validator/validator.go
+func VoteComplianceCheck(vote *model.Vote, block *model.Block) error {
 	// block hash must match
 	if vote.BlockID != block.BlockID {
 		// Sanity check! Failing indicates a bug in the higher-level logic

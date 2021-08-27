@@ -53,7 +53,7 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	}
 
 	// perform compliance checks on vote
-	err := ValidateVote(vote, c.block)
+	err := VoteComplianceCheck(vote, c.block)
 	if err != nil {
 		return fmt.Errorf("submitted invalid vote (%x) at view %d: %w", vote.ID(), vote.View, err)
 	}
