@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 const NotSet = "not set"
@@ -99,7 +100,7 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
-	bindAddr              string
+	BindAddr              string
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
@@ -134,8 +135,8 @@ type NodeConfig struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
-	Middleware        *p2p.Middleware
-	Network           *p2p.Network
+	Middleware        network.Middleware
+	Network           p2p.ReadyDoneAwareNetwork
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
@@ -160,7 +161,7 @@ func DefaultBaseConfig() *BaseConfig {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
-		bindAddr:              NotSet,
+		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
@@ -174,5 +175,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
 		metricsEnabled:        true,
+		receiptsCacheSize:     bstorage.DefaultCacheSize,
+		guaranteesCacheSize:   bstorage.DefaultCacheSize,
 	}
 }
