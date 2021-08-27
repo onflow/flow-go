@@ -5,8 +5,10 @@ import (
 	"errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
@@ -59,6 +61,8 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	ctx, cancel := context.WithCancel(context.Background())
 	anb.Cancel = cancel
 
+	anb.deriveBootstrapPeerIdentities()
+
 	anb.validateParams()
 
 	// if a network key has been passed in the init node info here
@@ -79,10 +83,61 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 	return anb
 }
 
+// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
+// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
+func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
+	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+	builder.MustNot(err)
+	builder.bootstrapIdentities = ids
+}
+
 func (anb *UnstakedAccessNodeBuilder) validateParams() {
+	if anb.BaseConfig.BindAddr != cmd.NotSet {
+		anb.Logger.Fatal().Msg("bind address not specified")
+	}
+	if len(anb.bootstrapNodeAddresses) == 0 {
+		anb.Logger.Fatal().Msg("no bootstrap node address provided")
+	}
 	if len(anb.bootstrapNodeAddresses) != len(anb.bootstrapNodePublicKeys) {
 		anb.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
 	}
+}
+
+// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the unstaked node.
+// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
+// The LibP2P host is created with the following options:
+// 		DHT as client and seeded with the given bootstrap peers
+// 		The specified bind address as the listen address
+// 		The passed in private key as the libp2p key
+//		No connection gater
+// 		No connection manager
+// 		Default libp2p pubsub options
+func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
+	nodeID flow.Identifier,
+	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
+
+	// the unstaked nodes act as the DHT clients
+	dhtOptions := []dht.Option{p2p.AsServer(false)}
+
+	// seed the DHT with the boostrap identities
+	bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentities)
+	builder.MustNot(err)
+	dhtOptions = append(dhtOptions, bootstrapPeersOpt)
+
+	return func() (*p2p.Node, error) {
+		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
+			SetRootBlockID(builder.RootBlock.ID().String()).
+			// unlike the staked side of the network where currently all the node addresses are known upfront,
+			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
+			SetDHTOptions(dhtOptions...).
+			SetLogger(builder.Logger).
+			Build(ctx)
+		if err != nil {
+			return nil, err
+		}
+		builder.LibP2PNode = libp2pNode
+		return builder.LibP2PNode, nil
+	}, nil
 }
 
 // initUnstakedLocal initializes the unstaked node ID, network key and network address
