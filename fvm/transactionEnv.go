@@ -528,6 +528,10 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) GetComputationLimit() uint64 {
+	// if gas limit is set to zero return the default one
+	if e.tx.GasLimit == 0 {
+		return e.ctx.GasLimit
+	}
 	return e.tx.GasLimit
 }
 
