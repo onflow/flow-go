@@ -16,7 +16,7 @@ import (
 type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
-	voteValidator *VoteValidator
+	block         *model.Block
 	combinedAggr  hotstuff.CombinedSigAggregator
 	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
@@ -53,7 +53,7 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	}
 
 	// perform compliance checks on vote
-	err := c.voteValidator.Validate(vote)
+	err := ValidateVote(vote, c.block)
 	if err != nil {
 		return fmt.Errorf("submitted invalid vote (%x) at view %d: %w", vote.ID(), vote.View, err)
 	}
