@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
-	idModule "github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -82,7 +82,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider idModule.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
 	cm := p2p.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
@@ -205,7 +205,7 @@ func GenerateNetworks(t *testing.T,
 			tops[i],
 			sms[i],
 			metrics,
-			idModule.NewFixedIdentityProvider(ids),
+			id.NewFixedIdentityProvider(ids),
 		)
 		require.NoError(t, err)
 
@@ -262,8 +262,7 @@ func generateLibP2PNode(t *testing.T,
 	id flow.Identity,
 	key crypto.PrivateKey,
 	connGating bool,
-	key crypto.PrivateKey,
-	idProvider idModule.IdentityProvider,
+	idProvider id.IdentityProvider,
 ) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
