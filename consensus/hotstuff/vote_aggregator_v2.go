@@ -7,7 +7,7 @@ import (
 // BlockSigner abstracts the implementation of how a signature of a block or a vote is produced
 // and stored in a stateful crypto object for aggregation.
 // The VoteAggregator implements both the VoteAggregator interface and the BlockSigner interface so that
-// The EventHandler could use the VoteAggregator interface to send Block, and Voter/BlockProducer can use
+// the EventHandler could use the VoteAggregator interface to sign a Block, and Voter/BlockProducer can use
 // the BlockSigner interface to create vote.
 // When `CreateVote` is called, it internally creates stateful VoteCollector object, which also has the ability
 // to verify the block and generate the vote signature.
@@ -34,14 +34,13 @@ type VoteAggregatorV2 interface {
 	// It returns:
 	//  - nil if the vote has been added to the queue for async processing
 	//  - error if there is exception adding the vote to the queue
-
 	AddVote(vote *model.Vote) error
 
 	// AddBlock notifies the VoteAggregator about a known block so that it can start processing
 	// pending votes whose block was unknown.
 	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
 	// It returns:
-	// 	- nil if the block is valid
+	// - nil if the block is valid
 	//  - model.InvalidBlockError if the block is invalid
 	//  - error if there is exception
 	AddBlock(block *model.Proposal) error

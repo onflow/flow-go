@@ -26,7 +26,7 @@ type VoteAggregatorV2 struct {
 	highestPrunedView   counters.StrictMonotonousCounter
 	collectors          hotstuff.VoteCollectors
 	queuedVotesNotifier engine.Notifier
-	queuedVotes         *fifoqueue.FifoQueue // keeps track of votes whose blocks can not be found
+	queuedVotes         *fifoqueue.FifoQueue
 }
 
 // TODO: Move to tests
@@ -136,9 +136,14 @@ func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 		return nil
 	}
 
-	err := va.collectors.ProcessBlock(block)
+	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View, block.Block.BlockID)
 	if err != nil {
-		return fmt.Errorf("could not process block %v: %w", block.Block.BlockID, err)
+		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
+	}
+
+	err = collector.ProcessBlock(block)
+	if err != nil {
+		return fmt.Errorf("could not process block: %v, %w", block.Block.BlockID, err)
 	}
 
 	return nil
