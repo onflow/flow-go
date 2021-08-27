@@ -6,9 +6,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RandomBeaconReconstructorImpl wraps the thresholdSigner, and translates the signer identity
-// into signer index
-type RandomBeaconReconstructorImpl struct {
+// RandomBeaconReconstructor implements hotstuff.RandomBeaconReconstructor. 
+// The implementation wraps the thresholdSigner and translates the signer identity into signer index.
+type RandomBeaconReconstructor struct {
 	dkg                  hotstuff.DKG                // to lookup signer index by signer ID
 	identity2SignerIndex map[flow.Identifier]int     // lookup signer index by identity
 	randomBeaconSigner   hotstuff.RandomBeaconSigner // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block

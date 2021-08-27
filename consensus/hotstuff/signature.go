@@ -65,6 +65,11 @@ type SignatureAggregator interface {
 	// Aggregate assumes enough shares have been collected, it aggregates the signatures
 	// and return the aggregated signature.
 	// if called concurrently, only one thread will be running the aggregation.
+	// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
+	// It errors if not enough weights have been collected.
+	// The function performs a final verification and errors if the aggregated signature is not valid. This is 
+	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
+	// If called concurrently, only one thread will be running the aggregation.
 	// TODO: consider return (signerIDs and crypto.Signature)
 	Aggregate() ([]byte, error)
 }
@@ -110,7 +115,7 @@ type AggregatedSignatureData struct {
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
-	// blockID is the block that the aggregated sig is signed for
+	// blockID is the block that the aggregated sig is for
 	// sig is the aggregated signature data
 	Pack(blockID flow.Identifier, sig *AggregatedSignatureData) ([]flow.Identifier, []byte, error)
 
