@@ -16,14 +16,18 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize      *prometheus.HistogramVec
-	inboundMessageSize       *prometheus.HistogramVec
-	duplicateMessagesDropped *prometheus.CounterVec
-	queueSize                *prometheus.GaugeVec
-	queueDuration            *prometheus.HistogramVec
-	inboundProcessTime       *prometheus.CounterVec
-	outboundConnectionCount  prometheus.Gauge
-	inboundConnectionCount   prometheus.Gauge
+	outboundMessageSize       *prometheus.HistogramVec
+	inboundMessageSize        *prometheus.HistogramVec
+	duplicateMessagesDropped  *prometheus.CounterVec
+	queueSize                 *prometheus.GaugeVec
+	queueDuration             *prometheus.HistogramVec
+	inboundProcessTime        *prometheus.CounterVec
+	outboundConnectionCount   prometheus.Gauge
+	inboundConnectionCount    prometheus.Gauge
+	dnsLookupDuration         prometheus.Histogram
+	dnsCacheMissCount         prometheus.Counter
+	dnsCacheHitCount          prometheus.Counter
+	dnsCacheInvalidationCount prometheus.Counter
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -52,6 +56,35 @@ func NewNetworkCollector() *NetworkCollector {
 			Name:      "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
 		}, []string{LabelChannel, LabelMessage}),
+
+		dnsLookupDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_lookup_duration_ms",
+			Buckets:   []float64{1, 10, 100, 500, 1000, 2000},
+			Help:      "the time spent on resolving a dns lookup (including cache hits)",
+		}),
+
+		dnsCacheMissCount: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_cache_miss_total",
+			Help:      "the number of dns lookups that miss the cache and made through network",
+		}),
+
+		dnsCacheInvalidationCount: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_cache_invalidation_total",
+			Help:      "the number of times dns cache is invalidated for an entry",
+		}),
+
+		dnsCacheHitCount: promauto.NewCounter(prometheus.CounterOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Name:      "dns_cache_hit_total",
+			Help:      "the number of dns cache hits",
+		}),
 
 		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
@@ -127,10 +160,33 @@ func (nc *NetworkCollector) InboundProcessDuration(topic string, duration time.D
 	nc.inboundProcessTime.WithLabelValues(topic).Add(duration.Seconds())
 }
 
+// OutboundConnections updates the metric tracking the number of outbound connections of this node
 func (nc *NetworkCollector) OutboundConnections(connectionCount uint) {
 	nc.outboundConnectionCount.Set(float64(connectionCount))
 }
 
+// InboundConnections updates the metric tracking the number of inbound connections of this node
 func (nc *NetworkCollector) InboundConnections(connectionCount uint) {
 	nc.inboundConnectionCount.Set(float64(connectionCount))
+}
+
+// DNSLookupDuration tracks the time spent to resolve a DNS address.
+func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
+	nc.dnsLookupDuration.Observe(float64(duration.Milliseconds()))
+}
+
+// OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
+func (nc *NetworkCollector) OnDNSCacheMiss() {
+	nc.dnsCacheMissCount.Inc()
+}
+
+// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
+func (nc *NetworkCollector) OnDNSCacheInvalidated() {
+	nc.dnsCacheInvalidationCount.Inc()
+}
+
+// OnDNSCacheHit tracks the total number of dns requests resolved through the cache without
+// looking up the network.
+func (nc *NetworkCollector) OnDNSCacheHit() {
+	nc.dnsCacheHitCount.Inc()
 }
