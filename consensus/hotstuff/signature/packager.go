@@ -17,10 +17,10 @@ func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPacke
 	}
 }
 
-func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.AggregatedSignatureData) ([]flow.Identifier, []byte, error) {
+func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	panic("to be implemented")
 }
 
-func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.AggregatedSignatureData, error) {
+func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	panic("to be implemented")
 }

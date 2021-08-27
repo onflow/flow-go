@@ -102,9 +102,9 @@ type CombinedSigAggregator interface {
 	Aggregate() (aggregatedStakingSig []byte, aggregatedRandomBeaconSig []byte, exception error)
 }
 
-// AggregatedSignatureData is an intermediate struct for Packer to pack the
+// BlockSignatureData is an intermediate struct for Packer to pack the
 // aggregated signature data into raw bytes or unpack from raw bytes.
-type AggregatedSignatureData struct {
+type BlockSignatureData struct {
 	StakingSigners               []flow.Identifier
 	RandomBeaconSigners          []flow.Identifier
 	AggregatedStakingSig         []byte
@@ -116,9 +116,9 @@ type AggregatedSignatureData struct {
 type Packer interface {
 	// blockID is the block that the aggregated sig is for
 	// sig is the aggregated signature data
-	Pack(blockID flow.Identifier, sig *AggregatedSignatureData) ([]flow.Identifier, []byte, error)
+	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
 
 	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
-	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*AggregatedSignatureData, error)
+	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }
