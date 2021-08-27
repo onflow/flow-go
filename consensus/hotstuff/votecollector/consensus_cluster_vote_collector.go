@@ -38,7 +38,7 @@ func (c *ConsensusClusterVoteCollector) CreateVote(block *model.Block) (*model.V
 func (c *ConsensusClusterVoteCollector) validateSignature(signerID flow.Identifier, sigType hotstuff.SigType, sig crypto.Signature) (bool, error) {
 	switch sigType {
 	case hotstuff.SigTypeStaking:
-		return c.combinedAggr.Verify(signerID, sig)
+		return c.combinedAggr.Verify(signerID, sig, hotstuff.SigTypeStaking)
 	case hotstuff.SigTypeRandomBeacon:
 		return c.reconstructor.Verify(signerID, sig)
 	}
