@@ -107,7 +107,7 @@ func (anb *UnstakedAccessNodeBuilder) validateParams() {
 	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
 		anb.Logger.Fatal().Msg("bind address not specified")
 	}
-	if anb.NetworkKey == nil {
+	if anb.AccessNodeConfig.NetworkKey == nil {
 		anb.Logger.Fatal().Msg("networking key not provided")
 	}
 	if len(anb.bootstrapIdentities) > 0 {
