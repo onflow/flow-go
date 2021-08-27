@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	message "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
@@ -255,8 +255,7 @@ func generateLibP2PNode(t *testing.T,
 	connManager := NewTagWatchingConnManager(logger, noopMetrics)
 
 	// dns resolver
-	resolver, err := dns.NewResolver(noopMetrics)
-	require.NoError(t, err)
+	resolver := dns.NewResolver(noopMetrics)
 
 	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
 		SetRootBlockID(rootBlockID).
