@@ -24,6 +24,12 @@ func NewRandomBeaconReconstructurImpl(dkg hotstuff.DKG, identity2SignerIndex map
 	}
 }
 
+// Verify returns true if and only if the signature is valid.
+// It expects that correct type of signature is passed. Only SigTypeRandomBeacon is supported
+func (r *RandomBeaconReconstructorImpl) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
+	panic("to be implemented")
+}
+
 // TrustedAdd adds the signature share to the reconstructors internal
 // state. Validity of signature is not checked. It is up to the
 // implementation, whether it still adds a signature or not, when the
