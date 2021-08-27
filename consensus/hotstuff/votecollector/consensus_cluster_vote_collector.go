@@ -16,6 +16,7 @@ import (
 type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
+	voteValidator *VoteValidator
 	combinedAggr  hotstuff.CombinedSigAggregator
 	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
@@ -51,6 +52,12 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		return nil
 	}
 
+	// perform compliance checks on vote
+	err := c.voteValidator.Validate(vote)
+	if err != nil {
+		return fmt.Errorf("submitted invalid vote (%x) at view %d: %w", vote.ID(), vote.View, err)
+	}
+
 	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
 	// handle InvalidVoteError
 	if err != nil {
@@ -62,9 +69,8 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 		return fmt.Errorf("could not verify vote signature: %w", err)
 	}
 
-	// TODO: handle invalid error with sentinel error or callback
 	if !valid {
-		return fmt.Errorf("invalid signature")
+		return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
 	}
 
 	if c.done.Load() {
