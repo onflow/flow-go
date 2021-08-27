@@ -38,12 +38,13 @@ func init() {
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
-	ContainerName   string
-	LogLevel        zerolog.Level
-	Ghost           bool
-	AdditionalFlags []string
-	Debug           bool
-	Unstaked        bool
+	ContainerName         string
+	LogLevel              zerolog.Level
+	Ghost                 bool
+	AdditionalFlags       []string
+	Debug                 bool
+	Unstaked              bool
+	SupportsUnstakedNodes bool
 }
 
 // ImageName returns the Docker image name for the given config.
