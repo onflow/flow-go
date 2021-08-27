@@ -2,7 +2,6 @@ package node_builder
 
 import (
 	"context"
-	"errors"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -52,6 +51,17 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 		anb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
+		// use the default identifier provider
+		anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+
+			// use the middleware that should have now been initialized
+			middleware, ok := anb.Middleware.(*p2p.Middleware)
+			if !ok {
+				anb.Logger.Fatal().Msg("middleware was of unexpected type")
+			}
+		return middleware.IdentifierProvider()
+		}
+
 		return nil
 	})
 }
@@ -65,7 +75,7 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	anb.validateParams()
 
-	// if a network key has been passed in, skip the init node info
+	// if a network key has been passed in, then initialize the node ID and networking key from it
 	if anb.AccessNodeConfig.NetworkKey != nil {
 		anb.initNodeInfo()
 	}
@@ -198,17 +208,6 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware(ctx context.Context) {
 // Build enqueues the sync engine and the follower engine for the unstaked access node.
 // Currently, the unstaked AN only runs the follower engine.
 func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	anb.
-		Module("sync engine participants provider", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			middleware, ok := anb.Middleware.(*p2p.Middleware)
-			if !ok {
-				return errors.New("middleware was of unexpected type")
-			}
-			// use the default identifier provider
-			anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider { return middleware.IdentifierProvider() }
-			return nil
-		})
-
 	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
 	return anb
 }
