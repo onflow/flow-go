@@ -65,7 +65,7 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	anb.validateParams()
 
-	// if a network key has been passed in the init node info here
+	// if a network key has been passed in, skip the init node info
 	if anb.AccessNodeConfig.NetworkKey != nil {
 		anb.initNodeInfo()
 	}
@@ -86,14 +86,22 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
 func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
+	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
+	// line params)
+	if builder.bootstrapIdentities != nil {
+		return
+	}
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
 	builder.MustNot(err)
 	builder.bootstrapIdentities = ids
 }
 
 func (anb *UnstakedAccessNodeBuilder) validateParams() {
-	if anb.BaseConfig.BindAddr != cmd.NotSet {
+	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
 		anb.Logger.Fatal().Msg("bind address not specified")
+	}
+	if len(anb.bootstrapIdentities) > 0 {
+		return
 	}
 	if len(anb.bootstrapNodeAddresses) == 0 {
 		anb.Logger.Fatal().Msg("no bootstrap node address provided")
