@@ -9,8 +9,8 @@ on:
       - feature/consensus-voting
 
 jobs:
-  golangci:
-    name: Lint
+  golangci-consensus-feature:
+    name: Lint on consensus feature
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repo
@@ -30,8 +30,8 @@ jobs:
       with:
         scandir: './crypto'
         ignore: 'relic'
-  unit-test:
-    name: Unit Tests
+  unit-test-consensus-feature:
+    name: Unit Tests on consensus feature
     strategy:
       fail-fast: false
       matrix:
@@ -66,8 +66,8 @@ jobs:
         flags: unittests
         name: codecov-umbrella
     
-  integration-test:
-    name: Integration Tests
+  integration-test-consensus-feature:
+    name: Integration Tests on consensus feature
     strategy:
       fail-fast: false
       matrix:
