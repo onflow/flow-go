@@ -43,10 +43,11 @@ const (
 	SigTypeInvalid
 )
 
-// SignatureAggregator aggregates the verified signatures.
+// WeighedSignatureAggregator aggregates signatures of the same signature scheme from different signers. 
+// The module is aware of weights assigned to each signer. 
 // It can either be used to aggregate staking signatures or aggregate random beacon signatures,
-// but not a mix of staking signature and random beacon signature.
-// Implementation of SignatureAggregator must be concurrent safe
+// but not a mix of both.
+// Implementation of SignatureAggregator must be concurrent safe.
 type SignatureAggregator interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message.
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
