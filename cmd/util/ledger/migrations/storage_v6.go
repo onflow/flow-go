@@ -81,11 +81,7 @@ func (e *EncodingStorage) Store(id atree.StorageID, value []byte) error {
 
 	payload := ledger.Payload{
 
-		//TODO: Properly convert storageID to ledger.Key
-		Key: ledger.NewKey([]ledger.KeyPart{
-			ledger.NewKeyPart(0, id.Address[:]),
-			ledger.NewKeyPart(1, id.Index[:]),
-		}),
+		Key: ledgerKeyFromStorageID(id),
 
 		// TODO: Still need to prepend magic number?
 		Value: newInter.PrependMagic(
@@ -97,6 +93,14 @@ func (e *EncodingStorage) Store(id atree.StorageID, value []byte) error {
 	e.Payloads = append(e.Payloads, payload)
 
 	return nil
+}
+
+func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
+	return ledger.NewKey([]ledger.KeyPart{
+		ledger.NewKeyPart(0, id.Address[:]),
+		ledger.NewKeyPart(1, []byte{}),
+		ledger.NewKeyPart(2, id.Index[:]),
+	})
 }
 
 type brokenTypeCause int
