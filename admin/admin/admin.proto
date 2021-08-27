@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package admin;
+option go_package = "github.com/onflow/flow-go/admin/admin";
+
+import "google/protobuf/struct.proto";
+
+service Admin {
+  rpc RunCommand(RunCommandRequest) returns (RunCommandResponse);
+}
+
+message RunCommandRequest {
+  string commandName = 1;
+  google.protobuf.Struct data = 2;
+}
+
+message RunCommandResponse {
+  google.protobuf.Struct data = 2;
+}
