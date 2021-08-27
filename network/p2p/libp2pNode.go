@@ -57,12 +57,6 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 
 	connGater := NewConnGater(log)
 
-	// TODO: uncomment following lines to activate dns caching
-	//resolver, err := dns.NewResolver(metrics)
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	//}
-
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
@@ -71,7 +65,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
-			// SetResolver(resolver).
+			SetResolver(dns.NewResolver(metrics)).
 			Build(ctx)
 	}, nil
 }
