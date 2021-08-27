@@ -4,13 +4,9 @@ on:
   push:
     branches:
       - feature/consensus-voting
-      - 'auto-cadence-upgrade/**'
-      - staging
-      - trying
   pull_request:
     branches:
       - feature/consensus-voting
-      - 'auto-cadence-upgrade/**'
 
 jobs:
   golangci:
@@ -19,6 +15,8 @@ jobs:
     steps:
     - name: Checkout repo
       uses: actions/checkout@v2
+      with:
+        ref: feature/consensus-voting
     - name: Build relic
       run: make crypto/relic/build
     - name: Run golangci-lint
@@ -48,6 +46,8 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - name: Checkout repo
       uses: actions/checkout@v2
+      with:
+        ref: feature/consensus-voting
     - name: Run tests
       if: github.actor != 'bors[bot]'
       run: make ci
