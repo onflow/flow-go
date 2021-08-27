@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
-	madns "github.com/multiformats/go-multiaddr-dns"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -640,14 +639,11 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(log, noopMetrics)
 
-	libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
-	require.NoError(t, err)
-
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
 		SetRootBlockID(rootID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
-		SetResolver(libp2pResolver).
+		SetResolver(dns.NewResolver(metrics.NewNoopCollector())).
 		SetLogger(log)
 
 	if allowList {
