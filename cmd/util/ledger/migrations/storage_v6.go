@@ -105,6 +105,11 @@ func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
 
 type brokenTypeCause int
 
+type ownerKeyPair struct {
+	owner string
+	key   string
+}
+
 type StorageFormatV6Migration struct {
 	Log           zerolog.Logger
 	OutputDir     string
@@ -114,6 +119,9 @@ type StorageFormatV6Migration struct {
 	reportFile    *os.File
 	storage       *atree.PersistentSlabStorage
 	baseStorage   *EncodingStorage
+	view          state.View
+
+	loadedDeferredValues map[ownerKeyPair]bool
 }
 
 func (m StorageFormatV6Migration) filename() string {
@@ -141,11 +149,13 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.Log.Info().Msg("Loading account contracts ...")
 
 	m.accounts = m.getContractsOnlyAccounts(payloads)
+	m.view = newView(payloads)
 
 	m.Log.Info().Msg("Loaded account contracts")
 
 	m.programs = programs.NewEmptyPrograms()
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
+	m.loadedDeferredValues = make(map[ownerKeyPair]bool, 0)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
@@ -299,6 +309,15 @@ func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledg
 		return &payload, nil
 	}
 
+	// If the payload is a deferred value, then skip it by not converting
+	// to new values. Then it doesn't get added to the storage.
+	if m.loadedDeferredValues[ownerKeyPair{
+		owner: string(rawOwner),
+		key:   string(rawKey),
+	}] {
+		return &payload, nil
+	}
+
 	// Extract the owner from the key
 
 	err = m.reencodeValue(
@@ -329,12 +348,96 @@ func (m StorageFormatV6Migration) reencodeValue(
 	owner common.Address,
 	key string,
 	version uint16,
-) (
-	err error,
-) {
+) (err error) {
 
 	// Decode the value
 
+	rootValue, err, skip := m.decode(data, owner, key, version)
+	if skip {
+		return nil
+	}
+
+	if err != nil {
+		return err
+	}
+
+	// Convert old value to new value
+
+	defer func() {
+		if r := recover(); r != nil {
+			panicErr, isError := r.(error)
+			if !isError {
+				panic(r)
+			}
+
+			err = panicErr
+		}
+	}()
+
+	inter, err := oldInter.NewInterpreter(
+		nil,
+		nil,
+		oldInter.WithStorageReadHandler(
+			func(inter *oldInter.Interpreter, owner common.Address, key string, deferred bool) oldInter.OptionalValue {
+
+				ownerStr := string(owner.Bytes())
+
+				m.loadedDeferredValues[ownerKeyPair{
+					owner: ownerStr,
+					key:   key,
+				}] = true
+
+				registerValue, err := m.view.Get(ownerStr, "", key)
+				if err != nil {
+					panic(err)
+				}
+
+				// Strip magic
+
+				content, version := oldInter.StripMagic(registerValue)
+
+				if version != oldInter.CurrentEncodingVersion {
+					panic(fmt.Errorf(
+						"invalid storage format version for key: %s: %d",
+						key,
+						version,
+					))
+				}
+
+				err = storageMigrationV6DecMode.Valid(content)
+				if err != nil {
+					panic(err)
+				}
+
+				// Decode
+
+				value, err, skip := m.decode(content, owner, key, oldInter.CurrentEncodingVersion)
+				if skip || err != nil {
+					panic(err)
+				}
+
+				return &oldInter.SomeValue{
+					Value: value,
+					Owner: &owner,
+				}
+			},
+		),
+	)
+
+	if err != nil {
+		return fmt.Errorf(
+			"failed to create interpreter: %w",
+			err,
+		)
+	}
+
+	converter := NewValueConverter(m.storage)
+	_ = converter.Convert(inter, rootValue)
+
+	return nil
+}
+
+func (m StorageFormatV6Migration) decode(data []byte, owner common.Address, key string, version uint16) (oldInter.Value, error, bool) {
 	storagePath := []string{key}
 
 	rootValue, err := oldInter.DecodeValue(data, &owner, storagePath, version, nil)
@@ -348,13 +451,13 @@ func (m StorageFormatV6Migration) reencodeValue(
 				Str("owner", owner.String()).
 				Msgf("DELETING unsupported storage reference")
 
-			return nil
+			return nil, nil, true
 
 		} else {
-			return fmt.Errorf(
+			return nil, fmt.Errorf(
 				"failed to decode value: %w\n\nvalue:\n%s\n",
 				err, hex.Dump(data),
-			)
+			), true
 		}
 	}
 
@@ -374,13 +477,7 @@ func (m StorageFormatV6Migration) reencodeValue(
 			return true
 		},
 	)
-
-	// Convert old value to new value
-
-	converter := NewValueConverter(m.storage)
-	_ = converter.Convert(rootValue)
-
-	return nil
+	return rootValue, nil, false
 }
 
 func cborMeLink(value []byte) string {
@@ -402,7 +499,7 @@ func NewValueConverter(storage atree.SlabStorage) *ValueConverter {
 	}
 }
 
-func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
+func (c *ValueConverter) Convert(inter *oldInter.Interpreter, value oldInter.Value) newInter.Value {
 	prevResult := c.result
 	c.result = nil
 
@@ -411,7 +508,11 @@ func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
 	}()
 
 	// Interpreter is never used. So safe to pass nil here.
-	value.Accept(nil, c)
+	value.Accept(inter, c)
+
+	if c.result == nil {
+		panic("returned nil")
+	}
 
 	return c.result
 }
@@ -438,11 +539,11 @@ func (c *ValueConverter) VisitStringValue(_ *oldInter.Interpreter, value *oldInt
 	c.result = newInter.NewStringValue(value.Str)
 }
 
-func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
+func (c *ValueConverter) VisitArrayValue(inter *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
 	newElements := make([]newInter.Value, value.Count())
 
 	for index, element := range value.Elements() {
-		newElements[index] = c.Convert(element)
+		newElements[index] = c.Convert(inter, element)
 	}
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
@@ -538,11 +639,11 @@ func (c *ValueConverter) VisitUFix64Value(_ *oldInter.Interpreter, value oldInte
 	c.result = newInter.NewUFix64ValueWithInteger(uint64(value.ToInt()))
 }
 
-func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
+func (c *ValueConverter) VisitCompositeValue(inter *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
 	fields := newInter.NewStringValueOrderedMap()
 
 	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
-		fields.Set(key, c.Convert(fieldVal))
+		fields.Set(key, c.Convert(inter, fieldVal))
 	})
 
 	// TODO: Convert location and kind to new package?
@@ -559,20 +660,15 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 	return false
 }
 
-func (c *ValueConverter) VisitDictionaryValue(_ *oldInter.Interpreter, value *oldInter.DictionaryValue) bool {
+func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value *oldInter.DictionaryValue) bool {
 	staticType := ConvertStaticType(value.StaticType()).(newInter.DictionaryStaticType)
 
 	keysAndValues := make([]newInter.Value, value.Count()*2)
 
 	for index, key := range value.Keys().Elements() {
-		keysAndValues[index*2] = c.Convert(key)
+		keysAndValues[index*2] = c.Convert(inter, key)
+		keysAndValues[index*2+1] = c.Convert(inter, value.Get(inter, nil, key))
 	}
-
-	index := 0
-	value.Entries().Foreach(func(_ string, value oldInter.Value) {
-		keysAndValues[index*2+1] = c.Convert(value)
-		index++
-	})
 
 	// TODO: pass address as a parameter?
 	c.result = newInter.NewDictionaryValue(
@@ -589,8 +685,8 @@ func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilVa
 	c.result = newInter.NilValue{}
 }
 
-func (c *ValueConverter) VisitSomeValue(_ *oldInter.Interpreter, value *oldInter.SomeValue) bool {
-	innerValue := c.Convert(value.Value)
+func (c *ValueConverter) VisitSomeValue(inter *oldInter.Interpreter, value *oldInter.SomeValue) bool {
+	innerValue := c.Convert(inter, value.Value)
 	c.result = newInter.NewSomeValueNonCopying(innerValue)
 
 	// Do not descent
@@ -616,10 +712,14 @@ func (c *ValueConverter) VisitPathValue(_ *oldInter.Interpreter, value oldInter.
 	}
 }
 
-func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value oldInter.CapabilityValue) {
-	address := c.Convert(value).(newInter.AddressValue)
-	pathValue := c.Convert(value).(newInter.PathValue)
-	burrowType := ConvertStaticType(value.BorrowType)
+func (c *ValueConverter) VisitCapabilityValue(inter *oldInter.Interpreter, value oldInter.CapabilityValue) {
+	address := c.Convert(inter, value.Address).(newInter.AddressValue)
+	pathValue := c.Convert(inter, value.Path).(newInter.PathValue)
+
+	var burrowType newInter.StaticType
+	if value.BorrowType != nil {
+		burrowType = ConvertStaticType(value.BorrowType)
+	}
 
 	c.result = &newInter.CapabilityValue{
 		Address:    address,
@@ -628,8 +728,8 @@ func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value old
 	}
 }
 
-func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.LinkValue) {
-	targetPath := c.Convert(value.TargetPath).(newInter.PathValue)
+func (c *ValueConverter) VisitLinkValue(inter *oldInter.Interpreter, value oldInter.LinkValue) {
+	targetPath := c.Convert(inter, value.TargetPath).(newInter.PathValue)
 	c.result = newInter.LinkValue{
 		TargetPath: targetPath,
 		Type:       ConvertStaticType(value.Type),
