@@ -48,7 +48,7 @@ const (
 // but not a mix of staking signature and random beacon signature.
 // Implementation of SignatureAggregator must be concurrent safe
 type SignatureAggregator interface {
-	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message. 
+	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message.
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 
 	// TrustedAdd adds an already verified signature, with weight for the given signer,
@@ -73,7 +73,7 @@ type SignatureAggregator interface {
 // sufficient weights for representing the majority of stakes have been collected. If yes, then aggregate
 // the signatures.
 type CombinedSigAggregator interface {
-	// Verify verifies the signature under the stored public key corresponding to the signerID and the stored message. 
+	// Verify verifies the signature under the stored public key corresponding to the signerID and the stored message.
 	// `sigType` specifies the type of the input signature (random beacon or hotstuff), which helps the module pick the right stored public key and message.
 	Verify(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (bool, error)
 
