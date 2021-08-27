@@ -93,7 +93,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 	anb.FlowAccessNodeBuilder.Build()
 
-	if anb.SupportsUnstakedNode() {
+	if anb.supportsUnstakedFollower {
 		var unstakedNetworkConduit network.Conduit
 		var proxyEngine *splitter.Engine
 
