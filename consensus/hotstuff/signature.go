@@ -8,8 +8,7 @@ import (
 // RandomBeaconReconstructor collects verified signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
-	// Verify returns true if and only if the signature is valid.
-	// It expects that correct type of signature is passed. Only SigTypeRandomBeacon is supported
+	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message agreed about upfront.
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 
 	// TrustedAdd adds the signature share to the reconstructors internal
@@ -49,8 +48,7 @@ const (
 // but not a mix of staking signature and random beacon signature.
 // Implementation of SignatureAggregator must be concurrent safe
 type SignatureAggregator interface {
-	// Verify returns true if and only if the signature is valid.
-	// It expects that correct type of signature is passed. Only SigTypeStaking is supported
+	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message. 
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 
 	// TrustedAdd adds an already verified signature, with weight for the given signer,
@@ -75,10 +73,9 @@ type SignatureAggregator interface {
 // sufficient weights for representing the majority of stakes have been collected. If yes, then aggregate
 // the signatures.
 type CombinedSigAggregator interface {
-	// Verify returns true if and only if the signature is valid.
-	// It expects that correct type of signature is passed. Only SigTypeStaking is supported.
-	// SigTypeRandomBeacon are expected to be checked by RandomBeaconReconstructor.
-	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+	// Verify verifies the signature under the stored public key corresponding to the signerID and the stored message. 
+	// `sigType` specifies the type of the input signature (random beacon or hotstuff), which helps the module pick the right stored public key and message.
+	Verify(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (bool, error)
 
 	// TrustedAdd adds the signature to staking signatures store or random beacon signature store
 	// based on the given sig type.
