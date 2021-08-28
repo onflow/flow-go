@@ -26,6 +26,11 @@ type CommandRunner struct {
 	commandQ   chan *CommandRequest
 	address    string
 	logger     zerolog.Logger
+
+	workersStarted   sync.WaitGroup
+	workersFinished  sync.WaitGroup
+	startupCompleted chan struct{}
+	start            sync.Once
 }
 
 type CommandHandler func(ctx context.Context, data map[string]interface{}) error
@@ -33,11 +38,12 @@ type CommandValidator func(data map[string]interface{}) error
 
 func NewCommandRunner(logger zerolog.Logger, address string) *CommandRunner {
 	return &CommandRunner{
-		handlers:   make(map[string]CommandHandler),
-		validators: make(map[string]CommandValidator),
-		commandQ:   make(chan *CommandRequest, CommandRunnerMaxQueueLength),
-		address:    address,
-		logger:     logger.With().Str("admin", "command_runner").Logger(),
+		handlers:         make(map[string]CommandHandler),
+		validators:       make(map[string]CommandValidator),
+		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
+		address:          address,
+		logger:           logger.With().Str("admin", "command_runner").Logger(),
+		startupCompleted: make(chan struct{}),
 	}
 }
 
@@ -86,13 +92,48 @@ func (r *CommandRunner) getValidator(command string) CommandValidator {
 }
 
 func (r *CommandRunner) Start(ctx context.Context) {
-	for i := 0; i < CommandRunnerNumWorkers; i++ {
-		go r.processLoop(ctx)
-	}
-	go r.runAdminServer(ctx)
+	r.start.Do(func() {
+		for i := 0; i < CommandRunnerNumWorkers; i++ {
+			r.workersStarted.Add(1)
+			r.workersFinished.Add(1)
+			go r.processLoop(ctx)
+		}
+
+		r.workersStarted.Add(1)
+		r.workersFinished.Add(1)
+		go r.runAdminServer(ctx)
+
+		close(r.startupCompleted)
+	})
+}
+
+func (r *CommandRunner) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+
+	go func() {
+		<-r.startupCompleted
+		r.workersStarted.Wait()
+		close(ready)
+	}()
+
+	return ready
+}
+
+func (r *CommandRunner) Done() <-chan struct{} {
+	done := make(chan struct{})
+
+	go func() {
+		<-r.startupCompleted
+		r.workersFinished.Wait()
+		close(done)
+	}()
+
+	return done
 }
 
 func (r *CommandRunner) runAdminServer(ctx context.Context) {
+	defer r.workersFinished.Done()
+
 	select {
 	case <-ctx.Done():
 		return
@@ -110,6 +151,8 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) {
 	pb.RegisterAdminServer(grpcServer, NewAdminServer(r.commandQ))
 	go grpcServer.Serve(listener)
 
+	r.workersStarted.Done()
+
 	<-ctx.Done()
 	r.logger.Info().Msg("admin server shutting down")
 
@@ -122,7 +165,11 @@ func (r *CommandRunner) processLoop(ctx context.Context) {
 		for command := range r.commandQ {
 			close(command.responseChan)
 		}
+
+		r.workersFinished.Done()
 	}()
+
+	r.workersStarted.Done()
 
 	for {
 		select {
