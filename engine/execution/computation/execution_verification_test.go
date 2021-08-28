@@ -185,7 +185,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
-
+		createAccountTx.SetGasLimit(500000)
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(5)
 		require.NoError(t, err)
