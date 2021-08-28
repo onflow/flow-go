@@ -2,9 +2,11 @@ package admin
 
 import (
 	"context"
+	"errors"
 
 	pb "github.com/onflow/flow-go/admin/admin"
-	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type adminServer struct {
@@ -20,12 +22,12 @@ type CommandRequest struct {
 }
 
 type CommandResponse struct {
-	err  error
-	data map[string]interface{}
+	err error
 }
 
 func (s *adminServer) RunCommand(ctx context.Context, in *pb.RunCommandRequest) (*pb.RunCommandResponse, error) {
 	resp := make(chan *CommandResponse, 1)
+
 	select {
 	case s.commandQ <- &CommandRequest{
 		ctx,
@@ -34,32 +36,26 @@ func (s *adminServer) RunCommand(ctx context.Context, in *pb.RunCommandRequest) 
 		resp,
 	}:
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return nil, status.Error(codes.Canceled, "client canceled")
+		} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return nil, status.Error(codes.DeadlineExceeded, "request timed out")
+		}
+
+		panic("context returned unexpected error after done channel was closed")
 	}
 
-	// TODO: also use a select around ctx.done() here?
 	response, ok := <-resp
 	if !ok {
-		// TODO: closed without response
-		// this means that there was no handler
-		// so return a sentinel error ErrUnexpectedCommand
+		// response channel was closed without a response
+		return nil, status.Error(codes.Internal, "command terminated unexpectedly")
 	}
 
 	if response.err != nil {
-		// TODO: define sentinel error here
 		return nil, response.err
 	}
 
-	data, err := structpb.NewStruct(response.data)
-	if err != nil {
-		// TODO: probably should log fatal here,
-		// this means the handler returned invalid
-		// data
-	}
-
-	return &pb.RunCommandResponse{
-		Data: data,
-	}, nil
+	return &pb.RunCommandResponse{}, nil
 }
 
 func NewAdminServer(commandQ chan<- *CommandRequest) *adminServer {

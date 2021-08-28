@@ -14,6 +14,4 @@ message RunCommandRequest {
   google.protobuf.Struct data = 2;
 }
 
-message RunCommandResponse {
-  google.protobuf.Struct data = 2;
-}
+message RunCommandResponse {}
