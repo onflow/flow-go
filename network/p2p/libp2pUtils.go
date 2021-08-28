@@ -233,8 +233,8 @@ func flowStream(conn network.Conn) network.Stream {
 	return nil
 }
 
-// ExtractPeerID extracts the LibP2P peer ID associated with the given Flow public key.
-func ExtractPeerID(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
+// PeerIDFromFlowPublicKey converts a Flow public key to a LibP2P peer ID.
+func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
 	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
 	if err != nil {
 		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
@@ -244,6 +244,23 @@ func ExtractPeerID(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
 	pid, err = peer.IDFromPublicKey(pk)
 	if err != nil {
 		err = fmt.Errorf("failed to convert LibP2P key to peer ID: %w", err)
+		return
+	}
+
+	return
+}
+
+// FlowPublicKeyFromPeerID converts a LibP2P peer ID to a Flow public key.
+func FlowPublicKeyFromPeerID(pid peer.ID) (networkPubKey fcrypto.PublicKey, err error) {
+	pk, err := pid.ExtractPublicKey()
+	if err != nil {
+		err = fmt.Errorf("failed to convert peer ID to LibP2P key: %w", err)
+		return
+	}
+
+	networkPubKey, err = FlowPublicKeyFromLibP2P(pk)
+	if err != nil {
+		err = fmt.Errorf("failed to convert LibP2P key to Flow key: %w", err)
 		return
 	}
 
