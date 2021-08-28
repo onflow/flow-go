@@ -20,17 +20,26 @@ const (
 )
 
 type CommandRunner struct {
-	mu         sync.RWMutex
 	handlers   map[string]CommandHandler
 	validators map[string]CommandValidator
 	commandQ   chan *CommandRequest
 	address    string
 	logger     zerolog.Logger
 
-	workersStarted   sync.WaitGroup
-	workersFinished  sync.WaitGroup
+	// mutex to guard against concurrent access to handlers and validators
+	mu sync.RWMutex
+
+	// wait for worker routines to be ready
+	workersStarted sync.WaitGroup
+
+	// wait for worker routines to exit
+	workersFinished sync.WaitGroup
+
+	// signals startup completion
 	startupCompleted chan struct{}
-	start            sync.Once
+
+	// ensures startup only occurs once
+	startOnce sync.Once
 }
 
 type CommandHandler func(ctx context.Context, data map[string]interface{}) error
@@ -92,7 +101,7 @@ func (r *CommandRunner) getValidator(command string) CommandValidator {
 }
 
 func (r *CommandRunner) Start(ctx context.Context) {
-	r.start.Do(func() {
+	r.startOnce.Do(func() {
 		for i := 0; i < CommandRunnerNumWorkers; i++ {
 			r.workersStarted.Add(1)
 			r.workersFinished.Add(1)
@@ -162,6 +171,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) {
 
 func (r *CommandRunner) processLoop(ctx context.Context) {
 	defer func() {
+		// cleanup uncompleted requests from the command queue
 		for command := range r.commandQ {
 			close(command.responseChan)
 		}
