@@ -23,6 +23,6 @@ func TestSecureGRPCDialOpt(t *testing.T) {
 		require.NoError(t, err)
 		// un-encoded public key will cause hex decoding to fail
 		_, err = SecureGRPCDialOpt(nk.PublicKey().String())
-		require.NoError(t, err)
+		require.Error(t, err)
 	})
 }
