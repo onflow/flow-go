@@ -465,9 +465,13 @@ func (n *Node) GetIPPort() (string, string, error) {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ...pubsub.ValidatorEx) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
+
+	if len(validators) > 1 {
+		return nil, errors.New("only one topic validator is allowed")
+	}
 
 	// Check if the topic has been already created and is in the cache
 	n.pubSub.GetTopics()
@@ -478,6 +482,19 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic) (*pubsub.Subs
 		if err != nil {
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
+
+		if len(validators) > 0 {
+			if err := n.pubSub.RegisterTopicValidator(
+				topic.String(), validators[0], pubsub.WithValidatorInline(true),
+			); err != nil {
+				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
+				if closeErr := tp.Close(); closeErr != nil {
+					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to close topic")
+				}
+				return nil, fmt.Errorf("failed to register topic validator: %w", err)
+			}
+		}
+
 		n.topics[topic] = tp
 	}
 
@@ -513,6 +530,8 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 		err := fmt.Errorf("could not find topic (%s)", topic)
 		return err
 	}
+
+	n.pubSub.UnregisterTopicValidator(topic.String())
 
 	// attempt to close the topic
 	err := tp.Close()

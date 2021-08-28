@@ -90,6 +90,13 @@ func Channels() network.ChannelList {
 	return channels
 }
 
+// UnstakedChannels returns all channels that unstaked nodes can send messages on.
+func UnstakedChannels() network.ChannelList {
+	return network.ChannelList{
+		UnstakedSyncCommittee,
+	}
+}
+
 // channels
 const (
 

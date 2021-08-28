@@ -46,6 +46,16 @@ func (cl ChannelList) ID() flow.Identifier {
 	return flow.MakeID(cl)
 }
 
+// Contains retuns true if the ChannelList contains the given channel.
+func (cl ChannelList) Contains(channel Channel) bool {
+	for _, c := range cl {
+		if c == channel {
+			return true
+		}
+	}
+	return false
+}
+
 // Conduit represents the interface for engines to communicate over the
 // peer-to-peer network. Upon registration with the network, each engine is
 // assigned a conduit, which it can use to communicate across the network in
