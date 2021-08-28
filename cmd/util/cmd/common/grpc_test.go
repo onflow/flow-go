@@ -2,8 +2,9 @@ package common
 
 import (
 	"encoding/hex"
-	"github.com/onflow/flow-go/utils/unittest"
 	"testing"
+
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/stretchr/testify/require"
 )
