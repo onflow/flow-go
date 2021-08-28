@@ -7,10 +7,12 @@ on:
       - 'auto-cadence-upgrade/**'
       - staging
       - trying
+      - feature/consensus-voting
   pull_request:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - feature/consensus-voting
 
 jobs:
   golangci:
