@@ -2,8 +2,10 @@ package common
 
 import (
 	"fmt"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+
 	"google.golang.org/grpc"
+
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
 )
 
 func GetGRPCDialOption(accessAddress, accessApiNodePubKey string, insecureAccessAPI bool) (grpc.DialOption, error) {

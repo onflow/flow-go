@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"path/filepath"
 	"testing"
+
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"

@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"time"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+
+	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
-	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -491,4 +493,3 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodePu
 
 	return qcContractClient, nil
 }
-
