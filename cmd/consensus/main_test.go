@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -43,7 +44,9 @@ func TestCreateDKGContractClient(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {
 
 			accessAddress := "17.123.255.123:2353"
-			accessApiNodeID := "02880abb813f1646952edb0a919d60444ebb34b92ce53e00868d526b80cf3621"
+			nk, err := unittest.NetworkingKey()
+			require.NoError(t, err)
+			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
 			insecureAccessAPI := false
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
@@ -53,7 +56,7 @@ func TestCreateDKGContractClient(t *testing.T) {
 			writeNodeMachineAccountInfo(t, infoPath)
 			require.FileExists(t, infoPath)
 
-			client, err := createDKGContractClient(cmd, accessAddress, accessApiNodeID, insecureAccessAPI)
+			client, err := createDKGContractClient(cmd, accessAddress, accessApiNodePubKey, insecureAccessAPI)
 			require.NoError(t, err)
 
 			assert.IsType(t, &dkgmodule.Client{}, client)
@@ -65,7 +68,9 @@ func TestCreateDKGContractClient(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {
 
 			accessAddress := "17.123.255.123:2353"
-			accessApiNodeID := "02880abb813f1646952edb0a919d60444ebb34b92ce53e00868d526b80cf3621"
+			nk, err := unittest.NetworkingKey()
+			require.NoError(t, err)
+			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
 			insecureAccessAPI := false
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
@@ -73,7 +78,7 @@ func TestCreateDKGContractClient(t *testing.T) {
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
 
-			_, err := createDKGContractClient(cmd, accessAddress, accessApiNodeID, insecureAccessAPI)
+			_, err = createDKGContractClient(cmd, accessAddress, accessApiNodePubKey, insecureAccessAPI)
 			require.Error(t, err)
 		})
 	})
