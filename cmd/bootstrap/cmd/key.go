@@ -88,6 +88,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		}
 
 		log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
+		// write the public key to terminal for entry in Flow Port
 		machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 		writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
 	}
