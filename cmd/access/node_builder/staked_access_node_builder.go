@@ -99,7 +99,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 
 		anb.
 			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				proxyEngine := splitter.New(node.Logger, engine.SyncCommittee)
+				proxyEngine = splitter.New(node.Logger, engine.UnstakedSyncCommittee)
 
 				// register the proxy engine with the unstaked network
 				var err error
@@ -119,6 +119,8 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 					node.Storage.Blocks,
 					anb.SyncCore,
 					anb.FinalizedHeader,
+					// don't queue missing heights from unstaked nodes
+					// since we are always more up-to-date than them
 					false,
 				)
 
