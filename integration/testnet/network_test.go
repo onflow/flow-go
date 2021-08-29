@@ -27,6 +27,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 	}
 
 	nodes := []testnet.NodeConfig{
+		testnet.NewNodeConfig(flow.RoleAccess),
 		testnet.NewNodeConfig(flow.RoleCollection),
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleConsensus),
@@ -44,6 +45,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 	realData := getNodeInfos(flowNetwork)
 
 	expectedData := []nodeInfo{
+		{image: defaultRegistry + "/access:latest", name: "access_1", address: "access_1:2137"},
 		{image: defaultRegistry + "/collection:latest", name: "collection_1", address: "collection_1:2137"},
 		{image: defaultRegistry + "/consensus:latest", name: "consensus_1", address: "consensus_1:2137"},
 		{image: defaultRegistry + "/consensus:latest", name: "consensus_2", address: "consensus_2:2137"},
@@ -58,6 +60,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 func TestNetworkSetupMultipleNodes(t *testing.T) {
 
 	nodes := []testnet.NodeConfig{
+		testnet.NewNodeConfig(flow.RoleAccess),
 		testnet.NewNodeConfig(flow.RoleCollection),
 		testnet.NewNodeConfig(flow.RoleCollection),
 		testnet.NewNodeConfig(flow.RoleCollection),
@@ -79,6 +82,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 	realData := getNodeInfos(flowNetwork)
 
 	expectedData := []nodeInfo{
+		{image: defaultRegistry + "/access:latest", name: "access_1", address: "access_1:2137"},
 		{image: defaultRegistry + "/collection:latest", name: "collection_1", address: "collection_1:2137"},
 		{image: defaultRegistry + "/collection:latest", name: "collection_2", address: "collection_2:2137"},
 		{image: defaultRegistry + "/collection:latest", name: "collection_3", address: "collection_3:2137"},
