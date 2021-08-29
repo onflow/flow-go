@@ -627,12 +627,32 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
+	// IMPORTANT: we must add additional flags to LN & SN nodes for secured GRPC conn
+	// 			  --access-node-grpc-public-key
+	// 			  --insecure-access-api
+	// 			  these are added here to LN & SN node confs after networking keys are generated for access nodes
+	accessNodeConfs := filterContainerConfigs(allConfs, func(config ContainerConfig) bool {
+		return config.Role == flow.RoleAccess
+	})
+	securedGRPCPubKey := hex.EncodeToString(accessNodeConfs[0].NetworkPubKey().Encode())
+	secureGRPCAdditionalFlags := []string{
+		fmt.Sprint("--insecure-access-api=false"),
+		fmt.Sprintf("--access-node-grpc-public-key=%s", securedGRPCPubKey),
+	}
+	for i, conf := range allConfs {
+		if conf.Role == flow.RoleConsensus || conf.Role == flow.RoleCollection {
+			conf.AdditionalFlags = append(conf.AdditionalFlags, secureGRPCAdditionalFlags...)
+		}
+		allConfs[i] = conf
+	}
+
 	// only staked configs - this only includes identity table members
 	stakedConfs := filterContainerConfigs(allConfs, func(config ContainerConfig) bool {
 		return !config.Unstaked
 	})
 	fmt.Println(len(stakedConfs))
 	fmt.Println(len(allConfs))
+
 	allNodeInfos := toNodeInfos(allConfs)
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
