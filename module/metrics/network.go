@@ -16,18 +16,18 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize       *prometheus.HistogramVec
-	inboundMessageSize        *prometheus.HistogramVec
-	duplicateMessagesDropped  *prometheus.CounterVec
-	queueSize                 *prometheus.GaugeVec
-	queueDuration             *prometheus.HistogramVec
-	inboundProcessTime        *prometheus.CounterVec
-	outboundConnectionCount   prometheus.Gauge
-	inboundConnectionCount    prometheus.Gauge
-	dnsLookupDuration         prometheus.Histogram
-	dnsCacheMissCount         prometheus.Counter
-	dnsCacheHitCount          prometheus.Counter
-	dnsCacheInvalidationCount prometheus.Counter
+	outboundMessageSize             *prometheus.HistogramVec
+	inboundMessageSize              *prometheus.HistogramVec
+	duplicateMessagesDropped        *prometheus.CounterVec
+	queueSize                       *prometheus.GaugeVec
+	queueDuration                   *prometheus.HistogramVec
+	inboundProcessTime              *prometheus.CounterVec
+	outboundConnectionCount         prometheus.Gauge
+	inboundConnectionCount          prometheus.Gauge
+	dnsLookupDuration               prometheus.Histogram
+	dnsCacheMissCount               prometheus.Counter
+	dnsCacheHitCount                prometheus.Counter
+	dnsCacheInvalidationCount       prometheus.Counter
 	unstakedOutboundConnectionCount prometheus.Gauge
 	unstakedInboundConnectionCount  prometheus.Gauge
 }
@@ -214,4 +214,3 @@ func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
 func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
 	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
 }
-
