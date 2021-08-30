@@ -369,6 +369,13 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 }
 
 func (fnb *FlowNodeBuilder) initDB() {
+
+	// if a db has been passed in, use that instead of creating one
+	if fnb.BaseConfig.db != nil {
+		fnb.DB = fnb.BaseConfig.db
+		return
+	}
+
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
@@ -735,6 +742,12 @@ func WithMetricsEnabled(enabled bool) Option {
 func WithLogLevel(level string) Option {
 	return func(config *BaseConfig) {
 		config.level = level
+	}
+}
+
+func WithDB(db *badger.DB) Option {
+	return func(config *BaseConfig) {
+		config.db = db
 	}
 }
 

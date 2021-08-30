@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -27,7 +29,8 @@ type Config struct {
 	networkPrivKey crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr       string              // address to bind on
-	dataDir        string              // directory to store the protocol state
+	db             *badger.DB          // the badger DB storage to use for the protocol state
+	dataDir        string              // directory to store the protocol state (if the badger storage is not provided)
 	bootstrapDir   string              // path to the bootstrap directory
 	logLevel       string              // log level
 }
@@ -49,6 +52,12 @@ func WithBootstrapDir(bootstrapDir string) Option {
 func WithLogLevel(level string) Option {
 	return func(cf *Config) {
 		cf.logLevel = level
+	}
+}
+
+func WithDB(db *badger.DB) Option {
+	return func(cf *Config) {
+		cf.db = db
 	}
 }
 
@@ -93,9 +102,6 @@ func getBaseOptions(config *Config) []cmd.Option {
 	}
 	if config.bindAddr != "" {
 		options = append(options, cmd.WithBindAddress(config.bindAddr))
-	}
-	if config.logLevel != "" {
-		options = append(options, cmd.WithLogLevel(config.logLevel))
 	}
 
 	return options
