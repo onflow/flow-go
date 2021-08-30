@@ -630,15 +630,27 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// IMPORTANT: we must add additional flags to LN & SN nodes for secured GRPC conn
 	// 			  --access-node-grpc-public-key
 	// 			  --insecure-access-api
-	// 			  these are added here to LN & SN node confs after networking keys are generated for access nodes
+	// 			  these are added here to LN & SN node confs after networking keys are generated for access nodes.
+	// 			  If no access node exists it will default to using insecure GRPC conn
 	accessNodeConfs := filterContainerConfigs(allConfs, func(config ContainerConfig) bool {
 		return config.Role == flow.RoleAccess
 	})
-	securedGRPCPubKey := hex.EncodeToString(accessNodeConfs[0].NetworkPubKey().Encode())
-	secureGRPCAdditionalFlags := []string{
-		fmt.Sprint("--insecure-access-api=false"),
-		fmt.Sprintf("--access-node-grpc-public-key=%s", securedGRPCPubKey),
+
+	secureGRPCAdditionalFlags := make([]string, 0)
+	if len(accessNodeConfs) > 0 {
+		securedGRPCPubKey := hex.EncodeToString(accessNodeConfs[0].NetworkPubKey().Encode())
+		secureGRPCAdditionalFlags = append(
+			secureGRPCAdditionalFlags,
+			fmt.Sprint("--insecure-access-api=false"),
+			fmt.Sprintf("--access-node-grpc-public-key=%s", securedGRPCPubKey),
+		)
+	} else {
+		secureGRPCAdditionalFlags = append(
+			secureGRPCAdditionalFlags,
+			fmt.Sprint("--insecure-access-api=true"),
+		)
 	}
+
 	for i, conf := range allConfs {
 		if conf.Role == flow.RoleConsensus || conf.Role == flow.RoleCollection {
 			conf.AdditionalFlags = append(conf.AdditionalFlags, secureGRPCAdditionalFlags...)
