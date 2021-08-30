@@ -113,6 +113,7 @@ type BaseConfig struct {
 	metricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
+	db                    *badger.DB
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
