@@ -40,7 +40,6 @@ func (suite *Suite) SetupTest() {
 		channel, _ := args.Get(0).(network.Channel)
 		engine, ok := args.Get(1).(module.Engine)
 		suite.Assert().True(ok)
-
 		suite.engines[channel] = engine
 	}).Return(suite.con, nil)
 
