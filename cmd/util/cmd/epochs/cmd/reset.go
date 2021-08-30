@@ -139,10 +139,7 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 	args = append(args, cadence.NewUInt64(epochCounter))
 
 	// add random source
-	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not convert random source to cadence type")
-	}
+	cdcRandomSource := cadence.NewString(hex.EncodeToString(randomSource))
 	args = append(args, cdcRandomSource)
 
 	// add payout
@@ -153,6 +150,7 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 			log.Fatal().Msg("invalid --payout, eg: 10000.0")
 		}
 
+		var err error
 		cdcPayout, err = cadence.NewUFix64(payout)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not convert payout to cadence type")

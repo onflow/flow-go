@@ -642,7 +642,10 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 						if dictionaryType, ok := fieldType.(interpreter.DictionaryStaticType); ok &&
 							fieldValue.Count() == 0 {
 
-							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(dictionaryType)
+							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(
+								m.newInterpreter(),
+								dictionaryType,
+							)
 						}
 					case *interpreter.DictionaryValue:
 						if arrayStaticType, ok := fieldType.(interpreter.ArrayStaticType); ok &&
@@ -1649,4 +1652,13 @@ func (m migrationRuntimeInterface) ImplementationDebugLog(_ string) error {
 
 func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
 	panic("unexpected ValidatePublicKey call")
+}
+
+func (m StorageFormatV5Migration) newInterpreter() *interpreter.Interpreter {
+	inter, err := interpreter.NewInterpreter(nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return inter
 }
