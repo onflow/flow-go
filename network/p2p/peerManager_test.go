@@ -37,7 +37,7 @@ func (suite *PeerManagerTestSuite) generatePeerIDs(n int) peer.IDSlice {
 	pids := peer.IDSlice{}
 	for i := 0; i < n; i++ {
 		key := generateNetworkingKey(suite.T())
-		pid, err := ExtractPeerID(key.PublicKey())
+		pid, err := PeerIDFromFlowPublicKey(key.PublicKey())
 		require.NoError(suite.T(), err)
 		pids = append(pids, pid)
 	}

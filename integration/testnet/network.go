@@ -227,7 +227,7 @@ type ConsensusFollowerConfig struct {
 }
 
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
-	pid, err := p2p.ExtractPeerID(networkingPrivKey.PublicKey())
+	pid, err := p2p.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
 	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
