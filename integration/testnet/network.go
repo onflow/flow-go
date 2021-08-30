@@ -636,7 +636,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	})
 	securedGRPCPubKey := hex.EncodeToString(accessNodeConfs[0].NetworkPubKey().Encode())
 	secureGRPCAdditionalFlags := []string{
-		fmt.Sprint("--insecure-access-api=true"),
+		fmt.Sprint("--insecure-access-api=false"),
 		fmt.Sprintf("--access-node-grpc-public-key=%s", securedGRPCPubKey),
 	}
 	for i, conf := range allConfs {
