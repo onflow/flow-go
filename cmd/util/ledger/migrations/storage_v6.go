@@ -363,17 +363,6 @@ func (m StorageFormatV6Migration) reencodeValue(
 
 	// Convert old value to new value
 
-	defer func() {
-		if r := recover(); r != nil {
-			panicErr, isError := r.(error)
-			if !isError {
-				panic(r)
-			}
-
-			err = panicErr
-		}
-	}()
-
 	inter, err := oldInter.NewInterpreter(
 		nil,
 		nil,
@@ -392,21 +381,35 @@ func (m StorageFormatV6Migration) reencodeValue(
 					panic(err)
 				}
 
+				if len(registerValue) == 0 {
+					m.Log.Warn().Msgf("empty value for key: %s", key)
+					panic(&ValueNotFoundError{
+						key: key,
+					})
+				}
+
 				// Strip magic
 
 				content, version := oldInter.StripMagic(registerValue)
 
 				if version != oldInter.CurrentEncodingVersion {
 					panic(fmt.Errorf(
-						"invalid storage format version for key: %s: %d",
+						"invalid storage format version for key: %s (owner: %s): %d\ncontent: %b",
 						key,
+						owner,
 						version,
+						registerValue,
 					))
 				}
 
 				err = storageMigrationV6DecMode.Valid(content)
 				if err != nil {
-					panic(err)
+					panic(fmt.Errorf(
+						"invalid content for key: %s: %w\ncontent: %b",
+						key,
+						err,
+						content,
+					))
 				}
 
 				// Decode
@@ -663,11 +666,16 @@ func (c *ValueConverter) VisitCompositeValue(inter *oldInter.Interpreter, value 
 func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value *oldInter.DictionaryValue) bool {
 	staticType := ConvertStaticType(value.StaticType()).(newInter.DictionaryStaticType)
 
-	keysAndValues := make([]newInter.Value, value.Count()*2)
+	keysAndValues := make([]newInter.Value, 0)
 
-	for index, key := range value.Keys().Elements() {
-		keysAndValues[index*2] = c.Convert(inter, key)
-		keysAndValues[index*2+1] = c.Convert(inter, value.Get(inter, nil, key))
+	for _, key := range value.Keys().Elements() {
+		entryValue := getValue(inter, value, key)
+		if entryValue == nil {
+			continue
+		}
+
+		keysAndValues = append(keysAndValues, c.Convert(inter, key))
+		keysAndValues = append(keysAndValues, c.Convert(inter, entryValue))
 	}
 
 	// TODO: pass address as a parameter?
@@ -679,6 +687,25 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 
 	// Do not descent
 	return false
+}
+
+func getValue(
+	inter *oldInter.Interpreter,
+	dictionary *oldInter.DictionaryValue,
+	key oldInter.Value,
+) (value oldInter.Value) {
+	defer func() {
+		if r := recover(); r != nil {
+			_, valueNotFound := r.(*ValueNotFoundError)
+			if !valueNotFound {
+				panic(r)
+			}
+
+			value = nil
+		}
+	}()
+
+	return dictionary.Get(inter, nil, key)
 }
 
 func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilValue) {
@@ -941,4 +968,12 @@ func ConvertPrimitiveStaticType(staticType oldInter.PrimitiveStaticType) newInte
 	default:
 		panic(fmt.Errorf("cannot covert static type: %s", staticType.String()))
 	}
+}
+
+type ValueNotFoundError struct {
+	key string
+}
+
+func (e *ValueNotFoundError) Error() string {
+	return fmt.Sprintf("value not found for key: %s")
 }
