@@ -547,7 +547,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			hostHTTPProxyPort := testingdock.RandomPort(t)
 			containerGRPCPort := "9000/tcp"
 			containerHTTPProxyPort := "8000/tcp"
-
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
@@ -625,37 +624,6 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	allConfs, err := setupKeys(networkConf)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
-	}
-
-	// IMPORTANT: we must add additional flags to LN & SN nodes for secured GRPC conn
-	// 			  --access-node-grpc-public-key
-	// 			  --insecure-access-api
-	// 			  these are added here to LN & SN node confs after networking keys are generated for access nodes.
-	// 			  If no access node exists it will default to using insecure GRPC conn
-	accessNodeConfs := filterContainerConfigs(allConfs, func(config ContainerConfig) bool {
-		return config.Role == flow.RoleAccess
-	})
-
-	secureGRPCAdditionalFlags := make([]string, 0)
-	if len(accessNodeConfs) > 0 {
-		securedGRPCPubKey := hex.EncodeToString(accessNodeConfs[0].NetworkPubKey().Encode())
-		secureGRPCAdditionalFlags = append(
-			secureGRPCAdditionalFlags,
-			fmt.Sprint("--insecure-access-api=false"),
-			fmt.Sprintf("--access-node-grpc-public-key=%s", securedGRPCPubKey),
-		)
-	} else {
-		secureGRPCAdditionalFlags = append(
-			secureGRPCAdditionalFlags,
-			fmt.Sprint("--insecure-access-api=true"),
-		)
-	}
-
-	for i, conf := range allConfs {
-		if conf.Role == flow.RoleConsensus || conf.Role == flow.RoleCollection {
-			conf.AdditionalFlags = append(conf.AdditionalFlags, secureGRPCAdditionalFlags...)
-		}
-		allConfs[i] = conf
 	}
 
 	// only staked configs - this only includes identity table members

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -85,6 +86,7 @@ func main() {
 
 		// epoch qc contract client
 		accessAddress       string
+		securedAccessAddress string
 		accessApiNodePubKey string
 		insecureAccessAPI   bool
 	)
@@ -141,8 +143,9 @@ func main() {
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&securedAccessAddress, "secured-access-address", "", "the address for secured GRPC conn to an access node")
 			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
-			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
+			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -400,8 +403,27 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
+			// create flow client with correct GRPC configuration for QC contract client
+			var flowClient *client.Client
+			if insecureAccessAPI {
+				flowClient, err = common.InsecureFlowClient(accessAddress)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				flowClient, err = common.SecureFlowClient(securedAccessAddress, accessApiNodePubKey)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			err = flowClient.Ping(context.Background())
+			if err != nil {
+				return nil, fmt.Errorf("failed to ping, flow client may be misconfigured check GRPC options %w", err)
+			}
+
 			// construct QC contract client
-			qcContractClient, err := createQCContractClient(node, accessAddress, accessApiNodePubKey, insecureAccessAPI)
+			qcContractClient, err := createQCContractClient(node, accessAddress, flowClient)
 			if err != nil {
 				return nil, fmt.Errorf("could not create qc contract client %w", err)
 			}
@@ -449,7 +471,7 @@ func main() {
 }
 
 // createQCContractClient creates QC contract client
-func createQCContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodePubKey string, insecureAccessAPI bool) (module.QCContractClient, error) {
+func createQCContractClient(node *cmd.NodeConfig, accessAddress string, flowClient *client.Client) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -476,17 +498,6 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodePu
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
 	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
-
-	grpcDialOpts, err := common.GetGRPCDialOption(accessAddress, accessApiNodePubKey, insecureAccessAPI)
-	if err != nil {
-		return nil, fmt.Errorf("could not get GRPC conn for flow client %w", err)
-	}
-
-	// create flow client
-	flowClient, err := client.New(accessAddress, grpcDialOpts)
-	if err != nil {
-		return nil, err
-	}
 
 	// create actual qc contract client, all flags and machine account info file found
 	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), info.Address, info.KeyIndex, qcContractAddress, txSigner)

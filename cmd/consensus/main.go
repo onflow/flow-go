@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,9 +93,10 @@ func main() {
 		emergencySealing                       bool
 
 		// DKG contract client
-		accessAddress       string
-		accessApiNodePubKey string
-		insecureAccessAPI   bool
+		accessAddress        string
+		securedAccessAddress string
+		accessApiNodePubKey  string
+		insecureAccessAPI    bool
 
 		err                     error
 		mutableState            protocol.MutableState
@@ -141,8 +143,9 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&securedAccessAddress, "secured-access-address", "", "the address for secured GRPC conn to an access node")
 			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
-			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
+			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -666,8 +669,27 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
+			// create flow client with correct GRPC configuration for QC contract client
+			var flowClient *client.Client
+			if insecureAccessAPI {
+				flowClient, err = common.InsecureFlowClient(accessAddress)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				flowClient, err = common.SecureFlowClient(securedAccessAddress, accessApiNodePubKey)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			err = flowClient.Ping(context.Background())
+			if err != nil {
+				return nil, fmt.Errorf("failed to ping, flow client may be misconfigured check GRPC options %w", err)
+			}
+
 			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, accessAddress, accessApiNodePubKey, insecureAccessAPI)
+			dkgContractClient, err := createDKGContractClient(node, accessAddress, flowClient)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
@@ -712,7 +734,7 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 }
 
 // createDKGContractClient creates a DKG contract client
-func createDKGContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodePubKey string, insecureAccessAPI bool) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowClient *client.Client) (module.DKGContractClient, error) {
 
 	var dkgClient module.DKGContractClient
 
@@ -739,17 +761,6 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress, accessApiNodeP
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
 	txSigner := crypto.NewInMemorySigner(sk, info.HashAlgorithm)
-
-	grpcDialOpts, err := common.GetGRPCDialOption(accessAddress, accessApiNodePubKey, insecureAccessAPI)
-	if err != nil {
-		return nil, fmt.Errorf("could not get GRPC conn for flow client %w", err)
-	}
-
-	// create flow client
-	flowClient, err := client.New(accessAddress, grpcDialOpts)
-	if err != nil {
-		return nil, err
-	}
 
 	// create actual dkg contract client, all flags and machine account info file found
 	dkgClient = dkgmodule.NewClient(
