@@ -29,6 +29,7 @@ type SealingSuite struct {
 	conIDs []flow.Identifier
 	exeID  flow.Identifier
 	verID  flow.Identifier
+	accID flow.Identifier
 	reader *client.FlowMessageStreamReader
 }
 
@@ -75,6 +76,11 @@ func (ss *SealingSuite) SetupTest() {
 	ss.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
+
+	// need one controllable access node (used ghost)
+	ss.accID = unittest.IdentifierFixture()
+	accConfig := testnet.NewNodeConfig(flow.RoleAccess, testnet.WithID(ss.accID), testnet.AsGhost())
+	nodeConfigs = append(nodeConfigs, accConfig)
 
 	// generate the network config
 	netConfig := testnet.NewNetworkConfig("consensus_execution_state_sealing", nodeConfigs)
