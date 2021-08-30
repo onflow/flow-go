@@ -81,6 +81,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.programs = programs.NewEmptyPrograms()
 
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
+
 	m.brokenContracts = make(map[common.Address]map[string]bool, 0)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
@@ -551,12 +552,13 @@ func (m StorageFormatV5Migration) reencodeValue(
 			if err != nil {
 				return false
 			}
+
 			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.ArrayValue:
 
 				if !m.arrayHasStaticType(inspectedValue) {
 
-					err = inferArrayStaticType(inspectedValue, nil)
+					err = m.inferArrayStaticType(inspectedValue, nil)
 					if err != nil {
 						return false
 					}
@@ -576,7 +578,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 				if !m.dictionaryHasStaticType(inspectedValue) {
 
-					err = inferDictionaryStaticType(inspectedValue, nil)
+					err = m.inferDictionaryStaticType(inspectedValue, nil)
 					if err != nil {
 						return false
 					}
@@ -596,6 +598,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 			return true
 		},
 	)
+
 	if err != nil {
 		// If there are empty containers without type info (e.g: at root level)
 		// Then drop such values and continue.
@@ -810,7 +813,7 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 				fieldType := interpreter.ConvertSemaToStaticType(member.TypeAnnotation.Type)
 
-				err = inferContainerStaticType(fieldValue, fieldType)
+				err = m.inferContainerStaticType(fieldValue, fieldType)
 				if err != nil {
 
 					// If the container type cannot be inferred using the field type,
@@ -1409,19 +1412,19 @@ func hasAnyLocationAddress(value *interpreter.CompositeValue, hexAddresses ...st
 	return false
 }
 
-func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
+func (m StorageFormatV5Migration) inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
 
 	// Only infer static type for arrays and dictionaries
 
 	switch value := value.(type) {
 	case *interpreter.ArrayValue:
-		err := inferArrayStaticType(value, t)
+		err := m.inferArrayStaticType(value, t)
 		if err != nil {
 			return err
 		}
 
 	case *interpreter.DictionaryValue:
-		err := inferDictionaryStaticType(value, t)
+		err := m.inferDictionaryStaticType(value, t)
 		if err != nil {
 			return err
 		}
@@ -1430,26 +1433,35 @@ func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType)
 	return nil
 }
 
-func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticType) error {
+func (m StorageFormatV5Migration) inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticType) error {
 
 	if t == nil {
+
 		if value.Count() == 0 {
 			return &EmptyContainerTypeInferringError{}
 		}
 
-		var elementType interpreter.StaticType
-
+		var inferredElementType interpreter.StaticType
 		for _, element := range value.Elements() {
-			if elementType == nil {
-				elementType = element.StaticType()
-			} else if !element.StaticType().Equal(elementType) {
+			elementType, err := m.getStaticType(element)
+			if err != nil {
+				return err
+			}
+
+			if inferredElementType == nil {
+				inferredElementType = elementType
+			} else if !elementType.Equal(inferredElementType) {
 				return fmt.Errorf("cannot infer static type for array with mixed elements")
 			}
 		}
 
+		if inferredElementType == nil {
+			return fmt.Errorf("cannot infer static type for array elements")
+		}
+
 		// TODO: infer element type to AnyStruct or AnyResource based on kinds of elements instead?
 		value.Type = interpreter.VariableSizedStaticType{
-			Type: elementType,
+			Type: inferredElementType,
 		}
 
 	} else {
@@ -1484,7 +1496,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 	elementType := value.Type.ElementType()
 
 	for _, element := range value.Elements() {
-		err := inferContainerStaticType(element, elementType)
+		err := m.inferContainerStaticType(element, elementType)
 		if err != nil {
 			return err
 		}
@@ -1493,7 +1505,22 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 	return nil
 }
 
-func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter.StaticType) error {
+func (m StorageFormatV5Migration) getStaticType(value interpreter.Value) (interpreter.StaticType, error) {
+	elementType := value.StaticType()
+
+	if elementType != nil {
+		return elementType, nil
+	}
+
+	err := m.inferContainerStaticType(value, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return value.StaticType(), nil
+}
+
+func (m StorageFormatV5Migration) inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter.StaticType) error {
 	entries := value.Entries()
 
 	if t == nil {
@@ -1512,19 +1539,29 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 				}
 			}
 
-			var valueType interpreter.StaticType
+			var inferredValueType interpreter.StaticType
 			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-				if valueType == nil {
-					valueType = pair.Value.StaticType()
-				} else if !pair.Value.StaticType().Equal(valueType) {
+
+				valueType, err := m.getStaticType(pair.Value)
+				if err != nil {
+					return err
+				}
+
+				if inferredValueType == nil {
+					inferredValueType = valueType
+				} else if !valueType.Equal(inferredValueType) {
 					return fmt.Errorf("cannot infer value static type for dictionary with mixed type values")
 				}
+			}
+
+			if inferredValueType == nil {
+				return fmt.Errorf("cannot infer value static type for dictionary")
 			}
 
 			// TODO: infer value type to AnyStruct or AnyResource based on kinds of values instead?
 			value.Type = interpreter.DictionaryStaticType{
 				KeyType:   keyType,
-				ValueType: valueType,
+				ValueType: inferredValueType,
 			}
 		}
 	} else {
@@ -1552,7 +1589,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 
 	// Recursively infer type for dictionary keys and values
 
-	err := inferContainerStaticType(
+	err := m.inferContainerStaticType(
 		value.Keys(),
 		interpreter.VariableSizedStaticType{
 			Type: value.Type.KeyType,
@@ -1563,7 +1600,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 	}
 
 	for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-		err := inferContainerStaticType(
+		err := m.inferContainerStaticType(
 			pair.Value,
 			value.Type.ValueType,
 		)
