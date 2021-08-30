@@ -107,7 +107,7 @@ func (c *ConnManager) updateConnectionMetric(n network.Network) {
 	stakedPeers := make(map[peer.ID]struct{})
 	if c.idProvider != nil {
 		for _, id := range c.idProvider.Identities(NotEjectedFilter) {
-			pid, err := ExtractPeerID(id.NetworkPubKey)
+			pid, err := PeerIDFromFlowPublicKey(id.NetworkPubKey)
 			if err != nil {
 				c.log.Fatal().Err(err).Msg("failed to convert network public key of staked node to peer ID")
 			}

@@ -101,7 +101,7 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 
 	// convert the Flow.crypto key to LibP2P key for easy comparision using LibP2P TLS utils
-	remotePeerLibP2PID, err := p2p.ExtractPeerID(expectedPublicKey)
+	remotePeerLibP2PID, err := p2p.PeerIDFromFlowPublicKey(expectedPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive the libp2p Peer ID from the Flow key: %w", err)
 	}
