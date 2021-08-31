@@ -10,13 +10,13 @@ import (
 )
 
 // SecureFlowClient creates a flow client with secured GRPC connection
-func SecureFlowClient(securedAccessAddress, accessApiNodePubKey string) (*client.Client, error) {
-	if securedAccessAddress == "" {
-		return nil, fmt.Errorf("failed to create  flow client with secured GRPC conn invalid flag --secure-access-address")
+func SecureFlowClient(accessAddress, accessApiNodePubKey string) (*client.Client, error) {
+	if accessAddress == "" {
+		return nil, fmt.Errorf("failed to create  flow client with secured GRPC conn invalid access-address")
 	}
 
 	if accessApiNodePubKey == "" {
-		return nil, fmt.Errorf("failed to create flow client with secured GRPC conn invalid flag --access-node-grpc-public-key")
+		return nil, fmt.Errorf("failed to create flow client with secured GRPC conn invalid access node grpc public key")
 	}
 
 	dialOpts, err := grpcutils.SecureGRPCDialOpt(accessApiNodePubKey)
@@ -25,7 +25,7 @@ func SecureFlowClient(securedAccessAddress, accessApiNodePubKey string) (*client
 	}
 
 	// create flow client
-	flowClient, err := client.New(securedAccessAddress, dialOpts)
+	flowClient, err := client.New(accessAddress, dialOpts)
 	if err != nil {
 		return nil, err
 	}
