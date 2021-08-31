@@ -106,7 +106,7 @@ func assembleNodeMachineAccountKey(machineKey crypto.PrivateKey) model.NodeMachi
 	encAccountKey := encodedRuntimeAccountPubKey(machineKey)
 	log.Info().
 		Str("machineAccountPubKey", fmt.Sprintf("%x", encAccountKey)).
-		Msg("encode machine account public key for entry to Flow Port")
+		Msg("encoded machine account public key for entry to Flow Port")
 	key := model.NodeMachineAccountKey{
 		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
 	}
