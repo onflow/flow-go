@@ -15,11 +15,14 @@ type StakedValidator struct {
 func (v *StakedValidator) Validate(ctx context.Context, receivedFrom peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
 	// check that message contains a valid sender ID
 	if from, err := messageSigningID(msg); err == nil {
-		// check that the sender peer ID can be converted to a Flow key
-		if key, err := FlowPublicKeyFromPeerID(from); err == nil {
-			// check that the Flow key belongs to a staked node
-			if _, found := v.stakedIdentities().ByNetworkingKey(key); found {
-				return pubsub.ValidationAccept
+		// check that the sender peer ID matches a staked Flow key
+		for _, id := range v.stakedIdentities() {
+			if key, err := LibP2PPublicKeyFromFlow(id.NetworkPubKey); err == nil {
+				if pid, err := peer.IDFromPublicKey(key); err == nil {
+					if from == pid {
+						return pubsub.ValidationAccept
+					}
+				}
 			}
 		}
 	}
