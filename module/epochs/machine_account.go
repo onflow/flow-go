@@ -81,7 +81,7 @@ func CheckMachineAccountInfo(
 		log.Warn().Msgf("non-standard signing algo (expected %s, got %s)", bootstrap.DefaultMachineAccountSignAlgo, info.SigningAlgorithm.String())
 	}
 	if info.KeyIndex != bootstrap.DefaultMachineAccountKeyIndex {
-		log.Warn().Msgf("non-standard key index (expected %s, got %s)", bootstrap.DefaultMachineAccountKeyIndex, info.KeyIndex)
+		log.Warn().Msgf("non-standard key index (expected %d, got %d)", bootstrap.DefaultMachineAccountKeyIndex, info.KeyIndex)
 	}
 
 	// SECOND - compare the local account info to the on-chain account
@@ -100,7 +100,7 @@ func CheckMachineAccountInfo(
 			accountKey.SigAlgo.String())
 	}
 	if accountKey.Index != int(info.KeyIndex) {
-		return fmt.Errorf("machine account key index mismatch between local (%s) and on-chain (%s)",
+		return fmt.Errorf("machine account key index mismatch between local (%d) and on-chain (%d)",
 			info.KeyIndex,
 			accountKey.Index)
 	}

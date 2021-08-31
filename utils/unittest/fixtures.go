@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
-	"github.com/onflow/flow-go/module/epochs"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -1742,9 +1742,15 @@ func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 
 func MachineAccountFixture() (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
 	info := NodeMachineAccountInfoFixture()
+
+	bal, err := cadence.NewUFix64("0.1")
+	if err != nil {
+		panic(err)
+	}
+
 	acct := &sdk.Account{
 		Address: sdk.HexToAddress(info.Address),
-		Balance: uint64(epochs.SoftMinBalanceSN),
+		Balance: uint64(bal),
 		Keys: []*sdk.AccountKey{
 			{
 				Index:     int(info.KeyIndex),
