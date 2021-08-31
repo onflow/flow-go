@@ -110,7 +110,7 @@ type BaseConfig struct {
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
-	metricsEnabled        bool
+	MetricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
 	db                    *badger.DB
@@ -171,7 +171,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
-		metricsEnabled:        true,
+		MetricsEnabled:        true,
 		receiptsCacheSize:     bstorage.DefaultCacheSize,
 		guaranteesCacheSize:   bstorage.DefaultCacheSize,
 	}
