@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 
 	"github.com/rs/zerolog"
@@ -47,7 +49,7 @@ func TestCreateDKGContractClient(t *testing.T) {
 			nk, err := unittest.NetworkingKey()
 			require.NoError(t, err)
 			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
-			insecureAccessAPI := false
+
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
 
@@ -56,7 +58,10 @@ func TestCreateDKGContractClient(t *testing.T) {
 			writeNodeMachineAccountInfo(t, infoPath)
 			require.FileExists(t, infoPath)
 
-			client, err := createDKGContractClient(cmd, accessAddress, accessApiNodePubKey, insecureAccessAPI)
+			flowClient, err := common.SecureFlowClient(accessAddress, accessApiNodePubKey)
+			require.NoError(t, err)
+
+			client, err := createDKGContractClient(cmd, accessAddress, flowClient)
 			require.NoError(t, err)
 
 			assert.IsType(t, &dkgmodule.Client{}, client)
@@ -71,14 +76,15 @@ func TestCreateDKGContractClient(t *testing.T) {
 			nk, err := unittest.NetworkingKey()
 			require.NoError(t, err)
 			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
-			insecureAccessAPI := false
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
 
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
+			flowClient, err := common.SecureFlowClient(accessAddress, accessApiNodePubKey)
+			require.NoError(t, err)
 
-			_, err = createDKGContractClient(cmd, accessAddress, accessApiNodePubKey, insecureAccessAPI)
+			_, err = createDKGContractClient(cmd, accessAddress, flowClient)
 			require.Error(t, err)
 		})
 	})

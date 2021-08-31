@@ -93,9 +93,9 @@ func main() {
 		emergencySealing                       bool
 
 		// DKG contract client
-		accessAddress        string
-		accessApiNodePubKey  string
-		insecureAccessAPI    bool
+		accessAddress       string
+		accessApiNodePubKey string
+		insecureAccessAPI   bool
 
 		err                     error
 		mutableState            protocol.MutableState

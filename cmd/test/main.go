@@ -3,10 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 )
 
-func main()  {
+func main() {
 	SecurePing()
 }
 
@@ -14,7 +15,7 @@ func SecurePing() {
 	ctx := context.Background()
 
 	secureGRPCServerAddress := "0.0.0.0:3570"
-	accessNodePublicKey := "7d18b2e351147d7c656b16279a5936e7ffeaf5f17f97c560d0a9c24d6294533fb1fda149ce8981583cd1bc25b489ea973cdf16eb224b59a476a9009f039043a4"
+	accessNodePublicKey := "dd5da993faebcb16e8b96a126a78f8845140b12c5b083cfa6b61701bc78b0039c78434acb010ca73c449f93acec6b81c3a71b8ca1f3c5b330258139f513e6f2a"
 
 	flowClient, err := common.SecureFlowClient(secureGRPCServerAddress, accessNodePublicKey)
 	if err != nil {

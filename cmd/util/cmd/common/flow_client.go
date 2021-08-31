@@ -1,12 +1,13 @@
 package common
 
 import (
-	"github.com/onflow/flow-go-sdk/client"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go-sdk/client"
+	grpcutils "github.com/onflow/flow-go/utils/grpc"
+
 	"fmt"
-	)
+)
 
 // SecureFlowClient creates a flow client with secured GRPC connection
 func SecureFlowClient(securedAccessAddress, accessApiNodePubKey string) (*client.Client, error) {

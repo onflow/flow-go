@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,7 +48,6 @@ func TestCreateQCContractClient(t *testing.T) {
 			nk, err := unittest.NetworkingKey()
 			require.NoError(t, err)
 			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
-			insecureAccessAPI := false
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
 
@@ -54,8 +55,9 @@ func TestCreateQCContractClient(t *testing.T) {
 			infoPath := filepath.Join(bootDir, machineAccountFileName)
 			writeNodeMachineAccountInfo(t, infoPath)
 			require.FileExists(t, infoPath)
-
-			client, err := createQCContractClient(cmd, accessAddress, accessApiNodePubKey, insecureAccessAPI)
+			flowClient, err := common.SecureFlowClient(accessAddress, accessApiNodePubKey)
+			require.NoError(t, err)
+			client, err := createQCContractClient(cmd, accessAddress, flowClient)
 			require.NoError(t, err)
 
 			assert.IsType(t, &epochs.QCContractClient{}, client)
@@ -70,14 +72,14 @@ func TestCreateQCContractClient(t *testing.T) {
 			nk, err := unittest.NetworkingKey()
 			require.NoError(t, err)
 			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
-			insecureAccessAPI := false
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
 
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
-
-			_, err = createQCContractClient(cmd, accessAddress, accessApiNodePubKey, insecureAccessAPI)
+			flowClient, err := common.SecureFlowClient(accessAddress, accessApiNodePubKey)
+			require.NoError(t, err)
+			_, err = createQCContractClient(cmd, accessAddress, flowClient)
 			require.Error(t, err)
 		})
 	})
