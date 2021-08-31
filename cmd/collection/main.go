@@ -88,7 +88,6 @@ func main() {
 		accessAddress      string
 		secureAccessNodeID string
 
-		accessApiNodePubKey string
 		insecureAccessAPI   bool
 	)
 
@@ -145,7 +144,6 @@ func main() {
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
-			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
 			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
