@@ -1,6 +1,8 @@
 package p2p
 
 import (
+	"fmt"
+
 	"github.com/libp2p/go-libp2p-core/peer"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
@@ -42,34 +44,34 @@ func (f *Filter) getIdentity(pid peer.ID) *flow.Identity {
 	return identities[0]
 }
 
-func (f *Filter) allowedTopics(pid peer.ID) []network.Topic {
+func (f *Filter) allowedTopics(pid peer.ID) map[network.Topic]struct{} {
 	id := f.getIdentity(pid)
 
 	var channels network.ChannelList
 
 	if id == nil {
+		fmt.Println("Unstaked channels allowed by " + f.myPeerID.String() + " for " + pid.String())
 		channels = engine.UnstakedChannels()
 	} else {
+		fmt.Println("Staked channels allowed by " + f.myPeerID.String() + " for " + pid.String())
 		channels = engine.ChannelsByRole(id.Role)
 	}
 
-	var topics []network.Topic
+	topics := make(map[network.Topic]struct{})
 
 	for _, ch := range channels {
-		topics = append(topics, engine.TopicFromChannel(ch, f.rootBlockID))
+		// TODO: we will probably have problems here with cluster channels
+		// We probably need special checking for this
+		// Add a unit test for cluster channels
+		topics[engine.TopicFromChannel(ch, f.rootBlockID)] = struct{}{}
 	}
 
 	return topics
 }
 
 func (f *Filter) CanSubscribe(topic string) bool {
-	for _, allowedTopic := range f.allowedTopics(f.myPeerID) {
-		if topic == allowedTopic.String() {
-			return true
-		}
-	}
-
-	return false
+	_, allowed := f.allowedTopics(f.myPeerID)[network.Topic(topic)]
+	return allowed
 }
 
 func (f *Filter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
@@ -77,10 +79,12 @@ func (f *Filter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpt
 	var filtered []*pb.RPC_SubOpts
 
 	for _, opt := range opts {
-		for _, allowedTopic := range allowedTopics {
-			if *opt.Topicid == allowedTopic.String() {
-				filtered = append(filtered, opt)
-			}
+		fmt.Println("Request " + *opt.Topicid + "to")
+		if _, allowed := allowedTopics[network.Topic(opt.GetTopicid())]; allowed {
+
+			filtered = append(filtered, opt)
+		} else {
+			fmt.Println("Blocked")
 		}
 	}
 

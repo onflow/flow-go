@@ -161,7 +161,7 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for protocols actively synchronizing state across nodes
-	channelRoleMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
+	channelRoleMap[SyncCommittee] = flow.Roles()
 	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for DKG communication

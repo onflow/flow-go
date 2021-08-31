@@ -3,7 +3,9 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -16,20 +18,100 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestFilterSubscribe(t *testing.T) {
+	identity1, privateKey1 := createID(t)
+	identity2, privateKey2 := createID(t)
+	ids := flow.IdentityList{identity1, identity2}
+
+	node1 := createNode(t, identity1.NodeID, privateKey1, createSubscriptionFilterPubsubOption(t, ids))
+	node2 := createNode(t, identity2.NodeID, privateKey2, createSubscriptionFilterPubsubOption(t, ids))
+
+	unstakedKey, err := unittest.NetworkingKey()
+	require.NoError(t, err)
+	unstakedNode := createNode(t, flow.ZeroID, unstakedKey)
+
+	fmt.Println(node1.host.ID())
+	fmt.Println(node2.host.ID())
+	fmt.Println(unstakedNode.host.ID())
+
+	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
+	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
+
+	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
+
+	sub1, err := node1.Subscribe(context.TODO(), badTopic)
+	require.NoError(t, err)
+	time.Sleep(300 * time.Millisecond)
+	sub2, err := node2.Subscribe(context.TODO(), badTopic)
+	require.NoError(t, err)
+	time.Sleep(300 * time.Millisecond)
+	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
+	require.NoError(t, err)
+	time.Sleep(300 * time.Millisecond)
+
+	require.Eventually(t, func() bool {
+		return len(node1.pubSub.ListPeers(badTopic.String())) > 0 &&
+			len(node2.pubSub.ListPeers(badTopic.String())) > 0 &&
+			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
+	}, 1*time.Second, 100*time.Millisecond)
+
+	require.Never(t, func() bool {
+		for _, pid := range node1.pubSub.ListPeers(badTopic.String()) {
+			if pid == unstakedNode.Host().ID() {
+				return true
+			}
+		}
+		return false
+	}, 1*time.Second, 100*time.Millisecond)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	testPublish := func(wg *sync.WaitGroup, from *Node, sub *pubsub.Subscription) {
+		data := []byte("hello")
+
+		from.Publish(context.TODO(), badTopic, data)
+
+		fmt.Println(from.pubSub.ListPeers(badTopic.String()))
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		msg, err := sub.Next(ctx)
+		cancel()
+		require.NoError(t, err)
+		require.Equal(t, msg.Data, data)
+
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+		msg, err = unstakedSub.Next(ctx)
+		fmt.Println(msg)
+		cancel()
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+
+		wg.Done()
+	}
+
+	// publish a message from node 1 and check that only node2 receives
+	testPublish(&wg, node1, sub2)
+
+	// publish a message from node 2 and check that only node1 receives
+	testPublish(&wg, node2, sub1)
+
+	fmt.Println(sub2)
+
+	wg.Wait()
+}
+
 func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := createID(t)
-	rootBlockID := unittest.IdentifierFixture()
 
-	node := createNode(t, rootBlockID, identity.NodeID, privateKey, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}, rootBlockID))
+	node := createNode(t, identity.NodeID, privateKey, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}))
 
-	badTopic := getDisallowedTopic(t, identity, rootBlockID)
+	badTopic := getDisallowedTopic(t, identity)
 	_, err := node.pubSub.Join(badTopic.String())
 
-	fmt.Println(err)
 	require.Error(t, err)
 }
 
-func getDisallowedTopic(t *testing.T, id *flow.Identity, rootBlockID flow.Identifier) network.Topic {
+func getDisallowedTopic(t *testing.T, id *flow.Identity) network.Topic {
 	allowedChannels := engine.UnstakedChannels()
 	if id != nil {
 		allowedChannels = engine.ChannelsByRole(id.Role)
@@ -46,7 +128,7 @@ func getDisallowedTopic(t *testing.T, id *flow.Identity, rootBlockID flow.Identi
 	return ""
 }
 
-func createSubscriptionFilterPubsubOption(t *testing.T, ids flow.IdentityList, rootBlockID flow.Identifier) PubsubOption {
+func createSubscriptionFilterPubsubOption(t *testing.T, ids flow.IdentityList) PubsubOption {
 	idTranslator, err := NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
@@ -69,7 +151,6 @@ func createID(t *testing.T) (*flow.Identity, crypto.PrivateKey) {
 
 func createNode(
 	t *testing.T,
-	rootBlockID flow.Identifier,
 	nodeID flow.Identifier,
 	networkKey crypto.PrivateKey,
 	psOpts ...PubsubOption,
