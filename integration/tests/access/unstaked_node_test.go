@@ -28,12 +28,11 @@ type UnstakedAccessSuite struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	net                   *testnet.FlowNetwork
-	stakedID              flow.Identifier
-	unstakedID            flow.Identifier
-	conID                 flow.Identifier
-	follower              consensus_follower.ConsensusFollower
-	finalizedBlockIDsChan chan flow.Identifier
+	net                    *testnet.FlowNetwork
+	stakedID               flow.Identifier
+	conID                  flow.Identifier
+	followers              []consensus_follower.ConsensusFollower
+	finalizedBlockIDsChans []chan flow.Identifier
 }
 
 func TestUnstakedAccessSuite(t *testing.T) {
@@ -51,7 +50,10 @@ func (suite *UnstakedAccessSuite) TearDownTest() {
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
-	suite.finalizedBlockIDsChan = make(chan flow.Identifier, blockCount)
+	suite.finalizedBlockIDsChans = []chan flow.Identifier{
+		make(chan flow.Identifier, blockCount),
+		make(chan flow.Identifier, blockCount),
+	}
 	suite.buildNetworkConfig()
 	// start the network
 	suite.ctx, suite.cancel = context.WithCancel(context.Background())
@@ -62,33 +64,35 @@ func (suite *UnstakedAccessSuite) SetupTest() {
 func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	ctx, cancel := context.WithCancel(suite.ctx)
 	defer cancel()
-	// kick off the follower
-	go suite.follower.Run(ctx)
+	// kick off the first follower
+	go suite.followers[0].Run(ctx)
 
-	followerImpl, ok := suite.follower.(*consensus_follower.ConsensusFollowerImpl)
+	followerImpl1, ok := suite.followers[0].(*consensus_follower.ConsensusFollowerImpl)
 	if !ok {
 		suite.Fail("unexpected consensus follower implementation")
 		return
 	}
 
 	// get the underlying node builder
-	node := followerImpl.NodeBuilder
+	node1 := followerImpl1.NodeBuilder
 	// wait for the follower to have completely started
-	unittest.RequireCloseBefore(suite.T(), node.Ready(), 10*time.Second,
+	unittest.RequireCloseBefore(suite.T(), node1.Ready(), 10*time.Second,
 		"timed out while waiting for consensus follower to start")
 
 	// get the underlying storage that the follower is using
-	storage := node.Storage
+	storage := node1.Storage
 	require.NotNil(suite.T(), storage)
 	blocks := storage.Blocks
 	require.NotNil(suite.T(), blocks)
 
 	rcvdBlockCnt := 0
 	var err error
+	receivedBlocks := make([]flow.Identifier, blockCount)
 	receiveBlocks := func() {
 		for ; rcvdBlockCnt < blockCount; rcvdBlockCnt++ {
 			select {
-			case blockID := <-suite.finalizedBlockIDsChan:
+			case blockID := <-suite.finalizedBlockIDsChans[0]:
+				receivedBlocks = append(receivedBlocks, blockID)
 				_, err = blocks.ByID(blockID)
 				if err != nil {
 					return
@@ -106,11 +110,39 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	// assert that blockCount number of blocks were received
 	require.Equal(suite.T(), blockCount, rcvdBlockCnt)
 
+	// kick off the second follower
+	go suite.followers[1].Run(ctx)
+
+	followerImpl2, ok := suite.followers[1].(*consensus_follower.ConsensusFollowerImpl)
+	if !ok {
+		suite.Fail("unexpected consensus follower implementation")
+		return
+	}
+
+	// get the underlying node builder
+	node2 := followerImpl2.NodeBuilder
+	// wait for the follower to have completely started
+	unittest.RequireCloseBefore(suite.T(), node2.Ready(), 10*time.Second,
+		"timed out while waiting for consensus follower to start")
+
+	receiveBlocks2 := func() {
+		for _, blockID := range receivedBlocks {
+			select {
+			case receivedBlockID := <-suite.finalizedBlockIDsChans[1]:
+				suite.Assert().Equal(blockID, receivedBlockID)
+			}
+		}
+	}
+
+	// wait for finalized blocks
+	unittest.AssertReturnsBefore(suite.T(), receiveBlocks2, 1*time.Minute) // waiting 1 minute for 5 blocks
 }
 
-func (suite *UnstakedAccessSuite) OnBlockFinalizedConsumer(finalizedBlockID flow.Identifier) {
-	// push the finalized block ID to the finalizedBlockIDsChan channel
-	suite.finalizedBlockIDsChan <- finalizedBlockID
+func (suite *UnstakedAccessSuite) OnBlockFinalizedConsumer(index int) func(flow.Identifier) {
+	return func(finalizedBlockID flow.Identifier) {
+		// push the finalized block ID to the finalizedBlockIDsChan channel
+		suite.finalizedBlockIDsChans[index] <- finalizedBlockID
+	}
 }
 
 func (suite *UnstakedAccessSuite) buildNetworkConfig() {
@@ -150,21 +182,27 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		stakedConfig,
 	}
 
-	unstakedKey, err := UnstakedNetworkingKey()
+	unstakedKey1, err := UnstakedNetworkingKey()
+	require.NoError(suite.T(), err)
+	unstakedKey2, err := UnstakedNetworkingKey()
 	require.NoError(suite.T(), err)
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey, suite.stakedID),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID),
 	}
-
-	suite.unstakedID = followerConfigs[0].NodeID
 
 	// consensus follower
 	conf := testnet.NewNetworkConfig("consensus follower test", net, testnet.WithConsensusFollowers(followerConfigs...))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
-	suite.follower = suite.net.ConsensusFollowerByID(suite.unstakedID)
-	suite.follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
+	follower1 := suite.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
+	follower1.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer(0))
+
+	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
+	follower2.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer(1))
+
+	suite.followers = []consensus_follower.ConsensusFollower{follower1, follower2}
 }
 
 // TODO: Move this to unittest and resolve the circular dependency issue
