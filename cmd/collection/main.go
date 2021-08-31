@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"time"
 
@@ -432,11 +431,6 @@ func main() {
 				if err != nil {
 					return nil, err
 				}
-			}
-
-			err = flowClient.Ping(context.Background())
-			if err != nil {
-				return nil, fmt.Errorf("failed to ping, flow client may be misconfigured check GRPC options %w", err)
 			}
 
 			// construct QC contract client
