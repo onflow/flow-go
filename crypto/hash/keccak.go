@@ -7,8 +7,25 @@
 
 package hash
 
-// This function is implemented in keccakf_amd64.s.
+/*
+#include <stdint.h>
+#include <stdlib.h>
+void KeccakP1600_Permute_Nrounds(void *state, unsigned int nrounds);
+void KeccakP1600_Permute_24rounds(void *state);
 
-//go:noescape
+void callKeccakF1600(ulong* state) {
+	KeccakP1600_Permute_24rounds(state);
+}
 
-func keccakF1600(a *[25]uint64)
+#cgo LDFLAGS: -L./lib -lXKCP -Wl,-rpath=./lib
+
+*/
+import "C"
+
+import (
+	_ "unsafe"
+)
+
+func keccakF1600(a *[25]uint64) {
+	C.callKeccakF1600((*C.ulong)(&a[0]))
+}
