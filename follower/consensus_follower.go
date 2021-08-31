@@ -96,7 +96,7 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
 	nodeBuilder.Initialize()
-	nodeBuilder.Build()
+	nodeBuilder.BuildConsensusFollower()
 
 	return nodeBuilder
 }
@@ -128,6 +128,7 @@ func NewConsensusFollower(
 
 	anb := buildAccessNode(accessNodeOptions)
 	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
+	anb.BaseConfig.NodeRole = "consensus_follower"
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
