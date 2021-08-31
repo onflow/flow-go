@@ -268,8 +268,7 @@ func prepareServices(containers []testnet.ContainerConfig, accessNodeGRPCPubKey 
 			services[container.ContainerName] = prepareConsensusService(
 				container,
 				numConsensus,
-				"localnet_access_1_1:9000",
-				"localnet_access_1_1:9001",
+				"access_1:9001",
 				accessNodeGRPCPubKey,
 			)
 			numConsensus++
@@ -277,8 +276,7 @@ func prepareServices(containers []testnet.ContainerConfig, accessNodeGRPCPubKey 
 			services[container.ContainerName] = prepareCollectionService(
 				container,
 				numCollection,
-				"localnet_access_1_1:9000",
-				"localnet_access_1_1:9001",
+				"access_1:9001",
 				accessNodeGRPCPubKey,
 			)
 			numCollection++
@@ -363,7 +361,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress,  securedAccessAddress, accessNodeGRPCPubKey string) Service {
+func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress, accessNodeGRPCPubKey string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -376,7 +374,6 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessAdd
 		fmt.Sprintf("--emergency-sealing-active=false"),
 		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--secured-access-address=%s", securedAccessAddress),
 		fmt.Sprintf("--access-node-grpc-public-key=%s", accessNodeGRPCPubKey),
 	)
 
@@ -397,7 +394,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, securedAccessAddress, accessNodeGRPCPubKey string) Service {
+func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, accessNodeGRPCPubKey string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -409,7 +406,6 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--secured-access-address=%s", securedAccessAddress),
 		fmt.Sprintf("--access-node-grpc-public-key=%s", accessNodeGRPCPubKey),
 	)
 
@@ -455,6 +451,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",

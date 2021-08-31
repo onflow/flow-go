@@ -94,7 +94,6 @@ func main() {
 
 		// DKG contract client
 		accessAddress        string
-		securedAccessAddress string
 		accessApiNodePubKey  string
 		insecureAccessAPI    bool
 
@@ -143,7 +142,6 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-			flags.StringVar(&securedAccessAddress, "secured-access-address", "", "the address for secured GRPC conn to an access node")
 			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
 			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
@@ -677,7 +675,7 @@ func main() {
 					return nil, err
 				}
 			} else {
-				flowClient, err = common.SecureFlowClient(securedAccessAddress, accessApiNodePubKey)
+				flowClient, err = common.SecureFlowClient(accessAddress, accessApiNodePubKey)
 				if err != nil {
 					return nil, err
 				}
