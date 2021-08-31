@@ -88,7 +88,7 @@ func main() {
 		accessAddress      string
 		secureAccessNodeID string
 
-		insecureAccessAPI   bool
+		insecureAccessAPI bool
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
