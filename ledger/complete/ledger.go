@@ -271,7 +271,10 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	for i, migrate := range migrations {
 		l.logger.Info().Msgf("migration %d is underway", i)
 
+		start := time.Now()
 		payloads, err = migrate(payloads)
+		elapsed := time.Since(start)
+
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
@@ -285,14 +288,17 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 				Int("outcome_size", newPayloadSize).
 				Msg("payload counts has changed during migration, make sure this is expected.")
 		}
-		l.logger.Info().Msgf("migration %d is done", i)
+		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
 
 		payloadSize = newPayloadSize
 	}
 
 	// run reporters
 	for i, reporter := range reporters {
+		start := time.Now()
 		err = reporter.Report(payloads)
+		elapsed := time.Since(start)
+		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("reporter %d is done", i)
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
 		}
