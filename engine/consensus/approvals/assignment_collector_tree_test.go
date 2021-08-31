@@ -3,7 +3,6 @@ package approvals_test
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine"
 	"sync"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	mockAC "github.com/onflow/flow-go/engine/consensus/approvals/mock"
 	"github.com/onflow/flow-go/model/flow"
