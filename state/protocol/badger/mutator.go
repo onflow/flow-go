@@ -170,11 +170,6 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 // header compliance check to verify if the given block connects to the
 // last finalized block.
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
-
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
-
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
 
@@ -256,8 +251,10 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 
 	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
+	if parentSpan, ok := m.tracer.GetSpan(blockID, trace.ProtoStateMutatorExtend); ok {
+		span := m.tracer.StartSpanFromParent(parentSpan, trace.ProtoStateMutatorExtendCheckGuarantees)
+		defer span.Finish()
+	}
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -331,8 +328,11 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 // candidate block.
 func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
+
+	if parentSpan, ok := m.tracer.GetSpan(blockID, trace.ProtoStateMutatorExtend); ok {
+		span := m.tracer.StartSpanFromParent(parentSpan, trace.ProtoStateMutatorExtendCheckSeals)
+		defer span.Finish()
+	}
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -350,8 +350,11 @@ func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 // We require the receipts to be sorted by block height (within a payload).
 func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
+
+	if parentSpan, ok := m.tracer.GetSpan(blockID, trace.ProtoStateMutatorExtend); ok {
+		span := m.tracer.StartSpanFromParent(parentSpan, trace.ProtoStateMutatorExtendCheckReceipts)
+		defer span.Finish()
+	}
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -375,11 +378,6 @@ func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
 func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
-
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
-
 	header := candidate.Header
 	payload := candidate.Payload
 
@@ -413,8 +411,9 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 
 	blockID := candidate.ID()
 
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
+	// TODO: Ramtin turn this off for now
+	// m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
+	// defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
 
 	// SIXTH: epoch transitions and service events
 	//    (i) Determine protocol state for block's _current_ Epoch.

@@ -92,6 +92,7 @@ const (
 	// Execution Node
 	//
 
+	EXEHandleBlock            SpanName = "exe.ingestion.handleBlock"
 	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
 	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
 	EXESaveExecutionReceipt   SpanName = "exe.ingestion.saveExecutionReceipt"

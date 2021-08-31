@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 )
+
+const DefaultEntityCacheSize = 500
 
 type SpanName string
 
@@ -40,6 +43,7 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 }
 
 // NewTracer creates a new tracer.
+// TODO pass entity cache size as param
 func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
@@ -85,10 +89,26 @@ func (t *OpenTracer) Done() <-chan struct{} {
 }
 
 // StartSpan starts a span using the flow identifier as a key into the span map
+// This should be used mostly for the very first span created for an entity on the service
 func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
+	key := spanKey(entityID, spanName)
+	// flow.Identifier to flow
+	traceID, err := jaeger.TraceIDFromString(entityID.String()[:32])
+	if err != nil {
+		// don't panic, gracefully move forward with background context
+		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
+		return sp
+	}
+	ctx := jaeger.NewSpanContext(
+		traceID,
+		jaeger.SpanID(rand.Uint64()),
+		jaeger.SpanID(0),
+		true,
+		nil,
+	)
+	opts = append(opts, jaeger.SelfRef(ctx))
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	key := spanKey(entityID, spanName)
 	t.openSpans[key] = t.Tracer.StartSpan(string(spanName), opts...)
 	return t.openSpans[key]
 }
@@ -114,27 +134,6 @@ func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName SpanName) (opent
 	key := spanKey(entityID, spanName)
 	span, exists := t.openSpans[key]
 	return span, exists
-}
-
-func (t *OpenTracer) StartRootSpanForEntity(
-	entityID flow.Identifier,
-	operationName SpanName,
-) opentracing.Span {
-	// flow.Identifier to flow
-	traceID, err := jaeger.TraceIDFromString(entityID.String()[:32])
-	if err != nil {
-		// don't panic, gracefully move forward with background context
-		sp, _ := t.StartSpanFromContext(context.Background(), operationName)
-		return sp
-	}
-	ctx := jaeger.NewSpanContext(
-		traceID,
-		jaeger.SpanID(1),
-		jaeger.SpanID(0),
-		false,
-		nil,
-	)
-	return t.Tracer.StartSpan(string(operationName), jaeger.SelfRef(ctx))
 }
 
 func (t *OpenTracer) StartSpanFromContext(

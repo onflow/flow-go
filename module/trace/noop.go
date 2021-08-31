@@ -66,10 +66,6 @@ func (t *NoopTracer) StartSpanFromParent(
 	return &NoopSpan{t}
 }
 
-func (t *NoopTracer) StartRootSpanForEntity(_ flow.Identifier, _ SpanName) opentracing.Span {
-	return &NoopSpan{t}
-}
-
 func (t *NoopTracer) RecordSpanFromParent(
 	span opentracing.Span,
 	operationName SpanName,
@@ -91,10 +87,6 @@ type InternalTracer struct {
 }
 
 func (t *InternalTracer) StartSpan(operationName string, opts ...opentracing.StartSpanOption) opentracing.Span {
-	return &NoopSpan{t.tracer}
-}
-
-func (t *InternalTracer) StartRootSpanForEntity(_ flow.Identifier, _ SpanName) opentracing.Span {
 	return &NoopSpan{t.tracer}
 }
 

@@ -47,9 +47,4 @@ type Tracer interface {
 		operationName trace.SpanName,
 		f func(),
 		opts ...opentracing.StartSpanOption)
-
-	StartRootSpanForEntity(
-		entityID flow.Identifier,
-		operationName trace.SpanName,
-	) opentracing.Span
 }

@@ -428,8 +428,12 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 // handle block will process the incoming block.
 // the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
+
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
+
+	span := e.tracer.StartSpan(blockID, trace.EXEHandleBlock)
+	defer span.Finish()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -442,8 +446,6 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	}
 
 	// unexecuted block
-	e.metrics.StartBlockReceivedToExecuted(blockID)
-
 	// acquiring the lock so that there is only one process modifying the queue
 	err = e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -574,7 +576,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
+	// TODO: Ramtin - comment out for now
+	// e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)

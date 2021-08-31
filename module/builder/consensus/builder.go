@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
@@ -105,23 +106,23 @@ func NewBuilder(
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOn)
+	span := b.tracer.StartSpan(parentID, trace.CONBuildOn)
 	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
 
 	// get the collection guarantees to insert in the payload
-	insertableGuarantees, err := b.getInsertableGuarantees(parentID)
+	insertableGuarantees, err := b.getInsertableGuarantees(parentID, span)
 	if err != nil {
 		return nil, fmt.Errorf("could not insert guarantees: %w", err)
 	}
 
 	// get the receipts to insert in the payload
-	insertableReceipts, err := b.getInsertableReceipts(parentID)
+	insertableReceipts, err := b.getInsertableReceipts(parentID, span)
 	if err != nil {
 		return nil, fmt.Errorf("could not insert receipts: %w", err)
 	}
 
 	// get the seals to insert in the payload
-	insertableSeals, err := b.getInsertableSeals(parentID)
+	insertableSeals, err := b.getInsertableSeals(parentID, span)
 	if err != nil {
 		return nil, fmt.Errorf("could not insert seals: %w", err)
 	}
@@ -136,8 +137,9 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
+	// TODO Ramtin comment out for now
+	// b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
+	// defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
 
 	err = b.state.Extend(proposal)
 	if err != nil {
@@ -247,9 +249,9 @@ func (b *Builder) repopulateExecutionTree() error {
 // 3) If the referenced block has an expired height, skip.
 //
 // 4) Otherwise, this guarantee can be included in the payload.
-func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
+func (b *Builder) getInsertableGuarantees(parentID flow.Identifier, parentSpan opentracing.Span) ([]*flow.CollectionGuarantee, error) {
+	span := b.tracer.StartSpanFromParent(parentSpan, trace.CONBuildOnCreatePayloadGuarantees)
+	defer span.Finish()
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -349,9 +351,9 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 //  (3) The result's parent must have been previously sealed (either by a seal in an ancestor
 //      block or by a seal included earlier in the block that we are constructing).
 // To limit block size, we cap the number of seals to maxSealCount.
-func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
+func (b *Builder) getInsertableSeals(parentID flow.Identifier, parentSpan opentracing.Span) ([]*flow.Seal, error) {
+	span := b.tracer.StartSpanFromParent(parentSpan, trace.CONBuildOnCreatePayloadSeals)
+	defer span.Finish()
 
 	// get the latest seal in the fork, which we are extending and
 	// the corresponding block, whose result is sealed
@@ -489,9 +491,10 @@ type InsertableReceipts struct {
 // 3) Otherwise, this receipt can be included in the payload.
 //
 // Receipts have to be ordered by block height.
-func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
+func (b *Builder) getInsertableReceipts(parentID flow.Identifier, parentSpan opentracing.Span) (*InsertableReceipts, error) {
+
+	span := b.tracer.StartSpanFromParent(parentSpan, trace.CONBuildOnCreatePayloadReceipts)
+	defer span.Finish()
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.

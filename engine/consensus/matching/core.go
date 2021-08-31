@@ -353,7 +353,6 @@ HEIGHT_LOOP:
 
 func (c *Core) OnBlockFinalization() error {
 	startTime := time.Now()
-	// requestReceiptsSpan = c.tracer.StartRootSpanForEntity(context.Background(), trace.CONMatchRequestPendingReceipts)
 	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
 	// request execution receipts for unsealed finalized blocks
 	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
