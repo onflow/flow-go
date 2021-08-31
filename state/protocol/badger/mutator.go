@@ -573,8 +573,10 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	if header.View > finalView {
 		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
 
-		// set current epoch counter
+		// set current epoch counter corresponding to new epoch
 		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+		// set epoch phase - since we are starting a new epoch we begin in the staking phase
+		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
