@@ -180,8 +180,6 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 			)
 		} else if result.payload != nil {
 			// NO-OP. Add all encoded values later.
-
-			// migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
 			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
@@ -828,8 +826,14 @@ func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 			Type:       ConvertStaticType(typ.Type),
 		}
 	case oldInter.CapabilityStaticType:
+		var burrowType newInter.StaticType
+
+		if typ.BorrowType != nil {
+			burrowType = ConvertStaticType(typ.BorrowType)
+		}
+
 		return newInter.CapabilityStaticType{
-			BorrowType: ConvertStaticType(typ.BorrowType),
+			BorrowType: burrowType,
 		}
 	case oldInter.PrimitiveStaticType:
 		return ConvertPrimitiveStaticType(typ)
