@@ -559,7 +559,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
 			fvm.WithTransactionFeesEnabled(true),

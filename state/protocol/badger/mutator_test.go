@@ -470,6 +470,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
 		metrics.On("CommittedEpochFinalView", finalView).Once()
 
+		metrics.On("CurrentEpochFinalView", finalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := realprotocol.DKGPhaseViews(initialCurrentEpoch)
+		require.NoError(t, err)
+		metrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		metrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
@@ -572,13 +580,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// finalize block 4 so we can finalize subsequent blocks
 		// ensure an epoch phase transition when we finalize block 4
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header).Once()
-		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup)
-		metrics.On("CurrentEpochCounter", epoch2Setup.Counter-1)
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup).Once()
 		err = state.Finalize(block4.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
-		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter-1)
 
 		// now that the setup event has been emitted, we should be in the setup phase
 		phase, err = state.AtBlockID(block4.ID()).Phase()
@@ -642,17 +648,15 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// expect epoch phase transition once we finalize block 7
-		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header).Once()
 		// expect committed final view to be updated, since we are committing epoch 2
-		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
-		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted)
-		metrics.On("CurrentEpochCounter", epoch2Setup.Counter-1)
+		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView).Once()
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 		err = state.Finalize(block7.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
 		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
-		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter-1)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()
@@ -694,12 +698,21 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
-		metrics.On("CurrentEpochCounter", epoch2Setup.Counter)
+
+		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
+
+		metrics.On("CurrentEpochFinalView", epoch1Setup.FinalView)
+		metrics.On("CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView)
+		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
+		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
+
 		err = state.Finalize(block8.ID())
 		require.NoError(t, err)
 		err = state.Finalize(block9.ID())
 		require.NoError(t, err)
 		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
+		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseStaking)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
 
 		metrics.AssertExpectations(t)

@@ -148,7 +148,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		rt := fvm.NewInterpreterRuntime()
-		chain := flow.Testnet.Chain()
+		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine(rt)
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -615,6 +615,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
 		zerolog.Nop(),
+		fvm.WithChain(flow.Localnet.Chain()),
 		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
 	)
 

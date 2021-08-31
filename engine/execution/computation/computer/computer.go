@@ -239,13 +239,31 @@ func (e *blockComputer) executeSystemCollection(
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
 	defer colSpan.Finish()
 
-	serviceAddress := e.vmCtx.Chain.ServiceAddress()
-	tx := blueprints.SystemChunkTransaction(serviceAddress)
-	err := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
+	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
+	if err != nil {
+		return txIndex, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
+	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
+
 	if err != nil {
 		return txIndex, err
 	}
+
+	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
+	if systemChunkTxResult.ErrorMessage != "" {
+		// This log is used as the data source for an alert on grafana.
+		// The system_chunk_error field must not be changed without adding the corresponding
+		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
+		e.log.Error().
+			Str("error_message", systemChunkTxResult.ErrorMessage).
+			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
+			Bool("system_chunk_error", true).
+			Bool("critical_error", true).
+			Msg("error executing system chunk transaction")
+	}
+
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
 	return txIndex, err
@@ -309,7 +327,6 @@ func (e *blockComputer) executeTransaction(
 	txIndex uint32,
 	res *execution.ComputationResult,
 ) error {
-
 	startedAt := time.Now()
 	var txSpan opentracing.Span
 	var traceID string

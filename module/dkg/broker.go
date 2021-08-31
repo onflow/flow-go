@@ -101,7 +101,9 @@ func (b *Broker) Broadcast(data []byte) {
 	if b.broadcasts > 0 {
 		// The Warn log is used by the integration tests to check if this method
 		// is called more than once within one epoch.
-		b.log.Warn().Msgf("DKG broadcast number %d", b.broadcasts+1)
+		b.log.Warn().Msgf("DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
+	} else {
+		b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
 	}
 	bcastMsg, err := b.prepareBroadcastMessage(data)
 	if err != nil {
@@ -125,8 +127,6 @@ func (b *Broker) Broadcast(data []byte) {
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to broadcast message")
 	}
-
-	b.log.Debug().Msg("dkg message broadcast")
 	b.broadcasts++
 }
 

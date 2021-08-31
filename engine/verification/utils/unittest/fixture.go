@@ -19,7 +19,9 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/epochs"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -207,6 +209,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 	var payload flow.Payload
 	var referenceBlock flow.Block
+	var serviceEvents flow.ServiceEventList
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -216,11 +219,15 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		require.NoError(t, err)
 		defer led.Done()
 
+		// set 0 clusters to pass n_collectors >= n_clusters check
+		epochConfig := epochs.DefaultEpochConfig()
+		epochConfig.NumCollectorClusters = 0
 		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			chain,
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+			fvm.WithEpochConfig(epochConfig),
 		)
 		require.NoError(t, err)
 
@@ -282,6 +289,12 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		}
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
+		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
+		for _, event := range computationResult.ServiceEvents {
+			converted, err := convert.ServiceEvent(referenceBlock.Header.ChainID, event)
+			require.NoError(t, err)
+			serviceEvents = append(serviceEvents, *converted)
+		}
 
 		startState := startStateCommitment
 
@@ -326,8 +339,9 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	}
 
 	result := &flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  chunks,
+		BlockID:       blockID,
+		Chunks:        chunks,
+		ServiceEvents: serviceEvents,
 	}
 
 	return result, &ExecutionReceiptData{
@@ -353,7 +367,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 		resultsCount: 1,
 		copyCount:    1,
 		chunksCount:  1,
-		chain:        flow.Testnet.Chain(),
+		chain:        root.ChainID.Chain(),
 	}
 
 	for _, apply := range opts {
