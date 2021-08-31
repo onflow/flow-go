@@ -213,7 +213,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`),
 		}
 
-		spamTx.SetGasLimit(650000)
+		spamTx.SetGasLimit(800000)
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
