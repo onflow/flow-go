@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/module/epochs"
 
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -1719,4 +1720,40 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 		DKGMessage: *DKGMessageFixture(),
 		Signature:  SignatureFixture(),
 	}
+}
+
+func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(64))
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
+func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
+	return bootstrap.NodeMachineAccountInfo{
+		Address:           AddressFixture().String(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
+		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
+		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
+		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,
+	}
+}
+
+func MachineAccountFixture() (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
+	info := NodeMachineAccountInfoFixture()
+	acct := &sdk.Account{
+		Address: sdk.HexToAddress(info.Address),
+		Balance: uint64(epochs.SoftMinBalanceSN),
+		Keys: []*sdk.AccountKey{
+			{
+				Index:     int(info.KeyIndex),
+				PublicKey: info.MustPrivateKey().PublicKey(),
+				SigAlgo:   info.SigningAlgorithm,
+				HashAlgo:  info.HashAlgorithm,
+				Weight:    1000,
+			},
+		},
+	}
+	return info, acct
 }
