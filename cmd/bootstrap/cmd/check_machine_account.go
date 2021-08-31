@@ -42,7 +42,7 @@ func checkMachineAccountRun(_ *cobra.Command, _ []string) {
 
 	// read the private node information - used to get the role
 	var nodeInfoPriv model.NodeInfoPriv
-	readJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeID), nodeInfoPriv)
+	readJSON(filepath.Join(flagOutdir, fmt.Sprintf(model.PathNodeInfoPriv, nodeID)), &nodeInfoPriv)
 
 	// read the machine account info file
 	machineAccountInfo := readMachineAccountInfo(nodeID)

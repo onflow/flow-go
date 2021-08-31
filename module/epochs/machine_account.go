@@ -64,7 +64,7 @@ func CheckMachineAccountInfo(
 		return fmt.Errorf("invalid role (%s) must be one of [collection, consensus]", role.String())
 	}
 
-	address := flow.HexToAddress(info.Address)
+	address := info.FlowAddress()
 	if address == flow.EmptyAddress {
 		return fmt.Errorf("could not parse machine account address: %s", info.Address)
 	}

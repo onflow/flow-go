@@ -4,6 +4,7 @@ package bootstrap
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -60,6 +61,15 @@ type NodeMachineAccountInfo struct {
 
 	// HashAlgorithm is the algorithm used for hashing
 	HashAlgorithm sdkcrypto.HashAlgorithm
+}
+
+func (info NodeMachineAccountInfo) FlowAddress() flow.Address {
+	// trim 0x-prefix if present
+	addr := info.Address
+	if strings.ToLower(addr[:2]) == "0x" {
+		addr = addr[2:]
+	}
+	return flow.HexToAddress(addr)
 }
 
 func (info NodeMachineAccountInfo) PrivateKey() (crypto.PrivateKey, error) {
