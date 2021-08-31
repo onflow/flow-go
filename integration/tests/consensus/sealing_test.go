@@ -29,7 +29,6 @@ type SealingSuite struct {
 	conIDs []flow.Identifier
 	exeID  flow.Identifier
 	verID  flow.Identifier
-	accID flow.Identifier
 	reader *client.FlowMessageStreamReader
 }
 
