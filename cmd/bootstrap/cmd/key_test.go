@@ -37,7 +37,7 @@ var happyPathWithMachineAccountRegex = `^will generate networking key` +
 	`will generate machine account key` +
 	`generated machine account key` +
 	`assembling machine account information` +
-	`encoded public machine account key` +
+	`encoded machine account public key for entry to Flow Port` +
 	`wrote file /tmp/%s/private-root-information/private-node-info_\S+/node-machine-account-key.priv.json`
 
 func TestHappyPath(t *testing.T) {

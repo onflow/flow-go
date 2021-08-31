@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -253,12 +254,17 @@ func generateLibP2PNode(t *testing.T,
 	// Inject some logic to be able to observe connections of this node
 	connManager := NewTagWatchingConnManager(logger, noopMetrics)
 
+	// dns resolver
+	resolver, err := dns.NewResolver(noopMetrics)
+	require.NoError(t, err)
+
 	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
 		SetRootBlockID(rootBlockID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
 		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
 		SetPingInfoProvider(pingInfoProvider).
+		SetResolver(resolver).
 		SetLogger(logger).
 		Build(ctx)
 	require.NoError(t, err)

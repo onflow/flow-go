@@ -53,11 +53,15 @@ func extractExecutionState(dir string,
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	var migrations []ledger.Migration
-	var reporters []ledger.Reporter
+	migrations := []ledger.Migration{}
+	reporters := []ledger.Reporter{}
+
+	storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{Log: log, OutputDir: outputDir}
+
 	if migrate {
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
+			storageUsedUpdateMigration.Migrate,
 		}
 	}
 	if report {
