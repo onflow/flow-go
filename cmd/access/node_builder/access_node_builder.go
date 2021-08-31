@@ -265,8 +265,16 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+		var cleanMetrics module.CleanerMetrics
+		if builder.MetricsEnabled {
+			cleanMetrics = metrics.NewCleanerCollector()
+		} else {
+			cleanMetrics = metrics.NewNoopCollector()
+		}
+
 		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+		cleaner := storage.NewCleaner(node.Logger, node.DB, cleanMetrics, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
 
 		followerEng, err := follower.New(

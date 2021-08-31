@@ -317,7 +317,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		Cache:      metrics.NewNoopCollector(),
 		Mempool:    metrics.NewNoopCollector(),
 	}
-	if fnb.BaseConfig.metricsEnabled {
+	if fnb.BaseConfig.MetricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
 
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
@@ -720,7 +720,7 @@ func WithDataDir(dataDir string) Option {
 
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
-		config.metricsEnabled = enabled
+		config.MetricsEnabled = enabled
 	}
 }
 
@@ -765,7 +765,7 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.EnqueueNetworkInit(ctx)
 
-	if fnb.metricsEnabled {
+	if fnb.MetricsEnabled {
 		fnb.EnqueueMetricsServerInit()
 		fnb.RegisterBadgerMetrics()
 	}
