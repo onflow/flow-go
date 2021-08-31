@@ -102,7 +102,7 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	}
 
 	// we haven't collected sufficient weight or shares, we have nothing to do further
-	if !c.hasSufficientStake() {
+	if !c.hasSufficientWeight() {
 		return nil
 	}
 
