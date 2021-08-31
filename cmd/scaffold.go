@@ -182,7 +182,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			true,
 			fnb.IDTranslator,
 			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-			p2p.WithMessageValidators(fnb.MsgValidators...),
 		)
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
