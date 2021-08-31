@@ -153,7 +153,7 @@ func main() {
 
 	fmt.Println("Node bootstrapping data generated...")
 
-	var accessNodeGRPCPubKey string
+	var secureAccessNodeID string
 	for i, c := range containers {
 		fmt.Printf("%d: %s", i+1, c.Identity().String())
 		if c.Unstaked {
@@ -161,13 +161,13 @@ func main() {
 		}
 
 		if c.Role == flow.RoleAccess && !c.Unstaked {
-			accessNodeGRPCPubKey = c.NetworkPubKey().String()[2:]
+			secureAccessNodeID = c.NodeID.String()
 		}
 
 		fmt.Println()
 	}
 
-	services := prepareServices(containers, accessNodeGRPCPubKey)
+	services := prepareServices(containers, secureAccessNodeID)
 
 	err = writeDockerComposeConfig(services)
 	if err != nil {
@@ -251,7 +251,7 @@ type Build struct {
 	Target     string
 }
 
-func prepareServices(containers []testnet.ContainerConfig, accessNodeGRPCPubKey string) Services {
+func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeID string) Services {
 	services := make(Services)
 
 	var (
@@ -269,7 +269,7 @@ func prepareServices(containers []testnet.ContainerConfig, accessNodeGRPCPubKey 
 				container,
 				numConsensus,
 				"access_1:9001",
-				accessNodeGRPCPubKey,
+				secureAccessNodeID,
 			)
 			numConsensus++
 		case flow.RoleCollection:
@@ -277,7 +277,7 @@ func prepareServices(containers []testnet.ContainerConfig, accessNodeGRPCPubKey 
 				container,
 				numCollection,
 				"access_1:9001",
-				accessNodeGRPCPubKey,
+				secureAccessNodeID,
 			)
 			numCollection++
 		case flow.RoleExecution:
@@ -367,7 +367,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress, accessNodeGRPCPubKey string) Service {
+func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -380,7 +380,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessAdd
 		fmt.Sprintf("--emergency-sealing-active=false"),
 		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--access-node-grpc-public-key=%s", accessNodeGRPCPubKey),
+		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
 	)
 
 	return service
@@ -397,7 +397,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, accessNodeGRPCPubKey string) Service {
+func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -409,7 +409,7 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--access-node-grpc-public-key=%s", accessNodeGRPCPubKey),
+		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
 	)
 
 	return service
