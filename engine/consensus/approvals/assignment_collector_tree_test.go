@@ -76,7 +76,9 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	return wrapper
 }
 
-func mockCollectorStateTransition(wrapper *mockedCollectorWrapper, oldState, newState approvals.ProcessingStatus) {
+// requireStateTransition specifies that we are expecting the business logic to 
+// execute the specified state transition.
+func requireStateTransition(wrapper *mockedCollectorWrapper, oldState, newState approvals.ProcessingStatus) {
 	wrapper.collector.On("ChangeProcessingStatus",
 		oldState, newState).Return(nil).Run(func(args mock2.Arguments) {
 		wrapper.status = newState
@@ -133,8 +135,8 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollector() {
 	require.Nil(s.T(), collector)
 }
 
-// TestGetCollectorsByInterval tests that GetCollectorsByInterval returns expected array of AssignmentCollector
-// in proposed interval
+// TestGetCollectorsByInterval tests that GetCollectorsByInterval returns a slice 
+// with the AssignmentCollectors from the requested interval
 func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	chain := unittest.ChainFixtureFrom(10, &s.ParentBlock)
 	receipts := unittest.ReceiptChainFor(chain, s.IncorporatedResult.Result)
@@ -142,27 +144,38 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 		s.Blocks[block.ID()] = block.Header
 	}
 
-	// process all receipts except first one, this will build a chain of collectors but all of them will be
-	// in caching state
+	// Process all receipts except first one. This generates a chain of collectors but all of them will be
+	// in caching state, as the receipt connecting them to the sealed state has not been added yet.
+	// As `GetCollectorsByInterval` only returns verifying collectors, we expect an empty slice to be returned.
 	for index, receipt := range receipts {
 		result := &receipt.ExecutionResult
-		mockedCollector := s.prepareMockedCollector(result)
-		mockCollectorStateTransition(mockedCollector, approvals.CachingApprovals, approvals.VerifyingApprovals)
+		s.prepareMockedCollector(result)
 		if index > 0 {
 			createdCollector, err := s.collectorTree.GetOrCreateCollector(result)
 			require.NoError(s.T(), err)
 			require.True(s.T(), createdCollector.Created)
 		}
 	}
-
 	collectors := s.collectorTree.GetCollectorsByInterval(0, s.Block.Height+100)
 	require.Empty(s.T(), collectors)
 
+	// Now we add the connecting receipt. The AssignmentCollectorTree should then change the states
+	// of all added collectors from `CachingApprovals` to `VerifyingApprovals`. Therefore, we
+	// expect `GetCollectorsByInterval` to return all added collectors.
+	for _, receipt := range receipts {
+		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.ID()]
+		mockCollectorStateTransition(mockedCollector, approvals.CachingApprovals, approvals.VerifyingApprovals)
+	}
 	_, err := s.collectorTree.GetOrCreateCollector(&receipts[0].ExecutionResult)
 	require.NoError(s.T(), err)
 
 	collectors = s.collectorTree.GetCollectorsByInterval(0, s.Block.Height+100)
 	require.Len(s.T(), collectors, len(receipts))
+
+	for _, receipt := range receipts {
+		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.ID()]
+		mockedCollector.collector.AssertExpectations(s.T())
+	}
 }
 
 // TestGetOrCreateCollector tests that getting collector creates one on first call and returns from cache on second one.
@@ -176,17 +189,18 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_ReturnFromCache(
 	require.True(s.T(), lazyCollector.Created)
 	require.Equal(s.T(), approvals.CachingApprovals, lazyCollector.Collector.ProcessingStatus())
 
-	lazyCollector, err = s.collectorTree.GetOrCreateCollector(result)
+	lazyCollector2, err := s.collectorTree.GetOrCreateCollector(result)
 	require.NoError(s.T(), err)
 	// should be returned from cache
-	require.False(s.T(), lazyCollector.Created)
+	require.False(s.T(), lazyCollector2.Created)
+	require.True(s.T(), lazyCollector.Collector == lazyCollector2.Collector)
 }
 
 // TestGetOrCreateCollector_FactoryError tests that AssignmentCollectorTree correctly handles factory method error
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_FactoryError() {
 	result := unittest.ExecutionResultFixture()
 	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
-	require.Error(s.T(), err)
+	require.ErrorIs(s.T(), err, factoryError)
 	require.Nil(s.T(), lazyCollector)
 }
 
@@ -210,6 +224,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingFinalizedC
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
 	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
 	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsOutdatedInputError(err))
 	require.Nil(s.T(), lazyCollector)
 }
 
@@ -287,4 +302,9 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 	// A becomes sealed, B becomes finalized
 	err := s.collectorTree.FinalizeForkAtLevel(finalized, &s.Block)
 	require.NoError(s.T(), err)
+	for forkIndex := range forks {
+		for _, result := range results[forkIndex] {
+			s.mockedCollectors[result.Result.ID()].collector.AssertExpectations(s.T())
+		}
+	}
 }

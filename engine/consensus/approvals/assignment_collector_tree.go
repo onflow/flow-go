@@ -262,9 +262,9 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	}
 
 	// leveled forest doesn't treat this case as error, we shouldn't create collectors
-	// for vertexes lower that forest.LowestLevel
+	// for vertices lower that forest.LowestLevel
 	if vertex.Level() < t.forest.LowestLevel {
-		return nil, fmt.Errorf("could not add collector with height lower than the lowest level")
+		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", vertex.Level(), t.forest.LowestLevel)
 	}
 
 	// add AssignmentCollector as vertex to tree
