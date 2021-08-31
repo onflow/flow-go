@@ -42,7 +42,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
 	if keyExists {
-		log.Info().Msg("machine account private key already exists")
+		log.Warn().Msg("machine account private key already exists")
 		return
 	}
 
@@ -54,8 +54,8 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 	log.Info().Msg("generated machine account private key")
 
 	// construct object to write to file
+	// also write the public key to terminal for entry in Flow Port
 	machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 
 	writeJSON(machineAccountKeyPath, machineAccountPriv)
-	log.Info().Msgf("machine account public key: %s", machineKey.PublicKey().String())
 }
