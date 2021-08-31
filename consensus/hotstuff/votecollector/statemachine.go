@@ -99,18 +99,26 @@ func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.
 	}
 
 	if (currentStatus == hotstuff.VoteCollectorStatusCaching) && (newStatus == hotstuff.VoteCollectorStatusVerifying) {
-		block, ok := payload.(*model.Block)
+		proposal, ok := payload.(*model.Proposal)
 		if !ok {
 			return fmt.Errorf("invalid payload %v, expected *model.Block", payload)
 		}
 
-		cachingCollector, err := m.caching2Verifying(block)
+		cachingCollector, err := m.caching2Verifying(proposal.Block)
 		if err != nil {
 			return fmt.Errorf("failed to transistion VoteCollector from %s to %s: %w", currentStatus.String(), newStatus.String(), err)
 		}
 
-		blockID := block.BlockID
+		blockID := proposal.Block.BlockID
 		m.workerPool.Submit(func() {
+			// TODO: check if SigData is correct
+			vote := proposal.ProposerVote()
+
+			err := m.AddVote(vote)
+			if err != nil {
+				m.log.Err(err).Msgf("failed to process vote from proposal %x", blockID)
+			}
+
 			for _, vote := range cachingCollector.GetVotesByBlockID(blockID) {
 				task := m.reIngestVoteTask(vote)
 				m.workerPool.Submit(task)
@@ -129,26 +137,37 @@ func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.
 func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
 	// TODO: implement logic for validating block proposal, converting it to vote and further processing
 
+	// TODO: Since we don't tolerate double votes we can't process double proposals.
+	//  In case we have received double proposal and our collector is already in verifying state we will just
+	//  turn collector into invalid state and stop processing of any votes until pacemaker kicks in, terminates current view with timeout
+	//  and next leader produces block.
+
 	block := proposal.Block
-	err := m.ChangeProcessingStatus(m.Status(), hotstuff.VoteCollectorStatusVerifying, proposal.Block)
+	err := m.ChangeProcessingStatus(m.Status(), hotstuff.VoteCollectorStatusVerifying, proposal)
 	if err != nil {
-		return fmt.Errorf("could not change processing status for block %x: %w", block.BlockID, err)
+		// if collector wasn't in caching state it means another goroutine has triggered state transition and
+		// submitted proposal first. This means we have received double proposal, and we should stop collecting votes for
+		// current view.
+		if !errors.Is(err, ErrDifferentCollectorState) {
+			return fmt.Errorf("could not change processing status for block %x: %w", block.BlockID, err)
+		}
 	}
 
-	m.workerPool.Submit(func() {
-		// TODO: check if SigData is correct
-		vote := &model.Vote{
-			View:     block.View,
-			BlockID:  block.BlockID,
-			SignerID: block.ProposerID,
-			SigData:  block.QC.SigData,
-		}
+	clr := m.atomicLoadCollector()
 
-		err := m.AddVote(vote)
-		if err != nil {
-			m.log.Err(err).Msgf("failed to process vote from proposal %x", block.BlockID)
+	// if we are dealing with verifying collector check if it's the same proposal
+	if verifyingCollector, ok := clr.(hotstuff.VerifyingVoteCollector); ok {
+		if verifyingCollector.Block().BlockID == block.BlockID {
+			return nil
 		}
-	})
+	}
+
+	// if our collector is in non verifying state, or we have received proposal for different block
+	// we need to transition to invalid state and stop processing votes.
+	err = m.ChangeProcessingStatus(m.Status(), hotstuff.VoteCollectorStatusInvalid, struct{}{})
+	if err != nil {
+		return fmt.Errorf("could not change processing status to invalid for block (%x): %w", block.BlockID, err)
+	}
 
 	return nil
 }

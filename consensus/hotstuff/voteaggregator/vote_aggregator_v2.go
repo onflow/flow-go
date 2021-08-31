@@ -108,6 +108,12 @@ func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 	}
 	err = collector.AddVote(vote)
 	if err != nil {
+		if model.IsDoubleVoteError(err) {
+			doubleVoteErr := err.(model.DoubleVoteError)
+			va.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
+			return nil
+		}
+
 		return fmt.Errorf("could not process vote for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
 	}
