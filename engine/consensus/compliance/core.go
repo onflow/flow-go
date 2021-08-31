@@ -274,10 +274,11 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		blockSpan.SetTag("view", proposal.Header.View)
 		blockSpan.SetTag("proposer", proposal.Header.ProposerID.String())
 	}
-	childSpan := c.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposalProcessSingle)
+	// TODO (Ramtin) comment out for now
+	// childSpan := c.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposalProcessSingle)
 	defer func() {
 		c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
-		childSpan.Finish()
+		// childSpan.Finish()
 	}()
 
 	header := proposal.Header
