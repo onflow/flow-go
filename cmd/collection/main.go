@@ -85,7 +85,9 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		accessAddress       string
+		accessAddress      string
+		secureAccessNodeID string
+
 		accessApiNodePubKey string
 		insecureAccessAPI   bool
 	)
@@ -142,6 +144,7 @@ func main() {
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
 			flags.StringVar(&accessApiNodePubKey, "access-node-grpc-public-key", "", "the networking public key of the secured access node being connected to")
 			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
@@ -409,7 +412,25 @@ func main() {
 					return nil, err
 				}
 			} else {
-				flowClient, err = common.SecureFlowClient(accessAddress, accessApiNodePubKey)
+				if secureAccessNodeID == "" {
+					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
+				}
+
+				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
+				if err != nil {
+					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
+				}
+
+				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
+				if err != nil {
+					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				if len(identities) < 1 {
+					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
 				if err != nil {
 					return nil, err
 				}
