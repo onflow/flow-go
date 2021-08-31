@@ -681,6 +681,7 @@ func main() {
 				}
 			}
 
+			// @TODO: this will be handled when https://github.com/dapperlabs/flow-go/issues/5792 is completed
 			err = flowClient.Ping(context.Background())
 			if err != nil {
 				return nil, fmt.Errorf("failed to ping, flow client may be misconfigured check GRPC options %w", err)
