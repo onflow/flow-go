@@ -85,6 +85,14 @@ func (e InvalidVoteError) Unwrap() error {
 	return e.Err
 }
 
+func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
+	return InvalidVoteError{
+		VoteID: vote.ID(),
+		View:   vote.View,
+		Err:    fmt.Errorf(msg, args...),
+	}
+}
+
 // ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
 // prove a Byzantine threshold of consensus replicas has been exceeded.
 // Per definition, the byzantine threshold is exceeded is there are byzantine consensus
