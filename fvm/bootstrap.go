@@ -10,11 +10,11 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -846,7 +846,7 @@ func registerNodeTransaction(
 	accountKey := flow.AccountPublicKey{
 		PublicKey: id.NetworkPubKey,
 		SignAlgo:  id.NetworkPubKey.Algorithm(),
-		HashAlgo:  hash.SHA3_256,
+		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 		Weight:    1000,
 	}
 
