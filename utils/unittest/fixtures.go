@@ -44,6 +44,13 @@ func RandomAddressFixture() flow.Address {
 	return addr
 }
 
+func RandomSDKAddressFixture() sdk.Address {
+	addr := RandomAddressFixture()
+	var sdkAddr sdk.Address
+	copy(sdkAddr[:], addr[:])
+	return sdkAddr
+}
+
 func InvalidAddressFixture() flow.Address {
 	addr := AddressFixture()
 	addr[0] ^= 1 // alter one bit to obtain an invalid address
@@ -1732,7 +1739,7 @@ func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	return bootstrap.NodeMachineAccountInfo{
-		Address:           AddressFixture().String(),
+		Address:           RandomAddressFixture().String(),
 		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
 		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
 		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
