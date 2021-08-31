@@ -1,16 +1,18 @@
 package approvals_test
 
 import (
+	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine"
 	"sync"
 	"testing"
 
-	mock2 "github.com/stretchr/testify/mock"
+	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/consensus/approvals"
-	"github.com/onflow/flow-go/engine/consensus/approvals/mock"
+	mockAC "github.com/onflow/flow-go/engine/consensus/approvals/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -22,10 +24,12 @@ func TestAssignmentCollectorTree(t *testing.T) {
 	suite.Run(t, new(AssignmentCollectorTreeSuite))
 }
 
+var factoryError = errors.New("factory error")
+
 // mockedCollectorWrapper is a helper structure for holding mock.AssignmentCollector and ProcessingStatus
 // this is needed for simplifying mocking of state transitions.
 type mockedCollectorWrapper struct {
-	collector *mock.AssignmentCollector
+	collector *mockAC.AssignmentCollector
 	status    approvals.ProcessingStatus
 }
 
@@ -44,7 +48,7 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 		if wrapper, found := s.mockedCollectors[result.ID()]; found {
 			return wrapper.collector, nil
 		}
-		return nil, fmt.Errorf("mocked collector %v not found", result.ID())
+		return nil, fmt.Errorf("mocked collector %v not found: %w", result.ID(), factoryError)
 	}
 
 	s.mockedCollectors = make(map[flow.Identifier]*mockedCollectorWrapper)
@@ -56,7 +60,7 @@ func (s *AssignmentCollectorTreeSuite) SetupTest() {
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
 // to create new collector when factory method will be called
 func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.ExecutionResult) *mockedCollectorWrapper {
-	collector := &mock.AssignmentCollector{}
+	collector := &mockAC.AssignmentCollector{}
 	collector.On("ResultID").Return(result.ID()).Maybe()
 	collector.On("Result").Return(result).Maybe()
 	collector.On("BlockID").Return(result.BlockID).Maybe()
@@ -76,11 +80,13 @@ func (s *AssignmentCollectorTreeSuite) prepareMockedCollector(result *flow.Execu
 	return wrapper
 }
 
-// requireStateTransition specifies that we are expecting the business logic to 
+// requireStateTransition specifies that we are expecting the business logic to
 // execute the specified state transition.
 func requireStateTransition(wrapper *mockedCollectorWrapper, oldState, newState approvals.ProcessingStatus) {
+	fmt.Printf("Require state transition for %x %v -> %v\n", wrapper.collector.BlockID(), wrapper.status, newState)
 	wrapper.collector.On("ChangeProcessingStatus",
-		oldState, newState).Return(nil).Run(func(args mock2.Arguments) {
+		oldState, newState).Return(nil).Run(func(args mocktestify.Arguments) {
+		fmt.Printf("Performing state transition for %x %v -> %v\n", wrapper.collector.BlockID(), wrapper.status, newState)
 		wrapper.status = newState
 	}).Once()
 }
@@ -135,7 +141,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollector() {
 	require.Nil(s.T(), collector)
 }
 
-// TestGetCollectorsByInterval tests that GetCollectorsByInterval returns a slice 
+// TestGetCollectorsByInterval tests that GetCollectorsByInterval returns a slice
 // with the AssignmentCollectors from the requested interval
 func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	chain := unittest.ChainFixtureFrom(10, &s.ParentBlock)
@@ -164,7 +170,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetCollectorsByInterval() {
 	// expect `GetCollectorsByInterval` to return all added collectors.
 	for _, receipt := range receipts {
 		mockedCollector := s.mockedCollectors[receipt.ExecutionResult.ID()]
-		mockCollectorStateTransition(mockedCollector, approvals.CachingApprovals, approvals.VerifyingApprovals)
+		requireStateTransition(mockedCollector, approvals.CachingApprovals, approvals.VerifyingApprovals)
 	}
 	_, err := s.collectorTree.GetOrCreateCollector(&receipts[0].ExecutionResult)
 	require.NoError(s.T(), err)
@@ -208,7 +214,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_FactoryError() {
 // In this specific case collector has to become verifying instead of caching.
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentIsSealed() {
 	result := s.IncorporatedResult.Result
-	mockCollectorStateTransition(s.mockedCollectors[result.ID()],
+	requireStateTransition(s.mockedCollectors[result.ID()],
 		approvals.CachingApprovals, approvals.VerifyingApprovals)
 	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
 	require.NoError(s.T(), err)
@@ -216,12 +222,23 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentI
 	require.Equal(s.T(), approvals.VerifyingApprovals, lazyCollector.Collector.ProcessingStatus())
 }
 
-// TestGetOrCreateCollector_AddingFinalizedCollector tests a case when we are trying to add collector which is already finalized.
+// TestGetOrCreateCollector_AddingSealedCollector tests a case when we are trying to add collector which is already sealed.
 // Leveled forest doesn't accept vertexes lower than the lowest height.
-func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingFinalizedCollector() {
-	block := unittest.BlockFixture()
-	block.Header.Height = s.ParentBlock.Height - 10
+func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedCollector() {
+	block := unittest.BlockWithParentFixture(&s.ParentBlock)
+	s.Blocks[block.ID()] = block.Header
 	result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	s.prepareMockedCollector(result)
+
+	// generate a few sealed blocks
+	prevSealedBlock := block.Header
+	for i := 0; i < 5; i++ {
+		sealedBlock := unittest.BlockHeaderWithParentFixture(prevSealedBlock)
+		s.MarkFinalized(&sealedBlock)
+		_ = s.collectorTree.FinalizeForkAtLevel(&sealedBlock, &sealedBlock)
+	}
+
+	// now adding a collector which is lower than sealed height should result in error
 	lazyCollector, err := s.collectorTree.GetOrCreateCollector(result)
 	require.Error(s.T(), err)
 	require.True(s.T(), engine.IsOutdatedInputError(err))
@@ -234,49 +251,52 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingFinalizedC
 //        <- E[ER{A}] <- F[ER{E}] <- G[ER{F}]
 //               |
 //           finalized
-// Initially P was executed,  B is finalized and incorporates ER for A, C incorporates ER for B, D was forked from A,
-// but wasn't finalized, E incorporates ER for D.
-// Let's take a case where we have collectors for ER incorporated in blocks B, C, D, E. Since we don't
-// have a collector for A, {B, C, D, E} are not processable. Test that when A becomes sealed {B, C, D} become processable
-// but E is unprocessable since D wasn't part of finalized fork.
+// Initially P was executed, B is finalized and incorporates ER for A, C incorporates ER for B, D incorporates ER for C,
+// E was forked from A and incorporates ER for A, but wasn't finalized, F incorporates ER for E, G incorporates ER for F
+// Let's take a case where we have collectors for execution results ER{A}, ER{B}, ER{C}, ER{E}, ER{F}.
+// All of those collectors are not processable because ER{A} doesn't have parent collector or is not a parent of sealed block.
+// Test that when A becomes sealed {ER{B}, ER{C}} become processable
+// but {ER{E}, ER{F}} are unprocessable since E wasn't part of finalized fork.
 func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterSealedParent() {
 	s.IdentitiesCache[s.IncorporatedBlock.ID()] = s.AuthorizedVerifiers
 	// two forks
 	forks := make([][]*flow.Block, 2)
 	results := make([][]*flow.IncorporatedResult, 2)
+
+	firstResult := unittest.ExecutionResultFixture(
+		unittest.WithPreviousResult(*s.IncorporatedResult.Result),
+		unittest.WithExecutionResultBlockID(s.IncorporatedBlock.ID()))
+	s.prepareMockedCollector(firstResult)
 	for i := 0; i < len(forks); i++ {
 		fork := unittest.ChainFixtureFrom(3, &s.IncorporatedBlock)
 		forks[i] = fork
-		prevResult := s.IncorporatedResult.Result
+		prevResult := firstResult
 		// create execution results for all blocks except last one, since it won't be valid by definition
 		for _, block := range fork {
 			blockID := block.ID()
-
-			// create execution result for previous block in chain
-			// this result will be incorporated in current block.
-			result := unittest.ExecutionResultFixture(
-				unittest.WithPreviousResult(*prevResult),
-			)
-			result.BlockID = block.Header.ParentID
 
 			// update caches
 			s.Blocks[blockID] = block.Header
 			s.IdentitiesCache[blockID] = s.AuthorizedVerifiers
 
 			IR := unittest.IncorporatedResult.Fixture(
-				unittest.IncorporatedResult.WithResult(result),
+				unittest.IncorporatedResult.WithResult(prevResult),
 				unittest.IncorporatedResult.WithIncorporatedBlockID(blockID))
 
 			results[i] = append(results[i], IR)
-
-			s.prepareMockedCollector(result)
 
 			collector, err := s.collectorTree.GetOrCreateCollector(IR.Result)
 			require.NoError(s.T(), err)
 
 			require.Equal(s.T(), approvals.CachingApprovals, collector.Collector.ProcessingStatus())
 
-			prevResult = result
+			// create execution result for previous block in chain
+			// this result will be incorporated in current block.
+			prevResult = unittest.ExecutionResultFixture(
+				unittest.WithPreviousResult(*prevResult),
+				unittest.WithExecutionResultBlockID(blockID),
+			)
+			s.prepareMockedCollector(prevResult)
 		}
 	}
 
@@ -287,14 +307,16 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 
 	// at this point collectors for forks[0] should be processable and for forks[1] not
 	for forkIndex := range forks {
-		for _, result := range results[forkIndex] {
+		for resultIndex, result := range results[forkIndex] {
 			wrapper, found := s.mockedCollectors[result.Result.ID()]
+			fmt.Printf("forkIndex: %d, resultIndex: %d, id: %x, result: %v\n", forkIndex, resultIndex, result.Result.ID(), result.Result)
 			require.True(s.T(), found)
 
 			if forkIndex == 0 {
-				mockCollectorStateTransition(wrapper, approvals.CachingApprovals, approvals.VerifyingApprovals)
-			} else {
-				mockCollectorStateTransition(wrapper, approvals.CachingApprovals, approvals.Orphaned)
+				requireStateTransition(wrapper, approvals.CachingApprovals, approvals.VerifyingApprovals)
+			} else if resultIndex > 0 {
+				// first result shouldn't transfer to orphaned state since it's actually ER{A} which is part of finalized fork.
+				requireStateTransition(wrapper, approvals.CachingApprovals, approvals.Orphaned)
 			}
 		}
 	}
@@ -302,6 +324,7 @@ func (s *AssignmentCollectorTreeSuite) TestFinalizeForkAtLevel_ProcessableAfterS
 	// A becomes sealed, B becomes finalized
 	err := s.collectorTree.FinalizeForkAtLevel(finalized, &s.Block)
 	require.NoError(s.T(), err)
+
 	for forkIndex := range forks {
 		for _, result := range results[forkIndex] {
 			s.mockedCollectors[result.Result.ID()].collector.AssertExpectations(s.T())

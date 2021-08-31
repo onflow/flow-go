@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/storage"
@@ -253,18 +254,19 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	// goroutine already added the needed collector. Hence, check again after acquiring the lock:
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	// leveled forest doesn't treat this case as error, we shouldn't create collectors
+	// for vertices lower that forest.LowestLevel
+	if vertex.Level() < t.forest.LowestLevel {
+		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", vertex.Level(), t.forest.LowestLevel)
+	}
+
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
 			Collector: v.(*assignmentCollectorVertex).collector,
 			Created:   false,
 		}, nil
-	}
-
-	// leveled forest doesn't treat this case as error, we shouldn't create collectors
-	// for vertices lower that forest.LowestLevel
-	if vertex.Level() < t.forest.LowestLevel {
-		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", vertex.Level(), t.forest.LowestLevel)
 	}
 
 	// add AssignmentCollector as vertex to tree
