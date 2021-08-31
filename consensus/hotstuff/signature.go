@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RandomBeaconReconstructor collects verified signature shares, and reconstructs the
+// RandomBeaconReconstructor collects signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message agreed about upfront.
@@ -43,10 +43,10 @@ const (
 	SigTypeInvalid
 )
 
-// WeightedSignatureAggregator aggregates signatures of the same signature scheme from different signers.
-// The module is aware of weights assigned to each signer.
-// It can either be used to aggregate staking signatures or aggregate random beacon signatures,
-// but not a mix of both.
+// WeightedSignatureAggregator aggregates signatures of the same signature scheme and the same message from different signers.
+// The public keys and message are aggreed upon upfront.
+// It is also recommended to only aggregate signatures generated with keys representing equivalent security-bit level.
+// The module is aware of weights assigned to each signer, as well as a total weight threshold.
 // Implementation of SignatureAggregator must be concurrent safe.
 type WeightedSignatureAggregator interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message.
@@ -107,15 +107,15 @@ type CombinedSigAggregator interface {
 type BlockSignatureData struct {
 	StakingSigners               []flow.Identifier
 	RandomBeaconSigners          []flow.Identifier
-	AggregatedStakingSig         []byte
-	AggregatedRandomBeaconSig    []byte
+	AggregatedStakingSig         []byte // if BLS is used, this is equivalent to crypto.Signature
+	AggregatedRandomBeaconSig    []byte // if BLS is used, this is equivalent to crypto.Signature
 	ReconstructedRandomBeaconSig crypto.Signature
 }
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
-	// blockID is the block that the aggregated sig is for
-	// sig is the aggregated signature data
+	// blockID is the block that the aggregated signature is for.
+	// sig is the aggregated signature data.
 	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
 
 	// blockID is the block that the aggregated sig is signed for

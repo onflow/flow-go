@@ -6,7 +6,7 @@ import (
 )
 
 // Verifier is the component responsible for the cryptographic integrity of
-// votes, proposals and QC's against w.r.t. the block they are signing.
+// votes, proposals and QC's against the block they are signing.
 // Overall, there are two criteria for the validity of a vote and QC:
 //  (1) the signer ID(s) must correspond to authorized consensus participants
 //  (2) the signature must be cryptographically valid.
