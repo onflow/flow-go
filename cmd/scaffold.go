@@ -45,11 +45,12 @@ import (
 )
 
 type Metrics struct {
-	Network    module.NetworkMetrics
-	Engine     module.EngineMetrics
-	Compliance module.ComplianceMetrics
-	Cache      module.CacheMetrics
-	Mempool    module.MempoolMetrics
+	Network        module.NetworkMetrics
+	Engine         module.EngineMetrics
+	Compliance     module.ComplianceMetrics
+	Cache          module.CacheMetrics
+	Mempool        module.MempoolMetrics
+	CleanCollector module.CleanerMetrics
 }
 
 type Storage struct {
@@ -182,7 +183,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			true,
 			fnb.IDTranslator,
 			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-			p2p.WithMessageValidators(fnb.MsgValidators...),
 		)
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
@@ -311,11 +311,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNoopCollector(),
-		Engine:     metrics.NewNoopCollector(),
-		Compliance: metrics.NewNoopCollector(),
-		Cache:      metrics.NewNoopCollector(),
-		Mempool:    metrics.NewNoopCollector(),
+		Network:        metrics.NewNoopCollector(),
+		Engine:         metrics.NewNoopCollector(),
+		Compliance:     metrics.NewNoopCollector(),
+		Cache:          metrics.NewNoopCollector(),
+		Mempool:        metrics.NewNoopCollector(),
+		CleanCollector: metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.metricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
@@ -323,11 +324,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:    metrics.NewNetworkCollector(),
-			Engine:     metrics.NewEngineCollector(),
-			Compliance: metrics.NewComplianceCollector(),
-			Cache:      metrics.NewCacheCollector(fnb.RootChainID),
-			Mempool:    mempools,
+			Network:        metrics.NewNetworkCollector(),
+			Engine:         metrics.NewEngineCollector(),
+			Compliance:     metrics.NewComplianceCollector(),
+			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			CleanCollector: metrics.NewCleanerCollector(),
+			Mempool:        mempools,
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup
