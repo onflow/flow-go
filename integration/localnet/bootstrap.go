@@ -160,7 +160,7 @@ func main() {
 			fmt.Printf(" (unstaked)")
 		}
 
-		if c.Role == flow.RoleAccess {
+		if c.Role == flow.RoleAccess && !c.Unstaked {
 			accessNodeGRPCPubKey = c.NetworkPubKey().String()[2:]
 		}
 
@@ -351,6 +351,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			},
 			Target: "production",
 		}
+
+		// bring up access node before any other nodes
+		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
+			service.DependsOn = []string{"access_1"}
+		}
+
 	} else {
 		// remaining services of this role must depend on first service
 		service.DependsOn = []string{
@@ -376,9 +382,6 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessAdd
 		fmt.Sprintf("--insecure-access-api=false"),
 		fmt.Sprintf("--access-node-grpc-public-key=%s", accessNodeGRPCPubKey),
 	)
-
-	// IMPORTANT: additional flags will contain correct flags for secure GRPC conn
-	service.Command = append(service.Command, container.AdditionalFlags...)
 
 	return service
 }
@@ -408,9 +411,6 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--insecure-access-api=false"),
 		fmt.Sprintf("--access-node-grpc-public-key=%s", accessNodeGRPCPubKey),
 	)
-
-	// IMPORTANT: additional flags will contain correct flags for secure GRPC conn
-	service.Command = append(service.Command, container.AdditionalFlags...)
 
 	return service
 }
@@ -459,8 +459,8 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 	}...)
 
 	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AccessAPIPort+i, RPCPort),
-		fmt.Sprintf("%d:%d", AccessAPIPort+(i+1), SecuredRPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
 	}
 
 	return service
