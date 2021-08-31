@@ -1,25 +1,35 @@
 package fvm_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	exeState "github.com/onflow/flow-go/engine/execution/state"
+	bootstrapexec "github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	completeLedger "github.com/onflow/flow-go/ledger/complete"
+	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 type vmTestContext struct {
-	vm                      *fvm.VirtualMachine
 	chain                   flow.Chain
-	ctx                     fvm.Context
-	view                    state.View
-	programs                *programs.Programs
 	serviceAccountSeqNumber uint64
 }
 
@@ -28,45 +38,41 @@ func (c *vmTestContext) serviceAccountSequenceNumber() uint64 {
 	return c.serviceAccountSeqNumber - 1
 }
 
+// BenchmarkRuntimeTopShotBatchTransfer simulates executing blocks with `transactionsPerBlock`
+// where each transaction transfers `momentsPerTransaction` moments (NFTs)
 func BenchmarkRuntimeTopShotBatchTransfer(b *testing.B) {
+	transactionsPerBlock := 10
+	momentsPerTransaction := 10
 
-	b.Run("Bench Top Shot Batch Transfer", newVMTest().withBootstrapProcedureOptions(
-		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
-		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
-		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-	).withContextOptions(
-		fvm.WithTransactionFeesEnabled(true),
-		fvm.WithAccountStorageLimit(true),
-	).bench(func(b *testing.B, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+	tctx := &vmTestContext{
+		chain: flow.Testnet.Chain(),
+	}
 
-		tctx := &vmTestContext{
-			vm:       vm,
-			chain:    chain,
-			ctx:      ctx,
-			view:     view,
-			programs: programs,
-		}
+	executeBlocks := prepareExecutionEnv(b, tctx.chain)
 
-		// Create an account private key.
-		privateKeys, err := testutil.GenerateAccountPrivateKeys(3)
-		require.NoError(b, err)
+	// Create an account private key.
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(3)
+	require.NoError(b, err)
 
-		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
-		accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
-		require.NoError(b, err)
+	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+	accounts, err := createManyAccounts(b, tctx, executeBlocks, privateKeys)
+	require.NoError(b, err)
 
-		nftAccount := accounts[0]
-		nftAccountPK := privateKeys[0]
-		deployNFT(b, tctx, nftAccount, nftAccountPK)
+	// deploy NFT
+	nftAccount := accounts[0]
+	nftAccountPK := privateKeys[0]
+	deployNFT(b, tctx, executeBlocks, nftAccount, nftAccountPK)
 
-		topShotAccount := accounts[1]
-		topShotAccountPK := privateKeys[1]
-		deployTopShot(b, tctx, topShotAccount, topShotAccountPK, nftAccount)
+	// deploy TopShot
+	topShotAccount := accounts[1]
+	topShotAccountPK := privateKeys[1]
+	deployTopShot(b, tctx, executeBlocks, topShotAccount, topShotAccountPK, nftAccount)
 
-		fundAccounts(b, tctx, cadence.UFix64(10_0000_0000), nftAccount, topShotAccount, accounts[2])
+	// fund all accounts so not to run into storage problems
+	fundAccounts(b, tctx, executeBlocks, cadence.UFix64(10_0000_0000), nftAccount, topShotAccount, accounts[2])
 
-		mintScript := []byte(fmt.Sprintf(`
+	// mint TopShot moments
+	mintScript := []byte(fmt.Sprintf(`
               import TopShot from 0x%s
 
               transaction {
@@ -86,29 +92,25 @@ func BenchmarkRuntimeTopShotBatchTransfer(b *testing.B) {
                           .batchDeposit(tokens: <-moments)
                   }
               }
-            `, accounts[1].Hex(), b.N))
+            `, accounts[1].Hex(), transactionsPerBlock*momentsPerTransaction*b.N))
 
-		txBody := flow.NewTransactionBody().
-			SetScript(mintScript).
-			SetProposalKey(chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
-			AddAuthorizer(accounts[1]).
-			SetPayer(chain.ServiceAddress())
+	txBody := flow.NewTransactionBody().
+		SetScript(mintScript).
+		SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
+		AddAuthorizer(accounts[1]).
+		SetPayer(tctx.chain.ServiceAddress())
 
-		err = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
-		require.NoError(b, err)
+	err = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
+	require.NoError(b, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(b, err)
+	err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	require.NoError(b, err)
 
-		tx := fvm.Transaction(txBody, 0)
+	computationResult := executeBlocks([][]*flow.TransactionBody{{txBody}})
+	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
 
-		err = vm.Run(ctx, tx, view, programs)
-		require.NoError(b, err)
-		require.NoError(b, tx.Err)
-
-		// Set up receiver
-
-		setupTx := []byte(fmt.Sprintf(`
+	// Set up receiver
+	setupTx := []byte(fmt.Sprintf(`
 import NonFungibleToken from 0x%s
 import TopShot from 0x%s
 
@@ -126,27 +128,23 @@ transaction {
   }
 }`, accounts[0].Hex(), accounts[1].Hex()))
 
-		txBody = flow.NewTransactionBody().
-			SetScript(setupTx).
-			SetProposalKey(chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
-			AddAuthorizer(accounts[2]).
-			SetPayer(chain.ServiceAddress())
+	txBody = flow.NewTransactionBody().
+		SetScript(setupTx).
+		SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
+		AddAuthorizer(accounts[2]).
+		SetPayer(tctx.chain.ServiceAddress())
 
-		err = testutil.SignPayload(txBody, accounts[2], privateKeys[2])
-		require.NoError(b, err)
+	err = testutil.SignPayload(txBody, accounts[2], privateKeys[2])
+	require.NoError(b, err)
 
-		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-		require.NoError(b, err)
+	err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+	require.NoError(b, err)
 
-		tx = fvm.Transaction(txBody, 0)
+	computationResult = executeBlocks([][]*flow.TransactionBody{{txBody}})
+	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
 
-		err = vm.Run(ctx, tx, view, programs)
-		require.NoError(b, err)
-		require.NoError(b, tx.Err)
-
-		// Transfer
-
-		transferTx := []byte(fmt.Sprintf(`
+	// Transfer NFTs
+	transferTx := []byte(fmt.Sprintf(`
 	  import NonFungibleToken from 0x%s
 	  import TopShot from 0x%s
 
@@ -172,44 +170,114 @@ transaction {
 	  }
 	`, accounts[0].Hex(), accounts[1].Hex()))
 
-		encodedAddress, err := jsoncdc.Encode(cadence.BytesToAddress(accounts[2].Bytes()))
-		require.NoError(b, err)
+	encodedAddress, err := jsoncdc.Encode(cadence.BytesToAddress(accounts[2].Bytes()))
+	require.NoError(b, err)
 
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+	b.ResetTimer() // setup done, lets start measuring
+	for i := 0; i < b.N; i++ {
+		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
+		for j := 0; j < transactionsPerBlock; j++ {
+			cadenceValues := make([]cadence.Value, momentsPerTransaction)
+			startMoment := (i*transactionsPerBlock+j)*momentsPerTransaction + 1
+			for m := 0; m < momentsPerTransaction; m++ {
+				cadenceValues[m] = cadence.NewUInt64(uint64(startMoment + m))
+			}
 
 			encodedArg, err := jsoncdc.Encode(
-				cadence.NewArray([]cadence.Value{
-					cadence.NewUInt64(uint64(i + 1)),
-				}),
+				cadence.NewArray(cadenceValues),
 			)
 			require.NoError(b, err)
 
-			txBody = flow.NewTransactionBody().
+			txBody := flow.NewTransactionBody().
 				SetScript(transferTx).
-				SetProposalKey(chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
+				SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
 				AddAuthorizer(accounts[1]).
 				AddArgument(encodedArg).
 				AddArgument(encodedAddress).
-				SetPayer(chain.ServiceAddress())
+				SetPayer(tctx.chain.ServiceAddress())
 
 			err = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
 			require.NoError(b, err)
 
-			err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+			err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 			require.NoError(b, err)
 
-			tx = fvm.Transaction(txBody, 0)
-
-			err = vm.Run(ctx, tx, view, programs)
-			require.NoError(b, err)
-			require.NoError(b, tx.Err)
+			transactions[j] = txBody
 		}
-	}))
+
+		computationResult = executeBlocks([][]*flow.TransactionBody{transactions})
+		for j := 0; j < transactionsPerBlock; j++ {
+			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+		}
+	}
 }
 
-func fundAccounts(b *testing.B, tctx *vmTestContext, value cadence.UFix64, accounts ...flow.Address) {
-	for _,a := range accounts{
+func prepareExecutionEnv(tb testing.TB, chain flow.Chain) func(txs [][]*flow.TransactionBody) *execution.ComputationResult {
+	rt := fvm.NewInterpreterRuntime()
+	vm := fvm.NewVirtualMachine(rt)
+
+	logger := zerolog.Nop()
+
+	opts := []fvm.Option{
+		fvm.WithTransactionFeesEnabled(true),
+		fvm.WithAccountStorageLimit(true),
+		fvm.WithChain(chain),
+	}
+
+	fvmContext :=
+		fvm.NewContext(
+			logger,
+			opts...,
+		)
+
+	collector := metrics.NewNoopCollector()
+	tracer := trace.NewNoopTracer()
+
+	wal := &fixtures.NoopWAL{}
+
+	ledger, err := completeLedger.NewLedger(wal, 100, collector, logger, completeLedger.DefaultPathFinderVersion)
+	require.NoError(tb, err)
+
+	bootstrapper := bootstrapexec.NewBootstrapper(logger)
+
+	initialCommit, err := bootstrapper.BootstrapLedger(
+		ledger,
+		unittest.ServiceAccountPublicKey,
+		chain,
+		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+	)
+
+	require.NoError(tb, err)
+
+	ledgerCommitter := committer.NewLedgerViewCommitter(ledger, tracer)
+
+	blockComputer, err := computer.NewBlockComputer(vm, fvmContext, collector, tracer, logger, ledgerCommitter)
+	require.NoError(tb, err)
+
+	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
+
+	return func(txs [][]*flow.TransactionBody) *execution.ComputationResult {
+		executableBlock := unittest.ExecutableBlockFromTransactions(txs)
+		executableBlock.StartState = &initialCommit
+
+		computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
+		require.NoError(tb, err)
+
+		prevResultId := unittest.IdentifierFixture()
+
+		_, _, _, err = execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
+		require.NoError(tb, err)
+
+		return computationResult
+	}
+}
+
+func fundAccounts(b *testing.B, tctx *vmTestContext, executeBlocks func(txs [][]*flow.TransactionBody) *execution.ComputationResult, value cadence.UFix64, accounts ...flow.Address) {
+	for _, a := range accounts {
 
 		txBody := transferTokensTx(tctx.chain)
 		txBody.SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber())
@@ -221,16 +289,13 @@ func fundAccounts(b *testing.B, tctx *vmTestContext, value cadence.UFix64, accou
 		err := testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 		require.NoError(b, err)
 
-		tx := fvm.Transaction(txBody, 0)
-
-		err = tctx.vm.Run(tctx.ctx, tx, tctx.view, tctx.programs)
-		require.NoError(b, err)
-		require.NoError(b, tx.Err)
+		computationResult := executeBlocks([][]*flow.TransactionBody{{txBody}})
+		require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
 	}
 
 }
 
-func deployTopShot(b *testing.B, tctx *vmTestContext, a flow.Address, pk flow.AccountPrivateKey, nftAddress flow.Address) {
+func deployTopShot(b *testing.B, tctx *vmTestContext, executeBlocks func(txs [][]*flow.TransactionBody) *execution.ComputationResult, a flow.Address, pk flow.AccountPrivateKey, nftAddress flow.Address) {
 	topShotContract := func(nftAddress flow.Address) string {
 		return fmt.Sprintf(`
 import NonFungibleToken from 0x%s
@@ -1022,10 +1087,10 @@ pub contract TopShot: NonFungibleToken {
 }
 `, nftAddress.Hex())
 	}
-	deployContract(b, tctx, a, pk, "TopShot", topShotContract(nftAddress))
+	deployContract(b, tctx, executeBlocks, a, pk, "TopShot", topShotContract(nftAddress))
 }
 
-func deployNFT(b *testing.B, tctx *vmTestContext, a flow.Address, pk flow.AccountPrivateKey) {
+func deployNFT(b *testing.B, tctx *vmTestContext, executeBlocks func(txs [][]*flow.TransactionBody) *execution.ComputationResult, a flow.Address, pk flow.AccountPrivateKey) {
 	const nftContract = `
 pub contract interface NonFungibleToken {
     pub var totalSupply: UInt64
@@ -1071,10 +1136,10 @@ pub contract interface NonFungibleToken {
     }
 }`
 
-	deployContract(b, tctx, a, pk, "NonFungibleToken", nftContract)
+	deployContract(b, tctx, executeBlocks, a, pk, "NonFungibleToken", nftContract)
 }
 
-func deployContract(b *testing.B, tctx *vmTestContext, a flow.Address, pk flow.AccountPrivateKey, contractName string, contract string) {
+func deployContract(b *testing.B, tctx *vmTestContext, executeBlocks func(txs [][]*flow.TransactionBody) *execution.ComputationResult, a flow.Address, pk flow.AccountPrivateKey, contractName string, contract string) {
 
 	txBody := testutil.CreateContractDeploymentTransaction(
 		contractName,
@@ -1091,9 +1156,67 @@ func deployContract(b *testing.B, tctx *vmTestContext, a flow.Address, pk flow.A
 	err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 	require.NoError(b, err)
 
-	tx := fvm.Transaction(txBody, 0)
+	computationResult := executeBlocks([][]*flow.TransactionBody{{txBody}})
+	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+}
 
-	err = tctx.vm.Run(tctx.ctx, tx, tctx.view, tctx.programs)
-	require.NoError(b, err)
-	require.NoError(b, tx.Err)
+func createManyAccounts(
+	tb testing.TB,
+	tctx *vmTestContext,
+	executeBlocks func(txs [][]*flow.TransactionBody) *execution.ComputationResult,
+	privateKeys []flow.AccountPrivateKey,
+) ([]flow.Address, error) {
+	var accounts []flow.Address
+
+	script := []byte(`
+	  transaction(publicKey: [UInt8]) {
+	    prepare(signer: AuthAccount) {
+	  	  let acct = AuthAccount(payer: signer)
+	  	  acct.addPublicKey(publicKey)
+	    }
+	  }
+	`)
+
+	serviceAddress := tctx.chain.ServiceAddress()
+
+	for _, privateKey := range privateKeys {
+		accountKey := privateKey.PublicKey(fvm.AccountKeyWeightThreshold)
+		encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+		cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
+		encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+
+		txBody := flow.NewTransactionBody().
+			SetScript(script).
+			AddArgument(encCadAccountKey).
+			AddAuthorizer(serviceAddress).
+			SetProposalKey(serviceAddress, 0, tctx.serviceAccountSequenceNumber()).
+			SetPayer(serviceAddress)
+
+		err := testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(tb, err)
+
+		computationResult := executeBlocks([][]*flow.TransactionBody{{txBody}})
+		require.Empty(tb, computationResult.TransactionResults[0].ErrorMessage)
+
+		var addr flow.Address
+
+		for _, eventList := range computationResult.Events {
+			for _, event := range eventList {
+				if event.Type == flow.EventAccountCreated {
+					data, err := jsoncdc.Decode(event.Payload)
+					if err != nil {
+						return nil, errors.New("error decoding events")
+					}
+					addr = flow.Address(data.(cadence.Event).Fields[0].(cadence.Address))
+					break
+				}
+			}
+		}
+		if addr == flow.EmptyAddress {
+			return nil, errors.New("no account creation event emitted")
+		}
+		accounts = append(accounts, addr)
+	}
+
+	return accounts, nil
 }
