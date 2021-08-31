@@ -26,7 +26,7 @@ const (
 	//
 
 	CONProcessCollection SpanName = "con.processCollection"
-	CONProcessBlock      SpanName = "con.processBlock"
+	CONProcessBlock      SpanName = "con.processBlockProposal"
 
 	// Hotstuff
 	CONHotFinalizeCollection SpanName = "con.hotstuff.finalizeCollection"

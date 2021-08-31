@@ -88,6 +88,24 @@ func (t *OpenTracer) Done() <-chan struct{} {
 	return done
 }
 
+func (t *OpenTracer) getSpanIDs(spanName SpanName) (spanID uint64, parentSpanID uint64) {
+	spanID = 0
+	switch spanName {
+	case CONBuildOn:
+		spanID = 1
+	case CONProvOnBlockProposal:
+		spanID = 2
+	default:
+		return rand.Uint64(), 0
+	}
+
+	if spanID > 1 {
+		parentSpanID = spanID - 1
+	}
+
+	return
+}
+
 // StartSpan starts a span using the flow identifier as a key into the span map
 // This should be used mostly for the very first span created for an entity on the service
 func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
@@ -99,10 +117,11 @@ func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts
 		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
 		return sp
 	}
+	spanID, parentSpanID := t.getSpanIDs(spanName)
 	ctx := jaeger.NewSpanContext(
 		traceID,
-		jaeger.SpanID(rand.Uint64()),
-		jaeger.SpanID(0),
+		jaeger.SpanID(spanID),
+		jaeger.SpanID(parentSpanID),
 		true,
 		nil,
 	)
