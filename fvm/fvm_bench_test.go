@@ -38,6 +38,130 @@ func (c *vmTestContext) serviceAccountSequenceNumber() uint64 {
 	return c.serviceAccountSeqNumber - 1
 }
 
+// BenchmarkRuntimeFungibleTokenTransfer simulates executing blocks with `transactionsPerBlock`
+// where each transaction transfers `momentsPerTransaction` moments (NFTs)
+func BenchmarkRuntimeFungibleTokenTransfer(b *testing.B) {
+	transactionsPerBlock := 10
+
+	tctx := &vmTestContext{
+		chain: flow.Testnet.Chain(),
+	}
+
+	executeBlocks := prepareExecutionEnv(b, tctx.chain)
+
+	// Create an account private key.
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+	require.NoError(b, err)
+
+	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+	accounts, err := createManyAccounts(b, tctx, executeBlocks, privateKeys)
+	require.NoError(b, err)
+
+	// Transfer NFTs
+	transferTx := []byte(fmt.Sprintf(`
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction(amount: UFix64, to: Address) {
+    let sentVault: @FungibleToken.Vault
+
+    prepare(signer: AuthAccount) {
+        let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+			?? panic("Could not borrow reference to the owner's Vault!")
+        self.sentVault <- vaultRef.withdraw(amount: amount)
+    }
+
+    execute {
+        let receiverRef =  getAccount(to)
+            .getCapability(/public/flowTokenReceiver)
+            .borrow<&{FungibleToken.Receiver}>()
+			?? panic("Could not borrow receiver reference to the recipient's Vault")
+        receiverRef.deposit(from: <-self.sentVault)
+    }
+}
+	`, fvm.FungibleTokenAddress(tctx.chain), fvm.FlowTokenAddress(tctx.chain)))
+
+	encodedAddress, err := jsoncdc.Encode(cadence.BytesToAddress(accounts[0].Bytes()))
+	require.NoError(b, err)
+
+	b.ResetTimer() // setup done, lets start measuring
+	for i := 0; i < b.N; i++ {
+		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
+		for j := 0; j < transactionsPerBlock; j++ {
+
+			txBody := flow.NewTransactionBody().
+				SetScript(transferTx).
+				SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
+				AddAuthorizer(tctx.chain.ServiceAddress()).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(1))).
+				AddArgument(encodedAddress).
+				SetPayer(tctx.chain.ServiceAddress())
+
+			err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+			require.NoError(b, err)
+
+			transactions[j] = txBody
+		}
+
+		computationResult := executeBlocks([][]*flow.TransactionBody{transactions})
+		for j := 0; j < transactionsPerBlock; j++ {
+			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+		}
+	}
+}
+
+// BenchmarkRuntimeFungibleTokenTransfer simulates executing blocks with `transactionsPerBlock`
+// where each transaction transfers `momentsPerTransaction` moments (NFTs)
+func BenchmarkRuntimeCreateAccount(b *testing.B) {
+	transactionsPerBlock := 10
+
+	tctx := &vmTestContext{
+		chain: flow.Testnet.Chain(),
+	}
+
+	executeBlocks := prepareExecutionEnv(b, tctx.chain)
+
+	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+
+	accountKey := privateKeys[0].PublicKey(fvm.AccountKeyWeightThreshold)
+	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
+	encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
+
+	transferTx := []byte(`
+	  transaction(publicKey: [UInt8]) {
+	    prepare(signer: AuthAccount) {
+	  	  let acct = AuthAccount(payer: signer)
+	  	  acct.addPublicKey(publicKey)
+	    }
+	  }
+	`)
+
+	b.ResetTimer() // setup done, lets start measuring
+	for i := 0; i < b.N; i++ {
+		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
+		for j := 0; j < transactionsPerBlock; j++ {
+
+			txBody := flow.NewTransactionBody().
+				SetScript(transferTx).
+				SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
+				AddAuthorizer(tctx.chain.ServiceAddress()).
+				AddArgument(encCadAccountKey).
+				SetPayer(tctx.chain.ServiceAddress())
+
+			err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+			require.NoError(b, err)
+
+			transactions[j] = txBody
+		}
+
+		computationResult := executeBlocks([][]*flow.TransactionBody{transactions})
+		for j := 0; j < transactionsPerBlock; j++ {
+			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+		}
+	}
+}
+
 // BenchmarkRuntimeTopShotBatchTransfer simulates executing blocks with `transactionsPerBlock`
 // where each transaction transfers `momentsPerTransaction` moments (NFTs)
 func BenchmarkRuntimeTopShotBatchTransfer(b *testing.B) {
