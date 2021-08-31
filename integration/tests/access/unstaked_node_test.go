@@ -92,7 +92,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 		for ; rcvdBlockCnt < blockCount; rcvdBlockCnt++ {
 			select {
 			case blockID := <-suite.finalizedBlockIDsChans[0]:
-				receivedBlocks = append(receivedBlocks, blockID)
+				receivedBlocks[rcvdBlockCnt] = blockID
 				_, err = blocks.ByID(blockID)
 				if err != nil {
 					return
