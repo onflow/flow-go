@@ -5,6 +5,7 @@ package network
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/message"
 )
@@ -66,6 +67,9 @@ type Overlay interface {
 
 	// Identities returns a list of all Flow identities on the network
 	Identities() flow.IdentityList
+
+	// GetIdentity returns the Identity associated with the given peer ID, if it exists
+	GetIdentity(peer.ID) (*flow.Identity, bool)
 
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 }

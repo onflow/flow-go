@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -14,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -36,7 +36,7 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	identityProvider id.IdentityProvider
+	identityProvider *ProtocolStateIDCache
 	logger           zerolog.Logger
 	codec            network.Codec
 	me               module.Local
@@ -64,7 +64,7 @@ func NewNetwork(
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
-	identityProvider id.IdentityProvider,
+	identityProvider *ProtocolStateIDCache,
 ) (*Network, error) {
 
 	rcache, err := newRcvCache(csize)
@@ -160,6 +160,14 @@ func (n *Network) unregister(channel network.Channel) error {
 
 func (n *Network) Identities() flow.IdentityList {
 	return n.identityProvider.Identities(NotEjectedFilter)
+}
+
+func (n *Network) GetIdentity(pid peer.ID) (*flow.Identity, bool) {
+	id, err := n.identityProvider.GetFlowID(pid)
+	if err != nil {
+		return &flow.Identity{}, false
+	}
+	return n.identityProvider.GetIdentity(id), true
 }
 
 // Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
