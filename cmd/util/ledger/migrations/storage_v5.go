@@ -619,8 +619,11 @@ func (m StorageFormatV5Migration) reencodeValue(
 						}
 
 						if len(registerValue) == 0 {
-							err = &MissingDeferredValueError{}
-							return false
+							m.Log.Warn().Msgf(
+								"missing deferred value: owner: %s key: %s",
+								string(deferredOwner),
+								storagePath,
+							)
 						}
 					}
 				}
@@ -651,8 +654,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 	if err != nil {
 		// If there are empty containers without type info (e.g: at root level)
 		// Then drop such values and continue.
-		switch err.(type) {
-		case *EmptyContainerTypeInferringError, *MissingDeferredValueError:
+		if _, ok := err.(*EmptyContainerTypeInferringError); ok {
 			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", key, owner)
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", owner, key))
 
@@ -1975,11 +1977,4 @@ type EmptyContainerTypeInferringError struct {
 
 func (e EmptyContainerTypeInferringError) Error() string {
 	return fmt.Sprint("cannot infer static type from empty container value")
-}
-
-type MissingDeferredValueError struct {
-}
-
-func (e MissingDeferredValueError) Error() string {
-	return fmt.Sprint("missing deferred value")
 }
