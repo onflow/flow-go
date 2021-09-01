@@ -59,7 +59,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		committer := new(computermock.ViewCommitter)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		metrics := new(modulemock.ExecutionMetrics)
@@ -111,7 +111,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -148,7 +148,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		}
 
 		rt := fvm.NewInterpreterRuntime()
-		chain := flow.Testnet.Chain()
+		chain := flow.Localnet.Chain()
 		vm := fvm.NewVirtualMachine(rt)
 		baseOpts := []fvm.Option{
 			fvm.WithChain(chain),
@@ -177,7 +177,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
@@ -220,7 +220,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(totalTransactionCount)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -615,6 +615,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	execCtx := fvm.NewContext(
 		zerolog.Nop(),
+		fvm.WithChain(flow.Localnet.Chain()),
 		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
 	)
 
@@ -627,7 +628,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	committer := new(computermock.ViewCommitter)
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil).
+		Return(nil, nil, nil, nil).
 		Times(1) // only system chunk
 
 	metrics := new(modulemock.ExecutionMetrics)

@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"fmt"
+
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow/order"
 
 	"github.com/onflow/flow-go/crypto"
@@ -81,7 +84,10 @@ func AssembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress
 }
 
 func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress string) model.NodeMachineAccountInfo {
-	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	encAccountKey := encodedRuntimeAccountPubKey(machineKey)
+	log.Debug().
+		Str("machineAccountPubKey", fmt.Sprintf("%x", encAccountKey)).
+		Msg("encoded public machine account key")
 	machineNodeInfo := model.NodeMachineAccountInfo{
 		EncodedPrivateKey: machineKey.Encode(),
 		KeyIndex:          0,
@@ -92,12 +98,34 @@ func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress
 	return machineNodeInfo
 }
 
+// assembleNodeMachineAccountKey assembles the machine account info and logs
+// the public key as it should be entered in Flow Port.
+//
+// We log the key as a flow.AccountPublicKey for input to Flow Port.
 func assembleNodeMachineAccountKey(machineKey crypto.PrivateKey) model.NodeMachineAccountKey {
-	log.Debug().Str("machineAccountPubKey", pubKeyToString(machineKey.PublicKey())).Msg("encoded public machine account key")
+	encAccountKey := encodedRuntimeAccountPubKey(machineKey)
+	log.Info().
+		Str("machineAccountPubKey", fmt.Sprintf("%x", encAccountKey)).
+		Msg("encoded machine account public key for entry to Flow Port")
 	key := model.NodeMachineAccountKey{
 		PrivateKey: encodable.MachineAccountPrivKey{PrivateKey: machineKey},
 	}
+
 	return key
+}
+
+func encodedRuntimeAccountPubKey(machineKey crypto.PrivateKey) []byte {
+	accountKey := flow.AccountPublicKey{
+		PublicKey: machineKey.PublicKey(),
+		SignAlgo:  machineKey.Algorithm(),
+		HashAlgo:  hash.SHA3_256,
+		Weight:    1000,
+	}
+	encAccountKey, err := flow.EncodeRuntimeAccountPublicKey(accountKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to encode machine account public key")
+	}
+	return encAccountKey
 }
 
 func validateAddressesUnique(ns []model.NodeConfig) {

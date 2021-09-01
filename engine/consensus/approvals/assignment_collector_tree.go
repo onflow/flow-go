@@ -6,6 +6,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/storage"
@@ -250,9 +251,16 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 
 	// Initial check showed that there was no collector. However, it's possible that after the
 	// initial check but before acquiring the lock to add the newly-created collector, another
-	// goroutine already added the needed collector. Hence check again after acquiring the lock:
+	// goroutine already added the needed collector. Hence, check again after acquiring the lock:
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	// leveled forest doesn't treat this case as error, we shouldn't create collectors
+	// for vertices lower that forest.LowestLevel
+	if vertex.Level() < t.forest.LowestLevel {
+		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", vertex.Level(), t.forest.LowestLevel)
+	}
+
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
@@ -266,6 +274,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 	if err != nil {
 		return nil, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
 	}
+
 	t.forest.AddVertex(vertex)
 
 	// An assignment collector is processable if and only if:
@@ -292,7 +301,7 @@ func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionRes
 
 // pruneUpToHeight prunes all assignment collectors for results with height up to but
 // NOT INCLUDING `limit`. Noop, if limit is lower than the previous value (caution:
-// this is different than the levelled forest's convention).
+// this is different from the levelled forest's convention).
 // This function is NOT concurrency safe.
 func (t *AssignmentCollectorTree) pruneUpToHeight(limit uint64) error {
 	if t.forest.LowestLevel >= limit {
