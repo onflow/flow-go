@@ -269,9 +269,8 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
 
 		unittest.RequireReturnsBefore(suite.T(), func() {
-			_, err = node1.CreateStream(context.Background(), pInfo.ID)
+			_, err = node1.CreateStream(ctx, pInfo.ID)
 		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
-
 		require.Error(suite.T(), err)
 		require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
 		cancel()
