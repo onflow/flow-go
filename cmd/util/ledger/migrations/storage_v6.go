@@ -380,7 +380,7 @@ func (m StorageFormatV6Migration) reencodeValue(
 				}
 
 				if len(registerValue) == 0 {
-					m.Log.Warn().Msgf("empty value for key: %s", key)
+					m.Log.Warn().Msgf("empty value for owner: %s, key: %s", owner, key)
 					panic(&ValueNotFoundError{
 						key: key,
 					})
@@ -417,10 +417,7 @@ func (m StorageFormatV6Migration) reencodeValue(
 					panic(err)
 				}
 
-				return &oldInter.SomeValue{
-					Value: value,
-					Owner: &owner,
-				}
+				return oldInter.NewSomeValueOwningNonCopying(value)
 			},
 		),
 	)
@@ -694,8 +691,8 @@ func getValue(
 ) (value oldInter.Value) {
 	defer func() {
 		if r := recover(); r != nil {
-			_, valueNotFound := r.(*ValueNotFoundError)
-			if !valueNotFound {
+			_, ok := r.(*ValueNotFoundError)
+			if !ok {
 				panic(r)
 			}
 
