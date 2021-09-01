@@ -73,7 +73,7 @@ func NewMachineAccountConfigValidator(
 ) (*MachineAccountConfigValidator, error) {
 	validator := &MachineAccountConfigValidator{
 		unit:   engine.NewUnit(),
-		log:    log.With().Str("process", "check_machine_account_config").Logger(),
+		log:    log.With().Str("component", "machine_account_config_validator").Logger(),
 		client: flowClient,
 		role:   role,
 		info:   info,
