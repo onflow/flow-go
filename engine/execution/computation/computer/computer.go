@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 
+	"github.com/onflow/flow-go/ledger"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
@@ -32,7 +34,7 @@ type VirtualMachine interface {
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
 type ViewCommitter interface {
 	// CommitView commits a views' register delta and collects proofs
-	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
+	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error)
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -141,6 +143,7 @@ func (e *blockComputer) executeBlock(
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
+	trieUpdates := make([]*ledger.TrieUpdate, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,
@@ -148,12 +151,13 @@ func (e *blockComputer) executeBlock(
 		tracer:    e.tracer,
 		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
-		callBack: func(state flow.StateCommitment, proof []byte, err error) {
+		callBack: func(state flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
 			if err != nil {
 				panic(err)
 			}
 			stateCommitments = append(stateCommitments, state)
 			proofs = append(proofs, proof)
+			trieUpdates = append(trieUpdates, trieUpdate)
 		},
 	}
 
@@ -217,6 +221,7 @@ func (e *blockComputer) executeBlock(
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
 	res.Proofs = proofs
+	res.TrieUpdates = trieUpdates
 
 	return res, nil
 }
@@ -399,7 +404,7 @@ func (e *blockComputer) executeTransaction(
 type blockCommitter struct {
 	tracer    module.Tracer
 	committer ViewCommitter
-	callBack  func(state flow.StateCommitment, proof []byte, err error)
+	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
 	blockSpan opentracing.Span
@@ -408,8 +413,8 @@ type blockCommitter struct {
 func (bc *blockCommitter) Run() {
 	for view := range bc.views {
 		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
-		stateCommit, proof, err := bc.committer.CommitView(view, bc.state)
-		bc.callBack(stateCommit, proof, err)
+		stateCommit, proof, trieUpdate, err := bc.committer.CommitView(view, bc.state)
+		bc.callBack(stateCommit, proof, trieUpdate, err)
 		bc.state = stateCommit
 		span.Finish()
 	}

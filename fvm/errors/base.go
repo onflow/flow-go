@@ -162,7 +162,7 @@ func (e OperationAuthorizationError) Error() string {
 
 // Code returns the error code for this error type
 func (e OperationAuthorizationError) Code() ErrorCode {
-	return ErrCodeAccountAuthorizationError
+	return ErrCodeOperationAuthorizationError
 }
 
 // Unwrap unwraps the error

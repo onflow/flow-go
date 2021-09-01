@@ -19,7 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the ingress server.

@@ -1,6 +1,7 @@
 package errors
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -76,6 +77,12 @@ func (e *LedgerFailure) FailureCode() FailureCode {
 // Unwrap unwraps the error
 func (e LedgerFailure) Unwrap() error {
 	return e.err
+}
+
+// IsALedgerFailure returns true if the error or any of the wrapped errors is a ledger failure
+func IsALedgerFailure(err error) bool {
+	var t *LedgerFailure
+	return errors.As(err, &t)
 }
 
 // StateMergeFailure captures a fatal caused by state merge
