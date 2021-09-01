@@ -259,13 +259,37 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 
 	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
 
-	var err error
-	unittest.RequireReturnsBefore(suite.T(), func() {
-		_, err = node1.CreateStream(context.Background(), *id2)
-	}, maxTimeToWait, fmt.Sprintf("create stream did not error within %d ms", maxTimeToWait))
+	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
+	// a race condition
+	someGraceTime := 100 * time.Millisecond
+	totalWaitTime := maxTimeToWait + someGraceTime
 
-	require.Error(suite.T(), err)
-	require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+	//each CreateStream() call may try to connect up to maxConnectAttempt (3) times.
+
+	//there are 2 scenarios that we need to account for:
+	//
+	//1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
+	//   In this case, we need to create a scenario where a backoff would have normally occured. This is why we initiate a second connection attempt.
+	//   Libp2p remembers the peer we are trying to connect to between CreateStream() calls and would have initiated a backoff if backoff wasn't turned off.
+	//   The second CreateStream() call will make a second connection attempt maxConnectAttempt times and that should never result in a backoff error.
+	//
+	//2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
+	//   In this case, there will be maxConnectAttempt (3) connection attempts on the first CreateStream() call and maxConnectAttempt (3) attempts on the second CreateStream() call.
+
+	// make two separate stream creation attempt and assert that no connection back off happened
+	for i := 0; i < 2; i++ {
+
+		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
+		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
+
+		var err error
+		unittest.RequireReturnsBefore(suite.T(), func() {
+			_, err = node1.CreateStream(ctx, *id2)
+		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
+		require.Error(suite.T(), err)
+		require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+		cancel()
+	}
 }
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
