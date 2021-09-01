@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/crypto"
@@ -70,6 +71,13 @@ func (info NodeMachineAccountInfo) FlowAddress() flow.Address {
 		addr = addr[2:]
 	}
 	return flow.HexToAddress(addr)
+}
+
+func (info NodeMachineAccountInfo) SDKAddress() sdk.Address {
+	flowAddr := info.FlowAddress()
+	var sdkAddr sdk.Address
+	copy(sdkAddr[:], flowAddr[:])
+	return sdkAddr
 }
 
 func (info NodeMachineAccountInfo) PrivateKey() (crypto.PrivateKey, error) {
