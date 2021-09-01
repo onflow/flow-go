@@ -65,11 +65,27 @@ type MachineAccountConfigValidator struct {
 	info   bootstrap.NodeMachineAccountInfo
 }
 
+func NewMachineAccountConfigValidator(
+	log zerolog.Logger,
+	flowClient *client.Client,
+	role flow.Role,
+	info bootstrap.NodeMachineAccountInfo,
+) (*MachineAccountConfigValidator, error) {
+	validator := &MachineAccountConfigValidator{
+		unit:   engine.NewUnit(),
+		log:    log.With().Str("process", "check_machine_account_config").Logger(),
+		client: flowClient,
+		role:   role,
+		info:   info,
+	}
+	return validator, nil
+}
+
 // Ready will launch the validator function in a goroutine.
 func (validator *MachineAccountConfigValidator) Ready() <-chan struct{} {
 	return validator.unit.Ready(func() {
 		validator.unit.Launch(func() {
-			validator.ValidateMachineAccountConfig(validator.unit.Ctx())
+			validator.validateMachineAccountConfig(validator.unit.Ctx())
 		})
 	})
 }
@@ -80,15 +96,16 @@ func (validator *MachineAccountConfigValidator) Done() <-chan struct{} {
 	return validator.unit.Done()
 }
 
-// ValidateMachineAccountConfig checks that the machine account in use by this
+// validateMachineAccountConfig checks that the machine account in use by this
 // BaseClient object is correctly configured. If the machine account is critically
-// misconfigured, or a correct configuration cannot be confirmed, this function
+// mis-configured, or a correct configuration cannot be confirmed, this function
 // will perpetually log errors indicating the problem.
 //
-// This function should be invoked as a goroutine.
-func (validator *MachineAccountConfigValidator) ValidateMachineAccountConfig(ctx context.Context) {
+// This function should be invoked as a goroutine by using Ready and Done.
+//
+func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx context.Context) {
 
-	log := validator.log.With().Str("process", "check_machine_account_config").Logger()
+	log := validator.log
 
 	expRetry, err := retry.NewExponential(checkMachineAccountRetryBase)
 	if err != nil {
