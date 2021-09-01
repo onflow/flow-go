@@ -14,7 +14,6 @@ import (
 
 	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
-	"github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/network"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/multiformats/go-multiaddr"
@@ -28,6 +27,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -238,6 +238,57 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
 		require.Equal(suite.T(), i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+	}
+}
+
+// TestNoBackoffWhenCreateStream checks that backoff is not enabled between attempts to connect to a remote peer
+// for one-to-one direct communication.
+func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
+
+	count := 2
+	// Creates nodes
+	nodes, identities := suite.NodesFixture(count, nil, false)
+	node1 := nodes[0]
+	node2 := nodes[1]
+
+	// stop node 2 immediately
+	StopNode(suite.T(), node2)
+	defer StopNode(suite.T(), node1)
+
+	id2 := identities[1]
+
+	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
+
+	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
+	// a race condition
+	someGraceTime := 100 * time.Millisecond
+	totalWaitTime := maxTimeToWait + someGraceTime
+
+	//each CreateStream() call may try to connect up to maxConnectAttempt (3) times.
+
+	//there are 2 scenarios that we need to account for:
+	//
+	//1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
+	//   In this case, we need to create a scenario where a backoff would have normally occured. This is why we initiate a second connection attempt.
+	//   Libp2p remembers the peer we are trying to connect to between CreateStream() calls and would have initiated a backoff if backoff wasn't turned off.
+	//   The second CreateStream() call will make a second connection attempt maxConnectAttempt times and that should never result in a backoff error.
+	//
+	//2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
+	//   In this case, there will be maxConnectAttempt (3) connection attempts on the first CreateStream() call and maxConnectAttempt (3) attempts on the second CreateStream() call.
+
+	// make two separate stream creation attempt and assert that no connection back off happened
+	for i := 0; i < 2; i++ {
+
+		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
+		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
+
+		var err error
+		unittest.RequireReturnsBefore(suite.T(), func() {
+			_, err = node1.CreateStream(ctx, *id2)
+		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
+		require.Error(suite.T(), err)
+		require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+		cancel()
 	}
 }
 
@@ -632,6 +683,10 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
+	// dns resolver
+	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
+	require.NoError(t, err)
+
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(log, noopMetrics)
 
@@ -639,6 +694,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetRootBlockID(rootID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
+		SetResolver(resolver).
 		SetLogger(log)
 
 	if allowList {
@@ -693,19 +749,6 @@ func generateNetworkingKey(t *testing.T) fcrypto.PrivateKey {
 	key, err := fcrypto.GeneratePrivateKey(fcrypto.ECDSASecp256k1, seed)
 	require.NoError(t, err)
 	return key
-}
-
-// generateNetworkingAndLibP2PKeys is a test helper that generates a ECDSA flow key pairs, and translate it to
-// libp2p key pairs. It returns both generated pairs of keys.
-func generateNetworkingAndLibP2PKeys(t *testing.T) (crypto.PrivKey, fcrypto.PrivateKey) {
-	// generates flow key
-	key := generateNetworkingKey(t)
-
-	// translates flow key into libp2p key
-	libP2Pkey, err := PrivKey(key)
-	require.NoError(t, err)
-
-	return libP2Pkey, key
 }
 
 // silentNodeFixture returns a TCP listener and a node which never replies

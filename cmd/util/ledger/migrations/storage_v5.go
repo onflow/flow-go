@@ -1955,6 +1955,10 @@ func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool
 	panic("unexpected ValidatePublicKey call")
 }
 
+func (m migrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([]string, error) {
+	panic("unexpected GetAccountContractNames call")
+}
+
 func (m StorageFormatV5Migration) newInterpreter() *interpreter.Interpreter {
 	inter, err := interpreter.NewInterpreter(nil, nil)
 	if err != nil {

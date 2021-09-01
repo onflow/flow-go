@@ -46,6 +46,7 @@ type Suite struct {
 	collections  *storage.Collections
 	transactions *storage.Transactions
 	receipts     *storage.ExecutionReceipts
+	results      *storage.ExecutionResults
 
 	eng *Engine
 }
@@ -82,6 +83,8 @@ func (suite *Suite) SetupTest() {
 	suite.headers = new(storage.Headers)
 	suite.collections = new(storage.Collections)
 	suite.transactions = new(storage.Transactions)
+	suite.receipts = new(storage.ExecutionReceipts)
+	suite.results = new(storage.ExecutionResults)
 	collectionsToMarkFinalized, err := stdmap.NewTimes(100)
 	require.NoError(suite.T(), err)
 	collectionsToMarkExecuted, err := stdmap.NewTimes(100)
@@ -90,10 +93,10 @@ func (suite *Suite) SetupTest() {
 	require.NoError(suite.T(), err)
 
 	rpcEng := rpc.New(log, suite.proto.state, rpc.Config{}, nil, nil, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, flow.Testnet, metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
+		suite.transactions, suite.receipts, suite.results, flow.Testnet, metrics.NewNoopCollector(), 0, 0, false, false, nil, nil)
 
 	eng, err := New(log, net, suite.proto.state, suite.me, suite.request, suite.blocks, suite.headers, suite.collections,
-		suite.transactions, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
+		suite.transactions, suite.results, suite.receipts, metrics.NewNoopCollector(), collectionsToMarkFinalized, collectionsToMarkExecuted,
 		blocksToMarkExecuted, rpcEng)
 	require.NoError(suite.T(), err)
 
@@ -196,6 +199,50 @@ func (suite *Suite) TestOnCollection() {
 	// check that the collection was stored and indexed, and we stored all transactions
 	suite.collections.AssertExpectations(suite.T())
 	suite.transactions.AssertNumberOfCalls(suite.T(), "Store", len(collection.Transactions))
+}
+
+// TestExecutionResultsAreIndexed checks that execution results are properly indexedd
+func (suite *Suite) TestExecutionResultsAreIndexed() {
+
+	originID := unittest.IdentifierFixture()
+	collection := unittest.CollectionFixture(5)
+	light := collection.Light()
+
+	// we should store the light collection and index its transactions
+	suite.collections.On("StoreLightAndIndexByTransaction", &light).Return(nil).Once()
+
+	// for each transaction in the collection, we should store it
+	needed := make(map[flow.Identifier]struct{})
+	for _, txID := range light.Transactions {
+		needed[txID] = struct{}{}
+	}
+	suite.transactions.On("Store", mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			tx := args.Get(0).(*flow.TransactionBody)
+			_, pending := needed[tx.ID()]
+			suite.Assert().True(pending, "tx not pending (%x)", tx.ID())
+		},
+	)
+	er1 := unittest.ExecutionReceiptFixture()
+	er2 := unittest.ExecutionReceiptFixture()
+
+	suite.receipts.On("Store", mock.Anything).Return(nil)
+	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
+	suite.blocks.On("ByID", er1.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
+
+	suite.receipts.On("Store", mock.Anything).Return(nil)
+	suite.results.On("ForceIndex", mock.Anything, mock.Anything).Return(nil)
+	suite.blocks.On("ByID", er2.ExecutionResult.BlockID).Return(nil, storerr.ErrNotFound)
+
+	err := suite.eng.handleExecutionReceipt(originID, er1)
+	require.NoError(suite.T(), err)
+
+	err = suite.eng.handleExecutionReceipt(originID, er2)
+	require.NoError(suite.T(), err)
+
+	suite.receipts.AssertExpectations(suite.T())
+	suite.results.AssertExpectations(suite.T())
+	suite.receipts.AssertExpectations(suite.T())
 }
 
 // TestOnCollection checks that when a duplicate collection is received, the node doesn't

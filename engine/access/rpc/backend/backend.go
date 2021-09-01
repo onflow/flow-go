@@ -54,6 +54,7 @@ type Backend struct {
 	backendBlockHeaders
 	backendBlockDetails
 	backendAccounts
+	backendExecutionResults
 
 	state             protocol.State
 	chainID           flow.ChainID
@@ -71,6 +72,7 @@ func New(
 	collections storage.Collections,
 	transactions storage.Transactions,
 	executionReceipts storage.ExecutionReceipts,
+	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	connFactory ConnectionFactory,
@@ -132,6 +134,9 @@ func New(
 			executionReceipts: executionReceipts,
 			connFactory:       connFactory,
 			log:               log,
+		},
+		backendExecutionResults: backendExecutionResults{
+			executionResults: executionResults,
 		},
 		collections:       collections,
 		executionReceipts: executionReceipts,

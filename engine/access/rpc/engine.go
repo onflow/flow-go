@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the access node server
@@ -70,6 +70,7 @@ func New(log zerolog.Logger,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	executionReceipts storage.ExecutionReceipts,
+	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
@@ -140,6 +141,7 @@ func New(log zerolog.Logger,
 		collections,
 		transactions,
 		executionReceipts,
+		executionResults,
 		chainID,
 		transactionMetrics,
 		connectionFactory,

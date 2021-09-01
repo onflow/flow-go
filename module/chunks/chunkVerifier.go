@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -28,10 +30,11 @@ type ChunkVerifier struct {
 	vm             VirtualMachine
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
+	logger         zerolog.Logger
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
+func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
 		vm:    vm,
 		vmCtx: vmCtx,
@@ -41,6 +44,7 @@ func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
 			fvm.WithServiceEventCollectionEnabled(),
 			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
 		),
+		logger: logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
 
@@ -74,7 +78,11 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	}
 
 	// transaction body of system chunk
-	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
+	txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
 	tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
@@ -198,12 +206,30 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
 	}
 	if chunk.EventCollection != eventsHash {
-		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID), nil
+
+		for i, event := range events {
+
+			fcv.logger.Warn().Int("list_index", i).
+				Str("event_id", event.ID().String()).
+				Hex("event_fingerptint", event.Fingerprint()).
+				Str("event_type", string(event.Type)).
+				Str("event_tx_id", event.TransactionID.String()).
+				Uint32("event_tx_index", event.TransactionIndex).
+				Uint32("event_index", event.EventIndex).
+				Bytes("event_payload", event.Payload).
+				Str("block_id", chunk.BlockID.String()).
+				Str("collection_id", chunkDataPack.Collection.ID().String()).
+				Str("result_id", result.ID().String()).
+				Uint64("chunk_index", chunk.Index).
+				Msg("not matching events debug")
+		}
+
+		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events), nil
 	}
 
 	if systemChunk {
 
-		computedServiceEvents := make(flow.ServiceEventList, len(result.ServiceEvents))
+		computedServiceEvents := make(flow.ServiceEventList, len(serviceEvents))
 
 		for i, serviceEvent := range serviceEvents {
 			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
@@ -236,7 +262,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	expEndStateComm, err := psmt.Set(update)
+	expEndStateComm, _, err := psmt.Set(update)
 
 	if err != nil {
 		if errors.Is(err, ledger.ErrMissingKeys{}) {

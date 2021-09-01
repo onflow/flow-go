@@ -47,11 +47,12 @@ const (
 
 // Execution Subsystems
 const (
-	subsystemStateStorage = "state_storage"
-	subsystemMTrie        = "mtrie"
-	subsystemIngestion    = "ingestion"
-	subsystemRuntime      = "runtime"
-	subsystemProvider     = "provider"
+	subsystemStateStorage      = "state_storage"
+	subsystemMTrie             = "mtrie"
+	subsystemIngestion         = "ingestion"
+	subsystemRuntime           = "runtime"
+	subsystemProvider          = "provider"
+	subsystemBlockDataUploader = "block_data_uploader"
 )
 
 // Verification Subsystems

@@ -17,12 +17,14 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -40,6 +42,9 @@ const (
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
+
+	// maximum number of milliseconds to wait between attempts for a 1-1 direct connection
+	maxConnectAttemptSleepDuration = 5
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -54,25 +59,21 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 
 	connGater := NewConnGater(log)
 
-	// create PubSub options for libp2p to use
-	psOptions := []pubsub.Option{
-		// skip message signing
-		pubsub.WithMessageSigning(false),
-		// skip message signature
-		pubsub.WithStrictSignatureVerification(false),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(maxPubSubMsgSize),
-		// no discovery
-	}
+	// TODO: uncomment following lines to activate dns caching
+	//resolver, err := dns.NewResolver(metrics)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	//}
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(psOptions...).
+			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
+			// SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
@@ -81,9 +82,10 @@ type NodeBuilder interface {
 	SetRootBlockID(string) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
-	SetPubsubOptions(...pubsub.Option) NodeBuilder
+	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
+	SetResolver(resolver *madns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -94,9 +96,10 @@ type DefaultLibP2PNodeBuilder struct {
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
+	resolver         *madns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
-	pubSubOpts       []pubsub.Option
+	pubSubOpts       []PubsubOption
 }
 
 func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
@@ -126,7 +129,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...pubsub.Option) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...PubsubOption) NodeBuilder {
 	builder.pubSubOpts = opts
 	return builder
 }
@@ -138,6 +141,11 @@ func (builder *DefaultLibP2PNodeBuilder) SetPingInfoProvider(pingInfoProvider Pi
 
 func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBuilder {
 	builder.logger = logger
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) NodeBuilder {
+	builder.resolver = resolver
 	return builder
 }
 
@@ -174,8 +182,17 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.connMgr = builder.connMngr
 	}
 
+	if builder.rootBlockID == "" {
+		return nil, errors.New("root block ID must be provided")
+	}
+	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
+	}
+
+	if builder.resolver != nil { // sets DNS resolver
+		opts = append(opts, libp2p.MultiaddrResolver(builder.resolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -190,7 +207,17 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.pingService = pingService
 	}
 
-	ps, err := builder.pubSubMaker(ctx, libp2pHost, builder.pubSubOpts...)
+	var libp2pPSOptions []pubsub.Option
+	// generate the libp2p Pubsub options from the given context and host
+	for _, optionGenerator := range builder.pubSubOpts {
+		option, err := optionGenerator(ctx, libp2pHost)
+		if err != nil {
+			return nil, err
+		}
+		libp2pPSOptions = append(libp2pPSOptions, option)
+	}
+
+	ps, err := builder.pubSubMaker(ctx, libp2pHost, libp2pPSOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -354,10 +381,11 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 		default:
 		}
 
-		// remove the peer from the peer store if present
-		n.host.Peerstore().ClearAddrs(peerID)
-
-		// cancel the dial back off (if any), since we want to connect immediately
+		// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
+		// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
+		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
+		// immediately without backing off and fail-fast.
+		// Hence, explicitly cancel the dial back off (if any) and try connecting again
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
@@ -366,7 +394,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, identity flow.Identity, m
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
 			// choose a random interval between 0 to 5
-			r := rand.Intn(5)
+			// (to ensure that this node and the target node don't attempt to reconnect at the same time)
+			r := rand.Intn(maxConnectAttemptSleepDuration)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
@@ -531,13 +560,14 @@ func (n *Node) UpdateAllowList(identities flow.IdentityList) error {
 	}
 
 	// generates peer address information for all identities
-	allowlist := make([]peer.AddrInfo, len(identities))
-	var err error
-	for i, identity := range identities {
-		allowlist[i], err = PeerAddressInfo(*identity)
+	allowlist := make([]peer.AddrInfo, 0, len(identities))
+	for _, identity := range identities {
+		addressInfo, err := PeerAddressInfo(*identity)
 		if err != nil {
-			return fmt.Errorf("could not generate address info: %w", err)
+			n.logger.Err(err).Str("identity", identity.String()).Msg("could not generate address info")
+			continue
 		}
+		allowlist = append(allowlist, addressInfo)
 	}
 
 	n.connGater.update(allowlist)
@@ -572,7 +602,8 @@ func (n *Node) IsConnected(identity flow.Identity) (bool, error) {
 
 // DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
 // customized with options
-func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host, error) {
+func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
+	error) {
 	defaultOptions, err := DefaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
@@ -592,7 +623,7 @@ func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateK
 // DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
 func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
-	libp2pKey, err := PrivKey(key)
+	libp2pKey, err := LibP2PPrivKeyFromFlow(key)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}
@@ -636,4 +667,34 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 		return nil, fmt.Errorf("could not create libp2p gossipsub: %w", err)
 	}
 	return pubSub, nil
+}
+
+// PubsubOption generates a libp2p pubsub.Option from the given context and host
+type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
+
+func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
+	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
+		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
+			return option, nil
+		}
+	}
+	return []PubsubOption{
+		// skip message signing
+		pubSubOptionFunc(pubsub.WithMessageSigning(true)),
+		// skip message signature
+		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
+		// set max message size limit for 1-k PubSub messaging
+		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
+		// no discovery
+	}
+}
+
+func WithDHTDiscovery(option ...dht.Option) PubsubOption {
+	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
+		dhtDiscovery, err := NewDHT(ctx, host, option...)
+		if err != nil {
+			return nil, err
+		}
+		return pubsub.WithDiscovery(dhtDiscovery), nil
+	}
 }
