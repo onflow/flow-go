@@ -177,9 +177,12 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	r.log.Debug().Str("origin_id", originID.String()).Msg("received new sync request")
-
 	final := r.finalizedHeader.Get()
+	r.log.Debug().
+		Str("origin_id", originID.String()).
+		Uint64("origin_height", req.Height).
+		Uint64("local_height", final.Height).
+		Msg("received new sync request")
 
 	if r.queueMissingHeights {
 		// queue any missing heights as needed
