@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"sort"
 
@@ -105,7 +106,7 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, owner, getError)
+		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), getError)
 	}
 
 	// if not part of recent updates count them as read
@@ -128,7 +129,7 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf("failed to update key %s on account %s: %w", key, owner, setError)
+		return fmt.Errorf("failed to update key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), setError)
 	}
 
 	if err := s.checkMaxInteraction(); err != nil {
