@@ -7,10 +7,12 @@ on:
       - 'auto-cadence-upgrade/**'
       - staging
       - trying
+      - 'feature/**'
   pull_request:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - 'feature/**'
 
 jobs:
   golangci:
