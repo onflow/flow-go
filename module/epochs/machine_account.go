@@ -179,10 +179,10 @@ func CheckMachineAccountInfo(
 	if !bytes.Equal(account.Address.Bytes(), address.Bytes()) {
 		return fmt.Errorf("machine account address mismatch between local (%s) and on-chain (%s)", address, account.Address)
 	}
-	if len(account.Keys) < 1 {
-		return fmt.Errorf("machine account (%s) has no keys - must have 1", account.Address)
+	if len(account.Keys) <= int(info.KeyIndex) {
+		return fmt.Errorf("machine account (%s) has %d keys - but configured with key index %d", account.Address, len(account.Keys), info.KeyIndex)
 	}
-	accountKey := account.Keys[0]
+	accountKey := account.Keys[info.KeyIndex]
 	if accountKey.HashAlgo != info.HashAlgorithm {
 		return fmt.Errorf("machine account hash algo mismatch between local (%s) and on-chain (%s)",
 			info.HashAlgorithm.String(),

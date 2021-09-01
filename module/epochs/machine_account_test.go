@@ -54,6 +54,13 @@ func TestMachineAccountChecking(t *testing.T) {
 		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
 		require.Error(t, err)
 	})
+	t.Run("account with insufficient keys", func(t *testing.T) {
+		local, remote := unittest.MachineAccountFixture()
+		// increment key index so it doesn't match remote account
+		local.KeyIndex = local.KeyIndex + 1
+		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
+		require.Error(t, err)
+	})
 	t.Run("account with < minimum balance", func(t *testing.T) {
 		t.Run("collection", func(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture()
