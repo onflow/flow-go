@@ -263,14 +263,20 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	someGraceTime := 100 * time.Millisecond
 	totalWaitTime := maxTimeToWait + someGraceTime
 
+	//each CreateStream() call may try to connect up to maxConnectAttempt (3) times.
+
+	//there are 2 scenarios that we need to account for:
+	//
+	//1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
+	//   In this case, we need to create a scenario where a backoff would have normally occured. This is why we initiate a second connection attempt.
+	//   Libp2p remembers the peer we are trying to connect to between CreateStream() calls and would have initiated a backoff if backoff wasn't turned off.
+	//   The second CreateStream() call will make a second connection attempt maxConnectAttempt times and that should never result in a backoff error.
+	//
+	//2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
+	//   In this case, there will be maxConnectAttempt (3) connection attempts on the first CreateStream() call and maxConnectAttempt (3) attempts on the second CreateStream() call.
+
 	// make two separate stream creation attempt and assert that no connection back off happened
 	for i := 0; i < 2; i++ {
-		// Each CreateStream call makes maxConnectAttempt number of connection attempts within
-		// the context timeout duration - maxTimeToWait.
-		// However, the first connection attempt itself, in the create stream call may block for all of the maxTimeToWait
-		// on certain machine based on their setup never allowing a second connection attempt.
-		// Hence, the test makes the stream creation twice to ensure that a second connection attempt to the same node
-		// never fails with a backoff error
 
 		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
 		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
@@ -283,7 +289,6 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 		require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
 		cancel()
 	}
-
 }
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
