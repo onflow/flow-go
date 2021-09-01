@@ -258,11 +258,11 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	id2 := identities[1]
 
 	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
-
+	someGraceTime := 100 * time.Millisecond
 	var err error
 	unittest.RequireReturnsBefore(suite.T(), func() {
 		_, err = node1.CreateStream(context.Background(), *id2)
-	}, maxTimeToWait, fmt.Sprintf("create stream did not error within %d ms", maxTimeToWait))
+	}, maxTimeToWait+someGraceTime, fmt.Sprintf("create stream did not error within %s", maxTimeToWait.String()))
 
 	require.Error(suite.T(), err)
 	require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
