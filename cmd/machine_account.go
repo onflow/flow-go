@@ -30,20 +30,3 @@ func LoadNodeMachineAccountInfoFile(bootstrapDir string, nodeID flow.Identifier)
 
 	return &machineAccountInfo, nil
 }
-
-// IsValidNodeMachineAccountConfig returns true if the machine account file exists at the default path and
-// if the `access-address` is set else returns false.
-func IsValidNodeMachineAccountConfig(node *NodeConfig, accessAddress string) bool {
-
-	// check if node machine account info file exists
-	machineAccountInfoPath := filepath.Join(node.BaseConfig.BootstrapDir, fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, node.Me.NodeID()))
-	exists := io.FileExists(machineAccountInfoPath)
-
-	if accessAddress == "" || !exists {
-		// log warning as one or more of the required components are missing
-		node.Logger.Warn().Msg("node machine account info file or the required flags are not configured properly")
-		return false
-	}
-
-	return true
-}
