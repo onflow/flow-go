@@ -29,19 +29,19 @@ func init() {
 	var err error
 	SoftMinBalanceLN, err = cadence.NewUFix64("0.0025")
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("could not convert soft min balance for LN: %w", err))
 	}
 	HardMinBalanceLN, err = cadence.NewUFix64("0.001")
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("could not convert hard min balance for LN: %w", err))
 	}
 	SoftMinBalanceSN, err = cadence.NewUFix64("0.125")
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("could not convert soft min balance for SN: %w", err))
 	}
 	HardMinBalanceSN, err = cadence.NewUFix64("0.05")
 	if err != nil {
-		panic(err)
+		panic(fmt.Errorf("could not convert hard min balance for SN: %w", err))
 	}
 }
 
