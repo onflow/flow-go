@@ -34,13 +34,15 @@ type storageFormatV5MigrationResult struct {
 }
 
 type StorageFormatV5Migration struct {
-	Log             zerolog.Logger
-	OutputDir       string
-	accounts        *state.Accounts
-	programs        *programs.Programs
-	brokenTypeIDs   map[common.TypeID]brokenTypeCause
-	reportFile      *os.File
-	brokenContracts map[common.Address]map[string]bool
+	Log                zerolog.Logger
+	OutputDir          string
+	accounts           *state.Accounts
+	programs           *programs.Programs
+	brokenTypeIDs      map[common.TypeID]brokenTypeCause
+	reportFile         *os.File
+	brokenContracts    map[common.Address]map[string]bool
+	deferredValueTypes map[string]interpreter.StaticType
+	view               state.View
 }
 
 type brokenTypeCause int
@@ -49,6 +51,10 @@ const (
 	brokenTypeCauseParsingCheckingError brokenTypeCause = iota
 	brokenTypeCauseMissingCompositeType
 )
+
+// \x1F = Information Separator One
+//
+const pathSeparator = "\x1F"
 
 func (m StorageFormatV5Migration) filename() string {
 	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
@@ -83,6 +89,10 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
 
 	m.brokenContracts = make(map[common.Address]map[string]bool, 0)
+
+	m.deferredValueTypes = make(map[string]interpreter.StaticType, 0)
+
+	m.view = newView(payloads)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
@@ -542,6 +552,19 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 	// Check static types of arrays and dictionaries
 
+	if typ, ok := m.deferredValueTypes[key]; ok {
+		switch value := rootValue.(type) {
+		case *interpreter.ArrayValue:
+			value.Type = typ.(interpreter.ArrayStaticType)
+		case *interpreter.DictionaryValue:
+			value.Type = typ.(interpreter.DictionaryStaticType)
+		case *interpreter.CompositeValue:
+			// NO-OP
+		default:
+			panic("deferred value cannot be a non-container")
+		}
+	}
+
 	interpreter.InspectValue(
 		rootValue,
 		func(inspectedValue interpreter.Value) bool {
@@ -576,6 +599,32 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 			case *interpreter.DictionaryValue:
 
+				deferredKeys := inspectedValue.DeferredKeys()
+				if deferredKeys != nil {
+					for pair := deferredKeys.Oldest(); pair != nil; pair = pair.Next() {
+						storagePath := strings.Join(
+							[]string{
+								inspectedValue.DeferredStorageKeyBase(),
+								pair.Key,
+							},
+							pathSeparator,
+						)
+
+						deferredOwner := inspectedValue.DeferredOwner().Bytes()
+
+						var registerValue flow.RegisterValue
+						registerValue, err = m.view.Get(string(deferredOwner), "", storagePath)
+						if err != nil {
+							return false
+						}
+
+						if len(registerValue) == 0 {
+							err = &MissingDeferredValueError{}
+							return false
+						}
+					}
+				}
+
 				if !m.dictionaryHasStaticType(inspectedValue) {
 
 					err = m.inferDictionaryStaticType(inspectedValue, nil)
@@ -602,7 +651,8 @@ func (m StorageFormatV5Migration) reencodeValue(
 	if err != nil {
 		// If there are empty containers without type info (e.g: at root level)
 		// Then drop such values and continue.
-		if _, ok := err.(*EmptyContainerTypeInferringError); ok {
+		switch err.(type) {
+		case *EmptyContainerTypeInferringError, *MissingDeferredValueError:
 			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", key, owner)
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", owner, key))
 
@@ -1585,6 +1635,21 @@ func (m StorageFormatV5Migration) inferDictionaryStaticType(value *interpreter.D
 				)
 			}
 		}
+
+		deferredKeys := value.DeferredKeys()
+		if deferredKeys != nil {
+			deferredKeys.Foreach(func(key string, _ struct{}) {
+				storagePath := strings.Join(
+					[]string{
+						value.DeferredStorageKeyBase(),
+						key,
+					},
+					pathSeparator,
+				)
+
+				m.deferredValueTypes[storagePath] = value.Type
+			})
+		}
 	}
 
 	// Recursively infer type for dictionary keys and values
@@ -1890,6 +1955,15 @@ func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool
 	panic("unexpected ValidatePublicKey call")
 }
 
+func (m StorageFormatV5Migration) newInterpreter() *interpreter.Interpreter {
+	inter, err := interpreter.NewInterpreter(nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return inter
+}
+
 // Errors
 
 type EmptyContainerTypeInferringError struct {
@@ -1899,11 +1973,9 @@ func (e EmptyContainerTypeInferringError) Error() string {
 	return fmt.Sprint("cannot infer static type from empty container value")
 }
 
-func (m StorageFormatV5Migration) newInterpreter() *interpreter.Interpreter {
-	inter, err := interpreter.NewInterpreter(nil, nil)
-	if err != nil {
-		panic(err)
-	}
+type MissingDeferredValueError struct {
+}
 
-	return inter
+func (e MissingDeferredValueError) Error() string {
+	return fmt.Sprint("missing deferred value")
 }
