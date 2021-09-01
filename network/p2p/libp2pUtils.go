@@ -249,20 +249,3 @@ func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err 
 
 	return
 }
-
-// FlowPublicKeyFromPeerID converts a LibP2P peer ID to a Flow public key.
-func FlowPublicKeyFromPeerID(pid peer.ID) (networkPubKey fcrypto.PublicKey, err error) {
-	pk, err := pid.ExtractPublicKey()
-	if err != nil {
-		err = fmt.Errorf("failed to convert peer ID to LibP2P key: %w", err)
-		return
-	}
-
-	networkPubKey, err = FlowPublicKeyFromLibP2P(pk)
-	if err != nil {
-		err = fmt.Errorf("failed to convert LibP2P key to Flow key: %w", err)
-		return
-	}
-
-	return
-}

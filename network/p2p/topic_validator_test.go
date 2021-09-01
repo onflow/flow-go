@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,8 +24,16 @@ func TestTopicValidator(t *testing.T) {
 
 	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
 
-	validator := StakedValidator{func() flow.IdentityList {
-		return flow.IdentityList{identity1, identity2}
+	ids := flow.IdentityList{identity1, identity2}
+	translator, err := NewFixedTableIdentityTranslator(ids)
+	require.NoError(t, err)
+
+	validator := StakedValidator{func(pid peer.ID) (*flow.Identity, bool) {
+		fid, err := translator.GetFlowID(pid)
+		if err != nil {
+			return &flow.Identity{}, false
+		}
+		return ids.ByNodeID(fid)
 	}}
 
 	unstakedKey, err := unittest.NetworkingKey()
