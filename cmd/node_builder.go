@@ -97,7 +97,6 @@ type BaseConfig struct {
 	nodeIDHex             string
 	bindAddr              string
 	NodeRole              string
-	timeout               time.Duration
 	datadir               string
 	level                 string
 	metricsPort           uint
@@ -152,7 +151,6 @@ func DefaultBaseConfig() *BaseConfig {
 		nodeIDHex:             NotSet,
 		bindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
-		timeout:               1 * time.Minute,
 		datadir:               datadir,
 		level:                 "info",
 		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
