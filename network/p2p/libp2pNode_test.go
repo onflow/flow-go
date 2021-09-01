@@ -260,12 +260,16 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
 
 	//need to add some buffer time to prevent failures on local machines which need more time for libp2p connections to fail
-	someGraceTime := 4000 * time.Millisecond
+	someGraceTime := 100 * time.Millisecond
 	totalWaitTime := maxTimeToWait + someGraceTime
+
+	// limit the maximum amount of time to wait for a connection to be established by using a context that times out
+	ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
+	defer cancel()
 
 	var err error
 	unittest.RequireReturnsBefore(suite.T(), func() {
-		_, err = node1.CreateStream(context.Background(), *id2)
+		_, err = node1.CreateStream(ctx, *id2)
 	}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
 
 	require.Error(suite.T(), err)
