@@ -123,7 +123,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 			log.Error().
 				Err(err).
 				Str("machine_account_address", validator.info.Address).
-				Msg("could not get machine account")
+				Msg("failed to validate machine account config - could not get machine account")
 			return retry.RetryableError(err)
 		}
 
