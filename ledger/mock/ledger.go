@@ -107,7 +107,7 @@ func (_m *Ledger) Ready() <-chan struct{} {
 }
 
 // Set provides a mock function with given fields: update
-func (_m *Ledger) Set(update *ledger.Update) (ledger.State, error) {
+func (_m *Ledger) Set(update *ledger.Update) (ledger.State, *ledger.TrieUpdate, error) {
 	ret := _m.Called(update)
 
 	var r0 ledger.State
@@ -119,12 +119,21 @@ func (_m *Ledger) Set(update *ledger.Update) (ledger.State, error) {
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*ledger.Update) error); ok {
+	var r1 *ledger.TrieUpdate
+	if rf, ok := ret.Get(1).(func(*ledger.Update) *ledger.TrieUpdate); ok {
 		r1 = rf(update)
 	} else {
-		r1 = ret.Error(1)
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(*ledger.TrieUpdate)
+		}
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(*ledger.Update) error); ok {
+		r2 = rf(update)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }

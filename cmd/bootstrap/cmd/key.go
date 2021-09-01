@@ -42,13 +42,24 @@ func init() {
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
 	_ = keyCmd.MarkFlagRequired("address")
 
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, fmt.Sprintf("hex encoded networking seed (min %d bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, fmt.Sprintf("hex encoded staking seed (min %d bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", []byte{}, fmt.Sprintf("hex encoded machine account seed (min %d bytes)", minSeedBytes))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
 func keyCmdRun(_ *cobra.Command, _ []string) {
+
+	// generate private key seeds if not specified via flag
+	if len(flagNetworkSeed) == 0 {
+		flagNetworkSeed = GenerateRandomSeed()
+	}
+	if len(flagStakingSeed) == 0 {
+		flagStakingSeed = GenerateRandomSeed()
+	}
+	if len(flagMachineSeed) == 0 {
+		flagMachineSeed = GenerateRandomSeed()
+	}
 
 	// validate inputs
 	role := validateRole(flagRole)
@@ -88,6 +99,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 		}
 
 		log.Debug().Str("address", flagAddress).Msg("assembling machine account information")
+		// write the public key to terminal for entry in Flow Port
 		machineAccountPriv := assembleNodeMachineAccountKey(machineKey)
 		writeJSON(fmt.Sprintf(model.PathNodeMachineAccountPrivateKey, nodeInfo.NodeID), machineAccountPriv)
 	}

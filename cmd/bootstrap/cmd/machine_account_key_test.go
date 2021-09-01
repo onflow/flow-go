@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -71,9 +70,8 @@ func TestMachineAccountKeyFileCreated(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(bootDir string) {
 		var keyFileCreatedRegex = `^generated machine account private key` +
-			`encoded public machine account key` +
-			`wrote file %s/private-root-information/private-node-info_\S+/node-machine-account-key.priv.json` +
-			`machine account public key: \S+`
+			`encoded machine account public key for entry to Flow Port` +
+			`wrote file %s/private-root-information/private-node-info_\S+/node-machine-account-key.priv.json`
 		regex := regexp.MustCompile(fmt.Sprintf(keyFileCreatedRegex, bootDir))
 
 		// command flags

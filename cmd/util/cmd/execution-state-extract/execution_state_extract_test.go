@@ -92,7 +92,7 @@ func TestExtractExecutionState(t *testing.T) {
 				update, err := ledger.NewUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)
 
-				stateCommitment, err = f.Set(update)
+				stateCommitment, _, err = f.Set(update)
 				//stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 				require.NoError(t, err)
 
