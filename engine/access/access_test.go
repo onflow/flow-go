@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -92,14 +94,13 @@ func (suite *Suite) SetupTest() {
 }
 
 func (suite *Suite) RunTest(
-	f func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers),
+	f func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, headers *storage.Headers, results *storage.ExecutionResults),
 ) {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
-		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
+		headers, _, _, _, _, blocks, _, _, _, results := util.StorageLayer(suite.T(), db)
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
-		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 
 		suite.backend = backend.New(
 			suite.state,
@@ -110,6 +111,7 @@ func (suite *Suite) RunTest(
 			collections,
 			transactions,
 			receipts,
+			results,
 			suite.chainID,
 			suite.metrics,
 			nil,
@@ -122,12 +124,12 @@ func (suite *Suite) RunTest(
 
 		handler := access.NewHandler(suite.backend, suite.chainID.Chain())
 
-		f(handler, db, blocks, headers)
+		f(handler, db, blocks, headers, results)
 	})
 }
 
 func (suite *Suite) TestSendAndGetTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers) {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
 		referenceBlock := unittest.BlockHeaderFixture()
 		transaction := unittest.TransactionFixture()
 		transaction.SetReferenceBlockID(referenceBlock.ID())
@@ -180,7 +182,7 @@ func (suite *Suite) TestSendAndGetTransaction() {
 }
 
 func (suite *Suite) TestSendExpiredTransaction() {
-	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers) {
+	suite.RunTest(func(handler *access.Handler, _ *badger.DB, _ *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
 		referenceBlock := unittest.BlockHeaderFixture()
 
 		// create latest block that is past the expiry window
@@ -285,6 +287,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 			collections,
 			transactions,
 			nil,
+			nil,
 			suite.chainID,
 			metrics,
 			connFactory, // passing in the connection factory
@@ -332,7 +335,7 @@ func (suite *Suite) TestSendTransactionToRandomCollectionNode() {
 }
 
 func (suite *Suite) TestGetBlockByIDAndHeight() {
-	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers) {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers, _ *storage.ExecutionResults) {
 
 		// test block1 get by ID
 		block1 := unittest.BlockFixture()
@@ -413,13 +416,87 @@ func (suite *Suite) TestGetBlockByIDAndHeight() {
 	})
 }
 
+func (suite *Suite) TestGetExecutionResultByBlockID() {
+	suite.RunTest(func(handler *access.Handler, db *badger.DB, blocks *storage.Blocks, _ *storage.Headers, executionResults *storage.ExecutionResults) {
+
+		// test block1 get by ID
+		nonexistingID := unittest.IdentifierFixture()
+		blockID := unittest.IdentifierFixture()
+
+		er := unittest.ExecutionResultFixture(
+			unittest.WithExecutionResultBlockID(blockID),
+			unittest.WIthServiceEvents(2))
+
+		require.NoError(suite.T(), executionResults.Store(er))
+		require.NoError(suite.T(), executionResults.Index(blockID, er.ID()))
+
+		assertResp := func(resp *accessproto.ExecutionResultForBlockIDResponse, err error, executionResult *flow.ExecutionResult) {
+			require.NoError(suite.T(), err)
+			require.NotNil(suite.T(), resp)
+			er := *resp.ExecutionResult
+
+			require.Len(suite.T(), er.Chunks, len(executionResult.Chunks))
+			require.Len(suite.T(), er.ServiceEvents, len(executionResult.ServiceEvents))
+
+			assert.Equal(suite.T(), executionResult.BlockID[:], er.BlockId)
+			assert.Equal(suite.T(), executionResult.PreviousResultID[:], er.PreviousResultId)
+
+			for i, chunk := range executionResult.Chunks {
+				assert.Equal(suite.T(), chunk.BlockID[:], er.Chunks[i].BlockId)
+				assert.Equal(suite.T(), chunk.Index, er.Chunks[i].Index)
+				assert.Equal(suite.T(), uint32(chunk.CollectionIndex), er.Chunks[i].CollectionIndex)
+				assert.Equal(suite.T(), chunk.StartState[:], er.Chunks[i].StartState)
+				assert.Equal(suite.T(), chunk.EventCollection[:], er.Chunks[i].EventCollection)
+				assert.Equal(suite.T(), chunk.TotalComputationUsed, er.Chunks[i].TotalComputationUsed)
+				assert.Equal(suite.T(), uint32(chunk.NumberOfTransactions), er.Chunks[i].NumberOfTransactions)
+				assert.Equal(suite.T(), chunk.EndState[:], er.Chunks[i].EndState)
+			}
+
+			for i, serviceEvent := range executionResult.ServiceEvents {
+				assert.Equal(suite.T(), serviceEvent.Type, er.ServiceEvents[i].Type)
+				event := serviceEvent.Event
+
+				marshalledEvent, err := json.Marshal(event)
+				require.NoError(suite.T(), err)
+
+				assert.Equal(suite.T(), marshalledEvent, er.ServiceEvents[i].Payload)
+			}
+		}
+
+		suite.Run("nonexisting block", func() {
+			req := &accessproto.GetExecutionResultForBlockIDRequest{
+				BlockId: nonexistingID[:],
+			}
+
+			resp, err := handler.GetExecutionResultForBlockID(context.Background(), req)
+
+			require.Error(suite.T(), err)
+			require.Nil(suite.T(), resp)
+		})
+
+		suite.Run("some block", func() {
+			// get header by ID
+			req := &accessproto.GetExecutionResultForBlockIDRequest{
+				BlockId: blockID[:],
+			}
+
+			resp, err := handler.GetExecutionResultForBlockID(context.Background(), req)
+
+			require.NoError(suite.T(), err)
+
+			assertResp(resp, err, er)
+		})
+
+	})
+}
+
 // TestGetSealedTransaction tests that transactions status of transaction that belongs to a sealed block
 // is reported as sealed
 func (suite *Suite) TestGetSealedTransaction() {
 	unittest.RunWithBadgerDB(suite.T(), func(db *badger.DB) {
 		headers, _, _, _, _, blocks, _, _, _, _ := util.StorageLayer(suite.T(), db)
 		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 		enIdentities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		enNodeIDs := flow.IdentifierList(enIdentities.NodeIDs())
 
@@ -474,6 +551,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 			collections,
 			transactions,
 			receipts,
+			results,
 			suite.chainID,
 			suite.metrics,
 			connFactory,
@@ -487,11 +565,11 @@ func (suite *Suite) TestGetSealedTransaction() {
 		handler := access.NewHandler(backend, suite.chainID.Chain())
 
 		rpcEng := rpc.New(suite.log, suite.state, rpc.Config{}, nil, nil, blocks, headers, collections, transactions,
-			receipts, suite.chainID, metrics, 0, 0, false, false, nil, nil)
+			receipts, results, suite.chainID, metrics, 0, 0, false, false, nil, nil)
 
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, rpcEng)
 		require.NoError(suite.T(), err)
 
 		// 1. Assume that follower engine updated the block storage and the protocol state. The block is reported as sealed
@@ -513,7 +591,7 @@ func (suite *Suite) TestGetSealedTransaction() {
 		ingestEng.OnCollection(originID, &collection)
 
 		for _, r := range executionReceipts {
-			err = ingestEng.Process(enNodeIDs[0], r)
+			err = ingestEng.Process(engine.ReceiveReceipts, enNodeIDs[0], r)
 			require.NoError(suite.T(), err)
 		}
 		unittest.AssertClosesBefore(suite.T(), ingestEng.Done(), 3*time.Second)
@@ -539,7 +617,7 @@ func (suite *Suite) TestExecuteScript() {
 		transactions := storage.NewTransactions(suite.metrics, db)
 		collections := storage.NewCollections(db, transactions)
 		results := storage.NewExecutionResults(suite.metrics, db)
-		receipts := storage.NewExecutionReceipts(suite.metrics, db, results)
+		receipts := storage.NewExecutionReceipts(suite.metrics, db, results, storage.DefaultCacheSize)
 
 		identities := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
 		suite.snapshot.On("Identities", mock.Anything).Return(identities, nil)
@@ -557,6 +635,7 @@ func (suite *Suite) TestExecuteScript() {
 			collections,
 			transactions,
 			receipts,
+			results,
 			suite.chainID,
 			suite.metrics,
 			connFactory,
@@ -583,7 +662,7 @@ func (suite *Suite) TestExecuteScript() {
 			Once()
 		// create the ingest engine
 		ingestEng, err := ingestion.New(suite.log, suite.net, suite.state, suite.me, suite.request, blocks, headers, collections,
-			transactions, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
+			transactions, results, receipts, metrics, collectionsToMarkFinalized, collectionsToMarkExecuted, blocksToMarkExecuted, nil)
 		require.NoError(suite.T(), err)
 
 		// create a block and a seal pointing to that block

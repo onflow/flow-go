@@ -53,7 +53,7 @@ func idsAndPeerInfos(t *testing.T) (flow.IdentityList, []peer.AddrInfo) {
 		ids[i] = id
 
 		// create a libp2p PeerAddressInfo
-		libp2pKey, err := publicKey(id.NetworkPubKey)
+		libp2pKey, err := LibP2PPublicKeyFromFlow(id.NetworkPubKey)
 		assert.NoError(t, err)
 		peerID, err := peer.IDFromPublicKey(libp2pKey)
 		assert.NoError(t, err)

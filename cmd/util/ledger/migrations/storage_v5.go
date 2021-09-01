@@ -523,19 +523,18 @@ func (m StorageFormatV5Migration) reencodeValue(
 		// then delete it
 
 		if compositeValue, ok := rootValue.(*interpreter.CompositeValue); ok {
-			if _, ok := m.brokenTypeIDs[compositeValue.TypeID()]; ok {
-				// TODO: only when type is literally missing?
-				//   cause == brokenTypeCauseMissingCompositeType
+			if cause, ok := m.brokenTypeIDs[compositeValue.TypeID()]; ok {
+				if cause == brokenTypeCauseMissingCompositeType {
+					m.Log.Warn().
+						Str("owner", owner.String()).
+						Str("key", key).
+						Msgf(
+							"DELETING composite value with missing type: %s",
+							compositeValue.String(),
+						)
 
-				m.Log.Warn().
-					Str("owner", owner.String()).
-					Str("key", key).
-					Msgf(
-						"DELETING composite value with missing type: %s",
-						compositeValue.String(),
-					)
-
-				return nil, false, nil
+					return nil, false, nil
+				}
 			}
 		}
 	}

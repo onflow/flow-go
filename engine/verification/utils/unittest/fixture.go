@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/engine/execution/state"
@@ -16,10 +17,11 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/ledger"
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal/fixtures"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/epochs"
 
 	fvmMock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/model/flow"
@@ -33,7 +35,6 @@ import (
 // to verify the result of an execution receipt.
 type ExecutionReceiptData struct {
 	ReferenceBlock *flow.Block // block that execution receipt refers to
-	Collections    []*flow.Collection
 	ChunkDataPacks []*flow.ChunkDataPack
 	SpockSecrets   [][]byte
 }
@@ -57,18 +58,13 @@ type CompleteExecutionReceiptList []*CompleteExecutionReceipt
 //
 // It fails the test if no chunk with specified chunk ID is found in this complete execution receipt list.
 func (c CompleteExecutionReceiptList) ChunkDataResponseOf(t *testing.T, chunkID flow.Identifier) *messages.ChunkDataResponse {
-	result, chunkIndex := c.resultOf(t, chunkID)
+	_, chunkIndex := c.resultOf(t, chunkID)
 	receiptData := c.ReceiptDataOf(t, chunkID)
 
 	// publishes the chunk data pack response to the network
 	res := &messages.ChunkDataResponse{
 		ChunkDataPack: *receiptData.ChunkDataPacks[chunkIndex],
 		Nonce:         rand.Uint64(),
-	}
-
-	// only non-system chunks have a collection
-	if !isSystemChunk(chunkIndex, len(result.Chunks)) {
-		res.Collection = *receiptData.Collections[chunkIndex]
 	}
 
 	return res
@@ -213,6 +209,7 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 
 	var payload flow.Payload
 	var referenceBlock flow.Block
+	var serviceEvents flow.ServiceEventList
 
 	unittest.RunWithTempDir(t, func(dir string) {
 
@@ -222,11 +219,15 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		require.NoError(t, err)
 		defer led.Done()
 
+		// set 0 clusters to pass n_collectors >= n_clusters check
+		epochConfig := epochs.DefaultEpochConfig()
+		epochConfig.NumCollectorClusters = 0
 		startStateCommitment, err := bootstrap.NewBootstrapper(log).BootstrapLedger(
 			led,
 			unittest.ServiceAccountPublicKey,
 			chain,
 			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+			fvm.WithEpochConfig(epochConfig),
 		)
 		require.NoError(t, err)
 
@@ -288,74 +289,45 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 		}
 		computationResult, err := bc.ExecuteBlock(context.Background(), executableBlock, view, programs)
 		require.NoError(t, err)
-
-		for i, stateSnapshot := range computationResult.StateSnapshots {
-
-			ids, values := view.Delta().RegisterUpdates()
-			keys := state.RegisterIDSToKeys(ids)
-			flowValues := state.RegisterValuesToValues(values)
-
-			update, err := ledger.NewUpdate(ledger.State(startStateCommitment), keys, flowValues)
+		serviceEvents = make([]flow.ServiceEvent, 0, len(computationResult.ServiceEvents))
+		for _, event := range computationResult.ServiceEvents {
+			converted, err := convert.ServiceEvent(referenceBlock.Header.ChainID, event)
 			require.NoError(t, err)
+			serviceEvents = append(serviceEvents, *converted)
+		}
 
-			// TODO: update CommitDelta to also return proofs
-			endStateCommitment, err := led.Set(update)
-			require.NoError(t, err, "error updating registers")
+		startState := startStateCommitment
 
-			var collectionID flow.Identifier
+		for i := range computationResult.StateCommitments {
+			endState := computationResult.StateCommitments[i]
 
-			// account for system chunk being last
-			if i < len(computationResult.StateSnapshots)-1 {
+			// generates chunk and chunk data pack
+			var chunkDataPack *flow.ChunkDataPack
+			var chunk *flow.Chunk
+			if i < len(computationResult.StateCommitments)-1 {
+				// generates chunk data pack fixture for non-system chunk
 				collectionGuarantee := executableBlock.Block.Payload.Guarantees[i]
 				completeCollection := executableBlock.CompleteCollections[collectionGuarantee.ID()]
-				collectionID = completeCollection.Collection().ID()
+				collection := completeCollection.Collection()
+
+				eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+				require.NoError(t, err)
+
+				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(len(completeCollection.Transactions)))
+				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, &collection, computationResult.Proofs[i])
 			} else {
-				collectionID = flow.ZeroID
-			}
+				// generates chunk data pack fixture for system chunk
+				eventsHash, err := flow.EventsListHash(computationResult.Events[i])
+				require.NoError(t, err)
 
-			eventsHash, err := flow.EventsListHash(computationResult.Events[i])
-			require.NoError(t, err)
-
-			chunk := &flow.Chunk{
-				ChunkBody: flow.ChunkBody{
-					CollectionIndex: uint(i),
-					StartState:      startStateCommitment,
-					// TODO: include real, event collection hash, currently using the collection ID to generate a different Chunk ID
-					// Otherwise, the chances of there being chunks with the same ID before all these TODOs are done is large, since
-					// startState stays the same if blocks are empty
-					EventCollection: eventsHash,
-					BlockID:         executableBlock.ID(),
-					// TODO: record gas used
-					TotalComputationUsed: 0,
-					// TODO: record number of txs
-					NumberOfTransactions: 0,
-				},
-				Index:    uint64(i),
-				EndState: flow.StateCommitment(endStateCommitment),
-			}
-
-			// chunkDataPack
-			allRegisters := view.Interactions().AllRegisters()
-			allKeys := state.RegisterIDSToKeys(allRegisters)
-
-			query, err := ledger.NewQuery(ledger.State(chunk.StartState), allKeys)
-			require.NoError(t, err)
-
-			//values, proofs, err := led.GetRegistersWithProof(allRegisters, chunk.StartState)
-			proof, err := led.Prove(query)
-			require.NoError(t, err, "error reading registers with proofs from ledger")
-
-			chunkDataPack := &flow.ChunkDataPack{
-				ChunkID:      chunk.ID(),
-				StartState:   chunk.StartState,
-				Proof:        proof,
-				CollectionID: collectionID,
+				chunk = execution.GenerateChunk(i, startState, endState, executableBlock.ID(), eventsHash, uint64(1))
+				chunkDataPack = execution.GenerateChunkDataPack(chunk.ID(), chunk.StartState, nil, computationResult.Proofs[i])
 			}
 
 			chunks = append(chunks, chunk)
 			chunkDataPacks = append(chunkDataPacks, chunkDataPack)
-			spockSecrets = append(spockSecrets, stateSnapshot.SpockSecret)
-			startStateCommitment = flow.StateCommitment(endStateCommitment)
+			spockSecrets = append(spockSecrets, computationResult.StateSnapshots[i].SpockSecret)
+			startState = endState
 		}
 
 	})
@@ -367,95 +339,15 @@ func ExecutionResultFixture(t *testing.T, chunkCount int, chain flow.Chain, refB
 	}
 
 	result := &flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  chunks,
+		BlockID:       blockID,
+		Chunks:        chunks,
+		ServiceEvents: serviceEvents,
 	}
 
 	return result, &ExecutionReceiptData{
 		ReferenceBlock: &referenceBlock,
-		Collections:    collections,
 		ChunkDataPacks: chunkDataPacks,
 		SpockSecrets:   spockSecrets,
-	}
-}
-
-// LightExecutionResultFixture returns a light mocked version of execution result with an
-// execution receipt referencing the block/collections. In the light version of execution result,
-// everything is wired properly, but with the minimum viable content provided. This version is basically used
-// for profiling.
-// TODO: remove this once new architecture of verification node is in place.
-func LightExecutionResultFixture(chunkCount int) *CompleteExecutionReceipt {
-	collections := make([]*flow.Collection, 0, chunkCount)
-	guarantees := make([]*flow.CollectionGuarantee, 0, chunkCount)
-	chunkDataPacks := make([]*flow.ChunkDataPack, 0, chunkCount)
-
-	// creates collections and guarantees
-	for i := 0; i < chunkCount; i++ {
-		coll := unittest.CollectionFixture(1)
-		guarantee := coll.Guarantee()
-		collections = append(collections, &coll)
-		guarantees = append(guarantees, &guarantee)
-	}
-
-	payload := flow.Payload{
-		Guarantees: guarantees,
-	}
-
-	header := unittest.BlockHeaderFixture()
-	header.Height = 0
-	header.PayloadHash = payload.Hash()
-
-	referenceBlock := flow.Block{
-		Header:  &header,
-		Payload: &payload,
-	}
-	blockID := referenceBlock.ID()
-
-	// creates chunks
-	chunks := make([]*flow.Chunk, 0)
-	for i := 0; i < chunkCount; i++ {
-		chunk := &flow.Chunk{
-			ChunkBody: flow.ChunkBody{
-				CollectionIndex: uint(i),
-				BlockID:         blockID,
-				EventCollection: unittest.IdentifierFixture(),
-			},
-			Index: uint64(i),
-		}
-		chunks = append(chunks, chunk)
-
-		// creates a light (quite empty) chunk data pack for the chunk at bare minimum
-		chunkDataPack := flow.ChunkDataPack{
-			ChunkID: chunk.ID(),
-		}
-		chunkDataPacks = append(chunkDataPacks, &chunkDataPack)
-	}
-
-	result := flow.ExecutionResult{
-		BlockID: blockID,
-		Chunks:  chunks,
-	}
-
-	receipt := &flow.ExecutionReceipt{
-		ExecutionResult: result,
-	}
-
-	// container block contains the execution receipt and points back to reference block
-	// as its parent.
-	containerBlock := unittest.BlockWithParentFixture(referenceBlock.Header)
-	containerBlock.Payload.Receipts = []*flow.ExecutionReceiptMeta{receipt.Meta()}
-	containerBlock.Payload.Results = []*flow.ExecutionResult{&receipt.ExecutionResult}
-
-	return &CompleteExecutionReceipt{
-		ContainerBlock: &containerBlock,
-		Receipts:       []*flow.ExecutionReceipt{receipt},
-		ReceiptsData: []*ExecutionReceiptData{
-			{
-				ReferenceBlock: &referenceBlock,
-				Collections:    collections,
-				ChunkDataPacks: chunkDataPacks,
-			},
-		},
 	}
 }
 
@@ -475,7 +367,7 @@ func CompleteExecutionReceiptChainFixture(t *testing.T, root *flow.Header, count
 		resultsCount: 1,
 		copyCount:    1,
 		chunksCount:  1,
-		chain:        flow.Testnet.Chain(),
+		chain:        root.ChainID.Chain(),
 	}
 
 	for _, apply := range opts {

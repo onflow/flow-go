@@ -103,9 +103,9 @@ func Bootstrap(
 		}
 
 		// 6) set metric values
-		err = state.updateCommittedEpochFinalView(root)
+		err = state.updateEpochMetrics(root)
 		if err != nil {
-			return fmt.Errorf("could not set epoch final view value: %w", err)
+			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
 		state.metrics.BlockSealed(tail)
 		state.metrics.SealedHeight(tail.Header.Height)
@@ -394,10 +394,12 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	// update committed final view metric
-	err = state.updateCommittedEpochFinalView(state.Final())
+	finalSnapshot := state.Final()
+
+	// update all epoch related metrics
+	err = state.updateEpochMetrics(finalSnapshot)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update committed epoch final view: %w", err)
+		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
 	}
 
 	return state, nil
@@ -486,6 +488,48 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 		return false, fmt.Errorf("retrieving finalized height failed: %w", err)
 	}
 	return true, nil
+}
+
+// updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
+// `consensus_compliance_current_epoch_phase` metric
+func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
+
+	// update epoch counter
+	counter, err := snap.Epochs().Current().Counter()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+	state.metrics.CurrentEpochCounter(counter)
+
+	// update epoch phase
+	phase, err := snap.Phase()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+	state.metrics.CurrentEpochPhase(phase)
+
+	// update committed epoch final view
+	err = state.updateCommittedEpochFinalView(snap)
+	if err != nil {
+		return fmt.Errorf("could not update committed epoch final view")
+	}
+
+	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("could not update current epoch final view: %w", err)
+	}
+	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
+
+	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
+	if err != nil {
+		return fmt.Errorf("could not get dkg phase final view: %w", err)
+	}
+
+	state.metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
+	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
+	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
+
+	return nil
 }
 
 // updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric

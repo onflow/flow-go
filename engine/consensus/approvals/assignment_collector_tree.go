@@ -6,38 +6,39 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/forest"
 	"github.com/onflow/flow-go/storage"
 )
 
-// assignmentCollectorVertex is a helper structure that implements a LevelledForrest Vertex interface and encapsulates
-// AssignmentCollector and information if collector is processable or not
+// assignmentCollectorVertex is a helper structure that wraps an AssignmentCollector
+// so it implements the LevelledForest's `Vertex` interface:
+//  * VertexID is defined as the ID of the execution result
+//  * Level is defined as the height of the executed block
 type assignmentCollectorVertex struct {
-	collector   *AssignmentCollector
-	processable bool
+	collector AssignmentCollector
 }
 
 /* Methods implementing LevelledForest's Vertex interface */
 
-func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collector.ResultID }
-func (v *assignmentCollectorVertex) Level() uint64             { return v.collector.BlockHeight }
+func (v *assignmentCollectorVertex) VertexID() flow.Identifier { return v.collector.ResultID() }
+func (v *assignmentCollectorVertex) Level() uint64             { return v.collector.Block().Height }
 func (v *assignmentCollectorVertex) Parent() (flow.Identifier, uint64) {
-	return v.collector.result.PreviousResultID, v.collector.BlockHeight - 1
+	return v.collector.Result().PreviousResultID, v.collector.Block().Height - 1
 }
 
-// NewCollector is a factory method to generate an AssignmentCollector for an execution result
-type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (*AssignmentCollector, error)
+// NewCollectorFactoryMethod is a factory method to generate an AssignmentCollector for an execution result
+type NewCollectorFactoryMethod = func(result *flow.ExecutionResult) (AssignmentCollector, error)
 
 // AssignmentCollectorTree is a mempool holding assignment collectors, which is aware of the tree structure
 // formed by the execution results. The mempool supports pruning by height: only collectors
-// descending from the latest finalized block are relevant.
-// Safe for concurrent access. Internally, the mempool utilizes the LevelledForrest.
+// descending from the latest sealed and finalized result are relevant.
+// Safe for concurrent access. Internally, the mempool utilizes the LevelledForest.
 type AssignmentCollectorTree struct {
 	forest              *forest.LevelledForest
 	lock                sync.RWMutex
 	createCollector     NewCollectorFactoryMethod
-	size                uint64
 	lastSealedID        flow.Identifier
 	lastSealedHeight    uint64
 	lastFinalizedHeight uint64
@@ -49,7 +50,6 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 		forest:              forest.NewLevelledForest(lastSealed.Height),
 		lock:                sync.RWMutex{},
 		createCollector:     createCollector,
-		size:                0,
 		lastSealedID:        lastSealed.ID(),
 		lastFinalizedHeight: lastSealed.Height,
 		lastSealedHeight:    lastSealed.Height,
@@ -60,24 +60,26 @@ func NewAssignmentCollectorTree(lastSealed *flow.Header, headers storage.Headers
 func (t *AssignmentCollectorTree) GetSize() uint64 {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	return t.size
+	//locking is still needed, since forest.GetSize is not concurrent safe.
+	return t.forest.GetSize()
 }
 
-// GetCollector returns collector by ID and whether it is processable or not
-func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) (*AssignmentCollector, bool) {
+// GetCollector returns assignment collector for the given result.
+func (t *AssignmentCollectorTree) GetCollector(resultID flow.Identifier) AssignmentCollector {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	vertex, found := t.forest.GetVertex(resultID)
 	if !found {
-		return nil, false
+		return nil
 	}
 
 	v := vertex.(*assignmentCollectorVertex)
-	return v.collector, v.processable
+	return v.collector
 }
 
-// FinalizeForkAtLevel performs finalization of fork which is stored in leveled forest. When block is finalized we
-// can mark other forks as orphan and stop processing approvals for it. Eventually all forks will be cleaned up by height
+// FinalizeForkAtLevel orphans forks in the AssignmentCollectorTree and prunes levels below the
+// sealed finalized height. When a block is finalized we can mark results for conflicting forks as
+// orphaned and stop processing approvals for them. Eventually all forks will be cleaned up by height.
 func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, sealed *flow.Header) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -86,6 +88,8 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 		return nil
 	}
 
+	// STEP 1: orphan forks in the AssignmentCollectorTree whose results are
+	// for blocks that are conflicting with the finalized blocks
 	t.lastSealedID = sealed.ID()
 	for height := finalized.Height; height > t.lastFinalizedHeight; height-- {
 		finalizedBlock, err := t.headers.ByHeight(height)
@@ -97,7 +101,10 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
 			if finalizedBlockID != vertex.collector.BlockID() {
-				t.markForkProcessable(vertex, false)
+				err = t.updateForkState(vertex, Orphaned)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -105,38 +112,51 @@ func (t *AssignmentCollectorTree) FinalizeForkAtLevel(finalized *flow.Header, se
 	t.lastFinalizedHeight = finalized.Height
 
 	// WARNING: next block of code implements a special fallback mechanism to recover from sealing halt.
-	// CONTEXT: as blocks are incorporated into chain they are picked up by sealing.Core and added to AssignmentCollectorTree
-	// by definition all blocks should be reported to sealing.Core and that's why all results should be saved in AssignmentCollectorTree.
-	// When finalization kicks in we must have a finalized processable fork of assignment collectors.
+	// CONTEXT: As blocks are incorporated into chain they are picked up by sealing.Core and added to AssignmentCollectorTree.
+	// By definition, all blocks should be reported to sealing.Core and that's why all results should be saved in AssignmentCollectorTree.
+	// When finalization kicks in, we must have a finalized processable fork of assignment collectors.
 	// Next section checks if we indeed have a finalized fork, starting from last finalized seal. By definition it has to be
 	// processable. If it's not then we have a critical bug which results in blocks being missed by sealing.Core.
 	// TODO: remove this at some point when this logic matures.
 	if t.lastSealedHeight < sealed.Height {
-		finalizedFork, err := t.selectFinalizedFork(sealed.Height+1, finalized.Height)
+		collectors, err := t.selectCollectorsForFinalizedFork(sealed.Height+1, finalized.Height)
 		if err != nil {
 			return fmt.Errorf("could not select finalized fork: %w", err)
 		}
 
-		if len(finalizedFork) > 0 {
-			if !finalizedFork[0].processable {
+		for _, collectorVertex := range collectors {
+			clr := collectorVertex.collector
+			if clr.ProcessingStatus() != VerifyingApprovals {
 				log.Error().Msgf("AssignmentCollectorTree has found not processable finalized fork %v,"+
-					" this is unexpected and shouldn't happen, recovering", finalizedFork[0].collector.BlockID())
-				for _, vertex := range finalizedFork {
-					vertex.processable = true
-				}
-				t.markForkProcessable(finalizedFork[len(finalizedFork)-1], true)
+					" this is unexpected and shouldn't happen, recovering", clr.BlockID())
+			}
+			currentStatus := clr.ProcessingStatus()
+			if clr.Block().Height < finalized.Height {
+				err = clr.ChangeProcessingStatus(currentStatus, VerifyingApprovals)
+			} else {
+				err = t.updateForkState(collectorVertex, VerifyingApprovals)
+			}
+			if err != nil {
+				return err
 			}
 		}
 
 		t.lastSealedHeight = sealed.Height
 	}
 
+	// STEP 2: prune levels below the latest sealed finalized height.
+	err := t.pruneUpToHeight(sealed.Height)
+	if err != nil {
+		return fmt.Errorf("could not prune collectors tree up to height %d: %w", sealed.Height, err)
+	}
+
 	return nil
 }
 
-// selectFinalizedFork traverses chain of collectors starting from some height and picks every collector which executed
-// block was finalized
-func (t *AssignmentCollectorTree) selectFinalizedFork(startHeight, finalizedHeight uint64) ([]*assignmentCollectorVertex, error) {
+// selectCollectorsForFinalizedFork collects all collectors for blocks with height
+// in [startHeight, finalizedHeight], whose block is finalized.
+// NOT concurrency safe.
+func (t *AssignmentCollectorTree) selectCollectorsForFinalizedFork(startHeight, finalizedHeight uint64) ([]*assignmentCollectorVertex, error) {
 	var fork []*assignmentCollectorVertex
 	for height := startHeight; height <= finalizedHeight; height++ {
 		iter := t.forest.GetVerticesAtLevel(height)
@@ -156,18 +176,33 @@ func (t *AssignmentCollectorTree) selectFinalizedFork(startHeight, finalizedHeig
 	return fork, nil
 }
 
-// markForkProcessable takes starting vertex of some fork and marks it as processable in recursive manner
-func (t *AssignmentCollectorTree) markForkProcessable(vertex *assignmentCollectorVertex, processable bool) {
-	vertex.processable = processable
+// updateForkState changes the state of `vertex` and all its descendants to `newState`.
+// NOT concurrency safe.
+func (t *AssignmentCollectorTree) updateForkState(vertex *assignmentCollectorVertex, newState ProcessingStatus) error {
+	currentStatus := vertex.collector.ProcessingStatus()
+	if currentStatus == newState {
+		return nil
+	}
+	err := vertex.collector.ChangeProcessingStatus(currentStatus, newState)
+	if err != nil {
+		return err
+	}
+
 	iter := t.forest.GetChildren(vertex.VertexID())
 	for iter.HasNext() {
-		t.markForkProcessable(iter.NextVertex().(*assignmentCollectorVertex), processable)
+		err := t.updateForkState(iter.NextVertex().(*assignmentCollectorVertex), newState)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
-// GetCollectorsByInterval returns processable collectors that satisfy interval [from; to)
-func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*AssignmentCollector {
-	var vertices []*AssignmentCollector
+// GetCollectorsByInterval returns all collectors in state `VerifyingApprovals`
+// whose executed block has height in [from; to)
+func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []AssignmentCollector {
+	var vertices []AssignmentCollector
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
@@ -179,7 +214,7 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 		iter := t.forest.GetVerticesAtLevel(l)
 		for iter.HasNext() {
 			vertex := iter.NextVertex().(*assignmentCollectorVertex)
-			if vertex.processable {
+			if vertex.collector.ProcessingStatus() == VerifyingApprovals {
 				vertices = append(vertices, vertex.collector)
 			}
 		}
@@ -190,107 +225,94 @@ func (t *AssignmentCollectorTree) GetCollectorsByInterval(from, to uint64) []*As
 
 // LazyInitCollector is a helper structure that is used to return collector which is lazy initialized
 type LazyInitCollector struct {
-	Collector   *AssignmentCollector
-	Processable bool // whether collector is processable
-	Created     bool // whether collector was created or retrieved from cache
+	Collector AssignmentCollector
+	Created   bool // whether collector was created or retrieved from cache
 }
 
 // GetOrCreateCollector performs lazy initialization of AssignmentCollector using double-checked locking.
 func (t *AssignmentCollectorTree) GetOrCreateCollector(result *flow.ExecutionResult) (*LazyInitCollector, error) {
 	resultID := result.ID()
 	// first let's check if we have a collector already
-	cachedCollector, processable := t.GetCollector(resultID)
+	cachedCollector := t.GetCollector(resultID)
 	if cachedCollector != nil {
 		return &LazyInitCollector{
-			Collector:   cachedCollector,
-			Processable: processable,
-			Created:     false,
+			Collector: cachedCollector,
+			Created:   false,
 		}, nil
 	}
 
 	collector, err := t.createCollector(result)
 	if err != nil {
-		return nil, fmt.Errorf("could not create assignment collector for %v: %w", resultID, err)
+		return nil, fmt.Errorf("could not create assignment collector for result %v: %w", resultID, err)
 	}
 	vertex := &assignmentCollectorVertex{
-		collector:   collector,
-		processable: false,
-	}
-
-	executedBlock, err := t.headers.ByBlockID(result.BlockID)
-	if err != nil {
-		return nil, fmt.Errorf("could not fetch executed block %v: %w", result.BlockID, err)
+		collector: collector,
 	}
 
 	// Initial check showed that there was no collector. However, it's possible that after the
 	// initial check but before acquiring the lock to add the newly-created collector, another
-	// goroutine already added the needed collector. Hence we need to check again:
+	// goroutine already added the needed collector. Hence, check again after acquiring the lock:
 	t.lock.Lock()
 	defer t.lock.Unlock()
+
+	// leveled forest doesn't treat this case as error, we shouldn't create collectors
+	// for vertices lower that forest.LowestLevel
+	if vertex.Level() < t.forest.LowestLevel {
+		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", vertex.Level(), t.forest.LowestLevel)
+	}
+
 	v, found := t.forest.GetVertex(resultID)
 	if found {
 		return &LazyInitCollector{
-			Collector:   v.(*assignmentCollectorVertex).collector,
-			Processable: v.(*assignmentCollectorVertex).processable,
-			Created:     false,
+			Collector: v.(*assignmentCollectorVertex).collector,
+			Created:   false,
 		}, nil
 	}
 
-	// An assignment collector is processable if and only if:
-	// either (i) the parent result is the latest sealed result (seal is finalized)
-	//    or (ii) the result's parent is processable
-	parent, parentFound := t.forest.GetVertex(result.PreviousResultID)
-	if parentFound {
-		vertex.processable = parent.(*assignmentCollectorVertex).processable
-	} else if executedBlock.ParentID == t.lastSealedID {
-		vertex.processable = true
-	}
-
+	// add AssignmentCollector as vertex to tree
 	err = t.forest.VerifyVertex(vertex)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store assignment collector into the tree: %w", err)
 	}
 
 	t.forest.AddVertex(vertex)
-	t.size += 1
-	t.markForkProcessable(vertex, vertex.processable)
+
+	// An assignment collector is processable if and only if:
+	// either (i) the parent result is the latest sealed result (seal is finalized)
+	//    or (ii) the result's parent is processable
+	parent, parentFound := t.forest.GetVertex(result.PreviousResultID)
+	newStatus := CachingApprovals
+	if parentFound {
+		newStatus = parent.(*assignmentCollectorVertex).collector.ProcessingStatus()
+	}
+	if collector.Block().ParentID == t.lastSealedID {
+		newStatus = VerifyingApprovals
+	}
+	err = t.updateForkState(vertex, newStatus)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update fork state: %w", err)
+	}
+
 	return &LazyInitCollector{
-		Collector:   vertex.collector,
-		Processable: vertex.processable,
-		Created:     true,
+		Collector: vertex.collector,
+		Created:   true,
 	}, nil
 }
 
-// PruneUpToHeight prunes all results for all assignment collectors with height up to but
+// pruneUpToHeight prunes all assignment collectors for results with height up to but
 // NOT INCLUDING `limit`. Noop, if limit is lower than the previous value (caution:
-// this is different than the levelled forest's convention).
-// Returns list of resultIDs that were pruned
-func (t *AssignmentCollectorTree) PruneUpToHeight(limit uint64) ([]flow.Identifier, error) {
-	var pruned []flow.Identifier
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
+// this is different from the levelled forest's convention).
+// This function is NOT concurrency safe.
+func (t *AssignmentCollectorTree) pruneUpToHeight(limit uint64) error {
 	if t.forest.LowestLevel >= limit {
-		return pruned, nil
-	}
-
-	if t.size > 0 {
-		// collect IDs of vertices that were pruned
-		for l := t.forest.LowestLevel; l < limit; l++ {
-			iterator := t.forest.GetVerticesAtLevel(l)
-			for iterator.HasNext() {
-				vertex := iterator.NextVertex()
-				pruned = append(pruned, vertex.VertexID())
-			}
-		}
+		return nil
 	}
 
 	// remove vertices and adjust size
 	err := t.forest.PruneUpToLevel(limit)
 	if err != nil {
-		return nil, fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
+		return fmt.Errorf("pruning Levelled Forest up to height (aka level) %d failed: %w", limit, err)
 	}
-	t.size -= uint64(len(pruned))
 
-	return pruned, nil
+	return nil
 }

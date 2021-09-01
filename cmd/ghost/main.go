@@ -19,15 +19,17 @@ func main() {
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
 		}).
-		Module("message validators", func(node *cmd.FlowNodeBuilder) error {
-			node.MsgValidators = []network.MessageValidator{
+		Initialize().
+		Module("message validators", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			validators := []network.MessageValidator{
 				// filter out messages sent by this node itself
-				validator.NewSenderValidator(node.Me.NodeID()),
+				validator.ValidateNotSender(node.Me.NodeID()),
 				// but retain all the 1-k messages even if they are not intended for this node
 			}
+			node.MsgValidators = validators
 			return nil
 		}).
-		Component("RPC engine", func(node *cmd.FlowNodeBuilder) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
 		}).

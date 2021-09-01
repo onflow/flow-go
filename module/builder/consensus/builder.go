@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -56,10 +57,14 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
+	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not create default block timer: %w", err)
+	}
+
 	// initialize default config
 	cfg := Config{
-		minInterval:       500 * time.Millisecond,
-		maxInterval:       10 * time.Second,
+		blockTimer:        blockTimer,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
@@ -88,7 +93,7 @@ func NewBuilder(
 		cfg:        cfg,
 	}
 
-	err := b.repopulateExecutionTree()
+	err = b.repopulateExecutionTree()
 	if err != nil {
 		return nil, fmt.Errorf("could not repopulate execution tree: %w", err)
 	}
@@ -378,23 +383,24 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
-		block, err := b.blocks.ByID(header.ID())
+		blockID := header.ID()
+		index, err := b.index.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve block %x: %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve index for block %x: %w", blockID, err)
 		}
 
 		// enforce condition (1): only consider seals for results that are incorporated in the fork
-		for _, result := range block.Payload.Results {
+		for _, resultID := range index.ResultIDs {
+
+			result, err := b.resultsDB.ByID(resultID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve execution result %x: %w", resultID, err)
+			}
+
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			// ATTENTION:
-			// Here, IncorporatedBlockID (the first argument) should be set to
-			// ancestorID, because that is the block that contains the
-			// ExecutionResult. However, in phase 2 of the sealing roadmap, we
-			// are still using a temporary sealing logic where the
-			// IncorporatedBlockID is expected to be the result's block ID.
 			incorporatedResult := flow.NewIncorporatedResult(
-				result.BlockID,
+				blockID,
 				result,
 			)
 
@@ -607,18 +613,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
-	// calculate the timestamp and cutoffs
-	timestamp := time.Now().UTC()
-	from := parent.Timestamp.Add(b.cfg.minInterval)
-	to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-	// adjust timestamp if outside of cutoffs
-	if timestamp.Before(from) {
-		timestamp = from
-	}
-	if timestamp.After(to) {
-		timestamp = to
-	}
+	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{
@@ -631,11 +626,11 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		// the following fields should be set by the custom function as needed
 		// NOTE: we could abstract all of this away into an interface{} field,
 		// but that would be over the top as we will probably always use hotstuff
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
+		View:               0,
+		ParentVoterIDs:     nil,
+		ParentVoterSigData: nil,
+		ProposerID:         flow.ZeroID,
+		ProposerSigData:    nil,
 	}
 
 	// apply the custom fields setter of the consensus algorithm

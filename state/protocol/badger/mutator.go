@@ -33,11 +33,12 @@ import (
 type FollowerState struct {
 	*State
 
-	index    storage.Index
-	payloads storage.Payloads
-	tracer   module.Tracer
-	consumer protocol.Consumer
-	cfg      Config
+	index      storage.Index
+	payloads   storage.Payloads
+	tracer     module.Tracer
+	consumer   protocol.Consumer
+	blockTimer protocol.BlockTimer
+	cfg        Config
 }
 
 // MutableState implements a mutable protocol state. When extending the
@@ -56,14 +57,16 @@ func NewFollowerState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	blockTimer protocol.BlockTimer,
 ) (*FollowerState, error) {
 	followerState := &FollowerState{
-		State:    state,
-		index:    index,
-		payloads: payloads,
-		tracer:   tracer,
-		consumer: consumer,
-		cfg:      DefaultConfig(),
+		State:      state,
+		index:      index,
+		payloads:   payloads,
+		tracer:     tracer,
+		consumer:   consumer,
+		blockTimer: blockTimer,
+		cfg:        DefaultConfig(),
 	}
 	return followerState, nil
 }
@@ -78,10 +81,11 @@ func NewFullConsensusState(
 	payloads storage.Payloads,
 	tracer module.Tracer,
 	consumer protocol.Consumer,
+	blockTimer protocol.BlockTimer,
 	receiptValidator module.ReceiptValidator,
 	sealValidator module.SealValidator,
 ) (*MutableState, error) {
-	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer)
+	followerState, err := NewFollowerState(state, index, payloads, tracer, consumer, blockTimer)
 	if err != nil {
 		return nil, fmt.Errorf("initialization of Mutable Follower State failed: %w", err)
 	}
@@ -194,6 +198,15 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 	if header.Height != parent.Height+1 {
 		return state.NewInvalidExtensionErrorf("candidate built with invalid height (candidate: %d, parent: %d)",
 			header.Height, parent.Height)
+	}
+
+	// check validity of block timestamp using parent's timestamp
+	err = m.blockTimer.Validate(parent.Timestamp, candidate.Header.Timestamp)
+	if err != nil {
+		if protocol.IsInvalidBlockTimestampError(err) {
+			return state.NewInvalidExtensionErrorf("candidate contains invalid timestamp: %w", err)
+		}
+		return fmt.Errorf("validating block's time stamp failed with unexpected error: %w", err)
 	}
 
 	// THIRD: Once we have established the block is valid within itself, and the
@@ -508,7 +521,16 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		return fmt.Errorf("could not retrieve setup event for current epoch: %w", err)
 	}
 
-	payload := block.Payload
+	// We will process service events from blocks which are sealed by this
+	// block's PARENT. The events are emitted when we finalize the first child
+	// of the block containing the seal for the result containing the
+	// corresponding service event.
+	parent, err := m.blocks.ByID(header.ParentID)
+	if err != nil {
+		return fmt.Errorf("could not get parent (id=%x): %w", header.ParentID, err)
+	}
+
+	payload := parent.Payload
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 	for _, seal := range payload.Seals {
@@ -519,9 +541,13 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		for _, event := range result.ServiceEvents {
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
+				// update current epoch phase
+				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseSetup) })
 				// track epoch phase transition (staking->setup)
 				events = append(events, func() { m.consumer.EpochSetupPhaseStarted(ev.Counter-1, header) })
 			case *flow.EpochCommit:
+				// update current epoch phase
+				events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseCommitted) })
 				// track epoch phase transition (setup->committed)
 				events = append(events, func() { m.consumer.EpochCommittedPhaseStarted(ev.Counter-1, header) })
 				// track final view of committed epoch
@@ -546,6 +572,11 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// this block begins the next epoch
 	if header.View > finalView {
 		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+
+		// set current epoch counter corresponding to new epoch
+		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+		// set epoch phase - since we are starting a new epoch we begin in the staking phase
+		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;

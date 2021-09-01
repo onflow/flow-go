@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.
