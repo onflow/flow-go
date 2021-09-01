@@ -34,7 +34,7 @@ func DefaultConfig() Config {
 		Tolerance:     10,
 		MaxAttempts:   5,
 		MaxSize:       64,
-		MaxRequests:   3,
+		MaxRequests:   10,
 	}
 }
 
