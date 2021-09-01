@@ -66,10 +66,18 @@ func (f *FinalizedHeaderCache) getHeader() (*flow.Header, error) {
 
 // updateHeader updates latest locally cached finalized header.
 func (f *FinalizedHeaderCache) updateHeader() error {
+	f.log.Debug().Msg("updating header")
+
 	head, err := f.getHeader()
 	if err != nil {
+		f.log.Err(err).Msg("failed to get header")
 		return err
 	}
+
+	f.log.Debug().
+		Str("block_id", head.ID().String()).
+		Uint64("height", head.Height).
+		Msg("got new header")
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -97,7 +105,8 @@ func (f *FinalizedHeaderCache) Done() <-chan struct{} {
 //  (1) Updates local state of last finalized snapshot.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (f *FinalizedHeaderCache) onFinalizedBlock(flow.Identifier) {
+func (f *FinalizedHeaderCache) onFinalizedBlock(blockID flow.Identifier) {
+	f.log.Debug().Str("block_id", blockID.String()).Msg("received new block finalization callback")
 	// notify that there is new finalized block
 	f.finalizationEventNotifier.Notify()
 }
