@@ -46,6 +46,7 @@ func (av *AggregationVerifier) VerifyMany(msg []byte, sig crypto.Signature, keys
 	return valid, nil
 }
 
+// TODO : to delete in V2
 // AggregationProvider is an aggregating signer and verifier that can create/verify
 // signatures, as well as aggregating & verifying aggregated signatures.
 // *Important*: the aggregation verifier can only verify signatures in the context
@@ -55,6 +56,7 @@ type AggregationProvider struct {
 	local module.Local
 }
 
+// TODO : to delete in V2
 // NewAggregationProvider creates a new aggregation provider using the given private
 // key to generate signatures. *Important*: the aggregation provider can only
 // create and verify signatures in the context of the provided HMAC tag.
@@ -66,12 +68,14 @@ func NewAggregationProvider(tag string, local module.Local) *AggregationProvider
 	return ap
 }
 
+// TODO : to delete in V2
 // Sign will sign the given message bytes with the internal private key and
 // return the signature on success.
 func (ap *AggregationProvider) Sign(msg []byte) (crypto.Signature, error) {
 	return ap.local.Sign(msg, ap.hasher)
 }
 
+// TODO : to delete in V2
 // Aggregate will aggregate the given signatures into one aggregated signature.
 func (ap *AggregationProvider) Aggregate(sigs []crypto.Signature) (crypto.Signature, error) {
 

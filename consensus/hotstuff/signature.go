@@ -52,19 +52,18 @@ type WeightedSignatureAggregator interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message.
 	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
 
-	// TrustedAdd adds an already verified signature, with weight for the given signer,
-	// and add it to the total weight, and returns the total weight that have been collected.
-	// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
-	//   (1000 is just an example)
-	// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-	TrustedAdd(signerID flow.Identifier, weight uint64, sig crypto.Signature) (totalWeight uint64, exception error)
+	// TrustedAdd adds a signature to the internal set of signatures.
+	// It adds the signer's weight to the total collected weight and returns the total weight regardless
+	// of the returned error.
+	// The function errors if a signature from the signerID was already collected.
+	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
 
-	// TotalWeight returns the total weight presented by the collected sig shares.
+	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
-	// Aggregate assumes enough shares have been collected, it aggregates the signatures
+	// Aggregate assumes enough weights have been collected, it aggregates the signatures
 	// and return the aggregated signature.
-	// if called concurrently, only one thread will be running the aggregation.
+	// If called concurrently, only one thread will be running the aggregation.
 	// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
 	// It errors if not enough weights have been collected.
 	// The function performs a final verification and errors if the aggregated signature is not valid. This is
