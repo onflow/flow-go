@@ -38,14 +38,14 @@ const (
 	ErrCodeInvalidEnvelopeSignatureError ErrorCode = 1009
 
 	// base errors 1050 - 1100
-	ErrCodeFVMInternalError          ErrorCode = 1050
-	ErrCodeValueError                ErrorCode = 1051
-	ErrCodeInvalidArgumentError      ErrorCode = 1052
-	ErrCodeInvalidAddressError       ErrorCode = 1053
-	ErrCodeInvalidLocationError      ErrorCode = 1054
-	ErrCodeAccountAuthorizationError ErrorCode = 1055
-	// ErrCodeOperationAuthorizationError ErrorCode = 1056
-	ErrCodeOperationNotSupportedError ErrorCode = 1057
+	ErrCodeFVMInternalError            ErrorCode = 1050
+	ErrCodeValueError                  ErrorCode = 1051
+	ErrCodeInvalidArgumentError        ErrorCode = 1052
+	ErrCodeInvalidAddressError         ErrorCode = 1053
+	ErrCodeInvalidLocationError        ErrorCode = 1054
+	ErrCodeAccountAuthorizationError   ErrorCode = 1055
+	ErrCodeOperationAuthorizationError ErrorCode = 1056
+	ErrCodeOperationNotSupportedError  ErrorCode = 1057
 
 	// execution errors 1100 - 1200
 	// ErrCodeExecutionError                 ErrorCode = 1100 - reserved
@@ -55,7 +55,7 @@ const (
 	// ErrCodeGasLimitExceededError              ErrorCode = 1104
 	ErrCodeEventLimitExceededError            ErrorCode = 1105
 	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
-	// ErrCodeStateKeySizeLimitError             ErrorCode = 1107
+	ErrCodeStateKeySizeLimitError             ErrorCode = 1107
 	ErrCodeStateValueSizeLimitError           ErrorCode = 1108
 	ErrCodeTransactionFeeDeductionFailedError ErrorCode = 1109
 
