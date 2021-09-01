@@ -161,6 +161,7 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.initStorage()
 
+	m.Log.Info().Msg("Converting payloads...")
 	for _, payload := range payloads {
 
 		keyParts := payload.Key.KeyParts
@@ -185,7 +186,9 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 		}
 	}
+	m.Log.Info().Msg("Converting payloads complete")
 
+	m.Log.Info().Msg("Re-encoding converted values...")
 	err = m.storage.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
@@ -194,6 +197,7 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	for _, payload := range m.baseStorage.Payloads {
 		migratedPayloads = append(migratedPayloads, payload)
 	}
+	m.Log.Info().Msg("Re-encoding converted values complete")
 
 	return migratedPayloads, nil
 }
