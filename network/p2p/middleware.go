@@ -244,7 +244,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	m.UpdateNodeAddresses()
 
-	m.stakedTopicValidator = &StakedValidator{m.ov.Identities}
+	m.stakedTopicValidator = &StakedValidator{m.ov.GetIdentity}
 
 	if m.connectionGating {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
