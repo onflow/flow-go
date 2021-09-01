@@ -29,6 +29,7 @@ type Config struct {
 	bindAddr       string              // address to bind on
 	dataDir        string              // directory to store the protocol state
 	bootstrapDir   string              // path to the bootstrap directory
+	logLevel       string              // log level
 }
 
 type Option func(c *Config)
@@ -42,6 +43,12 @@ func WithDataDir(dataDir string) Option {
 func WithBootstrapDir(bootstrapDir string) Option {
 	return func(cf *Config) {
 		cf.bootstrapDir = bootstrapDir
+	}
+}
+
+func WithLogLevel(level string) Option {
+	return func(cf *Config) {
+		cf.logLevel = level
 	}
 }
 
@@ -87,6 +94,9 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.bindAddr != "" {
 		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
+	if config.logLevel != "" {
+		options = append(options, cmd.WithLogLevel(config.logLevel))
+	}
 
 	return options
 }
@@ -118,6 +128,7 @@ func NewConsensusFollower(
 		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
+		logLevel:       "info",
 	}
 
 	for _, opt := range opts {

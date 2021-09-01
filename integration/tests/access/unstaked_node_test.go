@@ -188,8 +188,8 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	require.NoError(suite.T(), err)
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID),
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID, consensus_follower.WithLogLevel("debug")),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID, consensus_follower.WithLogLevel("debug")),
 	}
 
 	// consensus follower

@@ -732,6 +732,12 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+func WithLogLevel(level string) Option {
+	return func(config *BaseConfig) {
+		config.level = level
+	}
+}
+
 // FlowNode creates a new Flow node builder with the given name.
 func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 	config := DefaultBaseConfig()

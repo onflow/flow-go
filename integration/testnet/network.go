@@ -223,6 +223,7 @@ type ConsensusFollowerConfig struct {
 	NodeID            flow.Identifier
 	NetworkingPrivKey crypto.PrivateKey
 	StakedNodeID      flow.Identifier
+	Opts              []consensus_follower.Option
 }
 
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier) ConsensusFollowerConfig {
@@ -499,10 +500,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
-	opts := []consensus_follower.Option{
+	opts := append(
+		followerConf.Opts,
 		consensus_follower.WithDataDir(dataDir),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
-	}
+	)
 
 	var stakedANContainer *ContainerConfig
 	// find the upstream Access node container for this follower engine
