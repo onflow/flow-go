@@ -25,11 +25,35 @@ type ConsensusClusterVoteCollector struct {
 
 var _ hotstuff.VerifyingVoteCollector = &ConsensusClusterVoteCollector{}
 
-func NewConsensusClusterVoteCollector(base CollectionBase, block *model.Block) *ConsensusClusterVoteCollector {
-	return &ConsensusClusterVoteCollector{
-		CollectionBase: base,
-		block:          block,
+// NewConsensusClusterVoteCollector creates new vote collector, accepts already validated proposal as argument which will
+// be used as vote.
+func NewConsensusClusterVoteCollector(base CollectionBase, proposal *model.Proposal) (*ConsensusClusterVoteCollector, error) {
+
+	vote := proposal.ProposerVote()
+	sigType, _, err := signature.DecodeSingleSig(vote.SigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse vote signature type: %w", err)
 	}
+
+	clr := &ConsensusClusterVoteCollector{
+		CollectionBase: base,
+		block:          proposal.Block,
+	}
+
+	// process proposal as vote
+	_, err = clr.combinedAggr.TrustedAdd(vote.SignerID, vote.SigData, sigType)
+	if err != nil {
+		return nil, fmt.Errorf("could not aggregate staking sig share: %w", err)
+	}
+
+	if sigType == hotstuff.SigTypeRandomBeacon {
+		_, err = clr.reconstructor.TrustedAdd(vote.SignerID, vote.SigData)
+		if err != nil {
+			return nil, fmt.Errorf("could not add random beacon sig share: %w", err)
+		}
+	}
+
+	return clr, nil
 }
 
 func (c *ConsensusClusterVoteCollector) Block() *model.Block {

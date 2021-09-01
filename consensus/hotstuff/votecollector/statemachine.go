@@ -111,14 +111,6 @@ func (m *StateMachine) ChangeProcessingStatus(currentStatus, newStatus hotstuff.
 
 		blockID := proposal.Block.BlockID
 		m.workerPool.Submit(func() {
-			// TODO: check if SigData is correct
-			vote := proposal.ProposerVote()
-
-			err := m.AddVote(vote)
-			if err != nil {
-				m.log.Err(err).Msgf("failed to process vote from proposal %x", blockID)
-			}
-
 			for _, vote := range cachingCollector.GetVotesByBlockID(blockID) {
 				task := m.reIngestVoteTask(vote)
 				m.workerPool.Submit(task)
