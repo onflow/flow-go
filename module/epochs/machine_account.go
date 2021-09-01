@@ -48,6 +48,12 @@ func init() {
 // CheckMachineAccountInfo checks a node machine account config, logging
 // anything noteworthy but not critical, and returning an error if the machine
 // account is not configured correctly, or the configuration cannot be checked.
+//
+// This function checks most aspects of correct configuration EXCEPT for
+// confirming that the account contains the relevant QCVoter or DKGParticipant
+// resource. This is omitted because it is not possible to query private account
+// info from a script.
+//
 func CheckMachineAccountInfo(
 	log zerolog.Logger,
 	role flow.Role,
