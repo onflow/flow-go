@@ -102,7 +102,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	}
 
 	// wait for finalized blocks
-	unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 1*time.Minute) // waiting 1 minute for 5 blocks
+	unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 1 minute for 5 blocks
 
 	// all blocks were found in the storage
 	require.NoError(suite.T(), err, "finalized block not found in storage")
@@ -135,7 +135,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	}
 
 	// wait for finalized blocks
-	unittest.AssertReturnsBefore(suite.T(), receiveBlocks2, 1*time.Minute) // waiting 1 minute for 5 blocks
+	unittest.AssertReturnsBefore(suite.T(), receiveBlocks2, 2*time.Minute) // waiting 1 minute for 5 blocks
 }
 
 func (suite *UnstakedAccessSuite) OnBlockFinalizedConsumer(index int) func(flow.Identifier) {
