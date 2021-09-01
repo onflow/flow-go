@@ -22,6 +22,7 @@ type ProtocolStateIDCache struct {
 	mu         sync.RWMutex
 	peerIDs    map[flow.Identifier]peer.ID
 	flowIDs    map[peer.ID]flow.Identifier
+	lookup     map[flow.Identifier]*flow.Identity
 	logger     zerolog.Logger
 }
 
@@ -96,12 +97,19 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	p.identities = identities
 	p.flowIDs = flowIDs
 	p.peerIDs = peerIDs
+	p.lookup = identities.Lookup()
 }
 
 func (p *ProtocolStateIDCache) Identities(filter flow.IdentityFilter) flow.IdentityList {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.identities.Filter(filter)
+}
+
+func (p *ProtocolStateIDCache) GetIdentity(flowID flow.Identifier) *flow.Identity {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.lookup[flowID]
 }
 
 func (p *ProtocolStateIDCache) GetPeerID(flowID flow.Identifier) (pid peer.ID, err error) {
