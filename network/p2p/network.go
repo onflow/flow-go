@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -36,7 +37,7 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	identityProvider *ProtocolStateIDCache
+	identityProvider id.IdentityProvider
 	logger           zerolog.Logger
 	codec            network.Codec
 	me               module.Local
@@ -64,7 +65,7 @@ func NewNetwork(
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
-	identityProvider *ProtocolStateIDCache,
+	identityProvider id.IdentityProvider,
 ) (*Network, error) {
 
 	rcache, err := newRcvCache(csize)
