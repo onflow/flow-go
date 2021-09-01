@@ -172,6 +172,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
+		mwOpts := []p2p.MiddlewareOption{
+			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
+		}
+		if len(fnb.MsgValidators) > 0 {
+			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+		}
+
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
@@ -183,7 +190,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			true,
 			true,
 			fnb.IDTranslator,
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
+			mwOpts...,
 		)
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
