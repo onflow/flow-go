@@ -40,6 +40,11 @@ init:
 init-light:
 	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
 
+# Creates a version of localnet configured with short epochs
+.PHONY: init-short-epochs
+init-short-epochs:
+	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
+
 .PHONY: start
 start:
 	docker-compose -f docker-compose.metrics.yml up -d
