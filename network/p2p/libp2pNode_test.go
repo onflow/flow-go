@@ -260,7 +260,7 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
 
 	//need to add some buffer time to prevent failures on local machines which need more time for libp2p connections to fail
-	someGraceTime := 3000 * time.Millisecond
+	someGraceTime := 4000 * time.Millisecond
 	totalWaitTime := maxTimeToWait + someGraceTime
 
 	var err error
