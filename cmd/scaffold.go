@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
-	jsoncodec "github.com/onflow/flow-go/network/codec/json"
+	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -55,7 +55,7 @@ type Storage struct {
 	Index        storage.Index
 	Identities   storage.Identities
 	Guarantees   storage.Guarantees
-	Receipts     storage.ExecutionReceipts
+	Receipts     *bstorage.ExecutionReceipts
 	Results      storage.ExecutionResults
 	Seals        storage.Seals
 	Payloads     storage.Payloads
@@ -94,14 +94,15 @@ type namedDoneObject struct {
 // of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	*NodeConfig
-	flags       *pflag.FlagSet
-	modules     []namedModuleFunc
-	components  []namedComponentFunc
-	doneObject  []namedDoneObject
-	sig         chan os.Signal
-	preInitFns  []func(NodeBuilder, *NodeConfig)
-	postInitFns []func(NodeBuilder, *NodeConfig)
-	lm          *lifecycle.LifecycleManager
+	flags          *pflag.FlagSet
+	modules        []namedModuleFunc
+	components     []namedComponentFunc
+	doneObject     []namedDoneObject
+	sig            chan os.Signal
+	preInitFns     []func(NodeBuilder, *NodeConfig)
+	postInitFns    []func(NodeBuilder, *NodeConfig)
+	lm             *lifecycle.LifecycleManager
+	extraFlagCheck func() error
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -125,12 +126,15 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
+
+	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
+	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
-		codec := jsoncodec.NewCodec()
+		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
 		if fnb.BaseConfig.bindAddr != NotSet {
@@ -240,6 +244,11 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
 	})
 
 	log.Msg("flags loaded")
+}
+
+func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
+	fnb.extraFlagCheck = f
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
@@ -381,10 +390,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	fnb.MustNot(err).Msg("could not initialize max tracker")
 
 	headers := bstorage.NewHeaders(fnb.Metrics.Cache, fnb.DB)
-	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB)
+	guarantees := bstorage.NewGuarantees(fnb.Metrics.Cache, fnb.DB, fnb.BaseConfig.guaranteesCacheSize)
 	seals := bstorage.NewSeals(fnb.Metrics.Cache, fnb.DB)
 	results := bstorage.NewExecutionResults(fnb.Metrics.Cache, fnb.DB)
-	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results)
+	receipts := bstorage.NewExecutionReceipts(fnb.Metrics.Cache, fnb.DB, results, fnb.BaseConfig.receiptsCacheSize)
 	index := bstorage.NewIndex(fnb.Metrics.Cache, fnb.DB)
 	payloads := bstorage.NewPayloads(fnb.DB, index, guarantees, seals, receipts, results)
 	blocks := bstorage.NewBlocks(fnb.DB, headers, payloads)
@@ -550,7 +559,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
-	if fnb.RootChainID == flow.Testnet {
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
 			fvm.WithTransactionFeesEnabled(true),
@@ -712,6 +721,8 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
+	fnb.extraFlagsValidation()
+
 	fnb.EnqueueNetworkInit(ctx)
 
 	if fnb.metricsEnabled {
@@ -837,6 +848,15 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 		fnb.Logger.Error().
 			Err(err).
 			Msg("could not close database")
+	}
+}
+
+func (fnb *FlowNodeBuilder) extraFlagsValidation() {
+	if fnb.extraFlagCheck != nil {
+		err := fnb.extraFlagCheck()
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("invalid flags")
+		}
 	}
 }
 

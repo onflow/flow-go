@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
@@ -172,16 +173,18 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, fvm.DefaultTransactionFees, minimumStorage)
 
-		// ensure only events from the first transaction is emitted
+		// storage limit error
+		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
+		// ensure events from the first transaction is emitted
 		require.Len(t, cr.Events[0], 10)
-		require.Len(t, cr.Events[1], 0)
+		// ensure fee deduction events are emitted even though tx fails
+		require.Len(t, cr.Events[1], 3)
 		// storage limit error
 		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
 	})
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
-
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(5)
 		require.NoError(t, err)
@@ -210,6 +213,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`),
 		}
 
+		spamTx.SetGasLimit(800000)
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 
@@ -223,29 +227,402 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			},
 		}, txFee, fvm.DefaultMinimumStorageReservation)
 
-		// ensure only events from the first transaction is emitted
-		require.Len(t, cr.Events[0], 10)
-		require.Len(t, cr.Events[1], 0)
-		// tx fee error
-		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1109")
+		// no error
+		assert.Equal(t, cr.TransactionResults[0].ErrorMessage, "")
+
+		// ensure events from the first transaction is emitted. Since transactions are in the same block, get all events from Events[0]
+		transactionEvents := 0
+		for _, event := range cr.Events[0] {
+			if event.TransactionID == cr.TransactionResults[0].TransactionID {
+				transactionEvents += 1
+			}
+		}
+		require.Equal(t, 10, transactionEvents)
+
+		// minimum account balance error as account is put below minimum account balance due to fee deduction
+		assert.Contains(t, cr.TransactionResults[1].ErrorMessage, "Error Code: 1103")
+
+		// ensure tx fee deduction events are emitted even though tx failed
+		transactionEvents = 0
+		for _, event := range cr.Events[0] {
+			if event.TransactionID == cr.TransactionResults[1].TransactionID {
+				transactionEvents += 1
+			}
+		}
+		require.Equal(t, 3, transactionEvents)
 	})
 
 }
 
-func executeBlockAndVerify(t *testing.T,
+func TestTransactionFeeDeduction(t *testing.T) {
+
+	type testCase struct {
+		name          string
+		fundWith      uint64
+		tryToTransfer uint64
+		checkResult   func(t *testing.T, cr *execution.ComputationResult)
+	}
+
+	txFees := fvm.DefaultTransactionFees.ToGoValue().(uint64)
+	fundingAmount := uint64(1_0000_0000)
+	transferAmount := uint64(123_456)
+
+	testCases := []testCase{
+		{
+			name:          "Transaction fee deduction emits events",
+			fundWith:      fundingAmount,
+			tryToTransfer: 0,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
+			},
+		},
+		{
+			name:          "If just enough balance, fees are still deducted",
+			fundWith:      txFees + transferAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
+			},
+		},
+		{
+			// this is an edge case that is not applicable to any network.
+			// If storage limits were on this would fail due to storage limits
+			name:          "If not enough balance, transaction succeeds and fees are deducted to 0",
+			fundWith:      txFees,
+			tryToTransfer: 1,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
+			},
+		},
+		{
+			name:          "If tx fails, fees are deducted",
+			fundWith:      fundingAmount,
+			tryToTransfer: 2 * fundingAmount,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1101")
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 1)
+				require.Len(t, withdraws, 1)
+			},
+		},
+	}
+
+	testCasesWithStorageEnabled := []testCase{
+		{
+			name:          "Transaction fee deduction emits events",
+			fundWith:      fundingAmount,
+			tryToTransfer: 0,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
+			},
+		},
+		{
+			name:          "If just enough balance, fees are deducted",
+			fundWith:      txFees + transferAmount,
+			tryToTransfer: transferAmount,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[2].ErrorMessage)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 2)
+				require.Len(t, withdraws, 2)
+			},
+		},
+		{
+			name:          "If tx fails, fees are still deducted and fee deduction events are emitted",
+			fundWith:      fundingAmount,
+			tryToTransfer: 2 * fundingAmount,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1101")
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 1)
+				require.Len(t, withdraws, 1)
+			},
+		},
+		{
+			name:          "If balance at minimum, transaction fails, fees are deducted and fee deduction events are emitted",
+			fundWith:      0,
+			tryToTransfer: 0,
+			checkResult: func(t *testing.T, cr *execution.ComputationResult) {
+				require.Empty(t, cr.TransactionResults[0].ErrorMessage)
+				require.Empty(t, cr.TransactionResults[1].ErrorMessage)
+				require.Contains(t, cr.TransactionResults[2].ErrorMessage, "Error Code: 1103")
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range cr.Events[2] {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(chain)) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(chain)) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 1)
+				require.Len(t, withdraws, 1)
+			},
+		},
+	}
+
+	transferTokensTx := func(chain flow.Chain) *flow.TransactionBody {
+		return flow.NewTransactionBody().
+			SetScript([]byte(fmt.Sprintf(`
+							// This transaction is a template for a transaction that
+							// could be used by anyone to send tokens to another account
+							// that has been set up to receive tokens.
+							//
+							// The withdraw amount and the account from getAccount
+							// would be the parameters to the transaction
+							
+							import FungibleToken from 0x%s
+							import FlowToken from 0x%s
+							
+							transaction(amount: UFix64, to: Address) {
+							
+								// The Vault resource that holds the tokens that are being transferred
+								let sentVault: @FungibleToken.Vault
+							
+								prepare(signer: AuthAccount) {
+							
+									// Get a reference to the signer's stored vault
+									let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+										?? panic("Could not borrow reference to the owner's Vault!")
+							
+									// Withdraw tokens from the signer's stored vault
+									self.sentVault <- vaultRef.withdraw(amount: amount)
+								}
+							
+								execute {
+							
+									// Get the recipient's public account object
+									let recipient = getAccount(to)
+							
+									// Get a reference to the recipient's Receiver
+									let receiverRef = recipient.getCapability(/public/flowTokenReceiver)
+										.borrow<&{FungibleToken.Receiver}>()
+										?? panic("Could not borrow receiver reference to the recipient's Vault")
+							
+									// Deposit the withdrawn tokens in the recipient's receiver
+									receiverRef.deposit(from: <-self.sentVault)
+								}
+							}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain))),
+			)
+	}
+
+	runTx := func(tc testCase,
+		opts []fvm.Option,
+		bootstrapOpts []fvm.BootstrapProcedureOption) func(t *testing.T) {
+		return func(t *testing.T) {
+			// ==== Create an account ====
+			privateKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
+
+			// this should return the address of newly created account
+			address, err := chain.AddressAtIndex(5)
+			require.NoError(t, err)
+
+			err = testutil.SignTransactionAsServiceAccount(createAccountTx, 0, chain)
+			require.NoError(t, err)
+
+			// ==== Transfer tokens to new account ====
+			transferTx := transferTokensTx(chain).
+				AddAuthorizer(chain.ServiceAddress()).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.fundWith))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(address)))
+
+			transferTx.SetProposalKey(chain.ServiceAddress(), 0, 1)
+			transferTx.SetPayer(chain.ServiceAddress())
+
+			err = testutil.SignEnvelope(
+				transferTx,
+				chain.ServiceAddress(),
+				unittest.ServiceAccountPrivateKey,
+			)
+			require.NoError(t, err)
+
+			// ==== Transfer tokens from new account ====
+
+			transferTx2 := transferTokensTx(chain).
+				AddAuthorizer(address).
+				AddArgument(jsoncdc.MustEncode(cadence.UFix64(tc.tryToTransfer))).
+				AddArgument(jsoncdc.MustEncode(cadence.NewAddress(chain.ServiceAddress())))
+
+			transferTx2.SetProposalKey(address, 0, 0)
+			transferTx2.SetPayer(address)
+
+			err = testutil.SignEnvelope(
+				transferTx2,
+				address,
+				privateKey,
+			)
+			require.NoError(t, err)
+
+			cr := executeBlockAndVerifyWithParameters(t, [][]*flow.TransactionBody{
+				{
+					createAccountTx,
+				},
+				{
+					transferTx,
+				},
+				{
+					transferTx2,
+				},
+			}, opts, bootstrapOpts)
+
+			tc.checkResult(t, cr)
+		}
+	}
+
+	for i, tc := range testCases {
+		t.Run(fmt.Sprintf("Transaction Fees without storage %d: %s", i, tc.name), runTx(tc, []fvm.Option{
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(false),
+		}, []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+		}))
+	}
+
+	for i, tc := range testCasesWithStorageEnabled {
+		t.Run(fmt.Sprintf("Transaction Fees with storage %d: %s", i, tc.name), runTx(tc, []fvm.Option{
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+		}, []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		}))
+	}
+}
+
+func executeBlockAndVerifyWithParameters(t *testing.T,
 	txs [][]*flow.TransactionBody,
-	txFees cadence.UFix64,
-	minStorageBalance cadence.UFix64) *execution.ComputationResult {
+	opts []fvm.Option,
+	bootstrapOpts []fvm.BootstrapProcedureOption) *execution.ComputationResult {
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
 
 	logger := zerolog.Nop()
 
-	fvmContext := fvm.NewContext(logger,
-		fvm.WithChain(chain),
-		fvm.WithTransactionFeesEnabled(true),
-		fvm.WithAccountStorageLimit(true),
-	)
+	opts = append(opts, fvm.WithChain(chain))
+
+	fvmContext :=
+		fvm.NewContext(
+			logger,
+			opts...,
+		)
 
 	collector := metrics.NewNoopCollector()
 	tracer := trace.NewNoopTracer()
@@ -261,11 +638,7 @@ func executeBlockAndVerify(t *testing.T,
 		ledger,
 		unittest.ServiceAccountPublicKey,
 		chain,
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
-		fvm.WithMinimumStorageReservation(minStorageBalance),
-		fvm.WithTransactionFee(txFees),
-		fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		bootstrapOpts...,
 	)
 
 	require.NoError(t, err)
@@ -288,7 +661,7 @@ func executeBlockAndVerify(t *testing.T,
 	_, chdps, er, err := execution.GenerateExecutionResultAndChunkDataPacks(prevResultId, initialCommit, computationResult)
 	require.NoError(t, err)
 
-	verifier := chunks.NewChunkVerifier(vm, fvmContext)
+	verifier := chunks.NewChunkVerifier(vm, fvmContext, logger)
 
 	vcds := make([]*verification.VerifiableChunkData, er.Chunks.Len())
 
@@ -322,4 +695,22 @@ func executeBlockAndVerify(t *testing.T,
 	}
 
 	return computationResult
+}
+
+func executeBlockAndVerify(t *testing.T,
+	txs [][]*flow.TransactionBody,
+	txFees cadence.UFix64,
+	minStorageBalance cadence.UFix64) *execution.ComputationResult {
+	return executeBlockAndVerifyWithParameters(t,
+		txs,
+		[]fvm.Option{
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+		}, []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithMinimumStorageReservation(minStorageBalance),
+			fvm.WithTransactionFee(txFees),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+		})
 }

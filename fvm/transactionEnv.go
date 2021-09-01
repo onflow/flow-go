@@ -238,6 +238,15 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 	return len(v) > 0, nil
 }
 
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return 0, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+	return v, nil
+}
+
 func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
 	if e.isTraceable() {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
@@ -544,6 +553,14 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) GetComputationLimit() uint64 {
+	// if gas limit is set to zero fallback to the gas limit set by the context
+	if e.tx.GasLimit == 0 {
+		// if context gasLimit is also zero, fallback to the default gas limit
+		if e.ctx.GasLimit == 0 {
+			return DefaultGasLimit
+		}
+		return e.ctx.GasLimit
+	}
 	return e.tx.GasLimit
 }
 

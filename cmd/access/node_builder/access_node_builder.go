@@ -2,17 +2,18 @@ package node_builder
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/spf13/pflag"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/cmd"
-	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -42,11 +43,12 @@ import (
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/validator"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -84,7 +86,9 @@ type AccessNodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type AccessNodeConfig struct {
 	staked                       bool
-	stakedAccessNodeIDHex        string
+	bootstrapNodeAddresses       []string
+	bootstrapNodePublicKeys      []string
+	bootstrapIdentites           flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	unstakedNetworkBindAddr      string
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
@@ -131,7 +135,8 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		apiRatelimits:                nil,
 		apiBurstlimits:               nil,
 		staked:                       true,
-		stakedAccessNodeIDHex:        "",
+		bootstrapNodeAddresses:       []string{},
+		bootstrapNodePublicKeys:      []string{},
 		unstakedNetworkBindAddr:      cmd.NotSet,
 	}
 }
@@ -144,6 +149,7 @@ type FlowAccessNodeBuilder struct {
 	*AccessNodeConfig
 
 	// components
+	UnstakedLibP2PNode         *p2p.Node
 	UnstakedNetwork            *p2p.Network
 	unstakedMiddleware         *p2p.Middleware
 	FollowerState              protocol.MutableState
@@ -436,6 +442,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 				node.Storage.Collections,
 				node.Storage.Transactions,
 				node.Storage.Receipts,
+				node.Storage.Results,
 				node.RootChainID,
 				anb.TransactionMetrics,
 				anb.collectionGRPCPort,
@@ -464,7 +471,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 				return nil, fmt.Errorf("could not create requester engine: %w", err)
 			}
 
-			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Receipts, anb.TransactionMetrics,
+			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, anb.TransactionMetrics,
 				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
 			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
 			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
@@ -483,9 +490,9 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 
 type Option func(*AccessNodeConfig)
 
-func WithUpstreamAccessNodeID(upstreamAccessNodeID flow.Identifier) Option {
+func WithBootStrapPeers(bootstrapNodes ...*flow.Identity) Option {
 	return func(config *AccessNodeConfig) {
-		config.stakedAccessNodeIDHex = upstreamAccessNodeID.String()
+		config.bootstrapIdentites = bootstrapNodes
 	}
 }
 
@@ -563,50 +570,42 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringToIntVar(&builder.apiRatelimits, "api-rate-limits", defaultConfig.apiRatelimits, "per second rate limits for Access API methods e.g. Ping=300,GetTransaction=500 etc.")
 		flags.StringToIntVar(&builder.apiBurstlimits, "api-burst-limits", defaultConfig.apiBurstlimits, "burst limits for Access API methods e.g. Ping=100,GetTransaction=100 etc.")
 		flags.BoolVar(&builder.staked, "staked", defaultConfig.staked, "whether this node is a staked access node or not")
-		flags.StringVar(&builder.stakedAccessNodeIDHex, "staked-access-node-id", defaultConfig.stakedAccessNodeIDHex, "the node ID of the upstream staked access node if this is an unstaked access node")
+		flags.StringSliceVar(&builder.bootstrapNodeAddresses, "bootstrap-node-addresses", defaultConfig.bootstrapNodeAddresses, "the network addresses of the bootstrap access node if this is an unstaked access node e.g. access-001.mainnet.flow.org:9653,access-002.mainnet.flow.org:9653")
+		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.StringVar(&builder.unstakedNetworkBindAddr, "unstaked-bind-addr", defaultConfig.unstakedNetworkBindAddr, "address to bind on for the unstaked network")
 	})
 }
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
 // The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(
-	ctx context.Context,
+func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
-	networkKey crypto.PrivateKey,
-) (p2p.LibP2PFactoryFunc, error) {
+	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
-	// setup the Ping provider to return the software version and the sealed block height
-	pingProvider := p2p.PingInfoProviderImpl{
-		SoftwareVersionFun: func() string {
-			return build.Semver()
-		},
-		SealedBlockHeightFun: func() (uint64, error) {
-			head, err := builder.State.Sealed().Head()
-			if err != nil {
-				return 0, err
-			}
-			return head.Height, nil
-		},
+	// The staked nodes act as the DHT servers
+	dhtOptions := []dht.Option{p2p.AsServer(builder.IsStaked())}
+
+	// if this is an unstaked access node, then seed the DHT with the boostrap identities
+	if !builder.IsStaked() {
+		bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentites)
+		builder.MustNot(err)
+		dhtOptions = append(dhtOptions, bootstrapPeersOpt)
 	}
 
-	libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
-		ctx,
-		builder.Logger,
-		nodeID,
-		builder.unstakedNetworkBindAddr,
-		networkKey,
-		builder.RootBlock.ID().String(),
-		p2p.DefaultMaxPubSubMsgSize,
-		networkMetrics,
-		pingProvider,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-	}
-
-	return libP2PNodeFactory, nil
+	return func() (*p2p.Node, error) {
+		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.unstakedNetworkBindAddr, networkKey).
+			SetRootBlockID(builder.RootBlock.ID().String()).
+			// unlike the staked network where currently all the node addresses are known upfront,
+			// for the unstaked network the nodes need to discover each other using DHT Discovery.
+			SetPubsubOptions(p2p.WithDHTDiscovery(dhtOptions...)).
+			SetLogger(builder.Logger).
+			Build(ctx)
+		if err != nil {
+			return nil, err
+		}
+		builder.UnstakedLibP2PNode = libp2pNode
+		return builder.UnstakedLibP2PNode, nil
+	}, nil
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
@@ -614,20 +613,16 @@ func (builder *FlowAccessNodeBuilder) initLibP2PFactory(
 func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
-	peerUpdateInterval time.Duration,
-	unicastMessageTimeout time.Duration,
-	connectionGating bool,
-	managerPeerConnections bool,
 	validators ...network.MessageValidator) *p2p.Middleware {
 	builder.unstakedMiddleware = p2p.NewMiddleware(builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
 		builder.RootBlock.ID().String(),
-		peerUpdateInterval,
-		unicastMessageTimeout,
-		connectionGating,
-		managerPeerConnections,
+		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
+		p2p.DefaultUnicastTimeout,
+		false, // no connection gating for the unstaked network
+		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 		validators...)
 	return builder.unstakedMiddleware
 }
@@ -660,4 +655,50 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 	}
 
 	return net, nil
+}
+
+func unstakedNetworkMsgValidators(selfID flow.Identifier) []network.MessageValidator {
+	return []network.MessageValidator{
+		// filter out messages sent by this node itself
+		validator.ValidateNotSender(selfID),
+	}
+}
+
+// BootstrapIdentities converts the bootstrap node addresses and keys to a Flow Identity list where
+// each Flow Identity is initialized with the passed address, the networking key
+// and the Node ID set to ZeroID, role set to Access, 0 stake and no staking key.
+func BootstrapIdentities(addresses []string, keys []string) (flow.IdentityList, error) {
+
+	if len(addresses) != len(keys) {
+		return nil, fmt.Errorf("number of addresses and keys provided for the boostrap nodes don't match")
+	}
+
+	ids := make([]*flow.Identity, len(addresses))
+	for i, address := range addresses {
+
+		key := keys[i]
+		// json unmarshaller needs a quotes before and after the string
+		// the pflags.StringSliceVar does not retain quotes for the command line arg even if escaped with \"
+		// hence this additional check to ensure the key is indeed quoted
+		if !strings.HasPrefix(key, "\"") {
+			key = fmt.Sprintf("\"%s\"", key)
+		}
+		// networking public key
+		var networkKey encodable.NetworkPubKey
+		err := json.Unmarshal([]byte(key), &networkKey)
+		if err != nil {
+			return nil, err
+		}
+
+		// create the identity of the peer by setting only the relevant fields
+		id := &flow.Identity{
+			NodeID:        flow.ZeroID, // the NodeID is the hash of the staking key and for the unstaked network it does not apply
+			Address:       address,
+			Role:          flow.RoleAccess, // the upstream node has to be an access node
+			NetworkPubKey: networkKey,
+		}
+
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

@@ -24,7 +24,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -109,7 +109,7 @@ func (suite *RateLimitTestSuite) SetupTest() {
 	}
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
+		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, apiRateLimt, apiBurstLimt)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
