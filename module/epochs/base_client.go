@@ -11,6 +11,8 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -129,4 +131,58 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 	}
 
 	return nil
+}
+
+const (
+	checkMachineAccountRetryBase = time.Second * 5
+	checkMachineAccountRetryMax  = time.Minute * 10
+)
+
+// CheckMachineAccountConfiguration checks that the machine account in use by this
+// BaseClient object is correctly configured. If the machine account is critically
+// misconfigured, or a correct configuration cannot be confirmed, this function
+// will perpetually log errors indicating the problem.
+//
+// This function should be invoked as a goroutine.
+func (c *BaseClient) CheckMachineAccountConfiguration(ctx context.Context, role flow.Role, info bootstrap.NodeMachineAccountInfo) {
+
+	log := c.Log.With().Str("process", "check_machine_account_config").Logger()
+
+	expRetry, err := retry.NewExponential(checkMachineAccountRetryBase)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create machine account check retry")
+	}
+	backoff := retry.WithJitterPercent(
+		5, // 5% jitter
+		retry.WithMaxDuration(checkMachineAccountRetryMax, expRetry),
+	)
+
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
+		account, err := c.FlowClient.GetAccount(ctx, info.SDKAddress())
+		if err != nil {
+			// we cannot validate a correct configuration - log an error and try again
+			log.Error().
+				Err(err).
+				Str("machine_account_address", info.Address).
+				Msg("could not get machine account")
+			return retry.RetryableError(err)
+		}
+
+		err = CheckMachineAccountInfo(log, role, info, account)
+		if err != nil {
+			// either we cannot validate the configuration or there is a critical
+			// misconfiguration - log a warning and retry - we will continue checking
+			// and logging until the problem is resolved
+			log.Warn().
+				Err(err).
+				Msg("critical machine account misconfiguration")
+			return retry.RetryableError(err)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("failed to check machine account configuration after retry")
+		return
+	}
+	log.Debug().Msg("confirmed valid machine account configuration")
 }
