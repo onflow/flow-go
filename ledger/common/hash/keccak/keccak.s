@@ -35,6 +35,7 @@
 // domain sources at https://github.com/gvanas/KeccakCodePackage
 
 // Offsets in state
+
 #define _ba  (0*8)
 #define _be  (1*8)
 #define _bi  (2*8)
@@ -346,8 +347,8 @@
 	MOVQ rDi, _si(oState); \
 	MOVQ rDo, _so(oState)  \
 
-// func keccakF1600(state *[25]uint64)
-TEXT ·keccakF1600(SB), 0, $200-8
+// func KeccakF1600(state *[25]uint64)
+TEXT ·KeccakF1600(SB), 0, $200-8
 	MOVQ state+0(FP), rpState
 
 	// Convert the user state into an internal state
@@ -415,4 +416,4 @@ TEXT ·keccakF1600(SB), 0, $200-8
 	NOTQ _sa(rpState)
 
 	RET
-	
+    

@@ -7,8 +7,29 @@
 
 package hash
 
-// This function is implemented in keccakf_amd64.s.
+import (
+	"github.com/onflow/flow-go/ledger/common/hash/keccak"
+	"golang.org/x/sys/cpu"
+)
 
-//go:noescape
+/*
+#include <stdlib.h>
 
-func keccakF1600(state *[25]uint64)
+void KeccakP1600_Permute_24rounds(void *state);
+
+void callKeccakF1600(ulong* state) {
+	KeccakP1600_Permute_24rounds(state);
+}
+
+#cgo LDFLAGS: -L./lib -lXKCP  -Wl,-rpath=./lib
+
+*/
+import "C"
+
+func keccakF1600(a *[25]uint64) {
+	if cpu.X86.HasAVX512 {
+		C.callKeccakF1600((*C.ulong)(&a[0]))
+	} else {
+		keccak.KeccakF1600(a)
+	}
+}

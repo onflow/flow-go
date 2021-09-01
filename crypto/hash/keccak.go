@@ -7,25 +7,29 @@
 
 package hash
 
+import (
+	"github.com/onflow/flow-go/crypto/hash/keccak"
+	"golang.org/x/sys/cpu"
+)
+
 /*
-#include <stdint.h>
 #include <stdlib.h>
-void KeccakP1600_Permute_Nrounds(void *state, unsigned int nrounds);
+
 void KeccakP1600_Permute_24rounds(void *state);
 
 void callKeccakF1600(ulong* state) {
 	KeccakP1600_Permute_24rounds(state);
 }
 
-#cgo LDFLAGS: -L./lib -lXKCP -Wl,-rpath=./lib
+#cgo LDFLAGS: -L./lib -lXKCP  -Wl,-rpath=./lib
 
 */
 import "C"
 
-import (
-	_ "unsafe"
-)
-
 func keccakF1600(a *[25]uint64) {
-	C.callKeccakF1600((*C.ulong)(&a[0]))
+	if cpu.X86.HasAVX512 {
+		C.callKeccakF1600((*C.ulong)(&a[0]))
+	} else {
+		keccak.KeccakF1600(a)
+	}
 }
