@@ -263,17 +263,27 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	someGraceTime := 100 * time.Millisecond
 	totalWaitTime := maxTimeToWait + someGraceTime
 
-	// limit the maximum amount of time to wait for a connection to be established by using a context that times out
-	ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
-	defer cancel()
+	// make two separate stream creation attempt and assert that no connection back off happened
+	for i := 0; i < 2; i++ {
+		// Each CreateStream call makes maxConnectAttempt number of connection attempts within
+		// the context timeout duration - maxTimeToWait.
+		// However, the first connection attempt itself, in the create stream call may block for all of the maxTimeToWait
+		// on certain machine based on their setup never allowing a second connection attempt.
+		// Hence, the test makes the stream creation twice to ensure that a second connection attempt to the same node
+		// never fails with a backoff error
 
-	var err error
-	unittest.RequireReturnsBefore(suite.T(), func() {
-		_, err = node1.CreateStream(ctx, *id2)
-	}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
+		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
+		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
 
-	require.Error(suite.T(), err)
-	require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+		var err error
+		unittest.RequireReturnsBefore(suite.T(), func() {
+			_, err = node1.CreateStream(ctx, *id2)
+		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
+		require.Error(suite.T(), err)
+		require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+		cancel()
+	}
+
 }
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
