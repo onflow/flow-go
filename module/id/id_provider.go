@@ -1,6 +1,7 @@
 package id
 
 import (
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -14,4 +15,6 @@ type IdentifierProvider interface {
 // the set of staked participants in the Flow protocol.
 type IdentityProvider interface {
 	Identities(flow.IdentityFilter) flow.IdentityList
+	GetIdentity(flow.Identifier) (flow.Identity, bool)
+	GetFlowID(peer.ID) (flow.Identifier, error)
 }
