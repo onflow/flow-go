@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
 
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // the default timeout used when making a GRPC request to a collection node or an execution node
