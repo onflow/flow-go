@@ -53,14 +53,23 @@ func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	anb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, anb.ProtocolEvents)
-		if err != nil {
-			return err
+		var idProvider id.IdentityProvider
+		var idTranslator p2p.IDTranslator
+		if anb.IdProvider != nil {
+			idProvider = anb.IdProvider
+			idTranslator = p2p.NewIdentityProviderIDTranslator(idProvider)
+		} else {
+			idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+			if err != nil {
+				return err
+			}
+			idProvider = idCache
+			idTranslator = idCache
 		}
 
-		anb.IdentityProvider = idCache
+		anb.IdentityProvider = idProvider
 
-		anb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
+		anb.IDTranslator = p2p.NewHierarchicalIDTranslator(idTranslator, p2p.NewUnstakedNetworkIDTranslator())
 
 		// use the default identifier provider
 		anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {

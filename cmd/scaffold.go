@@ -450,21 +450,30 @@ func (fnb *FlowNodeBuilder) initStorage() {
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
-		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
-		if err != nil {
-			return err
+		var idProvider id.IdentityProvider
+		var idTranslator p2p.IDTranslator
+		if fnb.IdProvider != nil {
+			idProvider = fnb.IdProvider
+			idTranslator = p2p.NewIdentityProviderIDTranslator(idProvider)
+		} else {
+			idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+			if err != nil {
+				return err
+			}
+			idProvider = idCache
+			idTranslator = idCache
 		}
 
-		node.IdentityProvider = idCache
-		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
+		node.IdentityProvider = idProvider
+		node.IDTranslator = idTranslator
+		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idProvider)
 		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
 				p2p.NotEjectedFilter,
 			),
-			idCache,
+			idProvider,
 		)
 		return nil
 	})
@@ -752,6 +761,12 @@ func WithDB(db *badger.DB) Option {
 	return func(config *BaseConfig) {
 		config.db = db
 		config.datadir = ""
+	}
+}
+
+func WithIDProvider(idProvider id.IdentityProvider) Option {
+	return func(config *BaseConfig) {
+		config.IdProvider = idProvider
 	}
 }
 
