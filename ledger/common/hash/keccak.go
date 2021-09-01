@@ -17,7 +17,7 @@ import (
 
 void KeccakP1600_Permute_24rounds(void *state);
 
-void callKeccakF1600(ulong* state) {
+void callKeccakF1600Ledger(ulong* state) {
 	KeccakP1600_Permute_24rounds(state);
 }
 
@@ -28,7 +28,7 @@ import "C"
 
 func keccakF1600(a *[25]uint64) {
 	if cpu.X86.HasAVX512 {
-		C.callKeccakF1600((*C.ulong)(&a[0]))
+		C.callKeccakF1600Ledger((*C.ulong)(&a[0]))
 	} else {
 		keccak.KeccakF1600(a)
 	}
