@@ -34,15 +34,14 @@ type storageFormatV5MigrationResult struct {
 }
 
 type StorageFormatV5Migration struct {
-	Log                zerolog.Logger
-	OutputDir          string
-	accounts           *state.Accounts
-	programs           *programs.Programs
-	brokenTypeIDs      map[common.TypeID]brokenTypeCause
-	reportFile         *os.File
-	brokenContracts    map[common.Address]map[string]bool
-	deferredValueTypes map[string]interpreter.StaticType
-	view               state.View
+	Log             zerolog.Logger
+	OutputDir       string
+	accounts        *state.Accounts
+	programs        *programs.Programs
+	brokenTypeIDs   map[common.TypeID]brokenTypeCause
+	reportFile      *os.File
+	brokenContracts map[common.Address]map[string]bool
+	view            state.View
 }
 
 type brokenTypeCause int
@@ -89,8 +88,6 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
 
 	m.brokenContracts = make(map[common.Address]map[string]bool, 0)
-
-	m.deferredValueTypes = make(map[string]interpreter.StaticType, 0)
 
 	m.view = newView(payloads)
 
@@ -551,19 +548,6 @@ func (m StorageFormatV5Migration) reencodeValue(
 	}
 
 	// Check static types of arrays and dictionaries
-
-	if typ, ok := m.deferredValueTypes[key]; ok {
-		switch value := rootValue.(type) {
-		case *interpreter.ArrayValue:
-			value.Type = typ.(interpreter.ArrayStaticType)
-		case *interpreter.DictionaryValue:
-			value.Type = typ.(interpreter.DictionaryStaticType)
-		case *interpreter.CompositeValue:
-			// NO-OP
-		default:
-			panic("deferred value cannot be a non-container")
-		}
-	}
 
 	interpreter.InspectValue(
 		rootValue,
@@ -1636,21 +1620,6 @@ func (m StorageFormatV5Migration) inferDictionaryStaticType(value *interpreter.D
 					t, value,
 				)
 			}
-		}
-
-		deferredKeys := value.DeferredKeys()
-		if deferredKeys != nil {
-			deferredKeys.Foreach(func(key string, _ struct{}) {
-				storagePath := strings.Join(
-					[]string{
-						value.DeferredStorageKeyBase(),
-						key,
-					},
-					pathSeparator,
-				)
-
-				m.deferredValueTypes[storagePath] = value.Type
-			})
 		}
 	}
 
