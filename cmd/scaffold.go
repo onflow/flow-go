@@ -457,8 +457,6 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 }
 
 func (fnb *FlowNodeBuilder) IDProviders(node *NodeConfig) (id.IdentityProvider, p2p.IDTranslator, error) {
-	var idProvider id.IdentityProvider
-	var idTranslator p2p.IDTranslator
 
 	// if neither the ID Provider nor the ID Translator is provided, then use the ProtocolStateIDCache for both
 	if fnb.BaseConfig.IDProvider == nil && fnb.BaseConfig.IDTranslator == nil {
@@ -466,20 +464,18 @@ func (fnb *FlowNodeBuilder) IDProviders(node *NodeConfig) (id.IdentityProvider, 
 		if err != nil {
 			return nil, nil, err
 		}
-		idProvider = idCache
-		idTranslator = idCache
-		return idProvider, idTranslator, nil
+		return idCache, idCache, nil
 	}
 
-	if fnb.IDProvider == nil {
+	if fnb.BaseConfig.IDProvider == nil {
 		return nil, nil, fmt.Errorf("ID Provider not provided")
 	}
 
-	if fnb.IDProvider == nil {
+	if fnb.BaseConfig.IDTranslator == nil {
 		return nil, nil, fmt.Errorf("ID Translator not provided")
 	}
 
-	return fnb.IDProvider, fnb.IDTranslator, nil
+	return fnb.BaseConfig.IDProvider, fnb.BaseConfig.IDTranslator, nil
 }
 
 func (fnb *FlowNodeBuilder) initState() {
