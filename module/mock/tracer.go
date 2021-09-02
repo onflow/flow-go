@@ -36,20 +36,20 @@ func (_m *Tracer) Done() <-chan struct{} {
 	return r0
 }
 
-// EntityRootSpan provides a mock function with given fields: entityID, opts
-func (_m *Tracer) EntityRootSpan(entityID flow.Identifier, opts ...opentracing.StartSpanOption) opentracing.Span {
+// EntityRootSpan provides a mock function with given fields: entityID, entityType, opts
+func (_m *Tracer) EntityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, entityID)
+	_ca = append(_ca, entityID, entityType)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 opentracing.Span
-	if rf, ok := ret.Get(0).(func(flow.Identifier, ...opentracing.StartSpanOption) opentracing.Span); ok {
-		r0 = rf(entityID, opts...)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, string, ...opentracing.StartSpanOption) opentracing.Span); ok {
+		r0 = rf(entityID, entityType, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(opentracing.Span)
@@ -87,27 +87,68 @@ func (_m *Tracer) RecordSpanFromParent(span opentracing.Span, operationName trac
 	_m.Called(_ca...)
 }
 
-// StartSpan provides a mock function with given fields: entity, spanName, opts
-func (_m *Tracer) StartSpan(entity flow.Identifier, spanName trace.SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
+// StartBlockSpan provides a mock function with given fields: ctx, blockID, spanName, opts
+func (_m *Tracer) StartBlockSpan(ctx context.Context, blockID flow.Identifier, spanName trace.SpanName, opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
 	_va := make([]interface{}, len(opts))
 	for _i := range opts {
 		_va[_i] = opts[_i]
 	}
 	var _ca []interface{}
-	_ca = append(_ca, entity, spanName)
+	_ca = append(_ca, ctx, blockID, spanName)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
 	var r0 opentracing.Span
-	if rf, ok := ret.Get(0).(func(flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) opentracing.Span); ok {
-		r0 = rf(entity, spanName, opts...)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) opentracing.Span); ok {
+		r0 = rf(ctx, blockID, spanName, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(opentracing.Span)
 		}
 	}
 
-	return r0
+	var r1 context.Context
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) context.Context); ok {
+		r1 = rf(ctx, blockID, spanName, opts...)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(context.Context)
+		}
+	}
+
+	return r0, r1
+}
+
+// StartCollectionSpan provides a mock function with given fields: ctx, collectionID, spanName, opts
+func (_m *Tracer) StartCollectionSpan(ctx context.Context, collectionID flow.Identifier, spanName trace.SpanName, opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, collectionID, spanName)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 opentracing.Span
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) opentracing.Span); ok {
+		r0 = rf(ctx, collectionID, spanName, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(opentracing.Span)
+		}
+	}
+
+	var r1 context.Context
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) context.Context); ok {
+		r1 = rf(ctx, collectionID, spanName, opts...)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(context.Context)
+		}
+	}
+
+	return r0, r1
 }
 
 // StartSpanFromContext provides a mock function with given fields: ctx, operationName, opts
@@ -163,6 +204,38 @@ func (_m *Tracer) StartSpanFromParent(span opentracing.Span, operationName trace
 	}
 
 	return r0
+}
+
+// StartTransactionSpan provides a mock function with given fields: ctx, transactionID, spanName, opts
+func (_m *Tracer) StartTransactionSpan(ctx context.Context, transactionID flow.Identifier, spanName trace.SpanName, opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, transactionID, spanName)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 opentracing.Span
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) opentracing.Span); ok {
+		r0 = rf(ctx, transactionID, spanName, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(opentracing.Span)
+		}
+	}
+
+	var r1 context.Context
+	if rf, ok := ret.Get(1).(func(context.Context, flow.Identifier, trace.SpanName, ...opentracing.StartSpanOption) context.Context); ok {
+		r1 = rf(ctx, transactionID, spanName, opts...)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(context.Context)
+		}
+	}
+
+	return r0, r1
 }
 
 // WithSpanFromContext provides a mock function with given fields: ctx, operationName, f, opts

@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/opentracing/opentracing-go"
 )
 
 // State represents the full protocol state of the local node. It allows us to
@@ -38,14 +37,8 @@ type State interface {
 	AtBlockID(blockID flow.Identifier) Snapshot
 }
 
-// MutationContext contains contextual info about the mutation.
-type MutationContext interface {
-	ParentTraceSpan() opentracing.Span
-}
-
 type MutableState interface {
 	State
-
 	// Extend introduces the block with the given ID into the persistent
 	// protocol state without modifying the current finalized state. It allows
 	// us to execute fork-aware queries against ambiguous protocol state, while
