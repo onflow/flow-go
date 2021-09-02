@@ -7,10 +7,12 @@ on:
       - 'auto-cadence-upgrade/**'
       - staging
       - trying
+      - 'feature/**'
   pull_request:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
+      - 'feature/**'
 
 jobs:
   golangci:
@@ -65,7 +67,7 @@ jobs:
         file: ./coverage.txt
         flags: unittests
         name: codecov-umbrella
-    
+
   integration-test:
     name: Integration Tests
     strategy:
@@ -103,6 +105,9 @@ jobs:
       fail-fast: false
     runs-on: ubuntu-latest
     steps:
+    - name: CPU information
+      run: |
+        lscpu
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
@@ -113,11 +118,19 @@ jobs:
       run: make crypto/relic/build
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: make -C crypto cross-blst-test
+      run: |
+        if ! (grep -q -e '^flags.*\badx\b' /proc/cpuinfo) 2>/dev/null; then
+            export CGO_CFLAGS="-D__BLST_PORTABLE__"
+        fi
+        make -C crypto cross-blst-test
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 2
-        command: make -C crypto cross-blst-test
+        command: |
+          if ! (grep -q -e '^flags.*\badx\b' /proc/cpuinfo) 2>/dev/null; then
+              export CGO_CFLAGS="-D__BLST_PORTABLE__"
+          fi
+          make -C crypto cross-blst-test

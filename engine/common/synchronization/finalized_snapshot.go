@@ -29,9 +29,10 @@ type FinalizedHeaderCache struct {
 // NewFinalizedHeaderCache creates a new finalized header cache.
 func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
 	cache := &FinalizedHeaderCache{
-		state: state,
-		lm:    lifecycle.NewLifecycleManager(),
-		log:   log.With().Str("component", "finalized_snapshot_cache").Logger(),
+		state:                     state,
+		lm:                        lifecycle.NewLifecycleManager(),
+		log:                       log.With().Str("component", "finalized_snapshot_cache").Logger(),
+		finalizationEventNotifier: engine.NewNotifier(),
 	}
 
 	snapshot, err := cache.getHeader()
@@ -65,10 +66,18 @@ func (f *FinalizedHeaderCache) getHeader() (*flow.Header, error) {
 
 // updateHeader updates latest locally cached finalized header.
 func (f *FinalizedHeaderCache) updateHeader() error {
+	f.log.Debug().Msg("updating header")
+
 	head, err := f.getHeader()
 	if err != nil {
+		f.log.Err(err).Msg("failed to get header")
 		return err
 	}
+
+	f.log.Debug().
+		Str("block_id", head.ID().String()).
+		Uint64("height", head.Height).
+		Msg("got new header")
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -96,13 +105,15 @@ func (f *FinalizedHeaderCache) Done() <-chan struct{} {
 //  (1) Updates local state of last finalized snapshot.
 // CAUTION: the input to this callback is treated as trusted; precautions should be taken that messages
 // from external nodes cannot be considered as inputs to this function
-func (f *FinalizedHeaderCache) onFinalizedBlock(flow.Identifier) {
+func (f *FinalizedHeaderCache) onFinalizedBlock(blockID flow.Identifier) {
+	f.log.Debug().Str("block_id", blockID.String()).Msg("received new block finalization callback")
 	// notify that there is new finalized block
 	f.finalizationEventNotifier.Notify()
 }
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (f *FinalizedHeaderCache) finalizationProcessingLoop() {
+	f.log.Debug().Msg("starting finalization processing loop")
 	notifier := f.finalizationEventNotifier.Channel()
 	for {
 		select {

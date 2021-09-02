@@ -193,7 +193,7 @@ func (cc *ComplianceCollector) CurrentEpochCounter(counter uint64) {
 }
 
 func (cc *ComplianceCollector) CurrentEpochPhase(phase flow.EpochPhase) {
-	cc.currentEpochCounter.Set(float64(phase))
+	cc.currentEpochPhase.Set(float64(phase))
 }
 
 func (cc *ComplianceCollector) CurrentEpochFinalView(view uint64) {

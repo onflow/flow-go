@@ -37,10 +37,22 @@ func TestExecutionFlow(t *testing.T) {
 
 	chainID := flow.Testnet
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithKeys,
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithKeys,
+	)
+	exeID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithKeys,
+	)
+	verID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithKeys,
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID)
 
@@ -286,12 +298,23 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	// exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithKeys,
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithKeys,
+	)
+	exe1ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithKeys,
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID)
+	key, err := unittest.NetworkingKey()
+	require.NoError(t, err)
+	identities[3].NetworkPubKey = key.PublicKey()
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
@@ -424,11 +447,26 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 
 	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithKeys,
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithKeys,
+	)
+	exeID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithKeys,
+	)
+	ver1ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithKeys,
+	)
+	ver2ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithKeys,
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, ver1ID, ver2ID)
 
