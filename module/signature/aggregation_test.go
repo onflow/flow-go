@@ -31,6 +31,7 @@ func createAggregationB(b *testing.B) (*AggregationProvider, crypto.PrivateKey) 
 	return agg, priv
 }
 
+// TODO: delete in V2
 func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
