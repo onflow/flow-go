@@ -661,10 +661,24 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 	if parentSetup.FinalView < block.View { // first block of a new epoch
 		// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
 		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
-			return nil, fmt.Errorf("missing setup event for starting next epoch")
+			//return nil, fmt.Errorf("missing setup event for starting next epoch")
+			// TMP: CONTINUE FAILED EPOCH
+			status, err := flow.NewEpochStatus(
+				parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
+				parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
+				parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
+			)
+			return status, err
 		}
 		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
-			return nil, fmt.Errorf("missing commit event for starting next epoch")
+			//return nil, fmt.Errorf("missing commit event for starting next epoch")
+			// TMP: CONTINUE FAILED EPOCH
+			status, err := flow.NewEpochStatus(
+				parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
+				parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
+				parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
+			)
+			return status, err
 		}
 		status, err := flow.NewEpochStatus(
 			parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
