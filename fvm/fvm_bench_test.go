@@ -38,6 +38,131 @@ func (c *vmTestContext) serviceAccountSequenceNumber() uint64 {
 	return c.serviceAccountSeqNumber - 1
 }
 
+// BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
+// where each transaction is an empty transaction
+func BenchmarkRuntimeTransaction(b *testing.B) {
+	transactionsPerBlock := 10
+
+	chain := flow.Testnet.Chain()
+
+	benchTransaction := func(b *testing.B, tx string) {
+		tctx := &vmTestContext{
+			chain: flow.Testnet.Chain(),
+		}
+
+		executeBlocks := prepareExecutionEnv(b, tctx.chain)
+
+		btx := []byte(tx)
+
+		b.ResetTimer() // setup done, lets start measuring
+		for i := 0; i < b.N; i++ {
+			transactions := make([]*flow.TransactionBody, transactionsPerBlock)
+			for j := 0; j < transactionsPerBlock; j++ {
+
+				txBody := flow.NewTransactionBody().
+					SetScript(btx).
+					AddAuthorizer(tctx.chain.ServiceAddress()).
+					SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
+					SetPayer(tctx.chain.ServiceAddress())
+
+				err := testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(b, err)
+
+				transactions[j] = txBody
+			}
+
+			computationResult := executeBlocks([][]*flow.TransactionBody{transactions})
+			for j := 0; j < transactionsPerBlock; j++ {
+				require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
+			}
+		}
+	}
+
+	templateTx := func(prepare string) string {
+		return fmt.Sprintf(`
+import FungibleToken from 0x%s
+import FlowToken from 0x%s
+
+transaction(){
+	prepare(signer: AuthAccount){
+		var i = 0
+		while i < 100 {
+			i = i + 1
+%s
+		}
+	}
+}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), prepare)
+	}
+
+	b.Run("reference tx", func(b *testing.B) {
+		benchTransaction(b, templateTx(""))
+	})
+	b.Run("log empty string", func(b *testing.B) {
+		benchTransaction(b, templateTx(`log("")`))
+	})
+	b.Run("log long string", func(b *testing.B) {
+		benchTransaction(b, templateTx(`log("0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")`))
+		// 100 character string
+	})
+	b.Run("convert int to string", func(b *testing.B) {
+		benchTransaction(b, templateTx(`i.toString()`))
+	})
+	b.Run("convert int to string and concatenate it", func(b *testing.B) {
+		benchTransaction(b, templateTx(`"x".concat(i.toString())`))
+	})
+	b.Run("get signer address", func(b *testing.B) {
+		benchTransaction(b, templateTx(`signer.address`))
+	})
+	b.Run("get public account", func(b *testing.B) {
+		benchTransaction(b, templateTx(`getAccount(signer.address)`))
+	})
+	b.Run("get account and get balance", func(b *testing.B) {
+		benchTransaction(b, templateTx(`getAccount(signer.address).balance`))
+	})
+	b.Run("get account and get available balance", func(b *testing.B) {
+		benchTransaction(b, templateTx(`getAccount(signer.address).availableBalance`))
+	})
+	b.Run("get account and get storage used", func(b *testing.B) {
+		benchTransaction(b, templateTx(`getAccount(signer.address).storageUsed`))
+	})
+	b.Run("get account and get storage capacity", func(b *testing.B) {
+		benchTransaction(b, templateTx(`getAccount(signer.address).storageCapacity`))
+	})
+	b.Run("get signer vault", func(b *testing.B) {
+		benchTransaction(b, templateTx(`let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`))
+	})
+	b.Run("get signer receiver", func(b *testing.B) {
+		benchTransaction(b, templateTx(`let receiverRef =  getAccount(signer.address)
+				.getCapability(/public/flowTokenReceiver)
+				.borrow<&{FungibleToken.Receiver}>()!`))
+	})
+	b.Run("transfer tokens", func(b *testing.B) {
+		benchTransaction(b, templateTx(`
+			let receiverRef =  getAccount(signer.address)
+				.getCapability(/public/flowTokenReceiver)
+				.borrow<&{FungibleToken.Receiver}>()!
+			
+			let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!
+
+			receiverRef.deposit(from: <-vaultRef.withdraw(amount: 0.00001))
+			`))
+	})
+	b.Run("load and save empty string on signers address", func(b *testing.B) {
+		benchTransaction(b, templateTx(`
+				signer.load<String>(from: /storage/testpath)
+				signer.save("", to: /storage/testpath)
+			`))
+	})
+	b.Run("create new account", func(b *testing.B) {
+		benchTransaction(b, templateTx(`let acct = AuthAccount(payer: signer)`))
+	})
+	// TODO:
+	// create account and add key
+	// create account and add key and remove a key
+	// emit event
+	// hash something
+}
+
 // BenchmarkRuntimeFungibleTokenTransfer simulates executing blocks with `transactionsPerBlock`
 // where each transaction transfers `momentsPerTransaction` moments (NFTs)
 func BenchmarkRuntimeFungibleTokenTransfer(b *testing.B) {
@@ -110,58 +235,6 @@ transaction(amount: UFix64, to: Address) {
 	}
 }
 
-// BenchmarkRuntimeFungibleTokenTransfer simulates executing blocks with `transactionsPerBlock`
-// where each transaction transfers `momentsPerTransaction` moments (NFTs)
-func BenchmarkRuntimeCreateAccount(b *testing.B) {
-	transactionsPerBlock := 10
-
-	tctx := &vmTestContext{
-		chain: flow.Testnet.Chain(),
-	}
-
-	executeBlocks := prepareExecutionEnv(b, tctx.chain)
-
-	privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
-
-	accountKey := privateKeys[0].PublicKey(fvm.AccountKeyWeightThreshold)
-	encAccountKey, _ := flow.EncodeRuntimeAccountPublicKey(accountKey)
-	cadAccountKey := testutil.BytesToCadenceArray(encAccountKey)
-	encCadAccountKey, _ := jsoncdc.Encode(cadAccountKey)
-
-	transferTx := []byte(`
-	  transaction(publicKey: [UInt8]) {
-	    prepare(signer: AuthAccount) {
-	  	  let acct = AuthAccount(payer: signer)
-	  	  acct.addPublicKey(publicKey)
-	    }
-	  }
-	`)
-
-	b.ResetTimer() // setup done, lets start measuring
-	for i := 0; i < b.N; i++ {
-		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
-		for j := 0; j < transactionsPerBlock; j++ {
-
-			txBody := flow.NewTransactionBody().
-				SetScript(transferTx).
-				SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
-				AddAuthorizer(tctx.chain.ServiceAddress()).
-				AddArgument(encCadAccountKey).
-				SetPayer(tctx.chain.ServiceAddress())
-
-			err = testutil.SignEnvelope(txBody, tctx.chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
-			require.NoError(b, err)
-
-			transactions[j] = txBody
-		}
-
-		computationResult := executeBlocks([][]*flow.TransactionBody{transactions})
-		for j := 0; j < transactionsPerBlock; j++ {
-			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
-		}
-	}
-}
-
 // BenchmarkRuntimeTopShotBatchTransfer simulates executing blocks with `transactionsPerBlock`
 // where each transaction transfers `momentsPerTransaction` moments (NFTs)
 func BenchmarkRuntimeTopShotBatchTransfer(b *testing.B) {
@@ -219,6 +292,7 @@ func BenchmarkRuntimeTopShotBatchTransfer(b *testing.B) {
             `, accounts[1].Hex(), transactionsPerBlock*momentsPerTransaction*b.N))
 
 	txBody := flow.NewTransactionBody().
+		SetGasLimit(999999).
 		SetScript(mintScript).
 		SetProposalKey(tctx.chain.ServiceAddress(), 0, tctx.serviceAccountSequenceNumber()).
 		AddAuthorizer(accounts[1]).
