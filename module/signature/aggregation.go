@@ -34,7 +34,7 @@ type SignatureAggregatorSameMessage struct {
 //
 // A new SignatureAggregatorSameMessage is needed for each set of public keys. If the key set changes,
 // a new structure needs to be instantiated.
-// The function errors with a sentinel error if any input is invalid.
+// The function errors with ErrInvalidInputs if any input is invalid.
 func NewSignatureAggregatorSameMessage(
 	message []byte, // message to be aggregate signatures for
 	dsTag []byte, // domain separation tag used for signatures
@@ -50,7 +50,7 @@ func NewSignatureAggregatorSameMessage(
 //
 // This function does not update the internal state.
 // The function errors:
-//  - sentinel error if the index input is invalid
+//  - ErrInvalidInputs if the index input is invalid
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
 // The function is not thread-safe.
@@ -62,8 +62,8 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 // key at the input index. If the verification passes, the signature is added to the internal
 // signature state.
 // The function errors:
-//  - sentinel error if the index input is invalid
-//  - sentinel error if the signer has been already added
+//  - ErrInvalidInputs if the index input is invalid
+//  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
 // The function is not thread-safe.
@@ -77,8 +77,8 @@ func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Sig
 // outputs valid signatures. This would detect if TrustedAdd has added any invalid
 // signature.
 // The function errors:
-//  - sentinel error if the index input is invalid
-//  - sentinel error if the signer has been already added
+//  - ErrInvalidInputs if the index input is invalid
+//  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signature) error {
@@ -104,7 +104,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 // Aggregating the keys of the signers internally is optimized to only look at the keys delta
 // compared to the latest execution of the function. The function is therefore not thread-safe.
 // The function errors:
-//  - sentinel error if the indices are invalid
+//  - ErrInvalidInputs if the indices are invalid
 //  - random error if the execution failed
 func (s *SignatureAggregatorSameMessage) VerifyAggregation(sig crypto.Signature, signers []int) (bool, error) {
 	panic("implement me")
