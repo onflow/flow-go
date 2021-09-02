@@ -96,8 +96,10 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 
 		// the second follower is now atleast blockCount blocks behind and should sync up and get all the missed blocks
 		receiveBlocks := func() {
-			for i := 0; ; i++ {
+			for {
 				select {
+				case <-ctx.Done():
+					return
 				case blockID := <-suite.followerMgr2.blockIDChan:
 					delete(receivedBlocks, blockID)
 					if len(receivedBlocks) == 0 {
