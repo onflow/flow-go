@@ -37,7 +37,7 @@ type Engine struct {
 	unit    *engine.Unit
 	lm      *lifecycle.LifecycleManager
 	log     zerolog.Logger
-	metrics module.EngineMetrics
+	metrics SyncEngineMetrics
 	me      module.Local
 	con     network.Conduit
 	blocks  storage.Blocks
@@ -59,7 +59,7 @@ type Engine struct {
 // New creates a new main chain synchronization engine.
 func New(
 	log zerolog.Logger,
-	metrics module.EngineMetrics,
+	engineMetrics module.EngineMetrics,
 	net module.Network,
 	me module.Local,
 	blocks storage.Blocks,
@@ -84,7 +84,7 @@ func New(
 		unit:            engine.NewUnit(),
 		lm:              lifecycle.NewLifecycleManager(),
 		log:             log.With().Str("engine", "synchronization").Logger(),
-		metrics:         metrics,
+		metrics:         NewSyncEngineMetrics(metrics.EngineSynchronization, engineMetrics),
 		me:              me,
 		blocks:          blocks,
 		comp:            comp,
@@ -107,7 +107,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader)
+	e.requestHandler = NewRequestHandlerEngine(log, e.metrics, con, me, blocks, core, finalizedHeader)
 
 	return e, nil
 }
@@ -142,7 +142,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.SyncResponse)
 				if ok {
-					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+					e.metrics.MessageReceived(metrics.MessageSyncResponse)
 				}
 				return ok
 			},
@@ -152,7 +152,7 @@ func (e *Engine) setupResponseMessageHandler() error {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BlockResponse)
 				if ok {
-					e.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+					e.metrics.MessageReceived(metrics.MessageBlockResponse)
 				}
 				return ok
 			},
@@ -268,14 +268,14 @@ func (e *Engine) processAvailableResponses() {
 		msg, ok := e.pendingSyncResponses.Get()
 		if ok {
 			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
-			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+			e.metrics.MessageHandled(metrics.MessageSyncResponse)
 			continue
 		}
 
 		msg, ok = e.pendingBlockResponses.Get()
 		if ok {
 			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
-			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+			e.metrics.MessageHandled(metrics.MessageBlockResponse)
 			continue
 		}
 
@@ -370,7 +370,7 @@ func (e *Engine) pollHeight() {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
 	}
-	e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+	e.metrics.MessageSent(metrics.MessageSyncRequest)
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
@@ -394,7 +394,7 @@ func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Rang
 			Uint64("range_nonce", req.Nonce).
 			Msg("range requested")
 		e.core.RangeRequested(ran)
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+		e.metrics.MessageSent(metrics.MessageRangeRequest)
 	}
 
 	for _, batch := range batches {
@@ -408,7 +408,7 @@ func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Rang
 			continue
 		}
 		e.core.BatchRequested(batch)
-		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+		e.metrics.MessageSent(metrics.MessageBatchRequest)
 	}
 
 	if err := errs.ErrorOrNil(); err != nil {

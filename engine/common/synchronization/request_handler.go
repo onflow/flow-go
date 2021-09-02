@@ -34,7 +34,7 @@ type RequestHandlerEngine struct {
 
 	me      module.Local
 	log     zerolog.Logger
-	metrics module.EngineMetrics
+	metrics SyncEngineMetrics
 
 	blocks          storage.Blocks
 	core            module.SyncCore
@@ -49,7 +49,7 @@ type RequestHandlerEngine struct {
 
 func NewRequestHandlerEngine(
 	log zerolog.Logger,
-	metrics module.EngineMetrics,
+	metrics SyncEngineMetrics,
 	con network.Conduit,
 	me module.Local,
 	blocks storage.Blocks,
@@ -140,7 +140,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.SyncRequest)
 				if ok {
-					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
+					r.metrics.MessageReceived(metrics.MessageSyncRequest)
 				}
 				return ok
 			},
@@ -150,7 +150,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.RangeRequest)
 				if ok {
-					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
+					r.metrics.MessageReceived(metrics.MessageRangeRequest)
 				}
 				return ok
 			},
@@ -160,7 +160,7 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.BatchRequest)
 				if ok {
-					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
+					r.metrics.MessageReceived(metrics.MessageBatchRequest)
 				}
 				return ok
 			},
@@ -194,7 +194,7 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 		r.log.Warn().Err(err).Msg("sending sync response failed")
 		return nil
 	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
+	r.metrics.MessageSent(metrics.MessageSyncResponse)
 
 	return nil
 }
@@ -239,7 +239,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
 		return nil
 	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	r.metrics.MessageSent(metrics.MessageBlockResponse)
 
 	return nil
 }
@@ -287,7 +287,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
 		return nil
 	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	r.metrics.MessageSent(metrics.MessageBlockResponse)
 
 	return nil
 }
