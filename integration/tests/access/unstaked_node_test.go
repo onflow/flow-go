@@ -111,30 +111,6 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	})
 }
 
-func (suite *UnstakedAccessSuite) OnBlockFinalizedConsumer(index int, blockIDChannel chan<- flow.Identifier) func(flow.Identifier) {
-	return func(finalizedBlockID flow.Identifier) {
-		// push the finalized block ID to the blockIDChannel channel
-		blockIDChannel <- finalizedBlockID
-	}
-}
-
-func (suite *UnstakedAccessSuite) startFollower(follower *consensus_follower.ConsensusFollowerImpl) {
-	// get the underlying node builder
-	node1 := follower.NodeBuilder
-	// wait for the follower to have completely started
-	unittest.RequireCloseBefore(suite.T(), node1.Ready(), 10*time.Second,
-		"timed out while waiting for consensus follower to start")
-}
-
-func (suite *UnstakedAccessSuite) followerImpl(follower consensus_follower.ConsensusFollower) *consensus_follower.ConsensusFollowerImpl {
-	followerImpl, ok := follower.(*consensus_follower.ConsensusFollowerImpl)
-	if !ok {
-		suite.Fail("unexpected consensus follower implementation")
-		return nil
-	}
-	return followerImpl
-}
-
 func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 
 	// staked access node
