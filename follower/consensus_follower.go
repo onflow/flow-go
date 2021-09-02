@@ -103,6 +103,12 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.bindAddr != "" {
 		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
+	if config.logLevel != "" {
+		options = append(options, cmd.WithLogLevel(config.logLevel))
+	}
+	if config.db != nil {
+		options = append(options, cmd.WithDB(config.db))
+	}
 
 	return options
 }
