@@ -37,9 +37,13 @@ type Config struct {
 
 type Option func(c *Config)
 
+// WithDataDir sets the underlying directory to be used to store the database
+// If a database is supplied, then data directory will be set to empty string
 func WithDataDir(dataDir string) Option {
 	return func(cf *Config) {
-		cf.dataDir = dataDir
+		if cf.db == nil {
+			cf.dataDir = dataDir
+		}
 	}
 }
 
@@ -55,9 +59,12 @@ func WithLogLevel(level string) Option {
 	}
 }
 
+// WithDB sets the underlying database that will be used to store the chain state
+// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
 func WithDB(db *badger.DB) Option {
 	return func(cf *Config) {
 		cf.db = db
+		cf.dataDir = ""
 	}
 }
 
