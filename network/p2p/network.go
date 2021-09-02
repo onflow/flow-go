@@ -164,11 +164,7 @@ func (n *Network) Identities() flow.IdentityList {
 }
 
 func (n *Network) GetIdentity(pid peer.ID) (*flow.Identity, bool) {
-	id, err := n.identityProvider.GetFlowID(pid)
-	if err != nil {
-		return &flow.Identity{}, false
-	}
-	return n.identityProvider.GetIdentity(id), true
+	return n.identityProvider.ByPeerID(pid)
 }
 
 // Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
