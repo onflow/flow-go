@@ -43,11 +43,10 @@ type MutableIdentityTableSuite struct {
 // testNode encapsulates the node state which includes its identity, middleware, network,
 // mesh engine and the id refresher
 type testNode struct {
-	id          *flow.Identity
-	mw          *p2p.Middleware
-	net         *p2p.Network
-	engine      *MeshEngine
-	idRefresher *p2p.NodeIDRefresher
+	id     *flow.Identity
+	mw     *p2p.Middleware
+	net    *p2p.Network
+	engine *MeshEngine
 }
 
 // testNodeList encapsulates a list of test node and
@@ -106,16 +105,6 @@ func (t *testNodeList) engines() []*MeshEngine {
 	return engs
 }
 
-func (t *testNodeList) idRefreshers() []*p2p.NodeIDRefresher {
-	t.RLock()
-	defer t.RUnlock()
-	idRefreshers := make([]*p2p.NodeIDRefresher, len(t.nodes))
-	for i, node := range t.nodes {
-		idRefreshers[i] = node.idRefresher
-	}
-	return idRefreshers
-}
-
 func (t *testNodeList) networks() []*p2p.Network {
 	t.RLock()
 	defer t.RUnlock()
@@ -129,6 +118,14 @@ func (t *testNodeList) networks() []*p2p.Network {
 func TestEpochTransitionTestSuite(t *testing.T) {
 	// Test is flaky, print it in order to avoid the unused linting error
 	t.Skip(fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
+}
+
+// signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
+func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
+	for _, n := range suite.testNodes.nodes {
+		n.mw.UpdateNodeAddresses()
+		n.mw.UpdateAllowList()
+	}
 }
 
 func (suite *MutableIdentityTableSuite) SetupTest() {
@@ -180,17 +177,13 @@ func (suite *MutableIdentityTableSuite) addNodes(count int) {
 	// create the engines for the new nodes
 	engines := GenerateEngines(suite.T(), nets)
 
-	// create the node refreshers
-	idRefereshers := suite.generateNodeIDRefreshers(nets)
-
 	// create the test engines
 	for i := 0; i < count; i++ {
 		node := testNode{
-			id:          ids[i],
-			mw:          mws[i],
-			net:         nets[i],
-			engine:      engines[i],
-			idRefresher: idRefereshers[i],
+			id:     ids[i],
+			mw:     mws[i],
+			net:    nets[i],
+			engine: engines[i],
 		}
 		suite.testNodes.append(node)
 	}
@@ -302,13 +295,6 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 	suite.assertNetworkPrimitives(remainingIDs, remainingEngs, removedIDs, removedEngines)
 }
 
-// signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
-func (suite *MutableIdentityTableSuite) signalIdentityChanged() {
-	for _, r := range suite.testNodes.idRefreshers() {
-		r.OnIdentityTableChanged()
-	}
-}
-
 // assertConnected checks that the middleware of a node is directly connected
 // to at least half of the other nodes.
 func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids flow.IdentityList) {
@@ -317,7 +303,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids 
 	require.Eventuallyf(t, func() bool {
 		connections := 0
 		for _, id := range ids {
-			connected, err := mw.IsConnected(*id)
+			connected, err := mw.IsConnected(id.NodeID)
 			require.NoError(t, err)
 			if connected {
 				connections++
@@ -337,7 +323,7 @@ func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, i
 	t := suite.T()
 	require.Eventuallyf(t, func() bool {
 		for _, id := range ids {
-			connected, err := mw.IsConnected(*id)
+			connected, err := mw.IsConnected(id.NodeID)
 			require.NoError(t, err)
 			if connected {
 				return false
@@ -451,12 +437,4 @@ func (suite *MutableIdentityTableSuite) sendMessage(fromID flow.Identifier,
 	}
 
 	return send(event, fromEngine.con, toIDs.NodeIDs()...)
-}
-
-func (suite *MutableIdentityTableSuite) generateNodeIDRefreshers(nets []*p2p.Network) []*p2p.NodeIDRefresher {
-	refreshers := make([]*p2p.NodeIDRefresher, len(nets))
-	for i, net := range nets {
-		refreshers[i] = p2p.NewNodeIDRefresher(suite.logger, suite.state, net.SetIDs)
-	}
-	return refreshers
 }

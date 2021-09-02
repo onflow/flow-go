@@ -65,34 +65,23 @@ func newLibp2pConnector(host host.Host, log zerolog.Logger) (*libp2pConnector, e
 
 // UpdatePeers is the implementation of the Connector.UpdatePeers function. It connects to all of the ids and
 // disconnects from any other connection that the libp2p node might have.
-func (l *libp2pConnector) UpdatePeers(ctx context.Context, ids flow.IdentityList) error {
-
-	// derive the peer.AddrInfo from each of the flow.Identity
-	pInfos, invalidIDs := peerInfosFromIDs(ids)
-
+func (l *libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice) {
 	// connect to each of the peer.AddrInfo in pInfos
-	l.connectToPeers(ctx, pInfos)
+	l.connectToPeers(ctx, peerIDs)
 
 	// disconnect from any other peers not in pInfos
-	l.trimAllConnectionsExcept(pInfos)
-
-	// if some ids didn't translate to peer.AddrInfo, return error
-	if len(invalidIDs) != 0 {
-		return NewUnconvertableIdentitiesError(invalidIDs)
-	}
-
-	return nil
+	l.trimAllConnectionsExcept(peerIDs)
 }
 
 // connectToPeers connects each of the peer in pInfos
-func (l *libp2pConnector) connectToPeers(ctx context.Context, pInfos []peer.AddrInfo) {
+func (l *libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSlice) {
 
 	// create a channel of peer.AddrInfo as expected by the connector
-	peerCh := make(chan peer.AddrInfo, len(pInfos))
+	peerCh := make(chan peer.AddrInfo, len(peerIDs))
 
 	// stuff all the peer.AddrInfo it into the channel
-	for _, peerInfo := range pInfos {
-		peerCh <- peerInfo
+	for _, peerID := range peerIDs {
+		peerCh <- peer.AddrInfo{ID: peerID}
 	}
 
 	// close the channel to ensure Connect does not block
@@ -102,15 +91,15 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, pInfos []peer.Addr
 	l.backoffConnector.Connect(ctx, peerCh)
 }
 
-// trimAllConnectionsExcept trims all connections of the node from peers not part of peerInfos.
+// trimAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
 // A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
-func (l *libp2pConnector) trimAllConnectionsExcept(peerInfos []peer.AddrInfo) {
+func (l *libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 	// convert the peerInfos to a peer.ID -> bool map
-	peersToKeep := make(map[peer.ID]bool, len(peerInfos))
-	for _, pInfo := range peerInfos {
-		peersToKeep[pInfo.ID] = true
+	peersToKeep := make(map[peer.ID]bool, len(peerIDs))
+	for _, pid := range peerIDs {
+		peersToKeep[pid] = true
 	}
 
 	// get all current node connections
