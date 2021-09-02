@@ -2,6 +2,7 @@ package id
 
 import (
 	"github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 

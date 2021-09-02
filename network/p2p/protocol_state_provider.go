@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
@@ -82,7 +83,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	for _, identity := range identities {
 		p.logger.Debug().Interface("identity", identity).Msg("extracting peer ID from network key")
 
-		pid, err := PeerIDFromFlowPublicKey(identity.NetworkPubKey)
+		pid, err := keyutils.PeerIDFromFlowPublicKey(identity.NetworkPubKey)
 		if err != nil {
 			p.logger.Err(err).Interface("identity", identity).Msg("failed to extract peer ID from network key")
 			continue

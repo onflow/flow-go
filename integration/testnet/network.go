@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -227,7 +228,7 @@ type ConsensusFollowerConfig struct {
 }
 
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
-	pid, err := p2p.ExtractPeerID(networkingPrivKey.PublicKey())
+	pid, err := keyutils.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
 	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)

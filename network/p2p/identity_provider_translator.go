@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // IdentityProviderIDTranslator implements an IDTranslator which provides ID
@@ -21,7 +22,7 @@ func (t *IdentityProviderIDTranslator) GetFlowID(p peer.ID) (flow.Identifier, er
 	if err != nil {
 		return flow.ZeroID, err
 	}
-	flowKey, err := FlowPublicKeyFromLibP2P(key)
+	flowKey, err := keyutils.FlowPublicKeyFromLibP2P(key)
 	if err != nil {
 		return flow.ZeroID, err
 	}
@@ -37,7 +38,7 @@ func (t *IdentityProviderIDTranslator) GetPeerID(n flow.Identifier) (peer.ID, er
 	if len(ids) == 0 {
 		return "", fmt.Errorf("could not find identity with id %v", n.String())
 	}
-	key, err := LibP2PPublicKeyFromFlow(ids[0].NetworkPubKey)
+	key, err := keyutils.LibP2PPublicKeyFromFlow(ids[0].NetworkPubKey)
 	if err != nil {
 		return "", err
 	}
