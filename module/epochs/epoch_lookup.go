@@ -37,6 +37,10 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
 			continue
 		}
+		// TMP: CONTINUE FAILED EPOCH
+		if _, err := epoch.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) {
+			return current.Counter()
+		}
 		if err != nil {
 			return 0, err
 		}
@@ -51,11 +55,6 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 		if firstView <= view && view <= finalView {
 			return counter, nil
 		}
-	}
-
-	// TMP: CONTINUE FAILED EPOCH
-	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) {
-		return current.Counter()
 	}
 
 	return 0, fmt.Errorf("couldn't get epoch for view %d", view)
