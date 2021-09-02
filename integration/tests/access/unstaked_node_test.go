@@ -40,23 +40,18 @@ func TestUnstakedAccessSuite(t *testing.T) {
 }
 
 func (suite *UnstakedAccessSuite) TearDownTest() {
-	// avoid nil pointer errors for skipped tests
-	if suite.cancel != nil {
-		defer suite.cancel()
-	}
-	if suite.net != nil {
-		suite.net.Remove()
-	}
+	defer suite.cancel()
+	suite.net.Remove()
 }
 
 func (suite *UnstakedAccessSuite) SetupTest() {
+	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.finalizedBlockIDsChans = []chan flow.Identifier{
 		make(chan flow.Identifier, blockCount),
 		make(chan flow.Identifier, blockCount),
 	}
 	suite.buildNetworkConfig()
 	// start the network
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
 	suite.net.Start(suite.ctx)
 }
 
@@ -102,7 +97,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	}
 
 	// wait for finalized blocks
-	unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 1 minute for 5 blocks
+	unittest.AssertReturnsBefore(suite.T(), receiveBlocks, 2*time.Minute) // waiting 2 minute for 5 blocks
 
 	// all blocks were found in the storage
 	require.NoError(suite.T(), err, "finalized block not found in storage")
