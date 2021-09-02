@@ -16,7 +16,6 @@ type WeightedSignatureAggregator struct {
 	signerIDs                                 []flow.Identifier            // array of all signers IDs
 	idToIndex                                 map[flow.Identifier]int      // map node identifiers to indices
 	weights                                   map[flow.Identifier]uint64   // weight of each signer
-	weightThreshold                           uint64                       // weight threshold
 	totalWeight                               uint64                       // weight collected
 	lock                                      sync.RWMutex                 // lock for atomic updates
 	collectedIDs                              map[flow.Identifier]struct{} // map of collected IDs
@@ -30,7 +29,7 @@ func NewWeightedSignatureAggregator(signerIDs []flow.Identifier,
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
 	weights map[flow.Identifier]uint64, // signer to weight
-	weightThreshold uint64) (hotstuff.WeightedSignatureAggregator, error) {
+) (hotstuff.WeightedSignatureAggregator, error) {
 
 	// check input consistency
 	n := len(signerIDs) // number of signers
@@ -56,7 +55,6 @@ func NewWeightedSignatureAggregator(signerIDs []flow.Identifier,
 		SignatureAggregatorSameMessage: agg,
 		signerIDs:                      signerIDs,
 		weights:                        weights,
-		weightThreshold:                weightThreshold,
 	}
 
 	// build the idToIndex map
@@ -144,10 +142,6 @@ func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
 func (s *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
-
-	if s.totalWeight < s.weightThreshold {
-		return nil, nil, fmt.Errorf("Not enough weights collected, got %d, require %d", s.totalWeight, s.weightThreshold)
-	}
 
 	// Aggregate includes the safety check of the aggregated signature
 	indices, aggSignature, err := s.SignatureAggregatorSameMessage.Aggregate()
