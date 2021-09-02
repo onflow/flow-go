@@ -29,9 +29,10 @@ type FinalizedHeaderCache struct {
 // NewFinalizedHeaderCache creates a new finalized header cache.
 func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizationDistributor *pubsub.FinalizationDistributor) (*FinalizedHeaderCache, error) {
 	cache := &FinalizedHeaderCache{
-		state: state,
-		lm:    lifecycle.NewLifecycleManager(),
-		log:   log.With().Str("component", "finalized_snapshot_cache").Logger(),
+		state:                     state,
+		lm:                        lifecycle.NewLifecycleManager(),
+		log:                       log.With().Str("component", "finalized_snapshot_cache").Logger(),
+		finalizationEventNotifier: engine.NewNotifier(),
 	}
 
 	snapshot, err := cache.getHeader()
