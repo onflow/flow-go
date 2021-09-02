@@ -26,6 +26,10 @@ import (
 
 const cborTagStorageReference = 202
 
+// \x1F = Information Separator One
+//
+const pathSeparator = "\x1F"
+
 var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
 
 var storageMigrationV6DecMode = func() cbor.DecMode {
@@ -105,9 +109,14 @@ func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
 
 type brokenTypeCause int
 
-type ownerKeyPair struct {
+type storagePath struct {
 	owner string
 	key   string
+}
+
+type decodedPayload struct {
+	key   storagePath
+	value oldInter.Value
 }
 
 type StorageFormatV6Migration struct {
@@ -121,10 +130,12 @@ type StorageFormatV6Migration struct {
 	baseStorage   *EncodingStorage
 	view          state.View
 
-	loadedDeferredValues map[ownerKeyPair]bool
+	decodedPayloads      []decodedPayload
+	migratedPayloadPaths map[storagePath]bool
+	deferredValuePaths   map[storagePath]bool
 }
 
-func (m StorageFormatV6Migration) filename() string {
+func (m *StorageFormatV6Migration) filename() string {
 	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
 }
 
@@ -155,17 +166,25 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.programs = programs.NewEmptyPrograms()
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
-	m.loadedDeferredValues = make(map[ownerKeyPair]bool, 0)
+
+	m.deferredValuePaths = make(map[storagePath]bool, 0)
+
+	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
+
+	m.decodedPayloads = make([]decodedPayload, 0)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
 	m.initStorage()
 
-	m.Log.Info().Msg("Converting payloads...")
+	// Decode payloads.
+	//   - Cadence values are decoded and cached.
+	//   - Non-cadence values are added to the migrated payloads.
+
+	m.Log.Info().Msg("Decoding payloads...")
 	for _, payload := range payloads {
 
 		keyParts := payload.Key.KeyParts
-
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
 
@@ -180,19 +199,31 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 				result.err,
 			)
 		} else if result.payload != nil {
-			// NO-OP. Add all encoded values later.
+			migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
-			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
-			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+			// Both nil means, value is decoded and added to the cache.
+			// Do the encoding once all the values are loaded.
 		}
 	}
-	m.Log.Info().Msg("Converting payloads complete")
+	m.Log.Info().Msg("Decoding payloads complete")
+
+	m.Log.Info().Msgf("Found %d deferred values", len(m.deferredValuePaths))
+
+	// Convert the values to new value structure
+
+	m.Log.Info().Msg("Converting values...")
+	m.convertValues()
+	m.Log.Info().Msg("Converting values complete")
+
+	// Encode the new values by calling `storage.Commit()`
 
 	m.Log.Info().Msg("Re-encoding converted values...")
 	err = m.storage.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
+
+	// Add the encoded new values to the payloads
 
 	for _, payload := range m.baseStorage.Payloads {
 		migratedPayloads = append(migratedPayloads, payload)
@@ -222,7 +253,7 @@ func (m *StorageFormatV6Migration) initStorage() {
 	)
 }
 
-func (m StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
 	var filteredPayloads []ledger.Payload
 
 	for _, payload := range payloads {
@@ -242,7 +273,7 @@ func (m StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pay
 	return accounts
 }
 
-func (m StorageFormatV6Migration) migrate(payload ledger.Payload) storageFormatV6MigrationResult {
+func (m *StorageFormatV6Migration) migrate(payload ledger.Payload) storageFormatV6MigrationResult {
 	// TODO: skip inner values, if they are already encoded
 
 	migratedPayload, err := m.reencodePayload(payload)
@@ -263,7 +294,7 @@ func (m StorageFormatV6Migration) migrate(payload ledger.Payload) storageFormatV
 	return result
 }
 
-func (m StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
+func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
 
 	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
 		return nil
@@ -277,7 +308,7 @@ func (m StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) err
 	return nil
 }
 
-func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledger.Payload, error) {
+func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
 
@@ -311,18 +342,10 @@ func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledg
 		return &payload, nil
 	}
 
-	// If the payload is a deferred value, then skip it by not converting
-	// to new values. Then it doesn't get added to the storage.
-	if m.loadedDeferredValues[ownerKeyPair{
-		owner: string(rawOwner),
-		key:   string(rawKey),
-	}] {
-		return &payload, nil
-	}
+	// Decode the cadence values, and cache them to be encoded later.
+	// This is done to figure out the deferred values and skip them.
 
-	// Extract the owner from the key
-
-	err = m.reencodeValue(
+	err = m.decodeAndCache(
 		value,
 		common.BytesToAddress(rawOwner),
 		string(rawKey),
@@ -339,13 +362,12 @@ func (m StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledg
 			)
 	}
 
-	return &payload, nil
+	return nil, nil
 }
 
-// Re-encodes the value to the new storage format, using following steps:
-//   - Decode to old value
-//   - Covert value from old to new
-func (m StorageFormatV6Migration) reencodeValue(
+// Decode the value and cache it to be migrated later.
+//
+func (m *StorageFormatV6Migration) decodeAndCache(
 	data []byte,
 	owner common.Address,
 	key string,
@@ -363,6 +385,62 @@ func (m StorageFormatV6Migration) reencodeValue(
 		return err
 	}
 
+	m.decodedPayloads = append(
+		m.decodedPayloads,
+		decodedPayload{
+			key: storagePath{
+				owner: string(owner.Bytes()),
+				key:   key,
+			},
+			value: rootValue,
+		},
+	)
+
+	// Walk through values and find the deferred keys.
+
+	oldInter.InspectValue(
+		rootValue,
+		func(inspectedValue oldInter.Value) bool {
+
+			// NOTE: important: walking of siblings continues
+			// after setting an error and returning false (to stop walking),
+			// so don't overwrite a potentially already set error
+			if err != nil {
+				return false
+			}
+
+			if dictionary, ok := inspectedValue.(*oldInter.DictionaryValue); ok {
+				deferredKeys := dictionary.DeferredKeys()
+
+				if deferredKeys != nil {
+					deferredKeys.Foreach(func(key string, _ struct{}) {
+						storageKey := strings.Join(
+							[]string{
+								dictionary.DeferredStorageKeyBase(),
+								key,
+							},
+							pathSeparator,
+						)
+
+						deferredOwner := dictionary.DeferredOwner().Bytes()
+
+						m.deferredValuePaths[storagePath{
+							owner: string(deferredOwner),
+							key:   storageKey,
+						}] = true
+					})
+
+				}
+			}
+
+			return true
+		},
+	)
+
+	return nil
+}
+
+func (m *StorageFormatV6Migration) convertValues() {
 	// Convert old value to new value
 
 	inter, err := oldInter.NewInterpreter(
@@ -373,10 +451,18 @@ func (m StorageFormatV6Migration) reencodeValue(
 
 				ownerStr := string(owner.Bytes())
 
-				m.loadedDeferredValues[ownerKeyPair{
+				if m.migratedPayloadPaths[storagePath{
 					owner: ownerStr,
 					key:   key,
-				}] = true
+				}] {
+					panic(
+						fmt.Errorf(
+							"value is already migrated: owner: %s, key: %s",
+							ownerStr,
+							key,
+						),
+					)
+				}
 
 				registerValue, err := m.view.Get(ownerStr, "", key)
 				if err != nil {
@@ -427,19 +513,31 @@ func (m StorageFormatV6Migration) reencodeValue(
 	)
 
 	if err != nil {
-		return fmt.Errorf(
+		panic(fmt.Errorf(
 			"failed to create interpreter: %w",
 			err,
-		)
+		))
 	}
 
-	converter := NewValueConverter(m.storage)
-	_ = converter.Convert(inter, rootValue)
+	m.Log.Info().Msgf("converting %d values", len(m.decodedPayloads))
 
-	return nil
+	for _, value := range m.decodedPayloads {
+		// If the value is a deferred value then skip converting them.
+		// Deferred values get added when their enclosing dictionary is converted.
+		if m.deferredValuePaths[value.key] {
+			continue
+		}
+
+		converter := NewValueConverter(m.storage)
+		_ = converter.Convert(inter, value.value)
+
+		// Mark the payload as 'migrated'
+		m.migratedPayloadPaths[value.key] = true
+	}
+
 }
 
-func (m StorageFormatV6Migration) decode(data []byte, owner common.Address, key string, version uint16) (oldInter.Value, error, bool) {
+func (m *StorageFormatV6Migration) decode(data []byte, owner common.Address, key string, version uint16) (oldInter.Value, error, bool) {
 	storagePath := []string{key}
 
 	rootValue, err := oldInter.DecodeValue(data, &owner, storagePath, version, nil)
@@ -668,8 +766,8 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 	keysAndValues := make([]newInter.Value, 0)
 
 	for _, key := range value.Keys().Elements() {
-		entryValue := getValue(inter, value, key)
-		if entryValue == nil {
+		entryValue, err := getValue(inter, value, key)
+		if err != nil {
 			continue
 		}
 
@@ -692,19 +790,19 @@ func getValue(
 	inter *oldInter.Interpreter,
 	dictionary *oldInter.DictionaryValue,
 	key oldInter.Value,
-) (value oldInter.Value) {
+) (value oldInter.Value, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			_, ok := r.(*ValueNotFoundError)
+			valueNotFoundErr, ok := r.(*ValueNotFoundError)
 			if !ok {
 				panic(r)
 			}
 
-			value = nil
+			err = valueNotFoundErr
 		}
 	}()
 
-	return dictionary.Get(inter, nil, key)
+	return dictionary.Get(inter, nil, key), nil
 }
 
 func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilValue) {
