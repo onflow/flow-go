@@ -228,7 +228,8 @@ func wrapFile(bootDir string, nodeID string) error {
 	var pubKeyBytes [32]byte
 	copy(pubKeyBytes[:], publicKey)
 
-	ciphertext := make([]byte, 0, len(plaintext)+box.AnonymousOverhead)
+	ciphertextLength := len(plaintext) + box.AnonymousOverhead
+	ciphertext := make([]byte, 0, ciphertextLength)
 
 	ciphertext, err = box.SealAnonymous(ciphertext, plaintext, &pubKeyBytes, rand.Reader)
 	if err != nil {
