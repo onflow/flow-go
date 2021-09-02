@@ -3,28 +3,30 @@ package trace
 // Span names
 const (
 
-	// Common
-	//
+	//// Protocol State
 
-	// State
-	// mutator.Extend - full payload check
-	ProtoStateMutatorExtend                SpanName = "common.state.proto.mutator.extend"
-	ProtoStateMutatorExtendCheckHeader     SpanName = "common.state.proto.mutator.extend.checkHeader"
-	ProtoStateMutatorExtendCheckGuarantees SpanName = "common.state.proto.mutator.extend.checkGuarantees"
-	ProtoStateMutatorExtendCheckSeals      SpanName = "common.state.proto.mutator.extend.checkSeals"
-	ProtoStateMutatorExtendCheckReceipts   SpanName = "common.state.proto.mutator.extend.checkReceipts"
-	ProtoStateMutatorExtendDBInsert        SpanName = "common.state.proto.mutator.extend.dbInsert"
+	// Extend
+	ProtoStateMutatorExtend                SpanName = "proto.state.mutator.extend"
+	ProtoStateMutatorExtendCheckHeader     SpanName = "proto.state.mutator.extend.checkHeader"
+	ProtoStateMutatorExtendCheckGuarantees SpanName = "proto.state.mutator.extend.checkGuarantees"
+	ProtoStateMutatorExtendCheckSeals      SpanName = "proto.state.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendCheckReceipts   SpanName = "proto.state.mutator.extend.checkReceipts"
+	ProtoStateMutatorExtendDBInsert        SpanName = "proto.state.mutator.extend.dbInsert"
 
-	// mutator.HeaderExtend - header-only check
-	ProtoStateMutatorHeaderExtend              SpanName = "common.state.proto.mutator.headerExtend"
-	ProtoStateMutatorHeaderExtendGetLastSealed SpanName = "common.state.proto.mutator.headerExtend.lastSealed"
+	// HeaderExtend
+	ProtoStateMutatorHeaderExtend              SpanName = "proto.state.mutator.headerExtend"
+	ProtoStateMutatorHeaderExtendGetLastSealed SpanName = "proto.state.mutator.headerExtend.lastSealed"
 
 	// mutator.Finalize
-	ProtoStateMutatorFinalize SpanName = "common.state.proto.mutator.finalize"
+	ProtoStateMutatorFinalize SpanName = "proto.state.mutator.finalize"
+
+	//// Follower Engine
+	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
+	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
+	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
 
 	// Consensus Node
 	//
-
 	CONProcessCollection SpanName = "con.processCollection"
 	CONProcessBlock      SpanName = "con.processBlockProposal"
 
