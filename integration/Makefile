@@ -12,7 +12,7 @@ integration-test: common-tests execution-tests verification-tests collection-tes
 
 # NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
 .PHONY: ci-integration-test
-ci-integration-test: common-tests execution-tests epoch-tests verification-tests access-tests # collection-tests # consensus-tests
+ci-integration-test: access-tests common-tests execution-tests epoch-tests verification-tests # collection-tests # consensus-tests
 
 .PHONY: access-tests
 access-tests:

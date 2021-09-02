@@ -293,11 +293,7 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	var blockIDs flow.IdentifierList
-	for _, block := range res.Blocks {
-		blockIDs = append(blockIDs, block.ID())
-	}
-	e.log.Debug().Str("origin_id", originID.String()).Strs("block_ids", blockIDs.Strings()).Msg("received block response")
+	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {

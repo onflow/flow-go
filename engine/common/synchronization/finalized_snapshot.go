@@ -113,6 +113,7 @@ func (f *FinalizedHeaderCache) onFinalizedBlock(blockID flow.Identifier) {
 
 // finalizationProcessingLoop is a separate goroutine that performs processing of finalization events
 func (f *FinalizedHeaderCache) finalizationProcessingLoop() {
+	f.log.Debug().Msg("starting finalization processing loop")
 	notifier := f.finalizationEventNotifier.Channel()
 	for {
 		select {
