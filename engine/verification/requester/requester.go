@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/rand"
 
@@ -165,17 +164,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // handleChunkDataPackWithTracing encapsulates the logic of handling a chunk data pack with tracing enabled.
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
-	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
-	if !ok {
-		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", chunkDataPack.ChunkID)
-		defer span.Finish()
-	}
-
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataResponse, func() {
-		e.handleChunkDataPack(originID, chunkDataPack)
-	})
+	span, _ := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
+	span.SetTag("chunk_id", chunkDataPack.ChunkID)
+	defer span.Finish()
+	e.handleChunkDataPack(originID, chunkDataPack)
 }
 
 // handleChunkDataPack sends the received chunk data pack to the registered handler, and cleans up its request status.
@@ -208,14 +200,18 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
-	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	if !ok {
-		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", request.ChunkID)
-		defer span.Finish()
-	}
 
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	// TODO (Ramtin) enable this later
+	// span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+	// if !ok {
+	// 	span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+	// 	span.SetTag("chunk_id", request.ChunkID)
+	// 	defer span.Finish()
+	// }
+
+	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+
+	ctx := e.unit.Ctx()
 	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
 		added := e.pendingRequests.Add(request)
 
@@ -254,14 +250,17 @@ func (e *Engine) onTimer() {
 
 // handleChunkDataPackRequestWithTracing encapsulates the logic of dispatching chunk data request in network with tracing enabled.
 func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.ChunkDataPackRequest, lastSealedHeight uint64) {
-	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	if !ok {
-		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", request.ChunkID)
-		defer span.Finish()
-	}
+	// TODO (Ramtin) enable this later
+	// span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+	// if !ok {
+	// 	span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
+	// 	span.SetTag("chunk_id", request.ChunkID)
+	// 	defer span.Finish()
+	// }
 
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+
+	ctx := e.unit.Ctx()
 	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
 		e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
 	})

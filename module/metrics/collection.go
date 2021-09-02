@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"github.com/opentracing/opentracing-go"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 
@@ -70,7 +69,8 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 // from being created to being included as part of a collection.
 func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 	cc.transactionsIngested.Inc()
-	cc.tracer.StartSpan(txID, spanTransactionToCollection)
+	// TODO (Ramtin) - enable this later
+	// cc.tracer.StartSpan(txID, spanTransactionToCollection)
 }
 
 // ClusterBlockProposed tracks the size and number of proposals, as well as
@@ -82,17 +82,18 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 		With(prometheus.Labels{LabelChain: block.Header.ChainID.String()}).
 		Observe(float64(collection.Len()))
 
-	followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
-	for _, txID := range collection.Transactions {
-		if txSpan, exists := cc.tracer.GetSpan(txID, spanTransactionToCollection); exists {
-			// link its transactions' spans
-			followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
-		}
-	}
+	// TODO (Ramtin) - enable this later
+	// followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
+	// for _, txID := range collection.Transactions {
+	// 	if txSpan, exists := cc.tracer.GetSpan(txID, spanTransactionToCollection); exists {
+	// 		// link its transactions' spans
+	// 		followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
+	// 	}
+	// }
 
-	cc.tracer.StartSpan(collection.ID(), spanCollectionToGuarantee, followsFrom...).
-		SetTag("collection_id", collection.ID().String()).
-		SetTag("collection_txs", collection.Transactions)
+	// cc.tracer.StartSpan(collection.ID(), spanCollectionToGuarantee, followsFrom...).
+	// 	SetTag("collection_id", collection.ID().String()).
+	// 	SetTag("collection_txs", collection.Transactions)
 }
 
 // ClusterBlockFinalized updates the guaranteed collection size gauge and
@@ -112,8 +113,9 @@ func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 		}).
 		Observe(float64(collection.Len()))
 
-	for _, txID := range collection.Transactions {
-		cc.tracer.FinishSpan(txID, spanTransactionToCollection)
-	}
-	cc.tracer.FinishSpan(collection.ID(), spanCollectionToGuarantee)
+	// TODO (Ramtin) - enable this later
+	// for _, txID := range collection.Transactions {
+	// 	cc.tracer.FinishSpan(txID, spanTransactionToCollection)
+	// }
+	// cc.tracer.FinishSpan(collection.ID(), spanCollectionToGuarantee)
 }

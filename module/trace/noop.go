@@ -36,18 +36,32 @@ func (t *NoopTracer) Done() <-chan struct{} {
 	return done
 }
 
-// StartSpan starts a span using the flow identifier as a key into the span map
-func (t *NoopTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption,
-) opentracing.Span {
+func (t *NoopTracer) EntityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
 	return &NoopSpan{t}
 }
 
-// FinishSpan finishes a span started with the passed in flow identifier
-func (t *NoopTracer) FinishSpan(entityID flow.Identifier, spanName SpanName) {}
+func (t *NoopTracer) StartBlockSpan(
+	ctx context.Context,
+	entityID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	return &NoopSpan{t}, ctx
+}
 
-// GetSpan will get the span started with the passed in flow identifier
-func (t *NoopTracer) GetSpan(entityID flow.Identifier, spanName SpanName) (opentracing.Span, bool) {
-	return nil, false
+func (t *NoopTracer) StartCollectionSpan(
+	ctx context.Context,
+	entityID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	return &NoopSpan{t}, ctx
+}
+
+func (t *NoopTracer) StartTransactionSpan(
+	ctx context.Context,
+	entityID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	return &NoopSpan{t}, ctx
 }
 
 func (t *NoopTracer) StartSpanFromContext(

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -164,16 +163,20 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
 func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
-	chunkID := chunk.ID()
 
-	span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
-	if !ok {
-		span = e.tracer.StartSpan(chunkID, trace.VERProcessAssignedChunk)
-		span.SetTag("chunk_id", chunkID)
-		defer span.Finish()
-	}
+	// TODO (Ramtin) : enable this later
+	// chunkID := chunk.ID()
+	// span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
+	// if !ok {
+	// 	span = e.tracer.StartSpan(chunkID, trace.VERProcessAssignedChunk)
+	// 	span.SetTag("chunk_id", chunkID)
+	// 	defer span.Finish()
 
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	// }
+
+	ctx := e.unit.Ctx()
+
 	var err error
 	var requested bool
 	var blockHeight uint64
@@ -294,14 +297,17 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
-	if !ok {
-		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
-		span.SetTag("chunk_id", chunkDataPack.ChunkID)
-		defer span.Finish()
-	}
+	// TODO (ramtin) enable this later
+	// span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
+	// if !ok {
+	// 	span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
+	// 	span.SetTag("chunk_id", chunkDataPack.ChunkID)
+	// 	defer span.Finish()
+	// }
 
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+
+	ctx := e.unit.Ctx()
 
 	var ferr error
 	processed := false

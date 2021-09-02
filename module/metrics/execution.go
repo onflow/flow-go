@@ -484,13 +484,15 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 // StartBlockReceivedToExecuted starts a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) StartBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.StartSpan(blockID, executionBlockReceivedToExecuted).SetTag("block_id", blockID.String)
+	// TODO (Ramtin) - enable this later
+	// ec.tracer.StartSpan(blockID, executionBlockReceivedToExecuted).SetTag("block_id", blockID.String)
 }
 
 // FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
+	// TODO (Ramtin) - enable this later
+	// ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
 // ExecutionBlockExecuted reports computation and total time spent on a block computation

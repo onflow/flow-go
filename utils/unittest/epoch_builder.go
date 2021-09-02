@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"context"
 	"math/rand"
 	"testing"
 
@@ -364,10 +365,10 @@ func (builder *EpochBuilder) addBlock(block *flow.Block) {
 
 	blockID := block.ID()
 	for _, state := range builder.states {
-		err := state.Extend(block)
+		err := state.Extend(context.Background(), block)
 		require.NoError(builder.t, err)
 
-		err = state.Finalize(blockID)
+		err = state.Finalize(context.Background(), blockID)
 		require.NoError(builder.t, err)
 		err = state.MarkValid(blockID)
 		require.NoError(builder.t, err)

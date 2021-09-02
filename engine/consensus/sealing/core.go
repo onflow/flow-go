@@ -3,6 +3,7 @@
 package sealing
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -298,10 +299,11 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 // * exception in case of unexpected error
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
-	span := c.tracer.StartSpan(result.ID(), trace.CONSealingProcessIncorporatedResult)
-	err := c.processIncorporatedResult(result)
-	span.Finish()
 
+	span, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
+	defer span.Finish()
+
+	err := c.processIncorporatedResult(result)
 	// We expect only engine.OutdatedInputError. If we encounter UnverifiableInputError or InvalidInputError, we
 	// have a serious problem, because these results are coming from the node's local HotStuff, which is trusted.
 	if engine.IsOutdatedInputError(err) {
@@ -342,13 +344,13 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 // * exception in case of unexpected error
 // * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
+
+	span, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	defer span.Finish()
+
 	startTime := time.Now()
-	approvalSpan := c.tracer.StartSpan(approval.ID(), trace.CONSealingProcessApproval)
-
 	err := c.processApproval(approval)
-
 	c.metrics.OnApprovalProcessingDuration(time.Since(startTime))
-	approvalSpan.Finish()
 
 	if err != nil {
 		if engine.IsOutdatedInputError(err) {
@@ -460,7 +462,8 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 // * exception in case of unexpected error
 // * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
-	processFinalizedBlockSpan := c.tracer.StartSpan(finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
+
+	processFinalizedBlockSpan, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
 	defer processFinalizedBlockSpan.Finish()
 
 	// STEP 0: Collect auxiliary information

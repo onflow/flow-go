@@ -1,6 +1,7 @@
 package unittest
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -78,14 +79,14 @@ func SealBlock(t *testing.T, st protocol.MutableState, block *flow.Block, receip
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-	err := st.Extend(&block2)
+	err := st.Extend(context.Background(), &block2)
 	require.NoError(t, err)
 
 	block3 := BlockWithParentFixture(block2.Header)
 	block3.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
-	err = st.Extend(&block3)
+	err = st.Extend(context.Background(), &block3)
 	require.NoError(t, err)
 
 	return block3.Header

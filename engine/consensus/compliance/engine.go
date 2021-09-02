@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -327,12 +326,13 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
-	for _, g := range payload.Guarantees {
-		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
-			defer childSpan.Finish()
-		}
-	}
+	// TODO (Ramtin) - enable this later
+	// for _, g := range payload.Guarantees {
+	// 	if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
+	// 		childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
+	// 		defer childSpan.Finish()
+	// 	}
+	// }
 
 	// retrieve all consensus nodes without our ID
 	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(

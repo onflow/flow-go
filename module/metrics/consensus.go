@@ -83,22 +83,26 @@ func NewConsensusCollector(tracer module.Tracer, registerer prometheus.Registere
 
 // StartCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 func (cc *ConsensusCollector) StartCollectionToFinalized(collectionID flow.Identifier) {
-	cc.tracer.StartSpan(collectionID, consensusCollectionToFinalized)
+	// TODO (Ramtin) - enable this later
+	// cc.tracer.StartSpan(collectionID, consensusCollectionToFinalized)
 }
 
 // FinishCollectionToFinalized reports Metrics C1: Collection Received by CCL→ Collection Included in Finalized Block
 func (cc *ConsensusCollector) FinishCollectionToFinalized(collectionID flow.Identifier) {
-	cc.tracer.FinishSpan(collectionID, consensusCollectionToFinalized)
+	// TODO (Ramtin) - enable this later
+	// cc.tracer.FinishSpan(collectionID, consensusCollectionToFinalized)
 }
 
 // StartBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 func (cc *ConsensusCollector) StartBlockToSeal(blockID flow.Identifier) {
-	cc.tracer.StartSpan(blockID, consensusBlockToSeal)
+	// TODO (Ramtin) - enable this later
+	// cc.tracer.StartSpan(blockID, consensusBlockToSeal)
 }
 
 // FinishBlockToSeal reports Metrics C4: Block Received by CCL → Block Seal in finalized block
 func (cc *ConsensusCollector) FinishBlockToSeal(blockID flow.Identifier) {
-	cc.tracer.FinishSpan(blockID, consensusBlockToSeal)
+	// TODO (Ramtin) - enable this later
+	// cc.tracer.FinishSpan(blockID, consensusBlockToSeal)
 }
 
 // EmergencySeal increments the counter of emergency seals.

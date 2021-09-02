@@ -1,6 +1,7 @@
 package collection_test
 
 import (
+	"context"
 	"math/rand"
 	"os"
 	"testing"
@@ -513,9 +514,9 @@ func (suite *BuilderSuite) TestBuildOn_ExpiredTransaction() {
 		block.Payload.Guarantees = nil
 		block.Payload.Seals = nil
 		block.Header.PayloadHash = block.Payload.Hash()
-		err = suite.protoState.Extend(&block)
+		err = suite.protoState.Extend(context.Background(), &block)
 		suite.Require().Nil(err)
-		err = suite.protoState.Finalize(block.ID())
+		err = suite.protoState.Finalize(context.Background(), block.ID())
 		suite.Require().Nil(err)
 		head = block.Header
 	}

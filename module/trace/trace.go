@@ -2,12 +2,11 @@ package trace
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"math/rand"
-	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
@@ -16,7 +15,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const DefaultEntityCacheSize = 500
+const DefaultEntityCacheSize = 1000
+
+const EntityTypeBlock = "Block"
+const EntityTypeCollection = "Collection"
+const EntityTypeTransaction = "Transaction"
 
 type SpanName string
 
@@ -25,8 +28,7 @@ type OpenTracer struct {
 	opentracing.Tracer
 	closer    io.Closer
 	log       zerolog.Logger
-	openSpans map[string]opentracing.Span
-	lock      sync.RWMutex
+	spanCache *lru.Cache
 }
 
 type traceLogger struct {
@@ -43,7 +45,9 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 }
 
 // NewTracer creates a new tracer.
-// TODO pass entity cache size as param
+//
+// TODO (ramtin):  pass entity cache size as param
+// TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
 func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
@@ -59,11 +63,16 @@ func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 		return nil, err
 	}
 
+	spanCache, err := lru.New(int(DefaultEntityCacheSize))
+	if err != nil {
+		return nil, err
+	}
+
 	t := &OpenTracer{
 		Tracer:    tracer,
 		closer:    closer,
 		log:       log,
-		openSpans: map[string]opentracing.Span{},
+		spanCache: spanCache,
 	}
 
 	return t, nil
@@ -88,28 +97,14 @@ func (t *OpenTracer) Done() <-chan struct{} {
 	return done
 }
 
-func (t *OpenTracer) getSpanIDs(spanName SpanName) (spanID uint64, parentSpanID uint64) {
-	spanID = 0
-	switch spanName {
-	case CONBuildOn:
-		spanID = 1
-	case CONProvOnBlockProposal:
-		spanID = 2
-	default:
-		return rand.Uint64(), 0
-	}
-
-	if spanID > 1 {
-		parentSpanID = spanID - 1
-	}
-
-	return
-}
-
-// StartSpan starts a span using the flow identifier as a key into the span map
+// EntityRootSpan returns the root span for the given entity from the cache
+// and if not exist it would construct it and cache it and return it
 // This should be used mostly for the very first span created for an entity on the service
-func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
-	key := spanKey(entityID, spanName)
+func (t *OpenTracer) EntityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
+	if span, ok := t.spanCache.Get(entityID); ok {
+		return span.(opentracing.Span)
+	}
+
 	// flow.Identifier to flow
 	traceID, err := jaeger.TraceIDFromString(entityID.String()[:32])
 	if err != nil {
@@ -117,42 +112,48 @@ func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts
 		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
 		return sp
 	}
-	spanID, parentSpanID := t.getSpanIDs(spanName)
 	ctx := jaeger.NewSpanContext(
 		traceID,
-		jaeger.SpanID(spanID),
-		jaeger.SpanID(parentSpanID),
+		jaeger.SpanID(rand.Uint64()),
+		jaeger.SpanID(0),
 		true,
 		nil,
 	)
 	opts = append(opts, jaeger.SelfRef(ctx))
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	t.openSpans[key] = t.Tracer.StartSpan(string(spanName), opts...)
-	return t.openSpans[key]
+	span := t.Tracer.StartSpan("New "+string(entityType), opts...)
+	t.spanCache.Add(entityID, span)
+	span.Finish() // finish span right away
+	return span
 }
 
-// FinishSpan finishes a span started with the passed in flow identifier
-func (t *OpenTracer) FinishSpan(entityID flow.Identifier, spanName SpanName) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	key := spanKey(entityID, spanName)
-	span, ok := t.openSpans[key]
-	if ok {
-		span.Finish()
-		jaegerSpan := span.(*jaeger.Span)
-		spanDurationMetric.WithLabelValues(jaegerSpan.OperationName()).Observe(jaegerSpan.Duration().Seconds())
-		delete(t.openSpans, key)
-	}
+func (t *OpenTracer) StartBlockSpan(
+	ctx context.Context,
+	blockID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	rootSpan := t.EntityRootSpan(blockID, EntityTypeBlock)
+	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
 }
 
-// GetSpan will get the span started with the passed in flow identifier
-func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName SpanName) (opentracing.Span, bool) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	key := spanKey(entityID, spanName)
-	span, exists := t.openSpans[key]
-	return span, exists
+func (t *OpenTracer) StartCollectionSpan(
+	ctx context.Context,
+	collectionID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	rootSpan := t.EntityRootSpan(collectionID, EntityTypeCollection)
+	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
+}
+
+func (t *OpenTracer) StartTransactionSpan(
+	ctx context.Context,
+	transactionID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	rootSpan := t.EntityRootSpan(transactionID, EntityTypeTransaction)
+	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
 }
 
 func (t *OpenTracer) StartSpanFromContext(
@@ -179,8 +180,6 @@ func (t *OpenTracer) RecordSpanFromParent(
 	logs []opentracing.LogRecord,
 	opts ...opentracing.StartSpanOption,
 ) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
 	end := time.Now()
 	start := end.Add(-duration)
 	opts = append(opts, opentracing.FollowsFrom(span.Context()))
@@ -199,10 +198,4 @@ func (t *OpenTracer) WithSpanFromContext(ctx context.Context,
 	defer span.Finish()
 
 	f()
-}
-
-// in order to avoid different spans using the same entityID as the key, which creates a conflict,
-// we use span name and entity id as the key for a span.
-func spanKey(entityID flow.Identifier, spanName SpanName) string {
-	return fmt.Sprintf("%s-%x", spanName, entityID)
 }

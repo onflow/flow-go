@@ -3,6 +3,8 @@
 package mock
 
 import (
+	context "context"
+
 	flow "github.com/onflow/flow-go/model/flow"
 	mock "github.com/stretchr/testify/mock"
 
@@ -46,13 +48,13 @@ func (_m *MutableState) AtHeight(height uint64) protocol.Snapshot {
 	return r0
 }
 
-// Extend provides a mock function with given fields: candidate
-func (_m *MutableState) Extend(candidate *flow.Block) error {
-	ret := _m.Called(candidate)
+// Extend provides a mock function with given fields: ctx, candidate
+func (_m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
+	ret := _m.Called(ctx, candidate)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*flow.Block) error); ok {
-		r0 = rf(candidate)
+	if rf, ok := ret.Get(0).(func(context.Context, *flow.Block) error); ok {
+		r0 = rf(ctx, candidate)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -76,13 +78,13 @@ func (_m *MutableState) Final() protocol.Snapshot {
 	return r0
 }
 
-// Finalize provides a mock function with given fields: blockID
-func (_m *MutableState) Finalize(blockID flow.Identifier) error {
-	ret := _m.Called(blockID)
+// Finalize provides a mock function with given fields: ctx, blockID
+func (_m *MutableState) Finalize(ctx context.Context, blockID flow.Identifier) error {
+	ret := _m.Called(ctx, blockID)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(blockID)
+	if rf, ok := ret.Get(0).(func(context.Context, flow.Identifier) error); ok {
+		r0 = rf(ctx, blockID)
 	} else {
 		r0 = ret.Error(0)
 	}

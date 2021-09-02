@@ -36,32 +36,27 @@ func (_m *Tracer) Done() <-chan struct{} {
 	return r0
 }
 
-// FinishSpan provides a mock function with given fields: entity, spanName
-func (_m *Tracer) FinishSpan(entity flow.Identifier, spanName trace.SpanName) {
-	_m.Called(entity, spanName)
-}
-
-// GetSpan provides a mock function with given fields: entity, spanName
-func (_m *Tracer) GetSpan(entity flow.Identifier, spanName trace.SpanName) (opentracing.Span, bool) {
-	ret := _m.Called(entity, spanName)
+// EntityRootSpan provides a mock function with given fields: entityID, opts
+func (_m *Tracer) EntityRootSpan(entityID flow.Identifier, opts ...opentracing.StartSpanOption) opentracing.Span {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, entityID)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 opentracing.Span
-	if rf, ok := ret.Get(0).(func(flow.Identifier, trace.SpanName) opentracing.Span); ok {
-		r0 = rf(entity, spanName)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, ...opentracing.StartSpanOption) opentracing.Span); ok {
+		r0 = rf(entityID, opts...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(opentracing.Span)
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier, trace.SpanName) bool); ok {
-		r1 = rf(entity, spanName)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // Ready provides a mock function with given fields:

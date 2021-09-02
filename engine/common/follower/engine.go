@@ -1,6 +1,7 @@
 package follower
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -34,6 +36,7 @@ type Engine struct {
 	follower       module.HotStuffFollower
 	con            network.Conduit
 	sync           module.BlockRequester
+	tracer         module.Tracer
 }
 
 func New(
@@ -49,6 +52,7 @@ func New(
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
+	tracer module.Tracer,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -64,6 +68,7 @@ func New(
 		pending:        pending,
 		follower:       follower,
 		sync:           sync,
+		tracer:         tracer,
 	}
 
 	con, err := net.Register(engine.ReceiveBlocks, e)
@@ -284,6 +289,9 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // no need to do all the processing again.
 func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 
+	span, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONProcessBlock)
+	defer span.Finish()
+
 	header := proposal.Header
 
 	log := e.log.With().
@@ -309,7 +317,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
-	err := e.state.Extend(block)
+	err := e.state.Extend(context.Background(), block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {

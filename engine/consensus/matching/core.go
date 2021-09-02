@@ -141,7 +141,8 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 //   internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
-	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchProcessReceipt)
+
+	receiptSpan, _ := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
 	defer func() {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
 		receiptSpan.Finish()

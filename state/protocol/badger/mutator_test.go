@@ -3,6 +3,7 @@
 package badger_test
 
 import (
+	"context"
 	"errors"
 	"math/rand"
 	"sync"
@@ -107,7 +108,7 @@ func TestExtendValid(t *testing.T) {
 		extend.Payload.Guarantees = nil
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = fullState.Extend(&extend)
+		err = fullState.Extend(context.Background(), &extend)
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -115,7 +116,7 @@ func TestExtendValid(t *testing.T) {
 		require.Equal(t, seal.FinalState, finalCommit)
 
 		consumer.On("BlockFinalized", extend.Header).Once()
-		err = fullState.Finalize(extend.ID())
+		err = fullState.Finalize(context.Background(), extend.ID())
 		require.NoError(t, err)
 		consumer.AssertExpectations(t)
 	})
@@ -135,7 +136,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 		// Create a first block on top of the snapshot
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
 		// Add a second block containing a receipt committing to the first block
@@ -145,7 +146,7 @@ func TestExtendSealedBoundary(t *testing.T) {
 			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
 			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 		})
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		// Add a third block containing a seal for the first block
@@ -154,28 +155,28 @@ func TestExtendSealedBoundary(t *testing.T) {
 		block3.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{block1Seal},
 		})
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
 		require.Equal(t, seal.FinalState, finalCommit, "commit should not change before finalizing")
 
-		err = state.Finalize(block1.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
 		require.Equal(t, seal.FinalState, finalCommit, "commit should not change after finalizing non-sealing block")
 
-		err = state.Finalize(block2.ID())
+		err = state.Finalize(context.Background(), block2.ID())
 		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
 		require.NoError(t, err)
 		require.Equal(t, seal.FinalState, finalCommit, "commit should not change after finalizing non-sealing block")
 
-		err = state.Finalize(block3.ID())
+		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
 
 		finalCommit, err = state.Final().Commit()
@@ -195,7 +196,7 @@ func TestExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err := state.Extend(&extend)
+		err := state.Extend(context.Background(), &extend)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -219,7 +220,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		extend.Header.View = 1
 		extend.Header.ParentID = head.ID()
 
-		err = state.Extend(&extend)
+		err = state.Extend(context.Background(), &extend)
 		require.NoError(t, err)
 
 		// create another block with the same height and view, that is coming after
@@ -227,7 +228,7 @@ func TestExtendHeightTooSmall(t *testing.T) {
 		extend.Header.Height = 1
 		extend.Header.View = 2
 
-		err = state.Extend(&extend)
+		err = state.Extend(context.Background(), &extend)
 		require.Error(t, err)
 
 		// verify seal not indexed
@@ -250,7 +251,7 @@ func TestExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = head.Height + 2
 
-		err = state.Extend(&block)
+		err = state.Extend(context.Background(), &block)
 		require.Error(t, err)
 	})
 }
@@ -266,17 +267,17 @@ func TestExtendBlockNotConnected(t *testing.T) {
 		extend := unittest.BlockWithParentFixture(head)
 		extend.SetPayload(flow.EmptyPayload())
 
-		err = state.Extend(&extend)
+		err = state.Extend(context.Background(), &extend)
 		require.NoError(t, err)
 
-		err = state.Finalize(extend.ID())
+		err = state.Finalize(context.Background(), extend.ID())
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to root
 		extend.Header.Timestamp = extend.Header.Timestamp.Add(time.Second)
 		extend.Header.ParentID = head.ID()
 
-		err = state.Extend(&extend)
+		err = state.Extend(context.Background(), &extend)
 		require.Error(t, err)
 
 		// verify seal not indexed
@@ -298,7 +299,7 @@ func TestExtendInvalidChainID(t *testing.T) {
 		// use an invalid chain ID
 		block.Header.ChainID = head.ChainID + "-invalid"
 
-		err = state.Extend(&block)
+		err = state.Extend(context.Background(), &block)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
@@ -319,13 +320,13 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.Payload.Guarantees = nil
 		block2.Header.PayloadHash = block2.Payload.Hash()
-		err := state.Extend(&block2)
+		err := state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.Payload.Guarantees = nil
 		block3.Header.PayloadHash = block3.Payload.Hash()
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		receiptA := unittest.ReceiptForBlockFixture(&block3)
@@ -338,7 +339,7 @@ func TestExtendReceiptsNotSorted(t *testing.T) {
 			Results:  []*flow.ExecutionResult{&receiptA.ExecutionResult, &receiptB.ExecutionResult},
 		}
 		block4.Header.PayloadHash = block4.Payload.Hash()
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 	})
@@ -357,7 +358,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		// Add a receipt for block 2
@@ -372,7 +373,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		// force the receipt validator to refuse this payload
 		validator.On("ValidatePayload", &block3).Return(engine.NewInvalidInputError("")).Once()
 
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 		validator.AssertExpectations(t)
@@ -386,17 +387,17 @@ func TestExtendReceiptsValid(t *testing.T) {
 		require.NoError(t, err)
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		block4 := unittest.BlockWithParentFixture(block3.Header)
 		block4.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.NoError(t, err)
 
 		receipt3a := unittest.ReceiptForBlockFixture(&block3)
@@ -416,7 +417,7 @@ func TestExtendReceiptsValid(t *testing.T) {
 				&receipt3c.ExecutionResult,
 			},
 		})
-		err = state.Extend(&block5)
+		err = state.Extend(context.Background(), &block5)
 		require.NoError(t, err)
 	})
 }
@@ -493,9 +494,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
-		err = state.Finalize(block1.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -522,9 +523,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
-		err = state.Finalize(block2.ID())
+		err = state.Finalize(context.Background(), block2.ID())
 		require.NoError(t, err)
 
 		// block 3 contains the seal for block 1
@@ -534,12 +535,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		})
 
 		// insert the block sealing the EpochSetup event
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		// insert a block with a QC pointing to block 3
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.NoError(t, err)
 
 		// now that the setup event has been emitted, we should be in the setup phase
@@ -566,7 +567,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.Error(t, err)
 
 		// finalize block 3 so we can finalize subsequent blocks
-		err = state.Finalize(block3.ID())
+		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
 
 		// finalize block 4 so we can finalize subsequent blocks
@@ -574,7 +575,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header).Once()
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup)
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter-1)
-		err = state.Finalize(block4.ID())
+		err = state.Finalize(context.Background(), block4.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
@@ -600,9 +601,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block5 := unittest.BlockWithParentFixture(block4.Header)
 		block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2)))
 
-		err = state.Extend(&block5)
+		err = state.Extend(context.Background(), &block5)
 		require.NoError(t, err)
-		err = state.Finalize(block5.ID())
+		err = state.Finalize(context.Background(), block5.ID())
 		require.NoError(t, err)
 
 		// block 6 contains the seal for block 2
@@ -611,12 +612,12 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 			Seals: []*flow.Seal{seal2},
 		})
 
-		err = state.Extend(&block6)
+		err = state.Extend(context.Background(), &block6)
 		require.NoError(t, err)
 
 		// insert a block with a QC pointing to block 6
 		block7 := unittest.BlockWithParentFixture(block6.Header)
-		err = state.Extend(&block7)
+		err = state.Extend(context.Background(), &block7)
 		require.NoError(t, err)
 
 		// we should NOT be able to query epoch 2 commit info wrt blocks before 7
@@ -638,7 +639,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		assert.NoError(t, err)
 		require.Equal(t, flow.EpochPhaseCommitted, phase)
 
-		err = state.Finalize(block6.ID())
+		err = state.Finalize(context.Background(), block6.ID())
 		require.NoError(t, err)
 
 		// expect epoch phase transition once we finalize block 7
@@ -647,7 +648,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
 		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted)
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter-1)
-		err = state.Finalize(block7.ID())
+		err = state.Finalize(context.Background(), block7.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
 		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
@@ -664,7 +665,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		block8.SetPayload(flow.EmptyPayload())
 		block8.Header.View = epoch1FinalView
 
-		err = state.Extend(&block8)
+		err = state.Extend(context.Background(), &block8)
 		require.NoError(t, err)
 
 		// we should still be in epoch 1, since epochs are inclusive of final view
@@ -678,7 +679,7 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// we should handle views that aren't exactly the first valid view of the epoch
 		block9.Header.View = epoch1FinalView + uint64(1+rand.Intn(10))
 
-		err = state.Extend(&block9)
+		err = state.Extend(context.Background(), &block9)
 		require.NoError(t, err)
 
 		// now, at long last, we are in epoch 2
@@ -695,9 +696,9 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
 		metrics.On("CurrentEpochCounter", epoch2Setup.Counter)
-		err = state.Finalize(block8.ID())
+		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
-		err = state.Finalize(block9.ID())
+		err = state.Finalize(context.Background(), block9.ID())
 		require.NoError(t, err)
 		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
@@ -725,12 +726,12 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -760,7 +761,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
 			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
 		})
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		// block 2 receipt contains nextEpochSetup2
@@ -773,7 +774,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 			Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
 			Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
 		})
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.NoError(t, err)
 
 		// seal for block 1
@@ -787,7 +788,7 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		block5.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal1},
 		})
-		err = state.Extend(&block5)
+		err = state.Extend(context.Background(), &block5)
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
@@ -795,17 +796,17 @@ func TestExtendConflictingEpochEvents(t *testing.T) {
 		block6.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal2},
 		})
-		err = state.Extend(&block6)
+		err = state.Extend(context.Background(), &block6)
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
 		block7 := unittest.BlockWithParentFixture(block5.Header)
-		err = state.Extend(&block7)
+		err = state.Extend(context.Background(), &block7)
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
 		block8 := unittest.BlockWithParentFixture(block6.Header)
-		err = state.Extend(&block8)
+		err = state.Extend(context.Background(), &block8)
 		require.NoError(t, err)
 
 		// should be able query each epoch from the appropriate reference block
@@ -838,12 +839,12 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		// add two conflicting blocks for each service event to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		rootSetup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -864,7 +865,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		// add block 1 receipt to block 3 payload
 		block3 := unittest.BlockWithParentFixture(block1.Header)
 		block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block1Receipt)))
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		// block 2 receipt contains nextEpochSetup2
@@ -874,7 +875,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		// add block 2 receipt to block 4 payload
 		block4 := unittest.BlockWithParentFixture(block2.Header)
 		block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(block2Receipt)))
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.NoError(t, err)
 
 		// seal for block 1
@@ -888,7 +889,7 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		block5.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal1},
 		})
-		err = state.Extend(&block5)
+		err = state.Extend(context.Background(), &block5)
 		require.NoError(t, err)
 
 		// block 6 builds on block 4, contains seal for block 2
@@ -896,18 +897,18 @@ func TestExtendDuplicateEpochEvents(t *testing.T) {
 		block6.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal2},
 		})
-		err = state.Extend(&block6)
+		err = state.Extend(context.Background(), &block6)
 		require.NoError(t, err)
 
 		// block 7 builds on block 5, contains QC for block 7
 		block7 := unittest.BlockWithParentFixture(block5.Header)
-		err = state.Extend(&block7)
+		err = state.Extend(context.Background(), &block7)
 		require.NoError(t, err)
 
 		// block 8 builds on block 6, contains QC for block 6
 		// at this point we are inserting the duplicate EpochSetup, should not error
 		block8 := unittest.BlockWithParentFixture(block6.Header)
-		err = state.Extend(&block8)
+		err = state.Extend(context.Background(), &block8)
 		require.NoError(t, err)
 
 		// should be able query each epoch from the appropriate reference block
@@ -933,7 +934,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -968,7 +969,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -981,7 +982,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -994,7 +995,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -1014,7 +1015,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -1059,7 +1060,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block1, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -1070,7 +1071,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 		// insert a block with a QC for block 2
 		block3 := unittest.BlockWithParentFixture(block2)
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		t.Run("inconsistent counter", func(t *testing.T) {
@@ -1081,7 +1082,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -1094,7 +1095,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -1108,7 +1109,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 			sealingBlock := unittest.SealBlock(t, state, &block3, receipt, seal)
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
-			err = state.Extend(&qcBlock)
+			err = state.Extend(context.Background(), &qcBlock)
 			require.Error(t, err)
 			require.True(t, st.IsInvalidExtensionError(err), err)
 		})
@@ -1130,9 +1131,9 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		// add a block for the first seal to reference
 		block1 := unittest.BlockWithParentFixture(head)
 		block1.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
-		err = state.Finalize(block1.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
@@ -1156,9 +1157,9 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		// add a block containing a receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
-		err = state.Finalize(block2.ID())
+		err = state.Finalize(context.Background(), block2.ID())
 		require.NoError(t, err)
 
 		// block 3 seals block 1
@@ -1166,14 +1167,14 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 		block3.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal1},
 		})
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		// block 4 will be the first block for epoch 2
 		block4 := unittest.BlockWithParentFixture(block3.Header)
 		block4.Header.View = epoch2Setup.FinalView + 1
 
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.Error(t, err)
 	})
 }
@@ -1232,11 +1233,11 @@ func TestExtendInvalidSealsInBlock(t *testing.T) {
 			util.MockBlockTimer(), util.MockReceiptValidator(), sealValidator)
 		require.NoError(t, err)
 
-		err = fullState.Extend(&block1)
+		err = fullState.Extend(context.Background(), &block1)
 		require.NoError(t, err)
-		err = fullState.Extend(&block2)
+		err = fullState.Extend(context.Background(), &block2)
 		require.NoError(t, err)
-		err = fullState.Extend(&block3)
+		err = fullState.Extend(context.Background(), &block3)
 
 		sealValidator.AssertExpectations(t)
 		require.Error(t, err)
@@ -1255,7 +1256,7 @@ func TestHeaderExtendValid(t *testing.T) {
 		extend := unittest.BlockWithParentFixture(head)
 		extend.SetPayload(flow.EmptyPayload())
 
-		err = state.Extend(&extend)
+		err = state.Extend(context.Background(), &extend)
 		require.NoError(t, err)
 
 		finalCommit, err := state.Final().Commit()
@@ -1275,7 +1276,7 @@ func TestHeaderExtendMissingParent(t *testing.T) {
 		extend.Header.ParentID = unittest.BlockFixture().ID()
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err := state.Extend(&extend)
+		err := state.Extend(context.Background(), &extend)
 		require.Error(t, err)
 		require.True(t, st.IsInvalidExtensionError(err), err)
 
@@ -1294,7 +1295,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		require.NoError(t, err)
 
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
 		// create another block that points to the previous block `extend` as parent
@@ -1304,7 +1305,7 @@ func TestHeaderExtendHeightTooSmall(t *testing.T) {
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.Header.Height = block1.Header.Height
 
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.Error(t, err)
 
 		// verify seal not indexed
@@ -1326,7 +1327,7 @@ func TestHeaderExtendHeightTooLarge(t *testing.T) {
 		// set an invalid height
 		block.Header.Height = head.Height + 2
 
-		err = state.Extend(&block)
+		err = state.Extend(context.Background(), &block)
 		require.Error(t, err)
 	})
 }
@@ -1342,15 +1343,15 @@ func TestHeaderExtendBlockNotConnected(t *testing.T) {
 		// second block is a sibling to the finalized block
 		// The Follower should reject this block as an outdated chain extension
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
 
-		err = state.Finalize(block1.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		// create a fork at view/height 1 and try to connect it to root
 		block2 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.Error(t, err)
 		require.True(t, st.IsOutdatedExtensionError(err), err)
 
@@ -1370,12 +1371,12 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 		// create block2 and block3
 		block2 := unittest.BlockWithParentFixture(head)
 		block2.SetPayload(flow.EmptyPayload())
-		err := state.Extend(&block2)
+		err := state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
 		block3.SetPayload(flow.EmptyPayload())
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
 		// create seals for block2 and block3
@@ -1394,7 +1395,7 @@ func TestHeaderExtendHighestSeal(t *testing.T) {
 			Seals:      []*flow.Seal{seal3, seal2},
 			Guarantees: nil,
 		})
-		err = state.Extend(&block4)
+		err = state.Extend(context.Background(), &block4)
 		require.NoError(t, err)
 
 		finalCommit, err := state.AtBlockID(block4.ID()).Commit()
@@ -1413,12 +1414,12 @@ func TestMakeValid(t *testing.T) {
 			// create block2 and block3
 			block2 := unittest.BlockWithParentFixture(head)
 			block2.SetPayload(flow.EmptyPayload())
-			err := state.Extend(&block2)
+			err := state.Extend(context.Background(), &block2)
 			require.NoError(t, err)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
 			block3.SetPayload(flow.EmptyPayload())
-			err = state.Extend(&block3)
+			err = state.Extend(context.Background(), &block3)
 			require.NoError(t, err)
 
 			consumer.On("BlockProcessable", mock.Anything).Return()
@@ -1450,9 +1451,9 @@ func TestSealed(t *testing.T) {
 
 		// block 1 will be sealed
 		block1 := unittest.BlockWithParentFixture(head)
-		err = state.Extend(&block1)
+		err = state.Extend(context.Background(), &block1)
 		require.NoError(t, err)
-		err = state.Finalize(block1.ID())
+		err = state.Finalize(context.Background(), block1.ID())
 		require.NoError(t, err)
 
 		receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
@@ -1460,9 +1461,9 @@ func TestSealed(t *testing.T) {
 		// block 2 contains receipt for block 1
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-		err = state.Extend(&block2)
+		err = state.Extend(context.Background(), &block2)
 		require.NoError(t, err)
-		err = state.Finalize(block2.ID())
+		err = state.Finalize(context.Background(), block2.ID())
 		require.NoError(t, err)
 
 		// block 3 contains seal for block 1
@@ -1470,9 +1471,9 @@ func TestSealed(t *testing.T) {
 		block3.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{seal1},
 		})
-		err = state.Extend(&block3)
+		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
-		err = state.Finalize(block3.ID())
+		err = state.Finalize(context.Background(), block3.ID())
 		require.NoError(t, err)
 
 		sealed, err := state.Sealed().Head()
@@ -1514,7 +1515,7 @@ func TestCacheAtomicity(t *testing.T) {
 
 			// storing the block to database, which supposed to be atomic updates to headers and index,
 			// both to badger database and the cache.
-			err = state.Extend(&block)
+			err = state.Extend(context.Background(), &block)
 			require.NoError(t, err)
 			wg.Wait()
 		})
@@ -1551,7 +1552,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		extend.Payload.Guarantees = nil
 		extend.Header.PayloadHash = extend.Payload.Hash()
 
-		err = fullState.Extend(&extend)
+		err = fullState.Extend(context.Background(), &extend)
 		assert.Error(t, err, "a proposal with invalid timestamp has to be rejected")
 		assert.True(t, st.IsInvalidExtensionError(err), "if timestamp is invalid it should return invalid block error")
 	})

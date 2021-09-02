@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	metrics "github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	realstorage "github.com/onflow/flow-go/storage"
@@ -62,7 +63,19 @@ func (suite *Suite) SetupTest() {
 	suite.cache.On("Size", mock.Anything).Return(uint(0))
 
 	metrics := metrics.NewNoopCollector()
-	eng, err := follower.New(zerolog.Logger{}, suite.net, suite.me, metrics, metrics, suite.cleaner, suite.headers, suite.payloads, suite.state, suite.cache, suite.follower, suite.sync)
+	eng, err := follower.New(zerolog.Logger{},
+		suite.net,
+		suite.me,
+		metrics,
+		metrics,
+		suite.cleaner,
+		suite.headers,
+		suite.payloads,
+		suite.state,
+		suite.cache,
+		suite.follower,
+		suite.sync,
+		trace.NewNoopTracer())
 	require.Nil(suite.T(), err)
 
 	suite.engine = eng
