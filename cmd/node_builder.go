@@ -114,7 +114,8 @@ type BaseConfig struct {
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
 	db                    *badger.DB
-	IdProvider            id.IdentityProvider
+	IDProvider            id.IdentityProvider
+	IDTranslator          p2p.IDTranslator
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of

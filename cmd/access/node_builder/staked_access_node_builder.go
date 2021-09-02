@@ -38,20 +38,10 @@ func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBui
 func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 
-		var idProvider id.IdentityProvider
-		var idTranslator p2p.IDTranslator
-		if fnb.IdProvider != nil {
-			idProvider = fnb.IdProvider
-			idTranslator = p2p.NewIdentityProviderIDTranslator(idProvider)
-		} else {
-			idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
-			if err != nil {
-				return err
-			}
-			idProvider = idCache
-			idTranslator = idCache
+		idProvider, idTranslator, err := fnb.IDProviders(node)
+		if err != nil {
+			return err
 		}
-
 		fnb.IdentityProvider = idProvider
 
 		fnb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
