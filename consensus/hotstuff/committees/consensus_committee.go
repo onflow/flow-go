@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/indices"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -130,6 +131,37 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// block in every epoch, which is anyway a requirement for valid epochs.
 	//
 	next := c.state.Final().Epochs().Next()
+	// TMP: CONTINUE FAILED EPOCH
+	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+
+		counter, err := next.Counter()
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not get next epoch counter: %w", err)
+		}
+		identities, err := next.InitialIdentities()
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not get epoch initial identities: %w", err)
+		}
+		seed, err := next.Seed(indices.ProtocolConsensusLeaderSelection...)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not get epoch seed: %w", err)
+		}
+		firstView, err := next.FirstView()
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not get epoch first view: %w", err)
+		}
+		selection, err := leader.ComputeLeaderSelectionFromSeed(
+			firstView,
+			seed,
+			int(firstView+leader.EstimatedSixMonthOfViews), // pretend the next epoch lasts forever
+			identities.Filter(filter.IsVotingConsensusCommitteeMember),
+		)
+		c.leaders[counter] = selection
+		return selection.LeaderForView(view)
+	}
+
 	selection, err := c.prepareLeaderSelection(next)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not compute leader selection for next epoch: %w", err)
