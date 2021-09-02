@@ -155,6 +155,20 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	conduit, err := suite.conensusNodeBuilder.Network.Register(channels.PushBlocks, new(mockmodule.Engine))
 	require.NoError(suite.T(), err)
 
+
+	pInfo, err := p2p.PeerAddressInfo(*suite.consensusIdentity)
+	require.NoError(suite.T(), err)
+	err = nodeBuilder.LibP2PNode.AddPeer(context.Background(), pInfo)
+	require.NoError(suite.T(), err)
+
+	middleware, ok := nodeBuilder.Middleware.(*p2p.Middleware)
+	if !ok {
+		suite.Fail("unexpected type of middleware")
+	}
+	connected, err := middleware.IsConnected(suite.consensusIdentity.NodeID)
+	require.NoError(suite.T(), err)
+	fmt.Println(connected)
+
 	// determine the nodes we should send the block to
 	recipients, err := suite.snapshot.Identities(filter.And(
 		filter.Not(filter.Ejected),
@@ -162,10 +176,15 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	))
 	require.NoError(suite.T(), err)
 
+	unittest.Bloc()
 	blockProposal := unittest.ProposalFixture()
 	err = conduit.Publish(blockProposal, recipients.NodeIDs()...)
 	require.NoError(suite.T(), err)
-	time.Sleep(1 * time.Minute)
+
+
+	blk, err := nodeBuilder.Storage.Blocks.ByID(blockProposal.Header.ID())
+	require.NoError(suite.T(), err)
+	fmt.Println(blk.ID())
 
 }
 
@@ -193,10 +212,10 @@ func (suite *Suite) createConsensusNode(idProvider id.IdentityProvider, idTransl
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String(), options...)
 	nodeInfoPriv, err := suite.consensusNodeInfo.Private()
 	require.NoError(suite.T(), err)
-	nodeBuilder.Me, err = local.New(suite.stakedANNodeInfo.Identity(), nodeInfoPriv.StakingPrivKey)
+	nodeBuilder.Me, err = local.New(suite.consensusIdentity, nodeInfoPriv.StakingPrivKey)
 	require.NoError(suite.T(), err)
-	nodeBuilder.NodeConfig.NodeID = suite.stakedANNodeInfo.NodeID
-	nodeBuilder.NodeID = suite.stakedANNodeInfo.NodeID
+	nodeBuilder.NodeConfig.NodeID = suite.consensusIdentity.NodeID
+	nodeBuilder.NodeID = suite.consensusIdentity.NodeID
 	nodeBuilder.NodeConfig.NetworkKey = nodeInfoPriv.NetworkPrivKey
 	nodeBuilder.NodeConfig.StakingKey = nodeInfoPriv.StakingPrivKey
 	nodeBuilder.InitIDProviders()
