@@ -33,6 +33,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleConsensus),
 		testnet.NewNodeConfig(flow.RoleExecution),
 		testnet.NewNodeConfig(flow.RoleVerification),
+		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NewNetworkConfig("meta_test_basic", nodes)
 
@@ -50,6 +51,7 @@ func TestNetworkSetupBasic(t *testing.T) {
 		{image: defaultRegistry + "/consensus:latest", name: "consensus_3", address: "consensus_3:2137"},
 		{image: defaultRegistry + "/execution:latest", name: "execution_1", address: "execution_1:2137"},
 		{image: defaultRegistry + "/verification:latest", name: "verification_1", address: "verification_1:2137"},
+		{image: defaultRegistry + "/access:latest", name: "access_1", address: "access_1:2137"},
 	}
 
 	assert.Subset(t, realData, expectedData)
