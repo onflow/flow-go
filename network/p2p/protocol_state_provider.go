@@ -106,10 +106,21 @@ func (p *ProtocolStateIDCache) Identities(filter flow.IdentityFilter) flow.Ident
 	return p.identities.Filter(filter)
 }
 
-func (p *ProtocolStateIDCache) GetIdentity(flowID flow.Identifier) *flow.Identity {
+func (p *ProtocolStateIDCache) ByNodeID(flowID flow.Identifier) (*flow.Identity, bool) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.lookup[flowID]
+	id, ok := p.lookup[flowID]
+	return id, ok
+}
+
+func (p *ProtocolStateIDCache) ByPeerID(peerID peer.ID) (*flow.Identity, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if flowID, ok := p.flowIDs[peerID]; ok {
+		id, ok := p.lookup[flowID]
+		return id, ok
+	}
+	return nil, false
 }
 
 func (p *ProtocolStateIDCache) GetPeerID(flowID flow.Identifier) (pid peer.ID, err error) {
