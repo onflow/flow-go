@@ -52,6 +52,27 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 		executeBlocks := prepareExecutionEnv(b, tctx.chain)
 
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(b, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := createManyAccounts(b, tctx, executeBlocks, privateKeys)
+		require.NoError(b, err)
+
+		deployContract(b, tctx, executeBlocks, accounts[0], privateKeys[0], "TestContract", `
+access(all) contract TestContract {
+	access(all) event SomeEvent()
+
+    access(all) fun empty() {
+    }
+
+	access(all) fun emit() {
+		emit SomeEvent()
+    }
+}
+`)
+
 		btx := []byte(tx)
 
 		b.ResetTimer() // setup done, lets start measuring
@@ -82,6 +103,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 		return fmt.Sprintf(`
 import FungibleToken from 0x%s
 import FlowToken from 0x%s
+import TestContract from 0x%s
 
 transaction(){
 	prepare(signer: AuthAccount){
@@ -91,7 +113,7 @@ transaction(){
 %s
 		}
 	}
-}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), prepare)
+}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", prepare)
 	}
 
 	b.Run("reference tx", func(b *testing.B) {
@@ -156,11 +178,12 @@ transaction(){
 	b.Run("create new account", func(b *testing.B) {
 		benchTransaction(b, templateTx(`let acct = AuthAccount(payer: signer)`))
 	})
-	// TODO:
-	// create account and add key
-	// create account and add key and remove a key
-	// emit event
-	// hash something
+	b.Run("call empty contract function", func(b *testing.B) {
+		benchTransaction(b, templateTx(`TestContract.empty()`))
+	})
+	b.Run("emit event", func(b *testing.B) {
+		benchTransaction(b, templateTx(`TestContract.emit()`))
+	})
 }
 
 // BenchmarkRuntimeFungibleTokenTransfer simulates executing blocks with `transactionsPerBlock`
