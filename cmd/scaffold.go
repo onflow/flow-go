@@ -45,11 +45,12 @@ import (
 )
 
 type Metrics struct {
-	Network    module.NetworkMetrics
-	Engine     module.EngineMetrics
-	Compliance module.ComplianceMetrics
-	Cache      module.CacheMetrics
-	Mempool    module.MempoolMetrics
+	Network        module.NetworkMetrics
+	Engine         module.EngineMetrics
+	Compliance     module.ComplianceMetrics
+	Cache          module.CacheMetrics
+	Mempool        module.MempoolMetrics
+	CleanCollector module.CleanerMetrics
 }
 
 type Storage struct {
@@ -96,14 +97,15 @@ type namedDoneObject struct {
 // of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	*NodeConfig
-	flags       *pflag.FlagSet
-	modules     []namedModuleFunc
-	components  []namedComponentFunc
-	doneObject  []namedDoneObject
-	sig         chan os.Signal
-	preInitFns  []func(NodeBuilder, *NodeConfig)
-	postInitFns []func(NodeBuilder, *NodeConfig)
-	lm          *lifecycle.LifecycleManager
+	flags          *pflag.FlagSet
+	modules        []namedModuleFunc
+	components     []namedComponentFunc
+	doneObject     []namedDoneObject
+	sig            chan os.Signal
+	preInitFns     []func(NodeBuilder, *NodeConfig)
+	postInitFns    []func(NodeBuilder, *NodeConfig)
+	lm             *lifecycle.LifecycleManager
+	extraFlagCheck func() error
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -170,6 +172,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
+		mwOpts := []p2p.MiddlewareOption{
+			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
+		}
+		if len(fnb.MsgValidators) > 0 {
+			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+		}
+
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
@@ -181,8 +190,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			true,
 			true,
 			fnb.IDTranslator,
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-			p2p.WithMessageValidators(fnb.MsgValidators...),
+			mwOpts...,
 		)
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
@@ -255,6 +263,11 @@ func (fnb *FlowNodeBuilder) ParseAndPrintFlags() {
 	log.Msg("flags loaded")
 }
 
+func (fnb *FlowNodeBuilder) ValidateFlags(f func() error) NodeBuilder {
+	fnb.extraFlagCheck = f
+	return fnb
+}
+
 func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 	fnb.Logger.Info().Str("version", build.Semver()).Str("commit", build.Commit()).Msg("build details")
 }
@@ -311,11 +324,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNoopCollector(),
-		Engine:     metrics.NewNoopCollector(),
-		Compliance: metrics.NewNoopCollector(),
-		Cache:      metrics.NewNoopCollector(),
-		Mempool:    metrics.NewNoopCollector(),
+		Network:        metrics.NewNoopCollector(),
+		Engine:         metrics.NewNoopCollector(),
+		Compliance:     metrics.NewNoopCollector(),
+		Cache:          metrics.NewNoopCollector(),
+		Mempool:        metrics.NewNoopCollector(),
+		CleanCollector: metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.metricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
@@ -323,11 +337,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:    metrics.NewNetworkCollector(),
-			Engine:     metrics.NewEngineCollector(),
-			Compliance: metrics.NewComplianceCollector(),
-			Cache:      metrics.NewCacheCollector(fnb.RootChainID),
-			Mempool:    mempools,
+			Network:        metrics.NewNetworkCollector(),
+			Engine:         metrics.NewEngineCollector(),
+			Compliance:     metrics.NewComplianceCollector(),
+			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			CleanCollector: metrics.NewCleanerCollector(),
+			Mempool:        mempools,
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup
@@ -717,6 +732,12 @@ func WithMetricsEnabled(enabled bool) Option {
 	}
 }
 
+func WithLogLevel(level string) Option {
+	return func(config *BaseConfig) {
+		config.level = level
+	}
+}
+
 // FlowNode creates a new Flow node builder with the given name.
 func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 	config := DefaultBaseConfig()
@@ -746,6 +767,8 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 	fnb.BaseFlags()
 
 	fnb.ParseAndPrintFlags()
+
+	fnb.extraFlagsValidation()
 
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
@@ -878,6 +901,15 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 		fnb.Logger.Error().
 			Err(err).
 			Msg("could not close database")
+	}
+}
+
+func (fnb *FlowNodeBuilder) extraFlagsValidation() {
+	if fnb.extraFlagCheck != nil {
+		err := fnb.extraFlagCheck()
+		if err != nil {
+			fnb.Logger.Fatal().Err(err).Msg("invalid flags")
+		}
 	}
 }
 

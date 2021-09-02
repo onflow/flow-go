@@ -34,7 +34,7 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 // to channelRoleMap as a constant channel type manually.
 func Exists(channel network.Channel) bool {
 	_, exists := RolesByChannel(channel)
-	return exists
+	return exists || UnstakedChannels().Contains(channel)
 }
 
 // ChannelsByRole returns a list of all channels the role subscribes to.

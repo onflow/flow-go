@@ -223,10 +223,11 @@ type ConsensusFollowerConfig struct {
 	NodeID            flow.Identifier
 	NetworkingPrivKey crypto.PrivateKey
 	StakedNodeID      flow.Identifier
+	Opts              []consensus_follower.Option
 }
 
-func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier) ConsensusFollowerConfig {
-	pid, err := p2p.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
+func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
+	pid, err := p2p.ExtractPeerID(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
 	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
@@ -234,6 +235,7 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 		NetworkingPrivKey: networkingPrivKey,
 		StakedNodeID:      stakedNodeID,
 		NodeID:            nodeID,
+		Opts:              opts,
 	}
 }
 
@@ -499,10 +501,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
-	opts := []consensus_follower.Option{
+	opts := append(
+		followerConf.Opts,
 		consensus_follower.WithDataDir(dataDir),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
-	}
+	)
 
 	var stakedANContainer *ContainerConfig
 	// find the upstream Access node container for this follower engine
@@ -652,7 +655,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			hostHTTPProxyPort := testingdock.RandomPort(t)
 			containerGRPCPort := "9000/tcp"
 			containerHTTPProxyPort := "8000/tcp"
-
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
