@@ -1,6 +1,7 @@
 package liveness
 
 import (
+	"html"
 	"net/http"
 	"sync"
 	"time"
@@ -64,7 +65,7 @@ func (c *CheckCollector) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if toleranceStr := r.Header.Get(ToleranceHeader); toleranceStr != "" {
 		tolerance, err = time.ParseDuration(toleranceStr)
 		if err != nil {
-			http.Error(w, "Invalid tolerace: "+toleranceStr, http.StatusBadRequest)
+			http.Error(w, "Invalid tolerace: "+html.EscapeString(toleranceStr), http.StatusBadRequest)
 			return
 		}
 	}
