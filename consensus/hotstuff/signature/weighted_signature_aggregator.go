@@ -128,12 +128,10 @@ func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
 	return collectedWeight
 }
 
-// Aggregate assumes enough weights have been collected, it aggregates the signatures
-// and return the aggregated signature.
+// Aggregate aggregates the signatures and returns the aggregated signature.
 //
 // The function is thread-safe.
 // Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
-// It errors if not enough weights have been collected.
 // The function performs a final verification and errors if the aggregated signature is not valid. This is
 // required for the function safety since "TrustedAdd" allows adding invalid signatures.
 //
