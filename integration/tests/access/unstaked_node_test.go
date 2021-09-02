@@ -181,7 +181,7 @@ func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
 	return utils.GenerateUnstakedNetworkingKey(unittest.SeedFixture(n))
 }
 
-// followerManager a convinience wrapper around the consensus follower
+// followerManager is a convenience wrapper around the consensus follower
 type followerManager struct {
 	follower    *consensus_follower.ConsensusFollowerImpl
 	blockIDChan chan flow.Identifier
