@@ -450,20 +450,10 @@ func (fnb *FlowNodeBuilder) initStorage() {
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
-		var idProvider id.IdentityProvider
-		var idTranslator p2p.IDTranslator
-		if fnb.IdProvider != nil {
-			idProvider = fnb.IdProvider
-			idTranslator = p2p.NewIdentityProviderIDTranslator(idProvider)
-		} else {
-			idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
-			if err != nil {
-				return err
-			}
-			idProvider = idCache
-			idTranslator = idCache
+		idProvider, idTranslator, err := fnb.IDProviders(node)
+		if err != nil {
+			return err
 		}
-
 		node.IdentityProvider = idProvider
 		node.IDTranslator = idTranslator
 		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idProvider)
@@ -477,6 +467,32 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 		)
 		return nil
 	})
+}
+
+func (fnb *FlowNodeBuilder) IDProviders(node *NodeConfig) (id.IdentityProvider, p2p.IDTranslator, error) {
+	var idProvider id.IdentityProvider
+	var idTranslator p2p.IDTranslator
+
+	// if neither the ID Provider nor the ID Translator is provided, then use the ProtocolStateIDCache for both
+	if fnb.BaseConfig.IDProvider == nil && fnb.BaseConfig.IDTranslator == nil {
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+		if err != nil {
+			return nil, nil, err
+		}
+		idProvider = idCache
+		idTranslator = idCache
+		return idProvider, idTranslator, nil
+	}
+
+	if fnb.IDProvider == nil {
+		return nil, nil, fmt.Errorf("ID Provider not provided")
+	}
+
+	if fnb.IDProvider == nil {
+		return nil, nil, fmt.Errorf("ID Translator not provided")
+	}
+
+	return fnb.IDProvider, fnb.IDTranslator, nil
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -766,7 +782,13 @@ func WithDB(db *badger.DB) Option {
 
 func WithIDProvider(idProvider id.IdentityProvider) Option {
 	return func(config *BaseConfig) {
-		config.IdProvider = idProvider
+		config.IDProvider = idProvider
+	}
+}
+
+func WithIDTranslator(idTranslator p2p.IDTranslator) Option {
+	return func(config *BaseConfig) {
+		config.IDTranslator = idTranslator
 	}
 }
 

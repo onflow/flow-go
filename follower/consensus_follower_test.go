@@ -74,14 +74,17 @@ func (suite *Suite) SetupTest() {
 
 func (suite *Suite) TestFollowerReceivesBlocks() {
 
-	idProvider := test.NewUpdatableIDProvider(flow.IdentityList{})
+	idProvider := test.NewUpdatableIDProvider(suite.allParticipants)
+	idTranslator, err := p2p.NewFixedTableIdentityTranslator(suite.allParticipants)
+	require.NoError(suite.T(), err)
 
 	db, _ := unittest.TempBadgerDB(suite.T())
 	baseOptions := node_builder.WithBaseOptions([]cmd.Option{cmd.WithDB(db),
 		cmd.WithBindAddress("0.0.0.0:0"),
 		cmd.WithBootstrapDir(suite.bootDir),
 		cmd.WithMetricsEnabled(false),
-	cmd.WithIDProvider(idProvider)})
+	cmd.WithIDProvider(idProvider),
+	cmd.WithIDTranslator(idTranslator)})
 	accessNodeOptions := node_builder.SupportsUnstakedNode(true)
 	nodeBuilder := node_builder.NewStakedAccessNodeBuilder(node_builder.FlowAccessNode(baseOptions, accessNodeOptions))
 	nodeInfoPriv, err := suite.stakedANNodeInfo.Private()
@@ -97,49 +100,57 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	h, err := nodeBuilder.State.Sealed().Head()
 	require.NoError(suite.T(), err)
 	fmt.Println(h.Height)
-	host, portStr, err := nodeBuilder.LibP2PNode.GetIPPort()
-	require.NoError(suite.T(), err)
-	port, err := strconv.Atoi(portStr)
-	require.NoError(suite.T(), err)
+	//host, portStr, err := nodeBuilder.LibP2PNode.GetIPPort()
+	//require.NoError(suite.T(), err)
+	//port, err := strconv.Atoi(portStr)
+	//require.NoError(suite.T(), err)
 
 
 	suite.stakedANIdentity.Address = suite.getAddress(nodeBuilder.FlowNodeBuilder)
 
-	followerDB, _ := unittest.TempBadgerDB(suite.T())
-
-	followerKey, err := UnstakedNetworkingKey()
+	k, err := p2p.LibP2PPublicKeyFromFlow(suite.stakedANIdentity.NetworkPubKey)
 	require.NoError(suite.T(), err)
-
-	bootstrapNodeInfo := BootstrapNodeInfo{
-		Host:             host,
-		Port:             uint(port),
-		NetworkPublicKey: nodeBuilder.NodeConfig.NetworkKey.PublicKey(),
-	}
-
-	follower, err := NewConsensusFollower(followerKey, "0.0.0.0:0", []BootstrapNodeInfo{bootstrapNodeInfo},
-		WithBootstrapDir(suite.bootDir), WithDB(followerDB))
-	follower.NodeBuilder.MetricsEnabled = false
-
+	id, err := peer.IDFromPublicKey(k)
 	require.NoError(suite.T(), err)
+	fmt.Println(id.String())
 
-	follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
 
-	// get the underlying node builder
-	node := follower.NodeBuilder
-	// wait for the follower to have completely started
-	unittest.RequireCloseBefore(suite.T(), node.Ready(), 10*time.Second,
-		"timed out while waiting for consensus follower to start")
+	//followerDB, _ := unittest.TempBadgerDB(suite.T())
+	//
+	//followerKey, err := UnstakedNetworkingKey()
+	//require.NoError(suite.T(), err)
+	//
+	//bootstrapNodeInfo := BootstrapNodeInfo{
+	//	Host:             host,
+	//	Port:             uint(port),
+	//	NetworkPublicKey: nodeBuilder.NodeConfig.NetworkKey.PublicKey(),
+	//}
+	//
+	//follower, err := NewConsensusFollower(followerKey, "0.0.0.0:0", []BootstrapNodeInfo{bootstrapNodeInfo},
+	//	WithBootstrapDir(suite.bootDir), WithDB(followerDB))
+	//follower.NodeBuilder.MetricsEnabled = false
+	//
+	//require.NoError(suite.T(), err)
+	//
+	//follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
+	//
+	//// get the underlying node builder
+	//node := follower.NodeBuilder
+	//// wait for the follower to have completely started
+	//unittest.RequireCloseBefore(suite.T(), node.Ready(), 10*time.Second,
+	//	"timed out while waiting for consensus follower to start")
+	//
+	//go func() {
+	//	follower.Run(context.Background())
+	//}()
 
-	go func() {
-		follower.Run(context.Background())
-	}()
-
-	suite.conensusNodeBuilder = suite.createConsensusNode(idProvider)
+	suite.conensusNodeBuilder = suite.createConsensusNode(idProvider, idTranslator)
 	suite.consensusIdentity.Address = suite.getAddress(suite.conensusNodeBuilder)
 
 	for _, i := range suite.allParticipants {
 		fmt.Println(i.String())
 	}
+	idProvider.SetIdentities(suite.allParticipants)
 
 	conduit, err := suite.conensusNodeBuilder.Network.Register(channels.PushBlocks, new(mockmodule.Engine))
 	require.NoError(suite.T(), err)
@@ -171,13 +182,14 @@ func UnstakedNetworkingKey() (crypto.PrivateKey, error) {
 	return utils.GenerateUnstakedNetworkingKey(unittest.SeedFixture(n))
 }
 
-func (suite *Suite) createConsensusNode(idProvider id.IdentityProvider) *cmd.FlowNodeBuilder {
+func (suite *Suite) createConsensusNode(idProvider id.IdentityProvider, idTranslator p2p.IDTranslator) *cmd.FlowNodeBuilder {
 	db, _ := unittest.TempBadgerDB(suite.T())
 	options := []cmd.Option{cmd.WithDB(db),
 		cmd.WithBindAddress("0.0.0.0:0"),
 		cmd.WithBootstrapDir(suite.bootDir),
 		cmd.WithMetricsEnabled(false),
-		cmd.WithIDProvider(idProvider)}
+		cmd.WithIDProvider(idProvider),
+	cmd.WithIDTranslator(idTranslator)}
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String(), options...)
 	nodeInfoPriv, err := suite.consensusNodeInfo.Private()
 	require.NoError(suite.T(), err)
