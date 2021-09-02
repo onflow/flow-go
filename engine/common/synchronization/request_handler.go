@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/storage"
 )
 
 // defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
@@ -36,8 +35,7 @@ type RequestHandlerEngine struct {
 	log     zerolog.Logger
 	metrics SyncEngineMetrics
 
-	blocks          storage.Blocks
-	core            module.SyncCore
+	core            RequestHandlerCore
 	finalizedHeader *FinalizedHeaderCache
 	con             network.Conduit // used for sending responses to requesters
 
@@ -52,8 +50,7 @@ func NewRequestHandlerEngine(
 	metrics SyncEngineMetrics,
 	con network.Conduit,
 	me module.Local,
-	blocks storage.Blocks,
-	core module.SyncCore,
+	core RequestHandlerCore,
 	finalizedHeader *FinalizedHeaderCache,
 ) *RequestHandlerEngine {
 	r := &RequestHandlerEngine{
@@ -62,7 +59,6 @@ func NewRequestHandlerEngine(
 		me:              me,
 		log:             log.With().Str("engine", "synchronization").Logger(),
 		metrics:         metrics,
-		blocks:          blocks,
 		core:            core,
 		finalizedHeader: finalizedHeader,
 		con:             con,
@@ -173,73 +169,41 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // inform the other node of it, so they can organize their block downloads. If
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	final := r.finalizedHeader.Get()
 
-	// queue any missing heights as needed
-	r.core.HandleHeight(final, req.Height)
-
-	// don't bother sending a response if we're within tolerance or if we're
-	// behind the requester
-	if r.core.WithinTolerance(final, req.Height) || req.Height > final.Height {
-		return nil
-	}
-
-	// if we're sufficiently ahead of the requester, send a response
-	res := &messages.SyncResponse{
-		Height: final.Height,
-		Nonce:  req.Nonce,
-	}
-	err := r.con.Unicast(res, originID)
+	res, err := r.core.HandleSyncRequest(req, r.finalizedHeader.Get())
 	if err != nil {
-		r.log.Warn().Err(err).Msg("sending sync response failed")
-		return nil
+		return err
 	}
-	r.metrics.MessageSent(metrics.MessageSyncResponse)
+
+	if res != nil {
+		err = r.con.Unicast(res, originID)
+		if err != nil {
+			r.log.Warn().Err(err).Msg("sending sync response failed")
+			return nil
+		}
+		r.metrics.MessageSent(metrics.MessageSyncResponse)
+	}
 
 	return nil
 }
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+
 	// get the latest final state to know if we can fulfill the request
-	head := r.finalizedHeader.Get()
-
-	// if we don't have anything to send, we can bail right away
-	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
-		return nil
-	}
-
-	// get all of the blocks, one by one
-	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
-	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ByHeight(height)
-		if errors.Is(err, storage.ErrNotFound) {
-			r.log.Error().Uint64("height", height).Msg("skipping unknown heights")
-			break
-		}
-		if err != nil {
-			return fmt.Errorf("could not get block for height (%d): %w", height, err)
-		}
-		blocks = append(blocks, block)
-	}
-
-	// if there are no blocks to send, skip network message
-	if len(blocks) == 0 {
-		r.log.Debug().Msg("skipping empty range response")
-		return nil
-	}
-
-	// send the response
-	res := &messages.BlockResponse{
-		Nonce:  req.Nonce,
-		Blocks: blocks,
-	}
-	err := r.con.Unicast(res, originID)
+	res, err := r.core.HandleRangeRequest(req, r.finalizedHeader.Get())
 	if err != nil {
-		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
-		return nil
+		return err
 	}
-	r.metrics.MessageSent(metrics.MessageBlockResponse)
+
+	if res != nil {
+		err = r.con.Unicast(res, originID)
+		if err != nil {
+			r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
+			return nil
+		}
+		r.metrics.MessageSent(metrics.MessageBlockResponse)
+	}
 
 	return nil
 }
@@ -251,43 +215,19 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		return nil
 	}
 
-	// deduplicate the block IDs in the batch request
-	blockIDs := make(map[flow.Identifier]struct{})
-	for _, blockID := range req.BlockIDs {
-		blockIDs[blockID] = struct{}{}
-	}
-
-	// try to get all the blocks by ID
-	blocks := make([]*flow.Block, 0, len(blockIDs))
-	for blockID := range blockIDs {
-		block, err := r.blocks.ByID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			r.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
-		}
-		blocks = append(blocks, block)
-	}
-
-	// if there are no blocks to send, skip network message
-	if len(blocks) == 0 {
-		r.log.Debug().Msg("skipping empty batch response")
-		return nil
-	}
-
-	// send the response
-	res := &messages.BlockResponse{
-		Nonce:  req.Nonce,
-		Blocks: blocks,
-	}
-	err := r.con.Unicast(res, originID)
+	res, err := r.core.HandleBatchRequest(req)
 	if err != nil {
-		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
-		return nil
+		return err
 	}
-	r.metrics.MessageSent(metrics.MessageBlockResponse)
+
+	if res != nil {
+		err = r.con.Unicast(res, originID)
+		if err != nil {
+			r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
+			return nil
+		}
+		r.metrics.MessageSent(metrics.MessageBlockResponse)
+	}
 
 	return nil
 }

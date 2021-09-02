@@ -4,14 +4,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// SyncEngineMetrics is a helper interface which is built around module.EngineMetrics.
-// It's useful for RequestHandlerEngine since it can be used to report metrics for different engine names.
-type SyncEngineMetrics interface {
-	MessageSent(message string)
-	MessageReceived(message string)
-	MessageHandled(messages string)
-}
-
 // SyncEngineMetricsImpl implements SyncEngineMetrics proxying all calls to module.EngineMetrics with
 // preset engine name at construction time.
 type SyncEngineMetricsImpl struct {

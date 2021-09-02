@@ -40,7 +40,6 @@ type Engine struct {
 	metrics SyncEngineMetrics
 	me      module.Local
 	con     network.Conduit
-	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
 	pollInterval    time.Duration
@@ -86,9 +85,8 @@ func New(
 		log:             log.With().Str("engine", "synchronization").Logger(),
 		metrics:         NewSyncEngineMetrics(metrics.EngineSynchronization, engineMetrics),
 		me:              me,
-		blocks:          blocks,
-		comp:            comp,
 		core:            core,
+		comp:            comp,
 		pollInterval:    opt.pollInterval,
 		scanInterval:    opt.scanInterval,
 		finalizedHeader: finalizedHeader,
@@ -107,7 +105,8 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, e.metrics, con, me, blocks, core, finalizedHeader)
+	requestHandlerCore := NewRequestHandlerCore(log, blocks, core)
+	e.requestHandler = NewRequestHandlerEngine(log, e.metrics, con, me, requestHandlerCore, finalizedHeader)
 
 	return e, nil
 }
