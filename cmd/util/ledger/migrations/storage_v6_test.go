@@ -70,7 +70,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 
 		address := common.Address{1, 2}
 
-		err = migration.decodeAndCache(encoded, address, "", oldInter.CurrentEncodingVersion)
+		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
 
 		migration.storage.Commit()
@@ -134,7 +134,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 
 		address := common.Address{1, 2}
 
-		err = migration.decodeAndCache(encoded, address, "", oldInter.CurrentEncodingVersion)
+		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
 
 		migration.storage.Commit()
