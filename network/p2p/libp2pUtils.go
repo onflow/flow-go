@@ -16,8 +16,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -107,7 +107,7 @@ func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, erro
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := LibP2PPublicKeyFromFlow(identity.NetworkPubKey)
+	lkey, err := keyutils.LibP2PPublicKeyFromFlow(identity.NetworkPubKey)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
@@ -231,21 +231,4 @@ func flowStream(conn network.Conn) network.Stream {
 		}
 	}
 	return nil
-}
-
-// PeerIDFromFlowPublicKey converts a Flow public key to a LibP2P peer ID.
-func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
-	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
-	if err != nil {
-		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
-		return
-	}
-
-	pid, err = peer.IDFromPublicKey(pk)
-	if err != nil {
-		err = fmt.Errorf("failed to convert LibP2P key to peer ID: %w", err)
-		return
-	}
-
-	return
 }

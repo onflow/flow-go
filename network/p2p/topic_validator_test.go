@@ -8,11 +8,12 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestTopicValidator(t *testing.T) {

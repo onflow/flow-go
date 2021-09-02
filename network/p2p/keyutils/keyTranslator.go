@@ -1,13 +1,15 @@
-package p2p
+package keyutils
 
 import (
 	goecdsa "crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/x509"
+	"fmt"
 	"math/big"
 
 	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	lcrypto_pb "github.com/libp2p/go-libp2p-core/crypto/pb"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/crypto"
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -42,6 +44,23 @@ func setPubKey(c elliptic.Curve, x *big.Int, y *big.Int) *goecdsa.PublicKey {
 
 // Both Flow and LibP2P define a crypto package with their own abstraction of Keys
 // These utility functions convert a Flow crypto key to a LibP2P key (Flow --> LibP2P)
+
+// PeerIDFromFlowPublicKey converts a Flow public key to a LibP2P peer ID.
+func PeerIDFromFlowPublicKey(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
+	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
+	if err != nil {
+		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
+		return
+	}
+
+	pid, err = peer.IDFromPublicKey(pk)
+	if err != nil {
+		err = fmt.Errorf("failed to convert LibP2P key to peer ID: %w", err)
+		return
+	}
+
+	return
+}
 
 // PrivKey converts a Flow private key to a LibP2P Private key
 func LibP2PPrivKeyFromFlow(fpk fcrypto.PrivateKey) (lcrypto.PrivKey, error) {
