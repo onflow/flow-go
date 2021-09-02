@@ -3,7 +3,10 @@ package test
 import (
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // UpdatableIDProvider implements an IdentityProvider which can be manually updated by setting
@@ -36,4 +39,32 @@ func (p *UpdatableIDProvider) Identifiers() flow.IdentifierList {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.identities.NodeIDs()
+}
+
+func (p *UpdatableIDProvider) ByNodeID(flowID flow.Identifier) (*flow.Identity, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for _, v := range p.identities {
+		if v.ID() == flowID {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+func (p *UpdatableIDProvider) ByPeerID(peerID peer.ID) (*flow.Identity, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	for _, v := range p.identities {
+		if id, err := keyutils.PeerIDFromFlowPublicKey(v.NetworkPubKey); err == nil {
+			if id == peerID {
+				return v, true
+			}
+		}
+
+	}
+	return nil, false
+
 }
