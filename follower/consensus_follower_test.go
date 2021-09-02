@@ -3,6 +3,7 @@ package follower
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -15,7 +16,6 @@ import (
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
@@ -35,10 +35,10 @@ type Suite struct {
 	stakedANNodeInfo    bootstrap.NodeInfo
 	consensusNodeInfo   bootstrap.NodeInfo
 	conensusNodeBuilder *cmd.FlowNodeBuilder
-	allParticipants flow.IdentityList
-	stakedANIdentity *flow.Identity
-	consensusIdentity *flow.Identity
-
+	allParticipants     flow.IdentityList
+	stakedANIdentity    *flow.Identity
+	consensusIdentity   *flow.Identity
+	mockConsensus *MockConsensus
 }
 
 func TestConsensusFollower(t *testing.T) {
@@ -70,6 +70,11 @@ func (suite *Suite) SetupTest() {
 	err = unittest.WriteJSON(rootSnapshotPath, snapshot.Encodable())
 	require.NoError(suite.T(), err)
 	suite.snapshot = snapshot
+
+	suite.mockConsensus = &MockConsensus{
+		consensusIdentity: suite.consensusIdentity,
+		currentHeader: h,
+	}
 }
 
 func (suite *Suite) TestFollowerReceivesBlocks() {
@@ -83,8 +88,8 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 		cmd.WithBindAddress("0.0.0.0:0"),
 		cmd.WithBootstrapDir(suite.bootDir),
 		cmd.WithMetricsEnabled(false),
-	cmd.WithIDProvider(idProvider),
-	cmd.WithIDTranslator(idTranslator)})
+		cmd.WithIDProvider(idProvider),
+		cmd.WithIDTranslator(idTranslator)})
 	accessNodeOptions := node_builder.SupportsUnstakedNode(true)
 	nodeBuilder := node_builder.NewStakedAccessNodeBuilder(node_builder.FlowAccessNode(baseOptions, accessNodeOptions))
 	nodeInfoPriv, err := suite.stakedANNodeInfo.Private()
@@ -105,7 +110,6 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	//port, err := strconv.Atoi(portStr)
 	//require.NoError(suite.T(), err)
 
-
 	suite.stakedANIdentity.Address = suite.getAddress(nodeBuilder.FlowNodeBuilder)
 
 	k, err := p2p.LibP2PPublicKeyFromFlow(suite.stakedANIdentity.NetworkPubKey)
@@ -113,7 +117,6 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	id, err := peer.IDFromPublicKey(k)
 	require.NoError(suite.T(), err)
 	fmt.Println(id.String())
-
 
 	//followerDB, _ := unittest.TempBadgerDB(suite.T())
 	//
@@ -155,7 +158,6 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	conduit, err := suite.conensusNodeBuilder.Network.Register(channels.PushBlocks, new(mockmodule.Engine))
 	require.NoError(suite.T(), err)
 
-
 	pInfo, err := p2p.PeerAddressInfo(*suite.consensusIdentity)
 	require.NoError(suite.T(), err)
 	err = nodeBuilder.LibP2PNode.AddPeer(context.Background(), pInfo)
@@ -170,21 +172,26 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	fmt.Println(connected)
 
 	// determine the nodes we should send the block to
-	recipients, err := suite.snapshot.Identities(filter.And(
-		filter.Not(filter.Ejected),
-		filter.Not(filter.HasRole(flow.RoleConsensus)),
-	))
-	require.NoError(suite.T(), err)
+	//recipients, err := suite.snapshot.Identities(filter.And(
+	//	filter.Not(filter.Ejected),
+	//	filter.Not(filter.HasRole(flow.RoleConsensus)),
+	//))
+	//require.NoError(suite.T(), err)
 
-	unittest.Bloc()
-	blockProposal := unittest.ProposalFixture()
-	err = conduit.Publish(blockProposal, recipients.NodeIDs()...)
-	require.NoError(suite.T(), err)
+	//head, err := suite.snapshot.Head()
+	//require.NoError(suite.T(), err)
+	//extend := unittest.BlockWithParentFixture(head)
+	//extend.Payload.Guarantees = nil
+	//extend.Header.PayloadHash = extend.Payload.Hash()
 
-
-	blk, err := nodeBuilder.Storage.Blocks.ByID(blockProposal.Header.ID())
+	block := suite.mockConsensus.extendBlock()
+	blockProposal := unittest.ProposalFromBlock(block)
+	err = conduit.Unicast(blockProposal, suite.stakedANIdentity.NodeID)
 	require.NoError(suite.T(), err)
-	fmt.Println(blk.ID())
+	time.Sleep(time.Hour)
+	//blk, err := nodeBuilder.Storage.Blocks.ByID(blockProposal.Header.ID())
+	//require.NoError(suite.T(), err)
+	//fmt.Println(blk.ID())
 
 }
 
@@ -208,7 +215,7 @@ func (suite *Suite) createConsensusNode(idProvider id.IdentityProvider, idTransl
 		cmd.WithBootstrapDir(suite.bootDir),
 		cmd.WithMetricsEnabled(false),
 		cmd.WithIDProvider(idProvider),
-	cmd.WithIDTranslator(idTranslator)}
+		cmd.WithIDTranslator(idTranslator)}
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String(), options...)
 	nodeInfoPriv, err := suite.consensusNodeInfo.Private()
 	require.NoError(suite.T(), err)
@@ -228,7 +235,6 @@ func (suite *Suite) createConsensusNode(idProvider id.IdentityProvider, idTransl
 	return nodeBuilder
 }
 
-
 func (suite *Suite) getAddress(nodeBuilder *cmd.FlowNodeBuilder) string {
 	middleware, ok := nodeBuilder.Middleware.(*p2p.Middleware)
 	if !ok {
@@ -236,5 +242,19 @@ func (suite *Suite) getAddress(nodeBuilder *cmd.FlowNodeBuilder) string {
 	}
 	ip, port, err := middleware.GetIPPort()
 	require.NoError(suite.T(), err)
-	return fmt.Sprintf("%s:%s",ip, port)
+	return fmt.Sprintf("%s:%s", ip, port)
+}
+
+type MockConsensus struct {
+	consensusIdentity *flow.Identity
+	currentHeader *flow.Header
+}
+
+func (mc *MockConsensus) extendBlock() *flow.Block {
+	nextBlock := unittest.BlockWithParentFixture(mc.currentHeader)
+	nextBlock.Header.View = mc.currentHeader.View
+	nextBlock.Header.ProposerID = mc.consensusIdentity.NodeID
+	nextBlock.Header.ParentVoterIDs = flow.IdentifierList{mc.consensusIdentity.NodeID}
+	mc.currentHeader = nextBlock.Header
+	return &nextBlock
 }
