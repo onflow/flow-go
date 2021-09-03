@@ -40,7 +40,6 @@ func TestUnstakedAccessSuite(t *testing.T) {
 }
 
 func (suite *UnstakedAccessSuite) TearDownTest() {
-	// avoid nil pointer errors for skipped tests
 	defer suite.cancel()
 	suite.net.Remove()
 }
@@ -71,7 +70,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 				select {
 				case blockID := <-suite.followerMgr1.blockIDChan:
 					receivedBlocks[blockID] = struct{}{}
-					_, err = suite.followerMgr1.hasBlock(blockID)
+					_, err = suite.followerMgr1.getBlock(blockID)
 					if err != nil {
 						return
 					}
@@ -220,16 +219,12 @@ func (fm *followerManager) onBlockFinalizedConsumer(finalizedBlockID flow.Identi
 	fm.blockIDChan <- finalizedBlockID
 }
 
-// hasBlock checks if the underlying storage of the consensus follower has a block
-func (fm *followerManager) hasBlock(blockID flow.Identifier) (bool, error) {
+// getBlock checks if the underlying storage of the consensus follower has a block
+func (fm *followerManager) getBlock(blockID flow.Identifier) (*flow.Block, error) {
 	// get the underlying storage that the follower is using
 	store := fm.follower.NodeBuilder.Storage
 	require.NotNil(fm.t, store)
 	blocks := store.Blocks
 	require.NotNil(fm.t, blocks)
-	blk, err := blocks.ByID(blockID)
-	if err != nil {
-		return false, err
-	}
-	return blk == nil, nil
+	return blocks.ByID(blockID)
 }
