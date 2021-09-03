@@ -166,7 +166,7 @@ func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
 	overlay.On("Topology").Maybe().Return(m.getIds, nil)
 	// this test is not testing the topic validator, especially in spoofing,
 	// so we always return a valid identity
-	overlay.On("GetIdentity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
 	return overlay
 }
 
