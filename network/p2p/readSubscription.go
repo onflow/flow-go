@@ -12,7 +12,6 @@ import (
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -25,13 +24,13 @@ type readSubscription struct {
 	log      zerolog.Logger
 	sub      *pubsub.Subscription
 	metrics  module.NetworkMetrics
-	callback func(msg *message.Message, pubKey crypto.PublicKey)
+	callback func(msg *message.Message, peerID peer.ID)
 }
 
 // newReadSubscription reads the messages coming in on the subscription
 func newReadSubscription(ctx context.Context,
 	sub *pubsub.Subscription,
-	callback func(msg *message.Message, pubKey crypto.PublicKey),
+	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics) *readSubscription {
 
@@ -82,16 +81,9 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
-		// if pubsub.WithMessageSigning(true) and pubsub.WithStrictSignatureVerification(true),
-		// the emitter is authenticated
-		emitterKey, err := messagePubKey(rawMsg)
+		pid, err := messageSigningID(rawMsg)
 		if err != nil {
-			r.log.Err(err).Msg("failed to extract libp2p public key of message")
-			return
-		}
-		flowKey, err := FlowPublicKeyFromLibP2P(emitterKey)
-		if err != nil {
-			r.log.Err(err).Msg("failed to extract flow public key of libp2p key")
+			r.log.Err(err).Msg("failed to validate peer ID of incoming message")
 			return
 		}
 
@@ -109,7 +101,7 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
-		r.callback(&msg, flowKey)
+		r.callback(&msg, pid)
 	}
 }
 
@@ -118,35 +110,36 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 // https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md
 // This reproduces the exact logic of the private function doing the same decoding in libp2p:
 // https://github.com/libp2p/go-libp2p-pubsub/blob/ba28f8ecfc551d4d916beb748d3384951bce3ed0/sign.go#L77
-func messagePubKey(m *pubsub.Message) (lcrypto.PubKey, error) {
+func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 	var pubk lcrypto.PubKey
 
 	// m.From is the original sender of the message (versus `m.ReceivedFrom` which is the last hop which sent us this message)
 	pid, err := peer.IDFromBytes(m.From)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if m.Key == nil {
 		// no attached key, it must be extractable from the source ID
 		pubk, err = pid.ExtractPublicKey()
 		if err != nil {
-			return nil, fmt.Errorf("cannot extract signing key: %s", err.Error())
+			return "", fmt.Errorf("cannot extract signing key: %s", err.Error())
 		}
 		if pubk == nil {
-			return nil, fmt.Errorf("cannot extract signing key")
+			return "", fmt.Errorf("cannot extract signing key")
 		}
 	} else {
 		pubk, err = lcrypto.UnmarshalPublicKey(m.Key)
 		if err != nil {
-			return nil, fmt.Errorf("cannot unmarshal signing key: %s", err.Error())
+			return "", fmt.Errorf("cannot unmarshal signing key: %s", err.Error())
 		}
 
 		// verify that the source ID matches the attached key
 		if !pid.MatchesPublicKey(pubk) {
-			return nil, fmt.Errorf("bad signing key; source ID %s doesn't match key", pid)
+			return "", fmt.Errorf("bad signing key; source ID %s doesn't match key", pid)
 		}
 	}
 
-	return pubk, nil
+	// the pid either contains or matches the signing pubKey
+	return pid, nil
 }

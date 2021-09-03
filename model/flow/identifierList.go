@@ -2,6 +2,7 @@ package flow
 
 import (
 	"bytes"
+	"math/rand"
 
 	"github.com/rs/zerolog/log"
 )
@@ -68,6 +69,32 @@ func (il IdentifierList) Contains(target Identifier) bool {
 		}
 	}
 	return false
+}
+
+// Union returns a new identifier list containing the union of `il` and `other`.
+// There are no duplicates in the output.
+func (il IdentifierList) Union(other IdentifierList) IdentifierList {
+	// stores the output, the union of the two lists
+	union := make(IdentifierList, 0, len(il)+len(other))
+	// efficient lookup to avoid duplicates
+	lookup := make(map[Identifier]struct{})
+
+	// add all identifiers, omitted duplicates
+	for _, identifier := range append(il.Copy(), other...) {
+		if _, exists := lookup[identifier]; exists {
+			continue
+		}
+		union = append(union, identifier)
+		lookup[identifier] = struct{}{}
+	}
+
+	return union
+}
+
+// DeterministicSample returns deterministic random sample from the `IdentifierList` using the given seed
+func (il IdentifierList) DeterministicSample(size uint, seed int64) IdentifierList {
+	rand.Seed(seed)
+	return il.Sample(size)
 }
 
 // Sample returns random sample of length 'size' of the ids
