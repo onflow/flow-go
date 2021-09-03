@@ -39,19 +39,18 @@ func (ps VoteCollectorStatus) String() string {
 	return collectorStatusNames[ps]
 }
 
+// VoteCollector collects all votes for a specified view. On the happy path, it
+// generates a QC when enough votes have been collected.
+// The VoteCollector internally delegates the vote-format specific processing
+// to the VoteProcessor.
 type VoteCollector interface {
-	VoteCollectorState
 	// ProcessBlock performs validation of block signature and processes block with respected collector.
 	// Calling this function will mark conflicting collector as stale and change state of valid collectors
 	// It returns nil if the block is valid.
 	// It returns model.InvalidBlockError if block is invalid.
 	// It returns other error if there is exception processing the block.
 	ProcessBlock(block *model.Proposal) error
-}
 
-// VoteCollectorState collects votes for the same block, produces QC when enough votes are collected
-// VoteCollectorState takes a callback function to report the event that a QC has been produced.
-type VoteCollectorState interface {
 	// AddVote adds a vote to the collector
 	// return error if the signature is invalid
 	// When enough votes have been added to produce a QC, the QC will be created asynchronously, and
@@ -66,22 +65,8 @@ type VoteCollectorState interface {
 	Status() VoteCollectorStatus
 }
 
-// VerifyingVoteCollector is a VoteCollector and also implement the same interface as BlockSigner, so that
-// when the voter ask VoteAggregator(via BlockSigner interface)
-// to sign the block, and VoteAggregator will read the VerifyingVoteCollector from the vote collectors
-// map and produce the vote.
-// Note CachingVoteCollector can't create vote, only VerifyingVoteCollector can
-type VerifyingVoteCollector interface {
-	VoteCollectorState
-	BlockSigner
-
-	// Block returns block that will be used to collector votes for. Transition to VerifyingVoteCollector can occur only
-	// when we have received block proposal so this information has to be available.
-	Block() *model.Block
-}
-
-// VoteProcessor processes votes. Depending on their implementation, a VoteProcessor
-// might drop votes or attempt to construct a QC.
+// VoteProcessor processes votes. It implements the vote-format specific processing logic.
+// Depending on their implementation, a VoteProcessor might drop votes or attempt to construct a QC.
 type VoteProcessor interface {
 	// Process processes the given vote.
 	Process(vote *model.Vote) error
