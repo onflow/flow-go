@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 
@@ -37,9 +38,6 @@ type CommandRunner struct {
 
 	// signals startup completion
 	startupCompleted chan struct{}
-
-	// ensures startup only occurs once
-	startOnce sync.Once
 }
 
 type CommandHandler func(ctx context.Context, data map[string]interface{}) error
@@ -100,20 +98,20 @@ func (r *CommandRunner) getValidator(command string) CommandValidator {
 	return r.validators[command]
 }
 
-func (r *CommandRunner) Start(ctx context.Context) {
-	r.startOnce.Do(func() {
-		for i := 0; i < CommandRunnerNumWorkers; i++ {
-			r.workersStarted.Add(1)
-			r.workersFinished.Add(1)
-			go r.processLoop(ctx)
-		}
+func (r *CommandRunner) Start(ctx context.Context) error {
+	if err := r.runAdminServer(ctx); err != nil {
+		return fmt.Errorf("failed to start admin server: %w", err)
+	}
 
+	for i := 0; i < CommandRunnerNumWorkers; i++ {
 		r.workersStarted.Add(1)
 		r.workersFinished.Add(1)
-		go r.runAdminServer(ctx)
+		go r.processLoop(ctx)
+	}
 
-		close(r.startupCompleted)
-	})
+	close(r.startupCompleted)
+
+	return nil
 }
 
 func (r *CommandRunner) Ready() <-chan struct{} {
@@ -140,12 +138,10 @@ func (r *CommandRunner) Done() <-chan struct{} {
 	return done
 }
 
-func (r *CommandRunner) runAdminServer(ctx context.Context) {
-	defer r.workersFinished.Done()
-
+func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
-		return
+		return ctx.Err()
 	default:
 	}
 
@@ -153,20 +149,34 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) {
 
 	listener, err := net.Listen("tcp", r.address)
 	if err != nil {
-		r.logger.Fatal().Err(err).Msg("failed to listen on admin server address")
+		return fmt.Errorf("failed to listen on admin server address: %w", err)
 	}
 
 	grpcServer := grpc.NewServer()
 	pb.RegisterAdminServer(grpcServer, NewAdminServer(r.commandQ))
-	go grpcServer.Serve(listener)
 
-	r.workersStarted.Done()
+	r.workersStarted.Add(2)
+	r.workersFinished.Add(2)
+	go func() {
+		defer r.workersFinished.Done()
+		r.workersStarted.Done()
 
-	<-ctx.Done()
-	r.logger.Info().Msg("admin server shutting down")
+		if err := grpcServer.Serve(listener); err != nil {
+			r.logger.Err(err).Msg("gRPC server encountered fatal error")
+		}
+	}()
+	go func() {
+		defer r.workersFinished.Done()
+		r.workersStarted.Done()
 
-	grpcServer.Stop()
-	close(r.commandQ)
+		<-ctx.Done()
+		r.logger.Info().Msg("admin server shutting down")
+
+		grpcServer.Stop()
+		close(r.commandQ)
+	}()
+
+	return nil
 }
 
 func (r *CommandRunner) processLoop(ctx context.Context) {
