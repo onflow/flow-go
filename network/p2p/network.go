@@ -163,7 +163,7 @@ func (n *Network) Identities() flow.IdentityList {
 	return n.identityProvider.Identities(NotEjectedFilter)
 }
 
-func (n *Network) GetIdentity(pid peer.ID) (*flow.Identity, bool) {
+func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
