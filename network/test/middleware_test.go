@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
@@ -56,16 +58,20 @@ func (co *tagsObserver) OnComplete() {
 
 type MiddlewareTestSuite struct {
 	suite.Suite
-	size    int               // used to determine number of middlewares under test
-	mws     []*p2p.Middleware // used to keep track of middlewares under test
-	ov      []*mocknetwork.Overlay
-	obs     chan string // used to keep track of Protect events tagged by pubsub messages
-	ids     []*flow.Identity
-	metrics *metrics.NoopCollector // no-op performance monitoring simulation
+	sync.RWMutex
+	size      int               // used to determine number of middlewares under test
+	mws       []*p2p.Middleware // used to keep track of middlewares under test
+	ov        []*mocknetwork.Overlay
+	obs       chan string // used to keep track of Protect events tagged by pubsub messages
+	ids       []*flow.Identity
+	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
+	logger    zerolog.Logger
+	providers []*UpdatableIDProvider
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
-func TestMiddlewareTestSuit(t *testing.T) {
+func TestMiddlewareTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
@@ -73,6 +79,7 @@ func TestMiddlewareTestSuit(t *testing.T) {
 func (m *MiddlewareTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
+	m.logger = logger
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
@@ -85,7 +92,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -98,21 +105,72 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create the mock overlays
 	for i := 0; i < m.size; i++ {
-		overlay := &mocknetwork.Overlay{}
-		m.ov = append(m.ov, overlay)
-
-		identifierToID := make(map[flow.Identifier]flow.Identity)
-		for _, id := range m.ids {
-			identifierToID[id.NodeID] = *id
-		}
-		overlay.On("Identity").Maybe().Return(identifierToID, nil)
-		overlay.On("Topology").Maybe().Return(flow.IdentityList(m.ids), nil)
+		m.ov = append(m.ov, m.createOverlay())
 	}
 	for i, mw := range m.mws {
 		assert.NoError(m.T(), mw.Start(m.ov[i]))
-		err := mw.UpdateAllowList()
-		require.NoError(m.T(), err)
+		mw.UpdateAllowList()
 	}
+}
+
+// TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
+// the addresses of the staked network participants.
+func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
+	// create a new staked identity
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false)
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, false)
+	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
+	require.Len(m.T(), mws, 1)
+	newId := ids[0]
+	newMw := mws[0]
+	// newProvider := providers[0]
+	defer newMw.Stop()
+
+	overlay := m.createOverlay()
+	overlay.On("Receive",
+		m.ids[0].NodeID,
+		mock.AnythingOfType("*message.Message"),
+	).Return(nil)
+	assert.NoError(m.T(), newMw.Start(overlay))
+
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	// needed to enable ID translation
+	m.providers[0].SetIdentities(idList)
+	m.mws[0].UpdateAllowList()
+
+	msg := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+	// message should fail to send because no address is known yet
+	// for the new identity
+	err := m.mws[0].SendDirect(msg, newId.NodeID)
+	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
+
+	// update the addresses
+	m.Lock()
+	m.ids = idList
+	m.Unlock()
+	// newProvider.SetIdentities(idList)
+	// newMw.UpdateAllowList()
+	m.mws[0].UpdateNodeAddresses()
+
+	// now the message should send successfully
+	err = m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
+}
+
+func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
+	overlay := &mocknetwork.Overlay{}
+	overlay.On("Identities").Maybe().Return(m.getIds, nil)
+	overlay.On("Topology").Maybe().Return(m.getIds, nil)
+	return overlay
+}
+
+func (m *MiddlewareTestSuite) getIds() flow.IdentityList {
+	m.RLock()
+	defer m.RUnlock()
+	return flow.IdentityList(m.ids)
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
@@ -166,7 +224,6 @@ func (m *MiddlewareTestSuite) TestMultiPing() {
 // expectID and expectPayload are what we expect the receiver side to evaluate the
 // incoming ping against, it can be mocked or typed data
 func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
-
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error

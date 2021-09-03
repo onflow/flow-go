@@ -16,18 +16,20 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize       *prometheus.HistogramVec
-	inboundMessageSize        *prometheus.HistogramVec
-	duplicateMessagesDropped  *prometheus.CounterVec
-	queueSize                 *prometheus.GaugeVec
-	queueDuration             *prometheus.HistogramVec
-	inboundProcessTime        *prometheus.CounterVec
-	outboundConnectionCount   prometheus.Gauge
-	inboundConnectionCount    prometheus.Gauge
-	dnsLookupDuration         prometheus.Histogram
-	dnsCacheMissCount         prometheus.Counter
-	dnsCacheHitCount          prometheus.Counter
-	dnsCacheInvalidationCount prometheus.Counter
+	outboundMessageSize             *prometheus.HistogramVec
+	inboundMessageSize              *prometheus.HistogramVec
+	duplicateMessagesDropped        *prometheus.CounterVec
+	queueSize                       *prometheus.GaugeVec
+	queueDuration                   *prometheus.HistogramVec
+	inboundProcessTime              *prometheus.CounterVec
+	outboundConnectionCount         prometheus.Gauge
+	inboundConnectionCount          prometheus.Gauge
+	dnsLookupDuration               prometheus.Histogram
+	dnsCacheMissCount               prometheus.Counter
+	dnsCacheHitCount                prometheus.Counter
+	dnsCacheInvalidationCount       prometheus.Counter
+	unstakedOutboundConnectionCount prometheus.Gauge
+	unstakedInboundConnectionCount  prometheus.Gauge
 }
 
 func NewNetworkCollector() *NetworkCollector {
@@ -121,6 +123,20 @@ func NewNetworkCollector() *NetworkCollector {
 			Name:      "inbound_connection_count",
 			Help:      "the number of inbound connections of this node",
 		}),
+
+		unstakedOutboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      "unstaked_outbound_connection_count",
+			Help:      "the number of outbound connections to unstaked nodes",
+		}),
+
+		unstakedInboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemQueue,
+			Name:      "unstaked_inbound_connection_count",
+			Help:      "the number of inbound connections from unstaked nodes",
+		}),
 	}
 
 	return nc
@@ -189,4 +205,12 @@ func (nc *NetworkCollector) OnDNSCacheInvalidated() {
 // looking up the network.
 func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
+}
+
+func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
+	nc.unstakedOutboundConnectionCount.Set(float64(connectionCount))
+}
+
+func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
+	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
 }
