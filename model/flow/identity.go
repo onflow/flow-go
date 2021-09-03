@@ -392,7 +392,7 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	return nil, false
 }
 
-// ByNodeID gets a node from the list by network public key.
+// ByNetworkingKey gets a node from the list by network public key.
 func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
 	for _, identity := range il {
 		if identity.NetworkPubKey.Equals(key) {

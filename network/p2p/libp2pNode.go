@@ -478,21 +478,21 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		tp, err = n.pubSub.Join(topic.String())
-		if err != nil {
-			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
-		}
-
 		if len(validators) > 0 {
 			if err := n.pubSub.RegisterTopicValidator(
 				topic.String(), validators[0], pubsub.WithValidatorInline(true),
 			); err != nil {
 				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
-				if closeErr := tp.Close(); closeErr != nil {
-					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to close topic")
-				}
 				return nil, fmt.Errorf("failed to register topic validator: %w", err)
 			}
+		}
+
+		tp, err = n.pubSub.Join(topic.String())
+		if err != nil {
+			if len(validators) > 0 {
+				n.pubSub.UnregisterTopicValidator(topic.String())
+			}
+			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
 
 		n.topics[topic] = tp
