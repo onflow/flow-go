@@ -164,25 +164,11 @@ func (e *Engine) ProcessAssignedChunk(locator *chunks.Locator) {
 // processAssignedChunkWithTracing encapsulates the logic of processing assigned chunk with tracing enabled.
 func (e *Engine) processAssignedChunkWithTracing(chunk *flow.Chunk, result *flow.ExecutionResult, chunkLocatorID flow.Identifier) (bool, uint64, error) {
 
-	// TODO (Ramtin) : enable this later
-	// chunkID := chunk.ID()
-	// span, ok := e.tracer.GetSpan(chunkID, trace.VERProcessAssignedChunk)
-	// if !ok {
-	// 	span = e.tracer.StartSpan(chunkID, trace.VERProcessAssignedChunk)
-	// 	span.SetTag("chunk_id", chunkID)
-	// 	defer span.Finish()
+	span, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), result.BlockID, trace.VERProcessAssignedChunk)
+	span.SetTag("collection_index", chunk.CollectionIndex)
+	defer span.Finish()
 
-	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	// }
-
-	ctx := e.unit.Ctx()
-
-	var err error
-	var requested bool
-	var blockHeight uint64
-	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleAssignedChunk, func() {
-		requested, blockHeight, err = e.processAssignedChunk(chunk, result, chunkLocatorID)
-	})
+	requested, blockHeight, err := e.processAssignedChunk(chunk, result, chunkLocatorID)
 
 	return requested, blockHeight, err
 }
@@ -232,6 +218,9 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 // The chunks are supposed to be deduplicated by the requester.
 // So invocation of this method indicates arrival of a distinct requested chunk.
 func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
+
+	colID := chunkDataPack.Collection.ID()
+
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
@@ -240,7 +229,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	if chunkDataPack.Collection != nil {
 		// non-system chunk data packs have non-nil collection
 		lg = lg.With().
-			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
+			Hex("collection_id", logging.ID(colID)).
 			Logger()
 		lg.Info().Msg("chunk data pack arrived")
 	} else {
@@ -265,7 +254,10 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 		Bool("system_chunk", IsSystemChunk(status.ChunkIndex, status.ExecutionResult)).
 		Logger()
 
-	processed, err := e.handleChunkDataPackWithTracing(originID, status, chunkDataPack)
+	span, ctx := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
+	defer span.Finish()
+
+	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, chunkDataPack)
 	if IsChunkDataPackValidationError(err) {
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
 		return
@@ -293,39 +285,27 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 // The first returned value determines non-critical errors (i.e., expected ones).
 // The last returned value determines the critical errors that are unexpected, and should lead program to halt.
 func (e *Engine) handleChunkDataPackWithTracing(
+	ctx context.Context,
 	originID flow.Identifier,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	// TODO (ramtin) enable this later
-	// span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
-	// if !ok {
-	// 	span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessAssignedChunk)
-	// 	span.SetTag("chunk_id", chunkDataPack.ChunkID)
-	// 	defer span.Finish()
-	// }
-
-	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-
-	ctx := e.unit.Ctx()
-
 	var ferr error
 	processed := false
-	e.tracer.WithSpanFromContext(ctx, trace.VERFetcherHandleChunkDataPack, func() {
-		// make sure the chunk data pack is valid
-		err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
-		if err != nil {
-			// TODO: this can be due to a byzantine behavio
-			ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
-			return
-		}
 
-		processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
-		if err != nil {
-			ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
-			return
-		}
-	})
+	// make sure the chunk data pack is valid
+	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
+	if err != nil {
+		// TODO: this can be due to a byzantine behavio
+		ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
+		return processed, ferr
+	}
+
+	processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
+	if err != nil {
+		ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
+		return processed, ferr
+	}
 
 	return processed, ferr
 }

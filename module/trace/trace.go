@@ -120,7 +120,7 @@ func (t *OpenTracer) EntityRootSpan(entityID flow.Identifier, entityType string,
 		nil,
 	)
 	opts = append(opts, jaeger.SelfRef(ctx))
-	span := t.Tracer.StartSpan("New "+string(entityType), opts...)
+	span := t.Tracer.StartSpan(string(entityType), opts...)
 	t.spanCache.Add(entityID, span)
 	span.Finish() // finish span right away
 	return span

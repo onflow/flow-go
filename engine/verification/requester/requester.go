@@ -200,31 +200,17 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
+	added := e.pendingRequests.Add(request)
 
-	// TODO (Ramtin) enable this later
-	// span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	// if !ok {
-	// 	span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	// 	span.SetTag("chunk_id", request.ChunkID)
-	// 	defer span.Finish()
-	// }
+	e.metrics.OnChunkDataPackRequestReceivedByRequester()
 
-	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-
-	ctx := e.unit.Ctx()
-	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
-		added := e.pendingRequests.Add(request)
-
-		e.metrics.OnChunkDataPackRequestReceivedByRequester()
-
-		e.log.Info().
-			Hex("chunk_id", logging.ID(request.ChunkID)).
-			Uint64("block_height", request.Height).
-			Int("agree_executors", len(request.Agrees)).
-			Int("disagree_executors", len(request.Disagrees)).
-			Bool("added_to_pending_requests", added).
-			Msg("chunk data pack request arrived")
-	})
+	e.log.Info().
+		Hex("chunk_id", logging.ID(request.ChunkID)).
+		Uint64("block_height", request.Height).
+		Int("agree_executors", len(request.Agrees)).
+		Int("disagree_executors", len(request.Disagrees)).
+		Bool("added_to_pending_requests", added).
+		Msg("chunk data pack request arrived")
 }
 
 // onTimer should run periodically, it goes through all pending requests, and requests their chunk data pack.
@@ -250,20 +236,12 @@ func (e *Engine) onTimer() {
 
 // handleChunkDataPackRequestWithTracing encapsulates the logic of dispatching chunk data request in network with tracing enabled.
 func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.ChunkDataPackRequest, lastSealedHeight uint64) {
-	// TODO (Ramtin) enable this later
-	// span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	// if !ok {
-	// 	span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	// 	span.SetTag("chunk_id", request.ChunkID)
-	// 	defer span.Finish()
-	// }
-
-	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-
+	// TODO (Ramtin) - enable this later
+	// span, ctx := e.tracer.StartChunkSpan(context.Background(), request.ChunkID, trace.VERRequesterHandleChunkDataRequest)
+	// defer span.Finish()
 	ctx := e.unit.Ctx()
-	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
-		e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
-	})
+
+	e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
 }
 
 // handleChunkDataPackRequest encapsulates the logic of dispatching the chunk data pack request to the network.

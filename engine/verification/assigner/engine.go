@@ -154,23 +154,12 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, block
 // the assigned chunks are pushed to the chunks queue, which is the output stream of this engine.
 // Once the assigner engine is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
+	blockID := block.ID()
 
-	// TODO (Ramtin) enable this later
-	// blockID := block.ID()
-	// span, ok := e.tracer.GetSpan(blockID, trace.VERProcessFinalizedBlock)
-	// if !ok {
-	// 	span = e.tracer.StartSpan(blockID, trace.VERProcessFinalizedBlock)
-	// 	span.SetTag("block_id", blockID)
-	// 	defer span.Finish()
-	// }
+	span, ctx := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
+	defer span.Finish()
 
-	// ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-
-	ctx := e.unit.Ctx()
-
-	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleFinalizedBlock, func() {
-		e.processFinalizedBlock(ctx, block)
-	})
+	e.processFinalizedBlock(ctx, block)
 }
 
 // processFinalizedBlock indexes the execution receipts included in the block, performs chunk assignment on its result, and
