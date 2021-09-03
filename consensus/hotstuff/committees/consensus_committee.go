@@ -142,8 +142,6 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// for the duration of the current spork, without any epoch transitions.
 	//
 	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
-		c.mu.Lock()
-		defer c.mu.Unlock()
 
 		current := c.state.Final().Epochs().Current()
 
@@ -178,7 +176,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not compute epoch fallback leader selection: %w", err)
 		}
+		c.mu.Lock()
 		c.leaders[counter] = selection
+		c.mu.Unlock()
 		return selection.LeaderForView(view)
 	}
 
