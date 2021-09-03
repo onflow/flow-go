@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -99,7 +100,7 @@ access(all) contract TestContract {
 		}
 	}
 
-	longString := "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+	longString := strings.Repeat("0", 1000)
 
 	templateTx := func(prepare string) string {
 		return fmt.Sprintf(`
