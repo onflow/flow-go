@@ -29,14 +29,14 @@ func NewConnGater(log zerolog.Logger) *ConnGater {
 }
 
 // update updates the peer ID map
-func (c *ConnGater) update(peerInfos []peer.AddrInfo) {
+func (c *ConnGater) update(pids peer.IDSlice) {
 
 	// create a new peer.ID map
-	peerIDs := make(map[peer.ID]struct{}, len(peerInfos))
+	peerIDs := make(map[peer.ID]struct{}, len(pids))
 
 	// for each peer.AddrInfo, create an entry in the map for the peer.ID
-	for _, p := range peerInfos {
-		peerIDs[p.ID] = struct{}{}
+	for _, pid := range pids {
+		peerIDs[pid] = struct{}{}
 	}
 
 	// cache the new map
