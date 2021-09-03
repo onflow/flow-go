@@ -164,9 +164,6 @@ func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
 	overlay.On("Identities").Maybe().Return(m.getIds, nil)
 	overlay.On("Topology").Maybe().Return(m.getIds, nil)
-	// we're only dealing with staked IDs in this test, so queries based on PeerIDs should not succeeded
-	// (they will occur on the Spoofing test)
-	overlay.On("Identity").Return(nil, false)
 	return overlay
 }
 
