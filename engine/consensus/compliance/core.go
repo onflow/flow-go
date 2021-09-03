@@ -87,13 +87,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	}
 	defer span.Finish()
 
-	// for _, g := range proposal.Payload.Guarantees {
-	// 	if span, ok := c.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-	// 		childSpan := c.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
-	// 		defer childSpan.Finish()
-	// 	}
-	// }
-
 	header := proposal.Header
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
@@ -195,10 +188,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	recursiveProcessSpan := c.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposalProcessRecursive)
 	err = c.processBlockAndDescendants(proposal)
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-	recursiveProcessSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -267,21 +258,15 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 // the finalized state.
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
+	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
-	span, ctx := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONProcessBlock)
+	span, ctx := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
 	if span != nil {
 		span.SetTag("block_id", proposal.Header.ID())
 		span.SetTag("view", proposal.Header.View)
 		span.SetTag("proposer", proposal.Header.ProposerID.String())
 	}
 	defer span.Finish()
-
-	// TODO (Ramtin) comment out for now
-	// childSpan := c.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposalProcessSingle)
-	defer func() {
-		c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
-		// childSpan.Finish()
-	}()
 
 	header := proposal.Header
 	log := c.log.With().

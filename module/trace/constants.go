@@ -3,7 +3,8 @@ package trace
 // Span names
 const (
 
-	//// Protocol State
+	// Protocol State
+	//
 
 	// Extend
 	ProtoStateMutatorExtend                SpanName = "proto.state.mutator.extend"
@@ -20,56 +21,40 @@ const (
 	// mutator.Finalize
 	ProtoStateMutatorFinalize SpanName = "proto.state.mutator.finalize"
 
-	//// Follower Engine
-	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
-	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
-	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
-
-	// Consensus Node
+	// Consensus
 	//
-	CONProcessCollection SpanName = "con.processCollection"
-	CONProcessBlock      SpanName = "con.processBlockProposal"
 
-	// Hotstuff
-	CONHotFinalizeCollection SpanName = "con.hotstuff.finalizeCollection"
-	CONHotFinalizeBlock      SpanName = "con.hotstuff.finalizeBlock"
+	// Builder
+	CONBuilderBuildOn SpanName = "con.builder.buildOn"
+
+	// Finalizer
+	CONFinalizerFinalizeBlock SpanName = "con.finalizer.finalizeBlock"
 
 	// Ingestion
 	CONIngOnCollectionGuarantee SpanName = "con.ingestion.onCollectionGuarantee"
 
-	// Propagation
-	CONPropOnGuarantee SpanName = "con.propagation.onGuarantee"
-
 	// Provider
-	CONProvOnBlockProposal SpanName = "con.provider.onBlockProposal"
 
 	// Compliance
-	CONCompBroadcastProposalWithDelay      SpanName = "con.compliance.BroadcastProposalWithDelay"
-	CONCompOnBlockProposal                 SpanName = "con.compliance.onBlockProposal"
-	CONCompOnBlockProposalProcessRecursive SpanName = "con.compliance.onBlockProposal.processBlockProposal.recursive"
-	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
+	CONCompOnBlockProposal      SpanName = "con.compliance.onBlockProposal"
+	ConCompProcessBlockProposal SpanName = "con.compliance.processBlockProposal"
 
 	// Matching
-	CONMatchRequestPendingReceipts SpanName = "con.matching.requestPendingReceipts"
-	CONMatchProcessReceiptVal      SpanName = "con.matching.processReceipt.validation"
-	CONMatchProcessReceipt         SpanName = "con.matching.processReceipt"
+	CONMatchProcessReceipt    SpanName = "con.matching.processReceipt"
+	CONMatchProcessReceiptVal SpanName = "con.matching.processReceipt.validation"
 
 	// Sealing
 	CONSealingProcessFinalizedBlock           SpanName = "con.sealing.processFinalizedBlock"
 	CONSealingCheckForEmergencySealableBlocks SpanName = "con.sealing.processFinalizedBlock.checkEmergencySealing"
 	CONSealingPruning                         SpanName = "con.sealing.processFinalizedBlock.pruning"
 	CONSealingRequestingPendingApproval       SpanName = "con.sealing.processFinalizedBlock.requestPendingApprovals"
+	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
+	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	CONSealingProcessIncorporatedResult SpanName = "con.sealing.processIncorporatedResult"
-	CONSealingProcessApproval           SpanName = "con.sealing.processApproval"
-
-	// Builder
-	CONBuildOn                        SpanName = "con.builder"
-	CONBuildOnCreatePayloadGuarantees SpanName = "con.builder.createPayload.guarantees"
-	CONBuildOnCreatePayloadSeals      SpanName = "con.builder.createPayload.seals"
-	CONBuildOnCreatePayloadReceipts   SpanName = "con.builder.createPayload.receipts"
-	CONBuildOnCreateHeader            SpanName = "con.builder.createHeader"
-	CONBuildOnDBInsert                SpanName = "con.builder.dbInsert"
+	//Follower Engine
+	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
+	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
+	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
 
 	// Collection Node
 	//

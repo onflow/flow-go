@@ -326,14 +326,6 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 	log.Debug().Msg("processing proposal broadcast request from hotstuff")
 
-	// TODO (Ramtin) - enable this later
-	// for _, g := range payload.Guarantees {
-	// 	if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-	// 		childSpan := e.tracer.StartSpanFromParent(span, trace.CONCompBroadcastProposalWithDelay)
-	// 		defer childSpan.Finish()
-	// 	}
-	// }
-
 	// retrieve all consensus nodes without our ID
 	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
 		filter.HasRole(flow.RoleConsensus),

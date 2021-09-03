@@ -128,19 +128,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onBlockProposal is used when we want to broadcast a local block to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	// TODO (Ramtin) - enable this later
-	// if span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock); ok {
-	// 	childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
-	// 	defer childSpan.Finish()
-	// }
-
-	// for _, g := range proposal.Payload.Guarantees {
-	// 	if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-	// 		childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
-	// 		defer childSpan.Finish()
-	// 	}
-	// }
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Uint64("block_view", proposal.Header.View).

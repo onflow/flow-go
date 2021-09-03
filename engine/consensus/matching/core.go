@@ -354,10 +354,9 @@ HEIGHT_LOOP:
 
 func (c *Core) OnBlockFinalization() error {
 	startTime := time.Now()
-	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
+
 	// request execution receipts for unsealed finalized blocks
 	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
-	requestReceiptsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
