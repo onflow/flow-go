@@ -40,7 +40,7 @@ func (m *MutableState) Extend(block *cluster.Block) error {
 	blockID := block.ID()
 
 	// TODO (Ramtin) - figure out if this shoudl be CollectionSpan
-	span, ctx := m.tracer.StartBlockSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
+	span, ctx := m.tracer.StartCollectionSpan(context.Background(), blockID, trace.COLClusterStateMutatorExtend)
 	defer span.Finish()
 
 	err := m.State.db.View(func(tx *badger.Txn) error {
