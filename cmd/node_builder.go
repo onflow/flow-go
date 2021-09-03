@@ -105,6 +105,7 @@ type BaseConfig struct {
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
+	tracerSensitivity     int
 	metricsEnabled        bool
 }
 
@@ -157,6 +158,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
+		tracerSensitivity:     62,
 		metricsEnabled:        true,
 	}
 }

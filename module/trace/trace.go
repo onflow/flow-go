@@ -2,6 +2,7 @@ package trace
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math/rand"
 	"time"
@@ -17,6 +18,7 @@ import (
 
 const DefaultEntityCacheSize = 1000
 
+const SensitivityCaptureAll = 64
 const EntityTypeBlock = "Block"
 const EntityTypeCollection = "Collection"
 const EntityTypeTransaction = "Transaction"
@@ -26,9 +28,10 @@ type SpanName string
 // OpenTracer is the implementation of the Tracer interface
 type OpenTracer struct {
 	opentracing.Tracer
-	closer    io.Closer
-	log       zerolog.Logger
-	spanCache *lru.Cache
+	closer      io.Closer
+	log         zerolog.Logger
+	spanCache   *lru.Cache
+	sensitivity int
 }
 
 type traceLogger struct {
@@ -48,7 +51,7 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 //
 // TODO (ramtin):  pass entity cache size as param
 // TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
-func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
+func NewTracer(log zerolog.Logger, serviceName string, sensitivity int) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
@@ -56,6 +59,10 @@ func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 
 	if cfg.ServiceName == "" {
 		cfg.ServiceName = serviceName
+	}
+
+	if sensitivity < 0 || sensitivity > 64 {
+		return nil, fmt.Errorf("sensitivity is not in the accaptable range")
 	}
 
 	tracer, closer, err := cfg.NewTracer(config.Logger(traceLogger{log}))
@@ -69,10 +76,11 @@ func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 	}
 
 	t := &OpenTracer{
-		Tracer:    tracer,
-		closer:    closer,
-		log:       log,
-		spanCache: spanCache,
+		Tracer:      tracer,
+		closer:      closer,
+		log:         log,
+		spanCache:   spanCache,
+		sensitivity: sensitivity,
 	}
 
 	return t, nil
@@ -112,11 +120,12 @@ func (t *OpenTracer) EntityRootSpan(entityID flow.Identifier, entityType string,
 		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
 		return sp
 	}
+
 	ctx := jaeger.NewSpanContext(
 		traceID,
 		jaeger.SpanID(rand.Uint64()),
 		jaeger.SpanID(0),
-		true,
+		traceID.High>>uint64(64-t.sensitivity) == 0,
 		nil,
 	)
 	opts = append(opts, jaeger.SelfRef(ctx))
