@@ -4,7 +4,6 @@ package p2p
 
 import (
 	"fmt"
-	"github.com/libp2p/go-libp2p-pubsub"
 	"net"
 
 	core "github.com/libp2p/go-libp2p-core"
@@ -14,6 +13,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
