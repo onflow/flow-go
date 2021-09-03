@@ -141,34 +141,38 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// 6 months worth of views, so that consensus will have leaders specified
 	// for the duration of the current spork, without any epoch transitions.
 	//
-	// TODO - we could handle case of errors.Is(err, protocol.ErrNextEpochNotSetup)
-	// as well -- is it safe to use current epoch seed in that case? This will repeat
-	// the leader selection from the currently ending epoch.
-	//
-	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) {
+	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 
-		counter, err := next.Counter()
+		current := c.state.Final().Epochs().Current()
+
+		currentCounter, err := current.Counter()
 		if err != nil {
-			return flow.ZeroID, fmt.Errorf("could not get next epoch counter: %w", err)
+			return flow.ZeroID, fmt.Errorf("could not get next epoch currentCounter: %w", err)
 		}
-		identities, err := next.InitialIdentities()
+		identities, err := current.InitialIdentities()
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch initial identities: %w", err)
 		}
-		seed, err := next.Seed(indices.ProtocolConsensusLeaderSelection...)
+		// CAUTION: this is re-using the same leader selection seed from the now-ending epoch
+		seed, err := current.Seed(indices.ProtocolConsensusLeaderSelection...)
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch seed: %w", err)
 		}
-		firstView, err := next.FirstView()
+		currentFinalView, err := current.FinalView()
 		if err != nil {
 			return flow.ZeroID, fmt.Errorf("could not get epoch first view: %w", err)
 		}
+
+		// we will inject a fallback leader selection in place of the next epoch
+		counter := currentCounter + 1
+		// the fallback leader selection begins after the final view of the current epoch
+		firstView := currentFinalView + 1
 		selection, err := leader.ComputeLeaderSelectionFromSeed(
 			firstView,
 			seed,
-			int(firstView+leader.EstimatedSixMonthOfViews), // pretend the next epoch lasts forever
+			int(firstView+leader.EstimatedSixMonthOfViews), // the fallback epoch lasts until the next spork
 			identities.Filter(filter.IsVotingConsensusCommitteeMember),
 		)
 		if err != nil {
