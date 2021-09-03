@@ -1133,6 +1133,10 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 //
 // ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
+
+	// skipping because this case will now result in emergency epoch continuation kicking in
+	t.SkipNow()
+
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
@@ -1184,10 +1188,126 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// block 4 will be the first block for epoch 2
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.Header.View = epoch2Setup.FinalView + 1
+		block4.Header.View = epoch1Setup.FinalView + 1
 
 		err = state.Extend(&block4)
 		require.Error(t, err)
+	})
+}
+
+func TestEmergencyEpochChainContinuation(t *testing.T) {
+
+	// if we reach the first block of the next epoch before both setup and commit
+	// service events are finalized, the chain should continue with the previous epoch.
+	//
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("epoch transition without commit event - should continue with fallback epoch", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+
+			// add a block for the first seal to reference
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Extend(&block1)
+			require.NoError(t, err)
+			err = state.Finalize(block1.ID())
+			require.NoError(t, err)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			epoch1FinalView := epoch1Setup.FinalView
+
+			// add a participant for the next epoch
+			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+
+			// create the epoch setup event for the second epoch
+			epoch2Setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1FinalView+1000),
+				unittest.WithFirstView(epoch1FinalView+1),
+			)
+
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+
+			// add a block containing a receipt for block 1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			err = state.Extend(&block2)
+			require.NoError(t, err)
+			err = state.Finalize(block2.ID())
+			require.NoError(t, err)
+
+			// block 3 seals block 1
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal1},
+			})
+			err = state.Extend(&block3)
+			require.NoError(t, err)
+
+			// block 4 will be the first block for epoch 2
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.Header.View = epoch1Setup.FinalView + 1
+
+			err = state.Extend(&block4)
+			require.NoError(t, err)
+		})
+	})
+
+	// if we reach the first block of the next epoch before either setup and commit
+	// service events are finalized, the chain should continue with the previous epoch.
+	//
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("epoch transition without setup event - should continue with fallback epoch", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+
+			// add a block for the first seal to reference
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Extend(&block1)
+			require.NoError(t, err)
+			err = state.Finalize(block1.ID())
+			require.NoError(t, err)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+
+			// add a block containing a receipt for block 1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			err = state.Extend(&block2)
+			require.NoError(t, err)
+			err = state.Finalize(block2.ID())
+			require.NoError(t, err)
+
+			// block 3 seals block 1
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal1},
+			})
+			err = state.Extend(&block3)
+			require.NoError(t, err)
+
+			// block 4 will be the first block for epoch 2
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.Header.View = epoch1Setup.FinalView + 1
+
+			err = state.Extend(&block4)
+			require.NoError(t, err)
+		})
 	})
 }
 
