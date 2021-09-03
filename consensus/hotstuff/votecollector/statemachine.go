@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -158,7 +157,7 @@ func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
 				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s",
 					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String())
 			}
-			m.processCachedVotes(proposal.Block.BlockID)
+			m.processCachedVotes(proposal.Block)
 
 		// We already received a valid block for this view. Check whether the proposer is
 		// equivocating and terminate vote processing in this case. Note: proposal equivocation

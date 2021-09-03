@@ -116,39 +116,6 @@ func (vc *VotesCache) RegisterVoteConsumer(consumer VoteConsumer) {
 	}
 }
 
-// ByBlockID returns all votes for the specified block. Concurrency safe.
-func (vc *VotesCache) ByBlockID(blockID flow.Identifier) []*model.Vote {
-	vc.lock.Lock()
-	defer vc.lock.Unlock()
-
-	// First, put the cached votes in a slice in the order they were received.
-	// But leave the elements as nil, where the vote does _not_ match `blockID`.
-	matchingVotes := make([]*model.Vote, len(vc.votes))
-	for _, v := range vc.votes {
-		if v.Vote.BlockID == blockID {
-			matchingVotes[v.index] = v.Vote
-		}
-	}
-
-	// Second, consolidate all the non-nil elements in `matchingVotes` in the
-	// head of the slice, while preserving the order.
-	numberMatchingVotes := 0
-	for i, v := range matchingVotes {
-		if v == nil {
-			continue
-		}
-		if numberMatchingVotes < i {
-			matchingVotes[numberMatchingVotes] = v
-		}
-		numberMatchingVotes++
-	}
-
-	if numberMatchingVotes < 1 { // no vote for block found
-		return nil
-	}
-	return matchingVotes[:numberMatchingVotes]
-}
-
 // All returns all currently cached votes. Concurrency safe.
 func (vc *VotesCache) All() []*model.Vote {
 	vc.lock.Lock()
