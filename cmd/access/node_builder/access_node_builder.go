@@ -110,9 +110,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
-			UnsecureGRPCListenAddr:    "localhost:9000",
-			SecureGRPCListenAddr:      "localhost:9001",
-			HTTPListenAddr:            "localhost:8000",
+			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
+			SecureGRPCListenAddr:      "0.0.0.0:9001",
+			HTTPListenAddr:            "0.0.0.0:8000",
 			CollectionAddr:            "",
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
