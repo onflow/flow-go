@@ -16,7 +16,23 @@ type Overlay struct {
 	mock.Mock
 }
 
-// GetIdentity provides a mock function with given fields: _a0
+// Identities provides a mock function with given fields:
+func (_m *Overlay) Identities() flow.IdentityList {
+	ret := _m.Called()
+
+	var r0 flow.IdentityList
+	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(flow.IdentityList)
+		}
+	}
+
+	return r0
+}
+
+// Identity provides a mock function with given fields: _a0
 func (_m *Overlay) Identity(_a0 peer.ID) (*flow.Identity, bool) {
 	ret := _m.Called(_a0)
 
@@ -37,22 +53,6 @@ func (_m *Overlay) Identity(_a0 peer.ID) (*flow.Identity, bool) {
 	}
 
 	return r0, r1
-}
-
-// Identities provides a mock function with given fields:
-func (_m *Overlay) Identities() flow.IdentityList {
-	ret := _m.Called()
-
-	var r0 flow.IdentityList
-	if rf, ok := ret.Get(0).(func() flow.IdentityList); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(flow.IdentityList)
-		}
-	}
-
-	return r0
 }
 
 // Receive provides a mock function with given fields: nodeID, msg

@@ -102,4 +102,3 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 		r.callback(&msg, pid)
 	}
 }
-

@@ -479,11 +479,6 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		tp, err = n.pubSub.Join(topic.String())
-		if err != nil {
-			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
-		}
-
 		if len(validators) > 0 {
 			if err := n.pubSub.RegisterTopicValidator(
 				topic.String(), validators[0], pubsub.WithValidatorInline(true),
@@ -494,6 +489,11 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 				}
 				return nil, fmt.Errorf("failed to register topic validator: %w", err)
 			}
+		}
+
+		tp, err = n.pubSub.Join(topic.String())
+		if err != nil {
+			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
 
 		n.topics[topic] = tp
@@ -533,7 +533,8 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 	}
 
 	err := n.pubSub.UnregisterTopicValidator(topic.String())
-	if err != nil {
+	// TODO: is there better than stirng comparison here?
+	if err != nil && !strings.HasPrefix(err.Error(), "No validator for topic") {
 		return fmt.Errorf("could not unregister topic validator for (%s): %w", topic, err)
 	}
 
