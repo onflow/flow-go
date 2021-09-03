@@ -131,7 +131,20 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// block in every epoch, which is anyway a requirement for valid epochs.
 	//
 	next := c.state.Final().Epochs().Next()
+
 	// TMP: CONTINUE FAILED EPOCH
+	//
+	// If we reach this code-path, it means we are about to propose or vote
+	// for the first block in the next epoch. If that epoch has not been
+	// committed or set up, rather than stopping consensus, this intervention
+	// will create a new fallback leader selection for the next epoch containing
+	// 6 months worth of views, so that consensus will have leaders specified
+	// for the duration of the current spork, without any epoch transitions.
+	//
+	// TODO - we could handle case of errors.Is(err, protocol.ErrNextEpochNotSetup)
+	// as well -- is it safe to use current epoch seed in that case? This will repeat
+	// the leader selection from the currently ending epoch.
+	//
 	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
