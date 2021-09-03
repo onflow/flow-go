@@ -4,6 +4,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
@@ -35,24 +36,19 @@ func (p *FixedIdentityProvider) Identities(filter flow.IdentityFilter) flow.Iden
 	return p.identities.Filter(filter)
 }
 
-func (p *FixedIdentityProvider) ByNodeID(flowID flow.Identifier) (*flow.Identity, bool) {
-	for _, v := range p.identities {
-		if v.ID() == flowID {
-			return v, true
-		}
+func (p *FixedIdentityProvider) ByNodeID(nodeID flow.Identifier) (*flow.Identity, bool) {
+	results := p.identities.Filter(filter.HasNodeID(nodeID))
+	if len(results) > 0 {
+		return results[0], true
 	}
 	return nil, false
 }
 
-func (p *FixedIdentityProvider) ByPeerID(peerID peer.ID) (*flow.Identity, bool) {
-	for _, v := range p.identities {
-		if id, err := keyutils.PeerIDFromFlowPublicKey(v.NetworkPubKey); err == nil {
-			if id == peerID {
-				return v, true
-			}
+func (p *FixedIdentityProvider) ByPeerID(pid peer.ID) (*flow.Identity, bool) {
+	for _, id := range p.identities {
+		if peerID, err := keyutils.PeerIDFromFlowPublicKey(id.NetworkPubKey); err == nil && peerID == pid {
+			return id, true
 		}
-
 	}
 	return nil, false
-
 }
