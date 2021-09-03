@@ -16,7 +16,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestTopicValidator tests that a topic validator prevents an unstaked node to send messages to any staked node
 func TestTopicValidator(t *testing.T) {
+
+	// create two staked nodes - node1 and node2
 	identity1, privateKey1 := createID(t)
 	node1 := createNode(t, identity1.NodeID, privateKey1)
 
@@ -39,19 +42,25 @@ func TestTopicValidator(t *testing.T) {
 
 	unstakedKey, err := unittest.NetworkingKey()
 	require.NoError(t, err)
+	// create one unstaked node
 	unstakedNode := createNode(t, flow.ZeroID, unstakedKey)
 	require.NoError(t, err)
 
+	// node1 is connected to node2, and the unstaked node is connected to node1
+	// unstaked Node <-> node1 <-> node2
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.host)))
 	require.NoError(t, unstakedNode.AddPeer(context.TODO(), *host.InfoFromHost(node1.host)))
 
+	// node1 and node2 subscribe to the topic with the topic validator
 	sub1, err := node1.Subscribe(context.TODO(), badTopic, validator.Validate)
 	require.NoError(t, err)
 	sub2, err := node2.Subscribe(context.TODO(), badTopic, validator.Validate)
 	require.NoError(t, err)
+	// the unstaked node subscribes to the topic WITHOUT the topic validator
 	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
 	require.NoError(t, err)
 
+	// assert that the nodes are connected as expected
 	require.Eventually(t, func() bool {
 		return len(node1.pubSub.ListPeers(badTopic.String())) > 0 &&
 			len(node2.pubSub.ListPeers(badTopic.String())) > 0 &&
@@ -63,32 +72,40 @@ func TestTopicValidator(t *testing.T) {
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
 
+	// node2 publishes a message
 	err = node2.Publish(timedCtx, badTopic, data)
 	require.NoError(t, err)
 
+	// node1 gets the message
 	msg, err := sub1.Next(timedCtx)
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
 
+	// node2 also gets the message (as part of the libp2p loopback of published topic messages)
 	msg, err = sub2.Next(timedCtx)
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
 
+	// the unstaked node also gets the message since it subscribed to the channel without the topic validator
 	msg, err = unstakedSub.Next(timedCtx)
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
 
 	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel2s()
+
+	// the unstaked node now publishes a message
 	err = unstakedNode.Publish(timedCtx, badTopic, data)
 	require.NoError(t, err)
 
+	// it receives its own message
 	msg, err = unstakedSub.Next(timedCtx)
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
 
+	// node 1 does NOT receive the message due to the topic validator
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(1)
 	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
@@ -97,7 +114,9 @@ func TestTopicValidator(t *testing.T) {
 		wg.Done()
 	}()
 
-	timedCtx, cancel = context.WithTimeout(context.Background(), time.Second)
+	// node 2 also does not receive the message via gossip from the node1 (event after the 1 second hearbeat)
+	wg.Add(1)
+	timedCtx, cancel = context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	go func() {
 		msg, err = sub2.Next(timedCtx)
