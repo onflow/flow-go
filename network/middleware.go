@@ -70,7 +70,7 @@ type Overlay interface {
 	Identities() flow.IdentityList
 
 	// GetIdentity returns the Identity associated with the given peer ID, if it exists
-	GetIdentity(peer.ID) (*flow.Identity, bool)
+	Identity(peer.ID) (*flow.Identity, bool)
 
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 }
