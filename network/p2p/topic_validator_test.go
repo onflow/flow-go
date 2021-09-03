@@ -59,7 +59,8 @@ func TestTopicValidator(t *testing.T) {
 
 	data := []byte("hello")
 
-	timedCtx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel5s()
 
 	err = node2.Publish(timedCtx, badTopic, data)
 	require.NoError(t, err)
@@ -76,8 +77,8 @@ func TestTopicValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, msg.Data, data)
 
-	timedCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
+	timedCtx, cancel2s := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel2s()
 	err = unstakedNode.Publish(timedCtx, badTopic, data)
 	require.NoError(t, err)
 
@@ -87,7 +88,7 @@ func TestTopicValidator(t *testing.T) {
 
 	var wg sync.WaitGroup
 	wg.Add(2)
-	timedCtx, cancel = context.WithTimeout(context.Background(), time.Second)
+	timedCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
 		msg, err = sub1.Next(timedCtx)
