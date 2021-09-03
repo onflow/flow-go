@@ -23,11 +23,11 @@ import (
 // make sure the calls are concurrent safe.
 type SignatureAggregatorSameMessage struct {
 	// TODO: initial incomplete fields that will evolve
-	message       []byte
-	hasher        hash.Hasher
-	n             int                      // number of participants indexed from 0 to n-1
-	publicKeys    []crypto.PublicKey       // keys indexed from 0 to n-1, signer i is assigned to public key i
-	idToSignature map[int]crypto.Signature // signatures indexed by the signer index
+	message           []byte
+	hasher            hash.Hasher
+	n                 int                      // number of participants indexed from 0 to n-1
+	publicKeys        []crypto.PublicKey       // keys indexed from 0 to n-1, signer i is assigned to public key i
+	indexdToSignature map[int]crypto.Signature // signatures indexed by the signer index
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -41,8 +41,27 @@ func NewSignatureAggregatorSameMessage(
 	n int, // number of participants
 	publicKeys []crypto.PublicKey, // public keys of participants agreed upon upfront
 ) (*SignatureAggregatorSameMessage, error) {
-	panic("implement me")
-	return &SignatureAggregatorSameMessage{}, nil
+
+	//
+	if n <= 0 {
+		return nil, newErrInvalidInputs("number of participants must larger than 0, got %d", n)
+	}
+	if len(publickKeys) != n {
+		return nil, newErrInvalidInputs("number or keys %d, must be the number of participants %d", len(publicKeys), n)
+	}
+	// sanity check for BLS keys
+	for i, key := range publicKeys {
+		if key == nil || key.Algorithm() != crypto.BLSBLS12381 {
+			return nil, newErrInvalidInputs("key at index %d is not a BLS key", i)
+		}
+	}
+
+	return &SignatureAggregatorSameMessage{
+		messsage:   message,
+		hasher:     crypto.NewBLSKMAC(dsTag),
+		n:          n,
+		publicKeys: publicKeys,
+	}, nil
 }
 
 // Verify verifies the input signature under the stored message and stored
@@ -117,6 +136,8 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregation(sig crypto.Signature,
 func (s *SignatureAggregatorSameMessage) SetMessage(message []byte) { // we could also update the DST here
 	panic("implement me")
 }
+
+//------------------------------------------
 
 // TODO : to delete in V2
 // AggregationVerifier is an aggregating verifier that can verify signatures and
