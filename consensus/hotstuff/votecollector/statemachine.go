@@ -21,8 +21,8 @@ var (
 // VerifyingVoteProcessorFactory generates hotstuff.VerifyingVoteCollector instances
 type VerifyingVoteProcessorFactory = func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error)
 
-// StateMachine implements a state machine for transition between different states of vote collector
-type StateMachine struct {
+// VoteCollector implements a state machine for transition between different states of vote collector
+type VoteCollector struct {
 	sync.Mutex
 	log                      zerolog.Logger
 	workerPool               *workerpool.WorkerPool
@@ -33,7 +33,7 @@ type StateMachine struct {
 	votesProcessor atomic.Value
 }
 
-func (m *StateMachine) atomicLoadProcessor() hotstuff.VoteProcessor {
+func (m *VoteCollector) atomicLoadProcessor() hotstuff.VoteProcessor {
 	return m.votesProcessor.Load().(*atomicValueWrapper).processor
 }
 
@@ -50,12 +50,12 @@ func NewStateMachine(
 	workerPool *workerpool.WorkerPool,
 	notifier hotstuff.Consumer,
 	verifyingCollectorFactory VerifyingVoteProcessorFactory,
-) *StateMachine {
+) *VoteCollector {
 	log = log.With().
 		Str("hotstuff", "VoteCollector").
 		Uint64("view", view).
 		Logger()
-	sm := &StateMachine{
+	sm := &VoteCollector{
 		log:                      log,
 		workerPool:               workerPool,
 		notifier:                 notifier,
@@ -74,7 +74,7 @@ func NewStateMachine(
 // delegate function call, otherwise we will return an error indicating wrong collector state.
 // ATTENTION: this might be changed if CreateVote and state transitions will be called in parallel
 // something like compare-and-repeat might need to be implemented.
-func (m *StateMachine) CreateVote(block *model.Block) (*model.Vote, error) {
+func (m *VoteCollector) CreateVote(block *model.Block) (*model.Vote, error) {
 	processor := m.atomicLoadProcessor()
 	blockSigner, ok := processor.(hotstuff.BlockSigner)
 	if ok {
@@ -83,7 +83,7 @@ func (m *StateMachine) CreateVote(block *model.Block) (*model.Vote, error) {
 	return nil, ErrDifferentCollectorState
 }
 
-func (m *StateMachine) AddVote(vote *model.Vote) error {
+func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
 	err := m.votesCache.AddVote(vote)
 	if err != nil {
@@ -106,7 +106,7 @@ func (m *StateMachine) AddVote(vote *model.Vote) error {
 	return nil
 }
 
-func (m *StateMachine) processVote(vote *model.Vote) error {
+func (m *VoteCollector) processVote(vote *model.Vote) error {
 	for {
 		processor := m.atomicLoadProcessor()
 		currentState := processor.Status()
@@ -125,7 +125,7 @@ func (m *StateMachine) processVote(vote *model.Vote) error {
 	}
 }
 
-func (m *StateMachine) Status() hotstuff.VoteCollectorStatus {
+func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return m.atomicLoadProcessor().Status()
 }
 
@@ -140,7 +140,7 @@ func (m *StateMachine) Status() hotstuff.VoteCollectorStatus {
 //         CachingVotes   -> VerifyingVotes
 //         CachingVotes   -> Invalid
 //         VerifyingVotes -> Invalid
-func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
+func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 	for {
 		proc := m.atomicLoadProcessor()
 
@@ -189,7 +189,7 @@ func (m *StateMachine) ProcessBlock(proposal *model.Proposal) error {
 // Error returns:
 // * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-func (m *StateMachine) caching2Verifying(block *model.Block) error {
+func (m *VoteCollector) caching2Verifying(block *model.Block) error {
 	log := m.log.With().Hex("BlockID", block.BlockID[:]).Logger()
 	newProc, err := m.createVerifyingProcessor(log, block)
 	if err != nil {
@@ -207,7 +207,7 @@ func (m *StateMachine) caching2Verifying(block *model.Block) error {
 	return nil
 }
 
-func (m *StateMachine) terminateVoteProcessing() {
+func (m *VoteCollector) terminateVoteProcessing() {
 	if m.Status() == hotstuff.VoteCollectorStatusInvalid {
 		return
 	}
@@ -221,7 +221,7 @@ func (m *StateMachine) terminateVoteProcessing() {
 }
 
 // processCachedVotes feeds all cached votes into the VoteProcessor
-func (m *StateMachine) processCachedVotes(block *model.Block) {
+func (m *VoteCollector) processCachedVotes(block *model.Block) {
 	for _, vote := range m.votesCache.All() {
 		if vote.BlockID != block.BlockID {
 			continue
