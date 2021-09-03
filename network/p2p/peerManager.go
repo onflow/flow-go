@@ -5,20 +5,20 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // Connector connects to peer and disconnects from peer using the underlying networking library
 type Connector interface {
 
-	// UpdatePeers connects to the given flow.Identities and returns a map of identifiers which failed. It also
+	// UpdatePeers connects to the given peer.IDs and returns a map of peers which failed. It also
 	// disconnects from any other peers with which it may have previously established connection.
 	// UpdatePeers implementation should be idempotent such that multiple calls to connect to the same peer should not
 	// return an error or create multiple connections
-	UpdatePeers(ctx context.Context, ids flow.IdentityList) error
+	UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 }
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
@@ -28,10 +28,10 @@ var DefaultPeerUpdateInterval = 10 * time.Minute
 type PeerManager struct {
 	unit               *engine.Unit
 	logger             zerolog.Logger
-	idsProvider        func() (flow.IdentityList, error) // callback to retrieve list of peers to connect to
-	peerRequestQ       chan struct{}                     // a channel to queue a peer update request
-	connector          Connector                         // connector to connect or disconnect from peers
-	peerUpdateInterval time.Duration                     // interval the peer manager runs on
+	peersProvider      func() (peer.IDSlice, error) // callback to retrieve list of peers to connect to
+	peerRequestQ       chan struct{}                // a channel to queue a peer update request
+	connector          Connector                    // connector to connect or disconnect from peers
+	peerUpdateInterval time.Duration                // interval the peer manager runs on
 }
 
 // Option represents an option for the peer manager.
@@ -43,16 +43,16 @@ func WithInterval(period time.Duration) Option {
 	}
 }
 
-// NewPeerManager creates a new peer manager which calls the idsProvider callback to get a list of peers to connect to
+// NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, idsProvider func() (flow.IdentityList, error),
+func NewPeerManager(logger zerolog.Logger, peersProvider func() (peer.IDSlice, error),
 	connector Connector, options ...Option) *PeerManager {
 	pm := &PeerManager{
-		unit:         engine.NewUnit(),
-		logger:       logger,
-		idsProvider:  idsProvider,
-		connector:    connector,
-		peerRequestQ: make(chan struct{}, 1),
+		unit:          engine.NewUnit(),
+		logger:        logger,
+		peersProvider: peersProvider,
+		connector:     connector,
+		peerRequestQ:  make(chan struct{}, 1),
 	}
 	// apply options
 	for _, o := range options {
@@ -101,25 +101,21 @@ func (pm *PeerManager) RequestPeerUpdate() {
 	}
 }
 
-// updatePeers updates the peers by connecting to all the nodes provided by the idsProvider callback and disconnecting from
+// updatePeers updates the peers by connecting to all the nodes provided by the peersProvider callback and disconnecting from
 // previous nodes that are no longer in the new list of nodes.
 func (pm *PeerManager) updatePeers() {
 
-	// get all the ids to connect to
-	ids, err := pm.idsProvider()
+	// get all the peer ids to connect to
+	peers, err := pm.peersProvider()
 	if err != nil {
 		pm.logger.Error().Err(err).Msg("failed to update peers")
 		return
 	}
 
 	pm.logger.Trace().
-		Str("peers", fmt.Sprintf("%v", ids.NodeIDs())).
+		Str("peers", fmt.Sprintf("%v", peers)).
 		Msg("connecting to peers")
 
 	// ask the connector to connect to all peers in the list
-	err = pm.connector.UpdatePeers(pm.unit.Ctx(), ids)
-	if err != nil {
-		// one of more identities in the identity table could not be connected to
-		pm.logger.Error().Err(err).Msg("failed to connect to one or more peers")
-	}
+	pm.connector.UpdatePeers(pm.unit.Ctx(), peers)
 }

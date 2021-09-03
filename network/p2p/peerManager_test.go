@@ -1,20 +1,20 @@
 package p2p
 
 import (
+	"math/rand"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -33,27 +33,35 @@ func (suite *PeerManagerTestSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 }
 
+func (suite *PeerManagerTestSuite) generatePeerIDs(n int) peer.IDSlice {
+	pids := peer.IDSlice{}
+	for i := 0; i < n; i++ {
+		key := generateNetworkingKey(suite.T())
+		pid, err := ExtractPeerID(key.PublicKey())
+		require.NoError(suite.T(), err)
+		pids = append(pids, pid)
+	}
+
+	return pids
+}
+
 // TestUpdatePeers tests that updatePeers calls the connector with the expected list of ids to connect and disconnect
 // from. The tests are cumulative and ordered.
 func (suite *PeerManagerTestSuite) TestUpdatePeers() {
-
 	// create some test ids
-	currentIDs := unittest.IdentityListFixture(10)
+	pids := suite.generatePeerIDs(10)
 
-	// setup a ID provider callback to return currentIDs
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	// setup a ID provider callback to return peer IDs
+	idProvider := func() (peer.IDSlice, error) {
+		return pids, nil
 	}
-
-	// track IDs that should be disconnected
-	var extraIDs flow.IdentityList
 
 	// create the connector mock to check ids requested for connect and disconnect
 	connector := new(mocknetwork.Connector)
-	connector.On("UpdatePeers", mock.Anything, mock.AnythingOfType("flow.IdentityList")).
+	connector.On("UpdatePeers", mock.Anything, mock.AnythingOfType("peer.IDSlice")).
 		Run(func(args mock.Arguments) {
-			idArg := args[1].(flow.IdentityList)
-			assertListsEqual(suite.T(), currentIDs, idArg)
+			idArg := args[1].(peer.IDSlice)
+			assert.ElementsMatch(suite.T(), pids, idArg)
 		}).
 		Return(nil)
 
@@ -69,8 +77,8 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// a subsequent call to updatePeers should request a connector.UpdatePeers to existing ids and new ids
 	suite.Run("updatePeers connects to old and new peers", func() {
 		// create a new id
-		newIDs := unittest.IdentityListFixture(1)
-		currentIDs = append(currentIDs, newIDs...)
+		newPIDs := suite.generatePeerIDs(1)
+		pids = append(pids, newPIDs...)
 
 		pm.updatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
@@ -79,8 +87,7 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// when ids are only excluded, connector.UpdatePeers should be called
 	suite.Run("updatePeers disconnects from extra peers", func() {
 		// delete an id
-		extraIDs = currentIDs.Sample(1)
-		currentIDs = currentIDs.Filter(filter.Not(filter.In(extraIDs)))
+		pids = removeRandomElement(pids)
 
 		pm.updatePeers()
 		connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 3)
@@ -89,12 +96,12 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	// addition and deletion of ids should result in a call to connector.UpdatePeers
 	suite.Run("updatePeers connects to new peers and disconnects from extra peers", func() {
 		// remove a couple of ids
-		extraIDs = currentIDs.Sample(2)
-		currentIDs = currentIDs.Filter(filter.Not(filter.In(extraIDs)))
+		pids = removeRandomElement(pids)
+		pids = removeRandomElement(pids)
 
 		// add a couple of new ids
-		newIDs := unittest.IdentityListFixture(2)
-		currentIDs = append(currentIDs, newIDs...)
+		newPIDs := suite.generatePeerIDs(2)
+		pids = append(pids, newPIDs...)
 
 		pm.updatePeers()
 
@@ -102,11 +109,20 @@ func (suite *PeerManagerTestSuite) TestUpdatePeers() {
 	})
 }
 
+func removeRandomElement(pids peer.IDSlice) peer.IDSlice {
+	i := rand.Intn(len(pids))
+	pids[i] = pids[len(pids)-1]
+	return pids[:len(pids)-1]
+}
+
 // TestPeriodicPeerUpdate tests that the peer manager runs periodically
 func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
-	currentIDs := unittest.IdentityListFixture(10)
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	// create some test ids
+	pids := suite.generatePeerIDs(10)
+
+	// setup a ID provider callback to return peer IDs
+	idProvider := func() (peer.IDSlice, error) {
+		return pids, nil
 	}
 
 	connector := new(mocknetwork.Connector)
@@ -136,9 +152,12 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 
 // TestOnDemandPeerUpdate tests that the a peer update can be requested on demand and in between the periodic runs
 func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
-	currentIDs := unittest.IdentityListFixture(10)
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	// create some test ids
+	pids := suite.generatePeerIDs(10)
+
+	// setup a ID provider callback to return peer IDs
+	idProvider := func() (peer.IDSlice, error) {
+		return pids, nil
 	}
 
 	// chooses peer interval rate deliberately long to capture on demand peer update
@@ -179,9 +198,12 @@ func (suite *PeerManagerTestSuite) TestOnDemandPeerUpdate() {
 
 // TestConcurrentOnDemandPeerUpdate tests that concurrent on-demand peer update request never block
 func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
-	currentIDs := unittest.IdentityListFixture(10)
-	idProvider := func() (flow.IdentityList, error) {
-		return currentIDs, nil
+	// create some test ids
+	pids := suite.generatePeerIDs(10)
+
+	// setup a ID provider callback to return peer IDs
+	idProvider := func() (peer.IDSlice, error) {
+		return pids, nil
 	}
 
 	connector := new(mocknetwork.Connector)
@@ -216,11 +238,4 @@ func (suite *PeerManagerTestSuite) TestConcurrentOnDemandPeerUpdate() {
 	assert.Eventually(suite.T(), func() bool {
 		return connector.AssertNumberOfCalls(suite.T(), "UpdatePeers", 2)
 	}, 10*time.Second, 100*time.Millisecond)
-}
-
-// assertListsEqual asserts that two identity list are equal ignoring the order
-func assertListsEqual(t *testing.T, list1, list2 flow.IdentityList) {
-	list1 = list1.Sort(order.ByNodeIDAsc)
-	list2 = list2.Sort(order.ByNodeIDAsc)
-	assert.Equal(t, list1, list2)
 }

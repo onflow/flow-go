@@ -7,10 +7,10 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/message"
@@ -21,41 +21,37 @@ import (
 type readConnection struct {
 	ctx        context.Context
 	stream     libp2pnetwork.Stream
-	remoteKey  crypto.PublicKey
+	remoteID   peer.ID
 	log        zerolog.Logger
 	metrics    module.NetworkMetrics
 	maxMsgSize int
-	callback   func(msg *message.Message, pk crypto.PublicKey)
+	callback   func(msg *message.Message, peerID peer.ID)
+	isStaked   bool
 }
 
 // newReadConnection creates a new readConnection
 func newReadConnection(ctx context.Context,
 	stream libp2pnetwork.Stream,
-	callback func(msg *message.Message, pubKey crypto.PublicKey),
+	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics,
-	maxMsgSize int) *readConnection {
+	maxMsgSize int,
+	isStaked bool,
+) *readConnection {
 
 	if maxMsgSize <= 0 {
 		maxMsgSize = DefaultMaxUnicastMsgSize
 	}
 
-	remoteKey := stream.Conn().RemotePublicKey()
-	flowKey, err := FlowPublicKeyFromLibP2P(remoteKey)
-	// this should not happen if the stream was setup properly
-	if err != nil {
-		log.Err(err).Msg("failed to extract flow public key of stream libp2p key")
-		return nil
-	}
-
 	c := readConnection{
 		ctx:        ctx,
 		stream:     stream,
-		remoteKey:  flowKey,
+		remoteID:   stream.Conn().RemotePeer(),
 		callback:   callback,
 		log:        log,
 		metrics:    metrics,
 		maxMsgSize: maxMsgSize,
+		isStaked:   isStaked,
 	}
 	return &c
 }
@@ -109,11 +105,15 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
+		channel := metrics.ChannelOneToOne
+		if !rc.isStaked {
+			channel = metrics.ChannelOneToOneUnstaked
+		}
 		// log metrics with the channel name as OneToOne
-		rc.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+		rc.metrics.NetworkMessageReceived(msg.Size(), channel, msg.Type)
 
 		// call the callback
-		rc.callback(&msg, rc.remoteKey)
+		rc.callback(&msg, rc.remoteID)
 	}
 }
 
