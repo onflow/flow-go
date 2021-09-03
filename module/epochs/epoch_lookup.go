@@ -44,8 +44,14 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 	// or if the next epoch failed for any other reason. In either case we will
 	// continue using the last valid Random Beacon key until the next spork.
 	//
-	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
-		return current.Counter()
+	currentFinalView, err := current.FinalView()
+	if err != nil {
+		return 0, err
+	}
+	if view > currentFinalView {
+		if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
+			return current.Counter()
+		}
 	}
 
 	for _, epoch := range []protocol.Epoch{previous, current, next} {
