@@ -32,15 +32,28 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 	current := l.state.Final().Epochs().Current()
 	next := l.state.Final().Epochs().Next()
 
+	// TMP: CONTINUE FAILED EPOCH
+	//
+	// If the given view is within the bounds of the next epoch, and the epoch
+	// has not been set up or committed, we pretend that we are still in the
+	// current epoch and return that epoch's counter.
+	//
+	// This is used to determine which Random Beacon key we will use to sign and
+	// verify blocks and votes. The failure case we are avoiding here is if the
+	// DKG for next epoch failed and there is no Random Beacon key for that epoch,
+	// or if the next epoch failed for any other reason. In either case we will
+	// continue using the last valid Random Beacon key until the next spork.
+	//
+	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
+		return current.Counter()
+	}
+
 	for _, epoch := range []protocol.Epoch{previous, current, next} {
 		counter, err := epoch.Counter()
 		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
 			continue
 		}
-		// TMP: CONTINUE FAILED EPOCH
-		if _, err := epoch.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) {
-			return current.Counter()
-		}
+
 		if err != nil {
 			return 0, err
 		}
