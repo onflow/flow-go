@@ -24,7 +24,7 @@ import (
 // failure has been detected, and which has caused emergency epoch chain
 // continuation to kick in as a fallback. When we are in emergency epoch chain
 // continuation mode, we want to ignore any future service events.
-var errEmergencyEpochChainContinuation = fmt.Errorf("an epoch failure has occurred, resulting in emergy epoch chain continuation")
+var errEmergencyEpochChainContinuation = fmt.Errorf("an epoch failure has occurred, resulting in emergency epoch chain continuation")
 
 // FollowerState implements a lighter version of a mutable protocol state.
 // When extending the state, it performs hardly any checks on the block payload.
