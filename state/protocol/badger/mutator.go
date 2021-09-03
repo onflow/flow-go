@@ -662,7 +662,17 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 		// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
 		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
 			//return nil, fmt.Errorf("missing setup event for starting next epoch")
+
 			// TMP: CONTINUE FAILED EPOCH
+			//
+			// We are proposing or processing the first block of the next epoch,
+			// but that epoch has not been setup. Rather than returning an error
+			// which prevents further block production, we store the block with
+			// the same epoch status as its parent, resulting in it being considered
+			// by the protocol state to fall in the same epoch as its parent.
+			//
+			// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
+			//
 			status, err := flow.NewEpochStatus(
 				parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
 				parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
@@ -672,7 +682,17 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 		}
 		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
 			//return nil, fmt.Errorf("missing commit event for starting next epoch")
+
 			// TMP: CONTINUE FAILED EPOCH
+			//
+			// We are proposing or processing the first block of the next epoch,
+			// but that epoch has not been committed. Rather than returning an error
+			// which prevents further block production, we store the block with
+			// the same epoch status as its parent, resulting in it being considered
+			// by the protocol state to fall in the same epoch as its parent.
+			//
+			// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
+			//
 			status, err := flow.NewEpochStatus(
 				parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
 				parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
