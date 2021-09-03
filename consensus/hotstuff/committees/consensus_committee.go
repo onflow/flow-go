@@ -158,6 +158,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 			int(firstView+leader.EstimatedSixMonthOfViews), // pretend the next epoch lasts forever
 			identities.Filter(filter.IsVotingConsensusCommitteeMember),
 		)
+		if err != nil {
+			return flow.ZeroID, fmt.Errorf("could not compute epoch fallback leader selection: %w", err)
+		}
 		c.leaders[counter] = selection
 		return selection.LeaderForView(view)
 	}
