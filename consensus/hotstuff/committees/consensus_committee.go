@@ -132,7 +132,7 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	//
 	next := c.state.Final().Epochs().Next()
 
-	// TMP: CONTINUE FAILED EPOCH
+	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
 	//
 	// If we reach this code-path, it means we are about to propose or vote
 	// for the first block in the next epoch. If that epoch has not been

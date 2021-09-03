@@ -673,7 +673,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
 			//return nil, fmt.Errorf("missing setup event for starting next epoch")
 
-			// TMP: CONTINUE FAILED EPOCH
+			// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
 			//
 			// We are proposing or processing the first block of the next epoch,
 			// but that epoch has not been setup. Rather than returning an error
@@ -696,7 +696,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
 			//return nil, fmt.Errorf("missing commit event for starting next epoch")
 
-			// TMP: CONTINUE FAILED EPOCH
+			// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
 			//
 			// We are proposing or processing the first block of the next epoch,
 			// but that epoch has not been committed. Rather than returning an error
@@ -768,7 +768,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	// As we don't have slashing yet, there is nothing in the payload which could
 	// modify the protocol state for the current epoch.
 
-	// TMP: CONTINUE FAILED EPOCH
+	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
 	//
 	// When we detect an epoch failure, we will continue the current epoch
 	// indefinitely. When this happens, we will ignore all future service
@@ -804,7 +804,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	// chain finalization should halt.
 	for _, seal := range parent.Payload.Seals {
 
-		// TMP: CONTINUE FAILED EPOCH
+		// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
 		//
 		// If an epoch failure is detected, ignore all future service events.
 		if emergencyEpochChainContinuationEnabled {

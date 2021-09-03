@@ -32,7 +32,7 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 	current := l.state.Final().Epochs().Current()
 	next := l.state.Final().Epochs().Next()
 
-	// TMP: CONTINUE FAILED EPOCH
+	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
 	//
 	// If the given view is within the bounds of the next epoch, and the epoch
 	// has not been set up or committed, we pretend that we are still in the
