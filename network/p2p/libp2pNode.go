@@ -532,10 +532,13 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 		return err
 	}
 
-	n.pubSub.UnregisterTopicValidator(topic.String())
+	err := n.pubSub.UnregisterTopicValidator(topic.String())
+	if err != nil {
+		return fmt.Errorf("could not unregister topic validator for (%s): %w", topic, err)
+	}
 
 	// attempt to close the topic
-	err := tp.Close()
+	err = tp.Close()
 	if err != nil {
 		err = fmt.Errorf("could not close topic (%s): %w", topic, err)
 		return err
