@@ -7,9 +7,8 @@ import (
 	"time"
 
 	"github.com/onflow/cadence"
-	"github.com/rs/zerolog"
-
 	flowsdk "github.com/onflow/flow-go-sdk"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/metrics"
 
