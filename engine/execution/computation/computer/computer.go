@@ -9,7 +9,6 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
-	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -306,31 +305,26 @@ func (e *blockComputer) executeTransaction(
 ) error {
 
 	startedAt := time.Now()
-	var txSpan opentracing.Span
-	var traceID string
-	// call tracing
-	txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+	txID := txBody.ID()
 
-	if sc, ok := txSpan.Context().(jaeger.SpanContext); ok {
-		traceID = sc.TraceID().String()
-	}
+	// we capture two spans one for tx-based view and one for the current context (block-based) view
+	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+	txSpan.LogFields(
+		log.String("transaction.ID", txID.String()),
+	)
+	defer txSpan.Finish()
 
-	defer func() {
-		txSpan.LogFields(
-			log.String("transaction.ID", txBody.ID().String()),
-		)
-		txSpan.Finish()
-	}()
+	txInternalSpan, _ := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXEComputeTransaction)
+	defer txInternalSpan.Finish()
 
 	e.log.Debug().
 		Hex("tx_id", logging.Entity(txBody)).
 		Msg("executing transaction")
 
-	txView := collectionView.NewChild()
-
 	tx := fvm.Transaction(txBody, txIndex)
-	tx.SetTraceSpan(txSpan)
+	tx.SetTraceSpan(txInternalSpan)
 
+	txView := collectionView.NewChild()
 	err := e.vm.Run(ctx, tx, txView, programs)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction: %w", err)
@@ -371,7 +365,6 @@ func (e *blockComputer) executeTransaction(
 
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
-		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 
