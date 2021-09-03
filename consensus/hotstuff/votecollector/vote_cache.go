@@ -29,14 +29,15 @@ type voteContainer struct {
 // noteworthy delay. Otherwise, consensus speed is impacted.
 type VoteConsumer func(vote *model.Vote)
 
-// VotesCache maintains a cache of votes for one particular view. The cache
-// memorizes the order in which the votes were received. Votes are
-// de-duplicated based on the following rules:
+// VotesCache maintains a _concurrency safe_ cache of votes for one particular
+// view. The cache memorizes the order in which the votes were received. Votes
+// are de-duplicated based on the following rules:
 //  * Vor each voter (i.e. SignerID), we store the _first_ vote v0.
 //  * For any subsequent vote v, we check whether v.BlockID == v0.BlockID.
 //    If this is the case, we consider the vote a duplicate and drop it.
 //    If v and v0 have different BlockIDs, the voter is equivocating and
 //    we return a model.DoubleVoteError
+// .
 type VotesCache struct {
 	lock          sync.Mutex
 	view          uint64
@@ -58,10 +59,15 @@ func (vc *VotesCache) View() uint64 { return vc.view }
 // normal operations:
 //  * nil: if the vote was successfully added
 //  * model.DoubleVoteError is returned if the voter is equivocating
-//    (i.e. voting in the same view for different blocks). Vote is not stored
+//    (i.e. voting in the same view for different blocks).
 //  * RepeatedVoteErr is returned when adding a vote for the same block from
-//    the same voter multiple times. Vote is not stored.
+//    the same voter multiple times.
+//  * IncompatibleViewErr is returned if the vote is for a different view.
+// When AddVote returns an error, the vote is _not_ stored.
 func (vc *VotesCache) AddVote(vote *model.Vote) error {
+	if vote.View != vc.view {
+		return VoteForIncompatibleViewError
+	}
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
 
@@ -103,18 +109,14 @@ func (vc *VotesCache) RegisterVoteConsumer(consumer VoteConsumer) {
 	}
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
-	vc.voteConsumers = append(vc.voteConsumers, consumer)
 
-	// feed the consumer with the cached votes
-	orderedVotes := make([]*model.Vote, len(vc.votes))
-	for _, v := range vc.votes {
-		orderedVotes[v.index] = v.Vote
-	}
-	for _, vote := range orderedVotes {
+	vc.voteConsumers = append(vc.voteConsumers, consumer)
+	for _, vote := range vc.all() { // feed the consumer with the cached votes
 		consumer(vote) // non-blocking per API contract
 	}
 }
 
+// ByBlockID returns all votes for the specified block. Concurrency safe.
 func (vc *VotesCache) ByBlockID(blockID flow.Identifier) []*model.Vote {
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
@@ -145,4 +147,20 @@ func (vc *VotesCache) ByBlockID(blockID flow.Identifier) []*model.Vote {
 		return nil
 	}
 	return matchingVotes[:numberMatchingVotes]
+}
+
+// All returns all currently cached votes. Concurrency safe.
+func (vc *VotesCache) All() []*model.Vote {
+	vc.lock.Lock()
+	defer vc.lock.Unlock()
+	return vc.all()
+}
+
+// all returns all currently cached votes. NOT concurrency safe
+func (vc *VotesCache) all() []*model.Vote {
+	orderedVotes := make([]*model.Vote, len(vc.votes))
+	for _, v := range vc.votes {
+		orderedVotes[v.index] = v.Vote
+	}
+	return orderedVotes
 }

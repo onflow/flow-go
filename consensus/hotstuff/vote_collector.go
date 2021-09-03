@@ -15,7 +15,7 @@ type VoteCollectorStatus int
 const (
 	// VoteCollectorStatusCaching is for the status when the block has not been received.
 	// The vote collector in this status will cache all the votes without verifying them
-	VoteCollectorStatusCaching = iota
+	VoteCollectorStatusCaching VoteCollectorStatus = iota
 
 	// VoteCollectorStatusVerifying is for the status when the block has been received,
 	// and is able to process all votes for it.
@@ -76,6 +76,25 @@ type VerifyingVoteCollector interface {
 	BlockSigner
 
 	// Block returns block that will be used to collector votes for. Transition to VerifyingVoteCollector can occur only
+	// when we have received block proposal so this information has to be available.
+	Block() *model.Block
+}
+
+// VoteProcessor processes votes. Depending on their implementation, a VoteProcessor
+// might drop votes or attempt to construct a QC.
+type VoteProcessor interface {
+	// Process processes the given vote.
+	Process(vote *model.Vote) error
+
+	// Status returns the status of the vote processor
+	Status() VoteCollectorStatus
+}
+
+// VerifyingVoteProcessor is a VoteProcessor that attempts to construct a QC for the given block.
+type VerifyingVoteProcessor interface {
+	VoteProcessor
+
+	// Block returns which block that will be used to collector votes for. Transition to VerifyingVoteCollector can occur only
 	// when we have received block proposal so this information has to be available.
 	Block() *model.Block
 }

@@ -34,7 +34,7 @@ type RandomBeaconReconstructor interface {
 }
 
 // SigType is the aggregable signature type.
-type SigType int
+type SigType = uint8
 
 // SigType specifies the role of the signature in the protocol. SigTypeRandomBeacon type is for random beacon signatures. SigTypeStaking is for Hotstuff sigantures. Both types are aggregatable cryptographic signatures.
 const (
@@ -57,7 +57,7 @@ type WeightedSignatureAggregator interface {
 	// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
 	//   (1000 is just an example)
 	// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-	TrustedAdd(signerID flow.Identifier, weight uint64, sig crypto.Signature) (totalWeight uint64, exception error)
+	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
 
 	// TotalWeight returns the total weight presented by the collected sig shares.
 	TotalWeight() uint64
@@ -70,7 +70,7 @@ type WeightedSignatureAggregator interface {
 	// The function performs a final verification and errors if the aggregated signature is not valid. This is
 	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
 	// If called concurrently, only one thread will be running the aggregation.
-	Aggregate() ([]flow.Identifier, []byte, error)
+	Aggregate() ([]flow.Identifier, crypto.Signature, error)
 }
 
 // CombinedSigAggregator aggregates the staking signatures and random beacon signatures,
