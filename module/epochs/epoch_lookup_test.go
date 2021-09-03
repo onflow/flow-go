@@ -22,6 +22,8 @@ func TestEpochForView(t *testing.T) {
 		epoch.On("FirstView").Return(uint64(firstView), nil)
 		epoch.On("FinalView").Return(uint64(lastView), nil)
 		epoch.On("Counter").Return(uint64(counter), nil)
+		// return nil error to indicate a committed epoch
+		epoch.On("DKG").Return(nil, nil)
 		epochs = append(epochs, epoch)
 	}
 
