@@ -309,12 +309,11 @@ func (e *blockComputer) executeTransaction(
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
 	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-	txSpan.LogFields(
-		log.String("transaction.ID", txID.String()),
-	)
+	txSpan.LogFields(log.String("transaction.ID", txID.String()))
 	defer txSpan.Finish()
 
-	txInternalSpan, _ := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXEComputeTransaction)
+	txInternalSpan, _ := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
+	txInternalSpan.LogFields(log.String("transaction.ID", txID.String()))
 	defer txInternalSpan.Finish()
 
 	e.log.Debug().

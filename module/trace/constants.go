@@ -92,6 +92,7 @@ const (
 	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
 	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
 	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
+	EXERunTransaction          SpanName = "exe.computer.runTransaction"
 	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
