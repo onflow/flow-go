@@ -61,6 +61,20 @@ func NewPeerManager(logger zerolog.Logger, peersProvider func() (peer.IDSlice, e
 	return pm
 }
 
+// PeerManagerFactoryFunc is a factory function type for generating a PeerManager instance
+type PeerManagerFactoryFunc func() (*PeerManager, error)
+
+func PeerManagerFactory(logger zerolog.Logger, peersProvider func() (peer.IDSlice, error),
+	connectorFunc ConnectorFactoryFunc, options ...Option) PeerManagerFactoryFunc {
+		return func() (*PeerManager, error) {
+			connector, err := connectorFunc()
+			if err != nil {
+				return nil, err
+			}
+			return NewPeerManager(logger, peersProvider, connector, options...), nil
+		}
+}
+
 // Ready kicks off the ambient periodic connection updates.
 func (pm *PeerManager) Ready() <-chan struct{} {
 	// makes sure that peer update request is invoked

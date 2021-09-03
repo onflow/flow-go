@@ -75,11 +75,11 @@ type Middleware struct {
 	metrics                    module.NetworkMetrics
 	rootBlockID                string
 	validators                 []network.MessageValidator
+	peerManagerFactory PeerManagerFactoryFunc
 	peerManager                *PeerManager
 	peerUpdateInterval         time.Duration
 	unicastMessageTimeout      time.Duration
 	connectionGating           bool
-	managePeerConnections      bool
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
@@ -96,6 +96,12 @@ func WithIdentifierProvider(provider id.IdentifierProvider) MiddlewareOption {
 func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.validators = validators
+	}
+}
+
+func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.peerManagerFactory = peerManagerFunc
 	}
 }
 
@@ -117,7 +123,6 @@ func NewMiddleware(
 	peerUpdateInterval time.Duration,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,
-	managePeerConnections bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
@@ -141,7 +146,7 @@ func NewMiddleware(
 		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
 		connectionGating:      connectionGating,
-		managePeerConnections: managePeerConnections,
+		peerManagerFactory: peerManagerFactory,
 		idTranslator:          idTranslator,
 	}
 
@@ -159,7 +164,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
+func (m *Middleware) TopologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
 		return nil, err
@@ -246,13 +251,19 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
 	}
 
-	if m.managePeerConnections {
-		libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
+	if m.peerManagerFactory != nil {
+
+		m.peerManager, err = m.peerManagerFactory()
+		if err != nil {
+			return fmt.Errorf("failed to create peer manager: %w", err)
+		}
+
+		libp2pConnector, err := NewLibp2pConnector(m.libP2PNode.Host(), m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create libp2pConnector: %w", err)
 		}
 
-		m.peerManager = NewPeerManager(m.log, m.topologyPeers, libp2pConnector, WithInterval(m.peerUpdateInterval))
+		m.peerManager = NewPeerManager(m.log, m.TopologyPeers, libp2pConnector, WithInterval(m.peerUpdateInterval))
 		select {
 		case <-m.peerManager.Ready():
 			m.log.Debug().Msg("peer manager successfully started")
@@ -556,7 +567,7 @@ func (m *Middleware) peerManagerUpdate() {
 
 // peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
 func (m *Middleware) peerMgr() (*PeerManager, bool) {
-	if m.managePeerConnections {
+	if m.peerManager != nil {
 		return m.peerManager, true
 	}
 	return nil, false

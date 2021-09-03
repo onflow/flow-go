@@ -578,20 +578,32 @@ func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 	networkMetrics module.NetworkMetrics,
 	factoryFunc p2p.LibP2PFactoryFunc,
 	validators ...network.MessageValidator) network.Middleware {
-	builder.Middleware = p2p.NewMiddleware(
+
+
+
+	var middleware *p2p.Middleware
+	peerManagerFunc := func() p2p.PeerManagerFactoryFunc {
+		connectorFactory := p2p.LibP2PConnectorFactory(builder.LibP2PNode.Host(), builder.Logger)
+		return p2p.PeerManagerFactory(builder.Logger, middleware.TopologyPeers, connectorFactory, p2p.WithInterval(time.Hour))
+	}
+
+	middleware = p2p.NewMiddleware(
 		builder.Logger,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
 		builder.RootBlock.ID().String(),
-		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
+		, // TODO: this is pretty meaningless since there is no peermanager in play.
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating for the unstaked network
 		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
+		p2p.WithPeerManager(peerManagerFunc)
 		// use default identifier provider
 	)
+
+	builder.Middleware = middleware
 	return builder.Middleware
 }
 
