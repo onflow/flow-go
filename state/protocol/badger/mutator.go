@@ -577,12 +577,35 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// if this block's view exceeds the final view of its parent's current epoch,
 	// this block begins the next epoch
 	if header.View > finalView {
-		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
 
-		// set current epoch counter corresponding to new epoch
-		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
-		// set epoch phase - since we are starting a new epoch we begin in the staking phase
-		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
+		//
+		// If we have triggered emergency chain continuation as a result of a
+		// failed epoch, these events would be emitted for every block. Instead,
+		// we will skip them.
+		//
+		// We detect EECC here by checking for two blocks spanning what should
+		// be an epoch transition having the same epoch counter. This indicates
+		// that the last epoch was continued past its specified end time.
+		//
+		parentCounter, err := m.AtBlockID(header.ParentID).Epochs().Current().Counter()
+		if err != nil {
+			return fmt.Errorf("could not check parent counter to skip events in fallback epoch: %w", err)
+		}
+		currentCounter, err := m.AtBlockID(header.ID()).Epochs().Current().Counter()
+		if err != nil {
+			return fmt.Errorf("could not check current counter to skip events in fallback epoch: %w", err)
+		}
+		if parentCounter != currentCounter {
+
+			events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+
+			// set current epoch counter corresponding to new epoch
+			events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+			// set epoch phase - since we are starting a new epoch we begin in the staking phase
+			events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
+		}
+
 	}
 
 	// FINALLY: any block that is finalized is already a valid extension;
@@ -691,7 +714,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 			if err != nil {
 				return nil, fmt.Errorf("failed to create epoch status for fallback epoch: %w", err)
 			}
-			return status, errEmergencyEpochChainContinuation
+			return status, fmt.Errorf("entering not set up epoch: %w", errEmergencyEpochChainContinuation)
 		}
 		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
 			//return nil, fmt.Errorf("missing commit event for starting next epoch")
@@ -714,7 +737,7 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 			if err != nil {
 				return nil, fmt.Errorf("failed to create epoch status for fallback epoch: %w", err)
 			}
-			return status, errEmergencyEpochChainContinuation
+			return status, fmt.Errorf("entering not committed epoch: %w", errEmergencyEpochChainContinuation)
 		}
 		status, err := flow.NewEpochStatus(
 			parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
@@ -777,6 +800,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	epochStatus, err := m.epochStatus(block.Header)
 	if errors.Is(err, errEmergencyEpochChainContinuation) {
 		emergencyEpochChainContinuationEnabled = true
+		fmt.Println("handleServiceEvents: emergency epoch chain continuation triggered", err.Error())
 	} else if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
 	}
