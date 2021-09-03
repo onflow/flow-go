@@ -491,7 +491,9 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
 			if len(validators) > 0 {
-				n.pubSub.UnregisterTopicValidator(topic.String())
+				if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+				}
 			}
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
@@ -532,7 +534,9 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 		return err
 	}
 
-	n.pubSub.UnregisterTopicValidator(topic.String())
+	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+	}
 
 	// attempt to close the topic
 	err := tp.Close()
