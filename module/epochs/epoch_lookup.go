@@ -28,11 +28,12 @@ func NewEpochLookup(state protocol.State) *EpochLookup {
 // (even if the node does happen to have that stored in the underlying storage)
 // -- these queries indicate a bug in the querier.
 func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error) {
-	previous := l.state.Final().Epochs().Previous()
-	current := l.state.Final().Epochs().Current()
-	next := l.state.Final().Epochs().Next()
+	epochs := l.state.Final().Epochs()
+	previous := epochs.Previous()
+	current := epochs.Current()
+	next := epochs.Next()
 
-	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
+	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION [EECC]
 	//
 	// If the given view is within the bounds of the next epoch, and the epoch
 	// has not been set up or committed, we pretend that we are still in the
@@ -49,20 +50,25 @@ func (l *EpochLookup) EpochForView(view uint64) (epochCounter uint64, err error)
 		return 0, err
 	}
 	if view > currentFinalView {
-		if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
+		_, err := next.DKG() // either of the following errors indicates that we have transitioned into EECC
+		if errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
 			return current.Counter()
+		}
+		if err != nil {
+			return 0, fmt.Errorf("unexpected error in EECC logic while retrieving DKG data: %w", err)
 		}
 	}
 
+	// HAPPY PATH logic
 	for _, epoch := range []protocol.Epoch{previous, current, next} {
 		counter, err := epoch.Counter()
 		if errors.Is(err, protocol.ErrNoPreviousEpoch) {
 			continue
 		}
-
 		if err != nil {
 			return 0, err
 		}
+
 		firstView, err := epoch.FirstView()
 		if err != nil {
 			return 0, err

@@ -130,9 +130,10 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// This assumption is equivalent to assuming that we build at least one
 	// block in every epoch, which is anyway a requirement for valid epochs.
 	//
-	next := c.state.Final().Epochs().Next()
+	epochs := c.state.Final().Epochs()
+	next := epochs.Next()
 
-	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
+	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION [EECC]
 	//
 	// If we reach this code-path, it means we are about to propose or vote
 	// for the first block in the next epoch. If that epoch has not been
@@ -141,9 +142,9 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 	// 6 months worth of views, so that consensus will have leaders specified
 	// for the duration of the current spork, without any epoch transitions.
 	//
-	if _, err := next.DKG(); errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
-
-		current := c.state.Final().Epochs().Current()
+	_, err = next.DKG() // either of the following errors indicates that we have transitioned into EECC
+	if errors.Is(err, protocol.ErrEpochNotCommitted) || errors.Is(err, protocol.ErrNextEpochNotSetup) {
+		current := epochs.Current()
 
 		currentCounter, err := current.Counter()
 		if err != nil {
@@ -181,7 +182,11 @@ func (c *Consensus) LeaderForView(view uint64) (flow.Identifier, error) {
 		c.mu.Unlock()
 		return selection.LeaderForView(view)
 	}
+	if err != nil {
+		return flow.ZeroID, fmt.Errorf("unexpected error in EECC logic while retrieving DKG data: %w", err)
+	}
 
+	// HAPPY PATH logic
 	selection, err := c.prepareLeaderSelection(next)
 	if err != nil {
 		return flow.ZeroID, fmt.Errorf("could not compute leader selection for next epoch: %w", err)
