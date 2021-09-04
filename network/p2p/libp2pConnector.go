@@ -21,6 +21,7 @@ type Libp2pConnector struct {
 	backoffConnector *discovery.BackoffConnector
 	host             host.Host
 	log              zerolog.Logger
+	pruneConnections bool
 }
 
 var _ Connector = &Libp2pConnector{}
@@ -51,24 +52,30 @@ func IsUnconvertibleIdentitiesError(err error) bool {
 	return errors.As(err, &errUnconvertableIdentitiesError)
 }
 
-func NewLibp2pConnector(host host.Host, log zerolog.Logger) (*Libp2pConnector, error) {
+type ConnectorOption func(connector *Libp2pConnector)
+
+func DisableConnectionPruning() ConnectorOption {
+	return func(connector *Libp2pConnector) {
+		connector.pruneConnections = false
+	}
+}
+
+func NewLibp2pConnector(host host.Host, log zerolog.Logger, options ...ConnectorOption) (*Libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
-	return &Libp2pConnector{
+	libP2PConnector := &Libp2pConnector{
 		backoffConnector: connector,
 		host:             host,
 		log:              log,
-	}, nil
-}
-
-type ConnectorFactoryFunc func() (*Libp2pConnector, error)
-
-func LibP2PConnectorFactory(host host.Host, log zerolog.Logger) ConnectorFactoryFunc {
-	return func() (*Libp2pConnector, error) {
-		return NewLibp2pConnector(host, log)
+		pruneConnections: true,
 	}
+
+	for _, o := range options {
+		o(libP2PConnector)
+	}
+	return libP2PConnector, nil
 }
 
 // UpdatePeers is the implementation of the Connector.UpdatePeers function. It connects to all of the ids and
@@ -77,8 +84,10 @@ func (l *Libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice)
 	// connect to each of the peer.AddrInfo in pInfos
 	l.connectToPeers(ctx, peerIDs)
 
-	// disconnect from any other peers not in pInfos
-	l.trimAllConnectionsExcept(peerIDs)
+	if l.pruneConnections {
+		// disconnect from any other peers not in pInfos
+		l.trimAllConnectionsExcept(peerIDs)
+	}
 }
 
 // connectToPeers connects each of the peer in pInfos
