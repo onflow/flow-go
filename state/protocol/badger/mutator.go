@@ -20,11 +20,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-// errEmergencyEpochChainContinuation is a sentinel error returned when an epoch
-// failure has been detected, and which has caused emergency epoch chain
-// continuation to kick in as a fallback. When we are in emergency epoch chain
-// continuation mode, we want to ignore any future service events.
-var errEmergencyEpochChainContinuation = fmt.Errorf("an epoch failure has occurred, resulting in emergency epoch chain continuation")
+// errIncompleteEpochConfiguration is a sentinel error returned when there are
+// still epoch service events missing and the new epoch can't be constructed.
+var errIncompleteEpochConfiguration = errors.New("block beyond epoch boundary")
 
 // FollowerState implements a lighter version of a mutable protocol state.
 // When extending the state, it performs hardly any checks on the block payload.
@@ -484,9 +482,9 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 // finalizes one block at a time. Hence, the parent of `blockID`
 // has to be the last finalized block.
 func (m *FollowerState) Finalize(blockID flow.Identifier) error {
+	// preliminaries: start tracer and retrieve full block
 	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorFinalize)
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorFinalize)
-
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)
@@ -645,11 +643,11 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 		emit()
 	}
 	for _, seal := range block.Payload.Seals {
-		sealedBlockID, err := m.blocks.ByID(seal.BlockID)
+		sealedBlock, err := m.blocks.ByID(seal.BlockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve sealed block (%x): %w", seal.BlockID, err)
 		}
-		m.metrics.BlockSealed(sealedBlockID)
+		m.metrics.BlockSealed(sealedBlock)
 	}
 
 	return nil
@@ -669,8 +667,8 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 // consistency requirements of the protocol.
 //
 // Returns:
-// * errEmergencyEpochChainContinuation if the epoch has ended before processing
-//   both an EpochSetup and EpochCommit event
+// * errIncompleteEpochConfiguration if the epoch has ended before processing
+//   both an EpochSetup and EpochCommit event; so the new epoch can't be constructed.
 func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, error) {
 
 	parentStatus, err := m.epoch.statuses.ByBlockID(block.ParentID)
@@ -687,50 +685,10 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 	if parentSetup.FinalView < block.View { // first block of a new epoch
 		// sanity check: parent's epoch Preparation should be completed and have EpochSetup and EpochCommit events
 		if parentStatus.NextEpoch.SetupID == flow.ZeroID {
-			//return nil, fmt.Errorf("missing setup event for starting next epoch")
-
-			// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
-			//
-			// We are proposing or processing the first block of the next epoch,
-			// but that epoch has not been setup. Rather than returning an error
-			// which prevents further block production, we store the block with
-			// the same epoch status as its parent, resulting in it being considered
-			// by the protocol state to fall in the same epoch as its parent.
-			//
-			// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
-			//
-			status, err := flow.NewEpochStatus(
-				parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
-				parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
-				parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create epoch status for fallback epoch: %w", err)
-			}
-			return status, fmt.Errorf("entering not set up epoch: %w", errEmergencyEpochChainContinuation)
+			return nil, fmt.Errorf("missing setup event for starting next epoch: %w", errIncompleteEpochConfiguration)
 		}
 		if parentStatus.NextEpoch.CommitID == flow.ZeroID {
-			//return nil, fmt.Errorf("missing commit event for starting next epoch")
-
-			// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
-			//
-			// We are proposing or processing the first block of the next epoch,
-			// but that epoch has not been committed. Rather than returning an error
-			// which prevents further block production, we store the block with
-			// the same epoch status as its parent, resulting in it being considered
-			// by the protocol state to fall in the same epoch as its parent.
-			//
-			// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
-			//
-			status, err := flow.NewEpochStatus(
-				parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
-				parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
-				parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("failed to create epoch status for fallback epoch: %w", err)
-			}
-			return status, fmt.Errorf("entering not committed epoch: %w", errEmergencyEpochChainContinuation)
+			return nil, fmt.Errorf("missing commit event for starting next epoch: %w", errIncompleteEpochConfiguration)
 		}
 		status, err := flow.NewEpochStatus(
 			parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
@@ -776,7 +734,11 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // includes an operation to index the epoch status for every block, and
 // operations to insert service events for blocks that include them.
 //
+// Return values:
+//  * ops: pending data base operations to persist this processing step
+//  * error: no errors expected during normal operations
 func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
+	var ops []func(*transaction.Tx) error
 
 	// Determine epoch status for block's CURRENT epoch.
 	//
@@ -784,16 +746,24 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	// As we don't have slashing yet, there is nothing in the payload which could
 	// modify the protocol state for the current epoch.
 
-	// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
-	//
-	// When we detect an epoch failure, we will continue the current epoch
-	// indefinitely. When this happens, we will ignore all future service
-	// events.
-	emergencyEpochChainContinuationEnabled := false
 	epochStatus, err := m.epochStatus(block.Header)
-	if errors.Is(err, errEmergencyEpochChainContinuation) {
-		emergencyEpochChainContinuationEnabled = true
+	if errors.Is(err, errIncompleteEpochConfiguration) {
+		// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
+		//
+		// We are proposing or processing the first block of the next epoch,
+		// but that epoch has not been setup. Rather than returning an error
+		// which prevents further block production, we store the block with
+		// the same epoch status as its parent, resulting in it being considered
+		// by the protocol state to fall in the same epoch as its parent.
+		//
+		// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
 		fmt.Println("handleServiceEvents: emergency epoch chain continuation triggered", err.Error())
+		parentStatus, err := m.epoch.statuses.ByBlockID(block.Header.ParentID)
+		if err != nil {
+			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
+		}
+		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus))
+		return ops, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
 	}
@@ -803,9 +773,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
 	counter := activeSetup.Counter
-
-	// keep track of DB operations to apply when inserting this block
-	var ops []func(*transaction.Tx) error
 
 	// we will apply service events from blocks which are sealed by this block's PARENT
 	parent, err := m.blocks.ByID(block.Header.ParentID)
@@ -820,14 +787,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
 	for _, seal := range parent.Payload.Seals {
-
-		// TMP: EMERGENCY EPOCH CHAIN CONTINUATION
-		//
-		// If an epoch failure is detected, ignore all future service events.
-		if emergencyEpochChainContinuationEnabled {
-			break
-		}
-
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return nil, fmt.Errorf("could not get result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
