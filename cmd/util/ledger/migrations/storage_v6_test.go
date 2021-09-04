@@ -28,10 +28,16 @@ func TestValueConversion(t *testing.T) {
 			oldInter.BoolValue(true),
 		)
 
+		address := &common.Address{1, 2}
+		oldArray.SetOwner(address)
+
 		storage := newInter.NewInMemoryStorage()
 		converter := NewValueConverter(storage)
 
-		newValue := converter.Convert(oldArray)
+		inter, err := oldInter.NewInterpreter(nil, nil)
+		assert.NoError(t, err)
+
+		newValue := converter.Convert(inter, oldArray)
 
 		assert.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
@@ -41,7 +47,7 @@ func TestValueConversion(t *testing.T) {
 	})
 }
 
-func TestEncodeDecodeRoundTrip(t *testing.T) {
+func TestEncoding(t *testing.T) {
 
 	t.Run("Array", func(t *testing.T) {
 		// Get the bytes in old format
@@ -57,16 +63,12 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
 		require.NoError(t, err)
 
-		// Make sure the encoded content is from old version of value/encoder
-		// by asserting the bytes content.
-		bytes := []byte{216, 134, 130, 216, 215, 216, 212, 4, 131, 99, 102, 111, 111, 99, 98, 97, 114, 245}
-		assert.Equal(t, bytes, encoded)
-
-		migration := StorageFormatV6Migration{
+		migration := &StorageFormatV6Migration{
 			Log: zerolog.Logger{},
 		}
 
 		migration.initStorage()
+		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 		address := common.Address{1, 2}
 
@@ -126,11 +128,12 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := StorageFormatV6Migration{
+		migration := &StorageFormatV6Migration{
 			Log: zerolog.Logger{},
 		}
 
 		migration.initStorage()
+		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 		address := common.Address{1, 2}
 
@@ -140,7 +143,7 @@ func TestEncodeDecodeRoundTrip(t *testing.T) {
 		migration.storage.Commit()
 
 		encodedValues := migration.baseStorage.Payloads
-		require.Len(t, encodedValues, 1)
+		require.Len(t, encodedValues, 2)
 
 		storageId := atree.NewStorageID(
 			[8]byte(address),

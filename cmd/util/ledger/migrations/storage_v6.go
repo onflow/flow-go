@@ -87,7 +87,6 @@ func (e *EncodingStorage) Store(id atree.StorageID, value []byte) error {
 
 		Key: ledgerKeyFromStorageID(id),
 
-		// TODO: Still need to prepend magic number?
 		Value: newInter.PrependMagic(
 			value,
 			newInter.CurrentEncodingVersion,
@@ -798,10 +797,10 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 		keysAndValues = append(keysAndValues, c.Convert(inter, entryValue))
 	}
 
-	// TODO: pass address as a parameter?
-	c.result = newInter.NewDictionaryValue(
+	c.result = newInter.NewDictionaryValueWithAddress(
 		staticType,
 		c.storage,
+		*value.Owner,
 		keysAndValues...,
 	)
 
@@ -825,7 +824,13 @@ func getValue(
 		}
 	}()
 
-	return dictionary.Get(inter, nil, key), nil
+	value = dictionary.Get(inter, nil, key)
+
+	if someValue, ok := value.(*oldInter.SomeValue); ok {
+		value = someValue.Value
+	}
+
+	return
 }
 
 func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilValue) {
@@ -1101,5 +1106,5 @@ type ValueNotFoundError struct {
 }
 
 func (e *ValueNotFoundError) Error() string {
-	return fmt.Sprintf("value not found for key: %s")
+	return fmt.Sprintf("value not found for key: %s", e.key)
 }
