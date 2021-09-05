@@ -175,7 +175,7 @@ type FlowAccessNodeBuilder struct {
 	SyncEng     *synceng.Engine
 }
 
-func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildFollowerState() *FlowAccessNodeBuilder {
 	builder.Module("mutable follower state", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -200,7 +200,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildSyncCore() *FlowAccessNodeBuilder {
 	builder.Module("sync core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		syncCore, err := synchronization.New(node.Logger, synchronization.DefaultConfig())
 		builder.SyncCore = syncCore
@@ -211,7 +211,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildCommittee() *FlowAccessNodeBuilder {
 	builder.Module("committee", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
@@ -225,7 +225,7 @@ func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildLatestHeader() *FlowAccessNodeBuilder {
 	builder.Module("latest header", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
 		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
@@ -236,7 +236,7 @@ func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildFollowerCore() *FlowAccessNodeBuilder {
 	builder.Component("follower core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
@@ -263,7 +263,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		// initialize cleaner for DB
@@ -295,7 +295,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildFinalizedHeader() *FlowAccessNodeBuilder {
 	builder.Component("finalized snapshot", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
@@ -309,7 +309,7 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 	return builder
 }
 
-func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
+func (builder *FlowAccessNodeBuilder) BuildSyncEngine() *FlowAccessNodeBuilder {
 	builder.Component("sync engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
@@ -335,14 +335,14 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 
 func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder {
 	builder.
-		buildFollowerState().
-		buildSyncCore().
-		buildCommittee().
-		buildLatestHeader().
-		buildFollowerCore().
-		buildFollowerEngine().
-		buildFinalizedHeader().
-		buildSyncEngine()
+		BuildFollowerState().
+		BuildSyncCore().
+		BuildCommittee().
+		BuildLatestHeader().
+		BuildFollowerCore().
+		BuildFollowerEngine().
+		BuildFinalizedHeader().
+		BuildSyncEngine()
 
 	return builder
 }

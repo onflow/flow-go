@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -101,6 +102,8 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 		cmd.WithIDTranslator(idTranslator)})
 	accessNodeOptions := node_builder.SupportsUnstakedNode(true)
 	nodeBuilder := node_builder.NewStakedAccessNodeBuilder(node_builder.FlowAccessNode(baseOptions, accessNodeOptions))
+
+	//nodeBuilder := node_builder.NewStakedAccessNodeBuilder(node_builder.FlowAccessNode(baseOptions, accessNodeOptions))
 	nodeInfoPriv, err := suite.stakedANNodeInfo.Private()
 	require.NoError(suite.T(), err)
 	nodeBuilder.Me, err = local.New(suite.stakedANNodeInfo.Identity(), nodeInfoPriv.StakingPrivKey)
@@ -109,15 +112,15 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	nodeBuilder.NodeConfig.NetworkKey = nodeInfoPriv.NetworkPrivKey
 	nodeBuilder.NodeConfig.StakingKey = nodeInfoPriv.StakingPrivKey
 	nodeBuilder.Initialize()
-	nodeBuilder.Build()
+	buildConsensusFollower(nodeBuilder.FlowAccessNodeBuilder)
 	<-nodeBuilder.Ready()
 	h, err := nodeBuilder.State.Sealed().Head()
 	require.NoError(suite.T(), err)
 	fmt.Println(h.Height)
-	//host, portStr, err := nodeBuilder.LibP2PNode.GetIPPort()
-	//require.NoError(suite.T(), err)
-	//port, err := strconv.Atoi(portStr)
-	//require.NoError(suite.T(), err)
+	host, portStr, err := nodeBuilder.LibP2PNode.GetIPPort()
+	require.NoError(suite.T(), err)
+	port, err := strconv.Atoi(portStr)
+	require.NoError(suite.T(), err)
 
 	suite.stakedANIdentity.Address = suite.getAddress(nodeBuilder.FlowNodeBuilder)
 
@@ -127,34 +130,34 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	require.NoError(suite.T(), err)
 	fmt.Println(id.String())
 
-	//followerDB, _ := unittest.TempBadgerDB(suite.T())
-	//
-	//followerKey, err := UnstakedNetworkingKey()
-	//require.NoError(suite.T(), err)
-	//
-	//bootstrapNodeInfo := BootstrapNodeInfo{
-	//	Host:             host,
-	//	Port:             uint(port),
-	//	NetworkPublicKey: nodeBuilder.NodeConfig.NetworkKey.PublicKey(),
-	//}
-	//
-	//follower, err := NewConsensusFollower(followerKey, "0.0.0.0:0", []BootstrapNodeInfo{bootstrapNodeInfo},
-	//	WithBootstrapDir(suite.bootDir), WithDB(followerDB))
-	//follower.NodeBuilder.MetricsEnabled = false
-	//
-	//require.NoError(suite.T(), err)
-	//
-	//follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
-	//
-	//// get the underlying node builder
-	//node := follower.NodeBuilder
-	//// wait for the follower to have completely started
-	//unittest.RequireCloseBefore(suite.T(), node.Ready(), 10*time.Second,
-	//	"timed out while waiting for consensus follower to start")
-	//
-	//go func() {
-	//	follower.Run(context.Background())
-	//}()
+	followerDB, _ := unittest.TempBadgerDB(suite.T())
+
+	followerKey, err := UnstakedNetworkingKey()
+	require.NoError(suite.T(), err)
+
+	bootstrapNodeInfo := BootstrapNodeInfo{
+		Host:             host,
+		Port:             uint(port),
+		NetworkPublicKey: nodeBuilder.NodeConfig.NetworkKey.PublicKey(),
+	}
+
+	follower, err := newConsensusFollowerWithoutVerifer(followerKey, "0.0.0.0:0", []BootstrapNodeInfo{bootstrapNodeInfo},
+		WithBootstrapDir(suite.bootDir), WithDB(followerDB))
+	follower.NodeBuilder.MetricsEnabled = false
+
+	require.NoError(suite.T(), err)
+
+	follower.AddOnBlockFinalizedConsumer(suite.OnBlockFinalizedConsumer)
+
+	// get the underlying node builder
+	node := follower.NodeBuilder
+	// wait for the follower to have completely started
+	unittest.RequireCloseBefore(suite.T(), node.Ready(), 10*time.Second,
+		"timed out while waiting for consensus follower to start")
+
+	go func() {
+		follower.Run(context.Background())
+	}()
 
 	suite.conensusNodeBuilder = suite.createConsensusNode(idProvider, idTranslator)
 	suite.consensusIdentity.Address = suite.getAddress(suite.conensusNodeBuilder)
@@ -178,7 +181,17 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	}
 	connected, err := middleware.IsConnected(suite.consensusIdentity.NodeID)
 	require.NoError(suite.T(), err)
-	fmt.Println(connected)
+	require.True(suite.T(), connected)
+
+	connected, err = middleware.IsConnected(follower.NodeBuilder.NodeID)
+	require.NoError(suite.T(), err)
+	require.True(suite.T(), connected)
+	time.Sleep(5*time.Second)
+
+	for _, t := range nodeBuilder.LibP2PNode.PubSub.GetTopics() {
+		fmt.Println(t)
+		fmt.Println(nodeBuilder.LibP2PNode.PubSub.ListPeers(t))
+	}
 
 	// determine the nodes we should send the block to
 	//recipients, err := suite.snapshot.Identities(filter.And(
@@ -193,10 +206,35 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 	//extend.Payload.Guarantees = nil
 	//extend.Header.PayloadHash = extend.Payload.Hash()
 
-	block := suite.mockConsensus.extendBlock()
+
+	block := suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View+1)
 	blockProposal := unittest.ProposalFromBlock(block)
-	err = conduit.Unicast(blockProposal, suite.stakedANIdentity.NodeID)
+	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
 	require.NoError(suite.T(), err)
+	time.Sleep(5*time.Second)
+
+
+	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View+1)
+	blockProposal = unittest.ProposalFromBlock(block)
+	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
+	require.NoError(suite.T(), err)
+	time.Sleep(5*time.Second)
+
+	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View+1)
+	blockProposal = unittest.ProposalFromBlock(block)
+	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
+	require.NoError(suite.T(), err)
+	time.Sleep(5*time.Second)
+
+	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View+1)
+	blockProposal = unittest.ProposalFromBlock(block)
+	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
+	require.NoError(suite.T(), err)
+	time.Sleep(5*time.Second)
+
+	block1, err := nodeBuilder.Storage.Blocks.ByID(block.ID())
+	fmt.Println(err)
+	fmt.Println(block1.ID())
 	time.Sleep(time.Hour)
 	//blk, err := nodeBuilder.Storage.Blocks.ByID(blockProposal.Header.ID())
 	//require.NoError(suite.T(), err)
@@ -259,9 +297,9 @@ type MockConsensus struct {
 	currentHeader *flow.Header
 }
 
-func (mc *MockConsensus) extendBlock() *flow.Block {
+func (mc *MockConsensus) extendBlock(blockView uint64) *flow.Block {
 	nextBlock := unittest.BlockWithParentFixture(mc.currentHeader)
-	nextBlock.Header.View = mc.currentHeader.View
+	nextBlock.Header.View = blockView
 	nextBlock.Header.ProposerID = mc.consensusIdentity.NodeID
 	nextBlock.Header.ParentVoterIDs = flow.IdentifierList{mc.consensusIdentity.NodeID}
 	mc.currentHeader = nextBlock.Header

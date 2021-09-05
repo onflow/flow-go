@@ -242,7 +242,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	if err != nil {
 		return nil, err
 	}
-	node.pubSub = ps
+	node.PubSub = ps
 
 	ip, port, err := node.GetIPPort()
 	if err != nil {
@@ -262,7 +262,7 @@ type Node struct {
 	sync.Mutex
 	connGater            *ConnGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
+	PubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
 	logger               zerolog.Logger                         // used to provide logging
 	topics               map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
@@ -470,11 +470,11 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic) (*pubsub.Subs
 	defer n.Unlock()
 
 	// Check if the topic has been already created and is in the cache
-	n.pubSub.GetTopics()
+	n.PubSub.GetTopics()
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		tp, err = n.pubSub.Join(topic.String())
+		tp, err = n.PubSub.Join(topic.String())
 		if err != nil {
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
