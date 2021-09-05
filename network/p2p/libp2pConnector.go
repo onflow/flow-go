@@ -54,7 +54,7 @@ func IsUnconvertibleIdentitiesError(err error) bool {
 
 type ConnectorOption func(connector *Libp2pConnector)
 
-func DisableConnectionPruning() ConnectorOption {
+func WithConnectionPruning(enable bool) ConnectorOption {
 	return func(connector *Libp2pConnector) {
 		connector.pruneConnections = false
 	}
