@@ -1471,6 +1471,12 @@ func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
 	return vote
 }
 
+func WithView(view uint64) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.View = view
+	}
+}
+
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
 		setup.Participants = participants.Sort(order.ByNodeIDAsc)
