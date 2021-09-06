@@ -340,7 +340,7 @@ CheckLoop:
 			final, err := e.state.Final().Head()
 			if err != nil {
 				e.log.Error().Err(err).Msg("could not get last finalized header")
-				return
+				continue
 			}
 			ranges, batches := e.core.ScanPending(final)
 			e.sendRequests(ranges, batches)
