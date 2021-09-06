@@ -14,8 +14,7 @@ import (
 )
 
 var (
-	ErrInvalidCollectorStateTransition = errors.New("invalid state transition")
-	ErrDifferentCollectorState         = errors.New("different state")
+	ErrDifferentCollectorState = errors.New("different state")
 )
 
 // VerifyingVoteProcessorFactory generates hotstuff.VerifyingVoteCollector instances
@@ -101,7 +100,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		if errors.Is(err, VoteForIncompatibleBlockError) {
 			return nil
 		}
-		fmt.Errorf("internal error processing vote: %w", err)
+		return fmt.Errorf("internal error processing vote: %w", err)
 	}
 	return nil
 }

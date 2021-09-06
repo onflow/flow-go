@@ -22,7 +22,7 @@ func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 // and add it to the total weight, and returns the total weight that have been collected.
 // return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
 // return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
-func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, weight uint64, sig crypto.Signature) (totalWeight uint64, exception error) {
+func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error) {
 	panic("to be implemented")
 }
 
@@ -34,6 +34,6 @@ func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
 // Aggregate assumes enough shares have been collected, it aggregates the signatures
 // and return the aggregated signature.
 // if called concurrently, only one thread will be running the aggregation.
-func (s *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (s *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, crypto.Signature, error) {
 	panic("to be implemented")
 }
