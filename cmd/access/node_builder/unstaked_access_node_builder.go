@@ -2,8 +2,6 @@ package node_builder
 
 import (
 	"context"
-	"strings"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -43,13 +41,6 @@ func (anb *UnstakedAccessNodeBuilder) initNodeInfo() {
 	anb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
 	anb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
 }
-func (fnb *UnstakedAccessNodeBuilder) InitIDProviders() {
-	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-		fnb.IDTranslator = p2p.NewUnstakedNetworkIDTranslator()
-		return nil
-	})
-}
-
 
 func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	anb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {

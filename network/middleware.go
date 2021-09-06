@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -69,8 +68,6 @@ type Overlay interface {
 	Identities() flow.IdentityList
 
 	Receive(nodeID flow.Identifier, msg *message.Message) error
-	SetDefaultIdentifierProvider(id.IdentifierProvider)
-	GetIdentifierProvider() id.IdentifierProvider
 }
 
 // Connection represents an interface to read from & write to a connection.

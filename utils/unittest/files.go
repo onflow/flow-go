@@ -42,7 +42,6 @@ func WriteJSON(path string, data interface{}) error {
 	return nil
 }
 
-
 func ReadJSON(path string, target interface{}) error {
 
 	dat, err := io.ReadFile(path)

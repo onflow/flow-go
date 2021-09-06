@@ -198,7 +198,6 @@ func initializeChannelRoleMap() {
 	channelRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
 	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 
-	channelRoleMap[UnstakedSyncCommittee] = flow.RoleList{flow.RoleAccess}
 }
 
 // ClusterChannel returns true if channel is cluster-based.

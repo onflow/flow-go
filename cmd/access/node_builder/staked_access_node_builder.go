@@ -38,11 +38,12 @@ func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBui
 func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 
-		idProvider, idTranslator, err := fnb.IDProviders(node)
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
 		}
-		fnb.IdentityProvider = idProvider
+
+		fnb.IdentityProvider = idCache
 
 		fnb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
 			return id.NewFilteredIdentifierProvider(
@@ -51,14 +52,14 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
 					p2p.NotEjectedFilter,
 				),
-				idProvider,
+				idCache,
 			)
 		}
 
-		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idTranslator, p2p.NewUnstakedNetworkIDTranslator())
+		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
 		if !fnb.supportsUnstakedFollower {
-			fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idProvider)
+			fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
 		}
 
 		return nil

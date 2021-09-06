@@ -168,7 +168,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
-		level:                 "trace",
+		level:                 "info",
 		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,

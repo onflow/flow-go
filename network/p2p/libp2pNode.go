@@ -75,7 +75,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(psOptions...).
+			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			// SetResolver(resolver).
@@ -87,7 +87,7 @@ type NodeBuilder interface {
 	SetRootBlockID(string) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
-	SetPubsubOptions(...pubsub.Option) NodeBuilder
+	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetDHTOptions(...dht.Option) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
@@ -141,7 +141,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetConnectionGater(connGater *ConnGater
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...pubsub.Option) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetPubsubOptions(opts ...PubsubOption) NodeBuilder {
 	builder.pubSubOpts = opts
 	return builder
 }
@@ -194,6 +194,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.connMgr = builder.connMngr
 	}
 
+	if builder.rootBlockID == "" {
+		return nil, errors.New("root block ID must be provided")
+	}
+	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
 	}
@@ -223,7 +228,17 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.pingService = pingService
 	}
 
-	ps, err := builder.pubSubMaker(ctx, libp2pHost, builder.pubSubOpts...)
+	var libp2pPSOptions []pubsub.Option
+	// generate the libp2p Pubsub options from the given context and host
+	for _, optionGenerator := range builder.pubSubOpts {
+		option, err := optionGenerator(ctx, libp2pHost)
+		if err != nil {
+			return nil, err
+		}
+		libp2pPSOptions = append(libp2pPSOptions, option)
+	}
+
+	ps, err := builder.pubSubMaker(ctx, libp2pHost, libp2pPSOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -567,6 +582,11 @@ func (n *Node) UpdateAllowList(peers peer.IDSlice) {
 // Host returns pointer to host object of node.
 func (n *Node) Host() host.Host {
 	return n.host
+}
+
+// PubSub returns the underlying libp2p pubsub instance
+func (n *Node) PubSub() *pubsub.PubSub {
+	return n.pubSub
 }
 
 // SetFlowProtocolStreamHandler sets the stream handler of Flow libp2p Protocol
