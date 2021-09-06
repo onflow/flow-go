@@ -56,7 +56,7 @@ type Engine struct {
 	responseMessageHandler *engine.MessageHandler // message handler responsible for response processing
 }
 
-// New creates a new main chain synchronization engine.
+// New creates a new cluster chain synchronization engine.
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
