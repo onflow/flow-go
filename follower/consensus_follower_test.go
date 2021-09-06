@@ -150,6 +150,7 @@ func (suite *Suite) createStakedAccessNode() {
 	nodeBuilder.NodeConfig.NetworkKey = nodeInfoPriv.NetworkPrivKey
 	nodeBuilder.NodeConfig.StakingKey = nodeInfoPriv.StakingPrivKey
 	nodeBuilder.Initialize()
+	nodeBuilder.Build()
 	consensusFollowerWithMockVerifier(nodeBuilder.FlowAccessNodeBuilder) // use the consensus follower without the verifier
 	unittest.RequireCloseBefore(suite.T(), nodeBuilder.Ready(), 5*time.Second, "failed to start the access node")
 	suite.stakedAccessNode = nodeBuilder
@@ -320,27 +321,42 @@ func (suite *Suite) TestFollowerReceivesBlocks() {
 
 	block := suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View + 1)
 	blockProposal := unittest.ProposalFromBlock(block)
+
+	//h, _ := suite.snapshot.Head()
+	//blk := model.BlockFromFlow(block.Header, h.View)
+	//suite.stakedAccessNode.FlowAccessNodeBuilder.IngestEng.OnFinalizedBlock(blk)
 	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
 	require.NoError(suite.T(), err)
-	time.Sleep(5 * time.Second)
 
 	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View + 1)
 	blockProposal = unittest.ProposalFromBlock(block)
 	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
 	require.NoError(suite.T(), err)
-	time.Sleep(5 * time.Second)
+
+	require.Eventually(suite.T(), func() bool {
+		_, err := suite.stakedAccessNode.Storage.Blocks.ByID(block.Header.ID())
+		return err == nil
+	}, 2 * time.Second, 100 * time.Millisecond)
 
 	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View + 1)
 	blockProposal = unittest.ProposalFromBlock(block)
 	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
 	require.NoError(suite.T(), err)
-	time.Sleep(5 * time.Second)
+
+	require.Eventually(suite.T(), func() bool {
+		_, err := suite.stakedAccessNode.Storage.Blocks.ByID(block.Header.ID())
+		return err == nil
+	}, 2 * time.Second, 100 * time.Millisecond)
 
 	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View + 1)
 	blockProposal = unittest.ProposalFromBlock(block)
 	err = conduit.Publish(blockProposal, suite.stakedANIdentity.NodeID)
 	require.NoError(suite.T(), err)
-	time.Sleep(5 * time.Second)
+
+	require.Eventually(suite.T(), func() bool {
+		_, err := suite.stakedAccessNode.Storage.Blocks.ByID(block.Header.ID())
+		return err == nil
+	}, 2 * time.Second, 100 * time.Millisecond)
 
 	block = suite.mockConsensus.extendBlock(suite.mockConsensus.currentHeader.View + 5)
 	blockProposal = unittest.ProposalFromBlock(block)

@@ -259,6 +259,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 		return nil
 	}
 	if err != nil {
+		log.Error().Err(err).Msg("could not check parent")
 		return fmt.Errorf("could not check parent: %w", err)
 	}
 
