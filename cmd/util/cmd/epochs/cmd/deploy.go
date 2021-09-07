@@ -196,10 +196,7 @@ func convertDeployEpochTransactionArguments(
 	args := make([]cadence.Value, 0)
 
 	// add contractName
-	cdcContractName, err := cadence.NewString(contractName)
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not convert `contractName` to cadence representation")
-	}
+	cdcContractName := cadence.NewString(contractName)
 	args = append(args, cdcContractName)
 
 	// add epoch current counter
@@ -230,10 +227,7 @@ func convertDeployEpochTransactionArguments(
 	args = append(args, cdcFlowSupplyIncreasePercentage)
 
 	// add randomSource
-	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
-	if err != nil {
-		log.Fatal().Err(err).Msgf("could not convert `randomSource` to cadence representation")
-	}
+	cdcRandomSource := cadence.NewString(hex.EncodeToString(randomSource))
 	args = append(args, cdcRandomSource)
 
 	return args
