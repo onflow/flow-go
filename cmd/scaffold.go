@@ -118,7 +118,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
-	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
+	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
@@ -179,15 +179,17 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 		}
 
+		// run peer manager with the specified interval and let is also prune connections
+		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
+		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
+
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
 			fnb.RootBlock.ID().String(),
-			fnb.BaseConfig.peerUpdateInterval,
 			fnb.BaseConfig.UnicastMessageTimeout,
-			true,
 			true,
 			fnb.IDTranslator,
 			mwOpts...,
