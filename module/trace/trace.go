@@ -18,7 +18,7 @@ import (
 
 const DefaultEntityCacheSize = 1000
 
-const SensitivityCaptureAll = 64
+const SensitivityCaptureAll = 0
 const EntityTypeBlock = "Block"
 const EntityTypeCollection = "Collection"
 const EntityTypeTransaction = "Transaction"
@@ -121,6 +121,7 @@ func (t *OpenTracer) EntityRootSpan(entityID flow.Identifier, entityType string,
 		return sp
 	}
 
+	t.log.Info().Msgf("Tracer Decision for %x, %b", entityID, traceID.High>>uint64(64-t.sensitivity) == 0)
 	ctx := jaeger.NewSpanContext(
 		traceID,
 		jaeger.SpanID(rand.Uint64()),

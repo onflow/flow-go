@@ -158,7 +158,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
-		tracerSensitivity:     62,
+		tracerSensitivity:     1,
 		metricsEnabled:        true,
 	}
 }
