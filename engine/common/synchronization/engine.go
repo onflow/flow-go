@@ -88,8 +88,8 @@ func New(
 		blocks:               blocks,
 		comp:                 comp,
 		core:                 core,
-		pollInterval:         opt.pollInterval,
-		scanInterval:         opt.scanInterval,
+		pollInterval:         opt.PollInterval,
+		scanInterval:         opt.ScanInterval,
 		finalizedHeader:      finalizedHeader,
 		participantsProvider: participantsProvider,
 	}
