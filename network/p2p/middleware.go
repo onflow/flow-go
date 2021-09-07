@@ -161,7 +161,7 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
-func (m *Middleware) TopologyPeers() (peer.IDSlice, error) {
+func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
 		return nil, err
@@ -251,7 +251,7 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
 
-		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.TopologyPeers, m.log)
+		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)
 		}
