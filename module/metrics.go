@@ -55,6 +55,12 @@ type NetworkMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+
+	// UnstakedOutboundConnections updates the metric tracking the number of outbound connections to unstaked nodes
+	UnstakedOutboundConnections(connectionCount uint)
+
+	// UnstakedInboundConnections updates the metric tracking the number of inbound connections from unstaked nodes
+	UnstakedInboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
@@ -365,6 +371,10 @@ type ExecutionMetrics interface {
 
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
+
+	ExecutionBlockDataUploadStarted()
+
+	ExecutionBlockDataUploadFinished(dur time.Duration)
 }
 
 type TransactionMetrics interface {

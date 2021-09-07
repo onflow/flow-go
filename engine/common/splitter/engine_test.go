@@ -48,10 +48,8 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	engine1 := new(mockmodule.Engine)
 	engine2 := new(mockmodule.Engine)
 
-	err := suite.engine.RegisterEngine(engine1)
-	suite.Assert().Nil(err)
-	err = suite.engine.RegisterEngine(engine2)
-	suite.Assert().Nil(err)
+	suite.engine.RegisterEngine(engine1)
+	suite.engine.RegisterEngine(engine2)
 
 	processError := errors.New("Process Error!")
 
@@ -60,7 +58,7 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	engine1.On("Process", suite.channel, id, event).Return(processError).Once()
 	engine2.On("Process", suite.channel, id, event).Return(nil).Once()
 
-	err = suite.engine.Process(suite.channel, id, event)
+	err := suite.engine.Process(suite.channel, id, event)
 	merr, ok := err.(*multierror.Error)
 	suite.Assert().True(ok)
 	suite.Assert().Len(merr.Errors, 1)
@@ -100,24 +98,12 @@ func (suite *Suite) TestProcessUnknownChannel() {
 
 	engine := new(mockmodule.Engine)
 
-	err := suite.engine.RegisterEngine(engine)
-	suite.Assert().Nil(err)
+	suite.engine.RegisterEngine(engine)
 
-	err = suite.engine.Process(unknownChannel, id, event)
+	err := suite.engine.Process(unknownChannel, id, event)
 	suite.Assert().Error(err)
 
 	engine.AssertNumberOfCalls(suite.T(), "Process", 0)
-}
-
-// TestDuplicateRegistrations tests that an engine cannot register for the same channel twice.
-func (suite *Suite) TestDuplicateRegistrations() {
-	engine := new(mockmodule.Engine)
-
-	err := suite.engine.RegisterEngine(engine)
-	suite.Assert().Nil(err)
-
-	err = suite.engine.RegisterEngine(engine)
-	suite.Assert().Error(err)
 }
 
 // TestConcurrentEvents tests that sending multiple messages concurrently, results in each engine
@@ -131,8 +117,7 @@ func (suite *Suite) TestConcurrentEvents() {
 
 	for i := 0; i < numEngines; i++ {
 		engine := new(mockmodule.Engine)
-		err := suite.engine.RegisterEngine(engine)
-		suite.Assert().Nil(err)
+		suite.engine.RegisterEngine(engine)
 		engines[i] = engine
 	}
 

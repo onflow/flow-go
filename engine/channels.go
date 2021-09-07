@@ -34,7 +34,7 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 // to channelRoleMap as a constant channel type manually.
 func Exists(channel network.Channel) bool {
 	_, exists := RolesByChannel(channel)
-	return exists
+	return exists || UnstakedChannels().Contains(channel)
 }
 
 // ChannelsByRole returns a list of all channels the role subscribes to.
@@ -90,6 +90,13 @@ func Channels() network.ChannelList {
 	return channels
 }
 
+// UnstakedChannels returns all channels that unstaked nodes can send messages on.
+func UnstakedChannels() network.ChannelList {
+	return network.ChannelList{
+		UnstakedSyncCommittee,
+	}
+}
+
 // channels
 const (
 
@@ -133,6 +140,9 @@ const (
 	ProvideChunks            = RequestChunks
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
+
+	// Unstaked network channels
+	UnstakedSyncCommittee = network.Channel("unstaked-sync-committee")
 )
 
 // initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
