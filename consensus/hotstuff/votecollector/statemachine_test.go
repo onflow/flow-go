@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
@@ -24,6 +25,8 @@ func TestStateMachine(t *testing.T) {
 
 var factoryError = errors.New("factory error")
 
+// StateMachineTestSuite is a test suite for testing VoteCollector. Stored mocked state for testing behavior and
+// state transitions for VoteCollector.
 type StateMachineTestSuite struct {
 	suite.Suite
 
@@ -70,6 +73,8 @@ func (s *StateMachineTestSuite) prepareMockedProcessor(block *model.Block) *mock
 	return processor
 }
 
+// TestStatus_StateTransitions tests that Status returns correct state of VoteCollector in different scenarios
+// when proposal processing can possibly change state of collector
 func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
 	proposal := helper.MakeProposal(s.T(), helper.WithBlock(block))
@@ -78,8 +83,13 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	// by default, we should create in caching status
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
 
+	// failing to create collector has to result in error and won't change state
+	err := s.collector.ProcessBlock(helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(s.view)))))
+	require.ErrorIs(s.T(), err, factoryError)
+	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
+
 	// after processing block we should get into verifying status
-	err := s.collector.ProcessBlock(proposal)
+	err = s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.collector.Status())
 
@@ -165,5 +175,26 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		require.NoError(t, err)
 		processor.AssertCalled(t, "Process", vote)
 	})
+}
 
+// TestProcessBlock_ProcessingOfCachedVotes tests that after processing block proposal are cached votes
+// are sent to vote processor
+func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
+	votes := 10
+	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
+	proposal := helper.MakeProposal(s.T(), helper.WithBlock(block))
+	processor := s.prepareMockedProcessor(block)
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		// eventually it has to be process by processor
+		processor.On("Process", vote).Return(nil).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+	}
+
+	err := s.collector.ProcessBlock(proposal)
+	require.NoError(s.T(), err)
+
+	time.Sleep(100 * time.Millisecond)
+
+	processor.AssertExpectations(s.T())
 }

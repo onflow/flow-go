@@ -143,6 +143,7 @@ func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 //         CachingVotes   -> Invalid
 //         VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
+
 	if proposal.Block.View != m.votesCache.View() {
 		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d", m.votesCache.View(), proposal.Block.View)
 	}
@@ -160,8 +161,8 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 				continue // concurrent state update by other thread => restart our logic
 			}
 			if err != nil {
-				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s",
-					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String())
+				return fmt.Errorf("internal error updating VoteProcessor's status from %s to %s: %w",
+					proc.Status().String(), hotstuff.VoteCollectorStatusVerifying.String(), err)
 			}
 			m.processCachedVotes(proposal.Block)
 
@@ -199,7 +200,7 @@ func (m *VoteCollector) caching2Verifying(block *model.Block) error {
 	log := m.log.With().Hex("BlockID", block.BlockID[:]).Logger()
 	newProc, err := m.createVerifyingProcessor(log, block)
 	if err != nil {
-		return fmt.Errorf("failed to create VerifyingVoteProcessor for block %v", block.BlockID)
+		return fmt.Errorf("failed to create VerifyingVoteProcessor for block %v: %w", block.BlockID, err)
 	}
 	newProcWrapper := &atomicValueWrapper{processor: newProc}
 
