@@ -37,7 +37,7 @@ func (m *VoteCollector) atomicLoadProcessor() hotstuff.VoteProcessor {
 }
 
 // atomic.Value doesn't allow storing interfaces as atomic values,
-// it requires that stored type is always the same so we need a wrapper that will mitigate this restriction
+// it requires that stored type is always the same, so we need a wrapper that will mitigate this restriction
 // https://github.com/golang/go/issues/22550
 type atomicValueWrapper struct {
 	processor hotstuff.VoteProcessor

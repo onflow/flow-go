@@ -1,14 +1,42 @@
 package votecollector
 
 import (
-	"testing"
-
-	"github.com/stretchr/testify/require"
-
+	"github.com/gammazero/workerpool"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"testing"
 )
+
+type StateMachineTestSuite struct {
+	suite.Suite
+
+	view       uint64
+	notifier   *mocks.Consumer
+	workerPool *workerpool.WorkerPool
+	collector  *VoteCollector
+}
+
+func (s *StateMachineTestSuite) TearDownTest() {
+	// Without this line we are risking running into weird situations where one test has finished but there are active workers
+	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
+	// starting next test.
+	s.workerPool.StopWait()
+}
+
+func (s *StateMachineTestSuite) SetupTest() {
+	s.view = 1000
+	s.workerPool = workerpool.New(4)
+	s.collector = NewStateMachine(s.view, unittest.Logger(), s.workerPool, s.notifier, s.createMockedVoteProcessor)
+}
+
+func (s *StateMachineTestSuite) createMockedVoteProcessor(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+
+}
 
 // TestCachingVoteCollector_AddVote tests that AddVote adds only unique votes and
 // rejects duplicated votes.
