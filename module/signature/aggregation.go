@@ -3,7 +3,9 @@
 package signature
 
 import (
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -23,11 +25,17 @@ import (
 // make sure the calls are concurrent safe.
 type SignatureAggregatorSameMessage struct {
 	// TODO: initial incomplete fields that will evolve
-	message           []byte
-	hasher            hash.Hasher
-	n                 int                      // number of participants indexed from 0 to n-1
-	publicKeys        []crypto.PublicKey       // keys indexed from 0 to n-1, signer i is assigned to public key i
-	indexdToSignature map[int]crypto.Signature // signatures indexed by the signer index
+	message          []byte
+	hasher           hash.Hasher
+	n                int                // number of participants indexed from 0 to n-1
+	publicKeys       []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
+	indexToSignature map[int]string     // signatures indexed by the signer index
+
+	// the below items are related to public keys aggregation and the greedy aggrgetion algorithm
+	lastSigners       map[int]struct{} // maps the signers in the latest call to aggregate keys
+	lastAggregatedKey crypto.PublicKey // the latest aggregated public key
+	sync.RWMutex                       // the above "latest" data only make sense in a concurrent safe model, the lock maintains the thread-safety.
+	// since the caller should not be aware of the internal non thread-safe algorithm.
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -37,16 +45,16 @@ type SignatureAggregatorSameMessage struct {
 // The function errors with ErrInvalidInputs if any input is invalid.
 func NewSignatureAggregatorSameMessage(
 	message []byte, // message to be aggregate signatures for
-	dsTag []byte, // domain separation tag used for signatures
+	dsTag string, // domain separation tag used for signatures
 	n int, // number of participants
 	publicKeys []crypto.PublicKey, // public keys of participants agreed upon upfront
 ) (*SignatureAggregatorSameMessage, error) {
 
-	//
+	// inputs check
 	if n <= 0 {
 		return nil, newErrInvalidInputs("number of participants must larger than 0, got %d", n)
 	}
-	if len(publickKeys) != n {
+	if len(publicKeys) != n {
 		return nil, newErrInvalidInputs("number or keys %d, must be the number of participants %d", len(publicKeys), n)
 	}
 	// sanity check for BLS keys
@@ -57,10 +65,15 @@ func NewSignatureAggregatorSameMessage(
 	}
 
 	return &SignatureAggregatorSameMessage{
-		messsage:   message,
-		hasher:     crypto.NewBLSKMAC(dsTag),
-		n:          n,
-		publicKeys: publicKeys,
+		message:          message,
+		hasher:           crypto.NewBLSKMAC(dsTag),
+		n:                n,
+		publicKeys:       publicKeys,
+		indexToSignature: make(map[int]string),
+
+		lastSigners:       make(map[int]struct{}),
+		lastAggregatedKey: crypto.NeutralBLSPublicKey(),
+		RWMutex:           sync.RWMutex{},
 	}, nil
 }
 
@@ -74,7 +87,10 @@ func NewSignatureAggregatorSameMessage(
 // The function does not return an error for any invalid signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature) (bool, error) {
-	panic("implement me")
+	if signer >= s.n || signer < 0 {
+		return false, newErrInvalidInputs("input index %d is invalid", signer)
+	}
+	return s.publicKeys[signer].Verify(sig, s.message, s.hasher)
 }
 
 // VerifyAndAdd verifies the input signature under the stored message and stored
@@ -85,9 +101,22 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 //  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
+// If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Signature) (bool, error) {
-	panic("implement me")
+	if signer >= s.n || signer < 0 {
+		return false, newErrInvalidInputs("input index %d is invalid", signer)
+	}
+	_, duplicate := s.indexToSignature[signer]
+	if duplicate {
+		return false, newErrDuplicatedSigner("signer %d was already added", signer)
+	}
+	// signature is new
+	ok, err := s.publicKeys[signer].Verify(sig, s.message, s.hasher)
+	if ok {
+		s.indexToSignature[signer] = string(sig)
+	}
+	return ok, err
 }
 
 // TrustedAdd adds a signature to the internal state without verifying it.
@@ -101,7 +130,16 @@ func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Sig
 //  - random error if the execution failed
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signature) error {
-	panic("implement me")
+	if signer >= s.n || signer < 0 {
+		return newErrInvalidInputs("input index %d is invalid", signer)
+	}
+	_, duplicate := s.indexToSignature[signer]
+	if duplicate {
+		return newErrDuplicatedSigner("signer %d was already added", signer)
+	}
+	// signature is new
+	s.indexToSignature[signer] = string(sig)
+	return nil
 }
 
 // Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
@@ -115,7 +153,26 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 // TODO : When compacting the list of signers, update the return from []int
 // to a compact bit vector.
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
-	panic("implement me")
+	sharesNum := len(s.indexToSignature)
+	signatures := make([]crypto.Signature, 0, sharesNum)
+	indices := make([]int, 0, sharesNum)
+	for index, sig := range s.indexToSignature {
+		signatures = append(signatures, []byte(sig))
+		indices = append(indices, index)
+	}
+
+	aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
+	if err != nil {
+		return nil, nil, errors.New("BLS signature aggregtion failed")
+	}
+	ok, err := s.VerifyAggregation(indices, aggregatedSignature)
+	if err != nil {
+		return nil, nil, errors.New("BLS signature verification failed")
+	}
+	if !ok {
+		return nil, nil, errors.New("resulting BLS aggregated signatutre is invalid")
+	}
+	return indices, aggregatedSignature, nil
 }
 
 // VerifyAggregation verifies an aggregated signature against the stored message and the stored
@@ -125,7 +182,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 // The function errors:
 //  - ErrInvalidInputs if the indices are invalid
 //  - random error if the execution failed
-func (s *SignatureAggregatorSameMessage) VerifyAggregation(sig crypto.Signature, signers []int) (bool, error) {
+func (s *SignatureAggregatorSameMessage) VerifyAggregation(signers []int, sig crypto.Signature) (bool, error) {
 	panic("implement me")
 }
 
@@ -134,7 +191,73 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregation(sig crypto.Signature,
 // Once called, the fuction empties all internally stored signatures.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) SetMessage(message []byte) { // we could also update the DST here
-	panic("implement me")
+	s.message = message
+	// empty existing signatures
+	s.indexToSignature = make(map[int]string)
+}
+
+// aggregatedKey returns the aggregated public key of the input signers.
+func (s *SignatureAggregatorSameMessage) aggregatedKey(signers []int) (crypto.PublicKey, error) {
+
+	// this greedy algorithm assumes the signers set does not vary much from one call
+	// to aggregatedKey to another. It computes the delta of signers compared to the
+	// latest list of signers and adjust the latest aggregated public key. This is faster
+	// than aggregating the public keys from scratch at each call.
+
+	// read lock to read consistent last key and last signers
+	s.RLock()
+	// get the signers delta and update the last list for the next comparison
+	newSignerKeys, missingSignerKeys, updatedSignerSet := s.deltaKeys(signers)
+	lastKey := s.lastAggregatedKey
+	s.RUnlock()
+
+	// add the new keys
+	var err error
+	updatedKey, err := crypto.AggregateBLSPublicKeys(append(newSignerKeys, lastKey))
+	if err != nil {
+		return nil, fmt.Errorf("adding new staking keys failed: %w", err)
+	}
+	// remove the missing keys
+	updatedKey, err = crypto.RemoveBLSPublicKeys(updatedKey, missingSignerKeys)
+	if err != nil {
+		return nil, fmt.Errorf("removing missing staking keys failed: %w", err)
+	}
+
+	// update the latest list and public key.
+	s.Lock()
+	s.lastSigners = updatedSignerSet
+	s.lastAggregatedKey = updatedKey
+	s.Unlock()
+	return updatedKey, nil
+}
+
+// keysDelta computes the delta between the reference s.lastSigners
+// and the input identity list.
+// It returns a list of the new signer keys, a list of the missing signer keys and the new map of signers.
+func (s *SignatureAggregatorSameMessage) deltaKeys(signers []int) (
+	[]crypto.PublicKey, []crypto.PublicKey, map[int]struct{}) {
+
+	var newSignerKeys, missingSignerKeys []crypto.PublicKey
+
+	// create a map of the input list,
+	// and check the new signers
+	signersMap := make(map[int]struct{})
+	for _, signer := range signers {
+		signersMap[signer] = struct{}{}
+		_, ok := s.lastSigners[signer]
+		if !ok {
+			newSignerKeys = append(newSignerKeys, s.publicKeys[signer])
+		}
+	}
+
+	// look for missing signers
+	for signer, _ := range s.lastSigners {
+		_, ok := signersMap[signer]
+		if !ok {
+			missingSignerKeys = append(missingSignerKeys, s.publicKeys[signer])
+		}
+	}
+	return newSignerKeys, missingSignerKeys, signersMap
 }
 
 //------------------------------------------
