@@ -13,6 +13,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -82,6 +83,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
+	stakedTopicValidator       *StakedValidator
 }
 
 type MiddlewareOption func(*Middleware)
@@ -244,6 +246,8 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	m.UpdateNodeAddresses()
 
+	m.stakedTopicValidator = &StakedValidator{m.ov.Identity}
+
 	if m.connectionGating {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
 	}
@@ -386,7 +390,13 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
-	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
+	var validators []pubsub.ValidatorEx
+	if !engine.UnstakedChannels().Contains(channel) {
+		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
+		validators = append(validators, m.stakedTopicValidator.Validate)
+	}
+
+	s, err := m.libP2PNode.Subscribe(m.ctx, topic, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
