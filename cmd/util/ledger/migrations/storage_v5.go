@@ -34,12 +34,15 @@ type storageFormatV5MigrationResult struct {
 }
 
 type StorageFormatV5Migration struct {
-	Log           zerolog.Logger
-	OutputDir     string
-	accounts      *state.Accounts
-	programs      *programs.Programs
-	brokenTypeIDs map[common.TypeID]brokenTypeCause
-	reportFile    *os.File
+	Log                 zerolog.Logger
+	OutputDir           string
+	accounts            *state.Accounts
+	programs            *programs.Programs
+	brokenTypeIDs       map[common.TypeID]brokenTypeCause
+	reportFile          *os.File
+	brokenContractsFile *os.File
+	brokenContracts     map[common.Address]map[string]bool
+	view                state.View
 }
 
 type brokenTypeCause int
@@ -48,6 +51,12 @@ const (
 	brokenTypeCauseParsingCheckingError brokenTypeCause = iota
 	brokenTypeCauseMissingCompositeType
 )
+
+var keyCodePrefix = fmt.Sprintf("%s.", state.KeyCode)
+
+// \x1F = Information Separator One
+//
+const pathSeparator = "\x1F"
 
 func (m StorageFormatV5Migration) filename() string {
 	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
@@ -71,6 +80,28 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.reportFile = reportFile
 
+	// Create a file to dump removed contracts code
+
+	brokenContractsDumpFileName := path.Join(
+		m.OutputDir,
+		fmt.Sprintf("broken_contracts_%d.txt", int32(time.Now().Unix())),
+	)
+
+	m.Log.Info().Msgf("Any removed contracts would be save to %s.", filename)
+
+	brokenContracts, err := os.Create(brokenContractsDumpFileName)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = brokenContracts.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	m.brokenContractsFile = brokenContracts
+
 	m.Log.Info().Msg("Loading account contracts ...")
 
 	m.accounts = m.getContractsOnlyAccounts(payloads)
@@ -78,7 +109,12 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.Log.Info().Msg("Loaded account contracts")
 
 	m.programs = programs.NewEmptyPrograms()
+
 	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
+
+	m.brokenContracts = make(map[common.Address]map[string]bool, 0)
+
+	m.view = newView(payloads)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
@@ -107,7 +143,33 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 		}
 	}
 
-	return migratedPayloads, nil
+	cleanedPayloads, err := m.cleanupBrokenContracts(migratedPayloads)
+	if err != nil {
+		return nil, fmt.Errorf("failed to migrate storage: %w", err)
+	}
+
+	return cleanedPayloads, nil
+}
+
+func (m *StorageFormatV5Migration) initBrokenContractsDump() (err error) {
+	filename := path.Join(m.OutputDir, fmt.Sprintf("broken_contracts_%d.csv", int32(time.Now().Unix())))
+
+	m.Log.Info().Msgf("Any removed contracts would be save to %s.", filename)
+
+	brokenContracts, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = brokenContracts.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	m.brokenContractsFile = brokenContracts
+
+	return nil
 }
 
 func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
@@ -174,6 +236,189 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	}
 	return decMode
 }()
+
+// Clean-up the payloads by removing broken contracts. This method:
+//   - Removes the contracts code,
+//   - Remove the contract name from account.
+//
+func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payload) ([]ledger.Payload, error) {
+	cleanedPayloads := make([]ledger.Payload, 0, len(payloads))
+
+	addToCleanedPayloads := func(payload ledger.Payload) {
+		cleanedPayloads = append(cleanedPayloads, payload)
+	}
+
+	removedNames := make(map[common.AddressLocation]bool, 0)
+	removedContracts := make(map[common.AddressLocation]bool, 0)
+
+	removeBrokenContracts := func(payload ledger.Payload) {
+		keyParts := payload.Key.KeyParts
+
+		rawOwner := keyParts[0].Value
+		rawController := keyParts[1].Value
+		rawKey := keyParts[2].Value
+
+		// If the payload is a cadence value, then do not further process.
+		if !state.IsFVMStateKey(
+			string(rawOwner),
+			string(rawController),
+			string(rawKey),
+		) {
+			addToCleanedPayloads(payload)
+			return
+		}
+
+		address := common.BytesToAddress(rawOwner)
+
+		// Remove the contract name from the account
+		if string(rawKey) == state.KeyContractNames {
+
+			encContractNames := payload.Value
+			if len(encContractNames) == 0 {
+				addToCleanedPayloads(payload)
+				return
+			}
+
+			// Decode contract names
+			contractNames := make([]string, 0)
+			reader := bytes.NewReader(encContractNames)
+			cborDecoder := cbor.NewDecoder(reader)
+			err := cborDecoder.Decode(&contractNames)
+			if err != nil {
+				panic(err)
+			}
+
+			brokenContracts := m.brokenContracts[address]
+
+			// Remove broken contracts
+			updatedContractNames := make([]string, 0)
+			for _, contractName := range contractNames {
+				if !brokenContracts[contractName] {
+					updatedContractNames = append(updatedContractNames, contractName)
+					continue
+				}
+
+				m.Log.Warn().Msgf(
+					"REMOVED contract name '%s' from account: %s",
+					contractName,
+					address,
+				)
+
+				// Keep track of the removed names, so that it can be validated later.
+				removedContracts[common.AddressLocation{
+					Address: address,
+					Name:    contractName,
+				}] = true
+			}
+
+			// Encode the updated names back
+
+			buf := &bytes.Buffer{}
+			cborEncoder := cbor.NewEncoder(buf)
+			err = cborEncoder.Encode(updatedContractNames)
+			if err != nil {
+				panic(err)
+			}
+
+			updatedNames := ledger.Payload{
+				Key:   payload.Key,
+				Value: buf.Bytes(),
+			}
+
+			addToCleanedPayloads(updatedNames)
+			return
+		}
+
+		// Remove the contract code
+		if bytes.HasPrefix(rawKey, []byte(state.KeyCode)) {
+			contractName := strings.TrimPrefix(string(rawKey), keyCodePrefix)
+
+			brokenContracts := m.brokenContracts[address]
+			if !brokenContracts[contractName] {
+				addToCleanedPayloads(payload)
+				return
+			}
+
+			m.Log.Warn().Msgf("DELETED broken contract '%s' in account %s",
+				contractName,
+				address,
+			)
+			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+
+			m.brokenContractsFile.WriteString(
+				fmt.Sprintf("Owner: %x\nKey: %s\nContract Code: \n%s\n\n",
+					rawOwner,
+					string(rawKey),
+					string(payload.Value),
+				),
+			)
+
+			removedNames[common.AddressLocation{
+				Address: address,
+				Name:    contractName,
+			}] = true
+		}
+	}
+
+	for _, payload := range payloads {
+		removeBrokenContracts(payload)
+	}
+
+	// Do a sanity check.
+	// Check whether all the broken contract codes and their names are removed from accounts.
+	for address, contracts := range m.brokenContracts {
+		for contractName, _ := range contracts {
+			contractLoc := common.AddressLocation{
+				Address: address,
+				Name:    contractName,
+			}
+
+			if _, ok := removedContracts[contractLoc]; ok {
+				delete(removedContracts, contractLoc)
+			} else {
+				return nil, fmt.Errorf("contract code '%s' is not removed from account %s",
+					contractName,
+					address,
+				)
+			}
+
+			if _, ok := removedNames[contractLoc]; ok {
+				delete(removedNames, contractLoc)
+			} else {
+				return nil, fmt.Errorf("contract name '%s' is not removed from account %s",
+					contractName,
+					address,
+				)
+			}
+		}
+	}
+
+	if len(removedContracts) != 0 {
+		return nil, fmt.Errorf("additional contract names are removed: [%s]",
+			func() string {
+				contracts := make([]string, 0)
+				for contract := range removedContracts {
+					contracts = append(contracts, contract.String())
+				}
+				return strings.Join(contracts, ", ")
+			}(),
+		)
+	}
+
+	if len(removedNames) != 0 {
+		return nil, fmt.Errorf("additional contract names are removed: [%s]",
+			func() string {
+				names := make([]string, 0)
+				for name := range removedNames {
+					names = append(names, name.String())
+				}
+				return strings.Join(names, ", ")
+			}(),
+		)
+	}
+
+	return cleanedPayloads, nil
+}
 
 func (m StorageFormatV5Migration) reencodePayload(
 	payload ledger.Payload,
@@ -367,12 +612,13 @@ func (m StorageFormatV5Migration) reencodeValue(
 			if err != nil {
 				return false
 			}
+
 			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.ArrayValue:
 
 				if !m.arrayHasStaticType(inspectedValue) {
 
-					err = inferArrayStaticType(inspectedValue, nil)
+					err = m.inferArrayStaticType(inspectedValue, nil)
 					if err != nil {
 						return false
 					}
@@ -390,9 +636,38 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 			case *interpreter.DictionaryValue:
 
+				deferredKeys := inspectedValue.DeferredKeys()
+				if deferredKeys != nil {
+					for pair := deferredKeys.Oldest(); pair != nil; pair = pair.Next() {
+						storagePath := strings.Join(
+							[]string{
+								inspectedValue.DeferredStorageKeyBase(),
+								pair.Key,
+							},
+							pathSeparator,
+						)
+
+						deferredOwner := inspectedValue.DeferredOwner().Bytes()
+
+						var registerValue flow.RegisterValue
+						registerValue, err = m.view.Get(string(deferredOwner), "", storagePath)
+						if err != nil {
+							return false
+						}
+
+						if len(registerValue) == 0 {
+							m.Log.Warn().Msgf(
+								"missing deferred value: owner: %s key: %s",
+								string(deferredOwner),
+								storagePath,
+							)
+						}
+					}
+				}
+
 				if !m.dictionaryHasStaticType(inspectedValue) {
 
-					err = inferDictionaryStaticType(inspectedValue, nil)
+					err = m.inferDictionaryStaticType(inspectedValue, nil)
 					if err != nil {
 						return false
 					}
@@ -412,7 +687,17 @@ func (m StorageFormatV5Migration) reencodeValue(
 			return true
 		},
 	)
+
 	if err != nil {
+		// If there are empty containers without type info (e.g: at root level)
+		// Then drop such values and continue.
+		if _, ok := err.(*EmptyContainerTypeInferringError); ok {
+			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", key, owner)
+			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", owner, key))
+
+			return nil, false, nil
+		}
+
 		return nil, false, err
 	}
 
@@ -617,7 +902,7 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 				fieldType := interpreter.ConvertSemaToStaticType(member.TypeAnnotation.Type)
 
-				err = inferContainerStaticType(fieldValue, fieldType)
+				err = m.inferContainerStaticType(fieldValue, fieldType)
 				if err != nil {
 
 					// If the container type cannot be inferred using the field type,
@@ -642,7 +927,10 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 						if dictionaryType, ok := fieldType.(interpreter.DictionaryStaticType); ok &&
 							fieldValue.Count() == 0 {
 
-							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(dictionaryType)
+							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(
+								m.newInterpreter(),
+								dictionaryType,
+							)
 						}
 					case *interpreter.DictionaryValue:
 						if arrayStaticType, ok := fieldType.(interpreter.ArrayStaticType); ok &&
@@ -1213,19 +1501,19 @@ func hasAnyLocationAddress(value *interpreter.CompositeValue, hexAddresses ...st
 	return false
 }
 
-func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
+func (m StorageFormatV5Migration) inferContainerStaticType(value interpreter.Value, t interpreter.StaticType) error {
 
 	// Only infer static type for arrays and dictionaries
 
 	switch value := value.(type) {
 	case *interpreter.ArrayValue:
-		err := inferArrayStaticType(value, t)
+		err := m.inferArrayStaticType(value, t)
 		if err != nil {
 			return err
 		}
 
 	case *interpreter.DictionaryValue:
-		err := inferDictionaryStaticType(value, t)
+		err := m.inferDictionaryStaticType(value, t)
 		if err != nil {
 			return err
 		}
@@ -1234,27 +1522,37 @@ func inferContainerStaticType(value interpreter.Value, t interpreter.StaticType)
 	return nil
 }
 
-func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticType) error {
+func (m StorageFormatV5Migration) inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticType) error {
 
 	if t == nil {
+
 		if value.Count() == 0 {
-			return fmt.Errorf("cannot infer static type for empty array value")
+			return &EmptyContainerTypeInferringError{}
 		}
 
-		var elementType interpreter.StaticType
-
+		var inferredElementType interpreter.StaticType
 		for _, element := range value.Elements() {
-			if elementType == nil {
-				elementType = element.StaticType()
-			} else if !element.StaticType().Equal(elementType) {
+			elementType, err := m.getStaticType(element)
+			if err != nil {
+				return err
+			}
+
+			if inferredElementType == nil {
+				inferredElementType = elementType
+			} else if !elementType.Equal(inferredElementType) {
 				return fmt.Errorf("cannot infer static type for array with mixed elements")
 			}
 		}
 
+		if inferredElementType == nil {
+			return fmt.Errorf("cannot infer static type for array elements")
+		}
+
 		// TODO: infer element type to AnyStruct or AnyResource based on kinds of elements instead?
 		value.Type = interpreter.VariableSizedStaticType{
-			Type: elementType,
+			Type: inferredElementType,
 		}
+
 	} else {
 
 		switch arrayType := t.(type) {
@@ -1287,7 +1585,7 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 	elementType := value.Type.ElementType()
 
 	for _, element := range value.Elements() {
-		err := inferContainerStaticType(element, elementType)
+		err := m.inferContainerStaticType(element, elementType)
 		if err != nil {
 			return err
 		}
@@ -1296,14 +1594,42 @@ func inferArrayStaticType(value *interpreter.ArrayValue, t interpreter.StaticTyp
 	return nil
 }
 
-func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter.StaticType) error {
+func (m StorageFormatV5Migration) getStaticType(value interpreter.Value) (interpreter.StaticType, error) {
+	staticType := value.StaticType()
+
+	// If the static types are missing for the element,
+	// recursively infer the static type.
+	switch inspectedValue := value.(type) {
+	case *interpreter.ArrayValue:
+		if m.arrayHasStaticType(inspectedValue) {
+			return staticType, nil
+		}
+	case *interpreter.DictionaryValue:
+		if m.dictionaryHasStaticType(inspectedValue) {
+			return staticType, nil
+		}
+	default:
+		if staticType != nil {
+			return staticType, nil
+		}
+	}
+
+	err := m.inferContainerStaticType(value, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return value.StaticType(), nil
+}
+
+func (m StorageFormatV5Migration) inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter.StaticType) error {
 	entries := value.Entries()
 
 	if t == nil {
 		// NOTE: use entries.Len() instead of Count, because Count() > 0 && entries.Len() == 0 means
 		// the dictionary has deferred (separately stored) values, and we cannot get the types of those values
 		if entries.Len() == 0 {
-			return fmt.Errorf("cannot infer static type for empty dictionary value: %s", value.String())
+			return &EmptyContainerTypeInferringError{}
 		} else {
 
 			var keyType interpreter.StaticType
@@ -1315,19 +1641,29 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 				}
 			}
 
-			var valueType interpreter.StaticType
+			var inferredValueType interpreter.StaticType
 			for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-				if valueType == nil {
-					valueType = pair.Value.StaticType()
-				} else if !pair.Value.StaticType().Equal(valueType) {
+
+				valueType, err := m.getStaticType(pair.Value)
+				if err != nil {
+					return err
+				}
+
+				if inferredValueType == nil {
+					inferredValueType = valueType
+				} else if !valueType.Equal(inferredValueType) {
 					return fmt.Errorf("cannot infer value static type for dictionary with mixed type values")
 				}
+			}
+
+			if inferredValueType == nil {
+				return fmt.Errorf("cannot infer value static type for dictionary")
 			}
 
 			// TODO: infer value type to AnyStruct or AnyResource based on kinds of values instead?
 			value.Type = interpreter.DictionaryStaticType{
 				KeyType:   keyType,
-				ValueType: valueType,
+				ValueType: inferredValueType,
 			}
 		}
 	} else {
@@ -1355,7 +1691,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 
 	// Recursively infer type for dictionary keys and values
 
-	err := inferContainerStaticType(
+	err := m.inferContainerStaticType(
 		value.Keys(),
 		interpreter.VariableSizedStaticType{
 			Type: value.Type.KeyType,
@@ -1366,7 +1702,7 @@ func inferDictionaryStaticType(value *interpreter.DictionaryValue, t interpreter
 	}
 
 	for pair := entries.Oldest(); pair != nil; pair = pair.Next() {
-		err := inferContainerStaticType(
+		err := m.inferContainerStaticType(
 			pair.Value,
 			value.Type.ValueType,
 		)
@@ -1414,6 +1750,11 @@ func (m StorageFormatV5Migration) loadProgram(
 		},
 	)
 	if err != nil {
+		if m.brokenContracts[addressLocation.Address] == nil {
+			m.brokenContracts[addressLocation.Address] = make(map[string]bool)
+		}
+		m.brokenContracts[addressLocation.Address][addressLocation.Name] = true
+
 		return nil, err
 	}
 
@@ -1649,4 +1990,26 @@ func (m migrationRuntimeInterface) ImplementationDebugLog(_ string) error {
 
 func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
 	panic("unexpected ValidatePublicKey call")
+}
+
+func (m migrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([]string, error) {
+	panic("unexpected GetAccountContractNames call")
+}
+
+func (StorageFormatV5Migration) newInterpreter() *interpreter.Interpreter {
+	inter, err := interpreter.NewInterpreter(nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return inter
+}
+
+// Errors
+
+type EmptyContainerTypeInferringError struct {
+}
+
+func (e EmptyContainerTypeInferringError) Error() string {
+	return fmt.Sprint("cannot infer static type from empty container value")
 }
