@@ -22,7 +22,7 @@ func TestVotesCache_AddVoteRepeatedVote(t *testing.T) {
 
 	view := uint64(100)
 	cache := NewVotesCache(view)
-	vote := unittest.VoteFixture(unittest.WithView(view))
+	vote := unittest.VoteFixture(unittest.WithVoteView(view))
 
 	require.NoError(t, cache.AddVote(vote))
 	err := cache.AddVote(vote)
@@ -35,7 +35,7 @@ func TestVotesCache_AddVoteIncompatibleView(t *testing.T) {
 
 	view := uint64(100)
 	cache := NewVotesCache(view)
-	vote := unittest.VoteFixture(unittest.WithView(view + 1))
+	vote := unittest.VoteFixture(unittest.WithVoteView(view + 1))
 	err := cache.AddVote(vote)
 	require.ErrorIs(t, err, VoteForIncompatibleViewError)
 }
@@ -48,7 +48,7 @@ func TestVotesCache_All(t *testing.T) {
 	cache := NewVotesCache(view)
 	expectedVotes := make([]*model.Vote, 0, 5)
 	for i := range expectedVotes {
-		vote := unittest.VoteFixture(unittest.WithView(view))
+		vote := unittest.VoteFixture(unittest.WithVoteView(view))
 		expectedVotes[i] = vote
 		require.NoError(t, cache.AddVote(vote))
 	}
@@ -66,7 +66,7 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 	expectedVotes := make([]*model.Vote, 0, votesBatchSize)
 	// produce first batch before registering vote consumer
 	for i := range expectedVotes {
-		vote := unittest.VoteFixture(unittest.WithView(view))
+		vote := unittest.VoteFixture(unittest.WithVoteView(view))
 		expectedVotes[i] = vote
 		require.NoError(t, cache.AddVote(vote))
 	}
@@ -81,7 +81,7 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 
 	// produce second batch after registering vote consumer
 	for i := 0; i < votesBatchSize; i++ {
-		vote := unittest.VoteFixture(unittest.WithView(view))
+		vote := unittest.VoteFixture(unittest.WithVoteView(view))
 		expectedVotes = append(expectedVotes, vote)
 		require.NoError(t, cache.AddVote(vote))
 	}

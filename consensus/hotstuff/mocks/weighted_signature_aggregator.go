@@ -15,7 +15,7 @@ type WeightedSignatureAggregator struct {
 }
 
 // Aggregate provides a mock function with given fields:
-func (_m *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+func (_m *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, crypto.Signature, error) {
 	ret := _m.Called()
 
 	var r0 []flow.Identifier
@@ -27,12 +27,12 @@ func (_m *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, e
 		}
 	}
 
-	var r1 []byte
-	if rf, ok := ret.Get(1).(func() []byte); ok {
+	var r1 crypto.Signature
+	if rf, ok := ret.Get(1).(func() crypto.Signature); ok {
 		r1 = rf()
 	} else {
 		if ret.Get(1) != nil {
-			r1 = ret.Get(1).([]byte)
+			r1 = ret.Get(1).(crypto.Signature)
 		}
 	}
 
@@ -60,20 +60,20 @@ func (_m *WeightedSignatureAggregator) TotalWeight() uint64 {
 	return r0
 }
 
-// TrustedAdd provides a mock function with given fields: signerID, weight, sig
-func (_m *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, weight uint64, sig crypto.Signature) (uint64, error) {
-	ret := _m.Called(signerID, weight, sig)
+// TrustedAdd provides a mock function with given fields: signerID, sig
+func (_m *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
+	ret := _m.Called(signerID, sig)
 
 	var r0 uint64
-	if rf, ok := ret.Get(0).(func(flow.Identifier, uint64, crypto.Signature) uint64); ok {
-		r0 = rf(signerID, weight, sig)
+	if rf, ok := ret.Get(0).(func(flow.Identifier, crypto.Signature) uint64); ok {
+		r0 = rf(signerID, sig)
 	} else {
 		r0 = ret.Get(0).(uint64)
 	}
 
 	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, uint64, crypto.Signature) error); ok {
-		r1 = rf(signerID, weight, sig)
+	if rf, ok := ret.Get(1).(func(flow.Identifier, crypto.Signature) error); ok {
+		r1 = rf(signerID, sig)
 	} else {
 		r1 = ret.Error(1)
 	}

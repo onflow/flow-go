@@ -1471,10 +1471,27 @@ func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
 	return vote
 }
 
-func WithView(view uint64) func(*hotstuff.Vote) {
+func WithVoteView(view uint64) func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
 		vote.View = view
 	}
+}
+
+func WithVoteBlockID(blockID flow.Identifier) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.BlockID = blockID
+	}
+}
+
+func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
+	vote := VoteFixture(WithVoteView(block.View),
+		WithVoteBlockID(block.BlockID))
+
+	for _, opt := range opts {
+		opt(vote)
+	}
+
+	return vote
 }
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {

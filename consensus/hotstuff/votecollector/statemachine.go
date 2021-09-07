@@ -92,7 +92,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		if model.IsDoubleVoteError(err) {
 			panic("call m.notifier.OnDoubleVotingDetected( .. )")
 		}
-		return fmt.Errorf("internal error adding vote to cache")
+		return fmt.Errorf("internal error adding vote to cache: %w", err)
 	}
 
 	err = m.processVote(vote)
@@ -140,6 +140,10 @@ func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 //         CachingVotes   -> Invalid
 //         VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
+	if proposal.Block.View != m.votesCache.View() {
+		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d", m.votesCache.View(), proposal.Block.View)
+	}
+
 	for {
 		proc := m.atomicLoadProcessor()
 
