@@ -6,6 +6,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // FixedTableIdentityTranslator implements an IDTranslator which translates ID's for a
@@ -38,7 +39,7 @@ func NewFixedTableIdentityTranslator(identities flow.IdentityList) (*FixedTableI
 	for _, identity := range identities {
 		nodeID := identity.NodeID
 		networkKey := identity.NetworkPubKey
-		peerPK, err := LibP2PPublicKeyFromFlow(networkKey)
+		peerPK, err := keyutils.LibP2PPublicKeyFromFlow(networkKey)
 		if err != nil {
 			return nil, err
 		}

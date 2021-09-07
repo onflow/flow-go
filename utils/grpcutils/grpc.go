@@ -10,7 +10,7 @@ import (
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // DefaultMaxMsgSize use 16MB as the default message size limit.
@@ -23,7 +23,7 @@ const DefaultMaxMsgSize = 1024 * 1024 * 16
 func X509Certificate(privKey crypto.PrivateKey) (*tls.Certificate, error) {
 
 	// convert the Flow crypto private key to a Libp2p private crypto key
-	libP2PKey, err := p2p.LibP2PPrivKeyFromFlow(privKey)
+	libP2PKey, err := keyutils.LibP2PPrivKeyFromFlow(privKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert Flow key to libp2p key: %w", err)
 	}
@@ -101,7 +101,7 @@ func DefaultClientTLSConfig(publicKey crypto.PublicKey) (*tls.Config, error) {
 func verifyPeerCertificateFunc(expectedPublicKey crypto.PublicKey) (func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error, error) {
 
 	// convert the Flow.crypto key to LibP2P key for easy comparision using LibP2P TLS utils
-	remotePeerLibP2PID, err := p2p.ExtractPeerID(expectedPublicKey)
+	remotePeerLibP2PID, err := keyutils.PeerIDFromFlowPublicKey(expectedPublicKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to derive the libp2p Peer ID from the Flow key: %w", err)
 	}

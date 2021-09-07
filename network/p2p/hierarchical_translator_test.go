@@ -9,6 +9,7 @@ import (
 	"gotest.tools/assert"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -53,7 +54,7 @@ func (suite *HierarchicalTranslatorTestSuite) TestTranslationFailure() {
 	_, err := suite.translator.GetPeerID(fid)
 	require.Error(suite.T(), err)
 
-	key, err := LibP2PPrivKeyFromFlow(generateNetworkingKey(suite.T()))
+	key, err := keyutils.LibP2PPrivKeyFromFlow(generateNetworkingKey(suite.T()))
 	require.NoError(suite.T(), err)
 	pid, err := peer.IDFromPrivateKey(key)
 	require.NoError(suite.T(), err)
