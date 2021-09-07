@@ -43,6 +43,7 @@ func (s *StateMachineTestSuite) TearDownTest() {
 func (s *StateMachineTestSuite) SetupTest() {
 	s.view = 1000
 	s.mockedProcessors = make(map[flow.Identifier]*mocks.VerifyingVoteProcessor)
+	s.notifier = &mocks.Consumer{}
 
 	s.factoryMethod = func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
 		if processor, found := s.mockedProcessors[block.BlockID]; found {
@@ -104,11 +105,38 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		processor.AssertCalled(t, "Process", vote)
 	})
 	s.T().Run("add-double-vote", func(t *testing.T) {
-		//vote := unittest.VoteForBlockFixture(block)
-		//processor.On("Process", vote).Return(nil)
-		//err := s.collector.AddVote(vote)
-		//require.NoError(t, err)
-		//processor.AssertCalled(t, "Process", vote)
+		firstVote := unittest.VoteForBlockFixture(block)
+		processor.On("Process", firstVote).Return(nil).Once()
+		err := s.collector.AddVote(firstVote)
+		require.NoError(t, err)
+
+		secondVote := unittest.VoteFixture(func(vote *model.Vote) {
+			vote.View = firstVote.View
+			vote.SignerID = firstVote.SignerID
+		})
+
+		s.notifier.On("OnDoubleVotingDetected", firstVote, secondVote).Return(nil).Once()
+
+		err = s.collector.AddVote(secondVote)
+		// we shouldn't get an error
+		require.NoError(t, err)
+
+		// but should get notified about double voting
+		s.notifier.AssertCalled(t, "OnDoubleVotingDetected", firstVote, secondVote)
+		processor.AssertCalled(t, "Process", firstVote)
+	})
+	s.T().Run("add-invalid-vote", func(t *testing.T) {
+		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
+		processor.On("Process", vote).Return(model.NewInvalidVoteErrorf(vote, "")).Once()
+
+		s.notifier.On("OnInvalidVoteDetected", vote).Return(nil).Once()
+		err := s.collector.AddVote(vote)
+		// in case process returns model.InvalidVoteError we should silently ignore this error
+		require.NoError(t, err)
+
+		// but should get notified about invalid vote
+		s.notifier.AssertCalled(t, "OnInvalidVoteDetected", vote)
+		processor.AssertCalled(t, "Process", vote)
 	})
 	s.T().Run("add-repeated-vote", func(t *testing.T) {
 		vote := unittest.VoteForBlockFixture(block)
@@ -127,7 +155,13 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		err := s.collector.AddVote(vote)
 		require.ErrorIs(t, err, VoteForIncompatibleViewError)
 	})
-	s.T().Run("add-invalid-vote", func(t *testing.T) {
-
+	s.T().Run("add-incompatible-block-vote", func(t *testing.T) {
+		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
+		processor.On("Process", vote).Return(VoteForIncompatibleBlockError).Once()
+		err := s.collector.AddVote(vote)
+		// in case process returns VoteForIncompatibleBlockError we should silently ignore this error
+		require.NoError(t, err)
+		processor.AssertCalled(t, "Process", vote)
 	})
+
 }

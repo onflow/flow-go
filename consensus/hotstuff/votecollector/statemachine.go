@@ -90,7 +90,9 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 			return nil
 		}
 		if model.IsDoubleVoteError(err) {
-			panic("call m.notifier.OnDoubleVotingDetected( .. )")
+			doubleVoteErr := err.(model.DoubleVoteError)
+			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
+			return nil
 		}
 		return fmt.Errorf("internal error adding vote to cache: %w", err)
 	}
@@ -112,7 +114,8 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		err := processor.Process(vote)
 		if err != nil {
 			if model.IsInvalidVoteError(err) {
-				panic("call m.notifier.OnInvalidVoteDetected( .. )")
+				m.notifier.OnInvalidVoteDetected(vote)
+				return nil
 			}
 			return err
 		}
