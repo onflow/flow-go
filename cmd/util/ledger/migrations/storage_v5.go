@@ -835,7 +835,10 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 						if dictionaryType, ok := fieldType.(interpreter.DictionaryStaticType); ok &&
 							fieldValue.Count() == 0 {
 
-							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(dictionaryType)
+							newFieldValue = interpreter.NewDictionaryValueUnownedNonCopying(
+								m.newInterpreter(),
+								dictionaryType,
+							)
 						}
 					case *interpreter.DictionaryValue:
 						if arrayStaticType, ok := fieldType.(interpreter.ArrayStaticType); ok &&
@@ -1852,6 +1855,15 @@ func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool
 
 func (m migrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([]string, error) {
 	panic("unexpected GetAccountContractNames call")
+}
+
+func (StorageFormatV5Migration) newInterpreter() *interpreter.Interpreter {
+	inter, err := interpreter.NewInterpreter(nil, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	return inter
 }
 
 // Errors
