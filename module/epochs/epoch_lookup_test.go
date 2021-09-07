@@ -58,8 +58,11 @@ func TestEpochForView(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		e, err := lookup.EpochForView(tc.view)
+		epoch, err := lookup.EpochForView(tc.view)
 		require.NoError(t, err)
-		require.Equal(t, tc.epoch, e)
+		require.Equal(t, tc.epoch, epoch)
+		epoch, err = lookup.EpochForViewWithFallback(tc.view)
+		require.NoError(t, err)
+		require.Equal(t, tc.epoch, epoch)
 	}
 }
