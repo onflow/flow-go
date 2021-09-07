@@ -43,6 +43,7 @@ type StorageFormatV5Migration struct {
 	brokenContractsFile *os.File
 	brokenContracts     map[common.Address]map[string]bool
 	view                state.View
+	CleanupStorage      bool
 }
 
 type brokenTypeCause int
@@ -143,12 +144,14 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 		}
 	}
 
-	cleanedPayloads, err := m.cleanupBrokenContracts(migratedPayloads)
-	if err != nil {
-		return nil, fmt.Errorf("failed to migrate storage: %w", err)
+	if m.CleanupStorage {
+		migratedPayloads, err = m.cleanupBrokenContracts(migratedPayloads)
+		if err != nil {
+			return nil, fmt.Errorf("failed to migrate storage: %w", err)
+		}
 	}
 
-	return cleanedPayloads, nil
+	return migratedPayloads, nil
 }
 
 func (m *StorageFormatV5Migration) initBrokenContractsDump() (err error) {
@@ -479,6 +482,12 @@ func (m StorageFormatV5Migration) reencodePayload(
 		version,
 	)
 	if err != nil {
+		// If there are empty containers without type info (e.g: at root level)
+		// Then drop such values.
+		if _, ok := err.(*EmptyContainerTypeInferringError); ok {
+			return nil, nil
+		}
+
 		return nil,
 			fmt.Errorf(
 				"failed to re-encode key: %s: %w\n\nvalue:\n%s\n\n%s",
@@ -689,15 +698,6 @@ func (m StorageFormatV5Migration) reencodeValue(
 	)
 
 	if err != nil {
-		// If there are empty containers without type info (e.g: at root level)
-		// Then drop such values and continue.
-		if _, ok := err.(*EmptyContainerTypeInferringError); ok {
-			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", key, owner)
-			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", owner, key))
-
-			return nil, false, nil
-		}
-
 		return nil, false, err
 	}
 
