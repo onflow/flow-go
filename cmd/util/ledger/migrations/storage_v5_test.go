@@ -22,7 +22,9 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(
+		m := StorageFormatV5Migration{}
+
+		err := m.inferContainerStaticType(
 			array,
 			interpreter.PrimitiveStaticTypeAnyStruct,
 		)
@@ -42,7 +44,9 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(
+		m := StorageFormatV5Migration{}
+
+		err := m.inferContainerStaticType(
 			array,
 			interpreter.PrimitiveStaticTypeAnyResource,
 		)
@@ -62,7 +66,9 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(
+		m := StorageFormatV5Migration{}
+
+		err := m.inferContainerStaticType(
 			array,
 			interpreter.VariableSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeInt,
@@ -84,7 +90,9 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		array := interpreter.NewArrayValueUnownedNonCopying(nil)
 
-		err := inferContainerStaticType(
+		m := StorageFormatV5Migration{}
+
+		err := m.inferContainerStaticType(
 			array,
 			interpreter.ConstantSizedStaticType{
 				Type: interpreter.PrimitiveStaticTypeInt,
@@ -109,7 +117,9 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 		innerArray := interpreter.NewArrayValueUnownedNonCopying(nil)
 		array := interpreter.NewArrayValueUnownedNonCopying(nil, innerArray)
 
-		err := inferContainerStaticType(
+		m := StorageFormatV5Migration{}
+
+		err := m.inferContainerStaticType(
 			array,
 			interpreter.PrimitiveStaticTypeAnyStruct,
 		)
@@ -140,7 +150,9 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 			interpreter.NewStringValue("two"),
 		)
 
-		err := inferContainerStaticType(
+		m := StorageFormatV5Migration{}
+
+		err := m.inferContainerStaticType(
 			array,
 			nil,
 		)
@@ -158,11 +170,14 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		t.Parallel()
 
+		m := StorageFormatV5Migration{}
+
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			m.newInterpreter(),
 			interpreter.DictionaryStaticType{},
 		)
 
-		err := inferContainerStaticType(
+		err := m.inferContainerStaticType(
 			dictionary,
 			interpreter.PrimitiveStaticTypeAnyStruct,
 		)
@@ -181,11 +196,14 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		t.Parallel()
 
+		m := StorageFormatV5Migration{}
+
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			m.newInterpreter(),
 			interpreter.DictionaryStaticType{},
 		)
 
-		err := inferContainerStaticType(
+		err := m.inferContainerStaticType(
 			dictionary,
 			interpreter.PrimitiveStaticTypeAnyResource,
 		)
@@ -204,9 +222,14 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		t.Parallel()
 
-		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(interpreter.DictionaryStaticType{})
+		m := StorageFormatV5Migration{}
 
-		err := inferContainerStaticType(
+		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			m.newInterpreter(),
+			interpreter.DictionaryStaticType{},
+		)
+
+		err := m.inferContainerStaticType(
 			dictionary,
 			interpreter.DictionaryStaticType{
 				KeyType:   interpreter.PrimitiveStaticTypeInt,
@@ -228,15 +251,32 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		t.Parallel()
 
+		m := StorageFormatV5Migration{}
+
 		innerDictionary := interpreter.NewDictionaryValueUnownedNonCopying(
-			interpreter.DictionaryStaticType{},
+			m.newInterpreter(),
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeString,
+				ValueType: interpreter.PrimitiveStaticTypeBool,
+			},
 		)
+
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
-			interpreter.DictionaryStaticType{},
+			m.newInterpreter(),
+			interpreter.DictionaryStaticType{
+				KeyType: interpreter.PrimitiveStaticTypeInt,
+				ValueType: interpreter.DictionaryStaticType{
+					KeyType:   interpreter.PrimitiveStaticTypeString,
+					ValueType: interpreter.PrimitiveStaticTypeBool,
+				},
+			},
 			interpreter.NewIntValueFromInt64(1), innerDictionary,
 		)
 
-		err := inferContainerStaticType(
+		dictionary.Type = interpreter.DictionaryStaticType{}
+		innerDictionary.Type = interpreter.DictionaryStaticType{}
+
+		err := m.inferContainerStaticType(
 			dictionary,
 			interpreter.DictionaryStaticType{
 				KeyType: interpreter.PrimitiveStaticTypeInt,
@@ -272,15 +312,19 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		t.Parallel()
 
+		m := StorageFormatV5Migration{}
+
 		innerDictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			m.newInterpreter(),
 			interpreter.DictionaryStaticType{},
 		)
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			m.newInterpreter(),
 			interpreter.DictionaryStaticType{},
 			interpreter.NewIntValueFromInt64(1), innerDictionary,
 		)
 
-		err := inferContainerStaticType(
+		err := m.inferContainerStaticType(
 			dictionary,
 			interpreter.PrimitiveStaticTypeAnyResource,
 		)
@@ -307,13 +351,16 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		t.Parallel()
 
+		m := StorageFormatV5Migration{}
+
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
+			m.newInterpreter(),
 			interpreter.DictionaryStaticType{},
 			interpreter.NewStringValue("one"), interpreter.NewIntValueFromInt64(1),
 			interpreter.NewStringValue("two"), interpreter.NewIntValueFromInt64(2),
 		)
 
-		err := inferContainerStaticType(
+		err := m.inferContainerStaticType(
 			dictionary,
 			nil,
 		)
