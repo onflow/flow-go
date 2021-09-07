@@ -339,7 +339,7 @@ CheckLoop:
 		case <-scan.C:
 			final, err := e.state.Final().Head()
 			if err != nil {
-				e.log.Error().Err(err).Msg("could not get last finalized header")
+				e.log.Fatal().Err(err).Msg("could not get last finalized header")
 				continue
 			}
 			ranges, batches := e.core.ScanPending(final)
