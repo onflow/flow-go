@@ -107,7 +107,7 @@ type BaseConfig struct {
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
-	peerUpdateInterval    time.Duration
+	PeerUpdateInterval    time.Duration
 	UnicastMessageTimeout time.Duration
 	DNSCacheTTL           time.Duration
 	profilerEnabled       bool
@@ -168,7 +168,7 @@ func DefaultBaseConfig() *BaseConfig {
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
 		level:                 "info",
-		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
+		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,
 		profilerEnabled:       false,

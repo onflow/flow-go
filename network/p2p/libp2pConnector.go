@@ -17,13 +17,14 @@ import (
 )
 
 // libp2pConnector is a libp2p based Connector implementation to connect and disconnect from peers
-type libp2pConnector struct {
+type Libp2pConnector struct {
 	backoffConnector *discovery.BackoffConnector
 	host             host.Host
 	log              zerolog.Logger
+	pruneConnections bool
 }
 
-var _ Connector = &libp2pConnector{}
+var _ Connector = &Libp2pConnector{}
 
 // UnconvertibleIdentitiesError is an error which reports all the flow.Identifiers that could not be converted to
 // peer.AddrInfo
@@ -51,30 +52,46 @@ func IsUnconvertibleIdentitiesError(err error) bool {
 	return errors.As(err, &errUnconvertableIdentitiesError)
 }
 
-func newLibp2pConnector(host host.Host, log zerolog.Logger) (*libp2pConnector, error) {
+type ConnectorOption func(connector *Libp2pConnector)
+
+func WithConnectionPruning(enable bool) ConnectorOption {
+	return func(connector *Libp2pConnector) {
+		connector.pruneConnections = false
+	}
+}
+
+func NewLibp2pConnector(host host.Host, log zerolog.Logger, options ...ConnectorOption) (*Libp2pConnector, error) {
 	connector, err := defaultLibp2pBackoffConnector(host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libP2P connector: %w", err)
 	}
-	return &libp2pConnector{
+	libP2PConnector := &Libp2pConnector{
 		backoffConnector: connector,
 		host:             host,
 		log:              log,
-	}, nil
+		pruneConnections: true,
+	}
+
+	for _, o := range options {
+		o(libP2PConnector)
+	}
+	return libP2PConnector, nil
 }
 
 // UpdatePeers is the implementation of the Connector.UpdatePeers function. It connects to all of the ids and
 // disconnects from any other connection that the libp2p node might have.
-func (l *libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice) {
+func (l *Libp2pConnector) UpdatePeers(ctx context.Context, peerIDs peer.IDSlice) {
 	// connect to each of the peer.AddrInfo in pInfos
 	l.connectToPeers(ctx, peerIDs)
 
-	// disconnect from any other peers not in pInfos
-	l.trimAllConnectionsExcept(peerIDs)
+	if l.pruneConnections {
+		// disconnect from any other peers not in pInfos
+		l.trimAllConnectionsExcept(peerIDs)
+	}
 }
 
 // connectToPeers connects each of the peer in pInfos
-func (l *libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSlice) {
+func (l *Libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSlice) {
 
 	// create a channel of peer.AddrInfo as expected by the connector
 	peerCh := make(chan peer.AddrInfo, len(peerIDs))
@@ -94,7 +111,7 @@ func (l *libp2pConnector) connectToPeers(ctx context.Context, peerIDs peer.IDSli
 // trimAllConnectionsExcept trims all connections of the node from peers not part of peerIDs.
 // A node would have created such extra connections earlier when the identity list may have been different, or
 // it may have been target of such connections from node which have now been excluded.
-func (l *libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
+func (l *Libp2pConnector) trimAllConnectionsExcept(peerIDs peer.IDSlice) {
 
 	// convert the peerInfos to a peer.ID -> bool map
 	peersToKeep := make(map[peer.ID]bool, len(peerIDs))
