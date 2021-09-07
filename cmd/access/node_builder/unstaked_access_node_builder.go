@@ -150,7 +150,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
-	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.DNSCacheTTL))
+	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 	if err != nil {
 		return nil, fmt.Errorf("could not create dns resolver: %w", err)
 	}
