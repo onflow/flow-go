@@ -3,7 +3,6 @@ package node_builder
 import (
 	"context"
 	"fmt"
-	"time"
 
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 
@@ -159,8 +158,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 
 		libP2PFactory, err := builder.initLibP2PFactory(ctx,
 			builder.NodeID,
-			builder.NodeConfig.NetworkKey,
-			builder.BaseConfig.DNSCacheTTL)
+			builder.NodeConfig.NetworkKey)
 		builder.MustNot(err)
 
 		msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, builder.NodeID)
@@ -194,8 +192,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 // 		Default Flow libp2p pubsub options
 func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	nodeID flow.Identifier,
-	networkKey crypto.PrivateKey,
-	dnsCacheTTL time.Duration) (p2p.LibP2PFactoryFunc, error) {
+	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
 	// The staked nodes act as the DHT servers
 	dhtOptions := []dht.Option{p2p.AsServer(true)}
@@ -207,7 +204,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
-	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(dnsCacheTTL))
+	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.DNSCacheTTL))
 	if err != nil {
 		return nil, fmt.Errorf("could not create dns resolver: %w", err)
 	}

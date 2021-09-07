@@ -2,6 +2,8 @@ package node_builder
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -16,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
@@ -147,6 +150,11 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
+	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.DNSCacheTTL))
+	if err != nil {
+		return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	}
+
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID().String()).
@@ -155,6 +163,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
 			SetDHTOptions(dhtOptions...).
 			SetLogger(builder.Logger).
+			SetResolver(resolver).
 			Build(ctx)
 		if err != nil {
 			return nil, err
@@ -200,7 +209,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware(ctx context.Context) {
 			// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 			unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-			libP2PFactory, err := anb.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
+			libP2PFactory, err := anb.initLibP2PFactory(ctx, unstakedNodeID)
 			anb.MustNot(err)
 
 			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, unstakedNodeID)
