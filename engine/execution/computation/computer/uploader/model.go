@@ -13,11 +13,12 @@ import (
 )
 
 type BlockData struct {
-	Block       *flow.Block
-	Collections []*entity.CompleteCollection
-	TxResults   []*flow.TransactionResult
-	Events      []*flow.Event
-	TrieUpdates []*ledger.TrieUpdate
+	Block                *flow.Block
+	Collections          []*entity.CompleteCollection
+	TxResults            []*flow.TransactionResult
+	Events               []*flow.Event
+	TrieUpdates          []*ledger.TrieUpdate
+	FinalStateCommitment flow.StateCommitment
 }
 
 func ComputationResultToBlockData(computationResult *execution.ComputationResult) *BlockData {
@@ -35,11 +36,12 @@ func ComputationResultToBlockData(computationResult *execution.ComputationResult
 	}
 
 	return &BlockData{
-		Block:       computationResult.ExecutableBlock.Block,
-		Collections: computationResult.ExecutableBlock.Collections(),
-		TxResults:   txResults,
-		Events:      events,
-		TrieUpdates: computationResult.TrieUpdates,
+		Block:                computationResult.ExecutableBlock.Block,
+		Collections:          computationResult.ExecutableBlock.Collections(),
+		TxResults:            txResults,
+		Events:               events,
+		TrieUpdates:          computationResult.TrieUpdates,
+		FinalStateCommitment: computationResult.StateCommitments[len(computationResult.StateCommitments)-1],
 	}
 }
 

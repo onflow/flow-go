@@ -21,7 +21,9 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -43,11 +45,12 @@ import (
 )
 
 type Metrics struct {
-	Network    module.NetworkMetrics
-	Engine     module.EngineMetrics
-	Compliance module.ComplianceMetrics
-	Cache      module.CacheMetrics
-	Mempool    module.MempoolMetrics
+	Network        module.NetworkMetrics
+	Engine         module.EngineMetrics
+	Compliance     module.ComplianceMetrics
+	Cache          module.CacheMetrics
+	Mempool        module.MempoolMetrics
+	CleanCollector module.CleanerMetrics
 }
 
 type Storage struct {
@@ -110,12 +113,12 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 	// bind configuration parameters
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
-	fnb.flags.StringVar(&fnb.BaseConfig.bindAddr, "bind", defaultConfig.bindAddr, "address to bind on")
+	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
-	fnb.flags.DurationVar(&fnb.BaseConfig.peerUpdateInterval, "peerupdate-interval", defaultConfig.peerUpdateInterval, "how often to refresh the peer connections for the node")
+	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
 	fnb.flags.UintVarP(&fnb.BaseConfig.metricsPort, "metricport", "m", defaultConfig.metricsPort, "port for /metrics endpoint")
 	fnb.flags.BoolVar(&fnb.BaseConfig.profilerEnabled, "profiler-enabled", defaultConfig.profilerEnabled, "whether to enable the auto-profiler")
@@ -137,8 +140,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
-		if fnb.BaseConfig.bindAddr != NotSet {
-			myAddr = fnb.BaseConfig.bindAddr
+		if fnb.BaseConfig.BindAddr != NotSet {
+			myAddr = fnb.BaseConfig.BindAddr
 		}
 
 		// setup the Ping provider to return the software version and the sealed block height
@@ -163,29 +166,42 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.RootBlock.ID().String(),
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
-			pingProvider)
+			pingProvider,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		fnb.Middleware = p2p.NewMiddleware(fnb.Logger.Level(zerolog.ErrorLevel),
+		mwOpts := []p2p.MiddlewareOption{
+			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
+		}
+		if len(fnb.MsgValidators) > 0 {
+			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
+		}
+
+		// run peer manager with the specified interval and let is also prune connections
+		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
+		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
+
+		fnb.Middleware = p2p.NewMiddleware(
+			fnb.Logger.Level(zerolog.ErrorLevel),
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
 			fnb.RootBlock.ID().String(),
-			fnb.BaseConfig.peerUpdateInterval,
 			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
-			true,
-			fnb.MsgValidators...)
-
-		participants, err := fnb.State.Final().Identities(p2p.NetworkingSetFilter)
-		if err != nil {
-			return nil, fmt.Errorf("could not get network identities: %w", err)
-		}
+			fnb.IDTranslator,
+			mwOpts...,
+		)
 
 		subscriptionManager := p2p.NewChannelSubscriptionManager(fnb.Middleware)
-		top, err := topology.NewTopicBasedTopology(fnb.NodeID, fnb.Logger, fnb.State)
+
+		top, err := topology.NewTopicBasedTopology(
+			fnb.NodeID,
+			fnb.Logger,
+			fnb.State,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create topology: %w", err)
 		}
@@ -194,21 +210,24 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		// creates network instance
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
-			participants,
 			fnb.Me,
 			fnb.Middleware,
 			p2p.DefaultCacheSize,
 			topologyCache,
 			subscriptionManager,
-			fnb.Metrics.Network)
+			fnb.Metrics.Network,
+			fnb.IdentityProvider,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("could not initialize network: %w", err)
 		}
 
 		fnb.Network = net
 
-		idRefresher := p2p.NewNodeIDRefresher(fnb.Logger, fnb.State, net.SetIDs)
-		idEvents := gadgets.NewIdentityDeltas(idRefresher.OnIdentityTableChanged)
+		idEvents := gadgets.NewIdentityDeltas(func() {
+			fnb.Middleware.UpdateNodeAddresses()
+			fnb.Middleware.UpdateAllowList()
+		})
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, err
@@ -307,11 +326,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 
 	fnb.Metrics = Metrics{
-		Network:    metrics.NewNoopCollector(),
-		Engine:     metrics.NewNoopCollector(),
-		Compliance: metrics.NewNoopCollector(),
-		Cache:      metrics.NewNoopCollector(),
-		Mempool:    metrics.NewNoopCollector(),
+		Network:        metrics.NewNoopCollector(),
+		Engine:         metrics.NewNoopCollector(),
+		Compliance:     metrics.NewNoopCollector(),
+		Cache:          metrics.NewNoopCollector(),
+		Mempool:        metrics.NewNoopCollector(),
+		CleanCollector: metrics.NewNoopCollector(),
 	}
 	if fnb.BaseConfig.metricsEnabled {
 		fnb.MetricsRegisterer = prometheus.DefaultRegisterer
@@ -319,11 +339,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:    metrics.NewNetworkCollector(),
-			Engine:     metrics.NewEngineCollector(),
-			Compliance: metrics.NewComplianceCollector(),
-			Cache:      metrics.NewCacheCollector(fnb.RootChainID),
-			Mempool:    mempools,
+			Network:        metrics.NewNetworkCollector(),
+			Engine:         metrics.NewEngineCollector(),
+			Compliance:     metrics.NewComplianceCollector(),
+			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			CleanCollector: metrics.NewCleanerCollector(),
+			Mempool:        mempools,
 		}
 
 		// registers mempools as a Component so that its Ready method is invoked upon startup
@@ -350,6 +371,13 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 }
 
 func (fnb *FlowNodeBuilder) initDB() {
+
+	// if a db has been passed in, use that instead of creating one
+	if fnb.BaseConfig.db != nil {
+		fnb.DB = fnb.BaseConfig.db
+		return
+	}
+
 	// Pre-create DB path (Badger creates only one-level dirs)
 	err := os.MkdirAll(fnb.BaseConfig.datadir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.datadir).Msg("could not create datadir")
@@ -420,6 +448,28 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Statuses:     statuses,
 		DKGKeys:      dkgKeys,
 	}
+}
+
+func (fnb *FlowNodeBuilder) InitIDProviders() {
+	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
+		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
+		if err != nil {
+			return err
+		}
+
+		node.IdentityProvider = idCache
+		node.IDTranslator = idCache
+		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
+		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+			filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+				p2p.NotEjectedFilter,
+			),
+			idCache,
+		)
+		return nil
+	})
 }
 
 func (fnb *FlowNodeBuilder) initState() {
@@ -673,21 +723,37 @@ func WithBootstrapDir(bootstrapDir string) Option {
 	}
 }
 
-func WithNodeID(nodeID flow.Identifier) Option {
+func WithBindAddress(bindAddress string) Option {
 	return func(config *BaseConfig) {
-		config.nodeIDHex = nodeID.String()
+		config.BindAddr = bindAddress
 	}
 }
 
 func WithDataDir(dataDir string) Option {
 	return func(config *BaseConfig) {
-		config.datadir = dataDir
+		if config.db == nil {
+			config.datadir = dataDir
+		}
 	}
 }
 
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
 		config.metricsEnabled = enabled
+	}
+}
+
+func WithLogLevel(level string) Option {
+	return func(config *BaseConfig) {
+		config.level = level
+	}
+}
+
+// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
+func WithDB(db *badger.DB) Option {
+	return func(config *BaseConfig) {
+		config.db = db
+		config.datadir = ""
 	}
 }
 
@@ -722,6 +788,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 	fnb.ParseAndPrintFlags()
 
 	fnb.extraFlagsValidation()
+
+	// ID providers must be initialized before the network
+	fnb.InitIDProviders()
 
 	fnb.EnqueueNetworkInit(ctx)
 
@@ -779,7 +848,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 		// seed random generator
 		rand.Seed(time.Now().UnixNano())
 
-		fnb.initNodeInfo()
+		// init nodeinfo by reading the private bootstrap file if not already set
+		if fnb.NodeID == flow.ZeroID {
+			fnb.initNodeInfo()
+		}
 
 		fnb.initLogger()
 

@@ -15,11 +15,13 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 const NotSet = "not set"
@@ -42,6 +44,9 @@ type NodeBuilder interface {
 
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
+
+	// InitIDProviders initializes the ID providers needed by various components
+	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
 	EnqueueNetworkInit(ctx context.Context)
@@ -95,14 +100,14 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
-	bindAddr              string
+	BindAddr              string
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
-	peerUpdateInterval    time.Duration
+	PeerUpdateInterval    time.Duration
 	UnicastMessageTimeout time.Duration
 	profilerEnabled       bool
 	profilerDir           string
@@ -112,6 +117,7 @@ type BaseConfig struct {
 	metricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
+	db                    *badger.DB
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -130,12 +136,18 @@ type NodeConfig struct {
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
-	Middleware        *p2p.Middleware
-	Network           *p2p.Network
+	Middleware        network.Middleware
+	Network           module.ReadyDoneAwareNetwork
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
+
+	// ID providers
+	IdentityProvider             id.IdentityProvider
+	IDTranslator                 p2p.IDTranslator
+	NetworkingIdentifierProvider id.IdentifierProvider
+	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
 	RootBlock   *flow.Block
@@ -150,12 +162,12 @@ func DefaultBaseConfig() *BaseConfig {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
-		bindAddr:              NotSet,
+		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
 		level:                 "info",
-		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
+		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,
 		profilerEnabled:       false,
@@ -164,5 +176,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
 		metricsEnabled:        true,
+		receiptsCacheSize:     bstorage.DefaultCacheSize,
+		guaranteesCacheSize:   bstorage.DefaultCacheSize,
 	}
 }
