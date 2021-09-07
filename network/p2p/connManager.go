@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // TagLessConnManager is a companion interface to libp2p-core.connmgr.ConnManager which implements a (simplified) tagless variant of the Protect / Unprotect logic
@@ -107,7 +108,7 @@ func (c *ConnManager) updateConnectionMetric(n network.Network) {
 	stakedPeers := make(map[peer.ID]struct{})
 	if c.idProvider != nil {
 		for _, id := range c.idProvider.Identities(NotEjectedFilter) {
-			pid, err := ExtractPeerID(id.NetworkPubKey)
+			pid, err := keyutils.PeerIDFromFlowPublicKey(id.NetworkPubKey)
 			if err != nil {
 				c.log.Fatal().Err(err).Msg("failed to convert network public key of staked node to peer ID")
 			}

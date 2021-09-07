@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 )
@@ -22,6 +23,7 @@ type ProtocolStateIDCache struct {
 	mu         sync.RWMutex
 	peerIDs    map[flow.Identifier]peer.ID
 	flowIDs    map[peer.ID]flow.Identifier
+	lookup     map[flow.Identifier]*flow.Identity
 	logger     zerolog.Logger
 }
 
@@ -81,7 +83,7 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	for _, identity := range identities {
 		p.logger.Debug().Interface("identity", identity).Msg("extracting peer ID from network key")
 
-		pid, err := ExtractPeerID(identity.NetworkPubKey)
+		pid, err := keyutils.PeerIDFromFlowPublicKey(identity.NetworkPubKey)
 		if err != nil {
 			p.logger.Err(err).Interface("identity", identity).Msg("failed to extract peer ID from network key")
 			continue
@@ -96,12 +98,30 @@ func (p *ProtocolStateIDCache) update(blockID flow.Identifier) {
 	p.identities = identities
 	p.flowIDs = flowIDs
 	p.peerIDs = peerIDs
+	p.lookup = identities.Lookup()
 }
 
 func (p *ProtocolStateIDCache) Identities(filter flow.IdentityFilter) flow.IdentityList {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.identities.Filter(filter)
+}
+
+func (p *ProtocolStateIDCache) ByNodeID(flowID flow.Identifier) (*flow.Identity, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	id, ok := p.lookup[flowID]
+	return id, ok
+}
+
+func (p *ProtocolStateIDCache) ByPeerID(peerID peer.ID) (*flow.Identity, bool) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if flowID, ok := p.flowIDs[peerID]; ok {
+		id, ok := p.lookup[flowID]
+		return id, ok
+	}
+	return nil, false
 }
 
 func (p *ProtocolStateIDCache) GetPeerID(flowID flow.Identifier) (pid peer.ID, err error) {

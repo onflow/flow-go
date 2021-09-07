@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
 
@@ -32,7 +33,7 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 func (anb *UnstakedAccessNodeBuilder) initNodeInfo() {
 	// use the networking key that has been passed in the config
 	networkingKey := anb.AccessNodeConfig.NetworkKey
-	pubKey, err := p2p.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
+	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
 	anb.MustNot(err)
 	peerID, err := peer.IDFromPublicKey(pubKey)
 	anb.MustNot(err)
