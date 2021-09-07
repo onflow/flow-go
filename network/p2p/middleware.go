@@ -389,7 +389,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	var validators []pubsub.ValidatorEx
 	if !engine.UnstakedChannels().Contains(channel) {
-                 // for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
+		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators, m.stakedTopicValidator.Validate)
 	}
 
