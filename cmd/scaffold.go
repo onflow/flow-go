@@ -30,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	dns2 "github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -167,7 +168,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
-		)
+			dns2.DefaultTimeToLive)
+
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
