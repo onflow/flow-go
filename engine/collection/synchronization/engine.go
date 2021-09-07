@@ -76,7 +76,7 @@ func New(
 	}
 
 	if comp == nil {
-		panic("must initialize synchronization engine with comp engine")
+		return nil, fmt.Errorf("must initialize synchronization engine with comp engine")
 	}
 
 	// initialize the propagation engine with its dependencies
