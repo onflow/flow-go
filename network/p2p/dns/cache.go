@@ -38,12 +38,12 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, !cacheEntryExpired
+		return nil, !cacheEntryExists, cacheEntryExpired
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, !cacheEntryExists, cacheEntryExpired
+		return entry.addresses, cacheEntryExists, cacheEntryExpired
 	}
 
 	// exists and fresh
@@ -64,7 +64,7 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, !cacheEntryExists, cacheEntryExpired
+		return entry.addresses, cacheEntryExists, cacheEntryExpired
 	}
 
 	// exists and fresh

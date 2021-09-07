@@ -154,6 +154,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 	if expired && r.shouldResolveTXT(txt) {
 		r.unit.Launch(func() {
+			defer r.doneResolvingTXT(txt)
 			_, err := r.lookupResolverForTXTAddr(ctx, txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
@@ -162,7 +163,6 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 					r.collector.OnDNSCacheInvalidated()
 				}
 			}
-			r.doneResolvingTXT(txt)
 		})
 
 	}
@@ -213,7 +213,7 @@ func (r *Resolver) shouldResolveTXT(txt string) bool {
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.processingIPs[txt]; !ok {
+	if _, ok := r.processingTXTs[txt]; !ok {
 		r.processingTXTs[txt] = struct{}{}
 		return true
 	}
